@@ -2,6 +2,7 @@ package cl.helvoca.booking;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -10,6 +11,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/bookings")
+@PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
 public class BookingController {
     private final BookingService service;
 
