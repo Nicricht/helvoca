@@ -1,5 +1,6 @@
 package cl.helvoca.telephony.twilio;
 
+import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.call.*;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.customer.CustomerRepository;
@@ -52,8 +53,8 @@ public class TwilioCallService {
         call.setStartedAt(Instant.now());
         customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), from)
                 .ifPresent(customer -> call.setCustomerId(customer.getId()));
-        call = calls.saveAndFlush(call);
-        return twiml.connectMediaStream(call.getId());
+        CallSession saved = calls.saveAndFlush(call);
+        return twiml.connectMediaStream(saved.getId());
     }
 
     @Transactional
@@ -77,7 +78,7 @@ public class TwilioCallService {
     }
 
     @Transactional
-    public void markStreamStarted(UUID callId, String providerCallId, String streamSid) {
+    public RealtimeCallContext markStreamStarted(UUID callId, String providerCallId, String streamSid) {
         CallSession call = calls.findById(callId)
                 .orElseThrow(() -> new NotFoundException("Call not found"));
         if (!Objects.equals(call.getProviderCallId(), providerCallId)) {
@@ -89,6 +90,14 @@ public class TwilioCallService {
             call.setStatus(CallStatus.IN_PROGRESS);
             if (call.getAnsweredAt() == null) call.setAnsweredAt(Instant.now());
         }
+        calls.saveAndFlush(call);
+        return new RealtimeCallContext(
+                call.getId(),
+                call.getBusinessId(),
+                call.getCustomerId(),
+                call.getCallerNumber(),
+                call.getDestinationNumber(),
+                streamSid);
     }
 
     @Transactional

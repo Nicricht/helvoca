@@ -1,4 +1,4 @@
-# Helvoca API - Sprint 2
+# Helvoca API - Sprint 4
 
 ## Authentication and business
 
@@ -56,7 +56,61 @@ Availability is calculated from the service duration. Confirmed bookings for the
 | PATCH | `/api/v1/knowledge/{id}` | BUSINESS_ADMIN |
 | DELETE | `/api/v1/knowledge/{id}` | BUSINESS_ADMIN |
 
-`DELETE` deactivates the knowledge item instead of removing historical data.
+## Phone numbers and calls
+
+| Method | Path | Authentication |
+|---|---|---|
+| GET | `/api/v1/phone-numbers` | JWT / tenant |
+| POST | `/api/v1/phone-numbers` | JWT / tenant |
+| PATCH | `/api/v1/phone-numbers/{id}/active` | JWT / tenant |
+| GET | `/api/v1/calls` | JWT / tenant |
+| GET | `/api/v1/calls/{id}` | JWT / tenant |
+| POST | `/webhooks/v1/twilio/voice` | `X-Twilio-Signature` |
+| POST | `/webhooks/v1/twilio/status` | `X-Twilio-Signature` |
+| WSS | `/ws/twilio` | Twilio signed handshake |
+
+`GET /api/v1/calls/{id}` returns call metadata, ordered transcript and the automatic summary when available.
+
+## Realtime AI tools
+
+These are not public HTTP endpoints. They are internal function tools exposed only inside an authenticated Realtime call session.
+
+| Tool | Purpose |
+|---|---|
+| `get_business_information` | Read trusted business metadata |
+| `list_services` | List active tenant services |
+| `search_knowledge` | Search active Knowledge Base |
+| `find_caller` | Resolve caller from trusted call context |
+| `register_caller` | Register/update caller using trusted phone number |
+| `check_booking_availability` | Query real backend availability |
+| `create_booking` | Persist an `AI_CALL` booking |
+
+The model cannot choose `businessId`, `callId`, caller phone or `streamSid`; these values come from the server-side `RealtimeCallContext`.
+
+A tool result follows the contract:
+
+```json
+{
+  "success": true,
+  "data": {},
+  "error": null
+}
+```
+
+or:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "BOOKING_SLOT_UNAVAILABLE",
+    "message": "El horario solicitado ya no está disponible."
+  }
+}
+```
+
+The AI must never report an operation as successful unless the tool returned `success=true`.
 
 ## Infrastructure
 
@@ -67,4 +121,4 @@ Availability is calculated from the service duration. Confirmed bookings for the
 
 ## Multi-tenant rule
 
-Business endpoints never accept `businessId` as the authority for tenant selection. The backend resolves the tenant from the authenticated JWT claim `business_id` and scopes repository queries with that identifier.
+Business endpoints never accept `businessId` as the authority for tenant selection. Administrative requests resolve the tenant from JWT claim `business_id`; voice tools resolve it from a call context created only after Twilio validation.

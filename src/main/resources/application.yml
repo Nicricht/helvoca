@@ -40,3 +40,11 @@ app:
     auth-token: ${TWILIO_AUTH_TOKEN:}
     public-base-url: ${TWILIO_PUBLIC_BASE_URL:}
     media-stream-url: ${TWILIO_MEDIA_STREAM_URL:}
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    realtime-model: ${OPENAI_REALTIME_MODEL:gpt-realtime-2.1}
+    voice: ${OPENAI_REALTIME_VOICE:marin}
+    transcription-model: ${OPENAI_TRANSCRIPTION_MODEL:gpt-live-transcribe}
+    summary-model: ${OPENAI_SUMMARY_MODEL:gpt-5.6-luna}
+    realtime-url: ${OPENAI_REALTIME_URL:wss://api.openai.com/v1/realtime}
+    responses-url: ${OPENAI_RESPONSES_URL:https://api.openai.com/v1/responses}

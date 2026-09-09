@@ -1,0 +1,50 @@
+package cl.helvoca.ai.realtime;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+public final class RealtimeToolDefinitions {
+    private RealtimeToolDefinitions() {}
+
+    public static JSONArray all() {
+        return new JSONArray()
+                .put(function("get_business_information", "Obtiene nombre, idioma y zona horaria del negocio.", object()))
+                .put(function("list_services", "Lista servicios activos, precios y duración.", object()))
+                .put(function("search_knowledge", "Busca información oficial configurada por el negocio.",
+                        object().put("properties", new JSONObject().put("query", string("Texto a buscar")))
+                                .put("required", new JSONArray().put("query"))))
+                .put(function("find_caller", "Obtiene el cliente asociado al teléfono de esta llamada.", object()))
+                .put(function("register_caller", "Registra o actualiza al cliente de esta llamada. El teléfono se toma del contexto verificado y nunca de argumentos del modelo.",
+                        object().put("properties", new JSONObject()
+                                        .put("name", string("Nombre del cliente"))
+                                        .put("email", string("Correo opcional")))
+                                .put("required", new JSONArray().put("name"))))
+                .put(function("check_booking_availability", "Comprueba disponibilidad real antes de prometer una reserva.",
+                        object().put("properties", new JSONObject()
+                                        .put("serviceId", string("UUID del servicio"))
+                                        .put("startAt", string("Fecha y hora ISO-8601 con zona u offset")))
+                                .put("required", new JSONArray().put("serviceId").put("startAt"))))
+                .put(function("create_booking", "Crea una reserva real. Solo se considera confirmada cuando esta herramienta devuelve success=true.",
+                        object().put("properties", new JSONObject()
+                                        .put("serviceId", string("UUID del servicio"))
+                                        .put("startAt", string("Fecha y hora ISO-8601 con zona u offset"))
+                                        .put("notes", string("Notas opcionales")))
+                                .put("required", new JSONArray().put("serviceId").put("startAt"))));
+    }
+
+    private static JSONObject function(String name, String description, JSONObject parameters) {
+        return new JSONObject()
+                .put("type", "function")
+                .put("name", name)
+                .put("description", description)
+                .put("parameters", parameters);
+    }
+
+    private static JSONObject object() {
+        return new JSONObject().put("type", "object").put("additionalProperties", false).put("properties", new JSONObject());
+    }
+
+    private static JSONObject string(String description) {
+        return new JSONObject().put("type", "string").put("description", description);
+    }
+}
