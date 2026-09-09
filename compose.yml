@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: helvoca
+      POSTGRES_USER: helvoca
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-helvoca}
+    ports:
+      - "5432:5432"
+    volumes:
+      - helvoca_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helvoca -d helvoca"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/helvoca
+      DB_USERNAME: helvoca
+      DB_PASSWORD: ${DB_PASSWORD:-helvoca}
+      JWT_ISSUER: ${JWT_ISSUER:-helvoca-api}
+      JWT_SECRET: ${JWT_SECRET:-Y2FsbGFpLWRldi1vbmx5LXNlY3JldC1rZXktMzItYnl0ZXMhISE=}
+      SEED_ENABLED: "true"
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@helvoca.local}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-ChangeMe123!}
+    ports:
+      - "8080:8080"
+
+volumes:
+  helvoca_pgdata:
