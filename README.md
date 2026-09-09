@@ -1,28 +1,82 @@
-# Helvoca - Sprint 1
+# Helvoca - Sprint 2
 
-Base técnica del SaaS multi-tenant de call center con IA.
+Helvoca es la base de un SaaS multi-tenant de atención telefónica con IA para empresas. El backend ya cuenta con autenticación, aislamiento por tenant y el núcleo operativo de clientes, servicios, reservas y conocimiento empresarial.
 
-## Incluido
+## Estado actual
+
+### Plataforma y seguridad
 
 - Java 21
 - Spring Boot 4.1.1
 - Spring Security + JWT HS256
-- PostgreSQL
+- PostgreSQL 16+
 - Flyway
 - Docker Compose
-- Roles: `PLATFORM_ADMIN`, `BUSINESS_ADMIN`, `OPERATOR`
-- Tenant obtenido desde el JWT, no desde parámetros del frontend
-- CRUD mínimo del negocio actual
-- Creación/listado de usuarios del negocio
-- Auditoría inicial
-- Swagger UI
-- Tests unitarios iniciales
+- Swagger/OpenAPI
+- Roles `PLATFORM_ADMIN`, `BUSINESS_ADMIN` y `OPERATOR`
+- Tenant obtenido desde el claim `business_id` del JWT
+- Auditoría de operaciones
+- Manejo global de errores
 
-## Requisitos
+### Sprint 2
 
-Opción A: Docker + Docker Compose.
+- Clientes
+  - crear
+  - listar
+  - consultar por id
+  - buscar por teléfono
+  - actualizar
+- Catálogo de servicios
+  - crear
+  - listar
+  - consultar
+  - actualizar
+  - desactivar
+  - duración y precio
+- Reservas
+  - crear
+  - listar
+  - consultar
+  - verificar disponibilidad
+  - calcular término según duración del servicio
+  - rechazar solapamientos
+  - reprogramar
+  - cancelar
+  - rechazar reservas en el pasado
+- Knowledge Base
+  - crear
+  - listar
+  - consultar
+  - actualizar
+  - filtrar activos
+  - desactivar
+- Aislamiento multi-tenant en todos los módulos
+- Autorización por roles
+- Tests unitarios
+- Test de integración con PostgreSQL mediante Testcontainers
+- CI con GitHub Actions
 
-Opción B: Java 21, Maven y PostgreSQL 16+.
+## Regla crítica multi-tenant
+
+El frontend no decide el negocio mediante un parámetro `businessId` confiable.
+
+El backend obtiene el tenant autenticado desde el claim `business_id` del JWT mediante `TenantProvider` y todas las consultas de negocio se filtran con ese identificador.
+
+## Regla crítica de reservas
+
+Una reserva solo puede crearse cuando cliente y servicio pertenecen al tenant autenticado y el horario solicitado está disponible.
+
+Para el MVP, cada servicio representa una única capacidad reservable. Personal, salas, mesas, sillas o equipamiento se modelarán posteriormente como recursos explícitos.
+
+## Base de datos
+
+Flyway aplica actualmente:
+
+- `V1__foundation.sql`
+- `V2__seed_roles.sql`
+- `V3__sprint2_core.sql`
+
+La tercera migración incorpora `customer`, `service`, `booking` y `knowledge_item` con claves foráneas, índices por tenant y controles básicos de integridad.
 
 ## Ejecutar con Docker
 
@@ -45,14 +99,14 @@ http://localhost:8080/actuator/health
 
 ## Usuario local de desarrollo
 
-Cuando se inicia mediante `compose.yml`, se crea automáticamente:
+Cuando el seed de desarrollo está habilitado:
 
 ```text
 Email: admin@helvoca.local
 Password: ChangeMe123!
 ```
 
-Cambiar estas credenciales antes de cualquier despliegue real.
+Estas credenciales son exclusivamente de desarrollo y deben cambiarse antes de cualquier despliegue real.
 
 ## Login
 
@@ -62,40 +116,29 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   -d '{"email":"admin@helvoca.local","password":"ChangeMe123!"}'
 ```
 
-Copia `accessToken` y úsalo así:
+Usa luego el `accessToken` como Bearer token.
 
-```bash
-curl http://localhost:8080/api/v1/business \
-  -H "Authorization: Bearer TU_TOKEN"
-```
+## Documentación
 
-## Actualizar negocio
+- `docs/SPRINT1.md`
+- `docs/SPRINT2.md`
+- `docs/API.md`
 
-```bash
-curl -X PATCH http://localhost:8080/api/v1/business \
-  -H "Authorization: Bearer TU_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Restaurante Central","timezone":"America/Santiago","language":"es"}'
-```
+## CI
 
-## Crear operador
-
-```bash
-curl -X POST http://localhost:8080/api/v1/admin/users \
-  -H "Authorization: Bearer TU_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Operador Uno","email":"operator@helvoca.local","password":"ChangeMe123!","roles":["OPERATOR"]}'
-```
-
-## Regla multi-tenant
-
-Los controladores de negocio no aceptan `businessId` para decidir el tenant. El backend lo extrae del claim `business_id` del JWT mediante `TenantProvider`.
+Cada push y pull request hacia `main` ejecuta Maven y la suite de tests. La prueba de integración inicia PostgreSQL 16 con Testcontainers, aplica Flyway y valida consultas reales de reservas.
 
 ## Próximo sprint
 
-1. Customer
-2. Service
-3. Booking
-4. Availability
-5. Knowledge Base
-6. Tests de integración con PostgreSQL/Testcontainers
+Sprint 3 incorpora la capa telefónica:
+
+1. números telefónicos por negocio
+2. sesiones de llamada
+3. estados de llamada
+4. webhooks de telefonía
+5. validación de firma de Twilio
+6. base de integración con Twilio Programmable Voice
+7. WebSocket / Media Streams
+8. persistencia de transcripciones
+
+Después de esta capa se conectará el audio con el agente de voz IA en tiempo real.
