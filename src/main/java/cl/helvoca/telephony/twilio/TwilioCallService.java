@@ -58,6 +58,60 @@ public class TwilioCallService {
     }
 
     @Transactional
+    public RealtimeCallContext startTrialInboundCall(String providerCallId, String from, String to) {
+        CallSession existing = calls.findByProviderCallId(providerCallId).orElse(null);
+        if (existing != null) {
+            if (existing.getStreamSid() == null || !existing.getStreamSid().startsWith("trial:")) {
+                throw new IllegalArgumentException("The call already belongs to a non-trial media session");
+            }
+            return trialContext(existing);
+        }
+
+        PhoneNumber phone = phoneNumbers.findByPhoneNumberAndActiveTrue(to)
+                .orElseThrow(() -> new NotFoundException("Destination trial phone number is not registered"));
+
+        Instant now = Instant.now();
+        CallSession call = new CallSession();
+        call.setBusinessId(phone.getBusinessId());
+        call.setPhoneNumberId(phone.getId());
+        call.setProviderCallId(providerCallId);
+        call.setCallerNumber(from);
+        call.setDestinationNumber(to);
+        call.setDirection(CallDirection.INBOUND);
+        call.setStatus(CallStatus.IN_PROGRESS);
+        call.setStartedAt(now);
+        call.setAnsweredAt(now);
+        call.setStreamSid(trialStreamId(providerCallId));
+        call.setStreamStartedAt(now);
+        customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), from)
+                .ifPresent(customer -> call.setCustomerId(customer.getId()));
+        return trialContext(calls.saveAndFlush(call));
+    }
+
+    @Transactional(readOnly = true)
+    public RealtimeCallContext getTrialContext(String providerCallId) {
+        CallSession call = calls.findByProviderCallId(providerCallId)
+                .orElseThrow(() -> new NotFoundException("Trial call not found"));
+        if (call.getStreamSid() == null || !call.getStreamSid().startsWith("trial:")) {
+            throw new IllegalArgumentException("Call is not a trial voice session");
+        }
+        return trialContext(call);
+    }
+
+    @Transactional
+    public void markTrialEnded(String providerCallId) {
+        CallSession call = calls.findByProviderCallId(providerCallId)
+                .orElseThrow(() -> new NotFoundException("Trial call not found"));
+        Instant now = Instant.now();
+        if (call.getStreamEndedAt() == null) call.setStreamEndedAt(now);
+        if (call.getEndedAt() == null) call.setEndedAt(now);
+        call.setStatus(CallStatus.COMPLETED);
+        if (call.getDurationSeconds() == null && call.getStartedAt() != null) {
+            call.setDurationSeconds((int) Math.max(0, Duration.between(call.getStartedAt(), now).toSeconds()));
+        }
+    }
+
+    @Transactional
     public void updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {
         CallSession call = calls.findByProviderCallId(providerCallId)
                 .orElseThrow(() -> new NotFoundException("Call not found"));
@@ -104,6 +158,20 @@ public class TwilioCallService {
     public void markStreamStopped(String streamSid) {
         if (streamSid == null || streamSid.isBlank()) return;
         calls.findByStreamSid(streamSid).ifPresent(call -> call.setStreamEndedAt(Instant.now()));
+    }
+
+    private static RealtimeCallContext trialContext(CallSession call) {
+        return new RealtimeCallContext(
+                call.getId(),
+                call.getBusinessId(),
+                call.getCustomerId(),
+                call.getCallerNumber(),
+                call.getDestinationNumber(),
+                call.getStreamSid());
+    }
+
+    private static String trialStreamId(String providerCallId) {
+        return "trial:" + providerCallId;
     }
 
     static CallStatus mapStatus(String value) {

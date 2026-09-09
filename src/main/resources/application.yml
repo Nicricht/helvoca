@@ -40,11 +40,19 @@ app:
     auth-token: ${TWILIO_AUTH_TOKEN:}
     public-base-url: ${TWILIO_PUBLIC_BASE_URL:}
     media-stream-url: ${TWILIO_MEDIA_STREAM_URL:}
+    trial:
+      enabled: ${TWILIO_TRIAL_MODE_ENABLED:false}
+      phone-number: ${TWILIO_TRIAL_PHONE_NUMBER:}
+      business-name: ${TWILIO_TRIAL_BUSINESS_NAME:Helvoca Restaurante Demo}
+      greeting: ${TWILIO_TRIAL_GREETING:Hola, soy Helvoca. Puedes preguntarme por los servicios o pedirme una reserva.}
+      language: ${TWILIO_TRIAL_LANGUAGE:es-CL}
+      max-turns: ${TWILIO_TRIAL_MAX_TURNS:8}
   openai:
     api-key: ${OPENAI_API_KEY:}
     realtime-model: ${OPENAI_REALTIME_MODEL:gpt-realtime-2.1}
     voice: ${OPENAI_REALTIME_VOICE:marin}
     transcription-model: ${OPENAI_TRANSCRIPTION_MODEL:gpt-live-transcribe}
     summary-model: ${OPENAI_SUMMARY_MODEL:gpt-5.6-luna}
+    trial-model: ${OPENAI_TRIAL_MODEL:gpt-5.6-luna}
     realtime-url: ${OPENAI_REALTIME_URL:wss://api.openai.com/v1/realtime}
     responses-url: ${OPENAI_RESPONSES_URL:https://api.openai.com/v1/responses}
