@@ -47,6 +47,7 @@ app:
       greeting: ${TWILIO_TRIAL_GREETING:Hola, soy Helvoca. Puedes preguntarme por los servicios o pedirme una reserva.}
       language: ${TWILIO_TRIAL_LANGUAGE:es-CL}
       max-turns: ${TWILIO_TRIAL_MAX_TURNS:8}
+      webhook-secret: ${TWILIO_TRIAL_WEBHOOK_SECRET:}
   openai:
     api-key: ${OPENAI_API_KEY:}
     realtime-model: ${OPENAI_REALTIME_MODEL:gpt-realtime-2.1}
