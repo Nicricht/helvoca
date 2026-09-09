@@ -67,23 +67,32 @@ public class TwilioCallService {
             return trialContext(existing);
         }
 
-        PhoneNumber phone = phoneNumbers.findByPhoneNumberAndActiveTrue(to)
-                .orElseThrow(() -> new NotFoundException("Destination trial phone number is not registered"));
+        PhoneNumber destinationPhone = phoneNumbers.findByPhoneNumberAndActiveTrue(to).orElse(null);
+        PhoneNumber sourcePhone = destinationPhone == null
+                ? phoneNumbers.findByPhoneNumberAndActiveTrue(from).orElse(null)
+                : null;
+        PhoneNumber phone = destinationPhone != null ? destinationPhone : sourcePhone;
+        if (phone == null) {
+            throw new NotFoundException("Trial phone number is not registered as source or destination");
+        }
+
+        boolean outbound = destinationPhone == null;
+        String customerNumber = outbound ? to : from;
 
         Instant now = Instant.now();
         CallSession call = new CallSession();
         call.setBusinessId(phone.getBusinessId());
         call.setPhoneNumberId(phone.getId());
         call.setProviderCallId(providerCallId);
-        call.setCallerNumber(from);
+        call.setCallerNumber(customerNumber);
         call.setDestinationNumber(to);
-        call.setDirection(CallDirection.INBOUND);
+        call.setDirection(outbound ? CallDirection.OUTBOUND : CallDirection.INBOUND);
         call.setStatus(CallStatus.IN_PROGRESS);
         call.setStartedAt(now);
         call.setAnsweredAt(now);
         call.setStreamSid(trialStreamId(providerCallId));
         call.setStreamStartedAt(now);
-        customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), from)
+        customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), customerNumber)
                 .ifPresent(customer -> call.setCustomerId(customer.getId()));
         return trialContext(calls.saveAndFlush(call));
     }
