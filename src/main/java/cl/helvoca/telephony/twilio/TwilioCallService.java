@@ -53,8 +53,8 @@ public class TwilioCallService {
         call.setStartedAt(Instant.now());
         customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), from)
                 .ifPresent(customer -> call.setCustomerId(customer.getId()));
-        call = calls.saveAndFlush(call);
-        return twiml.connectMediaStream(call.getId());
+        CallSession saved = calls.saveAndFlush(call);
+        return twiml.connectMediaStream(saved.getId());
     }
 
     @Transactional
