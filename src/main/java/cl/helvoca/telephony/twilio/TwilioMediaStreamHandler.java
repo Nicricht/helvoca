@@ -69,7 +69,8 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         }
 
         try {
-            RealtimeCallContext context = calls.markStreamStarted(UUID.fromString(callIdValue), callSid, streamSid);
+            RealtimeCallContext context = calls.markStreamStarted(
+                    UUID.fromString(callIdValue), callSid, streamSid, aiProvider.id());
             VoiceAiSession aiSession = aiProvider.createSession(context, new TwilioVoiceTransportSession(session));
             sessions.put(session.getId(), aiSession);
             aiSession.start();
