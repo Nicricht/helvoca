@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: helvoca
+      POSTGRES_USER: helvoca
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - helvoca_pg:/var/lib/postgresql/data
+      - ./schema_final.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helvoca -d helvoca"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - helvoca_redis:/data
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - helvoca_rabbit:/var/lib/rabbitmq
+
+volumes:
+  helvoca_pg:
+  helvoca_redis:
+  helvoca_rabbit:
