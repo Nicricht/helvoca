@@ -2,6 +2,7 @@ package cl.helvoca.ai.realtime;
 
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.call.CallTranscriptService;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,8 +143,9 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, AutoClose
 
         JSONObject session = new JSONObject()
                 .put("type", "realtime")
+                .put("model", properties.getRealtimeModel())
                 .put("instructions", tools.buildInstructions(context))
-                .put("output_modalities", new org.json.JSONArray().put("audio"))
+                .put("output_modalities", new JSONArray().put("audio"))
                 .put("audio", new JSONObject().put("input", input).put("output", output))
                 .put("tools", RealtimeToolDefinitions.all())
                 .put("tool_choice", "auto");
@@ -154,7 +156,7 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, AutoClose
     private void sendGreeting() {
         JSONObject response = new JSONObject()
                 .put("instructions", "Saluda brevemente al cliente, di el nombre del negocio y pregunta en qué puedes ayudar. No afirmes ninguna acción todavía.")
-                .put("output_modalities", new org.json.JSONArray().put("audio"));
+                .put("output_modalities", new JSONArray().put("audio"));
         sendOpenAi(new JSONObject().put("type", "response.create").put("response", response));
     }
 
@@ -170,12 +172,20 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, AutoClose
                 case "response.output_audio_transcript.done" ->
                         transcripts.append(context.callId(), "ASSISTANT", event.optString("transcript", ""));
                 case "response.output_item.done" -> handleOutputItem(event.optJSONObject("item"));
+                case "response.done" -> handleResponseDone(event.optJSONObject("response"));
                 case "error" -> logOpenAiError(event);
                 default -> { }
             }
         } catch (Exception e) {
             log.warn("Could not process Realtime event for call {}: {}", context.callId(), e.getMessage());
         }
+    }
+
+    private void handleResponseDone(JSONObject response) {
+        if (response == null) return;
+        JSONArray output = response.optJSONArray("output");
+        if (output == null) return;
+        for (int i = 0; i < output.length(); i++) handleOutputItem(output.optJSONObject(i));
     }
 
     private void handleOutputItem(JSONObject item) {
