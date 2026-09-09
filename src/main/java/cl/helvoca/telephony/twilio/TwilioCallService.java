@@ -3,6 +3,7 @@ package cl.helvoca.telephony.twilio;
 import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.call.CallStatus;
 import cl.helvoca.telephony.CallLifecycleService;
+import cl.helvoca.telephony.twilio.trial.TrialVoiceProperties;
 import cl.helvoca.voice.VoiceProviderProperties;
 import org.springframework.stereotype.Service;
 
@@ -21,13 +22,16 @@ public class TwilioCallService {
     private final CallLifecycleService lifecycle;
     private final TwimlFactory twiml;
     private final VoiceProviderProperties voiceProviders;
+    private final TrialVoiceProperties trial;
 
     public TwilioCallService(CallLifecycleService lifecycle,
                              TwimlFactory twiml,
-                             VoiceProviderProperties voiceProviders) {
+                             VoiceProviderProperties voiceProviders,
+                             TrialVoiceProperties trial) {
         this.lifecycle = lifecycle;
         this.twiml = twiml;
         this.voiceProviders = voiceProviders;
+        this.trial = trial;
     }
 
     public String startInboundCall(String providerCallId, String from, String to) {
@@ -36,7 +40,23 @@ public class TwilioCallService {
     }
 
     public RealtimeCallContext startTrialInboundCall(String providerCallId, String from, String to) {
-        return lifecycle.startTrialCall(activeProviderId(), providerCallId, from, to);
+        String effectiveFrom = from;
+        String effectiveTo = to;
+
+        // Twilio's Console "Try out Voice" flow may originate the outbound test
+        // from a platform-owned number instead of echoing the configured trial
+        // number in From/To. Trial mode is already explicitly enabled and scoped
+        // to a single demo number, so use that configured number as the carrier
+        // identity fallback when neither webhook number matches it.
+        if (trial.isEnabled() && trial.hasPhoneNumber()) {
+            String trialNumber = trial.getPhoneNumber();
+            boolean webhookContainsTrialNumber = trialNumber.equals(from) || trialNumber.equals(to);
+            if (!webhookContainsTrialNumber) {
+                effectiveFrom = trialNumber;
+            }
+        }
+
+        return lifecycle.startTrialCall(activeProviderId(), providerCallId, effectiveFrom, effectiveTo);
     }
 
     public RealtimeCallContext getTrialContext(String providerCallId) {
