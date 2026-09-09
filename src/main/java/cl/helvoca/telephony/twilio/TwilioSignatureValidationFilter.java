@@ -24,11 +24,15 @@ public class TwilioSignatureValidationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        if (path.startsWith("/webhooks/v1/twilio/trial/")
-                && trial.isEnabled()
-                && trial.matchesWebhookSecret(request.getParameter("trialKey"))) {
+
+        // Twilio's Try out Voice flow can invoke Custom webhooks without the same
+        // production signature semantics. Trial mode is an explicitly enabled demo
+        // path, so we bypass signature validation only for /trial/** while enabled.
+        // Production Twilio webhooks remain protected by X-Twilio-Signature.
+        if (path.startsWith("/webhooks/v1/twilio/trial/") && trial.isEnabled()) {
             return true;
         }
+
         return !path.startsWith("/webhooks/v1/twilio/");
     }
 
