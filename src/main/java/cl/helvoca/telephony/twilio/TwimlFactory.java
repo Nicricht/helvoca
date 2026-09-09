@@ -29,7 +29,11 @@ public class TwimlFactory {
     public String trialGather(String prompt) {
         String base = normalizedPublicBaseUrl();
         if (base == null) return serviceUnavailable();
-        String action = escapeXml(base + "/webhooks/v1/twilio/trial/gather");
+        String actionUrl = base + "/webhooks/v1/twilio/trial/gather";
+        if (trial.hasWebhookSecret()) {
+            actionUrl += "?trialKey=" + trial.getWebhookSecret();
+        }
+        String action = escapeXml(actionUrl);
         String speechLanguage = escapeXml(trial.getLanguage());
         String spoken = escapeXml(prompt);
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
