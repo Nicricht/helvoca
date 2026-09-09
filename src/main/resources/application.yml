@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: helvoca
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/helvoca}
+    username: ${DB_USERNAME:helvoca}
+    password: ${DB_PASSWORD:helvoca}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  jwt:
+    issuer: ${JWT_ISSUER:helvoca-api}
+    secret: ${JWT_SECRET:Y2FsbGFpLWRldi1vbmx5LXNlY3JldC1rZXktMzItYnl0ZXMhISE=}
+    access-token-minutes: ${JWT_ACCESS_MINUTES:60}
+  seed:
+    enabled: ${SEED_ENABLED:false}
+    admin-email: ${SEED_ADMIN_EMAIL:admin@helvoca.local}
+    admin-password: ${SEED_ADMIN_PASSWORD:ChangeMe123!}
