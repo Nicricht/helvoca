@@ -1,6 +1,6 @@
-# Helvoca - Sprint 3
+# Helvoca - Sprint 4
 
-Helvoca es un SaaS multi-tenant de atención telefónica con IA para empresas. El backend ya cuenta con autenticación, aislamiento por tenant, clientes, servicios, reservas, conocimiento empresarial y una capa telefónica Twilio autenticada por firma.
+Helvoca es un SaaS multi-tenant de atención telefónica con IA para empresas. El backend cuenta con autenticación, aislamiento por tenant, clientes, servicios, reservas, conocimiento empresarial, telefonía Twilio autenticada y un agente de voz conectado a OpenAI Realtime.
 
 ## Estado actual
 
@@ -14,6 +14,8 @@ Helvoca es un SaaS multi-tenant de atención telefónica con IA para empresas. E
 - Docker Compose
 - Swagger/OpenAPI
 - GitHub Actions CI
+- Twilio Voice + Media Streams
+- OpenAI Realtime
 
 ### Sprint 1
 
@@ -35,23 +37,43 @@ Helvoca es un SaaS multi-tenant de atención telefónica con IA para empresas. E
 
 - números telefónicos por negocio
 - historial `call_session`
-- estados de llamada
-- asociación automática de cliente por teléfono
-- webhook de voz Twilio
-- webhook de estado Twilio
-- validación obligatoria `X-Twilio-Signature`
+- webhooks Twilio firmados
 - TwiML `<Connect><Stream>`
 - WebSocket `/ws/twilio`
-- validación de firma del handshake Media Stream
-- persistencia de `CallSid`, `StreamSid`, tiempos y duración
-- tabla y API de lectura de transcripción preparadas para Sprint 4
-- test de integración del ciclo de llamada contra PostgreSQL 16
+- persistencia de CallSid/StreamSid y ciclo de llamada
+
+### Sprint 4
+
+- puente de audio PCMU Twilio ↔ OpenAI Realtime
+- sesión Realtime independiente por llamada
+- Server VAD
+- interrupciones / barge-in
+- transcripción real de usuario y asistente
+- function calling ejecutado por Helvoca
+- consulta de información del negocio
+- catálogo y Knowledge Base por voz
+- identificación y registro del caller
+- comprobación de disponibilidad
+- creación de reservas por voz
+- regla fail-closed: la IA nunca decide si una operación fue exitosa
+- resumen automático post-llamada mediante Responses API
+- resumen incluido en detalle de llamada
 
 ## Regla crítica multi-tenant
 
 Las APIs administrativas no confían en un `businessId` enviado por el frontend. El backend obtiene `business_id` desde el JWT mediante `TenantProvider` y filtra las consultas por tenant.
 
-Los webhooks Twilio son una excepción al JWT porque provienen del proveedor telefónico. Se autentican obligatoriamente con `X-Twilio-Signature` y el Auth Token de Twilio.
+Los webhooks Twilio se autentican mediante `X-Twilio-Signature`. Las tools de Realtime tampoco aceptan un tenant elegido por el modelo: utilizan un `RealtimeCallContext` construido desde la llamada Twilio ya validada.
+
+## Regla crítica de IA
+
+El modelo solicita acciones, pero el backend decide su resultado.
+
+```text
+IA → function call → Helvoca → PostgreSQL → function_call_output → IA
+```
+
+Una reserva solo puede ser anunciada como confirmada si Helvoca devuelve `success=true`. Un error como `BOOKING_SLOT_UNAVAILABLE` debe comunicarse como error, no como éxito.
 
 ## Base de datos
 
@@ -61,8 +83,9 @@ Flyway aplica:
 - `V2__seed_roles.sql`
 - `V3__sprint2_core.sql`
 - `V4__sprint3_telephony.sql`
+- `V5__sprint4_ai_voice.sql`
 
-V4 incorpora `phone_number`, `call_session` y `call_transcript`.
+V5 incorpora `call_summary`.
 
 ## Ejecutar con Docker
 
@@ -83,14 +106,15 @@ Health:
 http://localhost:8080/actuator/health
 ```
 
-## Configurar Twilio
+## Configurar Twilio + OpenAI
 
-No guardes el Auth Token real en Git.
+No guardes tokens ni API keys reales en Git.
 
 ```text
 TWILIO_AUTH_TOKEN=tu_token
 TWILIO_PUBLIC_BASE_URL=https://tu-dominio-publico
 TWILIO_MEDIA_STREAM_URL=wss://tu-dominio-publico/ws/twilio
+OPENAI_API_KEY=tu_api_key
 ```
 
 Configura el número Twilio para llamar por POST a:
@@ -99,7 +123,7 @@ Configura el número Twilio para llamar por POST a:
 https://tu-dominio-publico/webhooks/v1/twilio/voice
 ```
 
-Y configura el callback de estados hacia:
+Callback de estados:
 
 ```text
 https://tu-dominio-publico/webhooks/v1/twilio/status
@@ -112,17 +136,19 @@ Después registra ese número en Helvoca mediante `POST /api/v1/phone-numbers`.
 - `docs/SPRINT1.md`
 - `docs/SPRINT2.md`
 - `docs/SPRINT3.md`
+- `docs/SPRINT4.md`
 - `docs/API.md`
+- `docs/design/`
 
 ## Próximo sprint
 
-Sprint 4 conecta el Media Stream con OpenAI Realtime:
+Sprint 5 debe convertir la configuración del agente en datos editables por cada negocio:
 
-1. puente de audio μ-law 8 kHz
-2. sesión Realtime por llamada
-3. VAD e interrupciones
-4. transcripción real
-5. tool calling
-6. reservas por voz
-7. respuestas de audio hacia Twilio
-8. resumen final de llamada
+1. entidad `AI_AGENT`
+2. nombre, voz, idioma y saludo por tenant
+3. instrucciones configurables protegidas
+4. horarios y excepciones/feriados
+5. capabilities permitidas por agente
+6. activación/desactivación
+7. API administrativa
+8. tests de aislamiento y permisos
