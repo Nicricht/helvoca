@@ -1,0 +1,6 @@
+package cl.helvoca.business;
+import cl.helvoca.audit.AuditService; import cl.helvoca.common.NotFoundException; import cl.helvoca.security.TenantProvider; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional;
+@Service public class BusinessService { private final BusinessRepository businesses; private final TenantProvider tenantProvider; private final AuditService auditService;
+ public BusinessService(BusinessRepository businesses,TenantProvider tenantProvider,AuditService auditService){this.businesses=businesses;this.tenantProvider=tenantProvider;this.auditService=auditService;}
+ @Transactional(readOnly=true) public BusinessResponse current(){var id=tenantProvider.requireBusinessId();return BusinessResponse.from(businesses.findById(id).orElseThrow(()->new NotFoundException("Business not found")));}
+ @Transactional public BusinessResponse update(UpdateBusinessRequest request){var id=tenantProvider.requireBusinessId();var business=businesses.findById(id).orElseThrow(()->new NotFoundException("Business not found"));business.setName(request.name());business.setTimezone(request.timezone());business.setLanguage(request.language());auditService.success(id,"BUSINESS_UPDATE","BUSINESS",id);return BusinessResponse.from(business);} }
