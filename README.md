@@ -1,10 +1,10 @@
-# Helvoca - Sprint 2
+# Helvoca - Sprint 3
 
-Helvoca es la base de un SaaS multi-tenant de atención telefónica con IA para empresas. El backend ya cuenta con autenticación, aislamiento por tenant y el núcleo operativo de clientes, servicios, reservas y conocimiento empresarial.
+Helvoca es un SaaS multi-tenant de atención telefónica con IA para empresas. El backend ya cuenta con autenticación, aislamiento por tenant, clientes, servicios, reservas, conocimiento empresarial y una capa telefónica Twilio autenticada por firma.
 
 ## Estado actual
 
-### Plataforma y seguridad
+### Plataforma
 
 - Java 21
 - Spring Boot 4.1.1
@@ -13,70 +13,56 @@ Helvoca es la base de un SaaS multi-tenant de atención telefónica con IA para 
 - Flyway
 - Docker Compose
 - Swagger/OpenAPI
-- Roles `PLATFORM_ADMIN`, `BUSINESS_ADMIN` y `OPERATOR`
-- Tenant obtenido desde el claim `business_id` del JWT
-- Auditoría de operaciones
-- Manejo global de errores
+- GitHub Actions CI
+
+### Sprint 1
+
+- autenticación
+- roles
+- negocio multi-tenant
+- usuarios
+- auditoría
 
 ### Sprint 2
 
-- Clientes
-  - crear
-  - listar
-  - consultar por id
-  - buscar por teléfono
-  - actualizar
-- Catálogo de servicios
-  - crear
-  - listar
-  - consultar
-  - actualizar
-  - desactivar
-  - duración y precio
-- Reservas
-  - crear
-  - listar
-  - consultar
-  - verificar disponibilidad
-  - calcular término según duración del servicio
-  - rechazar solapamientos
-  - reprogramar
-  - cancelar
-  - rechazar reservas en el pasado
+- clientes
+- catálogo de servicios
+- reservas y disponibilidad
 - Knowledge Base
-  - crear
-  - listar
-  - consultar
-  - actualizar
-  - filtrar activos
-  - desactivar
-- Aislamiento multi-tenant en todos los módulos
-- Autorización por roles
-- Tests unitarios
-- Test de integración con PostgreSQL mediante Testcontainers
-- CI con GitHub Actions
+- tests PostgreSQL con Testcontainers
+
+### Sprint 3
+
+- números telefónicos por negocio
+- historial `call_session`
+- estados de llamada
+- asociación automática de cliente por teléfono
+- webhook de voz Twilio
+- webhook de estado Twilio
+- validación obligatoria `X-Twilio-Signature`
+- TwiML `<Connect><Stream>`
+- WebSocket `/ws/twilio`
+- validación de firma del handshake Media Stream
+- persistencia de `CallSid`, `StreamSid`, tiempos y duración
+- tabla y API de lectura de transcripción preparadas para Sprint 4
+- test de integración del ciclo de llamada contra PostgreSQL 16
 
 ## Regla crítica multi-tenant
 
-El frontend no decide el negocio mediante un parámetro `businessId` confiable.
+Las APIs administrativas no confían en un `businessId` enviado por el frontend. El backend obtiene `business_id` desde el JWT mediante `TenantProvider` y filtra las consultas por tenant.
 
-El backend obtiene el tenant autenticado desde el claim `business_id` del JWT mediante `TenantProvider` y todas las consultas de negocio se filtran con ese identificador.
-
-## Regla crítica de reservas
-
-Una reserva solo puede crearse cuando cliente y servicio pertenecen al tenant autenticado y el horario solicitado está disponible.
-
-Para el MVP, cada servicio representa una única capacidad reservable. Personal, salas, mesas, sillas o equipamiento se modelarán posteriormente como recursos explícitos.
+Los webhooks Twilio son una excepción al JWT porque provienen del proveedor telefónico. Se autentican obligatoriamente con `X-Twilio-Signature` y el Auth Token de Twilio.
 
 ## Base de datos
 
-Flyway aplica actualmente:
+Flyway aplica:
 
 - `V1__foundation.sql`
 - `V2__seed_roles.sql`
 - `V3__sprint2_core.sql`
+- `V4__sprint3_telephony.sql`
 
-La tercera migración incorpora `customer`, `service`, `booking` y `knowledge_item` con claves foráneas, índices por tenant y controles básicos de integridad.
+V4 incorpora `phone_number`, `call_session` y `call_transcript`.
 
 ## Ejecutar con Docker
 
@@ -97,48 +83,46 @@ Health:
 http://localhost:8080/actuator/health
 ```
 
-## Usuario local de desarrollo
+## Configurar Twilio
 
-Cuando el seed de desarrollo está habilitado:
+No guardes el Auth Token real en Git.
 
 ```text
-Email: admin@helvoca.local
-Password: ChangeMe123!
+TWILIO_AUTH_TOKEN=tu_token
+TWILIO_PUBLIC_BASE_URL=https://tu-dominio-publico
+TWILIO_MEDIA_STREAM_URL=wss://tu-dominio-publico/ws/twilio
 ```
 
-Estas credenciales son exclusivamente de desarrollo y deben cambiarse antes de cualquier despliegue real.
+Configura el número Twilio para llamar por POST a:
 
-## Login
-
-```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@helvoca.local","password":"ChangeMe123!"}'
+```text
+https://tu-dominio-publico/webhooks/v1/twilio/voice
 ```
 
-Usa luego el `accessToken` como Bearer token.
+Y configura el callback de estados hacia:
+
+```text
+https://tu-dominio-publico/webhooks/v1/twilio/status
+```
+
+Después registra ese número en Helvoca mediante `POST /api/v1/phone-numbers`.
 
 ## Documentación
 
 - `docs/SPRINT1.md`
 - `docs/SPRINT2.md`
+- `docs/SPRINT3.md`
 - `docs/API.md`
-
-## CI
-
-Cada push y pull request hacia `main` ejecuta Maven y la suite de tests. La prueba de integración inicia PostgreSQL 16 con Testcontainers, aplica Flyway y valida consultas reales de reservas.
 
 ## Próximo sprint
 
-Sprint 3 incorpora la capa telefónica:
+Sprint 4 conecta el Media Stream con OpenAI Realtime:
 
-1. números telefónicos por negocio
-2. sesiones de llamada
-3. estados de llamada
-4. webhooks de telefonía
-5. validación de firma de Twilio
-6. base de integración con Twilio Programmable Voice
-7. WebSocket / Media Streams
-8. persistencia de transcripciones
-
-Después de esta capa se conectará el audio con el agente de voz IA en tiempo real.
+1. puente de audio μ-law 8 kHz
+2. sesión Realtime por llamada
+3. VAD e interrupciones
+4. transcripción real
+5. tool calling
+6. reservas por voz
+7. respuestas de audio hacia Twilio
+8. resumen final de llamada

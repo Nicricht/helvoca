@@ -36,3 +36,7 @@ app:
     enabled: ${SEED_ENABLED:false}
     admin-email: ${SEED_ADMIN_EMAIL:admin@helvoca.local}
     admin-password: ${SEED_ADMIN_PASSWORD:ChangeMe123!}
+  twilio:
+    auth-token: ${TWILIO_AUTH_TOKEN:}
+    public-base-url: ${TWILIO_PUBLIC_BASE_URL:}
+    media-stream-url: ${TWILIO_MEDIA_STREAM_URL:}
