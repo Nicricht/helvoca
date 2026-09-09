@@ -9,7 +9,7 @@ public class OpenAiRealtimeProperties {
     private String apiKey = "";
     private String realtimeModel = "gpt-realtime-2.1";
     private String voice = "marin";
-    private String transcriptionModel = "gpt-4o-mini-transcribe";
+    private String transcriptionModel = "gpt-live-transcribe";
     private String summaryModel = "gpt-5.6-luna";
     private String realtimeUrl = "wss://api.openai.com/v1/realtime";
     private String responsesUrl = "https://api.openai.com/v1/responses";
