@@ -40,6 +40,7 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, AutoClose
     private final StringBuilder incomingText = new StringBuilder();
 
     private volatile WebSocket openAiSocket;
+    private volatile RealtimeAgentRuntimeConfig runtime;
 
     OpenAiRealtimeBridge(RealtimeCallContext context,
                          WebSocketSession twilioSession,
@@ -60,6 +61,10 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, AutoClose
     public void start() {
         if (!properties.hasApiKey()) {
             throw new IllegalStateException("OPENAI_API_KEY is required for realtime calls");
+        }
+        runtime = tools.runtimeConfig(context);
+        if (!runtime.active()) {
+            throw new IllegalStateException("AI agent is disabled for this business");
         }
         String url = properties.getRealtimeUrl() + "?model="
                 + URLEncoder.encode(properties.getRealtimeModel(), StandardCharsets.UTF_8);
@@ -124,6 +129,7 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, AutoClose
     }
 
     private void sendSessionUpdate() {
+        RealtimeAgentRuntimeConfig cfg = requireRuntime();
         JSONObject turnDetection = new JSONObject()
                 .put("type", "server_vad")
                 .put("threshold", 0.5)
@@ -137,27 +143,38 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, AutoClose
                 .put("transcription", new JSONObject().put("model", properties.getTranscriptionModel()))
                 .put("turn_detection", turnDetection);
 
+        String voice = cfg.voice() == null || cfg.voice().isBlank() ? properties.getVoice() : cfg.voice();
         JSONObject output = new JSONObject()
                 .put("format", new JSONObject().put("type", "audio/pcmu"))
-                .put("voice", properties.getVoice());
+                .put("voice", voice);
 
         JSONObject session = new JSONObject()
                 .put("type", "realtime")
                 .put("model", properties.getRealtimeModel())
-                .put("instructions", tools.buildInstructions(context))
+                .put("instructions", cfg.instructions())
                 .put("output_modalities", new JSONArray().put("audio"))
                 .put("audio", new JSONObject().put("input", input).put("output", output))
-                .put("tools", RealtimeToolDefinitions.all())
+                .put("tools", RealtimeToolDefinitions.enabled(cfg.capabilities()))
                 .put("tool_choice", "auto");
 
         sendOpenAi(new JSONObject().put("type", "session.update").put("session", session));
     }
 
     private void sendGreeting() {
+        RealtimeAgentRuntimeConfig cfg = requireRuntime();
+        String greeting = cfg.greeting() == null || cfg.greeting().isBlank()
+                ? "Hola. ¿En qué puedo ayudarte?"
+                : cfg.greeting();
         JSONObject response = new JSONObject()
-                .put("instructions", "Saluda brevemente al cliente, di el nombre del negocio y pregunta en qué puedes ayudar. No afirmes ninguna acción todavía.")
+                .put("instructions", "Pronuncia el siguiente saludo de apertura de forma natural, sin agregar acciones ni resultados: " + greeting)
                 .put("output_modalities", new JSONArray().put("audio"));
         sendOpenAi(new JSONObject().put("type", "response.create").put("response", response));
+    }
+
+    private RealtimeAgentRuntimeConfig requireRuntime() {
+        RealtimeAgentRuntimeConfig value = runtime;
+        if (value == null) throw new IllegalStateException("Realtime agent configuration not loaded");
+        return value;
     }
 
     private void handleOpenAiEvent(String payload) {
