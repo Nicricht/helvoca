@@ -36,6 +36,9 @@ app:
     enabled: ${SEED_ENABLED:false}
     admin-email: ${SEED_ADMIN_EMAIL:admin@helvoca.local}
     admin-password: ${SEED_ADMIN_PASSWORD:ChangeMe123!}
+  voice:
+    telephony-provider: ${HELVOCA_TELEPHONY_PROVIDER:twilio}
+    ai-provider: ${HELVOCA_VOICE_AI_PROVIDER:openai}
   twilio:
     auth-token: ${TWILIO_AUTH_TOKEN:}
     public-base-url: ${TWILIO_PUBLIC_BASE_URL:}

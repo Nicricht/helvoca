@@ -7,6 +7,8 @@ public record CallResponse(
         UUID id,
         UUID customerId,
         UUID phoneNumberId,
+        String telephonyProvider,
+        String aiProvider,
         String providerCallId,
         String callerNumber,
         String destinationNumber,
@@ -23,9 +25,9 @@ public record CallResponse(
 ) {
     static CallResponse from(CallSession call) {
         return new CallResponse(call.getId(), call.getCustomerId(), call.getPhoneNumberId(),
-                call.getProviderCallId(), call.getCallerNumber(), call.getDestinationNumber(),
-                call.getDirection(), call.getStatus(), call.getStartedAt(), call.getAnsweredAt(),
-                call.getEndedAt(), call.getDurationSeconds(), call.getResolution(), call.getStreamSid(),
-                call.getStreamStartedAt(), call.getStreamEndedAt());
+                call.getTelephonyProvider(), call.getAiProvider(), call.getProviderCallId(),
+                call.getCallerNumber(), call.getDestinationNumber(), call.getDirection(), call.getStatus(),
+                call.getStartedAt(), call.getAnsweredAt(), call.getEndedAt(), call.getDurationSeconds(),
+                call.getResolution(), call.getStreamSid(), call.getStreamStartedAt(), call.getStreamEndedAt());
     }
 }

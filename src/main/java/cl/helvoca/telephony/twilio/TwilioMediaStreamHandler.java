@@ -1,8 +1,9 @@
 package cl.helvoca.telephony.twilio;
 
-import cl.helvoca.ai.realtime.OpenAiRealtimeBridge;
-import cl.helvoca.ai.realtime.OpenAiRealtimeBridgeFactory;
 import cl.helvoca.ai.realtime.RealtimeCallContext;
+import cl.helvoca.voice.VoiceAiProvider;
+import cl.helvoca.voice.VoiceAiProviderRegistry;
+import cl.helvoca.voice.VoiceAiSession;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -17,12 +18,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     private final TwilioCallService calls;
-    private final OpenAiRealtimeBridgeFactory realtime;
-    private final Map<String, OpenAiRealtimeBridge> bridges = new ConcurrentHashMap<>();
+    private final VoiceAiProviderRegistry aiProviders;
+    private final Map<String, VoiceAiSession> sessions = new ConcurrentHashMap<>();
 
-    public TwilioMediaStreamHandler(TwilioCallService calls, OpenAiRealtimeBridgeFactory realtime) {
+    public TwilioMediaStreamHandler(TwilioCallService calls,
+                                    VoiceAiProviderRegistry aiProviders) {
         this.calls = calls;
-        this.realtime = realtime;
+        this.aiProviders = aiProviders;
     }
 
     @Override
@@ -53,37 +55,47 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
             session.close(CloseStatus.BAD_DATA);
             return;
         }
-        if (!realtime.configured()) {
-            session.close(CloseStatus.SERVER_ERROR.withReason("Realtime AI is not configured"));
+
+        VoiceAiProvider aiProvider;
+        try {
+            aiProvider = aiProviders.active();
+        } catch (IllegalStateException e) {
+            session.close(CloseStatus.SERVER_ERROR.withReason("Voice AI provider is invalid"));
             return;
         }
+        if (!aiProvider.configured()) {
+            session.close(CloseStatus.SERVER_ERROR.withReason("Voice AI provider is not configured"));
+            return;
+        }
+
         try {
-            RealtimeCallContext context = calls.markStreamStarted(UUID.fromString(callIdValue), callSid, streamSid);
-            OpenAiRealtimeBridge bridge = realtime.create(context, session);
-            bridges.put(session.getId(), bridge);
-            bridge.start();
+            RealtimeCallContext context = calls.markStreamStarted(
+                    UUID.fromString(callIdValue), callSid, streamSid, aiProvider.id());
+            VoiceAiSession aiSession = aiProvider.createSession(context, new TwilioVoiceTransportSession(session));
+            sessions.put(session.getId(), aiSession);
+            aiSession.start();
         } catch (RuntimeException e) {
             session.close(CloseStatus.POLICY_VIOLATION);
         }
     }
 
     private void handleMedia(WebSocketSession session, JSONObject json) {
-        OpenAiRealtimeBridge bridge = bridges.get(session.getId());
-        if (bridge == null) return;
+        VoiceAiSession aiSession = sessions.get(session.getId());
+        if (aiSession == null) return;
         JSONObject media = json.optJSONObject("media");
         if (media == null) return;
-        bridge.acceptTwilioAudio(media.optString("payload", null));
+        aiSession.acceptInboundAudio(media.optString("payload", null));
     }
 
     private void handleStop(WebSocketSession session, JSONObject json) {
-        OpenAiRealtimeBridge bridge = bridges.remove(session.getId());
-        if (bridge != null) bridge.close();
+        VoiceAiSession aiSession = sessions.remove(session.getId());
+        if (aiSession != null) aiSession.close();
         calls.markStreamStopped(json.optString("streamSid"));
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        OpenAiRealtimeBridge bridge = bridges.remove(session.getId());
-        if (bridge != null) bridge.close();
+        VoiceAiSession aiSession = sessions.remove(session.getId());
+        if (aiSession != null) aiSession.close();
     }
 }

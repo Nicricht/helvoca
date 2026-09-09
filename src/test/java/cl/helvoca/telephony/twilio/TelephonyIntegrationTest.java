@@ -33,6 +33,8 @@ class TelephonyIntegrationTest {
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("app.seed.enabled", () -> "false");
         registry.add("app.twilio.media-stream-url", () -> "wss://voice.example/ws/twilio");
+        registry.add("app.voice.telephony-provider", () -> "twilio");
+        registry.add("app.voice.ai-provider", () -> "openai");
     }
 
     @Autowired BusinessRepository businesses;
@@ -41,7 +43,7 @@ class TelephonyIntegrationTest {
     @Autowired TwilioCallService callService;
 
     @Test
-    void flywayV4AndInboundCallLifecycleWorkAgainstPostgres() {
+    void flywayV6AndProviderIndependentCallLifecycleWorkAgainstPostgres() {
         Business business = new Business();
         business.setName("Telephony Test Business");
         business = businesses.saveAndFlush(business);
@@ -59,11 +61,13 @@ class TelephonyIntegrationTest {
         var call = calls.findByProviderCallId("CA-TEST-001").orElseThrow();
         assertEquals(business.getId(), call.getBusinessId());
         assertEquals(CallStatus.RINGING, call.getStatus());
+        assertEquals("twilio", call.getTelephonyProvider());
 
-        callService.markStreamStarted(call.getId(), "CA-TEST-001", "MZ-TEST-001");
+        callService.markStreamStarted(call.getId(), "CA-TEST-001", "MZ-TEST-001", "openai");
         call = calls.findByProviderCallId("CA-TEST-001").orElseThrow();
         assertEquals(CallStatus.IN_PROGRESS, call.getStatus());
         assertEquals("MZ-TEST-001", call.getStreamSid());
+        assertEquals("openai", call.getAiProvider());
 
         callService.updateStatus("CA-TEST-001", "completed", 42);
         call = calls.findByProviderCallId("CA-TEST-001").orElseThrow();

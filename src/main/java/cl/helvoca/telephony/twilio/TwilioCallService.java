@@ -1,200 +1,86 @@
 package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.ai.realtime.RealtimeCallContext;
-import cl.helvoca.call.*;
-import cl.helvoca.common.NotFoundException;
-import cl.helvoca.customer.CustomerRepository;
-import cl.helvoca.phone.PhoneNumber;
-import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.call.CallStatus;
+import cl.helvoca.telephony.CallLifecycleService;
+import cl.helvoca.voice.VoiceProviderProperties;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Locale;
-import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Twilio adapter around Helvoca's provider-neutral call lifecycle.
+ *
+ * <p>Twilio-specific response generation stays here while durable call state
+ * and business rules live in {@link CallLifecycleService}.</p>
+ */
 @Service
 public class TwilioCallService {
-    private final PhoneNumberRepository phoneNumbers;
-    private final CustomerRepository customers;
-    private final CallSessionRepository calls;
+    public static final String PROVIDER_ID = "twilio";
+
+    private final CallLifecycleService lifecycle;
     private final TwimlFactory twiml;
+    private final VoiceProviderProperties voiceProviders;
 
-    public TwilioCallService(PhoneNumberRepository phoneNumbers,
-                             CustomerRepository customers,
-                             CallSessionRepository calls,
-                             TwimlFactory twiml) {
-        this.phoneNumbers = phoneNumbers;
-        this.customers = customers;
-        this.calls = calls;
+    public TwilioCallService(CallLifecycleService lifecycle,
+                             TwimlFactory twiml,
+                             VoiceProviderProperties voiceProviders) {
+        this.lifecycle = lifecycle;
         this.twiml = twiml;
+        this.voiceProviders = voiceProviders;
     }
 
-    @Transactional
     public String startInboundCall(String providerCallId, String from, String to) {
-        CallSession existing = calls.findByProviderCallId(providerCallId).orElse(null);
-        if (existing != null) {
-            return twiml.connectMediaStream(existing.getId());
-        }
-
-        PhoneNumber phone = phoneNumbers.findByPhoneNumberAndActiveTrue(to)
-                .orElseThrow(() -> new NotFoundException("Destination phone number is not registered"));
-
-        CallSession call = new CallSession();
-        call.setBusinessId(phone.getBusinessId());
-        call.setPhoneNumberId(phone.getId());
-        call.setProviderCallId(providerCallId);
-        call.setCallerNumber(from);
-        call.setDestinationNumber(to);
-        call.setDirection(CallDirection.INBOUND);
-        call.setStatus(CallStatus.RINGING);
-        call.setStartedAt(Instant.now());
-        customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), from)
-                .ifPresent(customer -> call.setCustomerId(customer.getId()));
-        CallSession saved = calls.saveAndFlush(call);
-        return twiml.connectMediaStream(saved.getId());
+        UUID callId = lifecycle.startInboundCall(activeProviderId(), providerCallId, from, to);
+        return twiml.connectMediaStream(callId);
     }
 
-    @Transactional
     public RealtimeCallContext startTrialInboundCall(String providerCallId, String from, String to) {
-        CallSession existing = calls.findByProviderCallId(providerCallId).orElse(null);
-        if (existing != null) {
-            if (existing.getStreamSid() == null || !existing.getStreamSid().startsWith("trial:")) {
-                throw new IllegalArgumentException("The call already belongs to a non-trial media session");
-            }
-            return trialContext(existing);
-        }
-
-        PhoneNumber destinationPhone = phoneNumbers.findByPhoneNumberAndActiveTrue(to).orElse(null);
-        PhoneNumber sourcePhone = destinationPhone == null
-                ? phoneNumbers.findByPhoneNumberAndActiveTrue(from).orElse(null)
-                : null;
-        PhoneNumber phone = destinationPhone != null ? destinationPhone : sourcePhone;
-        if (phone == null) {
-            throw new NotFoundException("Trial phone number is not registered as source or destination");
-        }
-
-        boolean outbound = destinationPhone == null;
-        String customerNumber = outbound ? to : from;
-
-        Instant now = Instant.now();
-        CallSession call = new CallSession();
-        call.setBusinessId(phone.getBusinessId());
-        call.setPhoneNumberId(phone.getId());
-        call.setProviderCallId(providerCallId);
-        call.setCallerNumber(customerNumber);
-        call.setDestinationNumber(to);
-        call.setDirection(outbound ? CallDirection.OUTBOUND : CallDirection.INBOUND);
-        call.setStatus(CallStatus.IN_PROGRESS);
-        call.setStartedAt(now);
-        call.setAnsweredAt(now);
-        call.setStreamSid(trialStreamId(providerCallId));
-        call.setStreamStartedAt(now);
-        customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), customerNumber)
-                .ifPresent(customer -> call.setCustomerId(customer.getId()));
-        return trialContext(calls.saveAndFlush(call));
+        return lifecycle.startTrialCall(activeProviderId(), providerCallId, from, to);
     }
 
-    @Transactional(readOnly = true)
     public RealtimeCallContext getTrialContext(String providerCallId) {
-        CallSession call = calls.findByProviderCallId(providerCallId)
-                .orElseThrow(() -> new NotFoundException("Trial call not found"));
-        if (call.getStreamSid() == null || !call.getStreamSid().startsWith("trial:")) {
-            throw new IllegalArgumentException("Call is not a trial voice session");
-        }
-        return trialContext(call);
+        return lifecycle.getTrialContext(providerCallId);
     }
 
-    @Transactional
     public void markTrialEnded(String providerCallId) {
-        CallSession call = calls.findByProviderCallId(providerCallId)
-                .orElseThrow(() -> new NotFoundException("Trial call not found"));
-        Instant now = Instant.now();
-        if (call.getStreamEndedAt() == null) call.setStreamEndedAt(now);
-        if (call.getEndedAt() == null) call.setEndedAt(now);
-        call.setStatus(CallStatus.COMPLETED);
-        if (call.getDurationSeconds() == null && call.getStartedAt() != null) {
-            call.setDurationSeconds((int) Math.max(0, Duration.between(call.getStartedAt(), now).toSeconds()));
-        }
+        lifecycle.markTrialEnded(providerCallId);
     }
 
-    @Transactional
     public void updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {
-        CallSession call = calls.findByProviderCallId(providerCallId)
-                .orElseThrow(() -> new NotFoundException("Call not found"));
-        CallStatus mapped = mapStatus(providerStatus);
-        call.setStatus(mapped);
-        Instant now = Instant.now();
-        if (mapped == CallStatus.IN_PROGRESS && call.getAnsweredAt() == null) {
-            call.setAnsweredAt(now);
-        }
-        if (mapped.terminal() && call.getEndedAt() == null) {
-            call.setEndedAt(now);
-        }
-        if (durationSeconds != null && durationSeconds >= 0) {
-            call.setDurationSeconds(durationSeconds);
-        } else if (mapped.terminal() && call.getStartedAt() != null && call.getEndedAt() != null) {
-            call.setDurationSeconds((int) Math.max(0, Duration.between(call.getStartedAt(), call.getEndedAt()).toSeconds()));
-        }
+        lifecycle.updateStatus(providerCallId, providerStatus, durationSeconds);
     }
 
-    @Transactional
+    public RealtimeCallContext markStreamStarted(UUID callId,
+                                                 String providerCallId,
+                                                 String streamSid,
+                                                 String aiProvider) {
+        activeProviderId();
+        return lifecycle.markStreamStarted(callId, providerCallId, streamSid, aiProvider);
+    }
+
+    /**
+     * Compatibility overload for existing tests and callers while the provider
+     * abstraction is rolled out. New realtime callers should pass the active AI provider.
+     */
     public RealtimeCallContext markStreamStarted(UUID callId, String providerCallId, String streamSid) {
-        CallSession call = calls.findById(callId)
-                .orElseThrow(() -> new NotFoundException("Call not found"));
-        if (!Objects.equals(call.getProviderCallId(), providerCallId)) {
-            throw new IllegalArgumentException("Twilio call SID does not match callId");
-        }
-        call.setStreamSid(streamSid);
-        call.setStreamStartedAt(Instant.now());
-        if (call.getStatus() == CallStatus.RINGING || call.getStatus() == CallStatus.QUEUED) {
-            call.setStatus(CallStatus.IN_PROGRESS);
-            if (call.getAnsweredAt() == null) call.setAnsweredAt(Instant.now());
-        }
-        calls.saveAndFlush(call);
-        return new RealtimeCallContext(
-                call.getId(),
-                call.getBusinessId(),
-                call.getCustomerId(),
-                call.getCallerNumber(),
-                call.getDestinationNumber(),
-                streamSid);
+        return markStreamStarted(callId, providerCallId, streamSid, "openai");
     }
 
-    @Transactional
     public void markStreamStopped(String streamSid) {
-        if (streamSid == null || streamSid.isBlank()) return;
-        calls.findByStreamSid(streamSid).ifPresent(call -> call.setStreamEndedAt(Instant.now()));
-    }
-
-    private static RealtimeCallContext trialContext(CallSession call) {
-        return new RealtimeCallContext(
-                call.getId(),
-                call.getBusinessId(),
-                call.getCustomerId(),
-                call.getCallerNumber(),
-                call.getDestinationNumber(),
-                call.getStreamSid());
-    }
-
-    private static String trialStreamId(String providerCallId) {
-        return "trial:" + providerCallId;
+        lifecycle.markStreamStopped(streamSid);
     }
 
     static CallStatus mapStatus(String value) {
-        if (value == null) return CallStatus.UNKNOWN;
-        return switch (value.toLowerCase(Locale.ROOT)) {
-            case "queued" -> CallStatus.QUEUED;
-            case "ringing" -> CallStatus.RINGING;
-            case "in-progress" -> CallStatus.IN_PROGRESS;
-            case "completed" -> CallStatus.COMPLETED;
-            case "busy" -> CallStatus.BUSY;
-            case "failed" -> CallStatus.FAILED;
-            case "no-answer" -> CallStatus.NO_ANSWER;
-            case "canceled", "cancelled" -> CallStatus.CANCELED;
-            default -> CallStatus.UNKNOWN;
-        };
+        return CallLifecycleService.mapStatus(value);
+    }
+
+    private String activeProviderId() {
+        String configured = voiceProviders.getTelephonyProvider();
+        if (configured == null || !PROVIDER_ID.equalsIgnoreCase(configured.trim())) {
+            throw new IllegalStateException(
+                    "Twilio adapter cannot handle HELVOCA_TELEPHONY_PROVIDER='" + configured + "'");
+        }
+        return PROVIDER_ID;
     }
 }
