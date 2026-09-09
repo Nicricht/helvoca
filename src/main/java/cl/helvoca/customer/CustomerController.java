@@ -2,6 +2,7 @@ package cl.helvoca.customer;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -9,6 +10,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/customers")
+@PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
 public class CustomerController {
     private final CustomerService service;
 
