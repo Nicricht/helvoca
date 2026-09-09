@@ -9,16 +9,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TrialTwimlFactoryTest {
 
     @Test
-    void trialGatherUsesSpeechAndHelvocaActionWithoutMediaStream() {
+    void trialGatherUsesSpeechAndSecretGatedHelvocaActionWithoutMediaStream() {
         TwilioProperties twilio = new TwilioProperties();
         twilio.setPublicBaseUrl("https://helvoca.example/");
         TrialVoiceProperties trial = new TrialVoiceProperties();
         trial.setLanguage("es-CL");
+        trial.setWebhookSecret("test-secret");
 
         String xml = new TwimlFactory(twilio, trial).trialGather("Hola & bienvenido <Nico>");
 
         assertTrue(xml.contains("<Gather input=\"speech\""));
-        assertTrue(xml.contains("action=\"https://helvoca.example/webhooks/v1/twilio/trial/gather\""));
+        assertTrue(xml.contains("action=\"https://helvoca.example/webhooks/v1/twilio/trial/gather?trialKey=test-secret\""));
         assertTrue(xml.contains("language=\"es-CL\""));
         assertTrue(xml.contains("Hola &amp; bienvenido &lt;Nico&gt;"));
         assertFalse(xml.contains("<Stream"));
