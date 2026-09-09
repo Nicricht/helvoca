@@ -13,13 +13,16 @@ import java.util.UUID;
 public class CallQueryService {
     private final CallSessionRepository calls;
     private final CallTranscriptRepository transcripts;
+    private final CallSummaryRepository summaries;
     private final TenantProvider tenantProvider;
 
     public CallQueryService(CallSessionRepository calls,
                             CallTranscriptRepository transcripts,
+                            CallSummaryRepository summaries,
                             TenantProvider tenantProvider) {
         this.calls = calls;
         this.transcripts = transcripts;
+        this.summaries = summaries;
         this.tenantProvider = tenantProvider;
     }
 
@@ -36,6 +39,7 @@ public class CallQueryService {
                 .orElseThrow(() -> new NotFoundException("Call not found"));
         var transcript = transcripts.findAllByCallIdOrderBySequenceNumberAsc(id)
                 .stream().map(TranscriptResponse::from).toList();
-        return new CallDetailResponse(CallResponse.from(call), transcript);
+        String summary = summaries.findByCallId(id).map(CallSummary::getSummary).orElse(null);
+        return new CallDetailResponse(CallResponse.from(call), transcript, summary);
     }
 }
