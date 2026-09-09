@@ -11,6 +11,7 @@ public class OpenAiRealtimeProperties {
     private String voice = "marin";
     private String transcriptionModel = "gpt-live-transcribe";
     private String summaryModel = "gpt-5.6-luna";
+    private String trialModel = "gpt-5.6-luna";
     private String realtimeUrl = "wss://api.openai.com/v1/realtime";
     private String responsesUrl = "https://api.openai.com/v1/responses";
 
@@ -24,6 +25,8 @@ public class OpenAiRealtimeProperties {
     public void setTranscriptionModel(String transcriptionModel) { this.transcriptionModel = transcriptionModel; }
     public String getSummaryModel() { return summaryModel; }
     public void setSummaryModel(String summaryModel) { this.summaryModel = summaryModel; }
+    public String getTrialModel() { return trialModel; }
+    public void setTrialModel(String trialModel) { this.trialModel = trialModel; }
     public String getRealtimeUrl() { return realtimeUrl; }
     public void setRealtimeUrl(String realtimeUrl) { this.realtimeUrl = realtimeUrl; }
     public String getResponsesUrl() { return responsesUrl; }
