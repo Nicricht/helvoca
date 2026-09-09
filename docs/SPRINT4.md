@@ -40,7 +40,8 @@ Cliente
 - Server VAD
 - interrupción de respuesta por voz del cliente
 - `clear` del buffer de Twilio para barge-in
-- transcripción de usuario y asistente
+- transcripción de usuario con `gpt-live-transcribe` configurable
+- transcripción de respuesta del asistente
 - persistencia ordenada en `call_transcript`
 - tools de negocio controladas por backend
 - consulta de negocio
@@ -108,7 +109,7 @@ Opcionales:
 ```text
 OPENAI_REALTIME_MODEL=gpt-realtime-2.1
 OPENAI_REALTIME_VOICE=marin
-OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
+OPENAI_TRANSCRIPTION_MODEL=gpt-live-transcribe
 OPENAI_SUMMARY_MODEL=gpt-5.6-luna
 OPENAI_REALTIME_URL=wss://api.openai.com/v1/realtime
 OPENAI_RESPONSES_URL=https://api.openai.com/v1/responses
