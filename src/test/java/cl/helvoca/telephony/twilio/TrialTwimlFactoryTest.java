@@ -14,6 +14,8 @@ class TrialTwimlFactoryTest {
         twilio.setPublicBaseUrl("https://helvoca.example/");
         TrialVoiceProperties trial = new TrialVoiceProperties();
         trial.setLanguage("es-CL");
+        trial.setTtsLanguage("es-MX");
+        trial.setTtsVoice("Polly.Mía-Generative");
         trial.setWebhookSecret("test-secret");
 
         String xml = new TwimlFactory(twilio, trial).trialGather("Hola & bienvenido <Nico>");
@@ -21,17 +23,21 @@ class TrialTwimlFactoryTest {
         assertTrue(xml.contains("<Gather input=\"speech\""));
         assertTrue(xml.contains("action=\"https://helvoca.example/webhooks/v1/twilio/trial/gather?trialKey=test-secret\""));
         assertTrue(xml.contains("language=\"es-CL\""));
+        assertTrue(xml.contains("voice=\"Polly.Mía-Generative\" language=\"es-MX\""));
         assertTrue(xml.contains("Hola &amp; bienvenido &lt;Nico&gt;"));
         assertFalse(xml.contains("<Stream"));
     }
 
     @Test
-    void trialHangupEscapesSpokenText() {
+    void trialHangupUsesConfiguredGenerativeVoiceAndEscapesSpokenText() {
         TwilioProperties twilio = new TwilioProperties();
         TrialVoiceProperties trial = new TrialVoiceProperties();
+        trial.setTtsLanguage("es-MX");
+        trial.setTtsVoice("Polly.Mía-Generative");
 
         String xml = new TwimlFactory(twilio, trial).trialSayAndHangup("Reserva <confirmada> & lista");
 
+        assertTrue(xml.contains("voice=\"Polly.Mía-Generative\" language=\"es-MX\""));
         assertTrue(xml.contains("Reserva &lt;confirmada&gt; &amp; lista"));
         assertTrue(xml.contains("<Hangup/>"));
     }

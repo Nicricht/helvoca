@@ -14,6 +14,8 @@ public class TrialVoiceProperties {
     private String businessName = "Helvoca Restaurante Demo";
     private String greeting = "Hola, soy Helvoca. Puedes preguntarme por los servicios o pedirme una reserva.";
     private String language = "es-CL";
+    private String ttsLanguage = "es-MX";
+    private String ttsVoice = "Polly.Mía-Generative";
     private int maxTurns = 8;
     private String webhookSecret = "";
 
@@ -27,6 +29,10 @@ public class TrialVoiceProperties {
     public void setGreeting(String greeting) { this.greeting = greeting; }
     public String getLanguage() { return language; }
     public void setLanguage(String language) { this.language = language; }
+    public String getTtsLanguage() { return ttsLanguage; }
+    public void setTtsLanguage(String ttsLanguage) { this.ttsLanguage = ttsLanguage; }
+    public String getTtsVoice() { return ttsVoice; }
+    public void setTtsVoice(String ttsVoice) { this.ttsVoice = ttsVoice; }
     public int getMaxTurns() { return maxTurns; }
     public void setMaxTurns(int maxTurns) { this.maxTurns = maxTurns; }
     public String getWebhookSecret() { return webhookSecret; }

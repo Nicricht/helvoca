@@ -35,20 +35,19 @@ public class TwimlFactory {
         }
         String action = escapeXml(actionUrl);
         String speechLanguage = escapeXml(trial.getLanguage());
-        String spoken = escapeXml(prompt);
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
                 "<Response>" +
                 "<Gather input=\"speech\" action=\"" + action + "\" method=\"POST\" " +
                 "language=\"" + speechLanguage + "\" speechTimeout=\"auto\" timeout=\"5\" actionOnEmptyResult=\"true\">" +
-                "<Say language=\"es-MX\">" + spoken + "</Say>" +
+                trialSay(prompt) +
                 "</Gather>" +
-                "<Say language=\"es-MX\">No escuché una respuesta. Hasta luego.</Say><Hangup/>" +
+                trialSay("No escuché una respuesta. Hasta luego.") + "<Hangup/>" +
                 "</Response>";
     }
 
     public String trialSayAndHangup(String text) {
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
-                "<Response><Say language=\"es-MX\">" + escapeXml(text) + "</Say><Hangup/></Response>";
+                "<Response>" + trialSay(text) + "<Hangup/></Response>";
     }
 
     public String rejectUnknownNumber() {
@@ -59,6 +58,20 @@ public class TwimlFactory {
     public String serviceUnavailable() {
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
                 "<Response><Say>Voice service is temporarily unavailable.</Say><Hangup/></Response>";
+    }
+
+    private String trialSay(String text) {
+        String voice = trial.getTtsVoice();
+        String language = trial.getTtsLanguage();
+        StringBuilder say = new StringBuilder("<Say");
+        if (voice != null && !voice.isBlank()) {
+            say.append(" voice=\"").append(escapeXml(voice.trim())).append("\"");
+        }
+        if (language != null && !language.isBlank()) {
+            say.append(" language=\"").append(escapeXml(language.trim())).append("\"");
+        }
+        say.append(">").append(escapeXml(text)).append("</Say>");
+        return say.toString();
     }
 
     private String normalizedPublicBaseUrl() {
