@@ -7,6 +7,8 @@ import cl.helvoca.knowledge.KnowledgeItem;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.schedule.BusinessHour;
+import cl.helvoca.schedule.BusinessHourRepository;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.slf4j.Logger;
@@ -15,6 +17,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalTime;
 import java.util.UUID;
 
 @Component
@@ -27,19 +30,22 @@ public class TrialVoiceBootstrap implements CommandLineRunner {
     private final PhoneNumberRepository phoneNumbers;
     private final ServiceItemRepository services;
     private final KnowledgeItemRepository knowledge;
+    private final BusinessHourRepository hours;
 
     public TrialVoiceBootstrap(TrialVoiceProperties properties,
                                OpenAiRealtimeProperties openAi,
                                BusinessRepository businesses,
                                PhoneNumberRepository phoneNumbers,
                                ServiceItemRepository services,
-                               KnowledgeItemRepository knowledge) {
+                               KnowledgeItemRepository knowledge,
+                               BusinessHourRepository hours) {
         this.properties = properties;
         this.openAi = openAi;
         this.businesses = businesses;
         this.phoneNumbers = phoneNumbers;
         this.services = services;
         this.knowledge = knowledge;
+        this.hours = hours;
     }
 
     @Override
@@ -86,6 +92,19 @@ public class TrialVoiceBootstrap implements CommandLineRunner {
             services.save(service);
         }
 
+        // The fictional demo restaurant needs a real schedule so availability can be demonstrated.
+        // Production tenants configure their own schedule instead of inheriting these hours.
+        if (hours.countByBusinessId(businessId) == 0) {
+            for (int day = 1; day <= 7; day++) {
+                BusinessHour hour = new BusinessHour();
+                hour.setBusinessId(businessId);
+                hour.setDayOfWeek(day);
+                hour.setOpenTime(LocalTime.of(12, 0));
+                hour.setCloseTime(LocalTime.of(22, 0));
+                hours.save(hour);
+            }
+        }
+
         boolean hasDemoKnowledge = knowledge.findAllByBusinessIdOrderByTitleAsc(businessId).stream()
                 .anyMatch(item -> "Información demo".equalsIgnoreCase(item.getTitle()));
         if (!hasDemoKnowledge) {
@@ -93,12 +112,12 @@ public class TrialVoiceBootstrap implements CommandLineRunner {
             item.setBusinessId(businessId);
             item.setTitle("Información demo");
             item.setCategory("demo");
-            item.setContent("Este es un restaurante de demostración de Helvoca. Puede informar sobre el servicio de reserva de mesa y crear reservas reales en el entorno demo. No debe inventar dirección, menú, precios u horarios que no estén configurados.");
+            item.setContent("Este es un restaurante de demostración de Helvoca. Puede informar sobre el servicio de reserva de mesa y crear reservas reales en el entorno demo. No debe inventar dirección, menú o precios que no estén configurados.");
             item.setActive(true);
             knowledge.save(item);
         }
 
-        log.info("Twilio trial voice mode ready for {} (OpenAI configured: {})",
-                properties.getPhoneNumber(), openAi.hasApiKey());
+        log.info("Twilio trial voice mode ready for {} (OpenAI configured: {}, schedule configured: {})",
+                properties.getPhoneNumber(), openAi.hasApiKey(), hours.countByBusinessId(businessId) > 0);
     }
 }

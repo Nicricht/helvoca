@@ -1,12 +1,12 @@
 package cl.helvoca.ai.realtime;
 
 import cl.helvoca.booking.BookingRepository;
-import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
+import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
@@ -50,7 +50,9 @@ class RealtimeToolServiceTest {
         KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
         BookingRepository bookings = mock(BookingRepository.class);
         CallSessionRepository calls = mock(CallSessionRepository.class);
-        RealtimeToolService tools = new RealtimeToolService(businesses, customers, services, knowledge, bookings, calls);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, customers, services, knowledge, bookings, calls, schedule);
 
         cl.helvoca.servicecatalog.ServiceItem service = new cl.helvoca.servicecatalog.ServiceItem();
         service.setBusinessId(businessId);
@@ -81,7 +83,8 @@ class RealtimeToolServiceTest {
     private static RealtimeToolService service() {
         return new RealtimeToolService(
                 mock(BusinessRepository.class), mock(CustomerRepository.class), mock(ServiceItemRepository.class),
-                mock(KnowledgeItemRepository.class), mock(BookingRepository.class), mock(CallSessionRepository.class));
+                mock(KnowledgeItemRepository.class), mock(BookingRepository.class), mock(CallSessionRepository.class),
+                mock(BusinessScheduleService.class));
     }
 
     private static ServiceItemRepository services(RealtimeToolService service) {

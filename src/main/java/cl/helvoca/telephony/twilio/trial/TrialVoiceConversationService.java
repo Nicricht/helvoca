@@ -18,7 +18,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -26,65 +29,79 @@ import java.util.Locale;
 @Service
 public class TrialVoiceConversationService {
     private static final Logger log = LoggerFactory.getLogger(TrialVoiceConversationService.class);
-    private static final Duration FIRST_REQUEST_TIMEOUT = Duration.ofMillis(2200);
-    private static final Duration SECOND_REQUEST_TIMEOUT = Duration.ofMillis(1500);
+    private static final Duration FIRST_REQUEST_TIMEOUT = Duration.ofSeconds(6);
+    private static final Duration SECOND_REQUEST_TIMEOUT = Duration.ofSeconds(5);
 
     private final TrialVoiceProperties trial;
     private final OpenAiRealtimeProperties openAi;
     private final RealtimeToolService tools;
     private final CallTranscriptService transcriptWriter;
     private final CallTranscriptRepository transcriptRepository;
+    private final TrialConversationStateService state;
     private final HttpClient http = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(1))
+            .connectTimeout(Duration.ofSeconds(2))
             .build();
 
     public TrialVoiceConversationService(TrialVoiceProperties trial,
                                          OpenAiRealtimeProperties openAi,
                                          RealtimeToolService tools,
                                          CallTranscriptService transcriptWriter,
-                                         CallTranscriptRepository transcriptRepository) {
+                                         CallTranscriptRepository transcriptRepository,
+                                         TrialConversationStateService state) {
         this.trial = trial;
         this.openAi = openAi;
         this.tools = tools;
         this.transcriptWriter = transcriptWriter;
         this.transcriptRepository = transcriptRepository;
+        this.state = state;
     }
 
     public TrialVoiceReply reply(RealtimeCallContext context, String speech) {
+        initializeState(context);
+
         if (speech == null || speech.isBlank()) {
-            return new TrialVoiceReply("No alcancé a escucharte. Inténtalo nuevamente.", false);
+            return new TrialVoiceReply("No alcancé a escucharte bien. ¿Puedes repetirlo?", false);
         }
 
         String cleanSpeech = speech.trim();
         transcriptWriter.append(context.callId(), "USER", cleanSpeech);
 
         if (isFarewell(cleanSpeech)) {
-            String goodbye = "Gracias por llamar a Helvoca. Hasta luego.";
+            String goodbye = "Gracias por llamar a Helvoca. Que tengas un excelente día.";
             transcriptWriter.append(context.callId(), "ASSISTANT", goodbye);
+            state.clear(context.callId());
             return new TrialVoiceReply(goodbye, true);
         }
 
         int userTurns = countUserTurns(context);
         if (userTurns >= Math.max(1, trial.getMaxTurns())) {
-            String limit = "La demostración llegó a su límite de turnos. Gracias por probar Helvoca.";
+            String limit = "Llegamos al final de esta demostración. Gracias por probar Helvoca.";
             transcriptWriter.append(context.callId(), "ASSISTANT", limit);
+            state.clear(context.callId());
             return new TrialVoiceReply(limit, true);
         }
 
         if (!openAi.hasApiKey()) {
-            String unavailable = "La inteligencia artificial no está configurada en este momento.";
+            String unavailable = "En este momento no puedo completar la consulta. ¿Puedes intentarlo nuevamente en unos minutos?";
             transcriptWriter.append(context.callId(), "ASSISTANT", unavailable);
             return new TrialVoiceReply(unavailable, false);
         }
 
         try {
-            String instructions = tools.buildInstructions(context) + "\n" + """
+            String instructions = tools.buildInstructions(context)
+                    + state.promptContext(context.callId())
+                    + "\n" + """
                     Estás atendiendo mediante el modo de prueba telefónica de Twilio basado en turnos.
-                    Tu respuesta será leída en voz alta por teléfono. Responde en español, sin markdown y con un máximo de 35 palabras.
-                    Si necesitas datos oficiales o ejecutar una acción, usa las herramientas disponibles.
-                    No afirmes que una acción fue exitosa si la herramienta no devolvió success=true.
-                    Hora actual UTC: %s.
-                    """.formatted(Instant.now());
+                    Tu respuesta será leída en voz alta. Responde en español natural, sin markdown y con un máximo de 35 palabras.
+                    Habla como una recepcionista: no describas procesos internos, búsquedas, herramientas, identificadores ni estados técnicos.
+                    Si el estado indica que no hay cliente asociado y quiere reservar, pregunta simplemente: ¿A nombre de quién sería?
+                    Si ya conoces el único servicio disponible, no vuelvas a listar servicios salvo que el cliente lo pregunte.
+                    Si pregunta qué horarios hay en un día, usa list_available_slots y ofrece horas concretas.
+                    Si indica una hora concreta, comprueba esa hora antes de decir que está disponible.
+                    No digas que una reserva está disponible o confirmada sin haberlo comprobado con una herramienta.
+                    Conserva servicio, nombre, fecha y hora entre turnos y no vuelvas a preguntarlos si ya aparecen en el estado o historial.
+                    Cuando la consulta sea ajena al negocio, redirige brevemente a información, servicios o reservas del negocio.
+                    """;
 
             JSONObject firstBody = baseRequest(instructions)
                     .put("input", buildHistory(context));
@@ -108,7 +125,7 @@ public class TrialVoiceConversationService {
 
                 String responseId = first.optString("id", "");
                 if (!responseId.isBlank()) {
-                    JSONObject secondBody = baseRequest(instructions)
+                    JSONObject secondBody = baseRequest(instructions + state.promptContext(context.callId()))
                             .put("previous_response_id", responseId)
                             .put("input", outputs);
                     try {
@@ -118,19 +135,27 @@ public class TrialVoiceConversationService {
                             return persist(context, secondText, false);
                         }
                     } catch (Exception secondFailure) {
-                        log.info("Trial voice second AI turn fell back to backend result for call {}: {}",
+                        log.info("Trial voice second AI turn used deterministic fallback for call {}: {}",
                                 context.callId(), secondFailure.getMessage());
                     }
                 }
 
-                return persist(context, summarizeToolResults(executions), false);
+                return persist(context, summarizeToolResults(context, executions), false);
             }
 
-            return persist(context, "No pude generar una respuesta clara. ¿Puedes repetirlo de otra forma?", false);
+            return persist(context, "No entendí del todo. ¿Puedes decírmelo de otra forma?", false);
         } catch (Exception e) {
             log.warn("Trial voice AI response failed for call {}: {}", context.callId(), e.getMessage());
-            return persist(context, "Estoy teniendo una demora con la inteligencia artificial. Inténtalo nuevamente.", false);
+            return persist(context, state.timeoutFallback(context.callId(), cleanSpeech), false);
         }
+    }
+
+    private void initializeState(RealtimeCallContext context) {
+        if (!state.beginInitialization(context.callId())) return;
+        String caller = tools.execute(context, "find_caller", "{}");
+        state.observeToolResult(context.callId(), "find_caller", caller);
+        String services = tools.execute(context, "list_services", "{}");
+        state.observeToolResult(context.callId(), "list_services", services);
     }
 
     private JSONObject baseRequest(String instructions) {
@@ -175,7 +200,9 @@ public class TrialVoiceConversationService {
             String name = call.optString("name", "");
             String arguments = call.optString("arguments", "{}");
             if (callId.isBlank() || name.isBlank()) continue;
-            out.add(new ToolExecution(callId, name, tools.execute(context, name, arguments)));
+            String result = tools.execute(context, name, arguments);
+            state.observeToolResult(context.callId(), name, result);
+            out.add(new ToolExecution(callId, name, result));
         }
         return out;
     }
@@ -241,54 +268,89 @@ public class TrialVoiceConversationService {
         return new TrialVoiceReply(safe, endCall);
     }
 
-    private String summarizeToolResults(List<ToolExecution> executions) {
-        if (executions.isEmpty()) return "No pude completar la operación solicitada.";
+    private String summarizeToolResults(RealtimeCallContext context, List<ToolExecution> executions) {
+        if (executions.isEmpty()) return "No pude completar eso. ¿Quieres que lo intentemos nuevamente?";
         ToolExecution execution = executions.get(executions.size() - 1);
         JSONObject result;
         try {
             result = new JSONObject(execution.result());
         } catch (Exception e) {
-            return "La operación fue procesada, pero no pude interpretar el resultado.";
+            return "No pude completar eso. ¿Quieres que lo intentemos nuevamente?";
         }
 
         if (!result.optBoolean("success", false)) {
             JSONObject error = result.optJSONObject("error");
-            return error == null ? "La operación no pudo completarse." : error.optString("message", "La operación no pudo completarse.");
+            String code = error == null ? "" : error.optString("code", "");
+            return switch (code) {
+                case "CUSTOMER_NOT_REGISTERED" -> "Claro. ¿A nombre de quién sería?";
+                case "BOOKING_SLOT_UNAVAILABLE" -> "Ese horario ya no está disponible. ¿Quieres que busque otra hora?";
+                case "BUSINESS_CLOSED" -> "Ese horario está fuera del horario de atención. ¿Quieres que busque otra hora?";
+                case "INVALID_ARGUMENT" -> "Necesito un poco más de información para ayudarte. ¿Puedes repetir la fecha y hora?";
+                default -> "No pude completar eso ahora. ¿Quieres que lo intentemos nuevamente?";
+            };
         }
 
         JSONObject data = result.optJSONObject("data");
-        if (data == null) return "La operación se completó correctamente.";
+        if (data == null) return "Listo.";
         return switch (execution.name()) {
-            case "create_booking" -> "Perfecto, la reserva quedó confirmada para " + data.optString("startAt", "el horario solicitado") + ".";
-            case "check_booking_availability" -> data.optBoolean("available", false)
-                    ? "Sí, el horario solicitado está disponible."
-                    : "Ese horario no está disponible. Puedo ayudarte a buscar otra alternativa.";
-            case "register_caller" -> "Perfecto, tus datos quedaron registrados.";
+            case "create_booking" -> "Perfecto. Tu reserva quedó confirmada para "
+                    + friendlyLocalDateTime(data.optString("localStart", data.optString("startAt", ""))) + ".";
+            case "check_booking_availability" -> {
+                if (!data.optBoolean("withinBusinessHours", true)) {
+                    yield "Ese horario está fuera del horario de atención. ¿Quieres que busque otra hora?";
+                }
+                yield data.optBoolean("available", false)
+                        ? "Sí, ese horario está disponible. ¿Quieres que confirme la reserva?"
+                        : "Ese horario no está disponible. ¿Quieres que busque otra alternativa?";
+            }
+            case "list_available_slots" -> availableSlotSummary(data);
+            case "register_caller" -> state.afterRegistrationPrompt(context.callId());
             case "find_caller" -> data.optBoolean("found", false)
-                    ? "Ya encontré tu registro de cliente."
-                    : "Todavía no encuentro un cliente asociado a este teléfono.";
+                    ? "Perfecto, ya tengo tus datos."
+                    : "Claro. ¿A nombre de quién sería?";
             case "list_services" -> serviceNames(data);
             case "get_business_information" -> "Estás llamando a " + data.optString("name", "este negocio") + ".";
             case "search_knowledge" -> firstKnowledge(data);
-            default -> "La operación se completó correctamente.";
+            default -> "Listo.";
         };
+    }
+
+    private String availableSlotSummary(JSONObject data) {
+        if (!data.optBoolean("scheduleConfigured", false)) {
+            return "Aún no tengo horarios de atención configurados para ofrecerte horas disponibles.";
+        }
+        JSONArray slots = data.optJSONArray("slots");
+        if (slots == null || slots.isEmpty()) {
+            return "No tengo horas disponibles ese día. ¿Quieres consultar otra fecha?";
+        }
+
+        List<String> times = new ArrayList<>();
+        for (int i = 0; i < Math.min(slots.length(), 5); i++) {
+            String raw = slots.getJSONObject(i).optString("localTime", "");
+            if (!raw.isBlank()) times.add(spokenTime(raw));
+        }
+        String day = friendlyDay(data.optString("date", ""), data.optString("timezone", "America/Santiago"));
+        return "Para " + day + " tengo disponibilidad a las " + joinSpanish(times) + ". ¿Cuál prefieres?";
     }
 
     private String serviceNames(JSONObject data) {
         JSONArray services = data.optJSONArray("services");
-        if (services == null || services.isEmpty()) return "No hay servicios activos configurados.";
+        if (services == null || services.isEmpty()) return "En este momento no tengo servicios activos para reservar.";
         List<String> names = new ArrayList<>();
         for (int i = 0; i < Math.min(services.length(), 4); i++) {
             names.add(services.getJSONObject(i).optString("name", "servicio"));
         }
-        return "Los servicios disponibles son " + String.join(", ", names) + ".";
+        if (names.size() == 1) {
+            return "Puedo ayudarte con " + names.get(0) + ". ¿Para qué día y hora te gustaría reservar?";
+        }
+        return "Puedo ayudarte con " + joinSpanish(names) + ". ¿Cuál te interesa?";
     }
 
     private String firstKnowledge(JSONObject data) {
         JSONArray results = data.optJSONArray("results");
-        if (results == null || results.isEmpty()) return "No encontré información oficial sobre eso.";
+        if (results == null || results.isEmpty()) return "No tengo esa información configurada. ¿Quieres consultar servicios o una reserva?";
         String content = results.getJSONObject(0).optString("content", "");
-        return content.isBlank() ? "Encontré información, pero está vacía." : content;
+        return content.isBlank() ? "No tengo esa información configurada." : content;
     }
 
     private String sanitizeForSpeech(String text) {
@@ -299,11 +361,51 @@ public class TrialVoiceConversationService {
         return cleaned.length() <= 500 ? cleaned : cleaned.substring(0, 500);
     }
 
+    private String friendlyDay(String rawDate, String timezone) {
+        try {
+            LocalDate date = LocalDate.parse(rawDate);
+            LocalDate today = LocalDate.now(ZoneId.of(timezone));
+            if (date.equals(today)) return "hoy";
+            if (date.equals(today.plusDays(1))) return "mañana";
+            return date.format(DateTimeFormatter.ofPattern("d 'de' MMMM", new Locale("es", "CL")));
+        } catch (Exception ignored) {
+            return "ese día";
+        }
+    }
+
+    private String friendlyLocalDateTime(String raw) {
+        if (raw == null || raw.isBlank()) return "el horario solicitado";
+        try {
+            java.time.OffsetDateTime value = java.time.OffsetDateTime.parse(raw);
+            return value.format(DateTimeFormatter.ofPattern("d 'de' MMMM 'a las' H:mm", new Locale("es", "CL")));
+        } catch (Exception ignored) {
+            return "el horario solicitado";
+        }
+    }
+
+    private String spokenTime(String raw) {
+        try {
+            LocalTime time = LocalTime.parse(raw);
+            return time.getMinute() == 0
+                    ? time.getHour() + " horas"
+                    : String.format(Locale.ROOT, "%d:%02d", time.getHour(), time.getMinute());
+        } catch (Exception ignored) {
+            return raw;
+        }
+    }
+
+    private String joinSpanish(List<String> values) {
+        if (values.isEmpty()) return "ninguna hora";
+        if (values.size() == 1) return values.get(0);
+        return String.join(", ", values.subList(0, values.size() - 1)) + " o " + values.get(values.size() - 1);
+    }
+
     private boolean isFarewell(String text) {
         String normalized = text.toLowerCase(Locale.ROOT);
         return normalized.contains("adiós") || normalized.contains("adios")
                 || normalized.contains("hasta luego") || normalized.contains("chao")
-                || normalized.contains("chau") || normalized.contains("eso es todo");
+                || normalized.contains("chau") || normalized.contains("eso es todo")
+                || normalized.contains("nada más") || normalized.contains("nada mas");
     }
 
     private record ToolExecution(String callId, String name, String result) {}
