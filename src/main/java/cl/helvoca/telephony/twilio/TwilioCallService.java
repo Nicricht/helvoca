@@ -67,8 +67,8 @@ public class TwilioCallService {
         lifecycle.markTrialEnded(providerCallId);
     }
 
-    public void updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {
-        lifecycle.updateStatus(providerCallId, providerStatus, durationSeconds);
+    public UUID updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {
+        return lifecycle.updateStatus(providerCallId, providerStatus, durationSeconds);
     }
 
     public RealtimeCallContext markStreamStarted(UUID callId,
