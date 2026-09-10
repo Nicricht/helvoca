@@ -44,7 +44,8 @@ public final class RealtimeToolDefinitions {
                 .put(function("cancel_booking", "Cancela una reserva del cliente de esta llamada. Solo comunica la cancelación cuando success=true.",
                         object().put("properties", new JSONObject()
                                         .put("bookingId", string("UUID de la reserva obtenido desde list_customer_bookings")))
-                                .put("required", new JSONArray().put("bookingId"))));
+                                .put("required", new JSONArray().put("bookingId"))))
+                .put(function("transfer_to_human", "Solicita transferir la llamada a una persona del negocio cuando el cliente lo pida o la atención automática no pueda resolver su necesidad. El destino se obtiene de la configuración segura del negocio, nunca de argumentos del modelo.", object()));
     }
 
     private static JSONObject function(String name, String description, JSONObject parameters) {

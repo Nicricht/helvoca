@@ -103,8 +103,19 @@ public class TrialConversationStateService {
                 state.upcomingBookingCount = 0;
                 state.bookingConfirmed = false;
             }
+            case "transfer_to_human" -> setIfPresent(data, "targetPhone", value -> state.humanTransferTarget = value);
             default -> {
             }
+        }
+    }
+
+    public String consumeHumanTransferTarget(UUID callId) {
+        State state = states.get(callId);
+        if (state == null) return null;
+        synchronized (state) {
+            String target = state.humanTransferTarget;
+            state.humanTransferTarget = null;
+            return target;
         }
     }
 
@@ -215,6 +226,7 @@ public class TrialConversationStateService {
         private String requestedStartAt;
         private Boolean available;
         private boolean bookingConfirmed;
+        private String humanTransferTarget;
 
         private boolean isEmpty() {
             return !callerLookupDone && serviceId == null && serviceName == null && customerName == null

@@ -27,12 +27,8 @@ public class TwimlFactory {
     }
 
     public String trialGather(String prompt) {
-        String base = normalizedPublicBaseUrl();
-        if (base == null) return serviceUnavailable();
-        String actionUrl = base + "/webhooks/v1/twilio/trial/gather";
-        if (trial.hasWebhookSecret()) {
-            actionUrl += "?trialKey=" + trial.getWebhookSecret();
-        }
+        String actionUrl = trialActionUrl("/webhooks/v1/twilio/trial/gather");
+        if (actionUrl == null) return serviceUnavailable();
         String action = escapeXml(actionUrl);
         String speechLanguage = escapeXml(trial.getLanguage());
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
@@ -42,6 +38,18 @@ public class TwimlFactory {
                 trialSay(prompt) +
                 "</Gather>" +
                 trialSay("No escuché una respuesta. Hasta luego.") + "<Hangup/>" +
+                "</Response>";
+    }
+
+    public String trialTransfer(String prompt, String targetPhone) {
+        String actionUrl = trialActionUrl("/webhooks/v1/twilio/trial/transfer-result");
+        if (actionUrl == null || targetPhone == null || targetPhone.isBlank()) return serviceUnavailable();
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                "<Response>" +
+                trialSay(prompt) +
+                "<Dial action=\"" + escapeXml(actionUrl) + "\" method=\"POST\" timeout=\"20\" answerOnBridge=\"true\">" +
+                "<Number>" + escapeXml(targetPhone.trim()) + "</Number>" +
+                "</Dial>" +
                 "</Response>";
     }
 
@@ -72,6 +80,16 @@ public class TwimlFactory {
         }
         say.append(">").append(escapeXml(text)).append("</Say>");
         return say.toString();
+    }
+
+    private String trialActionUrl(String path) {
+        String base = normalizedPublicBaseUrl();
+        if (base == null) return null;
+        String actionUrl = base + path;
+        if (trial.hasWebhookSecret()) {
+            actionUrl += "?trialKey=" + trial.getWebhookSecret();
+        }
+        return actionUrl;
     }
 
     private String normalizedPublicBaseUrl() {

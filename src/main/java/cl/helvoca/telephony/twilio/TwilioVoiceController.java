@@ -3,6 +3,7 @@ package cl.helvoca.telephony.twilio;
 import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.common.NotFoundException;
+import cl.helvoca.telephony.twilio.trial.TrialConversationStateService;
 import cl.helvoca.telephony.twilio.trial.TrialVoiceConversationService;
 import cl.helvoca.telephony.twilio.trial.TrialVoiceProperties;
 import cl.helvoca.telephony.twilio.trial.TrialVoiceReply;
@@ -19,17 +20,20 @@ public class TwilioVoiceController {
     private final TwimlFactory twiml;
     private final TrialVoiceProperties trial;
     private final TrialVoiceConversationService trialConversation;
+    private final TrialConversationStateService trialState;
     private final CallSummaryService summaries;
 
     public TwilioVoiceController(TwilioCallService calls,
                                  TwimlFactory twiml,
                                  TrialVoiceProperties trial,
                                  TrialVoiceConversationService trialConversation,
+                                 TrialConversationStateService trialState,
                                  CallSummaryService summaries) {
         this.calls = calls;
         this.twiml = twiml;
         this.trial = trial;
         this.trialConversation = trialConversation;
+        this.trialState = trialState;
         this.summaries = summaries;
     }
 
@@ -71,12 +75,41 @@ public class TwilioVoiceController {
         try {
             RealtimeCallContext context = calls.getTrialContext(callSid);
             TrialVoiceReply reply = trialConversation.reply(context, speechResult);
+
+            String transferTarget = trialState.consumeHumanTransferTarget(context.callId());
+            if (transferTarget != null && !transferTarget.isBlank()) {
+                return ResponseEntity.ok(twiml.trialTransfer(
+                        "Claro, te comunico con una persona del negocio.", transferTarget));
+            }
+
             if (reply.endCall()) {
                 calls.markTrialEnded(callSid);
                 summaries.generate(context.callId());
                 return ResponseEntity.ok(twiml.trialSayAndHangup(reply.text()));
             }
             return ResponseEntity.ok(twiml.trialGather(reply.text()));
+        } catch (NotFoundException | IllegalArgumentException e) {
+            return ResponseEntity.ok(twiml.trialSayAndHangup("La sesión de prueba ya no está disponible."));
+        }
+    }
+
+    @PostMapping(value = "/trial/transfer-result", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+            produces = MediaType.APPLICATION_XML_VALUE)
+    public ResponseEntity<String> trialTransferResult(@RequestParam("CallSid") String callSid,
+                                                      @RequestParam(value = "DialCallStatus", required = false) String dialCallStatus) {
+        if (!trial.isEnabled()) {
+            return ResponseEntity.ok(twiml.serviceUnavailable());
+        }
+        try {
+            RealtimeCallContext context = calls.getTrialContext(callSid);
+            if ("completed".equalsIgnoreCase(dialCallStatus)) {
+                calls.markTrialEnded(callSid);
+                trialState.clear(context.callId());
+                summaries.generate(context.callId());
+                return ResponseEntity.ok(twiml.trialSayAndHangup("Gracias por comunicarte con nosotros. Hasta luego."));
+            }
+            return ResponseEntity.ok(twiml.trialGather(
+                    "No pude comunicarte con una persona en este momento. Puedo seguir ayudándote por aquí."));
         } catch (NotFoundException | IllegalArgumentException e) {
             return ResponseEntity.ok(twiml.trialSayAndHangup("La sesión de prueba ya no está disponible."));
         }

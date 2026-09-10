@@ -41,4 +41,24 @@ class TrialTwimlFactoryTest {
         assertTrue(xml.contains("Reserva &lt;confirmada&gt; &amp; lista"));
         assertTrue(xml.contains("<Hangup/>"));
     }
+
+    @Test
+    void trialTransferDialsConfiguredTargetAndUsesSecretGatedResultCallback() {
+        TwilioProperties twilio = new TwilioProperties();
+        twilio.setPublicBaseUrl("https://helvoca.example/");
+        TrialVoiceProperties trial = new TrialVoiceProperties();
+        trial.setTtsLanguage("es-MX");
+        trial.setTtsVoice("Polly.Mía-Generative");
+        trial.setWebhookSecret("test-secret");
+
+        String xml = new TwimlFactory(twilio, trial)
+                .trialTransfer("Te comunico.", "+56922222222");
+
+        assertTrue(xml.contains("<Dial action=\"https://helvoca.example/webhooks/v1/twilio/trial/transfer-result?trialKey=test-secret\""));
+        assertTrue(xml.contains("timeout=\"20\""));
+        assertTrue(xml.contains("answerOnBridge=\"true\""));
+        assertTrue(xml.contains("<Number>+56922222222</Number>"));
+        assertTrue(xml.contains("Te comunico."));
+        assertFalse(xml.contains("<Gather"));
+    }
 }
