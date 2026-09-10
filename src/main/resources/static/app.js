@@ -66,7 +66,8 @@ function clearMessage(element) {
 }
 
 function setBusy(form, busy) {
-    $$('button, input, select, textarea', form).forEach(el => el.disabled = busy);
+    $$("button", form).forEach(el => el.disabled = busy);
+    form.setAttribute("aria-busy", busy ? "true" : "false");
 }
 
 function switchAuth(mode) {
