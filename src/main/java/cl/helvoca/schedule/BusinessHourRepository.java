@@ -9,4 +9,5 @@ public interface BusinessHourRepository extends JpaRepository<BusinessHour, UUID
     List<BusinessHour> findAllByBusinessIdOrderByDayOfWeekAscOpenTimeAsc(UUID businessId);
     List<BusinessHour> findAllByBusinessIdAndDayOfWeekOrderByOpenTimeAsc(UUID businessId, int dayOfWeek);
     long countByBusinessId(UUID businessId);
+    void deleteAllByBusinessId(UUID businessId);
 }
