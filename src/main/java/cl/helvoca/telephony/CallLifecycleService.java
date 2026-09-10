@@ -132,7 +132,7 @@ public class CallLifecycleService {
     }
 
     @Transactional
-    public void updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {
+    public UUID updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {
         CallSession call = calls.findByProviderCallId(providerCallId)
                 .orElseThrow(() -> new NotFoundException("Call not found"));
         CallStatus mapped = mapStatus(providerStatus);
@@ -149,6 +149,7 @@ public class CallLifecycleService {
         } else if (mapped.terminal() && call.getStartedAt() != null && call.getEndedAt() != null) {
             call.setDurationSeconds((int) Math.max(0, Duration.between(call.getStartedAt(), call.getEndedAt()).toSeconds()));
         }
+        return call.getId();
     }
 
     @Transactional
