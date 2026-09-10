@@ -13,18 +13,23 @@ public final class RealtimeToolDefinitions {
                 .put(function("search_knowledge", "Busca información oficial configurada por el negocio.",
                         object().put("properties", new JSONObject().put("query", string("Texto a buscar")))
                                 .put("required", new JSONArray().put("query"))))
-                .put(function("find_caller", "Obtiene el cliente asociado al teléfono de esta llamada.", object()))
+                .put(function("find_caller", "Obtiene el cliente asociado al teléfono de esta llamada. Usa el resultado internamente; si no existe, pide el nombre de manera natural.", object()))
                 .put(function("register_caller", "Registra o actualiza al cliente de esta llamada. El teléfono se toma del contexto verificado y nunca de argumentos del modelo.",
                         object().put("properties", new JSONObject()
                                         .put("name", string("Nombre del cliente"))
                                         .put("email", string("Correo opcional")))
                                 .put("required", new JSONArray().put("name"))))
-                .put(function("check_booking_availability", "Comprueba disponibilidad real antes de prometer una reserva.",
+                .put(function("list_available_slots", "Lista horarios realmente disponibles para un servicio en una fecha local del negocio. Úsala cuando pregunten qué horas hay disponibles en un día.",
+                        object().put("properties", new JSONObject()
+                                        .put("serviceId", string("UUID del servicio"))
+                                        .put("date", string("Fecha local del negocio en formato YYYY-MM-DD")))
+                                .put("required", new JSONArray().put("serviceId").put("date"))))
+                .put(function("check_booking_availability", "Comprueba una hora exacta antes de prometer una reserva.",
                         object().put("properties", new JSONObject()
                                         .put("serviceId", string("UUID del servicio"))
                                         .put("startAt", string("Fecha y hora ISO-8601 con zona u offset")))
                                 .put("required", new JSONArray().put("serviceId").put("startAt"))))
-                .put(function("create_booking", "Crea una reserva real. Solo se considera confirmada cuando esta herramienta devuelve success=true.",
+                .put(function("create_booking", "Crea una reserva real. Solo se considera confirmada cuando esta herramienta devuelve success=true y el cliente ya confirmó verbalmente servicio y fecha/hora.",
                         object().put("properties", new JSONObject()
                                         .put("serviceId", string("UUID del servicio"))
                                         .put("startAt", string("Fecha y hora ISO-8601 con zona u offset"))
@@ -41,7 +46,9 @@ public final class RealtimeToolDefinitions {
     }
 
     private static JSONObject object() {
-        return new JSONObject().put("type", "object").put("additionalProperties", false).put("properties", new JSONObject());
+        return new JSONObject().put("type", "object")
+                .put("additionalProperties", false)
+                .put("properties", new JSONObject());
     }
 
     private static JSONObject string(String description) {
