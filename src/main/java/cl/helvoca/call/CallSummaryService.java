@@ -85,6 +85,7 @@ public class CallSummaryService {
         summary.setCallId(callId);
         summary.setSummary(text);
         summaries.save(summary);
+        log.info("Call summary persisted for call {}", callId);
     }
 
     private static String buildTranscript(List<CallTranscript> items) {
