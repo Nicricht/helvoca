@@ -11,16 +11,22 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
 public class PublicBusinessSourceService {
     private static final int MAX_BYTES = 250_000;
     private static final int MAX_TEXT = 24_000;
+    private static final int MAX_METADATA_TEXT = 8_000;
     private static final int MAX_REDIRECTS = 3;
     private static final Pattern SCRIPT = Pattern.compile("(?is)<(script|style|noscript)[^>]*>.*?</\\1>");
     private static final Pattern TAG = Pattern.compile("(?is)<[^>]+>");
     private static final Pattern SPACE = Pattern.compile("[\\s\\u00A0]+");
+    private static final Pattern TITLE = Pattern.compile("(?is)<title[^>]*>(.*?)</title>");
+    private static final Pattern META = Pattern.compile("(?is)<meta\\b[^>]*>");
+    private static final Pattern CONTENT_ATTR = Pattern.compile("(?is)\\bcontent\\s*=\\s*([\"'])(.*?)\\1");
+    private static final Pattern JSON_LD = Pattern.compile("(?is)<script[^>]*type\\s*=\\s*[\"']application/ld\\+json[\"'][^>]*>(.*?)</script>");
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(6))
@@ -133,15 +139,50 @@ public class PublicBusinessSourceService {
     }
 
     static String extractText(String html) {
-        String cleaned = SCRIPT.matcher(html == null ? "" : html).replaceAll(" ");
-        cleaned = TAG.matcher(cleaned).replaceAll(" ");
-        cleaned = cleaned.replace("&nbsp;", " ")
+        String source = html == null ? "" : html;
+        StringBuilder metadata = new StringBuilder();
+
+        Matcher titleMatcher = TITLE.matcher(source);
+        if (titleMatcher.find()) appendBounded(metadata, titleMatcher.group(1));
+
+        Matcher metaMatcher = META.matcher(source);
+        while (metaMatcher.find() && metadata.length() < MAX_METADATA_TEXT) {
+            String tag = metaMatcher.group();
+            String lower = tag.toLowerCase(Locale.ROOT);
+            if (lower.contains("description") || lower.contains("og:title") || lower.contains("og:description")) {
+                Matcher contentMatcher = CONTENT_ATTR.matcher(tag);
+                if (contentMatcher.find()) appendBounded(metadata, contentMatcher.group(2));
+            }
+        }
+
+        Matcher jsonLdMatcher = JSON_LD.matcher(source);
+        while (jsonLdMatcher.find() && metadata.length() < MAX_METADATA_TEXT) {
+            appendBounded(metadata, jsonLdMatcher.group(1));
+        }
+
+        String visible = SCRIPT.matcher(source).replaceAll(" ");
+        visible = TAG.matcher(visible).replaceAll(" ");
+        String combined = metadata + " " + visible;
+        combined = decodeEntities(combined);
+        return SPACE.matcher(combined).replaceAll(" ").trim();
+    }
+
+    private static void appendBounded(StringBuilder target, String value) {
+        if (value == null || value.isBlank() || target.length() >= MAX_METADATA_TEXT) return;
+        int remaining = MAX_METADATA_TEXT - target.length();
+        String trimmed = value.trim();
+        if (trimmed.length() > remaining) trimmed = trimmed.substring(0, remaining);
+        if (!target.isEmpty()) target.append(' ');
+        target.append(trimmed);
+    }
+
+    private static String decodeEntities(String value) {
+        return value.replace("&nbsp;", " ")
                 .replace("&amp;", "&")
                 .replace("&quot;", "\"")
                 .replace("&#39;", "'")
                 .replace("&lt;", "<")
                 .replace("&gt;", ">");
-        return SPACE.matcher(cleaned).replaceAll(" ").trim();
     }
 
     private static SourceReadResult unreadable(URI uri, String warning) {
