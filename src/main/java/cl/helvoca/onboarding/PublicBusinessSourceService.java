@@ -64,16 +64,15 @@ public class PublicBusinessSourceService {
                 try (InputStream input = response.body()) {
                     bytes = input.readNBytes(MAX_BYTES + 1);
                 }
-                if (bytes.length > MAX_BYTES) {
-                    return unreadable(uri, "La página es demasiado grande para el análisis rápido. Usa una página más específica del negocio.");
-                }
-                String html = new String(bytes, StandardCharsets.UTF_8);
+                boolean partial = bytes.length > MAX_BYTES;
+                String html = new String(bytes, 0, Math.min(bytes.length, MAX_BYTES), StandardCharsets.UTF_8);
                 String text = extractText(html);
                 if (text.length() < 80) {
                     return unreadable(uri, "La fuente no expuso suficiente texto público. Algunas páginas de Instagram o Google Maps requieren usar el sitio web oficial.");
                 }
                 if (text.length() > MAX_TEXT) text = text.substring(0, MAX_TEXT);
-                return new SourceReadResult(uri.toString(), true, text, null);
+                String warning = partial ? "La página era grande, así que Helvoca analizó solo una porción inicial de su contenido público." : null;
+                return new SourceReadResult(uri.toString(), true, text, warning);
             }
             return unreadable(uri, "No se pudo leer la fuente pública.");
         } catch (IllegalArgumentException e) {
