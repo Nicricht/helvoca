@@ -34,7 +34,17 @@ public final class RealtimeToolDefinitions {
                                         .put("serviceId", string("UUID del servicio"))
                                         .put("startAt", string("Fecha y hora ISO-8601 con zona u offset"))
                                         .put("notes", string("Notas opcionales")))
-                                .put("required", new JSONArray().put("serviceId").put("startAt"))));
+                                .put("required", new JSONArray().put("serviceId").put("startAt"))))
+                .put(function("list_customer_bookings", "Lista las próximas reservas confirmadas del cliente identificado por esta llamada. El cliente y negocio se obtienen del contexto verificado.", object()))
+                .put(function("reschedule_booking", "Reprograma una reserva del cliente de esta llamada. Solo comunica el cambio cuando success=true. El backend vuelve a validar horario y solapamientos.",
+                        object().put("properties", new JSONObject()
+                                        .put("bookingId", string("UUID de la reserva obtenido desde list_customer_bookings"))
+                                        .put("newStartAt", string("Nueva fecha y hora ISO-8601 con zona u offset")))
+                                .put("required", new JSONArray().put("bookingId").put("newStartAt"))))
+                .put(function("cancel_booking", "Cancela una reserva del cliente de esta llamada. Solo comunica la cancelación cuando success=true.",
+                        object().put("properties", new JSONObject()
+                                        .put("bookingId", string("UUID de la reserva obtenido desde list_customer_bookings")))
+                                .put("required", new JSONArray().put("bookingId"))));
     }
 
     private static JSONObject function(String name, String description, JSONObject parameters) {
