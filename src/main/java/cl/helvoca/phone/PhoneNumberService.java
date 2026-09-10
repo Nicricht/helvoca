@@ -30,9 +30,18 @@ public class PhoneNumberService {
     public PhoneNumberResponse create(PhoneNumberRequest request) {
         UUID businessId = tenantProvider.requireBusinessId();
         String number = request.phoneNumber().trim();
-        if (repository.existsByPhoneNumber(number)) {
-            throw new ConflictException("Phone number is already registered");
+
+        PhoneNumber existing = repository.findByPhoneNumber(number).orElse(null);
+        if (existing != null) {
+            if (!existing.getBusinessId().equals(businessId)) {
+                throw new ConflictException("Este número ya está conectado a otro negocio");
+            }
+            String externalId = blankToNull(request.externalId());
+            if (externalId != null) existing.setExternalId(externalId);
+            existing.setActive(request.active() == null || request.active());
+            return PhoneNumberResponse.from(repository.save(existing));
         }
+
         PhoneNumber phone = new PhoneNumber();
         phone.setBusinessId(businessId);
         phone.setProvider("TWILIO");
