@@ -74,7 +74,7 @@ public class TrialVoiceConversationService {
         }
 
         int userTurns = countUserTurns(context);
-        if (userTurns >= Math.max(1, trial.getMaxTurns())) {
+        if (userTurns > Math.max(1, trial.getMaxTurns())) {
             String limit = "Llegamos al final de esta demostración. Gracias por probar Helvoca.";
             transcriptWriter.append(context.callId(), "ASSISTANT", limit);
             state.clear(context.callId());
@@ -98,8 +98,12 @@ public class TrialVoiceConversationService {
                     Si ya conoces el único servicio disponible, no vuelvas a listar servicios salvo que el cliente lo pregunte.
                     Si pregunta qué horarios hay en un día, usa list_available_slots y ofrece horas concretas.
                     Si indica una hora concreta, comprueba esa hora antes de decir que está disponible.
-                    No digas que una reserva está disponible o confirmada sin haberlo comprobado con una herramienta.
-                    Conserva servicio, nombre, fecha y hora entre turnos y no vuelvas a preguntarlos si ya aparecen en el estado o historial.
+                    Si pregunta por sus reservas, usa list_customer_bookings.
+                    Si quiere cambiar una reserva y el estado ya contiene bookingId seleccionado, conserva ese bookingId mientras buscas o confirmas la nueva hora y luego usa reschedule_booking.
+                    Si quiere cancelar y el estado ya contiene bookingId seleccionado, usa ese bookingId después de confirmar la intención de cancelar.
+                    Si hay más de una reserva futura y no hay bookingId seleccionado, pregunta cuál desea cambiar o cancelar antes de ejecutar la acción.
+                    No digas que una reserva está disponible, confirmada, reprogramada o cancelada sin haberlo comprobado con una herramienta.
+                    Conserva servicio, nombre, bookingId, fecha y hora entre turnos y no vuelvas a preguntarlos si ya aparecen en el estado o historial.
                     Cuando la consulta sea ajena al negocio, redirige brevemente a información, servicios o reservas del negocio.
                     """;
 
@@ -270,7 +274,7 @@ public class TrialVoiceConversationService {
 
     private String summarizeToolResults(RealtimeCallContext context, List<ToolExecution> executions) {
         if (executions.isEmpty()) return "No pude completar eso. ¿Quieres que lo intentemos nuevamente?";
-        ToolExecution execution = executions.get(executions.size() - 1);
+        ToolExecution execution = preferredExecution(executions);
         JSONObject result;
         try {
             result = new JSONObject(execution.result());
@@ -285,6 +289,8 @@ public class TrialVoiceConversationService {
                 case "CUSTOMER_NOT_REGISTERED" -> "Claro. ¿A nombre de quién sería?";
                 case "BOOKING_SLOT_UNAVAILABLE" -> "Ese horario ya no está disponible. ¿Quieres que busque otra hora?";
                 case "BUSINESS_CLOSED" -> "Ese horario está fuera del horario de atención. ¿Quieres que busque otra hora?";
+                case "BOOKING_NOT_FOUND" -> "No encontré esa reserva entre tus reservas futuras. ¿Quieres que las revise nuevamente?";
+                case "BOOKING_CANCELLED" -> "Esa reserva ya está cancelada. ¿Quieres consultar tus otras reservas?";
                 case "INVALID_ARGUMENT" -> "Necesito un poco más de información para ayudarte. ¿Puedes repetir la fecha y hora?";
                 default -> "No pude completar eso ahora. ¿Quieres que lo intentemos nuevamente?";
             };
@@ -295,6 +301,10 @@ public class TrialVoiceConversationService {
         return switch (execution.name()) {
             case "create_booking" -> "Perfecto. Tu reserva quedó confirmada para "
                     + friendlyLocalDateTime(data.optString("localStart", data.optString("startAt", ""))) + ".";
+            case "reschedule_booking" -> "Perfecto. Tu reserva quedó reprogramada para "
+                    + friendlyLocalDateTime(data.optString("localStart", data.optString("startAt", ""))) + ".";
+            case "cancel_booking" -> "Perfecto. Tu reserva quedó cancelada.";
+            case "list_customer_bookings" -> customerBookingsSummary(data);
             case "check_booking_availability" -> {
                 if (!data.optBoolean("withinBusinessHours", true)) {
                     yield "Ese horario está fuera del horario de atención. ¿Quieres que busque otra hora?";
@@ -313,6 +323,39 @@ public class TrialVoiceConversationService {
             case "search_knowledge" -> firstKnowledge(data);
             default -> "Listo.";
         };
+    }
+
+    private ToolExecution preferredExecution(List<ToolExecution> executions) {
+        for (int i = executions.size() - 1; i >= 0; i--) {
+            ToolExecution candidate = executions.get(i);
+            try {
+                if (new JSONObject(candidate.result()).optBoolean("success", false)) {
+                    return candidate;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return executions.get(executions.size() - 1);
+    }
+
+    private String customerBookingsSummary(JSONObject data) {
+        JSONArray bookings = data.optJSONArray("bookings");
+        if (bookings == null || bookings.isEmpty()) {
+            return "No tienes reservas futuras confirmadas.";
+        }
+        if (bookings.length() == 1) {
+            JSONObject booking = bookings.getJSONObject(0);
+            return "Tienes una reserva de " + booking.optString("service", "servicio") + " para "
+                    + friendlyLocalDateTime(booking.optString("localStart", booking.optString("startAt", ""))) + ".";
+        }
+        List<String> items = new ArrayList<>();
+        for (int i = 0; i < Math.min(bookings.length(), 3); i++) {
+            JSONObject booking = bookings.getJSONObject(i);
+            items.add(booking.optString("service", "servicio") + " el "
+                    + friendlyLocalDateTime(booking.optString("localStart", booking.optString("startAt", ""))));
+        }
+        return "Tienes " + bookings.length() + " reservas futuras. Las primeras son " + joinSpanish(items)
+                + ". ¿Cuál quieres gestionar?";
     }
 
     private String availableSlotSummary(JSONObject data) {
