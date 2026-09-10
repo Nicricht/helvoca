@@ -119,6 +119,13 @@ public class TrialVoiceConversationService {
 
             if (!functionCalls.isEmpty()) {
                 List<ToolExecution> executions = executeTools(context, functionCalls);
+
+                String mutationReply = immediateMutationReply(context, executions);
+                if (mutationReply != null) {
+                    log.info("Trial voice returned immediate backend mutation confirmation for call {}", context.callId());
+                    return persist(context, mutationReply, false);
+                }
+
                 JSONArray outputs = new JSONArray();
                 for (ToolExecution execution : executions) {
                     outputs.put(new JSONObject()
@@ -270,6 +277,29 @@ public class TrialVoiceConversationService {
         String safe = sanitizeForSpeech(text);
         transcriptWriter.append(context.callId(), "ASSISTANT", safe);
         return new TrialVoiceReply(safe, endCall);
+    }
+
+    private String immediateMutationReply(RealtimeCallContext context, List<ToolExecution> executions) {
+        for (int i = executions.size() - 1; i >= 0; i--) {
+            ToolExecution execution = executions.get(i);
+            if (shouldAcknowledgeMutationImmediately(execution.name(), execution.result())) {
+                return summarizeToolResults(context, List.of(execution));
+            }
+        }
+        return null;
+    }
+
+    static boolean shouldAcknowledgeMutationImmediately(String toolName, String rawResult) {
+        if (!("create_booking".equals(toolName)
+                || "reschedule_booking".equals(toolName)
+                || "cancel_booking".equals(toolName))) {
+            return false;
+        }
+        try {
+            return new JSONObject(rawResult).optBoolean("success", false);
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private String summarizeToolResults(RealtimeCallContext context, List<ToolExecution> executions) {
