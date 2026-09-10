@@ -15,7 +15,20 @@ public class OpenAiRealtimeProperties {
     private String realtimeUrl = "wss://api.openai.com/v1/realtime";
     private String responsesUrl = "https://api.openai.com/v1/responses";
 
-    public String getApiKey() { return apiKey; }
+    /**
+     * Returns the API key bound through Spring configuration. Railway and other
+     * platforms may also expose OPENAI_API_KEY directly to the process, so use
+     * that raw environment variable as a safe fallback when property binding
+     * leaves the configured value blank.
+     */
+    public String getApiKey() {
+        if (apiKey != null && !apiKey.isBlank()) {
+            return apiKey.trim();
+        }
+        String environmentApiKey = System.getenv("OPENAI_API_KEY");
+        return environmentApiKey == null ? "" : environmentApiKey.trim();
+    }
+
     public void setApiKey(String apiKey) { this.apiKey = apiKey; }
     public String getRealtimeModel() { return realtimeModel; }
     public void setRealtimeModel(String realtimeModel) { this.realtimeModel = realtimeModel; }
@@ -32,5 +45,5 @@ public class OpenAiRealtimeProperties {
     public String getResponsesUrl() { return responsesUrl; }
     public void setResponsesUrl(String responsesUrl) { this.responsesUrl = responsesUrl; }
 
-    public boolean hasApiKey() { return apiKey != null && !apiKey.isBlank(); }
+    public boolean hasApiKey() { return !getApiKey().isBlank(); }
 }
