@@ -2,6 +2,8 @@ package cl.helvoca.telephony.twilio.trial;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
@@ -11,6 +13,8 @@ import java.util.concurrent.ConcurrentMap;
 
 @Component
 public class TrialConversationStateService {
+    private static final Logger log = LoggerFactory.getLogger(TrialConversationStateService.class);
+
     private final ConcurrentMap<UUID, State> states = new ConcurrentHashMap<>();
 
     public boolean beginInitialization(UUID callId) {
@@ -47,15 +51,19 @@ public class TrialConversationStateService {
         try {
             result = new JSONObject(rawResult);
         } catch (Exception ignored) {
+            log.info("Trial tool outcome call={} tool={} parseable=false", callId, toolName);
             return;
         }
+
+        boolean success = result.optBoolean("success", false);
+        JSONObject data = result.optJSONObject("data");
+        logToolOutcome(callId, toolName, result, data, success);
 
         State state = states.computeIfAbsent(callId, ignored -> new State());
         if ("find_caller".equals(toolName)) {
             state.callerLookupDone = true;
         }
-        if (!result.optBoolean("success", false)) return;
-        JSONObject data = result.optJSONObject("data");
+        if (!success) return;
         if (data == null) return;
 
         switch (toolName) {
@@ -119,6 +127,29 @@ public class TrialConversationStateService {
 
     public void clear(UUID callId) {
         states.remove(callId);
+    }
+
+    private static void logToolOutcome(UUID callId,
+                                       String toolName,
+                                       JSONObject result,
+                                       JSONObject data,
+                                       boolean success) {
+        if (!success) {
+            JSONObject error = result.optJSONObject("error");
+            String errorCode = error == null ? "UNKNOWN" : error.optString("code", "UNKNOWN");
+            log.info("Trial tool outcome call={} tool={} success=false errorCode={}", callId, toolName, errorCode);
+            return;
+        }
+
+        if ("create_booking".equals(toolName) && data != null) {
+            log.info("Trial tool outcome call={} tool=create_booking success=true bookingId={} status={}",
+                    callId,
+                    data.optString("bookingId", "unknown"),
+                    data.optString("status", "unknown"));
+            return;
+        }
+
+        log.info("Trial tool outcome call={} tool={} success=true", callId, toolName);
     }
 
     private static void observeServices(State state, JSONObject data) {

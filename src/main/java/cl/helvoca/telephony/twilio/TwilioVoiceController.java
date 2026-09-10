@@ -10,6 +10,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/webhooks/v1/twilio")
 public class TwilioVoiceController {
@@ -85,7 +87,10 @@ public class TwilioVoiceController {
                                        @RequestParam("CallStatus") String callStatus,
                                        @RequestParam(value = "CallDuration", required = false) Integer callDuration) {
         try {
-            calls.updateStatus(callSid, callStatus, callDuration);
+            UUID callId = calls.updateStatus(callSid, callStatus, callDuration);
+            if (TwilioCallService.mapStatus(callStatus).terminal()) {
+                summaries.generate(callId);
+            }
         } catch (NotFoundException ignored) {
             // A delayed callback for an unknown call is idempotently ignored.
         }
