@@ -32,11 +32,39 @@ class PublicBusinessSourceServiceTest {
     }
 
     @Test
-    void stripsScriptsStylesAndMarkupFromHtml() {
+    void stripsArbitraryScriptsAndStylesButKeepsVisibleText() {
         String html = "<html><style>.x{color:red}</style><script>alert(1)</script><body><h1>Don Pepe</h1><p>Abierto &amp; feliz</p></body></html>";
         String text = PublicBusinessSourceService.extractText(html);
         assertEquals("Don Pepe Abierto & feliz", text);
         assertFalse(text.contains("alert"));
         assertFalse(text.contains("color:red"));
+    }
+
+    @Test
+    void keepsTitleDescriptionsAndJsonLdBusinessFacts() {
+        String html = """
+                <html>
+                  <head>
+                    <title>Restaurante Don Pepe</title>
+                    <meta name="description" content="Cocina chilena en Santiago">
+                    <meta property="og:description" content="Reservas todos los días">
+                    <script type="application/ld+json">
+                      {"@type":"Restaurant","name":"Don Pepe","openingHours":"Mo-Sa 12:00-23:00","address":"Providencia"}
+                    </script>
+                    <script>window.secret = 'no incluir';</script>
+                  </head>
+                  <body><p>Bienvenidos.</p></body>
+                </html>
+                """;
+
+        String text = PublicBusinessSourceService.extractText(html);
+
+        assertTrue(text.contains("Restaurante Don Pepe"));
+        assertTrue(text.contains("Cocina chilena en Santiago"));
+        assertTrue(text.contains("Reservas todos los días"));
+        assertTrue(text.contains("openingHours"));
+        assertTrue(text.contains("Mo-Sa 12:00-23:00"));
+        assertTrue(text.contains("Providencia"));
+        assertFalse(text.contains("window.secret"));
     }
 }
