@@ -46,6 +46,57 @@ class TrialConversationStateServiceTest {
         assertTrue(state.afterRegistrationPrompt(callId).contains("horario que indicaste"));
     }
 
+    @Test
+    void remembersBookingIdWhenThereIsExactlyOneUpcomingBooking() {
+        UUID callId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        TrialConversationStateService state = new TrialConversationStateService();
+
+        JSONObject booking = new JSONObject()
+                .put("bookingId", bookingId.toString())
+                .put("serviceId", serviceId.toString())
+                .put("service", "Reserva de mesa")
+                .put("startAt", "2026-09-12T18:00:00Z")
+                .put("status", "CONFIRMED");
+
+        state.observeToolResult(callId, "list_customer_bookings", success(
+                new JSONObject().put("bookings", new JSONArray().put(booking))).toString());
+
+        String prompt = state.promptContext(callId);
+        assertTrue(prompt.contains("reservas futuras encontradas: 1"));
+        assertTrue(prompt.contains("bookingId seleccionado: " + bookingId));
+        assertTrue(prompt.contains("serviceId seleccionado: " + serviceId));
+        assertTrue(prompt.contains("reserva confirmada: true"));
+    }
+
+    @Test
+    void doesNotAutoSelectBookingWhenSeveralUpcomingBookingsExist() {
+        UUID callId = UUID.randomUUID();
+        TrialConversationStateService state = new TrialConversationStateService();
+
+        JSONArray bookings = new JSONArray()
+                .put(new JSONObject()
+                        .put("bookingId", UUID.randomUUID().toString())
+                        .put("serviceId", UUID.randomUUID().toString())
+                        .put("service", "Reserva de mesa")
+                        .put("startAt", "2026-09-12T18:00:00Z")
+                        .put("status", "CONFIRMED"))
+                .put(new JSONObject()
+                        .put("bookingId", UUID.randomUUID().toString())
+                        .put("serviceId", UUID.randomUUID().toString())
+                        .put("service", "Reserva de mesa")
+                        .put("startAt", "2026-09-13T18:00:00Z")
+                        .put("status", "CONFIRMED"));
+
+        state.observeToolResult(callId, "list_customer_bookings", success(
+                new JSONObject().put("bookings", bookings)).toString());
+
+        String prompt = state.promptContext(callId);
+        assertTrue(prompt.contains("reservas futuras encontradas: 2"));
+        assertFalse(prompt.contains("bookingId seleccionado:"));
+    }
+
     private static JSONObject success(JSONObject data) {
         return new JSONObject().put("success", true).put("data", data).put("error", JSONObject.NULL);
     }

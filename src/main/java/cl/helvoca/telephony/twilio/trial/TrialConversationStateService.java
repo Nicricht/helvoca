@@ -32,6 +32,8 @@ public class TrialConversationStateService {
         StringBuilder out = new StringBuilder("\nEstado estructurado de esta llamada. Úsalo como memoria y no vuelvas a pedir datos ya conocidos:\n");
         if (state.serviceId != null) out.append("- serviceId seleccionado: ").append(state.serviceId).append('\n');
         if (state.serviceName != null) out.append("- servicio seleccionado: ").append(state.serviceName).append('\n');
+        if (state.upcomingBookingCount != null) out.append("- reservas futuras encontradas: ").append(state.upcomingBookingCount).append('\n');
+        if (state.bookingId != null) out.append("- bookingId seleccionado: ").append(state.bookingId).append('\n');
         if (state.callerLookupDone) {
             if (Boolean.TRUE.equals(state.customerFound)) {
                 out.append("- cliente asociado al teléfono: sí\n");
@@ -78,6 +80,7 @@ public class TrialConversationStateService {
                 state.callerLookupDone = true;
                 setIfPresent(data, "name", value -> state.customerName = value);
             }
+            case "list_customer_bookings" -> observeCustomerBookings(state, data);
             case "check_booking_availability" -> {
                 setIfPresent(data, "serviceId", value -> state.serviceId = value);
                 setIfPresent(data, "serviceName", value -> state.serviceName = value);
@@ -85,15 +88,19 @@ public class TrialConversationStateService {
                 state.available = data.optBoolean("available", false);
             }
             case "create_booking", "reschedule_booking" -> {
+                setIfPresent(data, "bookingId", value -> state.bookingId = value);
                 setIfPresent(data, "service", value -> state.serviceName = value);
                 setIfPresent(data, "serviceId", value -> state.serviceId = value);
                 setIfPresent(data, "startAt", value -> state.requestedStartAt = value);
+                state.upcomingBookingCount = 1;
                 state.available = true;
                 state.bookingConfirmed = true;
             }
             case "cancel_booking" -> {
+                setIfPresent(data, "bookingId", value -> state.bookingId = value);
                 setIfPresent(data, "service", value -> state.serviceName = value);
                 setIfPresent(data, "startAt", value -> state.requestedStartAt = value);
+                state.upcomingBookingCount = 0;
                 state.bookingConfirmed = false;
             }
             default -> {
@@ -169,6 +176,27 @@ public class TrialConversationStateService {
         setIfPresent(service, "name", value -> state.serviceName = value);
     }
 
+    private static void observeCustomerBookings(State state, JSONObject data) {
+        JSONArray bookings = data.optJSONArray("bookings");
+        int count = bookings == null ? 0 : bookings.length();
+        state.upcomingBookingCount = count;
+        if (count != 1) {
+            state.bookingId = null;
+            return;
+        }
+
+        JSONObject booking = bookings.optJSONObject(0);
+        if (booking == null) {
+            state.bookingId = null;
+            return;
+        }
+        setIfPresent(booking, "bookingId", value -> state.bookingId = value);
+        setIfPresent(booking, "serviceId", value -> state.serviceId = value);
+        setIfPresent(booking, "service", value -> state.serviceName = value);
+        setIfPresent(booking, "startAt", value -> state.requestedStartAt = value);
+        state.bookingConfirmed = "CONFIRMED".equalsIgnoreCase(booking.optString("status", ""));
+    }
+
     private static void setIfPresent(JSONObject object, String key, java.util.function.Consumer<String> consumer) {
         if (!object.has(key) || object.isNull(key)) return;
         String value = object.optString(key, "").trim();
@@ -182,13 +210,16 @@ public class TrialConversationStateService {
         private String serviceId;
         private String serviceName;
         private String customerName;
+        private String bookingId;
+        private Integer upcomingBookingCount;
         private String requestedStartAt;
         private Boolean available;
         private boolean bookingConfirmed;
 
         private boolean isEmpty() {
             return !callerLookupDone && serviceId == null && serviceName == null && customerName == null
-                    && requestedStartAt == null && available == null && !bookingConfirmed;
+                    && bookingId == null && upcomingBookingCount == null && requestedStartAt == null
+                    && available == null && !bookingConfirmed;
         }
     }
 }
