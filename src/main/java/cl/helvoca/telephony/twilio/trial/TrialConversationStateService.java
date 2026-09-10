@@ -63,8 +63,7 @@ public class TrialConversationStateService {
         if ("find_caller".equals(toolName)) {
             state.callerLookupDone = true;
         }
-        if (!success) return;
-        if (data == null) return;
+        if (!success || data == null) return;
 
         switch (toolName) {
             case "list_services" -> observeServices(state, data);
@@ -85,11 +84,17 @@ public class TrialConversationStateService {
                 setIfPresent(data, "startAt", value -> state.requestedStartAt = value);
                 state.available = data.optBoolean("available", false);
             }
-            case "create_booking" -> {
+            case "create_booking", "reschedule_booking" -> {
                 setIfPresent(data, "service", value -> state.serviceName = value);
+                setIfPresent(data, "serviceId", value -> state.serviceId = value);
                 setIfPresent(data, "startAt", value -> state.requestedStartAt = value);
                 state.available = true;
                 state.bookingConfirmed = true;
+            }
+            case "cancel_booking" -> {
+                setIfPresent(data, "service", value -> state.serviceName = value);
+                setIfPresent(data, "startAt", value -> state.requestedStartAt = value);
+                state.bookingConfirmed = false;
             }
             default -> {
             }
@@ -141,9 +146,12 @@ public class TrialConversationStateService {
             return;
         }
 
-        if ("create_booking".equals(toolName) && data != null) {
-            log.info("Trial tool outcome call={} tool=create_booking success=true bookingId={} status={}",
+        if (("create_booking".equals(toolName)
+                || "reschedule_booking".equals(toolName)
+                || "cancel_booking".equals(toolName)) && data != null) {
+            log.info("Trial tool outcome call={} tool={} success=true bookingId={} status={}",
                     callId,
+                    toolName,
                     data.optString("bookingId", "unknown"),
                     data.optString("status", "unknown"));
             return;
