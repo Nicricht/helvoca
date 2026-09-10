@@ -119,38 +119,7 @@ public class TrialVoiceConversationService {
 
             if (!functionCalls.isEmpty()) {
                 List<ToolExecution> executions = executeTools(context, functionCalls);
-
-                String mutationReply = immediateMutationReply(context, executions);
-                if (mutationReply != null) {
-                    log.info("Trial voice returned immediate backend mutation confirmation for call {}", context.callId());
-                    return persist(context, mutationReply, false);
-                }
-
-                JSONArray outputs = new JSONArray();
-                for (ToolExecution execution : executions) {
-                    outputs.put(new JSONObject()
-                            .put("type", "function_call_output")
-                            .put("call_id", execution.callId())
-                            .put("output", execution.result()));
-                }
-
-                String responseId = first.optString("id", "");
-                if (!responseId.isBlank()) {
-                    JSONObject secondBody = baseRequest(instructions + state.promptContext(context.callId()))
-                            .put("previous_response_id", responseId)
-                            .put("input", outputs);
-                    try {
-                        JSONObject second = send(secondBody, SECOND_REQUEST_TIMEOUT);
-                        String secondText = extractOutputText(second);
-                        if (secondText != null && !secondText.isBlank()) {
-                            return persist(context, secondText, false);
-                        }
-                    } catch (Exception secondFailure) {
-                        log.info("Trial voice second AI turn used deterministic fallback for call {}: {}",
-                                context.callId(), secondFailure.getMessage());
-                    }
-                }
-
+                log.info("Trial voice returned immediate deterministic tool result for call {}", context.callId());
                 return persist(context, summarizeToolResults(context, executions), false);
             }
 
