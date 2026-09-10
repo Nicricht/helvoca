@@ -11,6 +11,7 @@ import cl.helvoca.schedule.BusinessHour;
 import cl.helvoca.schedule.BusinessHourRepository;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
+import cl.helvoca.user.AppUserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -31,6 +32,7 @@ public class TrialVoiceBootstrap implements CommandLineRunner {
     private final ServiceItemRepository services;
     private final KnowledgeItemRepository knowledge;
     private final BusinessHourRepository hours;
+    private final AppUserRepository users;
 
     public TrialVoiceBootstrap(TrialVoiceProperties properties,
                                OpenAiRealtimeProperties openAi,
@@ -38,7 +40,8 @@ public class TrialVoiceBootstrap implements CommandLineRunner {
                                PhoneNumberRepository phoneNumbers,
                                ServiceItemRepository services,
                                KnowledgeItemRepository knowledge,
-                               BusinessHourRepository hours) {
+                               BusinessHourRepository hours,
+                               AppUserRepository users) {
         this.properties = properties;
         this.openAi = openAi;
         this.businesses = businesses;
@@ -46,6 +49,7 @@ public class TrialVoiceBootstrap implements CommandLineRunner {
         this.services = services;
         this.knowledge = knowledge;
         this.hours = hours;
+        this.users = users;
     }
 
     @Override
@@ -59,6 +63,7 @@ public class TrialVoiceBootstrap implements CommandLineRunner {
 
         PhoneNumber phone = phoneNumbers.findByPhoneNumber(properties.getPhoneNumber()).orElse(null);
         UUID businessId;
+        boolean createdDemoBusiness = false;
         if (phone == null) {
             Business business = new Business();
             business.setName(properties.getBusinessName());
@@ -66,6 +71,7 @@ public class TrialVoiceBootstrap implements CommandLineRunner {
             business.setTimezone("America/Santiago");
             business = businesses.saveAndFlush(business);
             businessId = business.getId();
+            createdDemoBusiness = true;
 
             phone = new PhoneNumber();
             phone.setBusinessId(businessId);
@@ -82,6 +88,13 @@ public class TrialVoiceBootstrap implements CommandLineRunner {
             }
         }
 
+        boolean realTenantOwnsTrialNumber = !users.findAllByBusinessIdOrderByName(businessId).isEmpty();
+        if (realTenantOwnsTrialNumber && !createdDemoBusiness) {
+            log.info("Twilio trial voice mode ready for {} using configured tenant business {} (OpenAI configured: {})",
+                    properties.getPhoneNumber(), businessId, openAi.hasApiKey());
+            return;
+        }
+
         if (!services.existsByBusinessIdAndNameIgnoreCase(businessId, "Reserva de mesa")) {
             ServiceItem service = new ServiceItem();
             service.setBusinessId(businessId);
@@ -92,8 +105,8 @@ public class TrialVoiceBootstrap implements CommandLineRunner {
             services.save(service);
         }
 
-        // The fictional demo restaurant needs a real schedule so availability can be demonstrated.
-        // Production tenants configure their own schedule instead of inheriting these hours.
+        // Seed defaults only for the synthetic bootstrap business. A real tenant that owns
+        // the shared Trial number must keep its own services, hours and knowledge untouched.
         if (hours.countByBusinessId(businessId) == 0) {
             for (int day = 1; day <= 7; day++) {
                 BusinessHour hour = new BusinessHour();
