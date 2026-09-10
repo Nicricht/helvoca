@@ -1,5 +1,6 @@
 package cl.helvoca.telephony.twilio.trial;
 
+import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.knowledge.KnowledgeItem;
@@ -21,17 +22,20 @@ public class TrialVoiceBootstrap implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(TrialVoiceBootstrap.class);
 
     private final TrialVoiceProperties properties;
+    private final OpenAiRealtimeProperties openAi;
     private final BusinessRepository businesses;
     private final PhoneNumberRepository phoneNumbers;
     private final ServiceItemRepository services;
     private final KnowledgeItemRepository knowledge;
 
     public TrialVoiceBootstrap(TrialVoiceProperties properties,
+                               OpenAiRealtimeProperties openAi,
                                BusinessRepository businesses,
                                PhoneNumberRepository phoneNumbers,
                                ServiceItemRepository services,
                                KnowledgeItemRepository knowledge) {
         this.properties = properties;
+        this.openAi = openAi;
         this.businesses = businesses;
         this.phoneNumbers = phoneNumbers;
         this.services = services;
@@ -94,6 +98,7 @@ public class TrialVoiceBootstrap implements CommandLineRunner {
             knowledge.save(item);
         }
 
-        log.info("Twilio trial voice mode ready for {}", properties.getPhoneNumber());
+        log.info("Twilio trial voice mode ready for {} (OpenAI configured: {})",
+                properties.getPhoneNumber(), openAi.hasApiKey());
     }
 }
