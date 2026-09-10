@@ -67,6 +67,7 @@ public class RealtimeToolService {
                 case "list_customer_bookings" -> listCustomerBookings(context);
                 case "reschedule_booking" -> rescheduleBooking(context, args);
                 case "cancel_booking" -> cancelBooking(context, args);
+                case "transfer_to_human" -> transferToHuman(context);
                 default -> error("UNKNOWN_TOOL", "La operación solicitada no está habilitada.");
             };
             return result.toString();
@@ -94,11 +95,13 @@ public class RealtimeToolService {
                 Si el cliente indica una hora exacta, usa check_booking_availability antes de prometer disponibilidad.
                 Si el cliente pregunta por sus reservas, usa list_customer_bookings.
                 Para reprogramar o cancelar, primero identifica la reserva correcta con list_customer_bookings si aún no tienes su bookingId.
+                Si el cliente pide hablar con una persona, operador, recepcionista o humano, usa transfer_to_human.
                 Si no existe un cliente asociado al teléfono, no expliques estados internos. Pide su nombre de manera natural y luego usa register_caller.
                 Recuerda los datos ya obtenidos durante la llamada y no vuelvas a preguntar servicio, nombre, fecha u hora si ya están disponibles.
                 Una reserva solo existe si create_booking devuelve success=true.
                 Una reprogramación solo existe si reschedule_booking devuelve success=true.
                 Una cancelación solo existe si cancel_booking devuelve success=true.
+                Una transferencia solo está disponible si transfer_to_human devuelve success=true.
                 Si una herramienta devuelve success=false, explica el problema en lenguaje humano y ofrece una alternativa.
                 Antes de crear una reserva confirma verbalmente con el cliente el servicio y la fecha/hora.
                 Antes de reprogramar confirma verbalmente la nueva fecha/hora; antes de cancelar confirma cuál reserva será cancelada cuando haya ambigüedad.
@@ -342,6 +345,18 @@ public class RealtimeToolService {
                 .put("service", service == null ? "Servicio" : service.getName())
                 .put("startAt", booking.getStartAt().toString())
                 .put("localStart", formatLocal(context.businessId(), booking.getStartAt())));
+    }
+
+    private JSONObject transferToHuman(RealtimeCallContext context) {
+        requireTrustedCall(context);
+        Business business = requireBusiness(context.businessId());
+        String target = business.getHumanTransferPhone();
+        if (target == null || target.isBlank()) {
+            return error("HUMAN_TRANSFER_UNAVAILABLE", "El negocio no tiene un teléfono humano configurado para transferencias.");
+        }
+        return success(new JSONObject()
+                .put("transferRequested", true)
+                .put("targetPhone", target));
     }
 
     private JSONObject bookingData(UUID businessId, Booking booking, ServiceItem service) {
