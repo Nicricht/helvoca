@@ -3,6 +3,7 @@ package cl.helvoca.onboarding;
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
+import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.knowledge.KnowledgeItem;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
@@ -17,9 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -71,47 +75,125 @@ public class OnboardingService {
                 .toList();
         businessHours.replace(new BusinessHoursRequest(intervals));
 
-        upsertServices(businessId, request.services());
-        upsertKnowledge(businessId, request.knowledge() == null ? List.of() : request.knowledge());
+        syncServices(businessId, request.services());
+        syncKnowledge(businessId, request.knowledge() == null ? List.of() : request.knowledge());
         businesses.saveAndFlush(business);
         auditService.success(businessId, "ONBOARDING_SETUP", "BUSINESS", businessId);
         return buildStatus(businessId, business);
     }
 
-    private void upsertServices(UUID businessId, List<OnboardingSetupRequest.ServiceInput> requested) {
-        Map<String, ServiceItem> existing = new HashMap<>();
-        for (ServiceItem item : services.findAllByBusinessIdOrderByNameAsc(businessId)) {
-            existing.put(item.getName().trim().toLowerCase(Locale.ROOT), item);
+    private void syncServices(UUID businessId, List<OnboardingSetupRequest.ServiceInput> requested) {
+        List<ServiceItem> current = services.findAllByBusinessIdOrderByNameAsc(businessId);
+        Map<UUID, ServiceItem> byId = new HashMap<>();
+        Map<String, ServiceItem> byName = new HashMap<>();
+        for (ServiceItem item : current) {
+            byId.put(item.getId(), item);
+            byName.put(normalizedKey(item.getName()), item);
         }
+
+        Set<UUID> retainedIds = new HashSet<>();
+        Set<String> requestedNames = new HashSet<>();
         for (OnboardingSetupRequest.ServiceInput input : requested) {
-            String key = input.name().trim().toLowerCase(Locale.ROOT);
-            ServiceItem item = existing.getOrDefault(key, new ServiceItem());
-            if (item.getId() == null) item.setBusinessId(businessId);
+            String key = normalizedKey(input.name());
+            if (!requestedNames.add(key)) {
+                throw new ConflictException("Service names must be unique");
+            }
+
+            ServiceItem item;
+            if (input.id() != null) {
+                item = byId.get(input.id());
+                if (item == null) throw new NotFoundException("Service not found");
+            } else {
+                item = byName.get(key);
+                if (item == null) {
+                    item = new ServiceItem();
+                    item.setBusinessId(businessId);
+                }
+            }
+
+            ServiceItem nameOwner = byName.get(key);
+            if (nameOwner != null && !Objects.equals(nameOwner.getId(), item.getId())) {
+                throw new ConflictException("A service with that name already exists");
+            }
+
+            String oldKey = item.getId() == null ? null : normalizedKey(item.getName());
             item.setName(input.name().trim());
-            item.setDescription(input.description());
+            item.setDescription(input.description() == null || input.description().isBlank() ? null : input.description().trim());
             item.setDurationMinutes(input.durationMinutes());
             item.setPrice(input.price());
             item.setActive(true);
-            services.save(item);
-            existing.put(key, item);
+            ServiceItem saved = services.save(item);
+            if (saved.getId() != null) retainedIds.add(saved.getId());
+
+            if (oldKey != null && !oldKey.equals(key) && byName.get(oldKey) == item) {
+                byName.remove(oldKey);
+            }
+            byName.put(key, saved);
+            if (saved.getId() != null) byId.put(saved.getId(), saved);
+        }
+
+        for (ServiceItem item : current) {
+            if (item.isActive() && !retainedIds.contains(item.getId())) {
+                item.setActive(false);
+                services.save(item);
+            }
         }
     }
 
-    private void upsertKnowledge(UUID businessId, List<OnboardingSetupRequest.KnowledgeInput> requested) {
-        Map<String, KnowledgeItem> existing = new HashMap<>();
-        for (KnowledgeItem item : knowledge.findAllByBusinessIdOrderByTitleAsc(businessId)) {
-            existing.put(item.getTitle().trim().toLowerCase(Locale.ROOT), item);
+    private void syncKnowledge(UUID businessId, List<OnboardingSetupRequest.KnowledgeInput> requested) {
+        List<KnowledgeItem> current = knowledge.findAllByBusinessIdOrderByTitleAsc(businessId);
+        Map<UUID, KnowledgeItem> byId = new HashMap<>();
+        Map<String, KnowledgeItem> byTitle = new HashMap<>();
+        for (KnowledgeItem item : current) {
+            byId.put(item.getId(), item);
+            byTitle.put(normalizedKey(item.getTitle()), item);
         }
+
+        Set<UUID> retainedIds = new HashSet<>();
+        Set<String> requestedTitles = new HashSet<>();
         for (OnboardingSetupRequest.KnowledgeInput input : requested) {
-            String key = input.title().trim().toLowerCase(Locale.ROOT);
-            KnowledgeItem item = existing.getOrDefault(key, new KnowledgeItem());
-            if (item.getId() == null) item.setBusinessId(businessId);
+            String key = normalizedKey(input.title());
+            if (!requestedTitles.add(key)) {
+                throw new ConflictException("Knowledge titles must be unique");
+            }
+
+            KnowledgeItem item;
+            if (input.id() != null) {
+                item = byId.get(input.id());
+                if (item == null) throw new NotFoundException("Knowledge item not found");
+            } else {
+                item = byTitle.get(key);
+                if (item == null) {
+                    item = new KnowledgeItem();
+                    item.setBusinessId(businessId);
+                }
+            }
+
+            KnowledgeItem titleOwner = byTitle.get(key);
+            if (titleOwner != null && !Objects.equals(titleOwner.getId(), item.getId())) {
+                throw new ConflictException("A knowledge item with that title already exists");
+            }
+
+            String oldKey = item.getId() == null ? null : normalizedKey(item.getTitle());
             item.setTitle(input.title().trim());
             item.setCategory(input.category() == null || input.category().isBlank() ? null : input.category().trim());
             item.setContent(input.content().trim());
             item.setActive(true);
-            knowledge.save(item);
-            existing.put(key, item);
+            KnowledgeItem saved = knowledge.save(item);
+            if (saved.getId() != null) retainedIds.add(saved.getId());
+
+            if (oldKey != null && !oldKey.equals(key) && byTitle.get(oldKey) == item) {
+                byTitle.remove(oldKey);
+            }
+            byTitle.put(key, saved);
+            if (saved.getId() != null) byId.put(saved.getId(), saved);
+        }
+
+        for (KnowledgeItem item : current) {
+            if (item.isActive() && !retainedIds.contains(item.getId())) {
+                item.setActive(false);
+                knowledge.save(item);
+            }
         }
     }
 
@@ -154,5 +236,9 @@ public class OnboardingService {
     private static String normalizePhone(String phone) {
         if (phone == null || phone.isBlank()) return null;
         return phone.trim();
+    }
+
+    private static String normalizedKey(String value) {
+        return value.trim().toLowerCase(Locale.ROOT);
     }
 }

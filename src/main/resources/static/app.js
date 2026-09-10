@@ -29,30 +29,6 @@ function setToken(value) {
     else sessionStorage.removeItem(TOKEN_KEY);
 }
 
-async function api(path, options = {}, authenticated = true) {
-    const headers = new Headers(options.headers || {});
-    if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-    if (authenticated && token) headers.set("Authorization", `Bearer ${token}`);
-
-    const response = await fetch(path, { ...options, headers });
-    let payload = null;
-    const contentType = response.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-        try { payload = await response.json(); } catch (_) { payload = null; }
-    } else if (response.status !== 204) {
-        try { payload = await response.text(); } catch (_) { payload = null; }
-    }
-
-    if (!response.ok) {
-        const message = payload?.message || payload?.detail || payload?.error ||
-            (typeof payload === "string" && payload) || `Error HTTP ${response.status}`;
-        const error = new Error(message);
-        error.status = response.status;
-        throw error;
-    }
-    return payload;
-}
-
 function showMessage(element, text, kind = "error") {
     element.textContent = text;
     element.classList.remove("hidden", "error", "success");
@@ -76,6 +52,8 @@ function switchAuth(mode) {
     loginForm.classList.toggle("hidden", registering);
     $("#registerTab").classList.toggle("active", registering);
     $("#loginTab").classList.toggle("active", !registering);
+    $("#registerTab").setAttribute("aria-selected", registering ? "true" : "false");
+    $("#loginTab").setAttribute("aria-selected", registering ? "false" : "true");
     clearMessage(authMessage);
 }
 
@@ -97,8 +75,41 @@ function showDashboardShell() {
     badge.className = "badge online";
 }
 
+function handleExpiredSession() {
+    setToken("");
+    showAuth();
+    switchAuth("login");
+    showMessage(authMessage, "Tu sesión expiró. Ingresa nuevamente.");
+}
+
+async function api(path, options = {}, authenticated = true) {
+    const headers = new Headers(options.headers || {});
+    if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+    if (authenticated && token) headers.set("Authorization", `Bearer ${token}`);
+
+    const response = await fetch(path, { ...options, headers });
+    let payload = null;
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+        try { payload = await response.json(); } catch (_) { payload = null; }
+    } else if (response.status !== 204) {
+        try { payload = await response.text(); } catch (_) { payload = null; }
+    }
+
+    if (!response.ok) {
+        const message = payload?.message || payload?.detail || payload?.error ||
+            (typeof payload === "string" && payload) || `Error HTTP ${response.status}`;
+        const error = new Error(message);
+        error.status = response.status;
+        if (response.status === 401 && authenticated) handleExpiredSession();
+        throw error;
+    }
+    return payload;
+}
+
 function addServiceRow(service = {}) {
     const node = $("#serviceTemplate").content.firstElementChild.cloneNode(true);
+    if (service.id) node.dataset.id = service.id;
     $("[data-field=name]", node).value = service.name || "";
     $("[data-field=durationMinutes]", node).value = service.durationMinutes || 30;
     $("[data-field=price]", node).value = service.price ?? "";
@@ -117,6 +128,7 @@ function renderServices(services = []) {
 
 function addKnowledgeRow(item = {}) {
     const node = $("#knowledgeTemplate").content.firstElementChild.cloneNode(true);
+    if (item.id) node.dataset.id = item.id;
     $("[data-field=title]", node).value = item.title || "";
     $("[data-field=category]", node).value = item.category || "";
     $("[data-field=content]", node).value = item.content || "";
@@ -169,6 +181,32 @@ function ensureAddHourButton() {
     heading.appendChild(button);
 }
 
+async function refreshPhoneState() {
+    const [phones, status] = await Promise.all([
+        api("/api/v1/phone-numbers"),
+        api("/api/v1/onboarding/status")
+    ]);
+    renderPhones(phones);
+    applyStatus(status);
+}
+
+async function togglePhone(phone, button) {
+    clearMessage(phoneMessage);
+    button.disabled = true;
+    try {
+        await api(`/api/v1/phone-numbers/${phone.id}/active`, {
+            method: "PATCH",
+            body: JSON.stringify({ active: !phone.active })
+        });
+        await refreshPhoneState();
+        showMessage(phoneMessage, phone.active ? "Número desactivado." : "Número activado.", "success");
+    } catch (error) {
+        if (error.status !== 401) showMessage(phoneMessage, error.message || "No fue posible cambiar el estado del número.");
+    } finally {
+        button.disabled = false;
+    }
+}
+
 function renderPhones(phones = []) {
     phoneList.innerHTML = "";
     if (!phones.length) {
@@ -178,12 +216,22 @@ function renderPhones(phones = []) {
     phones.forEach(phone => {
         const row = document.createElement("div");
         row.className = "phone-item";
+
         const number = document.createElement("span");
+        number.className = "phone-number";
         number.textContent = phone.phoneNumber;
+
         const state = document.createElement("span");
+        state.className = `phone-state ${phone.active ? "active" : "inactive"}`;
         state.textContent = phone.active ? "ACTIVO" : "INACTIVO";
-        if (!phone.active) state.style.color = "var(--muted)";
-        row.append(number, state);
+
+        const action = document.createElement("button");
+        action.type = "button";
+        action.className = "button small ghost phone-toggle";
+        action.textContent = phone.active ? "Desactivar" : "Activar";
+        action.addEventListener("click", () => togglePhone(phone, action));
+
+        row.append(number, state, action);
         phoneList.appendChild(row);
     });
 }
@@ -231,12 +279,7 @@ async function loadDashboard() {
         applyStatus(status);
         ensureAddHourButton();
     } catch (error) {
-        if (error.status === 401) {
-            setToken("");
-            showAuth();
-            showMessage(authMessage, "Tu sesión expiró. Ingresa nuevamente.");
-            return;
-        }
+        if (error.status === 401) return;
         showMessage(setupMessage, error.message || "No pude cargar la configuración.");
     }
 }
@@ -246,6 +289,7 @@ function collectServices() {
         const name = $("[data-field=name]", row).value.trim();
         const priceRaw = $("[data-field=price]", row).value;
         return {
+            id: row.dataset.id || null,
             name,
             description: $("[data-field=description]", row).value.trim() || null,
             durationMinutes: Number($("[data-field=durationMinutes]", row).value),
@@ -264,6 +308,7 @@ function collectHours() {
 
 function collectKnowledge() {
     return $$(".knowledge-row", knowledgeList).map(row => ({
+        id: row.dataset.id || null,
         title: $("[data-field=title]", row).value.trim(),
         category: $("[data-field=category]", row).value.trim() || null,
         content: $("[data-field=content]", row).value.trim()
@@ -277,13 +322,13 @@ registerForm.addEventListener("submit", async event => {
     try {
         const f = new FormData(registerForm);
         const payload = {
-            adminName: f.get("adminName").trim(),
-            email: f.get("email").trim(),
-            password: f.get("password"),
-            businessName: f.get("businessName").trim(),
-            timezone: f.get("timezone").trim(),
-            language: f.get("language").trim(),
-            humanTransferPhone: f.get("humanTransferPhone").trim() || null
+            adminName: String(f.get("adminName") || "").trim(),
+            email: String(f.get("email") || "").trim(),
+            password: String(f.get("password") || ""),
+            businessName: String(f.get("businessName") || "").trim(),
+            timezone: String(f.get("timezone") || "").trim(),
+            language: String(f.get("language") || "").trim(),
+            humanTransferPhone: String(f.get("humanTransferPhone") || "").trim() || null
         };
         const result = await api("/api/v1/auth/register", { method: "POST", body: JSON.stringify(payload) }, false);
         setToken(result.accessToken);
@@ -303,7 +348,10 @@ loginForm.addEventListener("submit", async event => {
         const f = new FormData(loginForm);
         const result = await api("/api/v1/auth/login", {
             method: "POST",
-            body: JSON.stringify({ email: f.get("email").trim(), password: f.get("password") })
+            body: JSON.stringify({
+                email: String(f.get("email") || "").trim(),
+                password: String(f.get("password") || "")
+            })
         }, false);
         setToken(result.accessToken);
         await loadDashboard();
@@ -339,11 +387,11 @@ setupForm.addEventListener("submit", async event => {
             hours,
             knowledge: collectKnowledge()
         };
-        const status = await api("/api/v1/onboarding/setup", { method: "PUT", body: JSON.stringify(payload) });
-        applyStatus(status);
+        await api("/api/v1/onboarding/setup", { method: "PUT", body: JSON.stringify(payload) });
+        await loadDashboard();
         showMessage(setupMessage, "Configuración guardada correctamente.", "success");
     } catch (error) {
-        showMessage(setupMessage, error.message || "No fue posible guardar la configuración.");
+        if (error.status !== 401) showMessage(setupMessage, error.message || "No fue posible guardar la configuración.");
     } finally {
         setBusy(setupForm, false);
     }
@@ -358,18 +406,16 @@ phoneForm.addEventListener("submit", async event => {
         await api("/api/v1/phone-numbers", {
             method: "POST",
             body: JSON.stringify({
-                phoneNumber: f.get("phoneNumber").trim(),
-                externalId: f.get("externalId").trim() || null,
+                phoneNumber: String(f.get("phoneNumber") || "").trim(),
+                externalId: String(f.get("externalId") || "").trim() || null,
                 active: true
             })
         });
         phoneForm.reset();
-        const [phones, status] = await Promise.all([api("/api/v1/phone-numbers"), api("/api/v1/onboarding/status")]);
-        renderPhones(phones);
-        applyStatus(status);
+        await refreshPhoneState();
         showMessage(phoneMessage, "Número conectado a este negocio.", "success");
     } catch (error) {
-        showMessage(phoneMessage, error.message || "No fue posible conectar el número.");
+        if (error.status !== 401) showMessage(phoneMessage, error.message || "No fue posible conectar el número.");
     } finally {
         setBusy(phoneForm, false);
     }
@@ -379,11 +425,20 @@ $("#registerTab").addEventListener("click", () => switchAuth("register"));
 $("#loginTab").addEventListener("click", () => switchAuth("login"));
 $("#addServiceBtn").addEventListener("click", () => addServiceRow());
 $("#addKnowledgeBtn").addEventListener("click", () => addKnowledgeRow());
-$("#refreshBtn").addEventListener("click", loadDashboard);
-$("#logoutBtn").addEventListener("click", () => { setToken(""); showAuth(); switchAuth("login"); });
+$("#refreshBtn").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try { await loadDashboard(); } finally { button.disabled = false; }
+});
+$("#logoutBtn").addEventListener("click", () => {
+    setToken("");
+    showAuth();
+    switchAuth("login");
+});
 
 (async function boot() {
     ensureAddHourButton();
+    switchAuth("register");
     if (!token) {
         showAuth();
         return;
@@ -392,8 +447,6 @@ $("#logoutBtn").addEventListener("click", () => { setToken(""); showAuth(); swit
         await api("/api/v1/auth/me");
         await loadDashboard();
     } catch (_) {
-        setToken("");
-        showAuth();
-        switchAuth("login");
+        if (token) handleExpiredSession();
     }
 })();
