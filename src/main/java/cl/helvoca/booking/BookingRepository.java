@@ -12,6 +12,13 @@ import java.util.UUID;
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Booking> findAllByBusinessIdOrderByStartAtDesc(UUID businessId);
     Optional<Booking> findByIdAndBusinessId(UUID id, UUID businessId);
+    Optional<Booking> findByIdAndBusinessIdAndCustomerId(UUID id, UUID businessId, UUID customerId);
+    List<Booking> findAllByBusinessIdAndCustomerIdAndStatusAndStartAtAfterOrderByStartAtAsc(
+            UUID businessId,
+            UUID customerId,
+            BookingStatus status,
+            Instant startAt
+    );
 
     @Query("""
         select count(b) from Booking b
