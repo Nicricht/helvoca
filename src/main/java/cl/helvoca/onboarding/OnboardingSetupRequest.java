@@ -13,6 +13,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.UUID;
 
 public record OnboardingSetupRequest(
         @NotBlank @Size(max = 150) String businessName,
@@ -25,6 +26,7 @@ public record OnboardingSetupRequest(
         List<@Valid KnowledgeInput> knowledge
 ) {
     public record ServiceInput(
+            UUID id,
             @NotBlank @Size(max = 150) String name,
             String description,
             @NotNull @Positive Integer durationMinutes,
@@ -38,6 +40,7 @@ public record OnboardingSetupRequest(
     ) {}
 
     public record KnowledgeInput(
+            UUID id,
             @NotBlank @Size(max = 200) String title,
             @Size(max = 100) String category,
             @NotBlank String content
