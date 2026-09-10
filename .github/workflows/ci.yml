@@ -24,5 +24,8 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Validate console JavaScript
+        run: node --check src/main/resources/static/app.js
+
       - name: Run tests
         run: mvn --batch-mode --no-transfer-progress test

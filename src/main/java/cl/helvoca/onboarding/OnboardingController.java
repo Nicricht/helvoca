@@ -9,14 +9,22 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("hasRole('BUSINESS_ADMIN')")
 public class OnboardingController {
     private final OnboardingService service;
+    private final AutoOnboardingService autoOnboarding;
 
-    public OnboardingController(OnboardingService service) {
+    public OnboardingController(OnboardingService service,
+                                AutoOnboardingService autoOnboarding) {
         this.service = service;
+        this.autoOnboarding = autoOnboarding;
     }
 
     @GetMapping("/status")
     public OnboardingStatusResponse status() {
         return service.status();
+    }
+
+    @PostMapping("/analyze")
+    public AutoOnboardingProposal analyze(@Valid @RequestBody AutoOnboardingRequest request) {
+        return autoOnboarding.analyze(request);
     }
 
     @PutMapping("/setup")

@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Helvoca Console</title>
-    <meta name="description" content="Configura tu recepcionista telefónica con IA Helvoca.">
+    <title>Helvoca · Configura tu recepcionista con IA</title>
+    <meta name="description" content="Pega el enlace de tu negocio y deja que Helvoca prepare tu recepcionista telefónica con IA.">
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
     <header class="topbar">
         <div>
             <div class="brand">HELVOCA</div>
-            <div class="subtitle">Console · Recepcionista telefónica con IA</div>
+            <div class="subtitle">Tu recepcionista telefónica con IA</div>
         </div>
         <div class="top-actions">
             <span id="sessionBadge" class="badge muted">Sin sesión</span>
@@ -23,33 +23,30 @@
     <main>
         <section id="authView" class="auth-grid">
             <article class="card hero-card">
-                <div class="eyebrow">Empieza aquí</div>
-                <h1>Tu negocio atiende el teléfono aunque nadie pueda cogerlo.</h1>
-                <p>Registra la empresa, configura servicios y horarios, conecta un número y deja a Helvoca atender consultas, reservas y transferencias.</p>
+                <div class="eyebrow">Menos configuración, más llamadas</div>
+                <h1>Dinos qué negocio eres. Helvoca prepara el resto.</h1>
+                <p>Pega tu web, Instagram o Google Maps. La IA extrae una propuesta de servicios, horarios y respuestas frecuentes para que tú solo revises y confirmes.</p>
                 <div class="feature-grid">
-                    <div><strong>24/7</strong><span>Atención automatizada</span></div>
-                    <div><strong>IA + backend</strong><span>Acciones verificadas</span></div>
-                    <div><strong>Multi-tenant</strong><span>Datos aislados</span></div>
+                    <div><strong>1 enlace</strong><span>para empezar</span></div>
+                    <div><strong>IA factual</strong><span>propone, no inventa</span></div>
+                    <div><strong>Tú confirmas</strong><span>antes de guardar</span></div>
                 </div>
             </article>
 
             <article class="card auth-card">
                 <div class="tabs" role="tablist">
-                    <button class="tab active" id="registerTab" type="button">Crear empresa</button>
-                    <button class="tab" id="loginTab" type="button">Ingresar</button>
+                    <button class="tab active" id="registerTab" type="button" aria-selected="true">Crear empresa</button>
+                    <button class="tab" id="loginTab" type="button" aria-selected="false">Ingresar</button>
                 </div>
 
                 <form id="registerForm" class="stack">
                     <label>Tu nombre<input name="adminName" required maxlength="150" autocomplete="name" placeholder="Ana Pérez"></label>
                     <label>Correo<input name="email" required type="email" maxlength="180" autocomplete="email" placeholder="ana@empresa.cl"></label>
                     <label>Contraseña<input name="password" required type="password" minlength="10" maxlength="72" autocomplete="new-password" placeholder="Mínimo 10 caracteres"></label>
-                    <label>Nombre del negocio<input name="businessName" required maxlength="150" placeholder="Clínica Norte"></label>
-                    <div class="two-col">
-                        <label>Zona horaria<input name="timezone" required value="America/Santiago"></label>
-                        <label>Idioma<input name="language" required value="es" maxlength="10"></label>
-                    </div>
-                    <label>Teléfono para transferir a humano <span class="optional">opcional</span><input name="humanTransferPhone" placeholder="+56912345678"></label>
-                    <button class="button primary" type="submit">Crear empresa y continuar</button>
+                    <label>Nombre del negocio<input name="businessName" required maxlength="150" placeholder="Restaurante Don Pepe"></label>
+                    <label>Web, Instagram o Google Maps <span class="optional">opcional</span><input name="sourceUrl" type="text" maxlength="2048" placeholder="https://..."></label>
+                    <button class="button primary" type="submit">Crear mi recepcionista</button>
+                    <small class="form-hint">Zona horaria e idioma se detectan automáticamente. Podrás corregirlos después.</small>
                 </form>
 
                 <form id="loginForm" class="stack hidden">
@@ -64,33 +61,71 @@
         <section id="dashboardView" class="hidden">
             <div class="dashboard-heading">
                 <div>
-                    <div class="eyebrow">Configuración</div>
-                    <h1>Prepara a Helvoca para atender</h1>
-                    <p id="welcomeText">Configura los datos reales que la IA podrá consultar y utilizar.</p>
+                    <div class="eyebrow">Tu Helvoca</div>
+                    <h1>Prepara tu negocio en minutos</h1>
+                    <p id="welcomeText">Pega una fuente pública y deja que Helvoca haga el trabajo pesado.</p>
                 </div>
                 <button id="refreshBtn" class="button ghost" type="button">Actualizar estado</button>
             </div>
 
             <div class="status-grid" id="statusGrid">
-                <div class="status-card" data-key="businessProfileConfigured"><span class="dot"></span><div><strong>Negocio</strong><small>Perfil básico</small></div></div>
-                <div class="status-card" data-key="servicesConfigured"><span class="dot"></span><div><strong>Servicios</strong><small>Al menos uno activo</small></div></div>
-                <div class="status-card" data-key="scheduleConfigured"><span class="dot"></span><div><strong>Horarios</strong><small>Semana configurada</small></div></div>
-                <div class="status-card" data-key="phoneConfigured"><span class="dot"></span><div><strong>Teléfono</strong><small>Número activo</small></div></div>
-                <div class="status-card" data-key="humanTransferConfigured"><span class="dot"></span><div><strong>Transferencia</strong><small>Opcional</small></div></div>
-                <div class="status-card" data-key="knowledgeConfigured"><span class="dot"></span><div><strong>Conocimiento</strong><small>Opcional</small></div></div>
+                <div class="status-card" data-key="businessProfileConfigured"><span class="dot"></span><div><strong>Negocio</strong><small>Perfil</small></div></div>
+                <div class="status-card" data-key="servicesConfigured"><span class="dot"></span><div><strong>Servicios</strong><small>Reservables</small></div></div>
+                <div class="status-card" data-key="scheduleConfigured"><span class="dot"></span><div><strong>Horarios</strong><small>Atención</small></div></div>
+                <div class="status-card" data-key="phoneConfigured"><span class="dot"></span><div><strong>Teléfono</strong><small>Activo</small></div></div>
             </div>
 
             <div id="readyBanner" class="ready-banner hidden">
                 <strong>Helvoca está lista para llamadas.</strong>
-                <span>El núcleo obligatorio de configuración está completo.</span>
+                <span>La configuración obligatoria está completa.</span>
             </div>
             <div id="nextStepBanner" class="next-banner"></div>
 
-            <div class="admin-layout">
-                <form id="setupForm" class="card stack wide-card">
-                    <div class="section-heading">
-                        <div><div class="eyebrow">1 · Negocio</div><h2>Información principal</h2></div>
+            <section class="card ai-onboarding-card">
+                <div class="ai-heading">
+                    <div>
+                        <div class="eyebrow">Configuración con IA</div>
+                        <h2>Pega tu negocio. Nosotros preparamos la propuesta.</h2>
+                        <p>Helvoca solo utiliza el texto público que pueda leer del enlace. Nada se guarda hasta que tú confirmes.</p>
                     </div>
+                    <span class="ai-chip">✦ IA</span>
+                </div>
+                <form id="aiForm" class="ai-form">
+                    <label class="grow">Web, Instagram o Google Maps<input name="sourceUrl" required maxlength="2048" placeholder="https://tu-negocio.cl"></label>
+                    <button class="button primary" type="submit">Analizar negocio</button>
+                </form>
+                <div id="aiMessage" class="message hidden"></div>
+
+                <div id="proposalPanel" class="proposal-panel hidden">
+                    <div class="proposal-top">
+                        <div>
+                            <div class="eyebrow">Propuesta encontrada</div>
+                            <h3 id="proposalBusinessName"></h3>
+                            <p id="proposalSummary" class="muted-text"></p>
+                        </div>
+                        <span id="sourceBadge" class="badge online">Fuente leída</span>
+                    </div>
+                    <div class="proposal-grid">
+                        <div class="proposal-box"><strong>Servicios</strong><div id="proposalServices"></div></div>
+                        <div class="proposal-box"><strong>Horarios</strong><div id="proposalHours"></div></div>
+                        <div class="proposal-box"><strong>Respuestas útiles</strong><div id="proposalKnowledge"></div></div>
+                    </div>
+                    <div id="proposalWarnings" class="proposal-warnings hidden"></div>
+                    <div class="proposal-actions">
+                        <button id="confirmProposalBtn" class="button primary" type="button">Confirmar configuración</button>
+                        <button id="editProposalBtn" class="button ghost" type="button">Revisar y editar</button>
+                    </div>
+                </div>
+            </section>
+
+            <div class="secondary-actions">
+                <button id="advancedToggleBtn" class="button ghost" type="button">Editar manualmente</button>
+                <span>Para ajustes finos, horarios partidos, transferencia humana y conocimiento.</span>
+            </div>
+
+            <div id="advancedPanel" class="admin-layout hidden">
+                <form id="setupForm" class="card stack wide-card">
+                    <div class="section-heading"><div><div class="eyebrow">Negocio</div><h2>Configuración avanzada</h2></div></div>
                     <div class="two-col">
                         <label>Nombre del negocio<input name="businessName" required maxlength="150"></label>
                         <label>Teléfono humano <span class="optional">opcional</span><input name="humanTransferPhone" placeholder="+56912345678"></label>
@@ -98,41 +133,30 @@
                         <label>Idioma<input name="language" required value="es" maxlength="10"></label>
                     </div>
 
-                    <div class="section-heading divider">
-                        <div><div class="eyebrow">2 · Servicios</div><h2>Qué puede reservar un cliente</h2></div>
-                        <button id="addServiceBtn" class="button small ghost" type="button">+ Servicio</button>
-                    </div>
+                    <div class="section-heading divider"><div><div class="eyebrow">Servicios</div><h2>Qué puede reservar un cliente</h2></div><button id="addServiceBtn" class="button small ghost" type="button">+ Servicio</button></div>
                     <div id="servicesList" class="repeat-list"></div>
 
-                    <div class="section-heading divider">
-                        <div><div class="eyebrow">3 · Horarios</div><h2>Cuándo atiende el negocio</h2></div>
-                    </div>
+                    <div class="section-heading divider"><div><div class="eyebrow">Horarios</div><h2>Cuándo atiende el negocio</h2></div></div>
                     <div id="hoursGrid" class="hours-grid"></div>
 
-                    <div class="section-heading divider">
-                        <div><div class="eyebrow">4 · Conocimiento</div><h2>Preguntas que la IA debe saber</h2><p>Opcional. Ejemplo: estacionamiento, medios de pago o dirección.</p></div>
-                        <button id="addKnowledgeBtn" class="button small ghost" type="button">+ Respuesta</button>
-                    </div>
+                    <div class="section-heading divider"><div><div class="eyebrow">Conocimiento</div><h2>Preguntas que la IA debe saber</h2></div><button id="addKnowledgeBtn" class="button small ghost" type="button">+ Respuesta</button></div>
                     <div id="knowledgeList" class="repeat-list"></div>
 
                     <div id="setupMessage" class="message hidden"></div>
-                    <button class="button primary large" type="submit">Guardar configuración</button>
+                    <button class="button primary large" type="submit">Guardar cambios</button>
                 </form>
 
                 <aside class="card side-card">
-                    <div class="eyebrow">5 · Telefonía</div>
+                    <div class="eyebrow">Telefonía</div>
                     <h2>Conecta el número que recibirá llamadas</h2>
-                    <p>Registra aquí un número ya provisionado en tu proveedor de telefonía. Helvoca no inventa ni compra números automáticamente desde este formulario.</p>
+                    <p>Registra un número ya provisionado en tu proveedor. Helvoca no inventa ni compra números desde este formulario.</p>
                     <form id="phoneForm" class="stack">
                         <label>Número E.164<input name="phoneNumber" required placeholder="+17372508034"></label>
                         <label>ID externo <span class="optional">opcional</span><input name="externalId" placeholder="SID del proveedor"></label>
                         <button class="button secondary" type="submit">Conectar número</button>
                     </form>
                     <div id="phoneMessage" class="message hidden"></div>
-                    <div class="phone-list-wrap">
-                        <h3>Números registrados</h3>
-                        <div id="phoneList" class="phone-list"><span class="muted-text">Sin datos.</span></div>
-                    </div>
+                    <div class="phone-list-wrap"><h3>Números registrados</h3><div id="phoneList" class="phone-list"><span class="muted-text">Sin datos.</span></div></div>
                 </aside>
             </div>
         </section>
