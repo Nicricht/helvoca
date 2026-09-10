@@ -1,7 +1,7 @@
 CREATE TABLE business_hours (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     business_id UUID NOT NULL REFERENCES business(id) ON DELETE CASCADE,
-    day_of_week SMALLINT NOT NULL,
+    day_of_week INTEGER NOT NULL,
     open_time TIME NOT NULL,
     close_time TIME NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
