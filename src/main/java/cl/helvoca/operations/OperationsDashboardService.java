@@ -27,6 +27,8 @@ import java.util.UUID;
 
 @Service
 public class OperationsDashboardService {
+    private static final String SIMULATOR_PROVIDER = "simulator";
+
     private final BusinessRepository businesses;
     private final CallSessionRepository calls;
     private final BookingRepository bookings;
@@ -67,9 +69,10 @@ public class OperationsDashboardService {
         var allRequests = requests.findAllByBusinessIdOrderByCreatedAtDesc(businessId);
         var openQuestions = questions.findAllByBusinessIdAndStatusOrderByLastSeenAtDesc(businessId, QuestionStatus.OPEN);
 
-        long callsToday = calls.countByBusinessIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(businessId, dayStart, dayEnd);
-        long failuresToday = calls.countByBusinessIdAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
-                businessId, List.of(CallStatus.FAILED, CallStatus.NO_ANSWER), dayStart, dayEnd);
+        long callsToday = calls.countByBusinessIdAndTelephonyProviderNotAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                businessId, SIMULATOR_PROVIDER, dayStart, dayEnd);
+        long failuresToday = calls.countByBusinessIdAndTelephonyProviderNotAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                businessId, SIMULATOR_PROVIDER, List.of(CallStatus.FAILED, CallStatus.NO_ANSWER), dayStart, dayEnd);
         long bookingsToday = allBookings.stream()
                 .filter(b -> b.getStatus() != BookingStatus.CANCELLED && between(b.getCreatedAt(), dayStart, dayEnd)).count();
         long customersToday = allCustomers.stream().filter(c -> between(c.getCreatedAt(), dayStart, dayEnd)).count();

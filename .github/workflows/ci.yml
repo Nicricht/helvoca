@@ -33,6 +33,7 @@ jobs:
         run: |
           node --check src/main/resources/static/app.js
           node --check src/main/resources/static/operations.js
+          node --check src/main/resources/static/simulator.js
 
       - name: Run backend tests
         run: mvn --batch-mode --no-transfer-progress test
@@ -42,5 +43,5 @@ jobs:
           npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
 
-      - name: Run operations browser E2E
+      - name: Run browser E2E
         run: npm run test:e2e

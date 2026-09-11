@@ -17,7 +17,7 @@ public class CallSession {
     @Column(name = "customer_id")
     private UUID customerId;
 
-    @Column(name = "phone_number_id", nullable = false)
+    @Column(name = "phone_number_id")
     private UUID phoneNumberId;
 
     @Column(name = "telephony_provider", nullable = false, length = 30)
