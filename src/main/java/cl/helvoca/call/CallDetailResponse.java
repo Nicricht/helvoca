@@ -5,5 +5,6 @@ import java.util.List;
 public record CallDetailResponse(
         CallResponse call,
         List<TranscriptResponse> transcript,
-        String summary) {
+        String summary,
+        List<CallActionResponse> actions) {
 }
