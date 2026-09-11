@@ -46,6 +46,15 @@ jobs:
       - name: Verify production TwiML contract
         run: mvn --batch-mode --no-transfer-progress -Dtest=TrialTwimlFactoryTest test
 
+      - name: Verify Spring telephony integration
+        run: mvn --batch-mode --no-transfer-progress -Dtest=TelephonyIntegrationTest test
+
+      - name: Verify booking Spring integration
+        run: mvn --batch-mode --no-transfer-progress -Dtest=BookingRepositoryIntegrationTest test
+
+      - name: Verify Twilio controller regression
+        run: mvn --batch-mode --no-transfer-progress -Dtest=TwilioVoiceControllerTest test
+
       - name: Run backend tests
         run: mvn --batch-mode --no-transfer-progress test
 
