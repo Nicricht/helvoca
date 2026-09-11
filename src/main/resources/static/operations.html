@@ -56,6 +56,25 @@
     </article>
   </section>
 
+  <section id="callDetailPanel" class="panel call-detail hidden">
+    <div class="panel-head">
+      <div><p class="eyebrow">TRAZABILIDAD</p><h2>Detalle de llamada</h2><p id="callDetailMeta" class="muted"></p></div>
+      <button id="closeCallDetailBtn" class="ghost">Cerrar</button>
+    </div>
+    <div class="grid two call-detail-grid">
+      <div>
+        <h3>Resumen</h3>
+        <div id="callSummary" class="detail-box"></div>
+        <h3>Acciones verificadas</h3>
+        <div id="callActions" class="list"></div>
+      </div>
+      <div>
+        <h3>Transcripción</h3>
+        <div id="callTranscript" class="transcript"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="panel learning">
     <div class="panel-head"><div><p class="eyebrow">APRENDIZAJE</p><h2>Preguntas que Helvoca todavía no sabe</h2><p class="muted">Responde una vez y la respuesta entra a la base de conocimiento del negocio.</p></div></div>
     <div id="questionsList" class="list"></div>
