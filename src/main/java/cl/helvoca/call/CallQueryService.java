@@ -14,15 +14,18 @@ public class CallQueryService {
     private final CallSessionRepository calls;
     private final CallTranscriptRepository transcripts;
     private final CallSummaryRepository summaries;
+    private final CallActionRepository actions;
     private final TenantProvider tenantProvider;
 
     public CallQueryService(CallSessionRepository calls,
                             CallTranscriptRepository transcripts,
                             CallSummaryRepository summaries,
+                            CallActionRepository actions,
                             TenantProvider tenantProvider) {
         this.calls = calls;
         this.transcripts = transcripts;
         this.summaries = summaries;
+        this.actions = actions;
         this.tenantProvider = tenantProvider;
     }
 
@@ -40,6 +43,8 @@ public class CallQueryService {
         var transcript = transcripts.findAllByCallIdOrderBySequenceNumberAsc(id)
                 .stream().map(TranscriptResponse::from).toList();
         String summary = summaries.findByCallId(id).map(CallSummary::getSummary).orElse(null);
-        return new CallDetailResponse(CallResponse.from(call), transcript, summary);
+        var actionTrace = actions.findAllByCallIdOrderByCreatedAtAsc(id)
+                .stream().map(CallActionResponse::from).toList();
+        return new CallDetailResponse(CallResponse.from(call), transcript, summary, actionTrace);
     }
 }

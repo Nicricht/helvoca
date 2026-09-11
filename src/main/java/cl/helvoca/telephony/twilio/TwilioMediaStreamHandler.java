@@ -1,12 +1,14 @@
 package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.ai.realtime.RealtimeCallContext;
+import cl.helvoca.call.CallTraceService;
 import cl.helvoca.voice.VoiceAiProvider;
 import cl.helvoca.voice.VoiceAiProviderRegistry;
 import cl.helvoca.voice.VoiceAiSession;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -28,6 +30,9 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     private final Map<String, VoiceAiSession> sessions = new ConcurrentHashMap<>();
     private final Map<String, String> streamIds = new ConcurrentHashMap<>();
 
+    @Autowired(required = false)
+    private CallTraceService trace;
+
     public TwilioMediaStreamHandler(TwilioCallService calls,
                                     VoiceAiProviderRegistry aiProviders,
                                     TwilioCallControl callControl) {
@@ -44,10 +49,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
             case "start" -> handleStart(session, json);
             case "media" -> handleMedia(session, json);
             case "stop" -> handleStop(session, json);
-            default -> {
-                // connected, mark, DTMF and provider extension events are safe to
-                // ignore at this layer for the current production voice contract.
-            }
+            default -> { }
         }
     }
 
@@ -95,7 +97,8 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
                     UUID.fromString(callIdValue), callSid, streamSid, aiProvider.id());
             VoiceAiSession aiSession = aiProvider.createSession(
                     context,
-                    new TwilioVoiceTransportSession(session, accountSid, callSid, callControl));
+                    new TwilioVoiceTransportSession(session, accountSid, callSid, callControl,
+                            trace, context.businessId(), context.callId()));
             streamIds.put(session.getId(), streamSid);
             sessions.put(session.getId(), aiSession);
             aiSession.start();
