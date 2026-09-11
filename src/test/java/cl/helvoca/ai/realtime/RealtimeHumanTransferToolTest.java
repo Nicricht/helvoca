@@ -7,6 +7,8 @@ import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
+import cl.helvoca.learning.UnansweredQuestionService;
+import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.json.JSONObject;
@@ -84,7 +86,9 @@ class RealtimeHumanTransferToolTest {
                 mock(KnowledgeItemRepository.class),
                 mock(BookingRepository.class),
                 calls,
-                mock(BusinessScheduleService.class));
+                mock(BusinessScheduleService.class),
+                mock(BusinessRequestService.class),
+                mock(UnansweredQuestionService.class));
     }
 
     private static CallSession trustedCall(UUID businessId, String streamSid) {
