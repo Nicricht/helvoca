@@ -19,6 +19,9 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
             BookingStatus status,
             Instant startAt
     );
+    List<Booking> findTop10ByBusinessIdAndStatusAndStartAtAfterOrderByStartAtAsc(
+            UUID businessId, BookingStatus status, Instant startAt);
+    long countByBusinessIdAndCreatedAtBetween(UUID businessId, Instant from, Instant to);
 
     @Query("""
         select count(b) from Booking b

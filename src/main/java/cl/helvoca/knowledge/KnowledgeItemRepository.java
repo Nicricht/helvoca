@@ -9,4 +9,5 @@ public interface KnowledgeItemRepository extends JpaRepository<KnowledgeItem, UU
     List<KnowledgeItem> findAllByBusinessIdOrderByTitleAsc(UUID businessId);
     List<KnowledgeItem> findAllByBusinessIdAndActiveTrueOrderByTitleAsc(UUID businessId);
     Optional<KnowledgeItem> findByIdAndBusinessId(UUID id, UUID businessId);
+    Optional<KnowledgeItem> findFirstByBusinessIdAndCategoryAndTitleIgnoreCase(UUID businessId, String category, String title);
 }

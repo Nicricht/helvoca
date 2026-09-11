@@ -45,6 +45,16 @@ public final class RealtimeToolDefinitions {
                         object().put("properties", new JSONObject()
                                         .put("bookingId", string("UUID de la reserva obtenido desde list_customer_bookings")))
                                 .put("required", new JSONArray().put("bookingId"))))
+                .put(function("create_business_request", "Registra una solicitud real del cliente cuando su necesidad no es una reserva: cotización, soporte, visita, devolución de llamada, consulta comercial u otra gestión. Solo confirma que fue registrada cuando success=true.",
+                        object().put("properties", new JSONObject()
+                                        .put("category", string("Categoría breve opcional, por ejemplo cotización, soporte o visita"))
+                                        .put("subject", string("Resumen breve de lo que necesita el cliente"))
+                                        .put("details", string("Datos y contexto necesarios para que el negocio continúe la gestión"))
+                                        .put("priority", string("Prioridad opcional: LOW, NORMAL, HIGH o URGENT")))
+                                .put("required", new JSONArray().put("subject").put("details"))))
+                .put(function("record_unanswered_question", "Registra una pregunta que no puede responderse con información oficial del negocio. Úsala solo después de buscar conocimiento y confirmar que falta el dato; no inventes la respuesta.",
+                        object().put("properties", new JSONObject().put("question", string("Pregunta concreta del cliente que quedó sin respuesta")))
+                                .put("required", new JSONArray().put("question"))))
                 .put(function("transfer_to_human", "Solicita transferir la llamada a una persona del negocio cuando el cliente lo pida o la atención automática no pueda resolver su necesidad. El destino se obtiene de la configuración segura del negocio, nunca de argumentos del modelo.", object()));
     }
 

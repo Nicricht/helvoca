@@ -24,8 +24,23 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Validate console JavaScript
-        run: node --check src/main/resources/static/app.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
 
-      - name: Run tests
+      - name: Validate console JavaScript
+        run: |
+          node --check src/main/resources/static/app.js
+          node --check src/main/resources/static/operations.js
+
+      - name: Run backend tests
         run: mvn --batch-mode --no-transfer-progress test
+
+      - name: Install browser test dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run console E2E
+        run: npm run test:e2e
