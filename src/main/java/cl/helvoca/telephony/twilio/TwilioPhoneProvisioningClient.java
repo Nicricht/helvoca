@@ -4,6 +4,7 @@ import cl.helvoca.common.ExternalProviderException;
 import cl.helvoca.phone.AvailablePhoneNumberResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -30,6 +31,7 @@ public class TwilioPhoneProvisioningClient {
     private final TwilioProperties properties;
     private final RestClient restClient;
 
+    @Autowired
     public TwilioPhoneProvisioningClient(TwilioProperties properties, RestClient.Builder builder) {
         this(properties, builder.baseUrl(DEFAULT_API_BASE).build());
     }
