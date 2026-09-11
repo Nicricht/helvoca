@@ -287,10 +287,12 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
 
         String payload = json.toString();
         synchronized (sendLock) {
-            sendChain = sendChain.handle((ignored, previousError) -> null)
+            sendChain = sendChain.handle((ignored, previousError) -> (Void) null)
                     .thenCompose(ignored -> {
-                        if (!open.get() || closed.get()) return CompletableFuture.completedFuture(null);
-                        return socket.sendText(payload, true).thenApply(sent -> null);
+                        if (!open.get() || closed.get()) {
+                            return CompletableFuture.<Void>completedFuture(null);
+                        }
+                        return socket.sendText(payload, true).thenApply(sent -> (Void) null);
                     })
                     .whenComplete((ignored, error) -> {
                         pendingOpenAiMessages.decrementAndGet();
