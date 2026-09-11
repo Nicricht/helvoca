@@ -53,6 +53,25 @@ public class TwilioVoiceController {
         }
     }
 
+    /**
+     * Twilio outbound test calls have the business Twilio number in {@code From}
+     * and the tester's phone in {@code To}. The normal lifecycle expects the
+     * caller first and the business number second, so invert them here while
+     * keeping the exact same Media Streams/OpenAI path as a real inbound call.
+     * This route remains protected by Twilio signature validation.
+     */
+    @PostMapping(value = "/outbound-test", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+            produces = MediaType.APPLICATION_XML_VALUE)
+    public ResponseEntity<String> outboundTest(@RequestParam("CallSid") String callSid,
+                                               @RequestParam("From") String from,
+                                               @RequestParam("To") String to) {
+        try {
+            return ResponseEntity.ok(calls.startInboundCall(callSid, to, from));
+        } catch (NotFoundException e) {
+            return ResponseEntity.ok(twiml.rejectUnknownNumber());
+        }
+    }
+
     @PostMapping(value = "/trial/voice", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> trialIncoming(@RequestParam("CallSid") String callSid,
