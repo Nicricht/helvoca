@@ -34,6 +34,18 @@ jobs:
           node --check src/main/resources/static/app.js
           node --check src/main/resources/static/operations.js
 
+      - name: Verify Twilio live call control
+        run: mvn --batch-mode --no-transfer-progress -Dtest=TwilioCallControlTest test
+
+      - name: Verify Realtime human transfer contract
+        run: mvn --batch-mode --no-transfer-progress -Dtest=OpenAiRealtimeTransferTest test
+
+      - name: Verify Media Stream contract
+        run: mvn --batch-mode --no-transfer-progress -Dtest=TwilioMediaStreamHandlerTest test
+
+      - name: Verify production TwiML contract
+        run: mvn --batch-mode --no-transfer-progress -Dtest=TrialTwimlFactoryTest test
+
       - name: Run backend tests
         run: mvn --batch-mode --no-transfer-progress test
 
