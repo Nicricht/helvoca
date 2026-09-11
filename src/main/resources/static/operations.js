@@ -57,10 +57,47 @@ function renderCalls(items = []) {
   const root = $("#callsList");
   if (!items.length) { root.innerHTML = '<div class="empty">Todavía no hay llamadas.</div>'; return; }
   root.innerHTML = items.map(c => `
-    <div class="item">
+    <div class="item" data-call-id="${esc(c.id)}">
       <div class="item-head"><strong>${esc(c.callerNumber || "Número oculto")}</strong><span class="pill ${c.status === "FAILED" ? "bad" : ""}">${esc(c.status)}</span></div>
       <div class="meta"><span>${fmtDate(c.startedAt)}</span><span>${c.durationSeconds != null ? `${c.durationSeconds}s` : "sin duración"}</span>${c.resolution ? `<span>${esc(c.resolution)}</span>` : ""}</div>
+      <div class="actions call-actions"><button data-call-detail class="ghost">Ver detalle</button></div>
     </div>`).join("");
+  root.querySelectorAll("[data-call-detail]").forEach(button => button.addEventListener("click", async e => {
+    const item = e.target.closest("[data-call-id]");
+    e.target.disabled = true;
+    try { await loadCallDetail(item.dataset.callId); }
+    catch (err) { toast(err.message); }
+    finally { e.target.disabled = false; }
+  }));
+}
+
+function renderCallDetail(data) {
+  const call = data.call || {};
+  $("#callDetailMeta").textContent = `${call.callerNumber || "Número oculto"} · ${fmtDate(call.startedAt)} · ${call.status || ""}${call.resolution ? ` · ${call.resolution}` : ""}`;
+  $("#callSummary").textContent = data.summary || "El resumen todavía no está disponible.";
+
+  const actions = data.actions || [];
+  $("#callActions").innerHTML = actions.length ? actions.map(a => `
+    <div class="item">
+      <div class="item-head"><strong>${esc(a.actionType)}</strong><span class="pill ${a.success ? "" : "bad"}">${a.success ? "CONFIRMADO" : "FALLÓ"}</span></div>
+      <div class="meta">${a.detail ? `<span>${esc(a.detail)}</span>` : ""}${a.entityType ? `<span>${esc(a.entityType)}</span>` : ""}${a.entityId ? `<span>${esc(a.entityId)}</span>` : ""}${a.errorCode ? `<span>${esc(a.errorCode)}</span>` : ""}<span>${fmtDate(a.createdAt)}</span></div>
+    </div>`).join("") : '<div class="empty">No hay acciones registradas para esta llamada.</div>';
+
+  const transcript = data.transcript || [];
+  $("#callTranscript").innerHTML = transcript.length ? transcript.map(t => `
+    <div class="transcript-line ${String(t.speaker || "").toLowerCase()}">
+      <strong>${esc(t.speaker === "USER" ? "Cliente" : t.speaker === "ASSISTANT" ? "Helvoca" : t.speaker)}</strong>
+      <p>${esc(t.content)}</p>
+      <span>${fmtDate(t.createdAt)}</span>
+    </div>`).join("") : '<div class="empty">No hay transcripción disponible.</div>';
+
+  $("#callDetailPanel").classList.remove("hidden");
+  $("#callDetailPanel").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+async function loadCallDetail(callId) {
+  const data = await api(`/api/v1/calls/${encodeURIComponent(callId)}`);
+  renderCallDetail(data);
 }
 
 function renderRequests(items = []) {
@@ -134,6 +171,7 @@ async function load() {
 }
 
 $("#refreshBtn").addEventListener("click", load);
+$("#closeCallDetailBtn").addEventListener("click", () => $("#callDetailPanel").classList.add("hidden"));
 $("#newRequestBtn").addEventListener("click", () => $("#requestForm").classList.remove("hidden"));
 $("#cancelRequestBtn").addEventListener("click", () => $("#requestForm").classList.add("hidden"));
 $("#requestForm").addEventListener("submit", async e => {
