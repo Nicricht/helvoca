@@ -20,8 +20,11 @@ public class TwimlFactory {
             return serviceUnavailable();
         }
         String url = escapeXml(properties.getMediaStreamUrl().trim());
+        String statusCallback = streamStatusCallbackUrl();
+        String callbackAttributes = statusCallback == null ? ""
+                : " statusCallback=\"" + escapeXml(statusCallback) + "\" statusCallbackMethod=\"POST\"";
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
-                "<Response><Connect><Stream url=\"" + url + "\">" +
+                "<Response><Connect><Stream url=\"" + url + "\"" + callbackAttributes + ">" +
                 "<Parameter name=\"callId\" value=\"" + callId + "\"/>" +
                 "</Stream></Connect></Response>";
     }
@@ -90,6 +93,11 @@ public class TwimlFactory {
             actionUrl += "?trialKey=" + trial.getWebhookSecret();
         }
         return actionUrl;
+    }
+
+    private String streamStatusCallbackUrl() {
+        String base = normalizedPublicBaseUrl();
+        return base == null ? null : base + "/webhooks/v1/twilio/stream-status";
     }
 
     private String normalizedPublicBaseUrl() {
