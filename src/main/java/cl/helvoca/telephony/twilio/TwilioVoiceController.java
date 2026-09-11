@@ -7,6 +7,8 @@ import cl.helvoca.telephony.twilio.trial.TrialConversationStateService;
 import cl.helvoca.telephony.twilio.trial.TrialVoiceConversationService;
 import cl.helvoca.telephony.twilio.trial.TrialVoiceProperties;
 import cl.helvoca.telephony.twilio.trial.TrialVoiceReply;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,8 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/webhooks/v1/twilio")
 public class TwilioVoiceController {
+    private static final Logger log = LoggerFactory.getLogger(TwilioVoiceController.class);
+
     private final TwilioCallService calls;
     private final TwimlFactory twiml;
     private final TrialVoiceProperties trial;
@@ -113,6 +117,23 @@ public class TwilioVoiceController {
         } catch (NotFoundException | IllegalArgumentException e) {
             return ResponseEntity.ok(twiml.trialSayAndHangup("La sesión de prueba ya no está disponible."));
         }
+    }
+
+    @PostMapping(value = "/stream-status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public ResponseEntity<Void> streamStatus(@RequestParam("StreamSid") String streamSid,
+                                             @RequestParam("StreamEvent") String streamEvent,
+                                             @RequestParam(value = "CallSid", required = false) String callSid,
+                                             @RequestParam(value = "StreamError", required = false) String streamError) {
+        if ("stream-stopped".equalsIgnoreCase(streamEvent) || "stream-error".equalsIgnoreCase(streamEvent)) {
+            calls.markStreamStopped(streamSid);
+        }
+        if ("stream-error".equalsIgnoreCase(streamEvent)) {
+            log.warn("Twilio Media Stream error call={} stream={} error={}", callSid, streamSid,
+                    streamError == null ? "unknown" : streamError);
+        } else {
+            log.info("Twilio Media Stream event call={} stream={} event={}", callSid, streamSid, streamEvent);
+        }
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping(value = "/status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)

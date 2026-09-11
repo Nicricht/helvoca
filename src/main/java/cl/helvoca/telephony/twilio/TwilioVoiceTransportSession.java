@@ -15,9 +15,18 @@ public final class TwilioVoiceTransportSession implements VoiceTransportSession 
     private static final Logger log = LoggerFactory.getLogger(TwilioVoiceTransportSession.class);
 
     private final WebSocketSession session;
+    private final String accountSid;
+    private final String callSid;
+    private final TwilioCallControl callControl;
 
-    public TwilioVoiceTransportSession(WebSocketSession session) {
+    public TwilioVoiceTransportSession(WebSocketSession session,
+                                       String accountSid,
+                                       String callSid,
+                                       TwilioCallControl callControl) {
         this.session = session;
+        this.accountSid = accountSid;
+        this.callSid = callSid;
+        this.callControl = callControl;
     }
 
     @Override
@@ -45,7 +54,18 @@ public final class TwilioVoiceTransportSession implements VoiceTransportSession 
     }
 
     @Override
+    public boolean transferToHuman(String targetPhone) {
+        if (!session.isOpen()) return false;
+        return callControl.transferToHuman(accountSid, callSid, targetPhone);
+    }
+
+    @Override
     public void closeOnUpstreamFailure() {
+        // Prefer changing the live call to a short spoken fallback. Twilio will
+        // then close the Media Stream as it begins executing the replacement
+        // TwiML. If the REST update itself fails, close the WebSocket so the
+        // caller is never left attached to a dead AI stream indefinitely.
+        if (callControl.failGracefully(accountSid, callSid)) return;
         try {
             if (session.isOpen()) session.close(CloseStatus.SERVER_ERROR);
         } catch (Exception e) {

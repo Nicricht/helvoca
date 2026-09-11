@@ -3,10 +3,28 @@ package cl.helvoca.telephony.twilio;
 import cl.helvoca.telephony.twilio.trial.TrialVoiceProperties;
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TrialTwimlFactoryTest {
+
+    @Test
+    void productionMediaStreamUsesBidirectionalPcmuEndpointAndStatusCallback() {
+        TwilioProperties twilio = new TwilioProperties();
+        twilio.setPublicBaseUrl("https://helvoca.example/");
+        twilio.setMediaStreamUrl("wss://helvoca.example/ws/twilio");
+        TrialVoiceProperties trial = new TrialVoiceProperties();
+        UUID callId = UUID.randomUUID();
+
+        String xml = new TwimlFactory(twilio, trial).connectMediaStream(callId);
+
+        assertTrue(xml.contains("<Connect><Stream url=\"wss://helvoca.example/ws/twilio\""));
+        assertTrue(xml.contains("statusCallback=\"https://helvoca.example/webhooks/v1/twilio/stream-status\""));
+        assertTrue(xml.contains("statusCallbackMethod=\"POST\""));
+        assertTrue(xml.contains("<Parameter name=\"callId\" value=\"" + callId + "\"/>"));
+    }
 
     @Test
     void trialGatherUsesSpeechAndSecretGatedHelvocaActionWithoutMediaStream() {

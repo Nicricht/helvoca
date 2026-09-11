@@ -17,10 +17,12 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * OpenAI implementation of Helvoca's provider-neutral realtime voice session.
@@ -31,6 +33,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSession {
     private static final Logger log = LoggerFactory.getLogger(OpenAiRealtimeBridge.class);
     private static final int MAX_QUEUED_AUDIO_FRAMES = 250;
+    private static final int MAX_PENDING_OPENAI_MESSAGES = 600;
 
     private final RealtimeCallContext context;
     private final VoiceTransportSession transport;
@@ -43,9 +46,12 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
     private final Set<String> completedToolCalls = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean open = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    private final AtomicInteger pendingOpenAiMessages = new AtomicInteger(0);
     private final StringBuilder incomingText = new StringBuilder();
+    private final Object sendLock = new Object();
 
     private volatile WebSocket openAiSocket;
+    private CompletableFuture<Void> sendChain = CompletableFuture.completedFuture(null);
 
     OpenAiRealtimeBridge(RealtimeCallContext context,
                          VoiceTransportSession transport,
@@ -76,8 +82,7 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
                 .header("OpenAI-Safety-Identifier", context.businessId().toString())
                 .buildAsync(URI.create(url), this)
                 .exceptionally(error -> {
-                    log.warn("Could not open OpenAI Realtime for call {}: {}", context.callId(), error.getMessage());
-                    transport.closeOnUpstreamFailure();
+                    handleUpstreamFailure("Could not open OpenAI Realtime: " + rootMessage(error));
                     return null;
                 });
     }
@@ -89,7 +94,9 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
             sendOpenAi(new JSONObject().put("type", "input_audio_buffer.append").put("audio", base64Pcmu));
             return;
         }
-        if (pendingAudio.size() < MAX_QUEUED_AUDIO_FRAMES) pendingAudio.offer(base64Pcmu);
+        if (pendingAudio.size() < MAX_QUEUED_AUDIO_FRAMES) {
+            pendingAudio.offer(base64Pcmu);
+        }
     }
 
     @Override
@@ -103,6 +110,7 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
             sendOpenAi(new JSONObject().put("type", "input_audio_buffer.append").put("audio", frame));
         }
         sendGreeting();
+        log.info("OpenAI Realtime connected call={} model={}", context.callId(), properties.getRealtimeModel());
     }
 
     @Override
@@ -122,13 +130,16 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
     @Override
     public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
         open.set(false);
+        if (!closed.get()) {
+            handleUpstreamFailure("OpenAI Realtime closed unexpectedly status=" + statusCode + " reason=" + reason);
+        }
         return null;
     }
 
     @Override
     public void onError(WebSocket webSocket, Throwable error) {
         open.set(false);
-        log.warn("OpenAI Realtime error for call {}: {}", context.callId(), error.getMessage());
+        handleUpstreamFailure("OpenAI Realtime WebSocket error: " + rootMessage(error));
     }
 
     private void sendSessionUpdate() {
@@ -204,6 +215,15 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
         if (callId == null || name == null || !completedToolCalls.add(callId)) return;
 
         String result = tools.execute(context, name, arguments);
+        if ("transfer_to_human".equals(name)) {
+            String transferFailure = executeHumanTransfer(result);
+            if (transferFailure == null) {
+                finishAiSession("Transferred to human");
+                return;
+            }
+            result = transferFailure;
+        }
+
         JSONObject outputItem = new JSONObject()
                 .put("type", "function_call_output")
                 .put("call_id", callId)
@@ -212,6 +232,32 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
                 .put("type", "conversation.item.create")
                 .put("item", outputItem));
         sendOpenAi(new JSONObject().put("type", "response.create"));
+    }
+
+    /**
+     * Returns null only when the carrier actually accepted the transfer. Any
+     * non-null value is a tool result that must be sent back to the model.
+     */
+    private String executeHumanTransfer(String toolResult) {
+        try {
+            JSONObject parsed = new JSONObject(toolResult);
+            if (!parsed.optBoolean("success", false)) return toolResult;
+            JSONObject data = parsed.optJSONObject("data");
+            String target = data == null ? null : data.optString("targetPhone", null);
+            if (target != null && transport.transferToHuman(target)) {
+                log.info("Human transfer accepted by carrier call={}", context.callId());
+                return null;
+            }
+        } catch (Exception e) {
+            log.warn("Could not execute human transfer for call {}: {}", context.callId(), e.getMessage());
+        }
+        return new JSONObject()
+                .put("success", false)
+                .put("data", JSONObject.NULL)
+                .put("error", new JSONObject()
+                        .put("code", "HUMAN_TRANSFER_FAILED")
+                        .put("message", "No pude completar la transferencia con el proveedor telefónico. Puedes seguir ayudando al cliente por voz."))
+                .toString();
     }
 
     private void forwardAudio(String delta) {
@@ -223,10 +269,37 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
         transport.clearPlayback(context.streamSid());
     }
 
+    /**
+     * Serialize all client events sent to the JDK WebSocket. Audio frames arrive
+     * from the carrier thread while function outputs arrive from the OpenAI
+     * listener thread, so writing without ordering can race under real traffic.
+     */
     private void sendOpenAi(JSONObject json) {
         WebSocket socket = openAiSocket;
-        if (socket != null && open.get() && !closed.get()) {
-            socket.sendText(json.toString(), true);
+        if (socket == null || !open.get() || closed.get()) return;
+
+        int pending = pendingOpenAiMessages.incrementAndGet();
+        if (pending > MAX_PENDING_OPENAI_MESSAGES) {
+            pendingOpenAiMessages.decrementAndGet();
+            handleUpstreamFailure("OpenAI outbound message backlog exceeded safe limit");
+            return;
+        }
+
+        String payload = json.toString();
+        synchronized (sendLock) {
+            sendChain = sendChain.handle((ignored, previousError) -> (Void) null)
+                    .thenCompose(ignored -> {
+                        if (!open.get() || closed.get()) {
+                            return CompletableFuture.<Void>completedFuture(null);
+                        }
+                        return socket.sendText(payload, true).thenApply(sent -> (Void) null);
+                    })
+                    .whenComplete((ignored, error) -> {
+                        pendingOpenAiMessages.decrementAndGet();
+                        if (error != null) {
+                            handleUpstreamFailure("OpenAI send failed: " + rootMessage(error));
+                        }
+                    });
         }
     }
 
@@ -237,15 +310,34 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
         log.warn("OpenAI Realtime error call={} code={} message={}", context.callId(), code, message);
     }
 
-    @Override
-    public void close() {
+    private void handleUpstreamFailure(String reason) {
+        if (!closed.compareAndSet(false, true)) return;
+        open.set(false);
+        log.warn("Realtime upstream failure call={} reason={}", context.callId(), reason);
+        transport.closeOnUpstreamFailure();
+        summaries.generate(context.callId());
+    }
+
+    private void finishAiSession(String reason) {
         if (!closed.compareAndSet(false, true)) return;
         open.set(false);
         WebSocket socket = openAiSocket;
         if (socket != null) {
-            try { socket.sendClose(WebSocket.NORMAL_CLOSURE, "Voice transport ended"); }
+            try { socket.sendClose(WebSocket.NORMAL_CLOSURE, reason); }
             catch (Exception ignored) { }
         }
         summaries.generate(context.callId());
+    }
+
+    private static String rootMessage(Throwable error) {
+        if (error == null) return "unknown";
+        Throwable current = error;
+        while (current.getCause() != null) current = current.getCause();
+        return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
+    }
+
+    @Override
+    public void close() {
+        finishAiSession("Voice transport ended");
     }
 }
