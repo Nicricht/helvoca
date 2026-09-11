@@ -5,7 +5,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class TwilioSignatureValidator {
@@ -20,34 +22,95 @@ public class TwilioSignatureValidator {
         if (!properties.hasAuthToken() || signature == null || signature.isBlank()) {
             return false;
         }
+
         RequestValidator validator = new RequestValidator(properties.getAuthToken());
-        String url = publicHttpUrl(request);
         Map<String, String> parameters = new LinkedHashMap<>();
         request.getParameterMap().forEach((key, values) ->
                 parameters.put(key, values == null || values.length == 0 ? "" : values[0]));
-        return validator.validate(url, parameters, signature);
+
+        for (String url : httpCandidates(request)) {
+            if (validator.validate(url, parameters, signature)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean validateWebSocket(String requestUri, String signature) {
         if (!properties.hasAuthToken() || signature == null || signature.isBlank()) {
             return false;
         }
+
         RequestValidator validator = new RequestValidator(properties.getAuthToken());
-        String url = properties.hasMediaStreamUrl() ? properties.getMediaStreamUrl().trim() : requestUri;
-        if (validator.validate(url, Map.of(), signature)) {
-            return true;
+        Set<String> candidates = new LinkedHashSet<>();
+        if (properties.hasMediaStreamUrl()) {
+            addWebSocketCandidates(candidates, properties.getMediaStreamUrl().trim());
         }
-        String alternate = url.endsWith("/") ? url.substring(0, url.length() - 1) : url + "/";
-        return validator.validate(alternate, Map.of(), signature);
+        addWebSocketCandidates(candidates, requestUri);
+
+        for (String url : candidates) {
+            if (validator.validate(url, Map.of(), signature)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private String publicHttpUrl(HttpServletRequest request) {
+    private Set<String> httpCandidates(HttpServletRequest request) {
+        Set<String> candidates = new LinkedHashSet<>();
         String query = request.getQueryString();
+        String suffix = request.getRequestURI() + (query == null || query.isBlank() ? "" : "?" + query);
+
         if (properties.getPublicBaseUrl() != null && !properties.getPublicBaseUrl().isBlank()) {
-            String base = properties.getPublicBaseUrl().trim();
-            while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
-            return base + request.getRequestURI() + (query == null || query.isBlank() ? "" : "?" + query);
+            String base = trimTrailingSlash(properties.getPublicBaseUrl().trim());
+            candidates.add(base + suffix);
         }
-        return request.getRequestURL().toString() + (query == null || query.isBlank() ? "" : "?" + query);
+
+        candidates.add(request.getRequestURL().toString()
+                + (query == null || query.isBlank() ? "" : "?" + query));
+
+        String forwardedProto = firstForwardedValue(request.getHeader("X-Forwarded-Proto"));
+        String forwardedHost = firstForwardedValue(request.getHeader("X-Forwarded-Host"));
+        if (forwardedProto != null && forwardedHost != null) {
+            candidates.add(forwardedProto + "://" + forwardedHost + suffix);
+        }
+
+        return candidates;
+    }
+
+    private static void addWebSocketCandidates(Set<String> candidates, String url) {
+        if (url == null || url.isBlank()) return;
+        String value = url.trim();
+        addWithSlashVariant(candidates, value);
+
+        if (value.startsWith("wss://")) {
+            addWithSlashVariant(candidates, "https://" + value.substring("wss://".length()));
+        } else if (value.startsWith("ws://")) {
+            addWithSlashVariant(candidates, "http://" + value.substring("ws://".length()));
+        } else if (value.startsWith("https://")) {
+            addWithSlashVariant(candidates, "wss://" + value.substring("https://".length()));
+        } else if (value.startsWith("http://")) {
+            String rest = value.substring("http://".length());
+            addWithSlashVariant(candidates, "https://" + rest);
+            addWithSlashVariant(candidates, "ws://" + rest);
+            addWithSlashVariant(candidates, "wss://" + rest);
+        }
+    }
+
+    private static void addWithSlashVariant(Set<String> candidates, String url) {
+        candidates.add(url);
+        candidates.add(url.endsWith("/") ? url.substring(0, url.length() - 1) : url + "/");
+    }
+
+    private static String firstForwardedValue(String value) {
+        if (value == null || value.isBlank()) return null;
+        int comma = value.indexOf(',');
+        return (comma >= 0 ? value.substring(0, comma) : value).trim();
+    }
+
+    private static String trimTrailingSlash(String value) {
+        String out = value;
+        while (out.endsWith("/")) out = out.substring(0, out.length() - 1);
+        return out;
     }
 }
