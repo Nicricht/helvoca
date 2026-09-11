@@ -54,11 +54,9 @@ public class TwilioVoiceController {
     }
 
     /**
-     * Twilio outbound test calls have the business Twilio number in {@code From}
-     * and the tester's phone in {@code To}. The normal lifecycle expects the
-     * caller first and the business number second, so invert them here while
-     * keeping the exact same Media Streams/OpenAI path as a real inbound call.
-     * This route remains protected by Twilio signature validation.
+     * Twilio Console outbound tests put the business Twilio number in From and
+     * the tester phone in To. Keep this demo on its own Media Stream handshake
+     * route so production inbound WebSockets remain signature-protected.
      */
     @PostMapping(value = "/outbound-test", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
@@ -66,7 +64,7 @@ public class TwilioVoiceController {
                                                @RequestParam("From") String from,
                                                @RequestParam("To") String to) {
         try {
-            return ResponseEntity.ok(calls.startInboundCall(callSid, to, from));
+            return ResponseEntity.ok(calls.startOutboundTestCall(callSid, to, from));
         } catch (NotFoundException e) {
             return ResponseEntity.ok(twiml.rejectUnknownNumber());
         }
@@ -84,7 +82,7 @@ public class TwilioVoiceController {
             calls.startTrialInboundCall(callSid, from, to);
             return ResponseEntity.ok(twiml.trialGather(trial.getGreeting()));
         } catch (NotFoundException | IllegalArgumentException e) {
-            return ResponseEntity.ok(twiml.trialSayAndHangup("No pude iniciar la demostración de Helvoca para este número."));
+            return ResponseEntity.ok(twiml.trialSayAndHangup("No pude iniciar la demostración de RecepVoz para este número."));
         }
     }
 
@@ -143,6 +141,22 @@ public class TwilioVoiceController {
                                              @RequestParam("StreamEvent") String streamEvent,
                                              @RequestParam(value = "CallSid", required = false) String callSid,
                                              @RequestParam(value = "StreamError", required = false) String streamError) {
+        return handleStreamStatus(streamSid, streamEvent, callSid, streamError);
+    }
+
+    @PostMapping(value = "/trial/stream-status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public ResponseEntity<Void> trialStreamStatus(@RequestParam("StreamSid") String streamSid,
+                                                  @RequestParam("StreamEvent") String streamEvent,
+                                                  @RequestParam(value = "CallSid", required = false) String callSid,
+                                                  @RequestParam(value = "StreamError", required = false) String streamError) {
+        if (!trial.isEnabled()) return ResponseEntity.status(403).build();
+        return handleStreamStatus(streamSid, streamEvent, callSid, streamError);
+    }
+
+    private ResponseEntity<Void> handleStreamStatus(String streamSid,
+                                                    String streamEvent,
+                                                    String callSid,
+                                                    String streamError) {
         if ("stream-stopped".equalsIgnoreCase(streamEvent) || "stream-error".equalsIgnoreCase(streamEvent)) {
             calls.markStreamStopped(streamSid);
         }
