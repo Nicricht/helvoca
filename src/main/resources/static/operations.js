@@ -36,6 +36,23 @@ function fmtDate(value) {
   catch (_) { return value; }
 }
 
+function renderReadiness(data) {
+  $("#readinessBadge").textContent = data.ready ? "LISTO" : `${data.requiredPassed}/${data.requiredTotal}`;
+  const checks = $("#readinessChecks");
+  checks.innerHTML = (data.checks || []).map(c => `
+    <div class="item">
+      <div class="item-head"><strong>${esc(c.label)}</strong><span class="pill ${c.ready ? "" : "bad"}">${c.ready ? "OK" : "FALTA"}</span></div>
+      <div class="meta"><span>${esc(c.detail)}</span></div>
+    </div>`).join("");
+
+  const capabilities = Object.entries(data.capabilities || {});
+  $("#capabilities").innerHTML = capabilities.map(([name, enabled]) =>
+    `<span class="pill ${enabled ? "" : "bad"}">${esc(name)} ${enabled ? "✓" : "×"}</span>`).join(" ");
+
+  const warnings = $("#readinessWarnings");
+  warnings.innerHTML = (data.warnings || []).map(w => `<div class="empty">${esc(w)}</div>`).join("");
+}
+
 function renderCalls(items = []) {
   const root = $("#callsList");
   if (!items.length) { root.innerHTML = '<div class="empty">Todavía no hay llamadas.</div>'; return; }
@@ -96,7 +113,10 @@ function renderQuestions(items = []) {
 
 async function load() {
   try {
-    const data = await api("/api/v1/operations/dashboard");
+    const [data, readiness] = await Promise.all([
+      api("/api/v1/operations/dashboard"),
+      api("/api/v1/operations/readiness")
+    ]);
     $("#businessName").textContent = data.businessName;
     $("#localNow").textContent = `${data.timezone} · ${fmtDate(data.localNow)}`;
     $("#callsToday").textContent = data.callsToday;
@@ -106,6 +126,7 @@ async function load() {
     $("#unknownQuestions").textContent = data.unansweredQuestions;
     $("#failuresToday").textContent = data.callFailuresToday;
     $("#healthBadge").textContent = data.callFailuresToday ? `${data.callFailuresToday} llamada(s) con fallo` : "Operación saludable";
+    renderReadiness(readiness);
     renderCalls(data.recentCalls);
     renderRequests(data.recentRequests);
     renderQuestions(data.unanswered);
