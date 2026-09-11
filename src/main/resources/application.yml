@@ -40,6 +40,7 @@ app:
     telephony-provider: ${HELVOCA_TELEPHONY_PROVIDER:twilio}
     ai-provider: ${HELVOCA_VOICE_AI_PROVIDER:openai}
   twilio:
+    account-sid: ${TWILIO_ACCOUNT_SID:}
     auth-token: ${TWILIO_AUTH_TOKEN:}
     public-base-url: ${TWILIO_PUBLIC_BASE_URL:}
     media-stream-url: ${TWILIO_MEDIA_STREAM_URL:}
