@@ -1,10 +1,10 @@
-# Helvoca - Product V1
+# RecepVoz - Product V1
 
-Helvoca es un SaaS multi-tenant de atención telefónica con IA para empresas. El backend cuenta con autenticación, aislamiento por tenant, clientes, servicios, reservas, conocimiento empresarial, telefonía, agente de voz, herramientas controladas por backend y trazabilidad de llamadas.
+RecepVoz es un SaaS multi-tenant de atención telefónica con IA para empresas. El backend cuenta con autenticación, aislamiento por tenant, clientes, servicios, reservas, conocimiento empresarial, telefonía, agente de voz, herramientas controladas por backend y trazabilidad de llamadas.
 
 ## Enfoque de producto
 
-La V1 se concentra primero en negocios que trabajan con horas o reservas. La promesa comercial es simple: Helvoca contesta, resuelve preguntas repetitivas, agenda clientes y escala a una persona cuando corresponde.
+La V1 se concentra primero en negocios que trabajan con horas o reservas. La promesa comercial es simple: RecepVoz contesta, resuelve preguntas repetitivas, agenda clientes y escala a una persona cuando corresponde.
 
 El core ya no debe depender de un proveedor específico. Twilio y OpenAI son los primeros adaptadores, no la arquitectura completa del producto.
 
@@ -45,7 +45,7 @@ El core ya no debe depender de un proveedor específico. Twilio y OpenAI son los
 
 ## Arquitectura independiente de proveedores
 
-Helvoca define puertos propios para voz:
+RecepVoz define puertos propios para voz:
 
 ```text
 Caller
@@ -56,7 +56,7 @@ CallLifecycleService
   ↓
 VoiceAiProvider
   ↓
-Helvoca tools / business rules
+RecepVoz tools / business rules
   ↓
 PostgreSQL
 ```
@@ -84,17 +84,17 @@ La base queda preparada para añadir adapters Telnyx, SIP u otros motores de IA 
 
 Las APIs administrativas no confían en un `businessId` enviado por el frontend. El backend obtiene `business_id` desde el JWT mediante `TenantProvider` y filtra las consultas por tenant.
 
-Los webhooks de producción de Twilio se autentican mediante `X-Twilio-Signature`. Las tools de voz tampoco aceptan un tenant elegido por el modelo: utilizan un `RealtimeCallContext` construido desde una llamada previamente resuelta por Helvoca.
+Los webhooks de producción de Twilio se autentican mediante `X-Twilio-Signature`. Las tools de voz tampoco aceptan un tenant elegido por el modelo: utilizan un `RealtimeCallContext` construido desde una llamada previamente resuelta por RecepVoz.
 
 ## Regla crítica de IA
 
 El modelo solicita acciones, pero el backend decide su resultado.
 
 ```text
-IA → function call → Helvoca → PostgreSQL → tool result → IA
+IA → function call → RecepVoz → PostgreSQL → tool result → IA
 ```
 
-Una reserva solo puede ser anunciada como confirmada si Helvoca devuelve éxito. Un error como `BOOKING_SLOT_UNAVAILABLE` debe comunicarse como error, nunca como una confirmación inventada.
+Una reserva solo puede ser anunciada como confirmada si RecepVoz devuelve éxito. Un error como `BOOKING_SLOT_UNAVAILABLE` debe comunicarse como error, nunca como una confirmación inventada.
 
 ## Trazabilidad de proveedores
 
@@ -164,7 +164,7 @@ Callback de estados:
 https://tu-dominio-publico/webhooks/v1/twilio/status
 ```
 
-Después registra ese número en Helvoca mediante `POST /api/v1/phone-numbers`.
+Después registra ese número en RecepVoz mediante `POST /api/v1/phone-numbers`.
 
 ## Documentación
 
@@ -192,4 +192,4 @@ El orden recomendado desde aquí es:
 9. planes, límites y billing
 10. primer cliente pagado
 
-Redis, Telnyx, SIP y proveedores adicionales se incorporan cuando resuelvan una necesidad medida de escala, costo, disponibilidad o geografía. Helvoca se mantiene como monolito modular mientras esa sea la opción más simple y confiable.
+Redis, Telnyx, SIP y proveedores adicionales se incorporan cuando resuelvan una necesidad medida de escala, costo, disponibilidad o geografía. RecepVoz se mantiene como monolito modular mientras esa sea la opción más simple y confiable.

@@ -1,4 +1,4 @@
-name: Helvoca CI
+name: RecepVoz CI
 
 on:
   push:
