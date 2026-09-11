@@ -5,6 +5,7 @@ import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
+import cl.helvoca.call.CallTraceService;
 import cl.helvoca.customer.Customer;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItem;
@@ -19,6 +20,9 @@ import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +34,8 @@ import java.util.UUID;
 
 @Service
 public class RealtimeToolService {
+    private static final Logger log = LoggerFactory.getLogger(RealtimeToolService.class);
+
     private final BusinessRepository businesses;
     private final CustomerRepository customers;
     private final ServiceItemRepository services;
@@ -39,6 +45,9 @@ public class RealtimeToolService {
     private final BusinessScheduleService schedule;
     private final BusinessRequestService requests;
     private final UnansweredQuestionService unansweredQuestions;
+
+    @Autowired(required = false)
+    private CallTraceService trace;
 
     public RealtimeToolService(BusinessRepository businesses,
                                CustomerRepository customers,
@@ -62,11 +71,12 @@ public class RealtimeToolService {
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public String execute(RealtimeCallContext context, String toolName, String rawArguments) {
+        JSONObject result;
         try {
             JSONObject args = rawArguments == null || rawArguments.isBlank()
                     ? new JSONObject()
                     : new JSONObject(rawArguments);
-            JSONObject result = switch (toolName) {
+            result = switch (toolName) {
                 case "get_business_information" -> businessInformation(context);
                 case "list_services" -> listServices(context);
                 case "search_knowledge" -> searchKnowledge(context, args);
@@ -83,12 +93,20 @@ public class RealtimeToolService {
                 case "transfer_to_human" -> transferToHuman(context);
                 default -> error("UNKNOWN_TOOL", "La operación solicitada no está habilitada.");
             };
-            return result.toString();
         } catch (IllegalArgumentException e) {
-            return error("INVALID_ARGUMENT", e.getMessage()).toString();
+            result = error("INVALID_ARGUMENT", e.getMessage());
         } catch (Exception e) {
-            return error("TOOL_EXECUTION_FAILED", "La operación no pudo completarse en el backend.").toString();
+            result = error("TOOL_EXECUTION_FAILED", "La operación no pudo completarse en el backend.");
         }
+
+        if (trace != null) {
+            try {
+                trace.recordTool(context.businessId(), context.callId(), toolName, result);
+            } catch (Exception e) {
+                log.warn("Could not persist call trace call={} tool={}: {}", context.callId(), toolName, e.getMessage());
+            }
+        }
+        return result.toString();
     }
 
     @Transactional(readOnly = true)
