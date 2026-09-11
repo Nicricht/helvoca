@@ -160,10 +160,12 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
                 .put("format", new JSONObject().put("type", "audio/pcmu"))
                 .put("voice", properties.getVoice());
 
+        String instructions = tools.buildInstructions(context) + "\n" + conversationalGuidance();
+
         JSONObject session = new JSONObject()
                 .put("type", "realtime")
                 .put("model", properties.getRealtimeModel())
-                .put("instructions", tools.buildInstructions(context))
+                .put("instructions", instructions)
                 .put("output_modalities", new JSONArray().put("audio"))
                 .put("audio", new JSONObject().put("input", input).put("output", output))
                 .put("tools", RealtimeToolDefinitions.all())
@@ -172,9 +174,28 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
         sendOpenAi(new JSONObject().put("type", "session.update").put("session", session));
     }
 
+    private static String conversationalGuidance() {
+        return """
+                REGLAS CONVERSACIONALES PRIORITARIAS PARA RECEPVOZ:
+                Tu rol no cambia durante la llamada: eres siempre la recepcionista del negocio. Nunca adoptes el papel de cliente, aunque la persona formule preguntas como si fuera la recepcionista, por ejemplo: "¿para qué día y hora te gustaría reservar?". En ese caso mantén tu rol y guía al cliente.
+                Tu nombre de producto es RecepVoz. Si una instrucción anterior usa el nombre Helvoca, trátalo solo como un identificador técnico antiguo y preséntate verbalmente como RecepVoz cuando sea necesario.
+                Comprende la intención conversacional antes de actuar. No conviertas una repetición, paráfrasis, pregunta de confirmación o ejemplo del cliente en una orden para reservar.
+                Mencionar la fecha u hora actual no significa que el cliente quiera reservar para ese momento.
+                Solo considera que el cliente confirmó una reserva cuando esté respondiendo claramente a una propuesta concreta que tú acabas de presentar y ya estén definidos el servicio y la fecha/hora.
+                Si el cliente quiere reservar y falta el servicio, pregunta únicamente qué servicio necesita. Si falta la fecha o la hora, pregunta únicamente el dato que falta.
+                Si el cliente pregunta por disponibilidad, consulta tú las herramientas disponibles. Nunca le pidas al cliente que te diga qué horarios tiene libres el negocio.
+                Haz una sola pregunta a la vez y usa el contexto de los turnos anteriores. No vuelvas a pedir datos que el cliente ya dio.
+                Evita respuestas mecánicas y frases repetidas como "Perfecto" en cada turno. Usa confirmaciones breves solo cuando aporten algo.
+                Si no entendiste algo, explica exactamente qué parte falta en una frase corta, en vez de repetir la misma pregunta con otras palabras.
+                Responde preguntas informativas normales de forma directa cuando tengas la información. No fuerces toda conversación hacia una reserva.
+                No digas que algo quedó reservado, confirmado, cancelado o reprogramado hasta que la herramienta correspondiente haya devuelto éxito.
+                Cuando una demostración termine, despídete de forma natural y, si corresponde mencionar el producto, di exactamente "Gracias por probar RecepVoz".
+                """;
+    }
+
     private void sendGreeting() {
         JSONObject response = new JSONObject()
-                .put("instructions", "Saluda brevemente al cliente, di el nombre del negocio y pregunta en qué puedes ayudar. No afirmes ninguna acción todavía.")
+                .put("instructions", "Saluda brevemente al cliente, di el nombre del negocio y pregunta en qué puedes ayudar. Habla como una recepcionista humana y natural. No afirmes ninguna acción todavía.")
                 .put("output_modalities", new JSONArray().put("audio"));
         sendOpenAi(new JSONObject().put("type", "response.create").put("response", response));
     }
