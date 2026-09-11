@@ -62,3 +62,13 @@ app:
     trial-model: ${OPENAI_TRIAL_MODEL:gpt-5.6-luna}
     realtime-url: ${OPENAI_REALTIME_URL:wss://api.openai.com/v1/realtime}
     responses-url: ${OPENAI_RESPONSES_URL:https://api.openai.com/v1/responses}
+    live:
+      enabled: ${OPENAI_LIVE_ENABLED:false}
+      project-id: ${OPENAI_PROJECT_ID:}
+      webhook-secret: ${OPENAI_WEBHOOK_SECRET:}
+      model: ${OPENAI_LIVE_MODEL:gpt-live-1}
+      backend-model: ${OPENAI_LIVE_BACKEND_MODEL:gpt-5.6-luna}
+      voice: ${OPENAI_LIVE_VOICE:marin}
+      api-base-url: ${OPENAI_LIVE_API_BASE_URL:https://api.openai.com/v1}
+      sideband-base-url: ${OPENAI_LIVE_SIDEBAND_BASE_URL:wss://api.openai.com/v1}
+      webhook-tolerance-seconds: ${OPENAI_WEBHOOK_TOLERANCE_SECONDS:300}
