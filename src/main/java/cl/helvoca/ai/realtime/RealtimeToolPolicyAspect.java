@@ -64,6 +64,14 @@ public class RealtimeToolPolicyAspect {
             result = error("TOOL_EXECUTION_FAILED", "La operación no pudo completarse en el backend.");
         }
 
+        if (result.optBoolean("success", false)) {
+            try {
+                updateResolution(context, toolName);
+            } catch (Exception ignored) {
+                // El resultado principal no depende del dato agregado del dashboard.
+            }
+        }
+
         long durationMs = (System.nanoTime() - started) / 1_000_000L;
         try {
             toolEvents.record(context, toolName, result, durationMs);
@@ -94,8 +102,6 @@ public class RealtimeToolPolicyAspect {
         BusinessRequestPriority priority = priority(optional(args, "priority"));
         BusinessRequest created = requests.createFromCall(
                 context.businessId(), call.getCustomerId(), call.getId(), category, subject, details, priority);
-        call.setResolution("REQUEST_CREATED");
-        calls.save(call);
         return success(new JSONObject()
                 .put("requestId", created.getId().toString())
                 .put("subject", created.getSubject())
@@ -112,6 +118,21 @@ public class RealtimeToolPolicyAspect {
                 .put("questionId", item.getId().toString())
                 .put("status", item.getStatus().name())
                 .put("occurrences", item.getOccurrences()));
+    }
+
+    private void updateResolution(RealtimeCallContext context, String toolName) {
+        String resolution = switch (toolName) {
+            case "create_booking" -> "BOOKING_CREATED";
+            case "reschedule_booking" -> "BOOKING_RESCHEDULED";
+            case "cancel_booking" -> "BOOKING_CANCELLED";
+            case "create_business_request" -> "REQUEST_CREATED";
+            case "transfer_to_human" -> "HUMAN_TRANSFER";
+            default -> null;
+        };
+        if (resolution == null) return;
+        CallSession call = trustedCall(context);
+        call.setResolution(resolution);
+        calls.save(call);
     }
 
     private CallSession trustedCall(RealtimeCallContext context) {
