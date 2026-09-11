@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Helvoca · Probar mi recepcionista</title>
+  <link rel="stylesheet" href="/simulator.css">
+</head>
+<body>
+<header class="topbar">
+  <div><strong>HELVOCA</strong><span>Prueba de recepcionista</span></div>
+  <nav><a href="/operations.html">Operaciones</a><a href="/">Configuración</a></nav>
+</header>
+
+<main>
+  <section class="hero">
+    <div>
+      <p class="eyebrow">SIMULADOR SEGURO</p>
+      <h1>Habla con tu Helvoca antes de conectar telefonía comercial.</h1>
+      <p>Usa la configuración real de tu negocio. Las reservas, clientes, solicitudes y preguntas creadas aquí son simuladas y no modifican tus datos reales.</p>
+    </div>
+    <div id="sessionBadge" class="badge">Sin prueba activa</div>
+  </section>
+
+  <section class="sim-grid">
+    <article class="panel chat-panel">
+      <div class="panel-head">
+        <div><p class="eyebrow">CONVERSACIÓN</p><h2>Probar mi recepcionista</h2></div>
+        <div class="actions">
+          <button id="startBtn">Nueva prueba</button>
+          <button id="finishBtn" class="ghost" disabled>Finalizar</button>
+        </div>
+      </div>
+
+      <div class="safe-note"><strong>Modo seguro</strong><span>No crea datos comerciales reales ni realiza llamadas telefónicas.</span></div>
+      <div id="chat" class="chat"><div class="empty">Inicia una prueba para comenzar.</div></div>
+
+      <form id="messageForm" class="composer">
+        <button id="micBtn" class="mic" type="button" title="Hablar" disabled>🎙</button>
+        <input id="messageInput" autocomplete="off" placeholder="Escribe o usa el micrófono…" disabled maxlength="1000">
+        <button id="sendBtn" type="submit" disabled>Enviar</button>
+      </form>
+      <p id="voiceHint" class="hint">Si tu navegador admite reconocimiento de voz, puedes hablar y Helvoca leerá sus respuestas en voz alta.</p>
+    </article>
+
+    <aside class="panel trace-panel">
+      <div class="panel-head"><div><p class="eyebrow">TRAZABILIDAD</p><h2>Qué haría Helvoca</h2></div></div>
+      <div class="trace-stat"><span>Resultado actual</span><strong id="resolution">SIN ACCIÓN</strong></div>
+      <div class="trace-stat"><span>Acciones verificadas</span><strong id="actionCount">0</strong></div>
+      <div id="traceList" class="trace-list"><div class="empty">Las herramientas usadas aparecerán aquí.</div></div>
+    </aside>
+  </section>
+
+  <p id="message" class="toast hidden"></p>
+</main>
+<script src="/simulator.js" defer></script>
+</body>
+</html>
