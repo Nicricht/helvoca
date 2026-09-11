@@ -40,6 +40,48 @@ class TwilioSignatureValidatorTest {
         assertFalse(validator.validateHttp(request));
     }
 
+    @Test
+    void validatesWebhookUsingForwardedPublicUrlBehindProxy() throws Exception {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setAuthToken(TOKEN);
+        TwilioSignatureValidator validator = new TwilioSignatureValidator(properties);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/v1/twilio/stream-status");
+        request.setScheme("http");
+        request.setServerName("railway.internal");
+        request.setServerPort(8080);
+        request.addHeader("X-Forwarded-Proto", "https");
+        request.addHeader("X-Forwarded-Host", "helvoca-api-production.up.railway.app");
+        request.addParameter("StreamSid", "MZ123");
+        request.addParameter("StreamEvent", "stream-started");
+
+        String url = "https://helvoca-api-production.up.railway.app/webhooks/v1/twilio/stream-status";
+        request.addHeader("X-Twilio-Signature", signature(url, Map.of(
+                "StreamSid", "MZ123",
+                "StreamEvent", "stream-started")));
+
+        assertTrue(validator.validateHttp(request));
+    }
+
+    @Test
+    void validatesMediaStreamHandshakeWhenTwilioSignsHttpsFormOfWssUrl() throws Exception {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setAuthToken(TOKEN);
+        properties.setMediaStreamUrl("wss://helvoca-api-production.up.railway.app/ws/twilio");
+        TwilioSignatureValidator validator = new TwilioSignatureValidator(properties);
+
+        String signature = signature(
+                "https://helvoca-api-production.up.railway.app/ws/twilio/",
+                Map.of());
+
+        assertTrue(validator.validateWebSocket(
+                "http://helvoca-api.railway.internal/ws/twilio",
+                signature));
+        assertFalse(validator.validateWebSocket(
+                "http://helvoca-api.railway.internal/ws/twilio",
+                "invalid"));
+    }
+
     private static String signature(String url, Map<String, String> params) throws Exception {
         StringBuilder value = new StringBuilder(url);
         new TreeMap<>(params).forEach((key, item) -> value.append(key).append(item));
