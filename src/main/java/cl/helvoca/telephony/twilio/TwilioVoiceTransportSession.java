@@ -1,5 +1,6 @@
 package cl.helvoca.telephony.twilio;
 
+import cl.helvoca.call.CallTraceService;
 import cl.helvoca.voice.VoiceTransportSession;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -7,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+
+import java.util.UUID;
 
 /**
  * Twilio-specific implementation of the provider-neutral voice transport port.
@@ -18,15 +21,31 @@ public final class TwilioVoiceTransportSession implements VoiceTransportSession 
     private final String accountSid;
     private final String callSid;
     private final TwilioCallControl callControl;
+    private final CallTraceService trace;
+    private final UUID businessId;
+    private final UUID callId;
 
     public TwilioVoiceTransportSession(WebSocketSession session,
                                        String accountSid,
                                        String callSid,
                                        TwilioCallControl callControl) {
+        this(session, accountSid, callSid, callControl, null, null, null);
+    }
+
+    public TwilioVoiceTransportSession(WebSocketSession session,
+                                       String accountSid,
+                                       String callSid,
+                                       TwilioCallControl callControl,
+                                       CallTraceService trace,
+                                       UUID businessId,
+                                       UUID callId) {
         this.session = session;
         this.accountSid = accountSid;
         this.callSid = callSid;
         this.callControl = callControl;
+        this.trace = trace;
+        this.businessId = businessId;
+        this.callId = callId;
     }
 
     @Override
@@ -56,7 +75,15 @@ public final class TwilioVoiceTransportSession implements VoiceTransportSession 
     @Override
     public boolean transferToHuman(String targetPhone) {
         if (!session.isOpen()) return false;
-        return callControl.transferToHuman(accountSid, callSid, targetPhone);
+        boolean accepted = callControl.transferToHuman(accountSid, callSid, targetPhone);
+        if (trace != null && businessId != null && callId != null) {
+            try {
+                trace.recordHumanTransfer(businessId, callId, accepted, targetPhone);
+            } catch (Exception e) {
+                log.warn("Could not persist human transfer trace call={}: {}", callId, e.getMessage());
+            }
+        }
+        return accepted;
     }
 
     @Override
