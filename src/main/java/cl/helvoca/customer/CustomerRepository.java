@@ -9,4 +9,5 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
     List<Customer> findAllByBusinessIdOrderByCreatedAtDesc(UUID businessId);
     Optional<Customer> findByIdAndBusinessId(UUID id, UUID businessId);
     Optional<Customer> findFirstByBusinessIdAndPhone(UUID businessId, String phone);
+    long countByBusinessId(UUID businessId);
 }
