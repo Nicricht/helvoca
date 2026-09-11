@@ -2,6 +2,7 @@ package cl.helvoca.telephony.twilio;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -31,6 +32,7 @@ public class TwilioCallControl {
     private final HttpClient http;
     private final String apiBase;
 
+    @Autowired
     public TwilioCallControl(TwilioProperties properties) {
         this(properties,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build(),
