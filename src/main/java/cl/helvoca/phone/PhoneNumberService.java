@@ -49,7 +49,7 @@ public class PhoneNumberService {
                 if (!canClaimSeededTrialNumber(existing, number)) {
                     throw new ConflictException("Este número ya está conectado a otro negocio");
                 }
-                existing.setBusinessId(businessId);
+                return claimSeededTrialNumber(existing, businessId, number, request.active());
             }
 
             String externalId = blankToNull(request.externalId());
@@ -67,12 +67,39 @@ public class PhoneNumberService {
         return PhoneNumberResponse.from(repository.save(phone));
     }
 
+    private PhoneNumberResponse claimSeededTrialNumber(PhoneNumber existing,
+                                                       UUID businessId,
+                                                       String number,
+                                                       Boolean requestedActive) {
+        UUID existingId = existing.getId();
+        if (existingId == null) {
+            throw new ConflictException("El número Trial no puede transferirse de forma segura");
+        }
+
+        existing.setActive(false);
+        existing.setPhoneNumber(archivedPhoneNumber(existingId));
+        existing.setExternalId(TRIAL_EXTERNAL_ID + "_ARCHIVED_" + existingId);
+        repository.saveAndFlush(existing);
+
+        PhoneNumber claimed = new PhoneNumber();
+        claimed.setBusinessId(businessId);
+        claimed.setProvider(TRIAL_PROVIDER);
+        claimed.setExternalId(TRIAL_EXTERNAL_ID);
+        claimed.setPhoneNumber(number);
+        claimed.setActive(requestedActive == null || requestedActive);
+        return PhoneNumberResponse.from(repository.save(claimed));
+    }
+
     private boolean canClaimSeededTrialNumber(PhoneNumber existing, String requestedNumber) {
         if (!trialProperties.isEnabled() || !trialProperties.hasPhoneNumber()) return false;
         if (!trialProperties.getPhoneNumber().equals(requestedNumber)) return false;
         if (!TRIAL_PROVIDER.equals(existing.getProvider())) return false;
         if (!TRIAL_EXTERNAL_ID.equals(existing.getExternalId())) return false;
         return users.findAllByBusinessIdOrderByName(existing.getBusinessId()).isEmpty();
+    }
+
+    private static String archivedPhoneNumber(UUID id) {
+        return "archived-" + id.toString().replace("-", "").substring(0, 20);
     }
 
     @Transactional
