@@ -19,8 +19,19 @@ public class TwimlFactory {
         if (!properties.hasMediaStreamUrl()) {
             return serviceUnavailable();
         }
-        String url = escapeXml(properties.getMediaStreamUrl().trim());
-        String statusCallback = streamStatusCallbackUrl();
+        return connectStream(properties.getMediaStreamUrl().trim(), streamStatusCallbackUrl(), callId);
+    }
+
+    public String connectTrialMediaStream(UUID callId) {
+        String url = trialMediaStreamUrl();
+        if (url == null) {
+            return serviceUnavailable();
+        }
+        return connectStream(url, trialStreamStatusCallbackUrl(), callId);
+    }
+
+    private String connectStream(String streamUrl, String statusCallback, UUID callId) {
+        String url = escapeXml(streamUrl);
         String callbackAttributes = statusCallback == null ? ""
                 : " statusCallback=\"" + escapeXml(statusCallback) + "\" statusCallbackMethod=\"POST\"";
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
@@ -98,6 +109,25 @@ public class TwimlFactory {
     private String streamStatusCallbackUrl() {
         String base = normalizedPublicBaseUrl();
         return base == null ? null : base + "/webhooks/v1/twilio/stream-status";
+    }
+
+    private String trialStreamStatusCallbackUrl() {
+        String base = normalizedPublicBaseUrl();
+        return base == null ? null : base + "/webhooks/v1/twilio/trial/stream-status";
+    }
+
+    private String trialMediaStreamUrl() {
+        if (!properties.hasMediaStreamUrl()) return null;
+        String url = properties.getMediaStreamUrl().trim();
+        String normal = "/ws/twilio";
+        String trailing = normal + "/";
+        if (url.endsWith(trailing)) {
+            return url.substring(0, url.length() - trailing.length()) + "/ws/twilio-trial";
+        }
+        if (url.endsWith(normal)) {
+            return url.substring(0, url.length() - normal.length()) + "/ws/twilio-trial";
+        }
+        return null;
     }
 
     private String normalizedPublicBaseUrl() {
