@@ -39,6 +39,14 @@ public class TwilioCallService {
         return twiml.connectMediaStream(callId);
     }
 
+    public String startOutboundTestCall(String providerCallId, String testerPhone, String businessPhone) {
+        if (!trial.isEnabled()) {
+            return twiml.serviceUnavailable();
+        }
+        UUID callId = lifecycle.startInboundCall(activeProviderId(), providerCallId, testerPhone, businessPhone);
+        return twiml.connectTrialMediaStream(callId);
+    }
+
     public RealtimeCallContext startTrialInboundCall(String providerCallId, String from, String to) {
         String effectiveFrom = from;
         String effectiveTo = to;
