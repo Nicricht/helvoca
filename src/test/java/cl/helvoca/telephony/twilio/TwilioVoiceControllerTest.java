@@ -1,5 +1,6 @@
 package cl.helvoca.telephony.twilio;
 
+import cl.helvoca.ai.live.OpenAiLiveSipService;
 import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.telephony.twilio.trial.TrialConversationStateService;
@@ -16,14 +17,36 @@ import static org.mockito.Mockito.*;
 class TwilioVoiceControllerTest {
 
     @Test
-    void terminalStatusGeneratesSummaryForPersistedCall() {
+    void readyLiveSipRoutesInboundWithoutOpeningMediaStream() {
         TwilioCallService calls = mock(TwilioCallService.class);
         TwimlFactory twiml = mock(TwimlFactory.class);
+        OpenAiLiveSipService liveSip = mock(OpenAiLiveSipService.class);
         TrialVoiceProperties trial = mock(TrialVoiceProperties.class);
         TrialVoiceConversationService conversation = mock(TrialVoiceConversationService.class);
         TrialConversationStateService state = mock(TrialConversationStateService.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
-        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, trial, conversation, state, summaries);
+        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, liveSip, trial, conversation, state, summaries);
+        when(liveSip.isReady()).thenReturn(true);
+        when(liveSip.twiml("+14355652512", "+56911111111"))
+                .thenReturn("<Response><Dial><Sip>sip:proj_test@sip.api.openai.com</Sip></Dial></Response>");
+
+        var response = controller.incoming("CA-LIVE", "+56911111111", "+14355652512");
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(liveSip).twiml("+14355652512", "+56911111111");
+        verify(calls, never()).startInboundCall(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void terminalStatusGeneratesSummaryForPersistedCall() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        TwimlFactory twiml = mock(TwimlFactory.class);
+        OpenAiLiveSipService liveSip = mock(OpenAiLiveSipService.class);
+        TrialVoiceProperties trial = mock(TrialVoiceProperties.class);
+        TrialVoiceConversationService conversation = mock(TrialVoiceConversationService.class);
+        TrialConversationStateService state = mock(TrialConversationStateService.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, liveSip, trial, conversation, state, summaries);
 
         UUID callId = UUID.randomUUID();
         when(calls.updateStatus("CA-TERMINAL", "completed", 42)).thenReturn(callId);
@@ -39,11 +62,12 @@ class TwilioVoiceControllerTest {
     void nonTerminalStatusDoesNotGenerateSummary() {
         TwilioCallService calls = mock(TwilioCallService.class);
         TwimlFactory twiml = mock(TwimlFactory.class);
+        OpenAiLiveSipService liveSip = mock(OpenAiLiveSipService.class);
         TrialVoiceProperties trial = mock(TrialVoiceProperties.class);
         TrialVoiceConversationService conversation = mock(TrialVoiceConversationService.class);
         TrialConversationStateService state = mock(TrialConversationStateService.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
-        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, trial, conversation, state, summaries);
+        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, liveSip, trial, conversation, state, summaries);
 
         UUID callId = UUID.randomUUID();
         when(calls.updateStatus("CA-ACTIVE", "in-progress", null)).thenReturn(callId);
@@ -59,11 +83,12 @@ class TwilioVoiceControllerTest {
     void trialGatherBridgesToTrustedHumanTargetWhenTransferWasRequested() {
         TwilioCallService calls = mock(TwilioCallService.class);
         TwimlFactory twiml = mock(TwimlFactory.class);
+        OpenAiLiveSipService liveSip = mock(OpenAiLiveSipService.class);
         TrialVoiceProperties trial = mock(TrialVoiceProperties.class);
         TrialVoiceConversationService conversation = mock(TrialVoiceConversationService.class);
         TrialConversationStateService state = mock(TrialConversationStateService.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
-        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, trial, conversation, state, summaries);
+        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, liveSip, trial, conversation, state, summaries);
 
         UUID callId = UUID.randomUUID();
         UUID businessId = UUID.randomUUID();
@@ -89,11 +114,12 @@ class TwilioVoiceControllerTest {
     void failedHumanDialReturnsCallerToHelvoca() {
         TwilioCallService calls = mock(TwilioCallService.class);
         TwimlFactory twiml = mock(TwimlFactory.class);
+        OpenAiLiveSipService liveSip = mock(OpenAiLiveSipService.class);
         TrialVoiceProperties trial = mock(TrialVoiceProperties.class);
         TrialVoiceConversationService conversation = mock(TrialVoiceConversationService.class);
         TrialConversationStateService state = mock(TrialConversationStateService.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
-        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, trial, conversation, state, summaries);
+        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, liveSip, trial, conversation, state, summaries);
 
         UUID callId = UUID.randomUUID();
         RealtimeCallContext context = new RealtimeCallContext(
@@ -115,11 +141,12 @@ class TwilioVoiceControllerTest {
     void completedHumanDialEndsAiSessionAndGeneratesSummary() {
         TwilioCallService calls = mock(TwilioCallService.class);
         TwimlFactory twiml = mock(TwimlFactory.class);
+        OpenAiLiveSipService liveSip = mock(OpenAiLiveSipService.class);
         TrialVoiceProperties trial = mock(TrialVoiceProperties.class);
         TrialVoiceConversationService conversation = mock(TrialVoiceConversationService.class);
         TrialConversationStateService state = mock(TrialConversationStateService.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
-        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, trial, conversation, state, summaries);
+        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, liveSip, trial, conversation, state, summaries);
 
         UUID callId = UUID.randomUUID();
         RealtimeCallContext context = new RealtimeCallContext(

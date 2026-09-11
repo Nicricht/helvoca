@@ -1,5 +1,6 @@
 package cl.helvoca.telephony.twilio;
 
+import cl.helvoca.ai.live.OpenAiLiveSipService;
 import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.common.NotFoundException;
@@ -22,6 +23,7 @@ public class TwilioVoiceController {
 
     private final TwilioCallService calls;
     private final TwimlFactory twiml;
+    private final OpenAiLiveSipService liveSip;
     private final TrialVoiceProperties trial;
     private final TrialVoiceConversationService trialConversation;
     private final TrialConversationStateService trialState;
@@ -29,12 +31,14 @@ public class TwilioVoiceController {
 
     public TwilioVoiceController(TwilioCallService calls,
                                  TwimlFactory twiml,
+                                 OpenAiLiveSipService liveSip,
                                  TrialVoiceProperties trial,
                                  TrialVoiceConversationService trialConversation,
                                  TrialConversationStateService trialState,
                                  CallSummaryService summaries) {
         this.calls = calls;
         this.twiml = twiml;
+        this.liveSip = liveSip;
         this.trial = trial;
         this.trialConversation = trialConversation;
         this.trialState = trialState;
@@ -46,6 +50,9 @@ public class TwilioVoiceController {
     public ResponseEntity<String> incoming(@RequestParam("CallSid") String callSid,
                                            @RequestParam("From") String from,
                                            @RequestParam("To") String to) {
+        if (liveSip.isReady()) {
+            return ResponseEntity.ok(liveSip.twiml(to, from));
+        }
         try {
             return ResponseEntity.ok(calls.startInboundCall(callSid, from, to));
         } catch (NotFoundException e) {
@@ -55,14 +62,18 @@ public class TwilioVoiceController {
 
     /**
      * Twilio Console outbound tests put the business Twilio number in From and
-     * the tester phone in To. Keep this demo on its own Media Stream handshake
-     * route so production inbound WebSockets remain signature-protected.
+     * the tester phone in To. When GPT-Live SIP is ready the already-established
+     * Twilio call is bridged directly to OpenAI over SIP; otherwise keep the
+     * isolated Media Stream demo fallback.
      */
     @PostMapping(value = "/outbound-test", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> outboundTest(@RequestParam("CallSid") String callSid,
                                                @RequestParam("From") String from,
                                                @RequestParam("To") String to) {
+        if (liveSip.isReady()) {
+            return ResponseEntity.ok(liveSip.twiml(from, to));
+        }
         try {
             return ResponseEntity.ok(calls.startOutboundTestCall(callSid, to, from));
         } catch (NotFoundException e) {
@@ -179,7 +190,8 @@ public class TwilioVoiceController {
                 summaries.generate(callId);
             }
         } catch (NotFoundException ignored) {
-            // A delayed callback for an unknown call is idempotently ignored.
+            // Direct GPT-Live SIP calls are tracked under the OpenAI Live session id,
+            // so delayed Twilio status callbacks have no matching call record.
         }
         return ResponseEntity.noContent().build();
     }
