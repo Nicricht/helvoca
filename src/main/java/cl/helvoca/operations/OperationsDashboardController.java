@@ -10,9 +10,17 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
 public class OperationsDashboardController {
     private final OperationsDashboardService service;
+    private final CommercialReadinessService readiness;
 
-    public OperationsDashboardController(OperationsDashboardService service) { this.service = service; }
+    public OperationsDashboardController(OperationsDashboardService service,
+                                         CommercialReadinessService readiness) {
+        this.service = service;
+        this.readiness = readiness;
+    }
 
     @GetMapping("/dashboard")
     public OperationsDashboardService.Dashboard dashboard() { return service.dashboard(); }
+
+    @GetMapping("/readiness")
+    public CommercialReadinessService.Readiness readiness() { return readiness.readiness(); }
 }
