@@ -42,6 +42,7 @@ class RealtimeOperationsToolTest {
         RealtimeToolService tools = service(customers, calls, requests, questions);
 
         CallSession call = trustedCall(businessId, streamSid);
+        setId(call, callId);
         when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
         when(customers.findFirstByBusinessIdAndPhone(businessId, caller)).thenReturn(Optional.empty());
 
@@ -86,6 +87,7 @@ class RealtimeOperationsToolTest {
         RealtimeToolService tools = service(customers, calls, requests, questions);
 
         CallSession call = trustedCall(businessId, streamSid);
+        setId(call, callId);
         when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
         when(customers.findFirstByBusinessIdAndPhone(businessId, caller)).thenReturn(Optional.empty());
 
