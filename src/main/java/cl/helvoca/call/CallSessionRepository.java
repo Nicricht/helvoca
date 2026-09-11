@@ -18,4 +18,8 @@ public interface CallSessionRepository extends JpaRepository<CallSession, UUID> 
             UUID businessId, Instant start, Instant end);
     long countByBusinessIdAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
             UUID businessId, Collection<CallStatus> statuses, Instant start, Instant end);
+    long countByBusinessIdAndTelephonyProviderNotAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+            UUID businessId, String excludedProvider, Instant start, Instant end);
+    long countByBusinessIdAndTelephonyProviderNotAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+            UUID businessId, String excludedProvider, Collection<CallStatus> statuses, Instant start, Instant end);
 }
