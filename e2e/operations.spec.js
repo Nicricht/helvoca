@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-test('operations console loads metrics, creates a request and teaches an unanswered question', async ({ page }) => {
+test('operations console loads readiness, metrics, creates a request and teaches an unanswered question', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
 
   const state = {
@@ -23,9 +23,34 @@ test('operations console loads metrics, creates a request and teaches an unanswe
     unanswered: state.questions
   });
 
+  const readiness = {
+    ready: true,
+    requiredPassed: 7,
+    requiredTotal: 7,
+    checks: [
+      { code: 'BUSINESS_PROFILE', label: 'Perfil del negocio', ready: true, required: true, detail: 'Nombre, idioma y zona horaria válidos.' },
+      { code: 'ACTIVE_PHONE', label: 'Número activo', ready: true, required: true, detail: 'Hay al menos un número activo asociado al tenant.' },
+      { code: 'TWILIO_MEDIA_STREAM', label: 'Media Streams', ready: true, required: true, detail: 'WebSocket WSS de audio configurado.' },
+      { code: 'OPENAI_REALTIME', label: 'OpenAI Realtime', ready: true, required: true, detail: 'Realtime URL y modelo configurados.' }
+    ],
+    capabilities: {
+      VOICE_ASSISTANT: true,
+      INFORMATION: true,
+      GENERIC_REQUESTS: true,
+      BOOKINGS: true,
+      HUMAN_TRANSFER: true
+    },
+    warnings: []
+  };
+
   await page.route('**/api/v1/operations/dashboard', async route => {
     expect(route.request().headers().authorization).toBe('Bearer e2e-token');
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(dashboard()) });
+  });
+
+  await page.route('**/api/v1/operations/readiness', async route => {
+    expect(route.request().headers().authorization).toBe('Bearer e2e-token');
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(readiness) });
   });
 
   await page.route('**/api/v1/requests', async route => {
@@ -53,6 +78,9 @@ test('operations console loads metrics, creates a request and teaches an unanswe
   await page.goto('/operations.html');
 
   await expect(page.locator('#businessName')).toHaveText('Negocio E2E');
+  await expect(page.locator('#readinessBadge')).toHaveText('LISTO');
+  await expect(page.getByText('OpenAI Realtime')).toBeVisible();
+  await expect(page.getByText('VOICE_ASSISTANT ✓')).toBeVisible();
   await expect(page.locator('#callsToday')).toHaveText('12');
   await expect(page.locator('#bookingsToday')).toHaveText('4');
   await expect(page.locator('#openRequests')).toHaveText('1');
