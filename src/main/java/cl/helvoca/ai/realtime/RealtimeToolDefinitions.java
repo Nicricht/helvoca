@@ -45,6 +45,18 @@ public final class RealtimeToolDefinitions {
                         object().put("properties", new JSONObject()
                                         .put("bookingId", string("UUID de la reserva obtenido desde list_customer_bookings")))
                                 .put("required", new JSONArray().put("bookingId"))))
+                .put(function("create_request", "Crea una solicitud real de seguimiento cuando la necesidad del cliente no corresponde a una reserva. Sirve para cotizaciones, soporte, visitas, leads, urgencias u otros casos configurables. Solo confirma al cliente cuando success=true.",
+                        object().put("properties", new JSONObject()
+                                        .put("requestType", string("Tipo breve, por ejemplo cotización, soporte, visita, urgencia o contacto"))
+                                        .put("title", string("Resumen corto de la solicitud"))
+                                        .put("description", string("Descripción clara de lo que necesita el cliente"))
+                                        .put("priority", string("LOW, NORMAL, HIGH o URGENT"))
+                                        .put("detailsJson", string("Detalles estructurados opcionales en JSON serializado")))
+                                .put("required", new JSONArray().put("requestType").put("title"))))
+                .put(function("record_unanswered_question", "Registra una pregunta del cliente que no pudo resolverse con información oficial. Úsala solo después de buscar conocimiento y comprobar que la respuesta no está configurada.",
+                        object().put("properties", new JSONObject()
+                                        .put("question", string("Pregunta exacta o fielmente resumida del cliente")))
+                                .put("required", new JSONArray().put("question"))))
                 .put(function("transfer_to_human", "Solicita transferir la llamada a una persona del negocio cuando el cliente lo pida o la atención automática no pueda resolver su necesidad. El destino se obtiene de la configuración segura del negocio, nunca de argumentos del modelo.", object()));
     }
 

@@ -1,0 +1,130 @@
+const TOKEN_KEY = "helvoca_access_token";
+const token = sessionStorage.getItem(TOKEN_KEY) || "";
+const $ = s => document.querySelector(s);
+
+if (!token) location.replace("/");
+
+async function api(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  headers.set("Authorization", `Bearer ${token}`);
+  if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const response = await fetch(path, {...options, headers});
+  let payload = null;
+  const type = response.headers.get("content-type") || "";
+  if (type.includes("application/json")) { try { payload = await response.json(); } catch (_) {} }
+  else if (response.status !== 204) { try { payload = await response.text(); } catch (_) {} }
+  if (!response.ok) {
+    if (response.status === 401) { sessionStorage.removeItem(TOKEN_KEY); location.replace("/"); }
+    throw new Error(payload?.message || payload?.detail || payload?.error || (typeof payload === "string" && payload) || `HTTP ${response.status}`);
+  }
+  return payload;
+}
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+}
+
+function toast(text) {
+  const el = $("#message");
+  el.textContent = text; el.classList.remove("hidden");
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.add("hidden"), 3500);
+}
+
+function fmtDate(value) {
+  if (!value) return "";
+  try { return new Intl.DateTimeFormat("es", {dateStyle:"short", timeStyle:"short"}).format(new Date(value)); }
+  catch (_) { return value; }
+}
+
+function renderCalls(items = []) {
+  const root = $("#callsList");
+  if (!items.length) { root.innerHTML = '<div class="empty">Todavía no hay llamadas.</div>'; return; }
+  root.innerHTML = items.map(c => `
+    <div class="item">
+      <div class="item-head"><strong>${esc(c.callerNumber || "Número oculto")}</strong><span class="pill ${c.status === "FAILED" ? "bad" : ""}">${esc(c.status)}</span></div>
+      <div class="meta"><span>${fmtDate(c.startedAt)}</span><span>${c.durationSeconds != null ? `${c.durationSeconds}s` : "sin duración"}</span>${c.resolution ? `<span>${esc(c.resolution)}</span>` : ""}</div>
+    </div>`).join("");
+}
+
+function renderRequests(items = []) {
+  const root = $("#requestsList");
+  if (!items.length) { root.innerHTML = '<div class="empty">No hay solicitudes abiertas todavía.</div>'; return; }
+  root.innerHTML = items.map(r => `
+    <div class="item" data-request-id="${esc(r.id)}">
+      <div class="item-head"><strong>${esc(r.title)}</strong><span class="pill ${r.priority === "URGENT" || r.priority === "HIGH" ? "high" : ""}">${esc(r.priority)}</span></div>
+      <div class="meta"><span>${esc(r.type)}</span><span>${esc(r.status)}</span><span>${fmtDate(r.createdAt)}</span></div>
+      ${r.status !== "RESOLVED" && r.status !== "CANCELLED" ? '<div class="actions" style="margin-top:10px"><button data-status="IN_PROGRESS">En curso</button><button data-status="RESOLVED" class="ghost">Resolver</button></div>' : ""}
+    </div>`).join("");
+  root.querySelectorAll("button[data-status]").forEach(button => button.addEventListener("click", async e => {
+    const item = e.target.closest("[data-request-id]");
+    e.target.disabled = true;
+    try {
+      await api(`/api/v1/requests/${item.dataset.requestId}/status`, {method:"PATCH", body:JSON.stringify({status:e.target.dataset.status})});
+      await load(); toast("Solicitud actualizada.");
+    } catch (err) { toast(err.message); e.target.disabled = false; }
+  }));
+}
+
+function renderQuestions(items = []) {
+  const root = $("#questionsList");
+  if (!items.length) { root.innerHTML = '<div class="empty">Helvoca no tiene preguntas pendientes. ✨</div>'; return; }
+  root.innerHTML = items.map(q => `
+    <div class="item" data-question-id="${esc(q.id)}">
+      <div class="item-head"><strong>${esc(q.question)}</strong><span class="pill">${q.occurrences}×</span></div>
+      <div class="meta"><span>Última vez ${fmtDate(q.lastSeenAt)}</span></div>
+      <div class="question-actions"><input data-answer placeholder="Escribe la respuesta oficial"><button data-answer-btn>Enseñar</button><button data-dismiss-btn class="ghost">Descartar</button></div>
+    </div>`).join("");
+  root.querySelectorAll("[data-answer-btn]").forEach(button => button.addEventListener("click", async e => {
+    const item = e.target.closest("[data-question-id]");
+    const answer = item.querySelector("[data-answer]").value.trim();
+    if (!answer) { toast("Escribe una respuesta antes de enseñar a Helvoca."); return; }
+    e.target.disabled = true;
+    try {
+      await api(`/api/v1/learning/questions/${item.dataset.questionId}/answer`, {method:"POST", body:JSON.stringify({answer})});
+      await load(); toast("Respuesta aprendida y guardada en conocimiento.");
+    } catch (err) { toast(err.message); e.target.disabled = false; }
+  }));
+  root.querySelectorAll("[data-dismiss-btn]").forEach(button => button.addEventListener("click", async e => {
+    const item = e.target.closest("[data-question-id]");
+    e.target.disabled = true;
+    try {
+      await api(`/api/v1/learning/questions/${item.dataset.questionId}/dismiss`, {method:"POST"});
+      await load(); toast("Pregunta descartada.");
+    } catch (err) { toast(err.message); e.target.disabled = false; }
+  }));
+}
+
+async function load() {
+  try {
+    const data = await api("/api/v1/operations/dashboard");
+    $("#businessName").textContent = data.businessName;
+    $("#localNow").textContent = `${data.timezone} · ${fmtDate(data.localNow)}`;
+    $("#callsToday").textContent = data.callsToday;
+    $("#bookingsToday").textContent = data.bookingsToday;
+    $("#customersToday").textContent = data.newCustomersToday;
+    $("#openRequests").textContent = data.openRequests;
+    $("#unknownQuestions").textContent = data.unansweredQuestions;
+    $("#failuresToday").textContent = data.callFailuresToday;
+    $("#healthBadge").textContent = data.callFailuresToday ? `${data.callFailuresToday} llamada(s) con fallo` : "Operación saludable";
+    renderCalls(data.recentCalls);
+    renderRequests(data.recentRequests);
+    renderQuestions(data.unanswered);
+  } catch (err) { toast(err.message || "No pude cargar operaciones."); }
+}
+
+$("#refreshBtn").addEventListener("click", load);
+$("#newRequestBtn").addEventListener("click", () => $("#requestForm").classList.remove("hidden"));
+$("#cancelRequestBtn").addEventListener("click", () => $("#requestForm").classList.add("hidden"));
+$("#requestForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const data = Object.fromEntries(new FormData(form).entries());
+  form.querySelectorAll("button").forEach(b => b.disabled = true);
+  try {
+    await api("/api/v1/requests", {method:"POST", body:JSON.stringify(data)});
+    form.reset(); form.classList.add("hidden"); await load(); toast("Solicitud creada.");
+  } catch (err) { toast(err.message); }
+  finally { form.querySelectorAll("button").forEach(b => b.disabled = false); }
+});
+
+load();

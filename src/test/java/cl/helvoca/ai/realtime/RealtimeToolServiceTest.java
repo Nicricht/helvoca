@@ -9,6 +9,8 @@ import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
+import cl.helvoca.learning.UnansweredQuestionService;
+import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
@@ -59,7 +61,8 @@ class RealtimeToolServiceTest {
         CallSessionRepository calls = mock(CallSessionRepository.class);
         BusinessScheduleService schedule = mock(BusinessScheduleService.class);
         RealtimeToolService tools = new RealtimeToolService(
-                businesses, customers, services, knowledge, bookings, calls, schedule);
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
 
         ServiceItem service = serviceItem(businessId, serviceId, "Consulta", 30);
         when(services.findByIdAndBusinessId(serviceId, businessId)).thenReturn(Optional.of(service));
@@ -98,7 +101,8 @@ class RealtimeToolServiceTest {
         CallSessionRepository calls = mock(CallSessionRepository.class);
         BusinessScheduleService schedule = mock(BusinessScheduleService.class);
         RealtimeToolService tools = new RealtimeToolService(
-                businesses, customers, services, knowledge, bookings, calls, schedule);
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
 
         CallSession call = trustedCall(businessId, customerId, streamSid);
         when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
@@ -146,7 +150,8 @@ class RealtimeToolServiceTest {
         CallSessionRepository calls = mock(CallSessionRepository.class);
         BusinessScheduleService schedule = mock(BusinessScheduleService.class);
         RealtimeToolService tools = new RealtimeToolService(
-                businesses, customers, services, knowledge, bookings, calls, schedule);
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
 
         when(calls.findByIdAndBusinessId(callId, businessId))
                 .thenReturn(Optional.of(trustedCall(businessId, customerId, streamSid)));
@@ -191,7 +196,8 @@ class RealtimeToolServiceTest {
         CallSessionRepository calls = mock(CallSessionRepository.class);
         BusinessScheduleService schedule = mock(BusinessScheduleService.class);
         RealtimeToolService tools = new RealtimeToolService(
-                businesses, customers, services, knowledge, bookings, calls, schedule);
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
 
         when(calls.findByIdAndBusinessId(callId, businessId))
                 .thenReturn(Optional.of(trustedCall(businessId, customerId, streamSid)));
@@ -218,7 +224,8 @@ class RealtimeToolServiceTest {
         return new RealtimeToolService(
                 mock(BusinessRepository.class), mock(CustomerRepository.class), mock(ServiceItemRepository.class),
                 mock(KnowledgeItemRepository.class), mock(BookingRepository.class), mock(CallSessionRepository.class),
-                mock(BusinessScheduleService.class));
+                mock(BusinessScheduleService.class), mock(BusinessRequestService.class),
+                mock(UnansweredQuestionService.class));
     }
 
     private static ServiceItemRepository services(RealtimeToolService service) {

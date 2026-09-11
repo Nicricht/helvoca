@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Helvoca · Operaciones</title>
+  <link rel="stylesheet" href="/operations.css">
+</head>
+<body>
+<header class="topbar">
+  <div><strong>HELVOCA</strong><span>Operaciones</span></div>
+  <nav><a href="/">Configuración</a><button id="refreshBtn">Actualizar</button></nav>
+</header>
+<main>
+  <section class="hero">
+    <div><p class="eyebrow">HOY</p><h1 id="businessName">Helvoca</h1><p id="localNow" class="muted">Cargando…</p></div>
+    <div id="healthBadge" class="badge">Conectando</div>
+  </section>
+
+  <section id="metrics" class="metrics">
+    <article><strong id="callsToday">–</strong><span>Llamadas</span></article>
+    <article><strong id="bookingsToday">–</strong><span>Reservas creadas</span></article>
+    <article><strong id="customersToday">–</strong><span>Clientes nuevos</span></article>
+    <article><strong id="openRequests">–</strong><span>Solicitudes abiertas</span></article>
+    <article><strong id="unknownQuestions">–</strong><span>Preguntas pendientes</span></article>
+    <article><strong id="failuresToday">–</strong><span>Fallos de llamada</span></article>
+  </section>
+
+  <section class="grid two">
+    <article class="panel">
+      <div class="panel-head"><div><p class="eyebrow">ACTIVIDAD</p><h2>Últimas llamadas</h2></div></div>
+      <div id="callsList" class="list"></div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head"><div><p class="eyebrow">TRABAJO</p><h2>Solicitudes</h2></div><button id="newRequestBtn">+ Nueva</button></div>
+      <form id="requestForm" class="form hidden">
+        <input name="requestType" placeholder="Tipo, ej. cotización" required maxlength="80">
+        <input name="title" placeholder="Título" required maxlength="200">
+        <textarea name="description" placeholder="Descripción"></textarea>
+        <div class="row"><input name="contactName" placeholder="Nombre"><input name="contactPhone" placeholder="Teléfono"></div>
+        <select name="priority"><option>NORMAL</option><option>LOW</option><option>HIGH</option><option>URGENT</option></select>
+        <div class="actions"><button type="submit">Guardar solicitud</button><button type="button" id="cancelRequestBtn" class="ghost">Cancelar</button></div>
+      </form>
+      <div id="requestsList" class="list"></div>
+    </article>
+  </section>
+
+  <section class="panel learning">
+    <div class="panel-head"><div><p class="eyebrow">APRENDIZAJE</p><h2>Preguntas que Helvoca todavía no sabe</h2><p class="muted">Responde una vez y la respuesta entra a la base de conocimiento del negocio.</p></div></div>
+    <div id="questionsList" class="list"></div>
+  </section>
+
+  <p id="message" class="message hidden"></p>
+</main>
+<script src="/operations.js" defer></script>
+</body>
+</html>
