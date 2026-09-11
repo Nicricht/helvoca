@@ -28,6 +28,7 @@ public class TwilioSignatureValidationFilter extends OncePerRequestFilter {
         // Twilio's Try out Voice flow can invoke Custom webhooks without the same
         // production signature semantics. Trial mode is an explicitly enabled demo
         // path, so bypass signature validation only for demo endpoints while enabled.
+        // This exception is intentionally limited to the outbound test path and trial demo paths.
         // Production inbound/status/stream webhooks remain protected by X-Twilio-Signature.
         if (trial.isEnabled()
                 && (path.startsWith("/webhooks/v1/twilio/trial/")
