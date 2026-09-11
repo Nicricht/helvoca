@@ -32,8 +32,8 @@ public class TwilioPhoneProvisioningClient {
     private final RestClient restClient;
 
     @Autowired
-    public TwilioPhoneProvisioningClient(TwilioProperties properties, RestClient.Builder builder) {
-        this(properties, builder.baseUrl(DEFAULT_API_BASE).build());
+    public TwilioPhoneProvisioningClient(TwilioProperties properties) {
+        this(properties, RestClient.builder().baseUrl(DEFAULT_API_BASE).build());
     }
 
     TwilioPhoneProvisioningClient(TwilioProperties properties, RestClient restClient) {
