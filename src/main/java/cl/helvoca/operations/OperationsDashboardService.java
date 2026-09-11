@@ -7,6 +7,7 @@ import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
+import cl.helvoca.call.CallStatus;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.learning.QuestionStatus;
 import cl.helvoca.learning.UnansweredQuestionRepository;
@@ -66,13 +67,13 @@ public class OperationsDashboardService {
         var allRequests = requests.findAllByBusinessIdOrderByCreatedAtDesc(businessId);
         var openQuestions = questions.findAllByBusinessIdAndStatusOrderByLastSeenAtDesc(businessId, QuestionStatus.OPEN);
 
-        long callsToday = recentCalls.stream().filter(c -> between(c.getStartedAt(), dayStart, dayEnd)).count();
+        long callsToday = calls.countByBusinessIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(businessId, dayStart, dayEnd);
+        long failuresToday = calls.countByBusinessIdAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                businessId, List.of(CallStatus.FAILED, CallStatus.NO_ANSWER), dayStart, dayEnd);
         long bookingsToday = allBookings.stream()
                 .filter(b -> b.getStatus() != BookingStatus.CANCELLED && between(b.getCreatedAt(), dayStart, dayEnd)).count();
         long customersToday = allCustomers.stream().filter(c -> between(c.getCreatedAt(), dayStart, dayEnd)).count();
         long openRequests = allRequests.stream().filter(r -> r.getStatus() == RequestStatus.OPEN || r.getStatus() == RequestStatus.IN_PROGRESS).count();
-        long failuresToday = recentCalls.stream().filter(c -> between(c.getStartedAt(), dayStart, dayEnd))
-                .filter(c -> c.getStatus().name().equals("FAILED") || c.getStatus().name().equals("NO_ANSWER")).count();
 
         return new Dashboard(
                 business.getName(), business.getTimezone(), now.toOffsetDateTime().toString(),
