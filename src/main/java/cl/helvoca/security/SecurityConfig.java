@@ -56,7 +56,8 @@ public class SecurityConfig {
                                 "/favicon.ico", "/error").permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register", "/actuator/health").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers("/webhooks/v1/twilio/**", "/ws/twilio", "/ws/twilio-trial").permitAll()
+                        .requestMatchers("/webhooks/v1/twilio/**", "/webhooks/v1/openai/**",
+                                "/ws/twilio", "/ws/twilio-trial").permitAll()
                         .requestMatchers("/api/v1/platform/**").hasRole("PLATFORM_ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)));
