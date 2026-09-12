@@ -27,6 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class OpenAiLiveSipService {
     private static final Logger log = LoggerFactory.getLogger(OpenAiLiveSipService.class);
     private static final int MAX_DEDUP_IDS = 10_000;
+    private static final int MAX_ACCEPT_ATTEMPTS = 5;
+    private static final long ACCEPT_RETRY_BASE_DELAY_MS = 100L;
 
     private final OpenAiRealtimeProperties openAi;
     private final OpenAiLiveProperties live;
@@ -195,21 +197,84 @@ public class OpenAiLiveSipService {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
-        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-        String requestId = response.headers().firstValue("x-request-id").orElse("");
-        String processingMs = response.headers().firstValue("openai-processing-ms").orElse("");
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+
+        for (int attempt = 1; attempt <= MAX_ACCEPT_ATTEMPTS; attempt++) {
+            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            String requestId = response.headers().firstValue("x-request-id").orElse("");
+            String processingMs = response.headers().firstValue("openai-processing-ms").orElse("");
+            String errorCode = apiErrorCode(response.body());
+
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                log.info(
+                        "OpenAI Live accept succeeded session={} attempt={}/{} request_id={} processing_ms={}",
+                        sessionId,
+                        attempt,
+                        MAX_ACCEPT_ATTEMPTS,
+                        requestId,
+                        processingMs);
+                return;
+            }
+
+            boolean transientSessionLookup = response.statusCode() == 404
+                    && "session_id_not_found".equals(errorCode);
+            boolean decisionAlreadyMade = "decision_already_made".equals(errorCode);
+
+            if (transientSessionLookup && attempt < MAX_ACCEPT_ATTEMPTS) {
+                long delayMs = ACCEPT_RETRY_BASE_DELAY_MS * attempt;
+                log.warn(
+                        "OpenAI Live accept session lookup not ready; retrying session={} attempt={}/{} delay_ms={} request_id={} processing_ms={}",
+                        sessionId,
+                        attempt,
+                        MAX_ACCEPT_ATTEMPTS,
+                        delayMs,
+                        requestId,
+                        processingMs);
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    try {
+                        lifecycle.updateStatus(sessionId, "failed", null);
+                    } catch (Exception ignored) { }
+                    throw new IllegalStateException("Interrupted while retrying OpenAI Live accept", e);
+                }
+                continue;
+            }
+
             try {
                 lifecycle.updateStatus(sessionId, "failed", null);
             } catch (Exception ignored) { }
+
+            if (decisionAlreadyMade) {
+                throw new IllegalStateException("OpenAI Live accept stopped because decision was already made"
+                        + " status=" + response.statusCode()
+                        + " request_id=" + requestId
+                        + " processing_ms=" + processingMs
+                        + " session=" + sessionId
+                        + " body=" + truncate(response.body()));
+            }
+
             throw new IllegalStateException("OpenAI Live accept failed status=" + response.statusCode()
                     + " request_id=" + requestId
                     + " processing_ms=" + processingMs
+                    + " error_code=" + errorCode
+                    + " attempt=" + attempt + "/" + MAX_ACCEPT_ATTEMPTS
                     + " session=" + sessionId
                     + " body=" + truncate(response.body()));
         }
-        log.info("OpenAI Live accept succeeded session={} request_id={} processing_ms={}",
-                sessionId, requestId, processingMs);
+
+        throw new IllegalStateException("OpenAI Live accept exhausted retries for session=" + sessionId);
+    }
+
+    private static String apiErrorCode(String body) {
+        if (body == null || body.isBlank()) return "";
+        try {
+            JSONObject payload = new JSONObject(body);
+            JSONObject error = payload.optJSONObject("error");
+            return error == null ? "" : error.optString("code", "");
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     private static JSONObject normalizeSipHeaders(Object raw) {
