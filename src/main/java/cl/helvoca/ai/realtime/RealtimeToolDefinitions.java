@@ -9,7 +9,7 @@ public final class RealtimeToolDefinitions {
     public static JSONArray all() {
         return new JSONArray()
                 .put(function("get_business_information", "Obtiene nombre, idioma y zona horaria del negocio.", object()))
-                .put(function("list_services", "Lista servicios activos, precios y duración.", object()))
+                .put(function("list_services", "Lista servicios activos, precios y duración. Úsala antes de cualquier operación de reserva si todavía no tienes un serviceId real del catálogo.", object()))
                 .put(function("search_knowledge", "Busca información oficial configurada por el negocio.",
                         object().put("properties", new JSONObject().put("query", string("Texto a buscar")))
                                 .put("required", new JSONArray().put("query"))))
@@ -19,19 +19,19 @@ public final class RealtimeToolDefinitions {
                                         .put("name", string("Nombre del cliente"))
                                         .put("email", string("Correo opcional")))
                                 .put("required", new JSONArray().put("name"))))
-                .put(function("list_available_slots", "Lista horarios realmente disponibles para un servicio en una fecha local del negocio. Úsala cuando pregunten qué horas hay disponibles en un día.",
+                .put(function("list_available_slots", "Lista horarios realmente disponibles para un servicio en una fecha local del negocio. Si no tienes un serviceId devuelto literalmente por list_services, llama list_services primero. Nunca inventes UUID.",
                         object().put("properties", new JSONObject()
-                                        .put("serviceId", string("UUID del servicio"))
+                                        .put("serviceId", string("UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
                                         .put("date", string("Fecha local del negocio en formato YYYY-MM-DD")))
                                 .put("required", new JSONArray().put("serviceId").put("date"))))
-                .put(function("check_booking_availability", "Comprueba una hora exacta antes de prometer una reserva.",
+                .put(function("check_booking_availability", "Comprueba una hora exacta antes de prometer una reserva. El serviceId debe provenir literalmente de list_services. Si todavía no lo tienes, llama list_services primero. Nunca inventes UUID.",
                         object().put("properties", new JSONObject()
-                                        .put("serviceId", string("UUID del servicio"))
+                                        .put("serviceId", string("UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
                                         .put("startAt", string("Fecha y hora ISO-8601 con zona u offset")))
                                 .put("required", new JSONArray().put("serviceId").put("startAt"))))
-                .put(function("create_booking", "Crea una reserva real. Solo se considera confirmada cuando esta herramienta devuelve success=true y el cliente ya confirmó verbalmente servicio y fecha/hora.",
+                .put(function("create_booking", "Crea una reserva real. Solo se considera confirmada cuando esta herramienta devuelve success=true y el cliente ya confirmó verbalmente servicio y fecha/hora. El serviceId debe provenir literalmente de list_services; si no lo tienes, llama list_services primero y nunca inventes UUID.",
                         object().put("properties", new JSONObject()
-                                        .put("serviceId", string("UUID del servicio"))
+                                        .put("serviceId", string("UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
                                         .put("startAt", string("Fecha y hora ISO-8601 con zona u offset"))
                                         .put("notes", string("Notas opcionales")))
                                 .put("required", new JSONArray().put("serviceId").put("startAt"))))
