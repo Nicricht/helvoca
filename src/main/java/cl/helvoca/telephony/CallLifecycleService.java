@@ -62,7 +62,7 @@ public class CallLifecycleService {
     public UUID updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {
         CallSession call = calls.findByProviderCallId(providerCallId)
                 .orElseThrow(() -> new NotFoundException("Call not found"));
-        applyStatus(call, providerStatus, durationSeconds);
+        applyStatus(call, providerStatus, durationSeconds, true);
         return call.getId();
     }
 
@@ -70,7 +70,7 @@ public class CallLifecycleService {
     public UUID updateStatus(UUID callId, String providerStatus, Integer durationSeconds) {
         CallSession call = calls.findById(callId)
                 .orElseThrow(() -> new NotFoundException("Call not found"));
-        applyStatus(call, providerStatus, durationSeconds);
+        applyStatus(call, providerStatus, durationSeconds, false);
         return call.getId();
     }
 
@@ -116,19 +116,34 @@ public class CallLifecycleService {
         };
     }
 
-    private static void applyStatus(CallSession call, String providerStatus, Integer durationSeconds) {
+    private static void applyStatus(CallSession call,
+                                    String providerStatus,
+                                    Integer durationSeconds,
+                                    boolean carrierCallback) {
         CallStatus mapped = mapStatus(providerStatus);
-        call.setStatus(mapped);
+        CallStatus current = call.getStatus();
+
+        // A carrier can report its SIP leg as "completed" after the AI path has already
+        // failed. Preserve that application-level failure instead of turning a broken
+        // customer interaction into a successful call in reporting.
+        boolean preserveApplicationFailure = carrierCallback
+                && current == CallStatus.FAILED
+                && mapped == CallStatus.COMPLETED;
+        if (!preserveApplicationFailure) {
+            call.setStatus(mapped);
+        }
+
         Instant now = Instant.now();
         if (mapped == CallStatus.IN_PROGRESS && call.getAnsweredAt() == null) {
             call.setAnsweredAt(now);
         }
-        if (mapped.terminal() && call.getEndedAt() == null) {
+        if ((mapped.terminal() || preserveApplicationFailure) && call.getEndedAt() == null) {
             call.setEndedAt(now);
         }
         if (durationSeconds != null && durationSeconds >= 0) {
             call.setDurationSeconds(durationSeconds);
-        } else if (mapped.terminal() && call.getStartedAt() != null && call.getEndedAt() != null) {
+        } else if ((mapped.terminal() || preserveApplicationFailure)
+                && call.getStartedAt() != null && call.getEndedAt() != null) {
             call.setDurationSeconds((int) Math.max(0,
                     Duration.between(call.getStartedAt(), call.getEndedAt()).toSeconds()));
         }
