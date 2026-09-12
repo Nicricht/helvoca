@@ -112,7 +112,7 @@ class OpenAiLiveIncomingContractTest {
         assertFalse(responses.getBoolean("parallel_tool_calls"));
         assertTrue(responses.getJSONArray("tools").length() > 0);
 
-        verify(sideband).attach(sessionId, context);
+        verify(sideband).attach(sessionId, context, "Restaurante Demo");
         verify(lifecycle).startInboundCall("twilio", callSid, callerPhone, businessPhone);
         verify(lifecycle).markStreamStarted(callId, callSid, "live:" + sessionId, "openai-live");
     }
@@ -166,7 +166,7 @@ class OpenAiLiveIncomingContractTest {
         service.handleIncoming("webhook_b", event);
 
         verify(lifecycle, times(1)).startInboundCall("twilio", callSid, callerPhone, businessPhone);
-        verify(sideband, times(1)).attach(sessionId, context);
+        verify(sideband, times(1)).attach(sessionId, context, "Demo");
     }
 
     @Test
