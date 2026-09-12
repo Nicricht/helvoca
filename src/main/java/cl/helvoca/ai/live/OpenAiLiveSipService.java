@@ -89,8 +89,24 @@ public class OpenAiLiveSipService {
                 throw new IllegalArgumentException("Unsupported Live transport: " + transportType);
             }
 
-            String sessionId = firstNonBlank(data.optString("session_id", null), data.optString("call_id", null));
-            if (sessionId == null) throw new IllegalArgumentException("Missing Live session id");
+            String sessionId = data.optString("session_id", null);
+            if (sessionId == null || sessionId.isBlank()) {
+                throw new IllegalArgumentException("Missing Live session id");
+            }
+            sessionId = sessionId.trim();
+            if (!sessionId.startsWith("live_")) {
+                throw new IllegalArgumentException("Invalid Live session id prefix");
+            }
+
+            log.info(
+                    "GPT-Live incoming webhook={} event={} eventId={} createdAt={} session={} transport={} project={}",
+                    webhookId,
+                    eventType,
+                    event.optString("id", ""),
+                    event.optLong("created_at", 0L),
+                    sessionId,
+                    transportType,
+                    live.getProjectId().trim());
 
             JSONObject headers = normalizeSipHeaders(data.opt("sip_headers"));
             String businessPhone = header(headers, "x-recepvoz-business");
@@ -180,13 +196,20 @@ public class OpenAiLiveSipService {
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
         HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        String requestId = response.headers().firstValue("x-request-id").orElse("");
+        String processingMs = response.headers().firstValue("openai-processing-ms").orElse("");
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             try {
                 lifecycle.updateStatus(sessionId, "failed", null);
             } catch (Exception ignored) { }
             throw new IllegalStateException("OpenAI Live accept failed status=" + response.statusCode()
+                    + " request_id=" + requestId
+                    + " processing_ms=" + processingMs
+                    + " session=" + sessionId
                     + " body=" + truncate(response.body()));
         }
+        log.info("OpenAI Live accept succeeded session={} request_id={} processing_ms={}",
+                sessionId, requestId, processingMs);
     }
 
     private static JSONObject normalizeSipHeaders(Object raw) {
