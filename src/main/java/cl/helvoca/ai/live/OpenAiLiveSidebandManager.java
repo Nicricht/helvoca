@@ -54,10 +54,10 @@ public class OpenAiLiveSidebandManager {
         this.lifecycle = lifecycle;
     }
 
-    public void attach(String sessionId, RealtimeCallContext context) {
+    public void attach(String sessionId, RealtimeCallContext context, String businessName) {
         String pathId = URLEncoder.encode(sessionId, StandardCharsets.UTF_8).replace("+", "%20");
         String url = live.normalizedSidebandBaseUrl() + "/live/sessions/" + pathId + "/attach";
-        SidebandSession listener = new SidebandSession(sessionId, context);
+        SidebandSession listener = new SidebandSession(sessionId, context, businessName);
         http.newWebSocketBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .header("Authorization", "Bearer " + openAi.getApiKey())
@@ -73,8 +73,10 @@ public class OpenAiLiveSidebandManager {
     private final class SidebandSession implements WebSocket.Listener {
         private final String sessionId;
         private final RealtimeCallContext context;
+        private final String businessName;
         private final Set<String> completedToolCalls = ConcurrentHashMap.newKeySet();
         private final AtomicBoolean terminal = new AtomicBoolean(false);
+        private final AtomicBoolean sessionStartedEvent = new AtomicBoolean(false);
         private final AtomicBoolean sessionClosedEvent = new AtomicBoolean(false);
         private final StringBuilder frameBuffer = new StringBuilder();
         private final StringBuilder userTranscript = new StringBuilder();
@@ -83,21 +85,18 @@ public class OpenAiLiveSidebandManager {
         private CompletableFuture<Void> sendChain = CompletableFuture.completedFuture(null);
         private volatile WebSocket socket;
 
-        private SidebandSession(String sessionId, RealtimeCallContext context) {
+        private SidebandSession(String sessionId, RealtimeCallContext context, String businessName) {
             this.sessionId = sessionId;
             this.context = context;
+            this.businessName = businessName;
         }
 
         @Override
         public void onOpen(WebSocket webSocket) {
             this.socket = webSocket;
             webSocket.request(1);
-            send(new JSONObject()
-                    .put("type", "session.commentary.append")
-                    .put("event_id", eventId())
-                    .put("delegation_id", JSONObject.NULL)
-                    .put("content", "Saluda ahora al cliente de forma breve y natural, di el nombre del negocio si lo conoces y pregunta en qué puedes ayudar."));
-            log.info("GPT-Live sideband attached call={} session={}", context.callId(), sessionId);
+            log.info("GPT-Live sideband transport attached call={} session={} waiting_for=session.started",
+                    context.callId(), sessionId);
         }
 
         @Override
@@ -134,6 +133,7 @@ public class OpenAiLiveSidebandManager {
                 JSONObject event = new JSONObject(payload);
                 String type = event.optString("type", "");
                 switch (type) {
+                    case "session.started" -> startConversation();
                     case "session.input_transcript.delta" -> append(userTranscript, event.optString("delta", ""));
                     case "session.output_transcript.delta" -> append(assistantTranscript, event.optString("delta", ""));
                     case "session.delegation.created" -> flushTranscripts();
@@ -151,10 +151,32 @@ public class OpenAiLiveSidebandManager {
             }
         }
 
+        private void startConversation() {
+            if (!sessionStartedEvent.compareAndSet(false, true) || terminal.get()) return;
+            String opening = openingLine(businessName);
+
+            // Live commands are valid after session.started. Pair an instruction with
+            // speakable commentary so the receptionist reliably opens the call instead
+            // of racing the session startup or waiting indefinitely for the caller.
+            send(new JSONObject()
+                    .put("type", "session.instructions.append")
+                    .put("event_id", eventId())
+                    .put("delegation_id", JSONObject.NULL)
+                    .put("content", "Tu primera intervención debe ser exactamente esta frase: \"" + opening + "\""));
+            send(new JSONObject()
+                    .put("type", "session.commentary.append")
+                    .put("event_id", eventId())
+                    .put("delegation_id", JSONObject.NULL)
+                    .put("content", opening));
+            log.info("GPT-Live session started call={} session={} greeting_queued=true",
+                    context.callId(), sessionId);
+        }
+
         private void handleResponseEvent(JSONObject responseEvent) {
             if (responseEvent == null || !"response.output_item.done".equals(responseEvent.optString("type"))) return;
             JSONObject item = responseEvent.optJSONObject("item");
             if (item == null || !"function_call".equals(item.optString("type"))) return;
+            if (!"completed".equalsIgnoreCase(item.optString("status", "completed"))) return;
 
             String callId = item.optString("call_id", null);
             String name = item.optString("name", null);
@@ -293,6 +315,13 @@ public class OpenAiLiveSidebandManager {
             log.warn("GPT-Live control action={} session={} failed: {}", action, sessionId, e.getMessage());
         }
         return false;
+    }
+
+    private static String openingLine(String businessName) {
+        if (businessName == null || businessName.isBlank() || "el negocio".equalsIgnoreCase(businessName.trim())) {
+            return "Hola, gracias por llamar. ¿En qué puedo ayudarte?";
+        }
+        return "Hola, gracias por llamar a " + businessName.trim() + ". ¿En qué puedo ayudarte?";
     }
 
     private static void append(StringBuilder target, String delta) {
