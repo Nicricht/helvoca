@@ -69,6 +69,8 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(hasFunction(declarations, "create_booking"));
         assertTrue(hasFunction(declarations, "list_available_slots"));
         assertTrue(hasFunction(declarations, "transfer_to_human"));
+        assertFalse(declarations.toString().contains("\"additionalProperties\""),
+                "Gemini Live rejects additionalProperties in FunctionDeclaration parameters");
     }
 
     @Test
