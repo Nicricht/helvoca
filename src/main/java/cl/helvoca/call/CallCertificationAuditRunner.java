@@ -63,7 +63,15 @@ public class CallCertificationAuditRunner implements ApplicationRunner {
         long successful = persistedActions.stream().filter(CallAction::isSuccess).count();
         long failed = persistedActions.size() - successful;
         String actionDigest = persistedActions.stream()
-                .map(action -> action.getActionType() + ":" + (action.isSuccess() ? "OK" : "FAIL"))
+                .map(action -> {
+                    String state = action.isSuccess() ? "OK" : "FAIL";
+                    String error = action.getErrorCode();
+                    String entity = action.getEntityType();
+                    return action.getActionType()
+                            + ":" + state
+                            + (error == null || error.isBlank() ? "" : ":" + error)
+                            + (entity == null || entity.isBlank() ? "" : ":" + entity);
+                })
                 .collect(Collectors.joining(","));
         int transcriptCount = transcripts.findAllByCallIdOrderBySequenceNumberAsc(id).size();
         boolean summaryPresent = summaries.findByCallId(id).isPresent();
