@@ -39,7 +39,8 @@ public class TwilioVoiceController {
             log.warn("Blocked inbound voice because GPT-Live SIP is not ready call={}", callSid);
             return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
-        return ResponseEntity.ok(liveSip.twiml(to, from));
+        log.info("Routing inbound Twilio call={} to GPT-Live SIP", callSid);
+        return ResponseEntity.ok(liveSip.twiml(to, from, callSid));
     }
 
     @PostMapping(value = "/outbound-test", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
@@ -51,20 +52,21 @@ public class TwilioVoiceController {
             log.warn("Blocked outbound voice test because GPT-Live SIP is not ready call={}", callSid);
             return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
-        return ResponseEntity.ok(liveSip.twiml(from, to));
+        log.info("Routing outbound Twilio test call={} to GPT-Live SIP", callSid);
+        return ResponseEntity.ok(liveSip.twiml(from, to, callSid));
     }
 
     /**
-     * Backwards-compatible Twilio route. This does not restore the removed Trial/Polly stack.
-     * Any stale Twilio configuration still pointing at /trial/voice is routed into the exact
-     * same GPT-Live-only outbound flow as /outbound-test instead of dropping the call with 404.
+     * Compatibility ingress only. It never restores Trial, TTS, Media Streams or Polly.
+     * Stale Twilio/TwiML configuration that still points here is routed into the same
+     * GPT-Live SIP implementation as /outbound-test and is deliberately logged.
      */
     @PostMapping(value = "/trial/voice", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> legacyOutboundTest(@RequestParam("CallSid") String callSid,
                                                      @RequestParam("From") String from,
                                                      @RequestParam("To") String to) {
-        log.warn("Legacy Twilio route /trial/voice used; routing to GPT-Live outbound flow call={}", callSid);
+        log.warn("Deprecated Twilio route /trial/voice used; routing call={} to canonical GPT-Live flow", callSid);
         return outboundTest(callSid, from, to);
     }
 
@@ -95,7 +97,7 @@ public class TwilioVoiceController {
                 summaries.generate(callId);
             }
         } catch (NotFoundException ignored) {
-            // Direct GPT-Live SIP calls are tracked under the OpenAI Live session id.
+            log.debug("Ignoring Twilio status for untracked call={}", callSid);
         }
         return ResponseEntity.noContent().build();
     }
