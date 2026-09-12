@@ -36,6 +36,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     private static final Pattern ACCOUNT_SID = Pattern.compile("^AC[0-9a-fA-F]{32}$");
     private static final Pattern E164 = Pattern.compile("^\\+[1-9][0-9]{7,14}$");
     private static final AtomicBoolean FIRED = new AtomicBoolean(false);
+    private static final int START_DELAY_SECONDS = 10;
 
     private final boolean enabled;
     private final String accountSid;
@@ -76,14 +77,25 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
             return;
         }
 
-        try {
-            String callSid = createCall();
-            log.info("TWILIO_CERTIFICATION_CALL CREATED call={} to={} max_seconds={}",
-                    callSid, mask(to), maxSeconds);
-            scheduleSafetyHangup(callSid);
-        } catch (Exception e) {
-            log.error("TWILIO_CERTIFICATION_CALL FAILED reason={}", rootMessage(e));
-        }
+        ScheduledExecutorService kickoff = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "twilio-certification-kickoff");
+            t.setDaemon(true);
+            return t;
+        });
+        log.info("TWILIO_CERTIFICATION_CALL armed; starting in {} seconds after deployment cutover",
+                START_DELAY_SECONDS);
+        kickoff.schedule(() -> {
+            try {
+                String callSid = createCall();
+                log.info("TWILIO_CERTIFICATION_CALL CREATED call={} to={} max_seconds={}",
+                        callSid, mask(to), maxSeconds);
+                scheduleSafetyHangup(callSid);
+            } catch (Exception e) {
+                log.error("TWILIO_CERTIFICATION_CALL FAILED reason={}", rootMessage(e));
+            } finally {
+                kickoff.shutdown();
+            }
+        }, START_DELAY_SECONDS, TimeUnit.SECONDS);
     }
 
     private String createCall() throws Exception {
