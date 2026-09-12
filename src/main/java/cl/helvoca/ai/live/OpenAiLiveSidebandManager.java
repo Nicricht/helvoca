@@ -61,6 +61,7 @@ public class OpenAiLiveSidebandManager {
         http.newWebSocketBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .header("Authorization", "Bearer " + openAi.getApiKey())
+                .header("OpenAI-Project", live.getProjectId().trim())
                 .buildAsync(URI.create(url), listener)
                 .exceptionally(error -> {
                     listener.fail("Could not attach GPT-Live sideband: " + rootMessage(error));
@@ -269,6 +270,7 @@ public class OpenAiLiveSidebandManager {
                     .uri(URI.create(live.normalizedApiBaseUrl() + "/live/sessions/" + pathId + "/" + action))
                     .timeout(Duration.ofSeconds(8))
                     .header("Authorization", "Bearer " + openAi.getApiKey())
+                    .header("OpenAI-Project", live.getProjectId().trim())
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
