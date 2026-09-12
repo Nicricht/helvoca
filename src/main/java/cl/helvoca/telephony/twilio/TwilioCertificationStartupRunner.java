@@ -39,7 +39,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     private static final AtomicBoolean FIRED = new AtomicBoolean(false);
     private static final int START_DELAY_SECONDS = 10;
     private static final String OUTBOUND_TEST = "outbound-test";
-    private static final String INBOUND = "inbound";
+    private static final String INBOUND_CERTIFICATION = "inbound-certification";
 
     private final boolean enabled;
     private final String accountSid;
@@ -107,8 +107,8 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
 
     private String createCall() throws Exception {
         String base = trimTrailingSlash(publicBaseUrl.trim());
-        String voiceUrl = base + (INBOUND.equals(direction)
-                ? "/webhooks/v1/twilio/voice"
+        String voiceUrl = base + (INBOUND_CERTIFICATION.equals(direction)
+                ? "/webhooks/v1/twilio/inbound-certification"
                 : "/webhooks/v1/twilio/outbound-test");
         String statusUrl = base + "/webhooks/v1/twilio/status";
 
@@ -164,13 +164,13 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 && from != null && E164.matcher(from.trim()).matches()
                 && to != null && E164.matcher(to.trim()).matches()
                 && publicBaseUrl != null && publicBaseUrl.trim().startsWith("https://")
-                && (OUTBOUND_TEST.equals(direction) || INBOUND.equals(direction));
+                && (OUTBOUND_TEST.equals(direction) || INBOUND_CERTIFICATION.equals(direction));
     }
 
     static String normalizeDirection(String value) {
         if (value == null || value.isBlank()) return OUTBOUND_TEST;
         String normalized = value.trim().toLowerCase(Locale.ROOT);
-        return INBOUND.equals(normalized) ? INBOUND : OUTBOUND_TEST;
+        return INBOUND_CERTIFICATION.equals(normalized) ? INBOUND_CERTIFICATION : OUTBOUND_TEST;
     }
 
     private static String form(String key, String value) {
