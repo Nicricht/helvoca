@@ -42,7 +42,6 @@ app:
   twilio:
     auth-token: ${TWILIO_AUTH_TOKEN:}
     public-base-url: ${TWILIO_PUBLIC_BASE_URL:}
-    media-stream-url: ${TWILIO_MEDIA_STREAM_URL:}
   openai:
     api-key: ${OPENAI_API_KEY:}
     realtime-model: ${OPENAI_REALTIME_MODEL:gpt-realtime-2.1}
