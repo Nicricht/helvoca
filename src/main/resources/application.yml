@@ -48,6 +48,7 @@ app:
     live:
       enabled: ${GEMINI_LIVE_ENABLED:false}
       certification-simulation: ${GEMINI_CERTIFICATION_SIMULATION:false}
+      certification-caller: ${GEMINI_CERTIFICATION_CALLER:}
       api-key: ${GEMINI_API_KEY:}
       model: ${GEMINI_LIVE_MODEL:gemini-3.1-flash-live-preview}
       voice: ${GEMINI_LIVE_VOICE:Kore}
