@@ -53,7 +53,7 @@ class OpenAiLiveAcceptRetryTest {
         fixture.service.handleIncoming("webhook_retry_123", fixture.event);
 
         assertEquals(2, requests.get());
-        verify(fixture.sideband).attach("live_retry_123", fixture.context);
+        verify(fixture.sideband).attach("live_retry_123", fixture.context, "Restaurante Demo");
         verify(fixture.lifecycle, never()).updateStatus(fixture.callId, "failed", null);
     }
 
@@ -76,7 +76,7 @@ class OpenAiLiveAcceptRetryTest {
         assertThrows(IllegalStateException.class,
                 () -> fixture.service.handleIncoming("webhook_slow_123", fixture.event));
         assertEquals(1, requests.get());
-        verify(fixture.sideband, never()).attach(anyString(), any());
+        verify(fixture.sideband, never()).attach(anyString(), any(), anyString());
         verify(fixture.lifecycle).updateStatus(fixture.callId, "failed", null);
     }
 
@@ -99,7 +99,7 @@ class OpenAiLiveAcceptRetryTest {
         assertThrows(IllegalStateException.class,
                 () -> fixture.service.handleIncoming("webhook_decided_123", fixture.event));
         assertEquals(1, requests.get());
-        verify(fixture.sideband, never()).attach(anyString(), any());
+        verify(fixture.sideband, never()).attach(anyString(), any(), anyString());
         verify(fixture.lifecycle).updateStatus(fixture.callId, "failed", null);
     }
 
@@ -118,7 +118,7 @@ class OpenAiLiveAcceptRetryTest {
 
         assertEquals(2, requests.get());
         verify(fixture.lifecycle).updateStatus(fixture.callId, "failed", null);
-        verify(fixture.sideband, never()).attach(anyString(), any());
+        verify(fixture.sideband, never()).attach(anyString(), any(), anyString());
     }
 
     private static void respondSessionNotFound(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
