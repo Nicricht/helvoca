@@ -115,7 +115,7 @@ class GptLiveEndToEndContractTest {
 
         verify(lifecycle).startInboundCall("twilio", callSid, callerPhone, businessPhone);
         verify(lifecycle).markStreamStarted(callId, callSid, "live:live_e2e_123", "openai-live");
-        verify(sideband).attach("live_e2e_123", context);
+        verify(sideband).attach("live_e2e_123", context, "Restaurante Demo");
         JSONObject body = new JSONObject(acceptBody.get());
         assertEquals("live", body.getJSONObject("session").getString("type"));
         assertEquals("gpt-live-1", body.getJSONObject("session").getString("model"));
