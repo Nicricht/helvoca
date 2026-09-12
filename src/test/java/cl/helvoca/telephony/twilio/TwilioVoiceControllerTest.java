@@ -41,6 +41,25 @@ class TwilioVoiceControllerTest {
     }
 
     @Test
+    void inboundCertificationUsesSameBusinessCallerMappingAsRealInbound() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        String twiml = "<Response><Connect><Stream url=\"wss://example/ws\"/></Connect></Response>";
+        when(router.route("+14355652512", "+56911111111", CALL_SID))
+                .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
+                        "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
+
+        var response = controller(calls, router, summaries)
+                .inboundCertification(CALL_SID, "+14355652512", "+56911111111");
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(twiml, response.getBody());
+        verify(router).route("+14355652512", "+56911111111", CALL_SID);
+        verifyNoInteractions(calls, summaries);
+    }
+
+    @Test
     void inboundFailsClosedWhenNoVoiceProviderIsHealthy() {
         TwilioCallService calls = mock(TwilioCallService.class);
         VoiceCallRouter router = mock(VoiceCallRouter.class);
