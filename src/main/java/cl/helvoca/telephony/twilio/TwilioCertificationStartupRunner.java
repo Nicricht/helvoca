@@ -97,7 +97,10 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 + "&" + form("Method", "POST")
                 + "&" + form("StatusCallback", statusUrl)
                 + "&" + form("StatusCallbackMethod", "POST")
-                + "&" + form("StatusCallbackEvent", "initiated ringing answered completed")
+                + "&" + form("StatusCallbackEvent", "initiated")
+                + "&" + form("StatusCallbackEvent", "ringing")
+                + "&" + form("StatusCallbackEvent", "answered")
+                + "&" + form("StatusCallbackEvent", "completed")
                 + "&" + form("Timeout", "25");
 
         String basic = Base64.getEncoder().encodeToString(
