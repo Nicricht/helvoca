@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -35,13 +36,14 @@ class OpenAiLiveAcceptRetryTest {
     }
 
     @Test
-    void retriesSessionLookupEvenWhenFirst404ArrivesAfterTwoSeconds() throws Exception {
+    void retriesDelayedSessionLookupOnceAndThenAccepts() throws Exception {
         AtomicInteger requests = new AtomicInteger();
         server.createContext("/v1/live/sessions/live_retry_123/accept", exchange -> {
             int attempt = requests.incrementAndGet();
+            exchange.getRequestBody().readAllBytes();
             if (attempt == 1) {
                 try {
-                    Thread.sleep(2_200L);
+                    Thread.sleep(2_100L);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
@@ -61,14 +63,15 @@ class OpenAiLiveAcceptRetryTest {
 
         assertEquals(2, requests.get());
         verify(fixture.sideband).attach("live_retry_123", fixture.context);
-        verify(fixture.lifecycle, never()).updateStatus("live_retry_123", "failed", null);
+        verify(fixture.lifecycle, never()).updateStatus(fixture.callId, "failed", null);
     }
 
     @Test
-    void doesNotRetryDecisionAlreadyMade() throws Exception {
+    void doesNotRetryDecisionAlreadyMadeAndMarksCallFailed() throws Exception {
         AtomicInteger requests = new AtomicInteger();
         server.createContext("/v1/live/sessions/live_decided_123/accept", exchange -> {
             requests.incrementAndGet();
+            exchange.getRequestBody().readAllBytes();
             byte[] body = "{\"error\":{\"message\":\"Decision already made\",\"code\":\"decision_already_made\"}}"
                     .getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -82,6 +85,30 @@ class OpenAiLiveAcceptRetryTest {
         assertThrows(IllegalStateException.class,
                 () -> fixture.service.handleIncoming("webhook_decided_123", fixture.event));
         assertEquals(1, requests.get());
+        verify(fixture.sideband, never()).attach(anyString(), any());
+        verify(fixture.lifecycle).updateStatus(fixture.callId, "failed", null);
+    }
+
+    @Test
+    void retriesSessionNotFoundAtMostOnce() throws Exception {
+        AtomicInteger requests = new AtomicInteger();
+        server.createContext("/v1/live/sessions/live_missing_123/accept", exchange -> {
+            requests.incrementAndGet();
+            exchange.getRequestBody().readAllBytes();
+            byte[] body = "{\"error\":{\"message\":\"No session found\",\"code\":\"session_id_not_found\"}}"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(404, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+
+        Fixture fixture = fixture("live_missing_123");
+        assertThrows(IllegalStateException.class,
+                () -> fixture.service.handleIncoming("webhook_missing_123", fixture.event));
+
+        assertEquals(2, requests.get());
+        verify(fixture.lifecycle).updateStatus(fixture.callId, "failed", null);
         verify(fixture.sideband, never()).attach(anyString(), any());
     }
 
@@ -105,12 +132,14 @@ class OpenAiLiveAcceptRetryTest {
 
         String businessPhone = "+14355652512";
         String callerPhone = "+56911111111";
+        String callSid = "CA0123456789abcdef0123456789abcdef";
+        long issuedAt = Instant.now().getEpochSecond();
         UUID callId = UUID.randomUUID();
         RealtimeCallContext context = new RealtimeCallContext(
                 callId, UUID.randomUUID(), null, callerPhone, businessPhone, "live:" + sessionId);
 
-        when(lifecycle.startInboundCall("openai-sip", sessionId, callerPhone, businessPhone)).thenReturn(callId);
-        when(lifecycle.markStreamStarted(callId, sessionId, "live:" + sessionId, "openai-live"))
+        when(lifecycle.startInboundCall("twilio", callSid, callerPhone, businessPhone)).thenReturn(callId);
+        when(lifecycle.markStreamStarted(callId, callSid, "live:" + sessionId, "openai-live"))
                 .thenReturn(context);
         when(tools.buildInstructions(context)).thenReturn("backend instructions");
         when(tools.execute(context, "get_business_information", "{}"))
@@ -119,12 +148,14 @@ class OpenAiLiveAcceptRetryTest {
         JSONArray sipHeaders = new JSONArray()
                 .put(new JSONObject().put("name", "x-recepvoz-business").put("value", businessPhone))
                 .put(new JSONObject().put("name", "x-recepvoz-caller").put("value", callerPhone))
+                .put(new JSONObject().put("name", "x-recepvoz-call").put("value", callSid))
+                .put(new JSONObject().put("name", "x-recepvoz-issued-at").put("value", String.valueOf(issuedAt)))
                 .put(new JSONObject().put("name", "x-recepvoz-route")
-                        .put("value", signer.sign(businessPhone, callerPhone)));
+                        .put("value", signer.sign(businessPhone, callerPhone, callSid, issuedAt)));
 
         JSONObject event = new JSONObject()
                 .put("id", "evt_" + sessionId)
-                .put("created_at", 1_789_000_000L)
+                .put("created_at", Instant.now().getEpochSecond())
                 .put("type", "live.transport.incoming")
                 .put("data", new JSONObject()
                         .put("session_id", sessionId)
@@ -133,13 +164,14 @@ class OpenAiLiveAcceptRetryTest {
 
         OpenAiLiveSipService service = new OpenAiLiveSipService(
                 openAi, live, signer, lifecycle, tools, sideband);
-        return new Fixture(service, lifecycle, sideband, context, event);
+        return new Fixture(service, lifecycle, sideband, context, event, callId);
     }
 
     private record Fixture(OpenAiLiveSipService service,
                            CallLifecycleService lifecycle,
                            OpenAiLiveSidebandManager sideband,
                            RealtimeCallContext context,
-                           JSONObject event) {
+                           JSONObject event,
+                           UUID callId) {
     }
 }
