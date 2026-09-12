@@ -1,5 +1,6 @@
 package cl.helvoca.operations;
 
+import cl.helvoca.ai.live.OpenAiLiveProperties;
 import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
@@ -28,6 +29,7 @@ public class CommercialReadinessService {
     private final TenantProvider tenantProvider;
     private final TwilioProperties twilio;
     private final OpenAiRealtimeProperties openAi;
+    private final OpenAiLiveProperties live;
 
     public CommercialReadinessService(BusinessRepository businesses,
                                       PhoneNumberRepository phones,
@@ -35,7 +37,8 @@ public class CommercialReadinessService {
                                       BusinessHourRepository hours,
                                       TenantProvider tenantProvider,
                                       TwilioProperties twilio,
-                                      OpenAiRealtimeProperties openAi) {
+                                      OpenAiRealtimeProperties openAi,
+                                      OpenAiLiveProperties live) {
         this.businesses = businesses;
         this.phones = phones;
         this.services = services;
@@ -43,6 +46,7 @@ public class CommercialReadinessService {
         this.tenantProvider = tenantProvider;
         this.twilio = twilio;
         this.openAi = openAi;
+        this.live = live;
     }
 
     @Transactional(readOnly = true)
@@ -56,10 +60,16 @@ public class CommercialReadinessService {
         boolean activePhone = phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId).stream()
                 .anyMatch(phone -> phone.isActive() && notBlank(phone.getPhoneNumber()));
         boolean twilioAuth = twilio.hasAuthToken();
-        boolean mediaStream = validWss(twilio.getMediaStreamUrl());
         boolean publicWebhook = validHttps(twilio.getPublicBaseUrl());
         boolean openAiKey = openAi.hasApiKey();
-        boolean openAiRealtime = validWss(openAi.getRealtimeUrl()) && notBlank(openAi.getRealtimeModel());
+        boolean gptLive = live.isEnabled()
+                && live.hasProjectId()
+                && live.hasWebhookSecret()
+                && notBlank(live.getModel())
+                && notBlank(live.getBackendModel())
+                && notBlank(live.getVoice())
+                && validHttps(live.getApiBaseUrl())
+                && validWss(live.getSidebandBaseUrl());
 
         List<Check> core = List.of(
                 new Check("BUSINESS_PROFILE", "Perfil del negocio", profileReady, true,
@@ -70,12 +80,12 @@ public class CommercialReadinessService {
                         twilioAuth ? "Credencial de firma/webhook disponible." : "Falta TWILIO_AUTH_TOKEN."),
                 new Check("TWILIO_PUBLIC_WEBHOOK", "Webhook público Twilio", publicWebhook, true,
                         publicWebhook ? "URL pública HTTPS configurada." : "TWILIO_PUBLIC_BASE_URL debe ser HTTPS público."),
-                new Check("TWILIO_MEDIA_STREAM", "Media Streams", mediaStream, true,
-                        mediaStream ? "WebSocket WSS de audio configurado." : "TWILIO_MEDIA_STREAM_URL debe usar wss://."),
-                new Check("OPENAI_API", "OpenAI", openAiKey, true,
+                new Check("OPENAI_API", "OpenAI API", openAiKey, true,
                         openAiKey ? "API key disponible." : "Falta OPENAI_API_KEY."),
-                new Check("OPENAI_REALTIME", "OpenAI Realtime", openAiRealtime, true,
-                        openAiRealtime ? "Realtime URL y modelo configurados." : "Configura URL WSS y modelo Realtime.")
+                new Check("OPENAI_GPT_LIVE_SIP", "GPT-Live SIP", gptLive, true,
+                        gptLive
+                                ? "GPT-Live, proyecto, webhook firmado, modelo, voz y sideband están configurados."
+                                : "Configura OPENAI_LIVE_ENABLED, proyecto, webhook secret, modelos, voz y endpoints Live seguros.")
         );
 
         boolean coreReady = core.stream().allMatch(Check::ready);
