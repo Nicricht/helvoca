@@ -175,6 +175,7 @@ public class OpenAiLiveSipService {
                 .uri(URI.create(live.normalizedApiBaseUrl() + "/live/sessions/" + pathId + "/accept"))
                 .timeout(Duration.ofSeconds(12))
                 .header("Authorization", "Bearer " + openAi.getApiKey())
+                .header("OpenAI-Project", live.getProjectId().trim())
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
