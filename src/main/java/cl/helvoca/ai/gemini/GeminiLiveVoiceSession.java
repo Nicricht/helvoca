@@ -211,7 +211,6 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         if (!setupComplete.compareAndSet(false, true)) return;
         health.success(GeminiLiveVoiceProvider.ID);
 
-        // Technical turn used only to trigger the receptionist's opening turn.
         sendClientText("[RECEPVOZ_CALL_CONNECTED]");
 
         String frame;
@@ -254,9 +253,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private void advanceCertificationSimulation() {
         if (!properties.isCertificationSimulation() || closed.get()) return;
         int step = certificationStep.getAndIncrement();
-        String phone = context.callerPhone() == null || context.callerPhone().isBlank()
+        String phone = context.callerNumber() == null || context.callerNumber().isBlank()
                 ? "el teléfono de esta llamada"
-                : context.callerPhone();
+                : context.callerNumber();
         String text = switch (step) {
             case 0 -> "Hola. Quiero hacer una reserva para mañana a las 19:00 para dos personas, "
                     + "a nombre de Nicolás Vega y con el teléfono " + phone + ". "
