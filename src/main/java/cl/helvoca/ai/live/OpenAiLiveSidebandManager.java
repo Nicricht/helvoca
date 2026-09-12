@@ -75,6 +75,7 @@ public class OpenAiLiveSidebandManager {
         private final RealtimeCallContext context;
         private final Set<String> completedToolCalls = ConcurrentHashMap.newKeySet();
         private final AtomicBoolean terminal = new AtomicBoolean(false);
+        private final AtomicBoolean sessionClosedEvent = new AtomicBoolean(false);
         private final StringBuilder frameBuffer = new StringBuilder();
         private final StringBuilder userTranscript = new StringBuilder();
         private final StringBuilder assistantTranscript = new StringBuilder();
@@ -115,7 +116,10 @@ public class OpenAiLiveSidebandManager {
 
         @Override
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-            finish(false, "sideband closed status=" + statusCode + " reason=" + reason);
+            boolean cleanLiveClose = sessionClosedEvent.get();
+            finish(!cleanLiveClose,
+                    (cleanLiveClose ? "sideband closed after session.closed" : "unexpected sideband close")
+                            + " status=" + statusCode + " reason=" + reason);
             return null;
         }
 
@@ -134,7 +138,10 @@ public class OpenAiLiveSidebandManager {
                     case "session.output_transcript.delta" -> append(assistantTranscript, event.optString("delta", ""));
                     case "session.delegation.created" -> flushTranscripts();
                     case "response.event" -> handleResponseEvent(event.optJSONObject("event"));
-                    case "session.closed" -> finish(false, "GPT-Live session closed");
+                    case "session.closed" -> {
+                        sessionClosedEvent.set(true);
+                        finish(false, "GPT-Live session closed");
+                    }
                     case "error" -> logLiveError(event);
                     default -> { }
                 }
@@ -236,7 +243,7 @@ public class OpenAiLiveSidebandManager {
             if (!terminal.compareAndSet(false, true)) return;
             flushTranscripts();
             try {
-                lifecycle.updateStatus(sessionId, failed ? "failed" : "completed", null);
+                lifecycle.updateStatus(context.callId(), failed ? "failed" : "completed", null);
             } catch (Exception e) {
                 log.warn("Could not finalize GPT-Live call {}: {}", context.callId(), e.getMessage());
             }
@@ -245,7 +252,8 @@ public class OpenAiLiveSidebandManager {
             } catch (Exception e) {
                 log.warn("Could not summarize GPT-Live call {}: {}", context.callId(), e.getMessage());
             }
-            log.info("GPT-Live sideband ended call={} session={} reason={}", context.callId(), sessionId, reason);
+            log.info("GPT-Live sideband ended call={} session={} failed={} reason={}",
+                    context.callId(), sessionId, failed, reason);
         }
 
         private void fail(String reason) {
@@ -260,21 +268,24 @@ public class OpenAiLiveSidebandManager {
     }
 
     private void hangup(String sessionId) {
-        postControl(sessionId, "hangup", "{}");
+        postControl(sessionId, "hangup", null);
     }
 
     private boolean postControl(String sessionId, String action, String body) {
         try {
             String pathId = URLEncoder.encode(sessionId, StandardCharsets.UTF_8).replace("+", "%20");
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(live.normalizedApiBaseUrl() + "/live/sessions/" + pathId + "/" + action))
                     .timeout(Duration.ofSeconds(8))
                     .header("Authorization", "Bearer " + openAi.getApiKey())
-                    .header("OpenAI-Project", live.getProjectId().trim())
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .build();
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+                    .header("OpenAI-Project", live.getProjectId().trim());
+            if (body == null) {
+                builder.POST(HttpRequest.BodyPublishers.noBody());
+            } else {
+                builder.header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body));
+            }
+            HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() >= 200 && response.statusCode() < 300) return true;
             log.warn("GPT-Live control action={} session={} status={} body={}",
                     action, sessionId, response.statusCode(), truncate(response.body()));
