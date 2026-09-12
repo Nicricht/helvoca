@@ -16,7 +16,7 @@ import static org.mockito.Mockito.mock;
 class OpenAiLiveSipTwimlContractTest {
 
     @Test
-    void twimlIsWellFormedAndRequestsSrtpBeforeCustomSipHeaders() throws Exception {
+    void twimlIsWellFormedRequestsSrtpAndCarriesSignedCarrierCorrelation() throws Exception {
         OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
         openAi.setApiKey("sk-test");
 
@@ -33,7 +33,8 @@ class OpenAiLiveSipTwimlContractTest {
                 mock(RealtimeToolService.class),
                 mock(OpenAiLiveSidebandManager.class));
 
-        String xml = service.twiml("+14355652512", "+56911111111");
+        String callSid = "CA0123456789abcdef0123456789abcdef";
+        String xml = service.twiml("+14355652512", "+56911111111", callSid);
         Document document = DocumentBuilderFactory.newInstance().newDocumentBuilder()
                 .parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
         String sip = document.getElementsByTagName("Sip").item(0).getTextContent();
@@ -42,7 +43,12 @@ class OpenAiLiveSipTwimlContractTest {
         assertFalse(sip.contains("transport=tls"), "secure=true is the Twilio SRTP contract, not TLS-only media");
         assertTrue(sip.contains("x-recepvoz-business=%2B14355652512"));
         assertTrue(sip.contains("x-recepvoz-caller=%2B56911111111"));
+        assertTrue(sip.contains("x-recepvoz-call=" + callSid));
+        assertTrue(sip.contains("x-recepvoz-issued-at="));
         assertTrue(sip.contains("x-recepvoz-route="));
         assertFalse(sip.endsWith("x-recepvoz-route="));
+        assertFalse(xml.contains("<Say"));
+        assertFalse(xml.contains("<Gather"));
+        assertFalse(xml.contains("<Stream"));
     }
 }
