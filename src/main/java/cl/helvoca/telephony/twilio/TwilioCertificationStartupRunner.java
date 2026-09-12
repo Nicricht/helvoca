@@ -16,6 +16,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +38,8 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     private static final Pattern E164 = Pattern.compile("^\\+[1-9][0-9]{7,14}$");
     private static final AtomicBoolean FIRED = new AtomicBoolean(false);
     private static final int START_DELAY_SECONDS = 10;
+    private static final String OUTBOUND_TEST = "outbound-test";
+    private static final String INBOUND = "inbound";
 
     private final boolean enabled;
     private final String accountSid;
@@ -45,6 +48,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     private final String to;
     private final String publicBaseUrl;
     private final int maxSeconds;
+    private final String direction;
     private final TwilioCallControl callControl;
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(8))
@@ -58,6 +62,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
             @Value("${TWILIO_TEST_TO:}") String to,
             @Value("${TWILIO_PUBLIC_BASE_URL:}") String publicBaseUrl,
             @Value("${TWILIO_CERTIFICATION_MAX_SECONDS:75}") int maxSeconds,
+            @Value("${TWILIO_CERTIFICATION_DIRECTION:outbound-test}") String direction,
             TwilioCallControl callControl) {
         this.enabled = enabled;
         this.accountSid = accountSid;
@@ -66,6 +71,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         this.to = to;
         this.publicBaseUrl = publicBaseUrl;
         this.maxSeconds = Math.max(20, Math.min(maxSeconds, 180));
+        this.direction = normalizeDirection(direction);
         this.callControl = callControl;
     }
 
@@ -73,7 +79,8 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         if (!enabled || !FIRED.compareAndSet(false, true)) return;
         if (!validConfiguration()) {
-            log.error("TWILIO_CERTIFICATION_CALL blocked: invalid/missing Twilio certification configuration");
+            log.error("TWILIO_CERTIFICATION_CALL blocked: invalid/missing Twilio certification configuration direction={}",
+                    direction);
             return;
         }
 
@@ -82,16 +89,16 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
             t.setDaemon(true);
             return t;
         });
-        log.info("TWILIO_CERTIFICATION_CALL armed; starting in {} seconds after deployment cutover",
-                START_DELAY_SECONDS);
+        log.info("TWILIO_CERTIFICATION_CALL armed; direction={} starting in {} seconds after deployment cutover",
+                direction, START_DELAY_SECONDS);
         kickoff.schedule(() -> {
             try {
                 String callSid = createCall();
-                log.info("TWILIO_CERTIFICATION_CALL CREATED call={} to={} max_seconds={}",
-                        callSid, mask(to), maxSeconds);
+                log.info("TWILIO_CERTIFICATION_CALL CREATED call={} direction={} from={} to={} max_seconds={}",
+                        callSid, direction, mask(from), mask(to), maxSeconds);
                 scheduleSafetyHangup(callSid);
             } catch (Exception e) {
-                log.error("TWILIO_CERTIFICATION_CALL FAILED reason={}", rootMessage(e));
+                log.error("TWILIO_CERTIFICATION_CALL FAILED direction={} reason={}", direction, rootMessage(e));
             } finally {
                 kickoff.shutdown();
             }
@@ -100,7 +107,9 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
 
     private String createCall() throws Exception {
         String base = trimTrailingSlash(publicBaseUrl.trim());
-        String voiceUrl = base + "/webhooks/v1/twilio/outbound-test";
+        String voiceUrl = base + (INBOUND.equals(direction)
+                ? "/webhooks/v1/twilio/voice"
+                : "/webhooks/v1/twilio/outbound-test");
         String statusUrl = base + "/webhooks/v1/twilio/status";
 
         String body = form("To", to.trim())
@@ -154,7 +163,14 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 && authToken != null && !authToken.isBlank()
                 && from != null && E164.matcher(from.trim()).matches()
                 && to != null && E164.matcher(to.trim()).matches()
-                && publicBaseUrl != null && publicBaseUrl.trim().startsWith("https://");
+                && publicBaseUrl != null && publicBaseUrl.trim().startsWith("https://")
+                && (OUTBOUND_TEST.equals(direction) || INBOUND.equals(direction));
+    }
+
+    static String normalizeDirection(String value) {
+        if (value == null || value.isBlank()) return OUTBOUND_TEST;
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        return INBOUND.equals(normalized) ? INBOUND : OUTBOUND_TEST;
     }
 
     private static String form(String key, String value) {
