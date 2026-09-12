@@ -54,6 +54,20 @@ public class TwilioVoiceController {
         return ResponseEntity.ok(liveSip.twiml(from, to));
     }
 
+    /**
+     * Backwards-compatible Twilio route. This does not restore the removed Trial/Polly stack.
+     * Any stale Twilio configuration still pointing at /trial/voice is routed into the exact
+     * same GPT-Live-only outbound flow as /outbound-test instead of dropping the call with 404.
+     */
+    @PostMapping(value = "/trial/voice", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+            produces = MediaType.APPLICATION_XML_VALUE)
+    public ResponseEntity<String> legacyOutboundTest(@RequestParam("CallSid") String callSid,
+                                                     @RequestParam("From") String from,
+                                                     @RequestParam("To") String to) {
+        log.warn("Legacy Twilio route /trial/voice used; routing to GPT-Live outbound flow call={}", callSid);
+        return outboundTest(callSid, from, to);
+    }
+
     @PostMapping(value = "/stream-status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<Void> streamStatus(@RequestParam("StreamSid") String streamSid,
                                              @RequestParam("StreamEvent") String streamEvent,
