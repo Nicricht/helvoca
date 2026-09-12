@@ -5,10 +5,12 @@ import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.ai.realtime.RealtimeToolDefinitions;
 import cl.helvoca.ai.realtime.RealtimeToolService;
 import cl.helvoca.telephony.CallLifecycleService;
+import cl.helvoca.voice.VoiceProviderHealthRegistry;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -27,6 +29,8 @@ import java.util.regex.Pattern;
 
 @Service
 public class OpenAiLiveSipService {
+    public static final String PROVIDER_ID = "openai-live";
+
     private static final Logger log = LoggerFactory.getLogger(OpenAiLiveSipService.class);
     private static final int MAX_DEDUP_IDS = 10_000;
     private static final int MAX_ACCEPT_ATTEMPTS = 2;
@@ -47,6 +51,9 @@ public class OpenAiLiveSipService {
     private final Set<String> inFlightWebhookIds = ConcurrentHashMap.newKeySet();
     private final Set<String> processedSessionIds = ConcurrentHashMap.newKeySet();
     private final Set<String> inFlightSessionIds = ConcurrentHashMap.newKeySet();
+
+    @Autowired(required = false)
+    private VoiceProviderHealthRegistry providerHealth;
 
     public OpenAiLiveSipService(OpenAiRealtimeProperties openAi,
                                 OpenAiLiveProperties live,
@@ -157,19 +164,23 @@ public class OpenAiLiveSipService {
 
             UUID callId = lifecycle.startInboundCall("twilio", twilioCallSid, callerPhone, businessPhone);
             RealtimeCallContext context = lifecycle.markStreamStarted(
-                    callId, twilioCallSid, "live:" + sessionId, "openai-live");
+                    callId, twilioCallSid, "live:" + sessionId, PROVIDER_ID);
 
             String businessName = businessName(context);
             JSONObject requestBody = acceptancePayload(context, businessName);
             try {
                 accept(sessionId, requestBody);
-            } catch (Exception e) {
-                try {
-                    lifecycle.updateStatus(callId, "failed", null);
-                } catch (Exception statusError) {
-                    log.warn("Could not mark failed GPT-Live call={} session={}: {}",
-                            callId, sessionId, statusError.getMessage());
+            } catch (OpenAiLiveProviderException e) {
+                markFailed(callId, sessionId);
+                if (e.terminal()) {
+                    processedWebhookIds.add(webhookId);
+                    processedSessionIds.add(sessionId);
+                    pruneDedupSets();
                 }
+                throw e;
+            } catch (Exception e) {
+                markFailed(callId, sessionId);
+                recordFailure(VoiceProviderHealthRegistry.FailureKind.UPSTREAM, e.getMessage());
                 throw e;
             }
 
@@ -186,6 +197,15 @@ public class OpenAiLiveSipService {
         } finally {
             inFlightWebhookIds.remove(webhookId);
             if (claimedSessionId != null) inFlightSessionIds.remove(claimedSessionId);
+        }
+    }
+
+    private void markFailed(UUID callId, String sessionId) {
+        try {
+            lifecycle.updateStatus(callId, "failed", null);
+        } catch (Exception statusError) {
+            log.warn("Could not mark failed GPT-Live call={} session={}: {}",
+                    callId, sessionId, statusError.getMessage());
         }
     }
 
@@ -260,6 +280,7 @@ public class OpenAiLiveSipService {
             String errorCode = apiErrorCode(response.body());
 
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                clearFailure();
                 log.info(
                         "OpenAI Live accept succeeded session={} attempt={}/{} attempt_ms={} elapsed_ms={} request_id={} processing_ms={}",
                         sessionId, attempt, MAX_ACCEPT_ATTEMPTS, attemptMs, elapsedMs, requestId, processingMs);
@@ -287,18 +308,16 @@ public class OpenAiLiveSipService {
                 continue;
             }
 
-            if (decisionAlreadyMade) {
-                throw new IllegalStateException("OpenAI Live accept stopped because decision was already made"
-                        + " status=" + response.statusCode()
-                        + " request_id=" + requestId
-                        + " processing_ms=" + processingMs
-                        + " attempt_ms=" + attemptMs
-                        + " elapsed_ms=" + elapsedMs
-                        + " session=" + sessionId
-                        + " body=" + truncate(response.body()));
-            }
+            VoiceProviderHealthRegistry.FailureKind failureKind = classifyFailure(response.statusCode(), errorCode, response.body());
+            recordFailure(failureKind,
+                    "status=" + response.statusCode() + " error_code=" + errorCode + " session=" + sessionId);
 
-            throw new IllegalStateException("OpenAI Live accept failed status=" + response.statusCode()
+            boolean terminal = isTerminal(response.statusCode(), errorCode, decisionAlreadyMade, transientSessionLookup);
+            String prefix = decisionAlreadyMade
+                    ? "OpenAI Live accept stopped because decision was already made"
+                    : "OpenAI Live accept failed";
+            throw new OpenAiLiveProviderException(prefix
+                    + " status=" + response.statusCode()
                     + " request_id=" + requestId
                     + " processing_ms=" + processingMs
                     + " error_code=" + errorCode
@@ -307,10 +326,62 @@ public class OpenAiLiveSipService {
                     + " elapsed_ms=" + elapsedMs
                     + " retry_window_open=" + retryWindowOpen
                     + " session=" + sessionId
-                    + " body=" + truncate(response.body()));
+                    + " body=" + truncate(response.body()),
+                    response.statusCode(), errorCode, terminal);
         }
 
-        throw new IllegalStateException("OpenAI Live accept exhausted retries for session=" + sessionId);
+        recordFailure(VoiceProviderHealthRegistry.FailureKind.SESSION,
+                "OpenAI Live accept exhausted retries session=" + sessionId);
+        throw new OpenAiLiveProviderException(
+                "OpenAI Live accept exhausted retries for session=" + sessionId,
+                503,
+                "accept_retries_exhausted",
+                true);
+    }
+
+    private static VoiceProviderHealthRegistry.FailureKind classifyFailure(int status,
+                                                                           String errorCode,
+                                                                           String body) {
+        String code = errorCode == null ? "" : errorCode.toLowerCase(Locale.ROOT);
+        String text = body == null ? "" : body.toLowerCase(Locale.ROOT);
+        if ("credit_balance_exhausted".equals(code)
+                || "insufficient_quota".equals(code)
+                || text.contains("no credits remaining")) {
+            return VoiceProviderHealthRegistry.FailureKind.NO_CREDITS;
+        }
+        if (status == 401 || status == 403
+                || code.contains("api_key")
+                || code.contains("permission")) {
+            return VoiceProviderHealthRegistry.FailureKind.AUTH;
+        }
+        if (status == 429) return VoiceProviderHealthRegistry.FailureKind.RATE_LIMIT;
+        if ("session_id_not_found".equals(code) || "decision_already_made".equals(code)) {
+            return VoiceProviderHealthRegistry.FailureKind.SESSION;
+        }
+        if (status >= 500) return VoiceProviderHealthRegistry.FailureKind.UPSTREAM;
+        return VoiceProviderHealthRegistry.FailureKind.UNKNOWN;
+    }
+
+    private static boolean isTerminal(int status,
+                                      String errorCode,
+                                      boolean decisionAlreadyMade,
+                                      boolean sessionLookupFailed) {
+        if (decisionAlreadyMade || sessionLookupFailed) return true;
+        String code = errorCode == null ? "" : errorCode.toLowerCase(Locale.ROOT);
+        if ("credit_balance_exhausted".equals(code) || "insufficient_quota".equals(code)) return true;
+        if (status == 401 || status == 403) return true;
+        if (status >= 400 && status < 500 && status != 429) return true;
+        return false;
+    }
+
+    private void recordFailure(VoiceProviderHealthRegistry.FailureKind kind, String reason) {
+        VoiceProviderHealthRegistry registry = providerHealth;
+        if (registry != null) registry.failure(PROVIDER_ID, kind, reason);
+    }
+
+    private void clearFailure() {
+        VoiceProviderHealthRegistry registry = providerHealth;
+        if (registry != null) registry.success(PROVIDER_ID);
     }
 
     private static String apiErrorCode(String body) {
