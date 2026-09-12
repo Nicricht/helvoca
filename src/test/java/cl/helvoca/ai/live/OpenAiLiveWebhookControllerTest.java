@@ -1,5 +1,6 @@
 package cl.helvoca.ai.live;
 
+import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,7 +18,7 @@ class OpenAiLiveWebhookControllerTest {
         when(service.isReady()).thenReturn(true);
         doThrow(new OpenAiLiveProviderException(
                 "credit exhausted", 429, "credit_balance_exhausted", true))
-                .when(service).handleIncoming("wh_test", new org.json.JSONObject(BODY));
+                .when(service).handleIncoming(eq("wh_test"), any(JSONObject.class));
 
         OpenAiLiveWebhookController controller = new OpenAiLiveWebhookController(verifier, service);
         var response = controller.webhook("wh_test", "123", "sig", BODY);
@@ -33,7 +34,7 @@ class OpenAiLiveWebhookControllerTest {
         when(service.isReady()).thenReturn(true);
         doThrow(new OpenAiLiveProviderException(
                 "upstream unavailable", 503, "upstream_error", false))
-                .when(service).handleIncoming(eq("wh_test"), any(org.json.JSONObject.class));
+                .when(service).handleIncoming(eq("wh_test"), any(JSONObject.class));
 
         OpenAiLiveWebhookController controller = new OpenAiLiveWebhookController(verifier, service);
         var response = controller.webhook("wh_test", "123", "sig", BODY);
