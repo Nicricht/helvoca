@@ -6,6 +6,7 @@ import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.call.CallStatus;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.telephony.CallLifecycleService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,7 +17,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @Testcontainers
 @SpringBootTest
@@ -32,7 +33,6 @@ class TelephonyIntegrationTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("app.seed.enabled", () -> "false");
-        registry.add("app.twilio.media-stream-url", () -> "wss://voice.example/ws/twilio");
         registry.add("app.voice.telephony-provider", () -> "twilio");
         registry.add("app.voice.ai-provider", () -> "openai");
     }
@@ -40,10 +40,11 @@ class TelephonyIntegrationTest {
     @Autowired BusinessRepository businesses;
     @Autowired PhoneNumberRepository phoneNumbers;
     @Autowired CallSessionRepository calls;
-    @Autowired TwilioCallService callService;
+    @Autowired CallLifecycleService lifecycle;
+    @Autowired TwilioCallService twilio;
 
     @Test
-    void flywayV6AndProviderIndependentCallLifecycleWorkAgainstPostgres() {
+    void providerCallSidAndLiveSessionStayCorrelatedAgainstPostgres() {
         Business business = new Business();
         business.setName("Telephony Test Business");
         business = businesses.saveAndFlush(business);
@@ -54,25 +55,30 @@ class TelephonyIntegrationTest {
         phone.setPhoneNumber("+56220000000");
         phone = phoneNumbers.saveAndFlush(phone);
 
-        String xml = callService.startInboundCall("CA-TEST-001", "+56911111111", phone.getPhoneNumber());
-        assertTrue(xml.contains("wss://voice.example/ws/twilio"));
-        assertTrue(xml.contains("callId"));
+        String callSid = "CA0123456789abcdef0123456789abcdef";
+        String liveSession = "live_test_001";
+        var callId = lifecycle.startInboundCall("twilio", callSid, "+56911111111", phone.getPhoneNumber());
 
-        var call = calls.findByProviderCallId("CA-TEST-001").orElseThrow();
+        var call = calls.findByProviderCallId(callSid).orElseThrow();
+        assertEquals(callId, call.getId());
         assertEquals(business.getId(), call.getBusinessId());
         assertEquals(CallStatus.RINGING, call.getStatus());
         assertEquals("twilio", call.getTelephonyProvider());
 
-        callService.markStreamStarted(call.getId(), "CA-TEST-001", "MZ-TEST-001", "openai");
-        call = calls.findByProviderCallId("CA-TEST-001").orElseThrow();
-        assertEquals(CallStatus.IN_PROGRESS, call.getStatus());
-        assertEquals("MZ-TEST-001", call.getStreamSid());
-        assertEquals("openai", call.getAiProvider());
+        var context = lifecycle.markStreamStarted(callId, callSid, "live:" + liveSession, "openai-live");
+        assertEquals(callId, context.callId());
+        assertEquals("live:" + liveSession, context.streamSid());
 
-        callService.updateStatus("CA-TEST-001", "completed", 42);
-        call = calls.findByProviderCallId("CA-TEST-001").orElseThrow();
+        call = calls.findByProviderCallId(callSid).orElseThrow();
+        assertEquals(CallStatus.IN_PROGRESS, call.getStatus());
+        assertEquals("live:" + liveSession, call.getStreamSid());
+        assertEquals("openai-live", call.getAiProvider());
+        assertNotNull(call.getAnsweredAt());
+
+        twilio.updateStatus(callSid, "completed", 42);
+        call = calls.findByProviderCallId(callSid).orElseThrow();
         assertEquals(CallStatus.COMPLETED, call.getStatus());
         assertEquals(42, call.getDurationSeconds());
-        assertTrue(call.getEndedAt() != null);
+        assertNotNull(call.getEndedAt());
     }
 }
