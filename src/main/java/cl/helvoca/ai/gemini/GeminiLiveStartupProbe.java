@@ -23,11 +23,14 @@ import java.util.concurrent.TimeUnit;
  * Optional one-shot production diagnostic for Gemini Live. It validates the
  * real API key, WebSocket endpoint and model without involving Twilio.
  *
- * The probe deliberately uses the smallest setup payload from Google's current
- * WebSocket getting-started example. This keeps voice config, tools,
- * transcription and other product features out of the authentication/model
- * availability check. Enable only for a deliberate probe deployment with
- * GEMINI_LIVE_PROBE_ON_STARTUP=true, then disable it again.
+ * The current v1beta endpoint rejected responseModalities directly under
+ * setup, so the probe deliberately uses the API-reference shape with
+ * generationConfig.responseModalities and nothing else. Voice config, tools,
+ * transcription and product behavior stay out of this connectivity check.
+ *
+ * Probe failures are logged but never crash the application. Enable only for
+ * a deliberate probe deployment with GEMINI_LIVE_PROBE_ON_STARTUP=true, then
+ * disable it again.
  */
 @Component
 public class GeminiLiveStartupProbe implements ApplicationRunner {
@@ -47,10 +50,11 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
     }
 
     @Override
-    public void run(ApplicationArguments args) throws Exception {
+    public void run(ApplicationArguments args) {
         if (!enabled) return;
         if (!properties.ready()) {
-            throw new IllegalStateException("Gemini Live startup probe requested but Gemini Live is not configured");
+            log.error("GEMINI_LIVE_PROBE FAILED reason=Gemini Live is not configured");
+            return;
         }
 
         long started = System.nanoTime();
@@ -68,16 +72,17 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
 
             ProbeResult result = listener.result().get(RESULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             long elapsedMs = Duration.ofNanos(System.nanoTime() - started).toMillis();
-            if (!result.success()) {
-                throw new IllegalStateException("Gemini Live startup probe failed: " + result.detail());
+            if (result.success()) {
+                log.info("GEMINI_LIVE_PROBE SUCCESS model={} elapsed_ms={} result={}",
+                        properties.getModel(), elapsedMs, result.detail());
+            } else {
+                log.error("GEMINI_LIVE_PROBE FAILED model={} elapsed_ms={} reason={}",
+                        properties.getModel(), elapsedMs, result.detail());
             }
-            log.info("GEMINI_LIVE_PROBE SUCCESS model={} elapsed_ms={} result={}",
-                    properties.getModel(), elapsedMs, result.detail());
         } catch (Exception e) {
             long elapsedMs = Duration.ofNanos(System.nanoTime() - started).toMillis();
             log.error("GEMINI_LIVE_PROBE FAILED model={} elapsed_ms={} reason={}",
                     properties.getModel(), elapsedMs, rootMessage(e));
-            throw e;
         }
     }
 
@@ -99,9 +104,8 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
         public void onOpen(WebSocket webSocket) {
             this.socket = webSocket;
             webSocket.request(1);
-            JSONObject setup = setup();
-            log.info("GEMINI_LIVE_PROBE socket connected; sending minimal setup model={}", model);
-            webSocket.sendText(setup.toString(), true)
+            log.info("GEMINI_LIVE_PROBE socket connected; sending generationConfig-only setup model={}", model);
+            webSocket.sendText(setup().toString(), true)
                     .whenComplete((ignored, error) -> {
                         if (error != null) {
                             result.complete(new ProbeResult(false,
@@ -162,14 +166,11 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
         }
 
         private JSONObject setup() {
-            // Mirrors Google's current WebSocket getting-started example as
-            // closely as possible: model + responseModalities + systemInstruction.
+            JSONObject generationConfig = new JSONObject()
+                    .put("responseModalities", new JSONArray().put("AUDIO"));
             return new JSONObject().put("setup", new JSONObject()
                     .put("model", "models/" + model.trim())
-                    .put("responseModalities", new JSONArray().put("AUDIO"))
-                    .put("systemInstruction", new JSONObject()
-                            .put("parts", new JSONArray().put(new JSONObject()
-                                    .put("text", "You are a helpful assistant.")))));
+                    .put("generationConfig", generationConfig));
         }
     }
 
