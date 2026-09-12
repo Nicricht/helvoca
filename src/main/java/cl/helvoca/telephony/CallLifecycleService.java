@@ -62,20 +62,15 @@ public class CallLifecycleService {
     public UUID updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {
         CallSession call = calls.findByProviderCallId(providerCallId)
                 .orElseThrow(() -> new NotFoundException("Call not found"));
-        CallStatus mapped = mapStatus(providerStatus);
-        call.setStatus(mapped);
-        Instant now = Instant.now();
-        if (mapped == CallStatus.IN_PROGRESS && call.getAnsweredAt() == null) {
-            call.setAnsweredAt(now);
-        }
-        if (mapped.terminal() && call.getEndedAt() == null) {
-            call.setEndedAt(now);
-        }
-        if (durationSeconds != null && durationSeconds >= 0) {
-            call.setDurationSeconds(durationSeconds);
-        } else if (mapped.terminal() && call.getStartedAt() != null && call.getEndedAt() != null) {
-            call.setDurationSeconds((int) Math.max(0, Duration.between(call.getStartedAt(), call.getEndedAt()).toSeconds()));
-        }
+        applyStatus(call, providerStatus, durationSeconds);
+        return call.getId();
+    }
+
+    @Transactional
+    public UUID updateStatus(UUID callId, String providerStatus, Integer durationSeconds) {
+        CallSession call = calls.findById(callId)
+                .orElseThrow(() -> new NotFoundException("Call not found"));
+        applyStatus(call, providerStatus, durationSeconds);
         return call.getId();
     }
 
@@ -119,6 +114,24 @@ public class CallLifecycleService {
             case "canceled", "cancelled" -> CallStatus.CANCELED;
             default -> CallStatus.UNKNOWN;
         };
+    }
+
+    private static void applyStatus(CallSession call, String providerStatus, Integer durationSeconds) {
+        CallStatus mapped = mapStatus(providerStatus);
+        call.setStatus(mapped);
+        Instant now = Instant.now();
+        if (mapped == CallStatus.IN_PROGRESS && call.getAnsweredAt() == null) {
+            call.setAnsweredAt(now);
+        }
+        if (mapped.terminal() && call.getEndedAt() == null) {
+            call.setEndedAt(now);
+        }
+        if (durationSeconds != null && durationSeconds >= 0) {
+            call.setDurationSeconds(durationSeconds);
+        } else if (mapped.terminal() && call.getStartedAt() != null && call.getEndedAt() != null) {
+            call.setDurationSeconds((int) Math.max(0,
+                    Duration.between(call.getStartedAt(), call.getEndedAt()).toSeconds()));
+        }
     }
 
     private static RealtimeCallContext context(CallSession call) {
