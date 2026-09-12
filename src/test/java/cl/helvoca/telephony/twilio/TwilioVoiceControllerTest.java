@@ -12,6 +12,7 @@ import static org.mockito.Mockito.*;
 class TwilioVoiceControllerTest {
     private static final String SILENT_HANGUP =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>";
+    private static final String CALL_SID = "CA0123456789abcdef0123456789abcdef";
 
     private static TwilioVoiceController controller(TwilioCallService calls,
                                                     OpenAiLiveSipService liveSip,
@@ -25,14 +26,14 @@ class TwilioVoiceControllerTest {
         OpenAiLiveSipService liveSip = mock(OpenAiLiveSipService.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
         when(liveSip.isReady()).thenReturn(true);
-        when(liveSip.twiml("+14355652512", "+56911111111"))
+        when(liveSip.twiml("+14355652512", "+56911111111", CALL_SID))
                 .thenReturn("<Response><Dial><Sip>sip:proj_test@sip.api.openai.com;secure=true</Sip></Dial></Response>");
 
         var response = controller(calls, liveSip, summaries)
-                .incoming("CA-LIVE", "+56911111111", "+14355652512");
+                .incoming(CALL_SID, "+56911111111", "+14355652512");
 
         assertEquals(200, response.getStatusCode().value());
-        verify(liveSip).twiml("+14355652512", "+56911111111");
+        verify(liveSip).twiml("+14355652512", "+56911111111", CALL_SID);
         verifyNoInteractions(calls, summaries);
     }
 
@@ -44,7 +45,7 @@ class TwilioVoiceControllerTest {
         when(liveSip.isReady()).thenReturn(false);
 
         var response = controller(calls, liveSip, summaries)
-                .incoming("CA-NO-LIVE", "+56911111111", "+14355652512");
+                .incoming(CALL_SID, "+56911111111", "+14355652512");
 
         assertEquals(SILENT_HANGUP, response.getBody());
         verifyNoInteractions(calls, summaries);
@@ -56,9 +57,9 @@ class TwilioVoiceControllerTest {
         OpenAiLiveSipService liveSip = mock(OpenAiLiveSipService.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
         UUID callId = UUID.randomUUID();
-        when(calls.updateStatus("CA-TERMINAL", "completed", 42)).thenReturn(callId);
+        when(calls.updateStatus(CALL_SID, "completed", 42)).thenReturn(callId);
 
-        var response = controller(calls, liveSip, summaries).status("CA-TERMINAL", "completed", 42);
+        var response = controller(calls, liveSip, summaries).status(CALL_SID, "completed", 42);
 
         assertEquals(204, response.getStatusCode().value());
         verify(summaries).generate(callId);
@@ -69,9 +70,9 @@ class TwilioVoiceControllerTest {
         TwilioCallService calls = mock(TwilioCallService.class);
         OpenAiLiveSipService liveSip = mock(OpenAiLiveSipService.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
-        when(calls.updateStatus("CA-ACTIVE", "in-progress", null)).thenReturn(UUID.randomUUID());
+        when(calls.updateStatus(CALL_SID, "in-progress", null)).thenReturn(UUID.randomUUID());
 
-        var response = controller(calls, liveSip, summaries).status("CA-ACTIVE", "in-progress", null);
+        var response = controller(calls, liveSip, summaries).status(CALL_SID, "in-progress", null);
 
         assertEquals(204, response.getStatusCode().value());
         verifyNoInteractions(summaries);
@@ -84,7 +85,7 @@ class TwilioVoiceControllerTest {
         CallSummaryService summaries = mock(CallSummaryService.class);
 
         var response = controller(calls, liveSip, summaries)
-                .streamStatus("MZ-1", "stream-error", "CA-1", "network");
+                .streamStatus("MZ-1", "stream-error", CALL_SID, "network");
 
         assertEquals(204, response.getStatusCode().value());
         verify(calls).markStreamStopped("MZ-1");
