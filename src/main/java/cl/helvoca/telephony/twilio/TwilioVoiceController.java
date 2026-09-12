@@ -70,23 +70,6 @@ public class TwilioVoiceController {
         return outboundTest(callSid, from, to);
     }
 
-    @PostMapping(value = "/stream-status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-    public ResponseEntity<Void> streamStatus(@RequestParam("StreamSid") String streamSid,
-                                             @RequestParam("StreamEvent") String streamEvent,
-                                             @RequestParam(value = "CallSid", required = false) String callSid,
-                                             @RequestParam(value = "StreamError", required = false) String streamError) {
-        if ("stream-stopped".equalsIgnoreCase(streamEvent) || "stream-error".equalsIgnoreCase(streamEvent)) {
-            calls.markStreamStopped(streamSid);
-        }
-        if ("stream-error".equalsIgnoreCase(streamEvent)) {
-            log.warn("Twilio Media Stream error call={} stream={} error={}", callSid, streamSid,
-                    streamError == null ? "unknown" : streamError);
-        } else {
-            log.info("Twilio Media Stream event call={} stream={} event={}", callSid, streamSid, streamEvent);
-        }
-        return ResponseEntity.noContent().build();
-    }
-
     @PostMapping(value = "/status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<Void> status(@RequestParam("CallSid") String callSid,
                                        @RequestParam("CallStatus") String callStatus,
