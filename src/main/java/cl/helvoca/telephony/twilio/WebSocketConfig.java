@@ -10,24 +10,17 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 public class WebSocketConfig implements WebSocketConfigurer {
     private final TwilioMediaStreamHandler handler;
     private final TwilioMediaStreamHandshakeInterceptor interceptor;
-    private final TwilioTrialMediaStreamHandshakeInterceptor trialInterceptor;
 
     public WebSocketConfig(TwilioMediaStreamHandler handler,
-                           TwilioMediaStreamHandshakeInterceptor interceptor,
-                           TwilioTrialMediaStreamHandshakeInterceptor trialInterceptor) {
+                           TwilioMediaStreamHandshakeInterceptor interceptor) {
         this.handler = handler;
         this.interceptor = interceptor;
-        this.trialInterceptor = trialInterceptor;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(handler, "/ws/twilio")
                 .addInterceptors(interceptor)
-                .setAllowedOriginPatterns("*");
-
-        registry.addHandler(handler, "/ws/twilio-trial")
-                .addInterceptors(trialInterceptor)
                 .setAllowedOriginPatterns("*");
     }
 }
