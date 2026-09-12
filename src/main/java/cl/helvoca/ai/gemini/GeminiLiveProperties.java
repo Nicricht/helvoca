@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.gemini.live")
 public class GeminiLiveProperties {
     private boolean enabled = false;
+    private boolean certificationSimulation = false;
     private String apiKey = "";
     private String model = "gemini-3.1-flash-live-preview";
     private String voice = "Kore";
@@ -14,6 +15,8 @@ public class GeminiLiveProperties {
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public boolean isCertificationSimulation() { return certificationSimulation; }
+    public void setCertificationSimulation(boolean certificationSimulation) { this.certificationSimulation = certificationSimulation; }
     public String getApiKey() { return apiKey; }
     public void setApiKey(String apiKey) { this.apiKey = apiKey; }
     public String getModel() { return model; }
