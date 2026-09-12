@@ -55,6 +55,19 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
     @Override
     public VoiceAiSession createSession(RealtimeCallContext context, VoiceTransportSession transport) {
         return new GeminiLiveVoiceSession(
-                context, transport, properties, tools, transcripts, summaries, lifecycle, health, http);
+                context, transport, sessionProperties(context), tools, transcripts, summaries, lifecycle, health, http);
+    }
+
+    GeminiLiveProperties sessionProperties(RealtimeCallContext context) {
+        GeminiLiveProperties session = new GeminiLiveProperties();
+        session.setEnabled(properties.isEnabled());
+        session.setApiKey(properties.getApiKey());
+        session.setModel(properties.getModel());
+        session.setVoice(properties.getVoice());
+        session.setWebsocketUrl(properties.getWebsocketUrl());
+        session.setCertificationCaller(properties.getCertificationCaller());
+        session.setCertificationSimulation(
+                properties.certificationSimulationAllowedFor(context == null ? null : context.callerNumber()));
+        return session;
     }
 }
