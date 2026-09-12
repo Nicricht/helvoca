@@ -31,6 +31,7 @@ public class OpenAiLiveSipService {
     private static final int MAX_DEDUP_IDS = 10_000;
     private static final int MAX_ACCEPT_ATTEMPTS = 2;
     private static final long ACCEPT_RETRY_DELAY_MS = 200L;
+    private static final long ACCEPT_RETRY_WINDOW_MS = 2_000L;
     private static final Pattern TWILIO_CALL_SID = Pattern.compile("^CA[0-9a-fA-F]{32}$");
 
     private final OpenAiRealtimeProperties openAi;
@@ -247,6 +248,7 @@ public class OpenAiLiveSipService {
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
         long acceptStartedNanos = System.nanoTime();
+        long retryDeadlineNanos = acceptStartedNanos + Duration.ofMillis(ACCEPT_RETRY_WINDOW_MS).toNanos();
 
         for (int attempt = 1; attempt <= MAX_ACCEPT_ATTEMPTS; attempt++) {
             long attemptStartedNanos = System.nanoTime();
@@ -267,12 +269,15 @@ public class OpenAiLiveSipService {
             boolean transientSessionLookup = response.statusCode() == 404
                     && "session_id_not_found".equals(errorCode);
             boolean decisionAlreadyMade = "decision_already_made".equals(errorCode);
+            long remainingNanos = retryDeadlineNanos - System.nanoTime();
+            long requiredRetryNanos = Duration.ofMillis(ACCEPT_RETRY_DELAY_MS).toNanos();
+            boolean retryWindowOpen = remainingNanos > requiredRetryNanos;
 
-            if (transientSessionLookup && attempt < MAX_ACCEPT_ATTEMPTS) {
+            if (transientSessionLookup && attempt < MAX_ACCEPT_ATTEMPTS && retryWindowOpen) {
                 log.warn(
-                        "OpenAI Live accept session lookup not ready; retrying session={} attempt={}/{} delay_ms={} attempt_ms={} elapsed_ms={} request_id={} processing_ms={}",
+                        "OpenAI Live accept session lookup not ready; retrying session={} attempt={}/{} delay_ms={} attempt_ms={} elapsed_ms={} remaining_window_ms={} request_id={} processing_ms={}",
                         sessionId, attempt, MAX_ACCEPT_ATTEMPTS, ACCEPT_RETRY_DELAY_MS,
-                        attemptMs, elapsedMs, requestId, processingMs);
+                        attemptMs, elapsedMs, Duration.ofNanos(remainingNanos).toMillis(), requestId, processingMs);
                 try {
                     Thread.sleep(ACCEPT_RETRY_DELAY_MS);
                 } catch (InterruptedException e) {
@@ -300,6 +305,7 @@ public class OpenAiLiveSipService {
                     + " attempt=" + attempt + "/" + MAX_ACCEPT_ATTEMPTS
                     + " attempt_ms=" + attemptMs
                     + " elapsed_ms=" + elapsedMs
+                    + " retry_window_open=" + retryWindowOpen
                     + " session=" + sessionId
                     + " body=" + truncate(response.body()));
         }
