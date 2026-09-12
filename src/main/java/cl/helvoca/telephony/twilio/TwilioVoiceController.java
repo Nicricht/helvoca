@@ -47,6 +47,23 @@ public class TwilioVoiceController {
     }
 
     /**
+     * Certification-only ingress for an outbound Twilio call that must exercise
+     * the same business/caller mapping as a genuine inbound customer call.
+     *
+     * Twilio still originates the physical call from the purchased business
+     * number to the Chilean tester, but this endpoint intentionally interprets
+     * From as the business number and To as the caller number. The normal
+     * /voice endpoint remains the production ingress for real inbound calls.
+     */
+    @PostMapping(value = "/inbound-certification", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+            produces = MediaType.APPLICATION_XML_VALUE)
+    public ResponseEntity<String> inboundCertification(@RequestParam("CallSid") String callSid,
+                                                       @RequestParam("From") String from,
+                                                       @RequestParam("To") String to) {
+        return route(from, to, callSid, "inbound-certification");
+    }
+
+    /**
      * Temporary compatibility ingress for stale Twilio console configuration.
      * It routes into the exact same multi-provider voice edge and never restores
      * the old Trial/Polly/TTS flow.
