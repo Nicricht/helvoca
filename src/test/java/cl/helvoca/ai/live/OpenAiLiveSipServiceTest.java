@@ -32,7 +32,7 @@ class OpenAiLiveSipServiceTest {
         String twiml = service.twiml("+14355652512", "+56911111111");
 
         assertTrue(service.isReady());
-        assertTrue(twiml.contains("sip:proj_test123@sip.api.openai.com;transport=tls"));
+        assertTrue(twiml.contains("sip:proj_test123@sip.api.openai.com;secure=true"));
         assertTrue(twiml.contains("x-recepvoz-business=%2B14355652512"));
         assertTrue(twiml.contains("x-recepvoz-caller=%2B56911111111"));
         assertTrue(twiml.contains("&amp;x-recepvoz-route="));
