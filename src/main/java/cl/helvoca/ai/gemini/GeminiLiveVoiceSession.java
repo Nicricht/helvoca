@@ -59,6 +59,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean finalized = new AtomicBoolean(false);
     private final AtomicInteger pendingMessages = new AtomicInteger(0);
+    private final AtomicInteger certificationStep = new AtomicInteger(0);
     private final GeminiWebSocketJsonFrames inboundFrames = new GeminiWebSocketJsonFrames();
     private final StringBuilder userTranscript = new StringBuilder();
     private final StringBuilder assistantTranscript = new StringBuilder();
@@ -211,16 +212,12 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         health.success(GeminiLiveVoiceProvider.ID);
 
         // Technical turn used only to trigger the receptionist's opening turn.
-        send(new JSONObject().put("clientContent", new JSONObject()
-                .put("turns", new JSONArray().put(new JSONObject()
-                        .put("role", "user")
-                        .put("parts", new JSONArray().put(new JSONObject()
-                                .put("text", "[RECEPVOZ_CALL_CONNECTED]")))))
-                .put("turnComplete", true)));
+        sendClientText("[RECEPVOZ_CALL_CONNECTED]");
 
         String frame;
         while ((frame = pendingAudio.poll()) != null) sendAudio(frame);
-        log.info("Gemini Live setup complete call={}", context.callId());
+        log.info("Gemini Live setup complete call={} certification_simulation={}",
+                context.callId(), properties.isCertificationSimulation());
     }
 
     private void handleServerContent(JSONObject content) {
@@ -248,7 +245,43 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             }
         }
 
-        if (content.optBoolean("turnComplete", false)) flushTranscripts();
+        if (content.optBoolean("turnComplete", false)) {
+            flushTranscripts();
+            advanceCertificationSimulation();
+        }
+    }
+
+    private void advanceCertificationSimulation() {
+        if (!properties.isCertificationSimulation() || closed.get()) return;
+        int step = certificationStep.getAndIncrement();
+        String phone = context.callerPhone() == null || context.callerPhone().isBlank()
+                ? "el teléfono de esta llamada"
+                : context.callerPhone();
+        String text = switch (step) {
+            case 0 -> "Hola. Quiero hacer una reserva para mañana a las 19:00 para dos personas, "
+                    + "a nombre de Nicolás Vega y con el teléfono " + phone + ". "
+                    + "Si ese horario no está disponible, busca el horario disponible más cercano de mañana y reserva ese. "
+                    + "Confirma únicamente después de que la herramienta haya devuelto éxito.";
+            case 1 -> "Si la reserva anterior se creó correctamente, dime brevemente sus datos y luego cancélala "
+                    + "para dejar la base de datos como estaba. Si no se creó, explica brevemente el motivo sin inventar nada.";
+            case 2 -> "Gracias. Confirma brevemente el estado final y despídete. No hagas ninguna otra acción.";
+            default -> null;
+        };
+        if (text == null) {
+            log.info("RECEPVOZ_CERTIFICATION_SCENARIO COMPLETE call={}", context.callId());
+            return;
+        }
+        transcripts.append(context.callId(), "USER", "[SIMULATED_CERTIFICATION] " + text);
+        log.info("RECEPVOZ_CERTIFICATION_SCENARIO step={} call={}", step + 1, context.callId());
+        sendClientText(text);
+    }
+
+    private void sendClientText(String text) {
+        send(new JSONObject().put("clientContent", new JSONObject()
+                .put("turns", new JSONArray().put(new JSONObject()
+                        .put("role", "user")
+                        .put("parts", new JSONArray().put(new JSONObject().put("text", text)))))
+                .put("turnComplete", true)));
     }
 
     private void handleToolCall(JSONObject toolCall) {
