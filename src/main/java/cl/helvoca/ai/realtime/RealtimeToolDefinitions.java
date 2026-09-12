@@ -69,8 +69,11 @@ public final class RealtimeToolDefinitions {
     }
 
     private static JSONObject object() {
+        // Keep the shared tool contract inside the JSON Schema subset accepted by
+        // Gemini Live FunctionDeclaration. The backend still validates tenant,
+        // identifiers and business rules, so provider-side additionalProperties
+        // is not a security boundary.
         return new JSONObject().put("type", "object")
-                .put("additionalProperties", false)
                 .put("properties", new JSONObject());
     }
 
