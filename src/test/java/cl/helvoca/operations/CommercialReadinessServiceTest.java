@@ -1,5 +1,6 @@
 package cl.helvoca.operations;
 
+import cl.helvoca.ai.live.OpenAiLiveProperties;
 import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
@@ -33,14 +34,15 @@ class CommercialReadinessServiceTest {
         CommercialReadinessService.Readiness result = f.service.readiness();
 
         assertTrue(result.ready());
-        assertEquals(7, result.requiredPassed());
-        assertEquals(7, result.requiredTotal());
+        assertEquals(6, result.requiredPassed());
+        assertEquals(6, result.requiredTotal());
         assertTrue(result.capabilities().get("VOICE_ASSISTANT"));
         assertTrue(result.capabilities().get("INFORMATION"));
         assertTrue(result.capabilities().get("GENERIC_REQUESTS"));
         assertTrue(result.capabilities().get("BOOKINGS"));
         assertTrue(result.capabilities().get("HUMAN_TRANSFER"));
         assertTrue(result.warnings().isEmpty());
+        assertTrue(result.checks().stream().anyMatch(c -> c.code().equals("OPENAI_GPT_LIVE_SIP") && c.ready()));
     }
 
     @Test
@@ -61,17 +63,19 @@ class CommercialReadinessServiceTest {
     }
 
     @Test
-    void invalidRealtimeTransportBlocksCommercialReadiness() {
+    void invalidLiveConfigurationBlocksCommercialReadiness() {
         Fixture f = fixture();
-        when(f.twilio.getMediaStreamUrl()).thenReturn("https://example.com/ws/twilio");
+        when(f.live.isEnabled()).thenReturn(false);
         when(f.openAi.hasApiKey()).thenReturn(false);
 
         CommercialReadinessService.Readiness result = f.service.readiness();
 
         assertFalse(result.ready());
         assertFalse(result.capabilities().get("VOICE_ASSISTANT"));
-        assertTrue(result.checks().stream().anyMatch(c -> c.code().equals("TWILIO_MEDIA_STREAM") && !c.ready()));
+        assertTrue(result.checks().stream().anyMatch(c -> c.code().equals("OPENAI_GPT_LIVE_SIP") && !c.ready()));
         assertTrue(result.checks().stream().anyMatch(c -> c.code().equals("OPENAI_API") && !c.ready()));
+        assertTrue(result.checks().stream().noneMatch(c -> c.code().equals("TWILIO_MEDIA_STREAM")));
+        assertTrue(result.checks().stream().noneMatch(c -> c.code().equals("OPENAI_REALTIME")));
     }
 
     private static Fixture fixture() {
@@ -83,6 +87,7 @@ class CommercialReadinessServiceTest {
         TenantProvider tenant = mock(TenantProvider.class);
         TwilioProperties twilio = mock(TwilioProperties.class);
         OpenAiRealtimeProperties openAi = mock(OpenAiRealtimeProperties.class);
+        OpenAiLiveProperties live = mock(OpenAiLiveProperties.class);
 
         Business business = new Business();
         business.setName("Negocio horizontal");
@@ -100,14 +105,19 @@ class CommercialReadinessServiceTest {
         when(hours.countByBusinessId(businessId)).thenReturn(0L);
         when(twilio.hasAuthToken()).thenReturn(true);
         when(twilio.getPublicBaseUrl()).thenReturn("https://helvoca.example.com");
-        when(twilio.getMediaStreamUrl()).thenReturn("wss://helvoca.example.com/ws/twilio");
         when(openAi.hasApiKey()).thenReturn(true);
-        when(openAi.getRealtimeUrl()).thenReturn("wss://api.openai.com/v1/realtime");
-        when(openAi.getRealtimeModel()).thenReturn("gpt-realtime-2.1");
+        when(live.isEnabled()).thenReturn(true);
+        when(live.hasProjectId()).thenReturn(true);
+        when(live.hasWebhookSecret()).thenReturn(true);
+        when(live.getModel()).thenReturn("gpt-live-1");
+        when(live.getBackendModel()).thenReturn("gpt-5.6-luna");
+        when(live.getVoice()).thenReturn("marin");
+        when(live.getApiBaseUrl()).thenReturn("https://api.openai.com/v1");
+        when(live.getSidebandBaseUrl()).thenReturn("wss://api.openai.com/v1");
 
         CommercialReadinessService service = new CommercialReadinessService(
-                businesses, phones, services, hours, tenant, twilio, openAi);
-        return new Fixture(businessId, business, services, hours, twilio, openAi, service);
+                businesses, phones, services, hours, tenant, twilio, openAi, live);
+        return new Fixture(businessId, business, services, hours, twilio, openAi, live, service);
     }
 
     private record Fixture(
@@ -117,6 +127,7 @@ class CommercialReadinessServiceTest {
             BusinessHourRepository hours,
             TwilioProperties twilio,
             OpenAiRealtimeProperties openAi,
+            OpenAiLiveProperties live,
             CommercialReadinessService service
     ) {}
 }
