@@ -39,9 +39,18 @@ app:
   voice:
     telephony-provider: ${HELVOCA_TELEPHONY_PROVIDER:twilio}
     ai-provider: ${HELVOCA_VOICE_AI_PROVIDER:openai}
+    provider-order: ${HELVOCA_VOICE_PROVIDER_ORDER:gemini,openai-live}
   twilio:
     auth-token: ${TWILIO_AUTH_TOKEN:}
     public-base-url: ${TWILIO_PUBLIC_BASE_URL:}
+    media-stream-path: ${TWILIO_MEDIA_STREAM_PATH:/ws/v1/twilio/media}
+  gemini:
+    live:
+      enabled: ${GEMINI_LIVE_ENABLED:false}
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_LIVE_MODEL:gemini-3.1-flash-live-preview}
+      voice: ${GEMINI_LIVE_VOICE:Kore}
+      websocket-url: ${GEMINI_LIVE_WEBSOCKET_URL:wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent}
   openai:
     api-key: ${OPENAI_API_KEY:}
     realtime-model: ${OPENAI_REALTIME_MODEL:gpt-realtime-2.1}
