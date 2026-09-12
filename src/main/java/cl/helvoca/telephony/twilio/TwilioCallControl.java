@@ -16,9 +16,8 @@ import java.util.Base64;
 import java.util.regex.Pattern;
 
 /**
- * Small carrier-control adapter for operations that cannot be expressed over a
- * bidirectional Media Stream itself, such as redirecting an in-progress call
- * from the AI stream to a human destination.
+ * Carrier-control adapter for operations that require updating an in-progress
+ * Twilio call. It deliberately contains no Twilio TTS/Gather fallback.
  */
 @Component
 public class TwilioCallControl {
@@ -52,12 +51,10 @@ public class TwilioCallControl {
         }
 
         String target = targetPhone.trim();
-        String twiml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
-                "<Response>" +
-                "<Say>Claro, te comunico con una persona del negocio.</Say>" +
-                "<Dial timeout=\"20\" answerOnBridge=\"true\"><Number>" + escapeXml(target) + "</Number></Dial>" +
-                "<Say>No pude comunicarte con una persona en este momento.</Say><Hangup/>" +
-                "</Response>";
+        String twiml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                + "<Response><Dial timeout=\"20\" answerOnBridge=\"true\"><Number>"
+                + escapeXml(target)
+                + "</Number></Dial><Hangup/></Response>";
         boolean accepted = updateCallTwiml(accountSid, callSid, twiml);
         if (accepted) log.info("Twilio accepted human transfer for call {}", callSid);
         return accepted;
@@ -65,9 +62,8 @@ public class TwilioCallControl {
 
     public boolean failGracefully(String accountSid, String callSid) {
         if (!validCall(accountSid, callSid)) return false;
-        String twiml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
-                "<Response><Say>Lo siento, el asistente de voz no está disponible en este momento.</Say><Hangup/></Response>";
-        return updateCallTwiml(accountSid, callSid, twiml);
+        return updateCallTwiml(accountSid, callSid,
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>");
     }
 
     private boolean updateCallTwiml(String accountSid, String callSid, String twiml) {
