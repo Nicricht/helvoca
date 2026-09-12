@@ -1,7 +1,5 @@
 package cl.helvoca.operations;
 
-import cl.helvoca.ai.live.OpenAiLiveProperties;
-import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.phone.PhoneNumberRepository;
@@ -10,6 +8,7 @@ import cl.helvoca.security.TenantProvider;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import cl.helvoca.telephony.twilio.TwilioProperties;
+import cl.helvoca.voice.VoiceCallRouter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,8 +27,7 @@ public class CommercialReadinessService {
     private final BusinessHourRepository hours;
     private final TenantProvider tenantProvider;
     private final TwilioProperties twilio;
-    private final OpenAiRealtimeProperties openAi;
-    private final OpenAiLiveProperties live;
+    private final VoiceCallRouter voiceRouter;
 
     public CommercialReadinessService(BusinessRepository businesses,
                                       PhoneNumberRepository phones,
@@ -37,16 +35,14 @@ public class CommercialReadinessService {
                                       BusinessHourRepository hours,
                                       TenantProvider tenantProvider,
                                       TwilioProperties twilio,
-                                      OpenAiRealtimeProperties openAi,
-                                      OpenAiLiveProperties live) {
+                                      VoiceCallRouter voiceRouter) {
         this.businesses = businesses;
         this.phones = phones;
         this.services = services;
         this.hours = hours;
         this.tenantProvider = tenantProvider;
         this.twilio = twilio;
-        this.openAi = openAi;
-        this.live = live;
+        this.voiceRouter = voiceRouter;
     }
 
     @Transactional(readOnly = true)
@@ -60,36 +56,35 @@ public class CommercialReadinessService {
         boolean activePhone = phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId).stream()
                 .anyMatch(phone -> phone.isActive() && notBlank(phone.getPhoneNumber()));
         boolean twilioAuth = twilio.hasAuthToken();
-        boolean publicWebhook = validHttps(twilio.getPublicBaseUrl());
-        boolean openAiKey = openAi.hasApiKey();
-        boolean gptLive = live.isEnabled()
-                && live.hasProjectId()
-                && live.hasWebhookSecret()
-                && notBlank(live.getModel())
-                && notBlank(live.getBackendModel())
-                && notBlank(live.getVoice())
-                && validHttps(live.getApiBaseUrl())
-                && validWss(live.getSidebandBaseUrl());
+        boolean publicWebhook = twilio.hasSecurePublicBaseUrl();
+        VoiceCallRouter.VoiceReadiness voice = voiceRouter.readiness();
 
-        List<Check> core = List.of(
-                new Check("BUSINESS_PROFILE", "Perfil del negocio", profileReady, true,
-                        profileReady ? "Nombre, idioma y zona horaria válidos." : "Completa nombre, idioma y zona horaria."),
-                new Check("ACTIVE_PHONE", "Número activo", activePhone, true,
-                        activePhone ? "Hay al menos un número activo asociado al tenant." : "Conecta o activa un número telefónico."),
-                new Check("TWILIO_AUTH", "Autenticación Twilio", twilioAuth, true,
-                        twilioAuth ? "Credencial de firma/webhook disponible." : "Falta TWILIO_AUTH_TOKEN."),
-                new Check("TWILIO_PUBLIC_WEBHOOK", "Webhook público Twilio", publicWebhook, true,
-                        publicWebhook ? "URL pública HTTPS configurada." : "TWILIO_PUBLIC_BASE_URL debe ser HTTPS público."),
-                new Check("OPENAI_API", "OpenAI API", openAiKey, true,
-                        openAiKey ? "API key disponible." : "Falta OPENAI_API_KEY."),
-                new Check("OPENAI_GPT_LIVE_SIP", "GPT-Live SIP", gptLive, true,
-                        gptLive
-                                ? "GPT-Live, proyecto, webhook firmado, modelo, voz y sideband están configurados."
-                                : "Configura OPENAI_LIVE_ENABLED, proyecto, webhook secret, modelos, voz y endpoints Live seguros.")
-        );
+        List<Check> checks = new ArrayList<>();
+        checks.add(new Check("BUSINESS_PROFILE", "Perfil del negocio", profileReady, true,
+                profileReady ? "Nombre, idioma y zona horaria válidos." : "Completa nombre, idioma y zona horaria."));
+        checks.add(new Check("ACTIVE_PHONE", "Número activo", activePhone, true,
+                activePhone ? "Hay al menos un número activo asociado al tenant." : "Conecta o activa un número telefónico."));
+        checks.add(new Check("TWILIO_AUTH", "Autenticación Twilio", twilioAuth, true,
+                twilioAuth ? "Credencial de firma/webhook disponible." : "Falta TWILIO_AUTH_TOKEN."));
+        checks.add(new Check("TWILIO_PUBLIC_WEBHOOK", "Webhook público Twilio", publicWebhook, true,
+                publicWebhook ? "URL pública HTTPS configurada para webhooks y Media Streams." : "TWILIO_PUBLIC_BASE_URL debe ser HTTPS público."));
+        checks.add(new Check("VOICE_PROVIDER", "Proveedor de voz en tiempo real", voice.ready(), true,
+                voice.ready()
+                        ? "Proveedor seleccionado: " + voice.selectedProvider() + "."
+                        : "No hay ningún proveedor de voz configurado y saludable."));
 
-        boolean coreReady = core.stream().allMatch(Check::ready);
-        boolean bookingCapability = services.findAllByBusinessIdOrderByNameAsc(businessId).stream().anyMatch(ServiceItem::isActive)
+        for (VoiceCallRouter.ProviderStatus provider : voice.providers()) {
+            checks.add(new Check(
+                    "VOICE_PROVIDER_" + provider.providerId().toUpperCase().replace('-', '_'),
+                    "Proveedor " + provider.providerId(),
+                    provider.available(),
+                    false,
+                    provider.mode() + " / " + provider.state() + " / " + provider.detail()));
+        }
+
+        boolean coreReady = checks.stream().filter(Check::required).allMatch(Check::ready);
+        boolean bookingCapability = services.findAllByBusinessIdOrderByNameAsc(businessId).stream()
+                .anyMatch(ServiceItem::isActive)
                 && hours.countByBusinessId(businessId) > 0;
         boolean humanTransferCapability = notBlank(business.getHumanTransferPhone());
 
@@ -101,6 +96,10 @@ public class CommercialReadinessService {
         capabilities.put("HUMAN_TRANSFER", coreReady && humanTransferCapability);
 
         List<String> warnings = new ArrayList<>();
+        voice.providers().stream()
+                .filter(provider -> !provider.available())
+                .forEach(provider -> warnings.add(
+                        "Proveedor " + provider.providerId() + " no disponible: " + provider.detail()));
         if (!bookingCapability) {
             warnings.add("Reservas deshabilitadas: configura al menos un servicio activo y horarios de atención.");
         }
@@ -108,11 +107,13 @@ public class CommercialReadinessService {
             warnings.add("Transferencia humana deshabilitada: configura un teléfono de transferencia.");
         }
 
+        long requiredTotal = checks.stream().filter(Check::required).count();
+        long requiredPassed = checks.stream().filter(Check::required).filter(Check::ready).count();
         return new Readiness(
                 coreReady,
-                core.stream().filter(Check::ready).count(),
-                core.size(),
-                core,
+                requiredPassed,
+                requiredTotal,
+                List.copyOf(checks),
                 capabilities,
                 warnings);
     }
@@ -129,14 +130,6 @@ public class CommercialReadinessService {
         } catch (Exception ignored) {
             return false;
         }
-    }
-
-    private static boolean validHttps(String value) {
-        return notBlank(value) && value.trim().startsWith("https://");
-    }
-
-    private static boolean validWss(String value) {
-        return notBlank(value) && value.trim().startsWith("wss://");
     }
 
     public record Check(String code, String label, boolean ready, boolean required, String detail) {}
