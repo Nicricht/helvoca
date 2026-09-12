@@ -21,13 +21,18 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Optional one-shot production diagnostic for Gemini Live. It validates the
- * real API key, WebSocket endpoint, model and voice without involving Twilio.
- * Enable only for a deliberate probe deployment with
+ * real API key, WebSocket endpoint and model without involving Twilio.
+ *
+ * The probe deliberately uses the smallest setup payload from Google's current
+ * WebSocket getting-started example. This keeps voice config, tools,
+ * transcription and other product features out of the authentication/model
+ * availability check. Enable only for a deliberate probe deployment with
  * GEMINI_LIVE_PROBE_ON_STARTUP=true, then disable it again.
  */
 @Component
 public class GeminiLiveStartupProbe implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(GeminiLiveStartupProbe.class);
+    private static final int RESULT_TIMEOUT_SECONDS = 20;
 
     private final GeminiLiveProperties properties;
     private final boolean enabled;
@@ -49,7 +54,7 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
         }
 
         long started = System.nanoTime();
-        ProbeListener listener = new ProbeListener(properties.getModel(), properties.getVoice());
+        ProbeListener listener = new ProbeListener(properties.getModel());
         String separator = properties.getWebsocketUrl().contains("?") ? "&" : "?";
         String url = properties.getWebsocketUrl().trim()
                 + separator + "key="
@@ -61,31 +66,29 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
                     .buildAsync(URI.create(url), listener)
                     .get(10, TimeUnit.SECONDS);
 
-            ProbeResult result = listener.result().get(12, TimeUnit.SECONDS);
+            ProbeResult result = listener.result().get(RESULT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             long elapsedMs = Duration.ofNanos(System.nanoTime() - started).toMillis();
             if (!result.success()) {
                 throw new IllegalStateException("Gemini Live startup probe failed: " + result.detail());
             }
-            log.info("GEMINI_LIVE_PROBE SUCCESS model={} voice={} elapsed_ms={}",
-                    properties.getModel(), properties.getVoice(), elapsedMs);
+            log.info("GEMINI_LIVE_PROBE SUCCESS model={} elapsed_ms={} result={}",
+                    properties.getModel(), elapsedMs, result.detail());
         } catch (Exception e) {
             long elapsedMs = Duration.ofNanos(System.nanoTime() - started).toMillis();
-            log.error("GEMINI_LIVE_PROBE FAILED model={} voice={} elapsed_ms={} reason={}",
-                    properties.getModel(), properties.getVoice(), elapsedMs, rootMessage(e));
+            log.error("GEMINI_LIVE_PROBE FAILED model={} elapsed_ms={} reason={}",
+                    properties.getModel(), elapsedMs, rootMessage(e));
             throw e;
         }
     }
 
     private static final class ProbeListener implements WebSocket.Listener {
         private final String model;
-        private final String voice;
         private final CompletableFuture<ProbeResult> result = new CompletableFuture<>();
         private final StringBuilder frameBuffer = new StringBuilder();
         private volatile WebSocket socket;
 
-        private ProbeListener(String model, String voice) {
+        private ProbeListener(String model) {
             this.model = model;
-            this.voice = voice;
         }
 
         CompletableFuture<ProbeResult> result() {
@@ -96,7 +99,9 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
         public void onOpen(WebSocket webSocket) {
             this.socket = webSocket;
             webSocket.request(1);
-            webSocket.sendText(setup().toString(), true)
+            JSONObject setup = setup();
+            log.info("GEMINI_LIVE_PROBE socket connected; sending minimal setup model={}", model);
+            webSocket.sendText(setup.toString(), true)
                     .whenComplete((ignored, error) -> {
                         if (error != null) {
                             result.complete(new ProbeResult(false,
@@ -112,6 +117,7 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
                 if (last) {
                     String payload = frameBuffer.toString();
                     frameBuffer.setLength(0);
+                    log.info("GEMINI_LIVE_PROBE frame={}", truncate(payload));
                     handle(payload);
                 }
             }
@@ -121,6 +127,7 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
 
         @Override
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+            log.warn("GEMINI_LIVE_PROBE socket closed status={} reason={}", statusCode, reason);
             result.complete(new ProbeResult(false,
                     "socket closed before setupComplete status=" + statusCode + " reason=" + reason));
             return null;
@@ -128,6 +135,7 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
 
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
+            log.warn("GEMINI_LIVE_PROBE websocket error={}", rootMessage(error));
             result.complete(new ProbeResult(false, "websocket error: " + rootMessage(error)));
         }
 
@@ -154,19 +162,23 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
         }
 
         private JSONObject setup() {
-            JSONObject generation = new JSONObject()
-                    .put("responseModalities", new JSONArray().put("AUDIO"))
-                    .put("speechConfig", new JSONObject()
-                            .put("voiceConfig", new JSONObject()
-                                    .put("prebuiltVoiceConfig", new JSONObject()
-                                            .put("voiceName", voice))));
+            // Mirrors Google's current WebSocket getting-started example as
+            // closely as possible: model + responseModalities + systemInstruction.
             return new JSONObject().put("setup", new JSONObject()
                     .put("model", "models/" + model.trim())
-                    .put("generationConfig", generation));
+                    .put("responseModalities", new JSONArray().put("AUDIO"))
+                    .put("systemInstruction", new JSONObject()
+                            .put("parts", new JSONArray().put(new JSONObject()
+                                    .put("text", "You are a helpful assistant.")))));
         }
     }
 
     private record ProbeResult(boolean success, String detail) {
+    }
+
+    private static String truncate(String text) {
+        if (text == null) return "";
+        return text.length() <= 1000 ? text : text.substring(0, 1000);
     }
 
     private static String rootMessage(Throwable error) {
