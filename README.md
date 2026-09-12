@@ -36,25 +36,24 @@ El core ya no debe depender de un proveedor específico. Twilio y OpenAI son los
 
 ### Voz
 
-- Twilio Voice + Media Streams como primer adaptador de telefonía
-- OpenAI Realtime como primer adaptador de IA de voz
-- Server VAD
-- interrupciones / barge-in
-- audio PCMU bidireccional
-- modo Twilio Trial mediante `<Gather input="speech">` + `<Say>`
+- Twilio Voice con SIP seguro/SRTP
+- OpenAI GPT-Live como ruta telefónica activa
+- conversación full-duplex con interrupciones
+- herramientas del backend mediante sideband/delegación
+- sin fallback a Twilio `<Gather>`, `<Say>` ni voces Polly
 
 ## Arquitectura independiente de proveedores
 
-RecepVoz define puertos propios para voz:
+RecepVoz define puertos propios para voz y mantiene los contratos de negocio separados de los proveedores. El flujo telefónico activo es:
 
 ```text
 Caller
   ↓
-Telephony adapter
+Twilio
   ↓
-CallLifecycleService
+SIP seguro / SRTP
   ↓
-VoiceAiProvider
+OpenAI GPT-Live
   ↓
 RecepVoz tools / business rules
   ↓
@@ -69,8 +68,6 @@ Contratos principales:
 - `VoiceAiProviderRegistry`
 - `CallLifecycleService`
 
-`OpenAiRealtimeBridgeFactory` implementa `VoiceAiProvider` y `TwilioVoiceTransportSession` adapta el WebSocket de Twilio a `VoiceTransportSession`. El AI provider ya no necesita conocer el protocolo de Twilio.
-
 Selección actual:
 
 ```text
@@ -78,13 +75,11 @@ HELVOCA_TELEPHONY_PROVIDER=twilio
 HELVOCA_VOICE_AI_PROVIDER=openai
 ```
 
-La base queda preparada para añadir adapters Telnyx, SIP u otros motores de IA sin reescribir reservas, clientes, conocimiento ni reglas multi-tenant.
-
 ## Regla crítica multi-tenant
 
 Las APIs administrativas no confían en un `businessId` enviado por el frontend. El backend obtiene `business_id` desde el JWT mediante `TenantProvider` y filtra las consultas por tenant.
 
-Los webhooks de producción de Twilio se autentican mediante `X-Twilio-Signature`. Las tools de voz tampoco aceptan un tenant elegido por el modelo: utilizan un `RealtimeCallContext` construido desde una llamada previamente resuelta por RecepVoz.
+Los webhooks de Twilio se autentican mediante `X-Twilio-Signature`. Las tools de voz tampoco aceptan un tenant elegido por el modelo: utilizan un `RealtimeCallContext` construido desde una llamada previamente resuelta por RecepVoz.
 
 ## Regla crítica de IA
 
@@ -96,29 +91,9 @@ IA → function call → RecepVoz → PostgreSQL → tool result → IA
 
 Una reserva solo puede ser anunciada como confirmada si RecepVoz devuelve éxito. Un error como `BOOKING_SLOT_UNAVAILABLE` debe comunicarse como error, nunca como una confirmación inventada.
 
-## Trazabilidad de proveedores
-
-Cada `call_session` registra:
-
-```text
-telephony_provider
-ai_provider
-```
-
-Eso permite construir después costos por llamada, comparación de proveedores, fallback y margen por negocio sin adivinar qué infraestructura atendió cada conversación.
-
 ## Base de datos
 
-Flyway aplica:
-
-- `V1__foundation.sql`
-- `V2__seed_roles.sql`
-- `V3__sprint2_core.sql`
-- `V4__sprint3_telephony.sql`
-- `V5__sprint4_ai_voice.sql`
-- `V6__provider_independent_voice.sql`
-
-V5 incorpora `call_summary`. V6 incorpora trazabilidad de proveedor telefónico y proveedor de IA en `call_session`.
+Flyway administra el esquema y PostgreSQL sigue siendo la fuente de verdad del negocio.
 
 ## Ejecutar con Docker
 
@@ -148,8 +123,12 @@ HELVOCA_TELEPHONY_PROVIDER=twilio
 HELVOCA_VOICE_AI_PROVIDER=openai
 TWILIO_AUTH_TOKEN=tu_token
 TWILIO_PUBLIC_BASE_URL=https://tu-dominio-publico
-TWILIO_MEDIA_STREAM_URL=wss://tu-dominio-publico/ws/twilio
 OPENAI_API_KEY=tu_api_key
+OPENAI_LIVE_ENABLED=true
+OPENAI_PROJECT_ID=tu_project_id
+OPENAI_WEBHOOK_SECRET=tu_webhook_secret
+OPENAI_LIVE_MODEL=gpt-live-1
+OPENAI_LIVE_VOICE=marin
 ```
 
 Configura el número Twilio para llamar por POST a:
@@ -164,7 +143,11 @@ Callback de estados:
 https://tu-dominio-publico/webhooks/v1/twilio/status
 ```
 
-Después registra ese número en RecepVoz mediante `POST /api/v1/phone-numbers`.
+Para una prueba outbound, la única ruta válida es:
+
+```text
+https://tu-dominio-publico/webhooks/v1/twilio/outbound-test
+```
 
 ## Documentación
 
@@ -173,16 +156,13 @@ Después registra ese número en RecepVoz mediante `POST /api/v1/phone-numbers`.
 - `docs/SPRINT2.md`
 - `docs/SPRINT3.md`
 - `docs/SPRINT4.md`
-- `docs/TRIAL_VOICE.md`
 - `docs/API.md`
 - `docs/design/`
 
 ## Próximos hitos comerciales
 
-El orden recomendado desde aquí es:
-
 1. llamada telefónica real estable
-2. conversación Realtime estable
+2. conversación GPT-Live estable
 3. configuración del agente por tenant
 4. horarios y excepciones
 5. transferencia humana
@@ -191,5 +171,3 @@ El orden recomendado desde aquí es:
 8. medición de uso y costo por llamada
 9. planes, límites y billing
 10. primer cliente pagado
-
-Redis, Telnyx, SIP y proveedores adicionales se incorporan cuando resuelvan una necesidad medida de escala, costo, disponibilidad o geografía. RecepVoz se mantiene como monolito modular mientras esa sea la opción más simple y confiable.

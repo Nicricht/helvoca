@@ -1,6 +1,5 @@
 package cl.helvoca.telephony.twilio;
 
-import cl.helvoca.telephony.twilio.trial.TrialVoiceProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,30 +12,14 @@ import java.io.IOException;
 @Component
 public class TwilioSignatureValidationFilter extends OncePerRequestFilter {
     private final TwilioSignatureValidator validator;
-    private final TrialVoiceProperties trial;
 
-    public TwilioSignatureValidationFilter(TwilioSignatureValidator validator,
-                                           TrialVoiceProperties trial) {
+    public TwilioSignatureValidationFilter(TwilioSignatureValidator validator) {
         this.validator = validator;
-        this.trial = trial;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-
-        // Twilio's Try out Voice flow can invoke Custom webhooks without the same
-        // production signature semantics. Trial mode is an explicitly enabled demo
-        // path, so bypass signature validation only for demo endpoints while enabled.
-        // This exception is intentionally limited to the outbound test path and trial demo paths.
-        // Production inbound/status/stream webhooks remain protected by X-Twilio-Signature.
-        if (trial.isEnabled()
-                && (path.startsWith("/webhooks/v1/twilio/trial/")
-                || path.equals("/webhooks/v1/twilio/outbound-test"))) {
-            return true;
-        }
-
-        return !path.startsWith("/webhooks/v1/twilio/");
+        return !request.getRequestURI().startsWith("/webhooks/v1/twilio/");
     }
 
     @Override

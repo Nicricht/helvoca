@@ -18,12 +18,6 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * Provider-neutral lifecycle for calls persisted by Helvoca.
- *
- * <p>Carrier adapters translate their own webhooks/protocols and delegate the
- * durable business state to this service.</p>
- */
 @Service
 public class CallLifecycleService {
     private final PhoneNumberRepository phoneNumbers;
@@ -62,73 +56,6 @@ public class CallLifecycleService {
         customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), from)
                 .ifPresent(customer -> call.setCustomerId(customer.getId()));
         return calls.saveAndFlush(call).getId();
-    }
-
-    @Transactional
-    public RealtimeCallContext startTrialCall(String telephonyProvider,
-                                              String providerCallId,
-                                              String from,
-                                              String to) {
-        CallSession existing = calls.findByProviderCallId(providerCallId).orElse(null);
-        if (existing != null) {
-            if (existing.getStreamSid() == null || !existing.getStreamSid().startsWith("trial:")) {
-                throw new IllegalArgumentException("The call already belongs to a non-trial media session");
-            }
-            return trialContext(existing);
-        }
-
-        PhoneNumber destinationPhone = phoneNumbers.findByPhoneNumberAndActiveTrue(to).orElse(null);
-        PhoneNumber sourcePhone = destinationPhone == null
-                ? phoneNumbers.findByPhoneNumberAndActiveTrue(from).orElse(null)
-                : null;
-        PhoneNumber phone = destinationPhone != null ? destinationPhone : sourcePhone;
-        if (phone == null) {
-            throw new NotFoundException("Trial phone number is not registered as source or destination");
-        }
-
-        boolean outbound = destinationPhone == null;
-        String customerNumber = outbound ? to : from;
-        Instant now = Instant.now();
-
-        CallSession call = new CallSession();
-        call.setBusinessId(phone.getBusinessId());
-        call.setPhoneNumberId(phone.getId());
-        call.setTelephonyProvider(normalizeProvider(telephonyProvider));
-        call.setProviderCallId(providerCallId);
-        call.setCallerNumber(customerNumber);
-        call.setDestinationNumber(to);
-        call.setDirection(outbound ? CallDirection.OUTBOUND : CallDirection.INBOUND);
-        call.setStatus(CallStatus.IN_PROGRESS);
-        call.setStartedAt(now);
-        call.setAnsweredAt(now);
-        call.setStreamSid(trialStreamId(providerCallId));
-        call.setStreamStartedAt(now);
-        customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), customerNumber)
-                .ifPresent(customer -> call.setCustomerId(customer.getId()));
-        return trialContext(calls.saveAndFlush(call));
-    }
-
-    @Transactional(readOnly = true)
-    public RealtimeCallContext getTrialContext(String providerCallId) {
-        CallSession call = calls.findByProviderCallId(providerCallId)
-                .orElseThrow(() -> new NotFoundException("Trial call not found"));
-        if (call.getStreamSid() == null || !call.getStreamSid().startsWith("trial:")) {
-            throw new IllegalArgumentException("Call is not a trial voice session");
-        }
-        return trialContext(call);
-    }
-
-    @Transactional
-    public void markTrialEnded(String providerCallId) {
-        CallSession call = calls.findByProviderCallId(providerCallId)
-                .orElseThrow(() -> new NotFoundException("Trial call not found"));
-        Instant now = Instant.now();
-        if (call.getStreamEndedAt() == null) call.setStreamEndedAt(now);
-        if (call.getEndedAt() == null) call.setEndedAt(now);
-        call.setStatus(CallStatus.COMPLETED);
-        if (call.getDurationSeconds() == null && call.getStartedAt() != null) {
-            call.setDurationSeconds((int) Math.max(0, Duration.between(call.getStartedAt(), now).toSeconds()));
-        }
     }
 
     @Transactional
@@ -194,10 +121,6 @@ public class CallLifecycleService {
         };
     }
 
-    private static RealtimeCallContext trialContext(CallSession call) {
-        return context(call);
-    }
-
     private static RealtimeCallContext context(CallSession call) {
         return new RealtimeCallContext(
                 call.getId(),
@@ -206,10 +129,6 @@ public class CallLifecycleService {
                 call.getCallerNumber(),
                 call.getDestinationNumber(),
                 call.getStreamSid());
-    }
-
-    private static String trialStreamId(String providerCallId) {
-        return "trial:" + providerCallId;
     }
 
     private static String normalizeProvider(String provider) {
