@@ -36,26 +36,6 @@ public class TwilioSignatureValidator {
         return false;
     }
 
-    public boolean validateWebSocket(String requestUri, String signature) {
-        if (!properties.hasAuthToken() || signature == null || signature.isBlank()) {
-            return false;
-        }
-
-        RequestValidator validator = new RequestValidator(properties.getAuthToken());
-        Set<String> candidates = new LinkedHashSet<>();
-        if (properties.hasMediaStreamUrl()) {
-            addWebSocketCandidates(candidates, properties.getMediaStreamUrl().trim());
-        }
-        addWebSocketCandidates(candidates, requestUri);
-
-        for (String url : candidates) {
-            if (validator.validate(url, Map.of(), signature)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private Set<String> httpCandidates(HttpServletRequest request) {
         Set<String> candidates = new LinkedHashSet<>();
         String query = request.getQueryString();
@@ -76,30 +56,6 @@ public class TwilioSignatureValidator {
         }
 
         return candidates;
-    }
-
-    private static void addWebSocketCandidates(Set<String> candidates, String url) {
-        if (url == null || url.isBlank()) return;
-        String value = url.trim();
-        addWithSlashVariant(candidates, value);
-
-        if (value.startsWith("wss://")) {
-            addWithSlashVariant(candidates, "https://" + value.substring("wss://".length()));
-        } else if (value.startsWith("ws://")) {
-            addWithSlashVariant(candidates, "http://" + value.substring("ws://".length()));
-        } else if (value.startsWith("https://")) {
-            addWithSlashVariant(candidates, "wss://" + value.substring("https://".length()));
-        } else if (value.startsWith("http://")) {
-            String rest = value.substring("http://".length());
-            addWithSlashVariant(candidates, "https://" + rest);
-            addWithSlashVariant(candidates, "ws://" + rest);
-            addWithSlashVariant(candidates, "wss://" + rest);
-        }
-    }
-
-    private static void addWithSlashVariant(Set<String> candidates, String url) {
-        candidates.add(url);
-        candidates.add(url.endsWith("/") ? url.substring(0, url.length() - 1) : url + "/");
     }
 
     private static String firstForwardedValue(String value) {
