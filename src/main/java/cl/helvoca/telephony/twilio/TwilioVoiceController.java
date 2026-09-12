@@ -1,8 +1,8 @@
 package cl.helvoca.telephony.twilio;
 
-import cl.helvoca.ai.live.OpenAiLiveSipService;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.common.NotFoundException;
+import cl.helvoca.voice.VoiceCallRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -19,14 +19,14 @@ public class TwilioVoiceController {
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>";
 
     private final TwilioCallService calls;
-    private final OpenAiLiveSipService liveSip;
+    private final VoiceCallRouter voiceRouter;
     private final CallSummaryService summaries;
 
     public TwilioVoiceController(TwilioCallService calls,
-                                 OpenAiLiveSipService liveSip,
+                                 VoiceCallRouter voiceRouter,
                                  CallSummaryService summaries) {
         this.calls = calls;
-        this.liveSip = liveSip;
+        this.voiceRouter = voiceRouter;
         this.summaries = summaries;
     }
 
@@ -35,12 +35,7 @@ public class TwilioVoiceController {
     public ResponseEntity<String> incoming(@RequestParam("CallSid") String callSid,
                                            @RequestParam("From") String from,
                                            @RequestParam("To") String to) {
-        if (!liveSip.isReady()) {
-            log.warn("Blocked inbound voice because GPT-Live SIP is not ready call={}", callSid);
-            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
-        }
-        log.info("Routing inbound Twilio call={} to GPT-Live SIP", callSid);
-        return ResponseEntity.ok(liveSip.twiml(to, from, callSid));
+        return route(to, from, callSid, "inbound");
     }
 
     @PostMapping(value = "/outbound-test", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
@@ -48,26 +43,39 @@ public class TwilioVoiceController {
     public ResponseEntity<String> outboundTest(@RequestParam("CallSid") String callSid,
                                                @RequestParam("From") String from,
                                                @RequestParam("To") String to) {
-        if (!liveSip.isReady()) {
-            log.warn("Blocked outbound voice test because GPT-Live SIP is not ready call={}", callSid);
-            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
-        }
-        log.info("Routing outbound Twilio test call={} to GPT-Live SIP", callSid);
-        return ResponseEntity.ok(liveSip.twiml(from, to, callSid));
+        return route(from, to, callSid, "outbound-test");
     }
 
     /**
-     * Compatibility ingress only. It never restores Trial, TTS, Media Streams or Polly.
-     * Stale Twilio/TwiML configuration that still points here is routed into the same
-     * GPT-Live SIP implementation as /outbound-test and is deliberately logged.
+     * Temporary compatibility ingress for stale Twilio console configuration.
+     * It routes into the exact same multi-provider voice edge and never restores
+     * the old Trial/Polly/TTS flow.
      */
     @PostMapping(value = "/trial/voice", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> legacyOutboundTest(@RequestParam("CallSid") String callSid,
                                                      @RequestParam("From") String from,
                                                      @RequestParam("To") String to) {
-        log.warn("Deprecated Twilio route /trial/voice used; routing call={} to canonical GPT-Live flow", callSid);
+        log.warn("Deprecated Twilio route /trial/voice used; routing call={} to multi-provider voice edge", callSid);
         return outboundTest(callSid, from, to);
+    }
+
+    @PostMapping(value = "/stream-status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public ResponseEntity<Void> streamStatus(@RequestParam("StreamSid") String streamSid,
+                                             @RequestParam("StreamEvent") String streamEvent,
+                                             @RequestParam(value = "CallSid", required = false) String callSid,
+                                             @RequestParam(value = "StreamError", required = false) String streamError) {
+        if ("stream-stopped".equalsIgnoreCase(streamEvent)
+                || "stream-error".equalsIgnoreCase(streamEvent)) {
+            calls.markStreamStopped(streamSid);
+        }
+        if ("stream-error".equalsIgnoreCase(streamEvent)) {
+            log.warn("Twilio Media Stream error call={} stream={} error={}",
+                    callSid, streamSid, streamError == null ? "unknown" : streamError);
+        } else {
+            log.info("Twilio Media Stream event call={} stream={} event={}", callSid, streamSid, streamEvent);
+        }
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping(value = "/status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -83,5 +91,22 @@ public class TwilioVoiceController {
             log.debug("Ignoring Twilio status for untracked call={}", callSid);
         }
         return ResponseEntity.noContent().build();
+    }
+
+    private ResponseEntity<String> route(String businessPhone,
+                                         String callerPhone,
+                                         String callSid,
+                                         String direction) {
+        return voiceRouter.route(businessPhone, callerPhone, callSid)
+                .map(decision -> {
+                    log.info("Routing Twilio {} call={} provider={} mode={}",
+                            direction, callSid, decision.providerId(), decision.mode());
+                    return ResponseEntity.ok(decision.twiml());
+                })
+                .orElseGet(() -> {
+                    log.error("Blocking Twilio {} call={} because no healthy voice provider is available",
+                            direction, callSid);
+                    return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+                });
     }
 }
