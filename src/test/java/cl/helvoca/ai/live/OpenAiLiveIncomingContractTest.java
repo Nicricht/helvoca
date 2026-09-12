@@ -87,6 +87,8 @@ class OpenAiLiveIncomingContractTest {
                 .put(new JSONObject().put("name", "x-recepvoz-route")
                         .put("value", signer.sign(businessPhone, callerPhone)));
         JSONObject event = new JSONObject()
+                .put("id", "evt_live_123")
+                .put("created_at", 1_789_000_000L)
                 .put("type", "live.transport.incoming")
                 .put("data", new JSONObject()
                         .put("session_id", sessionId)
@@ -112,5 +114,65 @@ class OpenAiLiveIncomingContractTest {
 
         verify(sideband).attach(sessionId, context);
         verify(lifecycle).startInboundCall("openai-sip", sessionId, callerPhone, businessPhone);
+    }
+
+    @Test
+    void liveWebhookDoesNotFallBackToRealtimeCallId() {
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("sk-test");
+
+        OpenAiLiveProperties live = new OpenAiLiveProperties();
+        live.setEnabled(true);
+        live.setProjectId("proj_test123");
+        live.setWebhookSecret("whsec-test");
+
+        OpenAiLiveSipService service = new OpenAiLiveSipService(
+                openAi,
+                live,
+                new OpenAiLiveRouteSigner(live),
+                mock(CallLifecycleService.class),
+                mock(RealtimeToolService.class),
+                mock(OpenAiLiveSidebandManager.class));
+
+        JSONObject event = new JSONObject()
+                .put("type", "live.transport.incoming")
+                .put("data", new JSONObject()
+                        .put("call_id", "rtc_should_not_be_used")
+                        .put("type", "sip"));
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.handleIncoming("webhook_call_id_only", event));
+        assertEquals("Missing Live session id", error.getMessage());
+    }
+
+    @Test
+    void liveWebhookRejectsNonLiveSessionPrefix() {
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("sk-test");
+
+        OpenAiLiveProperties live = new OpenAiLiveProperties();
+        live.setEnabled(true);
+        live.setProjectId("proj_test123");
+        live.setWebhookSecret("whsec-test");
+
+        OpenAiLiveSipService service = new OpenAiLiveSipService(
+                openAi,
+                live,
+                new OpenAiLiveRouteSigner(live),
+                mock(CallLifecycleService.class),
+                mock(RealtimeToolService.class),
+                mock(OpenAiLiveSidebandManager.class));
+
+        JSONObject event = new JSONObject()
+                .put("type", "live.transport.incoming")
+                .put("data", new JSONObject()
+                        .put("session_id", "rtc_wrong_surface")
+                        .put("type", "sip"));
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.handleIncoming("webhook_wrong_prefix", event));
+        assertEquals("Invalid Live session id prefix", error.getMessage());
     }
 }
