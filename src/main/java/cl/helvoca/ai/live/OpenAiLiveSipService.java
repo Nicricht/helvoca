@@ -173,7 +173,7 @@ public class OpenAiLiveSipService {
                 throw e;
             }
 
-            sideband.attach(sessionId, context);
+            sideband.attach(sessionId, context, businessName);
             processedWebhookIds.add(webhookId);
             processedSessionIds.add(sessionId);
             pruneDedupSets();
