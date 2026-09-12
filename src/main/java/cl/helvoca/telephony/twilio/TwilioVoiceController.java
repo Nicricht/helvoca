@@ -20,6 +20,8 @@ import java.util.UUID;
 @RequestMapping("/webhooks/v1/twilio")
 public class TwilioVoiceController {
     private static final Logger log = LoggerFactory.getLogger(TwilioVoiceController.class);
+    private static final String SILENT_HANGUP_TWIML =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>";
 
     private final TwilioCallService calls;
     private final TwimlFactory twiml;
@@ -62,39 +64,38 @@ public class TwilioVoiceController {
 
     /**
      * Twilio Console outbound tests put the business Twilio number in From and
-     * the tester phone in To. When GPT-Live SIP is ready the already-established
-     * Twilio call is bridged directly to OpenAI over SIP; otherwise keep the
-     * isolated Media Stream demo fallback.
+     * the tester phone in To. Tests are intentionally GPT-Live-only so a Live
+     * configuration problem can never silently fall back to the legacy demo
+     * voice path and make us evaluate Twilio TTS instead of GPT-Live.
      */
     @PostMapping(value = "/outbound-test", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> outboundTest(@RequestParam("CallSid") String callSid,
                                                @RequestParam("From") String from,
                                                @RequestParam("To") String to) {
-        if (liveSip.isReady()) {
-            return ResponseEntity.ok(liveSip.twiml(from, to));
+        if (!liveSip.isReady()) {
+            log.warn("Blocked outbound voice test because GPT-Live SIP is not ready call={}", callSid);
+            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
-        try {
-            return ResponseEntity.ok(calls.startOutboundTestCall(callSid, to, from));
-        } catch (NotFoundException e) {
-            return ResponseEntity.ok(twiml.rejectUnknownNumber());
-        }
+        return ResponseEntity.ok(liveSip.twiml(from, to));
     }
 
+    /**
+     * Compatibility endpoint for Twilio Console setups that still point at the
+     * old trial URL. It no longer starts Gather/Say TTS. Instead it bridges the
+     * already-established outbound test call directly to GPT-Live SIP.
+     */
     @PostMapping(value = "/trial/voice", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> trialIncoming(@RequestParam("CallSid") String callSid,
                                                 @RequestParam("From") String from,
                                                 @RequestParam("To") String to) {
-        if (!trial.isEnabled()) {
-            return ResponseEntity.ok(twiml.serviceUnavailable());
+        if (!liveSip.isReady()) {
+            log.warn("Blocked legacy trial voice path because GPT-Live SIP is not ready call={}", callSid);
+            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
-        try {
-            calls.startTrialInboundCall(callSid, from, to);
-            return ResponseEntity.ok(twiml.trialGather(trial.getGreeting()));
-        } catch (NotFoundException | IllegalArgumentException e) {
-            return ResponseEntity.ok(twiml.trialSayAndHangup("No pude iniciar la demostración de RecepVoz para este número."));
-        }
+        log.info("Bridging legacy trial voice endpoint to GPT-Live SIP call={}", callSid);
+        return ResponseEntity.ok(liveSip.twiml(from, to));
     }
 
     @PostMapping(value = "/trial/gather", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
