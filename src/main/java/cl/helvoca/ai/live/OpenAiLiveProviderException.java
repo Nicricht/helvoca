@@ -6,7 +6,7 @@ package cl.helvoca.ai.live;
  * the same incoming SIP decision cannot repair billing, auth or an expired
  * session. Transient upstream errors may still be retried by webhook delivery.
  */
-public class OpenAiLiveProviderException extends RuntimeException {
+public class OpenAiLiveProviderException extends IllegalStateException {
     private final int httpStatus;
     private final String errorCode;
     private final boolean terminal;
