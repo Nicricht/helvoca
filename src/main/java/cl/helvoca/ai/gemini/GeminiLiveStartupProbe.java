@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
@@ -23,10 +24,11 @@ import java.util.concurrent.TimeUnit;
  * Optional one-shot production diagnostic for Gemini Live. It validates the
  * real API key, WebSocket endpoint and model without involving Twilio.
  *
- * The current v1beta endpoint rejected responseModalities directly under
- * setup, so the probe deliberately uses the API-reference shape with
- * generationConfig.responseModalities and nothing else. Voice config, tools,
- * transcription and product behavior stay out of this connectivity check.
+ * Gemini Live returns server JSON as binary UTF-8 WebSocket frames in common
+ * runtimes, including setupComplete. The probe therefore consumes both text
+ * and binary frames. It uses the API-reference setup shape with
+ * generationConfig.responseModalities and keeps all product behavior out of
+ * this connectivity check.
  *
  * Probe failures are logged but never crash the application. Enable only for
  * a deliberate probe deployment with GEMINI_LIVE_PROBE_ON_STARTUP=true, then
@@ -89,7 +91,7 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
     private static final class ProbeListener implements WebSocket.Listener {
         private final String model;
         private final CompletableFuture<ProbeResult> result = new CompletableFuture<>();
-        private final StringBuilder frameBuffer = new StringBuilder();
+        private final GeminiWebSocketJsonFrames inboundFrames = new GeminiWebSocketJsonFrames();
         private volatile WebSocket socket;
 
         private ProbeListener(String model) {
@@ -116,21 +118,39 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
 
         @Override
         public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-            synchronized (frameBuffer) {
-                frameBuffer.append(data);
-                if (last) {
-                    String payload = frameBuffer.toString();
-                    frameBuffer.setLength(0);
-                    log.info("GEMINI_LIVE_PROBE frame={}", truncate(payload));
+            try {
+                String payload = inboundFrames.acceptText(data, last);
+                if (payload != null) {
+                    log.info("GEMINI_LIVE_PROBE text-frame={}", truncate(payload));
                     handle(payload);
                 }
+            } catch (Exception e) {
+                result.complete(new ProbeResult(false, "invalid text frame: " + e.getMessage()));
+            } finally {
+                webSocket.request(1);
             }
-            webSocket.request(1);
+            return null;
+        }
+
+        @Override
+        public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
+            try {
+                String payload = inboundFrames.acceptBinary(data, last);
+                if (payload != null) {
+                    log.info("GEMINI_LIVE_PROBE binary-frame={}", truncate(payload));
+                    handle(payload);
+                }
+            } catch (Exception e) {
+                result.complete(new ProbeResult(false, "invalid binary frame: " + e.getMessage()));
+            } finally {
+                webSocket.request(1);
+            }
             return null;
         }
 
         @Override
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+            inboundFrames.reset();
             log.warn("GEMINI_LIVE_PROBE socket closed status={} reason={}", statusCode, reason);
             result.complete(new ProbeResult(false,
                     "socket closed before setupComplete status=" + statusCode + " reason=" + reason));
@@ -139,6 +159,7 @@ public class GeminiLiveStartupProbe implements ApplicationRunner {
 
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
+            inboundFrames.reset();
             log.warn("GEMINI_LIVE_PROBE websocket error={}", rootMessage(error));
             result.complete(new ProbeResult(false, "websocket error: " + rootMessage(error)));
         }

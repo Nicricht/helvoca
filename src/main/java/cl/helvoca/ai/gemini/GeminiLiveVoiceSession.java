@@ -18,6 +18,7 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Queue;
@@ -33,6 +34,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Server-to-server Gemini Live session. The telephony adapter supplies Twilio
  * PCMU frames; this session converts them to Gemini PCM16 input and converts
  * Gemini's native PCM24k output back to Twilio PCMU.
+ *
+ * Gemini Live sends server JSON as binary UTF-8 WebSocket frames in common
+ * runtimes, so both text and binary frames are decoded into the same message
+ * handler before any setup, audio, transcription or tool event is processed.
  */
 final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener {
     private static final Logger log = LoggerFactory.getLogger(GeminiLiveVoiceSession.class);
@@ -54,7 +59,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean finalized = new AtomicBoolean(false);
     private final AtomicInteger pendingMessages = new AtomicInteger(0);
-    private final StringBuilder frameBuffer = new StringBuilder();
+    private final GeminiWebSocketJsonFrames inboundFrames = new GeminiWebSocketJsonFrames();
     private final StringBuilder userTranscript = new StringBuilder();
     private final StringBuilder assistantTranscript = new StringBuilder();
     private final Object sendLock = new Object();
@@ -128,20 +133,35 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     @Override
     public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-        synchronized (frameBuffer) {
-            frameBuffer.append(data);
-            if (last) {
-                String payload = frameBuffer.toString();
-                frameBuffer.setLength(0);
-                handle(payload);
-            }
+        try {
+            String payload = inboundFrames.acceptText(data, last);
+            if (payload != null) handle(payload);
+        } catch (Exception e) {
+            fail("Gemini Live invalid text frame: " + e.getMessage(),
+                    VoiceProviderHealthRegistry.FailureKind.UPSTREAM);
+        } finally {
+            webSocket.request(1);
         }
-        webSocket.request(1);
+        return null;
+    }
+
+    @Override
+    public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
+        try {
+            String payload = inboundFrames.acceptBinary(data, last);
+            if (payload != null) handle(payload);
+        } catch (Exception e) {
+            fail("Gemini Live invalid binary frame: " + e.getMessage(),
+                    VoiceProviderHealthRegistry.FailureKind.UPSTREAM);
+        } finally {
+            webSocket.request(1);
+        }
         return null;
     }
 
     @Override
     public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+        inboundFrames.reset();
         if (!closed.get()) {
             fail("Gemini Live closed unexpectedly status=" + statusCode + " reason=" + reason,
                     VoiceProviderHealthRegistry.FailureKind.UPSTREAM);
@@ -151,6 +171,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     @Override
     public void onError(WebSocket webSocket, Throwable error) {
+        inboundFrames.reset();
         fail("Gemini Live WebSocket error: " + rootMessage(error),
                 VoiceProviderHealthRegistry.FailureKind.UPSTREAM);
     }
@@ -422,6 +443,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) return;
+        inboundFrames.reset();
         flushTranscripts();
         WebSocket current = socket;
         if (current != null) {
