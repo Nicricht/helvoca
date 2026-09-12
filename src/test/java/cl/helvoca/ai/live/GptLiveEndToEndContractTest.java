@@ -6,7 +6,12 @@ import cl.helvoca.ai.realtime.RealtimeToolService;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.telephony.CallLifecycleService;
 import cl.helvoca.telephony.twilio.TwilioCallService;
+import cl.helvoca.telephony.twilio.TwilioMediaStreamTwimlFactory;
 import cl.helvoca.telephony.twilio.TwilioVoiceController;
+import cl.helvoca.voice.VoiceAiProviderRegistry;
+import cl.helvoca.voice.VoiceCallRouter;
+import cl.helvoca.voice.VoiceProviderHealthRegistry;
+import cl.helvoca.voice.VoiceProviderProperties;
 import com.sun.net.httpserver.HttpServer;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -21,6 +26,7 @@ import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -69,8 +75,16 @@ class GptLiveEndToEndContractTest {
         OpenAiLiveSipService liveSip = new OpenAiLiveSipService(
                 openAi, live, signer, lifecycle, tools, sideband);
 
+        VoiceProviderProperties voiceProperties = new VoiceProviderProperties();
+        voiceProperties.setProviderOrder(List.of("openai-live"));
+        VoiceCallRouter router = new VoiceCallRouter(
+                voiceProperties,
+                mock(VoiceAiProviderRegistry.class),
+                new VoiceProviderHealthRegistry(),
+                mock(TwilioMediaStreamTwimlFactory.class),
+                liveSip);
         TwilioVoiceController controller = new TwilioVoiceController(
-                mock(TwilioCallService.class), liveSip, mock(CallSummaryService.class));
+                mock(TwilioCallService.class), router, mock(CallSummaryService.class));
 
         String callSid = "CA0123456789abcdef0123456789abcdef";
         String businessPhone = "+14355652512";

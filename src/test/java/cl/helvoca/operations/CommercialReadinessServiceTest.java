@@ -1,7 +1,5 @@
 package cl.helvoca.operations;
 
-import cl.helvoca.ai.live.OpenAiLiveProperties;
-import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.phone.PhoneNumber;
@@ -11,6 +9,7 @@ import cl.helvoca.security.TenantProvider;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import cl.helvoca.telephony.twilio.TwilioProperties;
+import cl.helvoca.voice.VoiceCallRouter;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -24,7 +23,7 @@ class CommercialReadinessServiceTest {
 
     @Test
     void readyCoreExposesAllConfiguredCapabilities() {
-        Fixture f = fixture();
+        Fixture f = fixture(true);
         f.business.setHumanTransferPhone("+56911111111");
         ServiceItem service = mock(ServiceItem.class);
         when(service.isActive()).thenReturn(true);
@@ -34,20 +33,21 @@ class CommercialReadinessServiceTest {
         CommercialReadinessService.Readiness result = f.service.readiness();
 
         assertTrue(result.ready());
-        assertEquals(6, result.requiredPassed());
-        assertEquals(6, result.requiredTotal());
+        assertEquals(5, result.requiredPassed());
+        assertEquals(5, result.requiredTotal());
         assertTrue(result.capabilities().get("VOICE_ASSISTANT"));
         assertTrue(result.capabilities().get("INFORMATION"));
         assertTrue(result.capabilities().get("GENERIC_REQUESTS"));
         assertTrue(result.capabilities().get("BOOKINGS"));
         assertTrue(result.capabilities().get("HUMAN_TRANSFER"));
         assertTrue(result.warnings().isEmpty());
-        assertTrue(result.checks().stream().anyMatch(c -> c.code().equals("OPENAI_GPT_LIVE_SIP") && c.ready()));
+        assertTrue(result.checks().stream().anyMatch(c -> c.code().equals("VOICE_PROVIDER") && c.ready()));
+        assertTrue(result.checks().stream().anyMatch(c -> c.code().equals("VOICE_PROVIDER_GEMINI") && c.ready() && !c.required()));
     }
 
     @Test
     void coreVoiceCanBeReadyWithoutBookingOrTransferConfiguration() {
-        Fixture f = fixture();
+        Fixture f = fixture(true);
         when(f.services.findAllByBusinessIdOrderByNameAsc(f.businessId)).thenReturn(List.of());
         when(f.hours.countByBusinessId(f.businessId)).thenReturn(0L);
 
@@ -63,22 +63,19 @@ class CommercialReadinessServiceTest {
     }
 
     @Test
-    void invalidLiveConfigurationBlocksCommercialReadiness() {
-        Fixture f = fixture();
-        when(f.live.isEnabled()).thenReturn(false);
-        when(f.openAi.hasApiKey()).thenReturn(false);
+    void noHealthyVoiceProviderBlocksCommercialReadiness() {
+        Fixture f = fixture(false);
 
         CommercialReadinessService.Readiness result = f.service.readiness();
 
         assertFalse(result.ready());
         assertFalse(result.capabilities().get("VOICE_ASSISTANT"));
-        assertTrue(result.checks().stream().anyMatch(c -> c.code().equals("OPENAI_GPT_LIVE_SIP") && !c.ready()));
-        assertTrue(result.checks().stream().anyMatch(c -> c.code().equals("OPENAI_API") && !c.ready()));
-        assertTrue(result.checks().stream().noneMatch(c -> c.code().equals("TWILIO_MEDIA_STREAM")));
-        assertTrue(result.checks().stream().noneMatch(c -> c.code().equals("OPENAI_REALTIME")));
+        assertTrue(result.checks().stream().anyMatch(c -> c.code().equals("VOICE_PROVIDER") && !c.ready()));
+        assertTrue(result.checks().stream().anyMatch(c -> c.code().equals("VOICE_PROVIDER_GEMINI") && !c.ready()));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("gemini")));
     }
 
-    private static Fixture fixture() {
+    private static Fixture fixture(boolean voiceReady) {
         UUID businessId = UUID.randomUUID();
         BusinessRepository businesses = mock(BusinessRepository.class);
         PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
@@ -86,8 +83,7 @@ class CommercialReadinessServiceTest {
         BusinessHourRepository hours = mock(BusinessHourRepository.class);
         TenantProvider tenant = mock(TenantProvider.class);
         TwilioProperties twilio = mock(TwilioProperties.class);
-        OpenAiRealtimeProperties openAi = mock(OpenAiRealtimeProperties.class);
-        OpenAiLiveProperties live = mock(OpenAiLiveProperties.class);
+        VoiceCallRouter voiceRouter = mock(VoiceCallRouter.class);
 
         Business business = new Business();
         business.setName("Negocio horizontal");
@@ -104,20 +100,23 @@ class CommercialReadinessServiceTest {
         when(services.findAllByBusinessIdOrderByNameAsc(businessId)).thenReturn(List.of());
         when(hours.countByBusinessId(businessId)).thenReturn(0L);
         when(twilio.hasAuthToken()).thenReturn(true);
-        when(twilio.getPublicBaseUrl()).thenReturn("https://helvoca.example.com");
-        when(openAi.hasApiKey()).thenReturn(true);
-        when(live.isEnabled()).thenReturn(true);
-        when(live.hasProjectId()).thenReturn(true);
-        when(live.hasWebhookSecret()).thenReturn(true);
-        when(live.getModel()).thenReturn("gpt-live-1");
-        when(live.getBackendModel()).thenReturn("gpt-5.6-luna");
-        when(live.getVoice()).thenReturn("marin");
-        when(live.getApiBaseUrl()).thenReturn("https://api.openai.com/v1");
-        when(live.getSidebandBaseUrl()).thenReturn("wss://api.openai.com/v1");
+        when(twilio.hasSecurePublicBaseUrl()).thenReturn(true);
+
+        VoiceCallRouter.ProviderStatus provider = new VoiceCallRouter.ProviderStatus(
+                "gemini",
+                "MEDIA_STREAM",
+                voiceReady,
+                voiceReady,
+                voiceReady ? "READY" : "UNCONFIGURED",
+                voiceReady ? "No active circuit breaker" : "Provider credentials/configuration are incomplete");
+        when(voiceRouter.readiness()).thenReturn(new VoiceCallRouter.VoiceReadiness(
+                voiceReady,
+                voiceReady ? "gemini" : null,
+                List.of(provider)));
 
         CommercialReadinessService service = new CommercialReadinessService(
-                businesses, phones, services, hours, tenant, twilio, openAi, live);
-        return new Fixture(businessId, business, services, hours, twilio, openAi, live, service);
+                businesses, phones, services, hours, tenant, twilio, voiceRouter);
+        return new Fixture(businessId, business, services, hours, twilio, voiceRouter, service);
     }
 
     private record Fixture(
@@ -126,8 +125,7 @@ class CommercialReadinessServiceTest {
             ServiceItemRepository services,
             BusinessHourRepository hours,
             TwilioProperties twilio,
-            OpenAiRealtimeProperties openAi,
-            OpenAiLiveProperties live,
+            VoiceCallRouter voiceRouter,
             CommercialReadinessService service
     ) {}
 }

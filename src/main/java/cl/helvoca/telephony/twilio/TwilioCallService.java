@@ -7,8 +7,8 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 
 /**
- * Thin Twilio adapter for carrier status callbacks. GPT-Live SIP call creation
- * is owned by OpenAiLiveSipService and the provider-neutral CallLifecycleService.
+ * Thin Twilio adapter for carrier callbacks. Voice-provider-specific session
+ * creation is owned by the voice edge and provider implementations.
  */
 @Service
 public class TwilioCallService {
@@ -20,6 +20,10 @@ public class TwilioCallService {
 
     public UUID updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {
         return lifecycle.updateStatus(providerCallId, providerStatus, durationSeconds);
+    }
+
+    public void markStreamStopped(String streamSid) {
+        lifecycle.markStreamStopped(streamSid);
     }
 
     static CallStatus mapStatus(String value) {

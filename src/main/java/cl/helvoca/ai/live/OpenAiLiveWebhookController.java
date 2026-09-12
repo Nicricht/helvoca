@@ -56,6 +56,17 @@ public class OpenAiLiveWebhookController {
         } catch (SecurityException | IllegalArgumentException e) {
             log.warn("Rejected GPT-Live SIP webhook: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
+        } catch (OpenAiLiveProviderException e) {
+            if (e.terminal()) {
+                log.warn("GPT-Live terminal provider failure acknowledged status={} code={} message={}",
+                        e.httpStatus(), e.errorCode(), e.getMessage());
+                // The call has already been marked failed. Returning 2xx prevents the
+                // same decision from being redelivered after billing/auth/session errors.
+                return ResponseEntity.ok().build();
+            }
+            log.error("GPT-Live transient provider failure status={} code={}",
+                    e.httpStatus(), e.errorCode(), e);
+            return ResponseEntity.status(503).build();
         } catch (Exception e) {
             log.error("Could not handle GPT-Live SIP webhook", e);
             return ResponseEntity.internalServerError().build();
