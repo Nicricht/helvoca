@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -34,7 +35,7 @@ class OpenAiLiveIncomingContractTest {
     }
 
     @Test
-    void officialIncomingSipShapeIsAcceptedWithProjectScopedLiveConfiguration() throws Exception {
+    void officialIncomingSipShapeIsAcceptedWithCarrierCorrelation() throws Exception {
         AtomicReference<String> requestPath = new AtomicReference<>();
         AtomicReference<String> projectHeader = new AtomicReference<>();
         AtomicReference<String> authorizationHeader = new AtomicReference<>();
@@ -69,23 +70,22 @@ class OpenAiLiveIncomingContractTest {
         String businessPhone = "+14355652512";
         String callerPhone = "+56911111111";
         String sessionId = "live_session_123";
+        String callSid = "CA0123456789abcdef0123456789abcdef";
+        long issuedAt = Instant.now().getEpochSecond();
         UUID callId = UUID.randomUUID();
         RealtimeCallContext context = new RealtimeCallContext(
                 callId, UUID.randomUUID(), null, callerPhone, businessPhone, "live:" + sessionId);
 
-        when(lifecycle.startInboundCall("openai-sip", sessionId, callerPhone, businessPhone)).thenReturn(callId);
-        when(lifecycle.markStreamStarted(callId, sessionId, "live:" + sessionId, "openai-live"))
+        when(lifecycle.startInboundCall("twilio", callSid, callerPhone, businessPhone)).thenReturn(callId);
+        when(lifecycle.markStreamStarted(callId, callSid, "live:" + sessionId, "openai-live"))
                 .thenReturn(context);
+        when(tools.buildInstructions(context)).thenReturn("backend instructions");
         when(tools.execute(context, "get_business_information", "{}"))
                 .thenReturn("{\"success\":true,\"data\":{\"name\":\"Restaurante Demo\"},\"error\":null}");
 
         OpenAiLiveSipService service = new OpenAiLiveSipService(openAi, live, signer, lifecycle, tools, sideband);
 
-        JSONArray sipHeaders = new JSONArray()
-                .put(new JSONObject().put("name", "x-recepvoz-business").put("value", businessPhone))
-                .put(new JSONObject().put("name", "x-recepvoz-caller").put("value", callerPhone))
-                .put(new JSONObject().put("name", "x-recepvoz-route")
-                        .put("value", signer.sign(businessPhone, callerPhone)));
+        JSONArray sipHeaders = headers(signer, businessPhone, callerPhone, callSid, issuedAt);
         JSONObject event = new JSONObject()
                 .put("id", "evt_live_123")
                 .put("created_at", 1_789_000_000L)
@@ -113,7 +113,60 @@ class OpenAiLiveIncomingContractTest {
         assertTrue(responses.getJSONArray("tools").length() > 0);
 
         verify(sideband).attach(sessionId, context);
-        verify(lifecycle).startInboundCall("openai-sip", sessionId, callerPhone, businessPhone);
+        verify(lifecycle).startInboundCall("twilio", callSid, callerPhone, businessPhone);
+        verify(lifecycle).markStreamStarted(callId, callSid, "live:" + sessionId, "openai-live");
+    }
+
+    @Test
+    void sameLiveSessionIsDecidedOnlyOnceEvenWithDifferentWebhookIds() throws Exception {
+        server.createContext("/v1/live/sessions/live_dedupe_123/accept", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(200, -1);
+            exchange.close();
+        });
+
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("sk-test");
+        OpenAiLiveProperties live = new OpenAiLiveProperties();
+        live.setEnabled(true);
+        live.setProjectId("proj_test123");
+        live.setWebhookSecret("whsec-test");
+        live.setApiBaseUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
+
+        OpenAiLiveRouteSigner signer = new OpenAiLiveRouteSigner(live);
+        CallLifecycleService lifecycle = mock(CallLifecycleService.class);
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        OpenAiLiveSidebandManager sideband = mock(OpenAiLiveSidebandManager.class);
+
+        String businessPhone = "+14355652512";
+        String callerPhone = "+56911111111";
+        String callSid = "CAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        String sessionId = "live_dedupe_123";
+        long issuedAt = Instant.now().getEpochSecond();
+        UUID callId = UUID.randomUUID();
+        RealtimeCallContext context = new RealtimeCallContext(
+                callId, UUID.randomUUID(), null, callerPhone, businessPhone, "live:" + sessionId);
+
+        when(lifecycle.startInboundCall("twilio", callSid, callerPhone, businessPhone)).thenReturn(callId);
+        when(lifecycle.markStreamStarted(callId, callSid, "live:" + sessionId, "openai-live"))
+                .thenReturn(context);
+        when(tools.buildInstructions(context)).thenReturn("backend instructions");
+        when(tools.execute(context, "get_business_information", "{}"))
+                .thenReturn("{\"success\":true,\"data\":{\"name\":\"Demo\"}}");
+
+        OpenAiLiveSipService service = new OpenAiLiveSipService(openAi, live, signer, lifecycle, tools, sideband);
+        JSONObject event = new JSONObject()
+                .put("type", "live.transport.incoming")
+                .put("data", new JSONObject()
+                        .put("session_id", sessionId)
+                        .put("type", "sip")
+                        .put("sip_headers", headers(signer, businessPhone, callerPhone, callSid, issuedAt)));
+
+        service.handleIncoming("webhook_a", event);
+        service.handleIncoming("webhook_b", event);
+
+        verify(lifecycle, times(1)).startInboundCall("twilio", callSid, callerPhone, businessPhone);
+        verify(sideband, times(1)).attach(sessionId, context);
     }
 
     @Test
@@ -127,11 +180,8 @@ class OpenAiLiveIncomingContractTest {
         live.setWebhookSecret("whsec-test");
 
         OpenAiLiveSipService service = new OpenAiLiveSipService(
-                openAi,
-                live,
-                new OpenAiLiveRouteSigner(live),
-                mock(CallLifecycleService.class),
-                mock(RealtimeToolService.class),
+                openAi, live, new OpenAiLiveRouteSigner(live),
+                mock(CallLifecycleService.class), mock(RealtimeToolService.class),
                 mock(OpenAiLiveSidebandManager.class));
 
         JSONObject event = new JSONObject()
@@ -157,11 +207,8 @@ class OpenAiLiveIncomingContractTest {
         live.setWebhookSecret("whsec-test");
 
         OpenAiLiveSipService service = new OpenAiLiveSipService(
-                openAi,
-                live,
-                new OpenAiLiveRouteSigner(live),
-                mock(CallLifecycleService.class),
-                mock(RealtimeToolService.class),
+                openAi, live, new OpenAiLiveRouteSigner(live),
+                mock(CallLifecycleService.class), mock(RealtimeToolService.class),
                 mock(OpenAiLiveSidebandManager.class));
 
         JSONObject event = new JSONObject()
@@ -174,5 +221,19 @@ class OpenAiLiveIncomingContractTest {
                 IllegalArgumentException.class,
                 () -> service.handleIncoming("webhook_wrong_prefix", event));
         assertEquals("Invalid Live session id prefix", error.getMessage());
+    }
+
+    private static JSONArray headers(OpenAiLiveRouteSigner signer,
+                                     String businessPhone,
+                                     String callerPhone,
+                                     String callSid,
+                                     long issuedAt) {
+        return new JSONArray()
+                .put(new JSONObject().put("name", "x-recepvoz-business").put("value", businessPhone))
+                .put(new JSONObject().put("name", "x-recepvoz-caller").put("value", callerPhone))
+                .put(new JSONObject().put("name", "x-recepvoz-call").put("value", callSid))
+                .put(new JSONObject().put("name", "x-recepvoz-issued-at").put("value", String.valueOf(issuedAt)))
+                .put(new JSONObject().put("name", "x-recepvoz-route")
+                        .put("value", signer.sign(businessPhone, callerPhone, callSid, issuedAt)));
     }
 }
