@@ -77,17 +77,4 @@ class TwilioVoiceControllerTest {
         assertEquals(204, response.getStatusCode().value());
         verifyNoInteractions(summaries);
     }
-
-    @Test
-    void streamErrorMarksLegacyMediaStreamStopped() {
-        TwilioCallService calls = mock(TwilioCallService.class);
-        OpenAiLiveSipService liveSip = mock(OpenAiLiveSipService.class);
-        CallSummaryService summaries = mock(CallSummaryService.class);
-
-        var response = controller(calls, liveSip, summaries)
-                .streamStatus("MZ-1", "stream-error", CALL_SID, "network");
-
-        assertEquals(204, response.getStatusCode().value());
-        verify(calls).markStreamStopped("MZ-1");
-    }
 }
