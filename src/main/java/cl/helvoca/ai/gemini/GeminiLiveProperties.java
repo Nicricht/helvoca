@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 public class GeminiLiveProperties {
     private boolean enabled = false;
     private boolean certificationSimulation = false;
+    private String certificationCaller = "";
     private String apiKey = "";
     private String model = "gemini-3.1-flash-live-preview";
     private String voice = "Kore";
@@ -17,6 +18,8 @@ public class GeminiLiveProperties {
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public boolean isCertificationSimulation() { return certificationSimulation; }
     public void setCertificationSimulation(boolean certificationSimulation) { this.certificationSimulation = certificationSimulation; }
+    public String getCertificationCaller() { return certificationCaller; }
+    public void setCertificationCaller(String certificationCaller) { this.certificationCaller = certificationCaller; }
     public String getApiKey() { return apiKey; }
     public void setApiKey(String apiKey) { this.apiKey = apiKey; }
     public String getModel() { return model; }
@@ -33,6 +36,13 @@ public class GeminiLiveProperties {
                 && notBlank(voice)
                 && websocketUrl != null
                 && websocketUrl.trim().startsWith("wss://");
+    }
+
+    public boolean certificationSimulationAllowedFor(String callerNumber) {
+        return certificationSimulation
+                && notBlank(certificationCaller)
+                && notBlank(callerNumber)
+                && certificationCaller.trim().equals(callerNumber.trim());
     }
 
     private static boolean notBlank(String value) {
