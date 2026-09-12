@@ -20,6 +20,16 @@ class TwilioSignatureValidationFilterTest {
     }
 
     @Test
+    void legacyTrialVoiceCompatibilityRouteRequiresTwilioSignatureValidation() {
+        TwilioSignatureValidationFilter filter =
+                new TwilioSignatureValidationFilter(mock(TwilioSignatureValidator.class));
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("POST", "/webhooks/v1/twilio/trial/voice");
+
+        assertFalse(filter.shouldNotFilter(request));
+    }
+
+    @Test
     void productionVoiceRequiresTwilioSignatureValidation() {
         TwilioSignatureValidationFilter filter =
                 new TwilioSignatureValidationFilter(mock(TwilioSignatureValidator.class));
