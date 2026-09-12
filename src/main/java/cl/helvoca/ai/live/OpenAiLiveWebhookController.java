@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/webhooks/v1/openai/live")
+@RequestMapping({"/webhooks/v1/openai/live", "/webhooks/v1/openai/live-v2"})
 public class OpenAiLiveWebhookController {
     private static final Logger log = LoggerFactory.getLogger(OpenAiLiveWebhookController.class);
 
