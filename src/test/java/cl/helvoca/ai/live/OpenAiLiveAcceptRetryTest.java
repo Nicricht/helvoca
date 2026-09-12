@@ -36,26 +36,17 @@ class OpenAiLiveAcceptRetryTest {
     }
 
     @Test
-    void retriesDelayedSessionLookupOnceAndThenAccepts() throws Exception {
+    void retriesFastSessionLookupOnceAndThenAccepts() throws Exception {
         AtomicInteger requests = new AtomicInteger();
         server.createContext("/v1/live/sessions/live_retry_123/accept", exchange -> {
             int attempt = requests.incrementAndGet();
             exchange.getRequestBody().readAllBytes();
             if (attempt == 1) {
-                try {
-                    Thread.sleep(2_100L);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-                byte[] body = "{\"error\":{\"message\":\"No session found\",\"code\":\"session_id_not_found\"}}"
-                        .getBytes(StandardCharsets.UTF_8);
-                exchange.getResponseHeaders().add("Content-Type", "application/json");
-                exchange.sendResponseHeaders(404, body.length);
-                exchange.getResponseBody().write(body);
+                respondSessionNotFound(exchange);
             } else {
                 exchange.sendResponseHeaders(200, -1);
+                exchange.close();
             }
-            exchange.close();
         });
 
         Fixture fixture = fixture("live_retry_123");
@@ -64,6 +55,29 @@ class OpenAiLiveAcceptRetryTest {
         assertEquals(2, requests.get());
         verify(fixture.sideband).attach("live_retry_123", fixture.context);
         verify(fixture.lifecycle, never()).updateStatus(fixture.callId, "failed", null);
+    }
+
+    @Test
+    void doesNotStartAnotherRetryAfterTwoSecondWindowExpired() throws Exception {
+        AtomicInteger requests = new AtomicInteger();
+        server.createContext("/v1/live/sessions/live_slow_123/accept", exchange -> {
+            requests.incrementAndGet();
+            exchange.getRequestBody().readAllBytes();
+            try {
+                Thread.sleep(2_100L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            respondSessionNotFound(exchange);
+        });
+
+        Fixture fixture = fixture("live_slow_123");
+
+        assertThrows(IllegalStateException.class,
+                () -> fixture.service.handleIncoming("webhook_slow_123", fixture.event));
+        assertEquals(1, requests.get());
+        verify(fixture.sideband, never()).attach(anyString(), any());
+        verify(fixture.lifecycle).updateStatus(fixture.callId, "failed", null);
     }
 
     @Test
@@ -95,12 +109,7 @@ class OpenAiLiveAcceptRetryTest {
         server.createContext("/v1/live/sessions/live_missing_123/accept", exchange -> {
             requests.incrementAndGet();
             exchange.getRequestBody().readAllBytes();
-            byte[] body = "{\"error\":{\"message\":\"No session found\",\"code\":\"session_id_not_found\"}}"
-                    .getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "application/json");
-            exchange.sendResponseHeaders(404, body.length);
-            exchange.getResponseBody().write(body);
-            exchange.close();
+            respondSessionNotFound(exchange);
         });
 
         Fixture fixture = fixture("live_missing_123");
@@ -110,6 +119,15 @@ class OpenAiLiveAcceptRetryTest {
         assertEquals(2, requests.get());
         verify(fixture.lifecycle).updateStatus(fixture.callId, "failed", null);
         verify(fixture.sideband, never()).attach(anyString(), any());
+    }
+
+    private static void respondSessionNotFound(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
+        byte[] body = "{\"error\":{\"message\":\"No session found\",\"code\":\"session_id_not_found\"}}"
+                .getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        exchange.sendResponseHeaders(404, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
     }
 
     private Fixture fixture(String sessionId) {
