@@ -1,13 +1,11 @@
 package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.ai.live.OpenAiLiveSipService;
-import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.telephony.twilio.trial.TrialConversationStateService;
 import cl.helvoca.telephony.twilio.trial.TrialVoiceConversationService;
 import cl.helvoca.telephony.twilio.trial.TrialVoiceProperties;
-import cl.helvoca.telephony.twilio.trial.TrialVoiceReply;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -47,26 +45,25 @@ public class TwilioVoiceController {
         this.summaries = summaries;
     }
 
+    /**
+     * Production voice is GPT-Live SIP-only. If Live is not ready, fail closed
+     * instead of falling back to the legacy Media Stream/STT/TTS architecture.
+     */
     @PostMapping(value = "/voice", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> incoming(@RequestParam("CallSid") String callSid,
                                            @RequestParam("From") String from,
                                            @RequestParam("To") String to) {
-        if (liveSip.isReady()) {
-            return ResponseEntity.ok(liveSip.twiml(to, from));
+        if (!liveSip.isReady()) {
+            log.warn("Blocked inbound voice because GPT-Live SIP is not ready call={}", callSid);
+            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
-        try {
-            return ResponseEntity.ok(calls.startInboundCall(callSid, from, to));
-        } catch (NotFoundException e) {
-            return ResponseEntity.ok(twiml.rejectUnknownNumber());
-        }
+        return ResponseEntity.ok(liveSip.twiml(to, from));
     }
 
     /**
-     * Twilio Console outbound tests put the business Twilio number in From and
-     * the tester phone in To. Tests are intentionally GPT-Live-only so a Live
-     * configuration problem can never silently fall back to the legacy demo
-     * voice path and make us evaluate Twilio TTS instead of GPT-Live.
+     * Twilio Console outbound tests are GPT-Live-only. A Live configuration
+     * problem must never silently fall back to legacy Gather/Say/Polly TTS.
      */
     @PostMapping(value = "/outbound-test", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
@@ -81,71 +78,38 @@ public class TwilioVoiceController {
     }
 
     /**
-     * Compatibility endpoint for Twilio Console setups that still point at the
-     * old trial URL. It no longer starts Gather/Say TTS. Instead it bridges the
-     * already-established outbound test call directly to GPT-Live SIP.
+     * Retired trial endpoint. Keeping the URL as a silent tombstone prevents a
+     * stale Twilio Console configuration from accidentally exercising the old
+     * trial conversation architecture. Normal tests must use /outbound-test.
      */
     @PostMapping(value = "/trial/voice", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> trialIncoming(@RequestParam("CallSid") String callSid,
                                                 @RequestParam("From") String from,
                                                 @RequestParam("To") String to) {
-        if (!liveSip.isReady()) {
-            log.warn("Blocked legacy trial voice path because GPT-Live SIP is not ready call={}", callSid);
-            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
-        }
-        log.info("Bridging legacy trial voice endpoint to GPT-Live SIP call={}", callSid);
-        return ResponseEntity.ok(liveSip.twiml(from, to));
+        log.warn("Blocked retired /trial/voice endpoint call={}; use /outbound-test", callSid);
+        return ResponseEntity.ok(SILENT_HANGUP_TWIML);
     }
 
+    /**
+     * Retired legacy Gather/STT/TTS endpoint. It intentionally never calls
+     * TrialVoiceConversationService or TwimlFactory.trialGather/trialSay.
+     */
     @PostMapping(value = "/trial/gather", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> trialGather(@RequestParam("CallSid") String callSid,
                                               @RequestParam(value = "SpeechResult", required = false) String speechResult) {
-        if (!trial.isEnabled()) {
-            return ResponseEntity.ok(twiml.serviceUnavailable());
-        }
-        try {
-            RealtimeCallContext context = calls.getTrialContext(callSid);
-            TrialVoiceReply reply = trialConversation.reply(context, speechResult);
-
-            String transferTarget = trialState.consumeHumanTransferTarget(context.callId());
-            if (transferTarget != null && !transferTarget.isBlank()) {
-                return ResponseEntity.ok(twiml.trialTransfer(
-                        "Claro, te comunico con una persona del negocio.", transferTarget));
-            }
-
-            if (reply.endCall()) {
-                calls.markTrialEnded(callSid);
-                summaries.generate(context.callId());
-                return ResponseEntity.ok(twiml.trialSayAndHangup(reply.text()));
-            }
-            return ResponseEntity.ok(twiml.trialGather(reply.text()));
-        } catch (NotFoundException | IllegalArgumentException e) {
-            return ResponseEntity.ok(twiml.trialSayAndHangup("La sesión de prueba ya no está disponible."));
-        }
+        log.warn("Blocked retired /trial/gather endpoint call={}", callSid);
+        return ResponseEntity.ok(SILENT_HANGUP_TWIML);
     }
 
+    /** Retired legacy transfer callback from the Gather/Say trial flow. */
     @PostMapping(value = "/trial/transfer-result", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> trialTransferResult(@RequestParam("CallSid") String callSid,
                                                       @RequestParam(value = "DialCallStatus", required = false) String dialCallStatus) {
-        if (!trial.isEnabled()) {
-            return ResponseEntity.ok(twiml.serviceUnavailable());
-        }
-        try {
-            RealtimeCallContext context = calls.getTrialContext(callSid);
-            if ("completed".equalsIgnoreCase(dialCallStatus)) {
-                calls.markTrialEnded(callSid);
-                trialState.clear(context.callId());
-                summaries.generate(context.callId());
-                return ResponseEntity.ok(twiml.trialSayAndHangup("Gracias por comunicarte con nosotros. Hasta luego."));
-            }
-            return ResponseEntity.ok(twiml.trialGather(
-                    "No pude comunicarte con una persona en este momento. Puedo seguir ayudándote por aquí."));
-        } catch (NotFoundException | IllegalArgumentException e) {
-            return ResponseEntity.ok(twiml.trialSayAndHangup("La sesión de prueba ya no está disponible."));
-        }
+        log.warn("Blocked retired /trial/transfer-result endpoint call={}", callSid);
+        return ResponseEntity.ok(SILENT_HANGUP_TWIML);
     }
 
     @PostMapping(value = "/stream-status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -156,13 +120,14 @@ public class TwilioVoiceController {
         return handleStreamStatus(streamSid, streamEvent, callSid, streamError);
     }
 
+    /** Retired callback for the old trial Media Stream path. */
     @PostMapping(value = "/trial/stream-status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<Void> trialStreamStatus(@RequestParam("StreamSid") String streamSid,
                                                   @RequestParam("StreamEvent") String streamEvent,
                                                   @RequestParam(value = "CallSid", required = false) String callSid,
                                                   @RequestParam(value = "StreamError", required = false) String streamError) {
-        if (!trial.isEnabled()) return ResponseEntity.status(403).build();
-        return handleStreamStatus(streamSid, streamEvent, callSid, streamError);
+        log.warn("Ignored retired /trial/stream-status callback call={} stream={}", callSid, streamSid);
+        return ResponseEntity.noContent().build();
     }
 
     private ResponseEntity<Void> handleStreamStatus(String streamSid,
