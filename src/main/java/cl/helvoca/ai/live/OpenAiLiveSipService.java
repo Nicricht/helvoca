@@ -18,17 +18,20 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 @Service
 public class OpenAiLiveSipService {
     private static final Logger log = LoggerFactory.getLogger(OpenAiLiveSipService.class);
     private static final int MAX_DEDUP_IDS = 10_000;
-    private static final int MAX_ACCEPT_ATTEMPTS = 3;
-    private static final long ACCEPT_RETRY_BASE_DELAY_MS = 150L;
+    private static final int MAX_ACCEPT_ATTEMPTS = 2;
+    private static final long ACCEPT_RETRY_DELAY_MS = 200L;
+    private static final Pattern TWILIO_CALL_SID = Pattern.compile("^CA[0-9a-fA-F]{32}$");
 
     private final OpenAiRealtimeProperties openAi;
     private final OpenAiLiveProperties live;
@@ -37,10 +40,12 @@ public class OpenAiLiveSipService {
     private final RealtimeToolService tools;
     private final OpenAiLiveSidebandManager sideband;
     private final HttpClient http = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
+            .connectTimeout(Duration.ofSeconds(8))
             .build();
     private final Set<String> processedWebhookIds = ConcurrentHashMap.newKeySet();
     private final Set<String> inFlightWebhookIds = ConcurrentHashMap.newKeySet();
+    private final Set<String> processedSessionIds = ConcurrentHashMap.newKeySet();
+    private final Set<String> inFlightSessionIds = ConcurrentHashMap.newKeySet();
 
     public OpenAiLiveSipService(OpenAiRealtimeProperties openAi,
                                 OpenAiLiveProperties live,
@@ -60,12 +65,20 @@ public class OpenAiLiveSipService {
         return live.ready(openAi.getApiKey());
     }
 
-    public String twiml(String businessPhone, String callerPhone) {
+    public String twiml(String businessPhone, String callerPhone, String twilioCallSid) {
         if (!isReady()) throw new IllegalStateException("GPT-Live SIP is not configured");
-        String route = routeSigner.sign(businessPhone, callerPhone);
+        if (twilioCallSid == null || !TWILIO_CALL_SID.matcher(twilioCallSid.trim()).matches()) {
+            throw new IllegalArgumentException("Valid Twilio CallSid is required for GPT-Live SIP routing");
+        }
+
+        String callSid = twilioCallSid.trim();
+        long issuedAt = Instant.now().getEpochSecond();
+        String route = routeSigner.sign(businessPhone, callerPhone, callSid, issuedAt);
         String sipUri = "sip:" + live.getProjectId().trim() + "@sip.api.openai.com;secure=true"
                 + "?x-recepvoz-business=" + url(businessPhone)
                 + "&x-recepvoz-caller=" + url(callerPhone)
+                + "&x-recepvoz-call=" + url(callSid)
+                + "&x-recepvoz-issued-at=" + issuedAt
                 + "&x-recepvoz-route=" + url(route);
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
                 + "<Response><Dial><Sip>" + xml(sipUri) + "</Sip></Dial></Response>";
@@ -77,10 +90,12 @@ public class OpenAiLiveSipService {
         if (processedWebhookIds.contains(webhookId)) return;
         if (!inFlightWebhookIds.add(webhookId)) return;
 
+        String claimedSessionId = null;
         try {
             String eventType = event.optString("type", "");
             if (!"live.transport.incoming".equals(eventType) && !"live.call.incoming".equals(eventType)) {
                 processedWebhookIds.add(webhookId);
+                pruneDedupSets();
                 return;
             }
 
@@ -100,42 +115,76 @@ public class OpenAiLiveSipService {
                 throw new IllegalArgumentException("Invalid Live session id prefix");
             }
 
+            if (processedSessionIds.contains(sessionId)) {
+                processedWebhookIds.add(webhookId);
+                pruneDedupSets();
+                return;
+            }
+            if (!inFlightSessionIds.add(sessionId)) {
+                log.info("Ignoring duplicate GPT-Live decision while session is in flight session={} webhook={}",
+                        sessionId, webhookId);
+                processedWebhookIds.add(webhookId);
+                pruneDedupSets();
+                return;
+            }
+            claimedSessionId = sessionId;
+
+            JSONObject headers = normalizeSipHeaders(data.opt("sip_headers"));
+            String businessPhone = header(headers, "x-recepvoz-business");
+            String callerPhone = header(headers, "x-recepvoz-caller");
+            String twilioCallSid = header(headers, "x-recepvoz-call");
+            String issuedAt = header(headers, "x-recepvoz-issued-at");
+            String routeToken = header(headers, "x-recepvoz-route");
+
+            if (twilioCallSid == null || !TWILIO_CALL_SID.matcher(twilioCallSid).matches()) {
+                throw new SecurityException("Missing or invalid Twilio CallSid in GPT-Live SIP route");
+            }
+            if (!routeSigner.verify(businessPhone, callerPhone, twilioCallSid, issuedAt, routeToken)) {
+                throw new SecurityException("Invalid or expired RecepVoz SIP route signature");
+            }
+
             log.info(
-                    "GPT-Live incoming webhook={} event={} eventId={} createdAt={} session={} transport={} project={}",
+                    "GPT-Live incoming webhook={} event={} eventId={} createdAt={} session={} twilioCall={} transport={} project={}",
                     webhookId,
                     eventType,
                     event.optString("id", ""),
                     event.optLong("created_at", 0L),
                     sessionId,
+                    twilioCallSid,
                     transportType,
                     live.getProjectId().trim());
 
-            JSONObject headers = normalizeSipHeaders(data.opt("sip_headers"));
-            String businessPhone = header(headers, "x-recepvoz-business");
-            String callerPhone = header(headers, "x-recepvoz-caller");
-            String routeToken = header(headers, "x-recepvoz-route");
-            if (!routeSigner.verify(businessPhone, callerPhone, routeToken)) {
-                throw new SecurityException("Invalid RecepVoz SIP route signature");
-            }
-
-            UUID callId = lifecycle.startInboundCall("openai-sip", sessionId, callerPhone, businessPhone);
+            UUID callId = lifecycle.startInboundCall("twilio", twilioCallSid, callerPhone, businessPhone);
             RealtimeCallContext context = lifecycle.markStreamStarted(
-                    callId, sessionId, "live:" + sessionId, "openai-live");
+                    callId, twilioCallSid, "live:" + sessionId, "openai-live");
 
             String businessName = businessName(context);
             JSONObject requestBody = acceptancePayload(context, businessName);
-            accept(sessionId, requestBody);
-            sideband.attach(sessionId, context);
+            try {
+                accept(sessionId, requestBody);
+            } catch (Exception e) {
+                try {
+                    lifecycle.updateStatus(callId, "failed", null);
+                } catch (Exception statusError) {
+                    log.warn("Could not mark failed GPT-Live call={} session={}: {}",
+                            callId, sessionId, statusError.getMessage());
+                }
+                throw e;
+            }
 
+            sideband.attach(sessionId, context);
             processedWebhookIds.add(webhookId);
-            pruneDedupSet();
-            log.info("Accepted GPT-Live SIP call={} session={} business={}", callId, sessionId, businessName);
+            processedSessionIds.add(sessionId);
+            pruneDedupSets();
+            log.info("Accepted GPT-Live SIP call={} twilioCall={} session={} business={}",
+                    callId, twilioCallSid, sessionId, businessName);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
             throw new IllegalStateException("Could not accept GPT-Live SIP call", e);
         } finally {
             inFlightWebhookIds.remove(webhookId);
+            if (claimedSessionId != null) inFlightSessionIds.remove(claimedSessionId);
         }
     }
 
@@ -191,7 +240,7 @@ public class OpenAiLiveSipService {
         String pathId = url(sessionId);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(live.normalizedApiBaseUrl() + "/live/sessions/" + pathId + "/accept"))
-                .timeout(Duration.ofSeconds(12))
+                .timeout(Duration.ofSeconds(7))
                 .header("Authorization", "Bearer " + openAi.getApiKey())
                 .header("OpenAI-Project", live.getProjectId().trim())
                 .header("Content-Type", "application/json")
@@ -200,60 +249,45 @@ public class OpenAiLiveSipService {
         long acceptStartedNanos = System.nanoTime();
 
         for (int attempt = 1; attempt <= MAX_ACCEPT_ATTEMPTS; attempt++) {
+            long attemptStartedNanos = System.nanoTime();
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            long attemptMs = Duration.ofNanos(Math.max(0L, System.nanoTime() - attemptStartedNanos)).toMillis();
+            long elapsedMs = Duration.ofNanos(Math.max(0L, System.nanoTime() - acceptStartedNanos)).toMillis();
             String requestId = response.headers().firstValue("x-request-id").orElse("");
             String processingMs = response.headers().firstValue("openai-processing-ms").orElse("");
             String errorCode = apiErrorCode(response.body());
-            long elapsedMs = Duration.ofNanos(Math.max(0L, System.nanoTime() - acceptStartedNanos)).toMillis();
 
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
                 log.info(
-                        "OpenAI Live accept succeeded session={} attempt={}/{} elapsed_ms={} request_id={} processing_ms={}",
-                        sessionId,
-                        attempt,
-                        MAX_ACCEPT_ATTEMPTS,
-                        elapsedMs,
-                        requestId,
-                        processingMs);
+                        "OpenAI Live accept succeeded session={} attempt={}/{} attempt_ms={} elapsed_ms={} request_id={} processing_ms={}",
+                        sessionId, attempt, MAX_ACCEPT_ATTEMPTS, attemptMs, elapsedMs, requestId, processingMs);
                 return;
             }
 
             boolean transientSessionLookup = response.statusCode() == 404
                     && "session_id_not_found".equals(errorCode);
             boolean decisionAlreadyMade = "decision_already_made".equals(errorCode);
-            long delayMs = ACCEPT_RETRY_BASE_DELAY_MS * attempt;
 
             if (transientSessionLookup && attempt < MAX_ACCEPT_ATTEMPTS) {
                 log.warn(
-                        "OpenAI Live accept session lookup not ready; retrying session={} attempt={}/{} delay_ms={} elapsed_ms={} request_id={} processing_ms={}",
-                        sessionId,
-                        attempt,
-                        MAX_ACCEPT_ATTEMPTS,
-                        delayMs,
-                        elapsedMs,
-                        requestId,
-                        processingMs);
+                        "OpenAI Live accept session lookup not ready; retrying session={} attempt={}/{} delay_ms={} attempt_ms={} elapsed_ms={} request_id={} processing_ms={}",
+                        sessionId, attempt, MAX_ACCEPT_ATTEMPTS, ACCEPT_RETRY_DELAY_MS,
+                        attemptMs, elapsedMs, requestId, processingMs);
                 try {
-                    Thread.sleep(delayMs);
+                    Thread.sleep(ACCEPT_RETRY_DELAY_MS);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    try {
-                        lifecycle.updateStatus(sessionId, "failed", null);
-                    } catch (Exception ignored) { }
                     throw new IllegalStateException("Interrupted while retrying OpenAI Live accept", e);
                 }
                 continue;
             }
-
-            try {
-                lifecycle.updateStatus(sessionId, "failed", null);
-            } catch (Exception ignored) { }
 
             if (decisionAlreadyMade) {
                 throw new IllegalStateException("OpenAI Live accept stopped because decision was already made"
                         + " status=" + response.statusCode()
                         + " request_id=" + requestId
                         + " processing_ms=" + processingMs
+                        + " attempt_ms=" + attemptMs
                         + " elapsed_ms=" + elapsedMs
                         + " session=" + sessionId
                         + " body=" + truncate(response.body()));
@@ -264,6 +298,7 @@ public class OpenAiLiveSipService {
                     + " processing_ms=" + processingMs
                     + " error_code=" + errorCode
                     + " attempt=" + attempt + "/" + MAX_ACCEPT_ATTEMPTS
+                    + " attempt_ms=" + attemptMs
                     + " elapsed_ms=" + elapsedMs
                     + " session=" + sessionId
                     + " body=" + truncate(response.body()));
@@ -309,11 +344,16 @@ public class OpenAiLiveSipService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private void pruneDedupSet() {
-        if (processedWebhookIds.size() <= MAX_DEDUP_IDS) return;
-        int toRemove = processedWebhookIds.size() - (MAX_DEDUP_IDS / 2);
-        for (String id : processedWebhookIds) {
-            processedWebhookIds.remove(id);
+    private void pruneDedupSets() {
+        prune(processedWebhookIds);
+        prune(processedSessionIds);
+    }
+
+    private static void prune(Set<String> values) {
+        if (values.size() <= MAX_DEDUP_IDS) return;
+        int toRemove = values.size() - (MAX_DEDUP_IDS / 2);
+        for (String id : values) {
+            values.remove(id);
             if (--toRemove <= 0) break;
         }
     }
