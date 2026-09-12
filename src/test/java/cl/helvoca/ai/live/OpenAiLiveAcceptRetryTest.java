@@ -35,11 +35,16 @@ class OpenAiLiveAcceptRetryTest {
     }
 
     @Test
-    void retriesOnlyTransientSessionLookupAndThenAccepts() throws Exception {
+    void retriesSessionLookupEvenWhenFirst404ArrivesAfterTwoSeconds() throws Exception {
         AtomicInteger requests = new AtomicInteger();
         server.createContext("/v1/live/sessions/live_retry_123/accept", exchange -> {
             int attempt = requests.incrementAndGet();
-            if (attempt < 3) {
+            if (attempt == 1) {
+                try {
+                    Thread.sleep(2_200L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
                 byte[] body = "{\"error\":{\"message\":\"No session found\",\"code\":\"session_id_not_found\"}}"
                         .getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -54,7 +59,7 @@ class OpenAiLiveAcceptRetryTest {
         Fixture fixture = fixture("live_retry_123");
         fixture.service.handleIncoming("webhook_retry_123", fixture.event);
 
-        assertEquals(3, requests.get());
+        assertEquals(2, requests.get());
         verify(fixture.sideband).attach("live_retry_123", fixture.context);
         verify(fixture.lifecycle, never()).updateStatus("live_retry_123", "failed", null);
     }
