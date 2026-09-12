@@ -61,7 +61,7 @@ public class OpenAiLiveSipService {
     public String twiml(String businessPhone, String callerPhone) {
         if (!isReady()) throw new IllegalStateException("GPT-Live SIP is not configured");
         String route = routeSigner.sign(businessPhone, callerPhone);
-        String sipUri = "sip:" + live.getProjectId().trim() + "@sip.api.openai.com;transport=tls"
+        String sipUri = "sip:" + live.getProjectId().trim() + "@sip.api.openai.com;secure=true"
                 + "?x-recepvoz-business=" + url(businessPhone)
                 + "&x-recepvoz-caller=" + url(callerPhone)
                 + "&x-recepvoz-route=" + url(route);
