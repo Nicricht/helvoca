@@ -17,12 +17,16 @@ public class VoiceAiProviderRegistry {
     }
 
     public VoiceAiProvider active() {
-        String configuredId = normalize(properties.getAiProvider());
+        return require(properties.getAiProvider());
+    }
+
+    public VoiceAiProvider require(String providerId) {
+        String configuredId = normalize(providerId);
         return providers.stream()
                 .filter(provider -> normalize(provider.id()).equals(configuredId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
-                        "Unknown voice AI provider '" + properties.getAiProvider() + "'. Available: " + availableIds()));
+                        "Unknown voice AI provider '" + providerId + "'. Available: " + availableIds()));
     }
 
     public boolean configured() {
@@ -33,8 +37,12 @@ public class VoiceAiProviderRegistry {
         return active().id();
     }
 
+    public List<String> providerIds() {
+        return providers.stream().map(VoiceAiProvider::id).sorted().toList();
+    }
+
     private String availableIds() {
-        return providers.stream().map(VoiceAiProvider::id).sorted().toList().toString();
+        return providerIds().toString();
     }
 
     private static String normalize(String value) {

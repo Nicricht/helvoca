@@ -57,6 +57,16 @@ public class BusinessRequestService {
                                         String requestType, String title, String description,
                                         String contactName, String contactPhone,
                                         RequestPriority priority, String detailsJson) {
+        return createFromAi(businessId, customerId, callId, requestType, title, description,
+                contactName, contactPhone, priority, detailsJson, RequestSource.AI_CALL);
+    }
+
+    @Transactional
+    public BusinessRequest createFromAi(UUID businessId, UUID customerId, UUID callId,
+                                        String requestType, String title, String description,
+                                        String contactName, String contactPhone,
+                                        RequestPriority priority, String detailsJson,
+                                        RequestSource source) {
         BusinessRequest request = new BusinessRequest();
         request.setBusinessId(businessId);
         request.setCustomerId(customerId);
@@ -68,7 +78,7 @@ public class BusinessRequestService {
         request.setContactPhone(blankToNull(contactPhone));
         request.setPriority(priority == null ? RequestPriority.NORMAL : priority);
         request.setStatus(RequestStatus.OPEN);
-        request.setSource(RequestSource.AI_CALL);
+        request.setSource(source == null ? RequestSource.AI_CALL : source);
         request.setDetailsJson(blankToNull(detailsJson));
         return repository.saveAndFlush(request);
     }

@@ -3,18 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Helvoca · Operaciones</title>
+  <title>RecepVoz · Operaciones</title>
   <link rel="stylesheet" href="/operations.css">
 </head>
 <body>
 <header class="topbar">
-  <div><strong>HELVOCA</strong><span>Operaciones</span></div>
-  <nav><a href="/">Configuración</a><button id="refreshBtn">Actualizar</button></nav>
+  <div><strong>RECEPVOZ</strong><span>Operaciones</span></div>
+  <nav><a href="/simulator.html">Probar recepcionista</a><a href="/">Configuración</a><button id="refreshBtn">Actualizar</button></nav>
 </header>
 <main>
   <section class="hero">
-    <div><p class="eyebrow">HOY</p><h1 id="businessName">Helvoca</h1><p id="localNow" class="muted">Cargando…</p></div>
+    <div><p class="eyebrow">HOY</p><h1 id="businessName">RecepVoz</h1><p id="localNow" class="muted">Cargando…</p></div>
     <div id="healthBadge" class="badge">Conectando</div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div><p class="eyebrow">LISTO PARA PRODUCCIÓN</p><h2>Estado comercial de voz</h2><p class="muted">Verifica el núcleo Realtime sin depender de un nicho específico.</p></div>
+      <div id="readinessBadge" class="badge">Verificando</div>
+    </div>
+    <div id="readinessChecks" class="list"></div>
+    <div id="capabilities" class="meta"></div>
+    <div id="readinessWarnings" class="list"></div>
   </section>
 
   <section id="metrics" class="metrics">
@@ -46,8 +56,27 @@
     </article>
   </section>
 
+  <section id="callDetailPanel" class="panel call-detail hidden">
+    <div class="panel-head">
+      <div><p class="eyebrow">TRAZABILIDAD</p><h2>Detalle de llamada</h2><p id="callDetailMeta" class="muted"></p></div>
+      <button id="closeCallDetailBtn" class="ghost">Cerrar</button>
+    </div>
+    <div class="grid two call-detail-grid">
+      <div>
+        <h3>Resumen</h3>
+        <div id="callSummary" class="detail-box"></div>
+        <h3>Acciones verificadas</h3>
+        <div id="callActions" class="list"></div>
+      </div>
+      <div>
+        <h3>Transcripción</h3>
+        <div id="callTranscript" class="transcript"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="panel learning">
-    <div class="panel-head"><div><p class="eyebrow">APRENDIZAJE</p><h2>Preguntas que Helvoca todavía no sabe</h2><p class="muted">Responde una vez y la respuesta entra a la base de conocimiento del negocio.</p></div></div>
+    <div class="panel-head"><div><p class="eyebrow">APRENDIZAJE</p><h2>Preguntas que RecepVoz todavía no sabe</h2><p class="muted">Responde una vez y la respuesta entra a la base de conocimiento del negocio.</p></div></div>
     <div id="questionsList" class="list"></div>
   </section>
 

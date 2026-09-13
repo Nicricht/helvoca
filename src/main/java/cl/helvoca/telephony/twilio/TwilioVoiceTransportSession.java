@@ -8,78 +8,83 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
-/**
- * Twilio-specific implementation of the provider-neutral voice transport port.
- */
-public final class TwilioVoiceTransportSession implements VoiceTransportSession {
+import java.io.IOException;
+
+final class TwilioVoiceTransportSession implements VoiceTransportSession {
     private static final Logger log = LoggerFactory.getLogger(TwilioVoiceTransportSession.class);
 
-    private final WebSocketSession session;
+    private final WebSocketSession socket;
+    private final String streamSid;
     private final String accountSid;
     private final String callSid;
-    private final TwilioCallControl callControl;
+    private final TwilioCallControl control;
+    private final Object sendLock = new Object();
 
-    public TwilioVoiceTransportSession(WebSocketSession session,
-                                       String accountSid,
-                                       String callSid,
-                                       TwilioCallControl callControl) {
-        this.session = session;
+    TwilioVoiceTransportSession(WebSocketSession socket,
+                                String streamSid,
+                                String accountSid,
+                                String callSid,
+                                TwilioCallControl control) {
+        this.socket = socket;
+        this.streamSid = streamSid;
         this.accountSid = accountSid;
         this.callSid = callSid;
-        this.callControl = callControl;
+        this.control = control;
     }
 
     @Override
     public String id() {
-        return session.getId();
+        return streamSid;
     }
 
     @Override
     public boolean isOpen() {
-        return session.isOpen();
+        return socket.isOpen();
     }
 
     @Override
     public void sendAudio(String streamId, String base64Audio) {
-        if (base64Audio == null || base64Audio.isBlank()) return;
+        if (!matches(streamId) || base64Audio == null || base64Audio.isBlank()) return;
         send(new JSONObject()
                 .put("event", "media")
-                .put("streamSid", streamId)
+                .put("streamSid", streamSid)
                 .put("media", new JSONObject().put("payload", base64Audio)));
     }
 
     @Override
     public void clearPlayback(String streamId) {
-        send(new JSONObject().put("event", "clear").put("streamSid", streamId));
+        if (!matches(streamId)) return;
+        send(new JSONObject().put("event", "clear").put("streamSid", streamSid));
     }
 
     @Override
     public boolean transferToHuman(String targetPhone) {
-        if (!session.isOpen()) return false;
-        return callControl.transferToHuman(accountSid, callSid, targetPhone);
+        return control.transferToHuman(accountSid, callSid, targetPhone);
     }
 
     @Override
     public void closeOnUpstreamFailure() {
-        // Prefer changing the live call to a short spoken fallback. Twilio will
-        // then close the Media Stream as it begins executing the replacement
-        // TwiML. If the REST update itself fails, close the WebSocket so the
-        // caller is never left attached to a dead AI stream indefinitely.
-        if (callControl.failGracefully(accountSid, callSid)) return;
+        control.hangup(accountSid, callSid);
         try {
-            if (session.isOpen()) session.close(CloseStatus.SERVER_ERROR);
-        } catch (Exception e) {
-            log.warn("Could not close Twilio transport session {}: {}", session.getId(), e.getMessage());
+            if (socket.isOpen()) socket.close(CloseStatus.SERVER_ERROR);
+        } catch (IOException e) {
+            log.debug("Could not close failed Twilio media socket call={}: {}", callSid, e.getMessage());
         }
     }
 
     private void send(JSONObject payload) {
-        try {
-            synchronized (session) {
-                if (session.isOpen()) session.sendMessage(new TextMessage(payload.toString()));
+        synchronized (sendLock) {
+            if (!socket.isOpen()) return;
+            try {
+                socket.sendMessage(new TextMessage(payload.toString()));
+            } catch (IOException e) {
+                log.warn("Could not send Twilio media message call={} stream={}: {}",
+                        callSid, streamSid, e.getMessage());
             }
-        } catch (Exception e) {
-            log.warn("Could not send Twilio media event on session {}: {}", session.getId(), e.getMessage());
         }
+    }
+
+    private boolean matches(String streamId) {
+        return streamId != null && streamId.equals(streamSid);
     }
 }

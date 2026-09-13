@@ -21,10 +21,13 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
 
 springdoc:
+  api-docs:
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
   swagger-ui:
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:false}
     path: /swagger-ui.html
 
 app:
@@ -36,30 +39,73 @@ app:
     enabled: ${SEED_ENABLED:false}
     admin-email: ${SEED_ADMIN_EMAIL:admin@helvoca.local}
     admin-password: ${SEED_ADMIN_PASSWORD:ChangeMe123!}
+  security:
+    rate-limit:
+      enabled: ${HELVOCA_RATE_LIMIT_ENABLED:true}
+      login:
+        requests: ${HELVOCA_RATE_LIMIT_LOGIN_REQUESTS:20}
+        window-seconds: ${HELVOCA_RATE_LIMIT_LOGIN_WINDOW_SECONDS:60}
+      register:
+        requests: ${HELVOCA_RATE_LIMIT_REGISTER_REQUESTS:5}
+        window-seconds: ${HELVOCA_RATE_LIMIT_REGISTER_WINDOW_SECONDS:3600}
+      public-api:
+        requests: ${HELVOCA_RATE_LIMIT_PUBLIC_REQUESTS:120}
+        window-seconds: ${HELVOCA_RATE_LIMIT_PUBLIC_WINDOW_SECONDS:60}
+      billing:
+        requests: ${HELVOCA_RATE_LIMIT_BILLING_REQUESTS:20}
+        window-seconds: ${HELVOCA_RATE_LIMIT_BILLING_WINDOW_SECONDS:60}
+      authenticated-api:
+        requests: ${HELVOCA_RATE_LIMIT_AUTHENTICATED_REQUESTS:600}
+        window-seconds: ${HELVOCA_RATE_LIMIT_AUTHENTICATED_WINDOW_SECONDS:60}
+  commercial:
+    calls:
+      max-concurrent-per-business: ${HELVOCA_MAX_CONCURRENT_CALLS_PER_BUSINESS:10}
+      telephony-cost-per-minute-usd: ${HELVOCA_TELEPHONY_COST_PER_MINUTE_USD:0}
+      ai-cost-per-minute-usd: ${HELVOCA_AI_COST_PER_MINUTE_USD:0}
   voice:
     telephony-provider: ${HELVOCA_TELEPHONY_PROVIDER:twilio}
     ai-provider: ${HELVOCA_VOICE_AI_PROVIDER:openai}
+    provider-order: ${HELVOCA_VOICE_PROVIDER_ORDER:gemini,openai-live}
   twilio:
-    account-sid: ${TWILIO_ACCOUNT_SID:}
     auth-token: ${TWILIO_AUTH_TOKEN:}
     public-base-url: ${TWILIO_PUBLIC_BASE_URL:}
-    media-stream-url: ${TWILIO_MEDIA_STREAM_URL:}
-    trial:
-      enabled: ${TWILIO_TRIAL_MODE_ENABLED:false}
-      phone-number: ${TWILIO_TRIAL_PHONE_NUMBER:}
-      business-name: ${TWILIO_TRIAL_BUSINESS_NAME:Helvoca Restaurante Demo}
-      greeting: ${TWILIO_TRIAL_GREETING:Hola, soy Helvoca. Puedes preguntarme por los servicios o pedirme una reserva.}
-      language: ${TWILIO_TRIAL_LANGUAGE:es-CL}
-      tts-language: ${TWILIO_TRIAL_TTS_LANGUAGE:es-MX}
-      tts-voice: ${TWILIO_TRIAL_TTS_VOICE:Polly.Mía-Generative}
-      max-turns: ${TWILIO_TRIAL_MAX_TURNS:8}
-      webhook-secret: ${TWILIO_TRIAL_WEBHOOK_SECRET:}
+    media-stream-path: ${TWILIO_MEDIA_STREAM_PATH:/ws/v1/twilio/media}
+    certification-ingress-enabled: ${TWILIO_CERTIFICATION_INGRESS_ENABLED:false}
+  whatsapp:
+    enabled: ${TWILIO_WHATSAPP_ENABLED:false}
+    webhook-validation-enabled: ${TWILIO_WHATSAPP_WEBHOOK_VALIDATION_ENABLED:true}
+    session-hours: ${TWILIO_WHATSAPP_SESSION_HOURS:24}
+  mercadopago:
+    enabled: ${MERCADOPAGO_ENABLED:false}
+    access-token: ${MERCADOPAGO_ACCESS_TOKEN:}
+    webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
+    back-url: ${MERCADOPAGO_BACK_URL:}
+    webhook-tolerance-seconds: ${MERCADOPAGO_WEBHOOK_TOLERANCE_SECONDS:300}
+  gemini:
+    live:
+      enabled: ${GEMINI_LIVE_ENABLED:false}
+      certification-simulation: ${GEMINI_CERTIFICATION_SIMULATION:false}
+      certification-caller: ${GEMINI_CERTIFICATION_CALLER:}
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_LIVE_MODEL:gemini-3.1-flash-live-preview}
+      voice: ${GEMINI_LIVE_VOICE:Kore}
+      websocket-url: ${GEMINI_LIVE_WEBSOCKET_URL:wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent}
   openai:
     api-key: ${OPENAI_API_KEY:}
     realtime-model: ${OPENAI_REALTIME_MODEL:gpt-realtime-2.1}
     voice: ${OPENAI_REALTIME_VOICE:marin}
     transcription-model: ${OPENAI_TRANSCRIPTION_MODEL:gpt-live-transcribe}
     summary-model: ${OPENAI_SUMMARY_MODEL:gpt-5.6-luna}
-    trial-model: ${OPENAI_TRIAL_MODEL:gpt-5.6-luna}
+    simulator-model: ${OPENAI_SIMULATOR_MODEL:gpt-5.6-luna}
     realtime-url: ${OPENAI_REALTIME_URL:wss://api.openai.com/v1/realtime}
     responses-url: ${OPENAI_RESPONSES_URL:https://api.openai.com/v1/responses}
+    live:
+      enabled: ${OPENAI_LIVE_ENABLED:false}
+      project-id: ${OPENAI_PROJECT_ID:}
+      webhook-secret: ${OPENAI_LIVE_WEBHOOK_SECRET:${OPENAI_WEBHOOK_SECRET:}}
+      model: ${OPENAI_LIVE_MODEL:gpt-live-1}
+      backend-model: ${OPENAI_LIVE_BACKEND_MODEL:gpt-5.6-luna}
+      voice: ${OPENAI_LIVE_VOICE:marin}
+      api-base-url: ${OPENAI_LIVE_API_BASE_URL:https://api.openai.com/v1}
+      sideband-base-url: ${OPENAI_LIVE_SIDEBAND_BASE_URL:wss://api.openai.com/v1}
+      webhook-tolerance-seconds: ${OPENAI_LIVE_WEBHOOK_TOLERANCE_SECONDS:300}

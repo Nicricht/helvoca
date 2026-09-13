@@ -1,12 +1,12 @@
-# Helvoca - Product V1
+# RecepVoz - Product V1
 
-Helvoca es un SaaS multi-tenant de atención telefónica con IA para empresas. El backend cuenta con autenticación, aislamiento por tenant, clientes, servicios, reservas, conocimiento empresarial, telefonía, agente de voz, herramientas controladas por backend y trazabilidad de llamadas.
+RecepVoz es un SaaS multi-tenant de atención telefónica con IA para empresas. El backend cuenta con autenticación, aislamiento por tenant, clientes, servicios, reservas, conocimiento empresarial, telefonía, agente de voz, herramientas controladas por backend y trazabilidad de llamadas.
 
 ## Enfoque de producto
 
-La V1 se concentra primero en negocios que trabajan con horas o reservas. La promesa comercial es simple: Helvoca contesta, resuelve preguntas repetitivas, agenda clientes y escala a una persona cuando corresponde.
+La V1 se concentra primero en negocios que trabajan con horas o reservas. La promesa comercial es simple: RecepVoz contesta, resuelve preguntas repetitivas, agenda clientes y escala a una persona cuando corresponde.
 
-El core ya no debe depender de un proveedor específico. Twilio y OpenAI son los primeros adaptadores, no la arquitectura completa del producto.
+El core no depende de un proveedor específico. Twilio transporta las llamadas y RecepVoz selecciona un proveedor de voz en tiempo real saludable antes de construir la ruta de audio.
 
 ## Estado actual
 
@@ -36,27 +36,30 @@ El core ya no debe depender de un proveedor específico. Twilio y OpenAI son los
 
 ### Voz
 
-- Twilio Voice + Media Streams como primer adaptador de telefonía
-- OpenAI Realtime como primer adaptador de IA de voz
-- Server VAD
-- interrupciones / barge-in
-- audio PCMU bidireccional
-- modo Twilio Trial mediante `<Gather input="speech">` + `<Say>`
+- voice edge multi-provider
+- Gemini Live con audio nativo mediante Twilio Bidirectional Media Streams
+- OpenAI GPT-Live mediante SIP seguro/SRTP como proveedor alternativo
+- conversación full-duplex con interrupciones
+- herramientas de negocio compartidas por todos los proveedores
+- circuit breaker para créditos, autenticación, rate limits, sesiones y errores upstream
+- fail-closed cuando no existe un proveedor saludable
+- sin fallback a Twilio `<Gather>`, `<Say>` ni voces Polly
+- sin pipeline clásico STT → LLM → TTS para Gemini Live o GPT-Live
 
 ## Arquitectura independiente de proveedores
-
-Helvoca define puertos propios para voz:
 
 ```text
 Caller
   ↓
-Telephony adapter
+Twilio
   ↓
-CallLifecycleService
+RecepVoz Voice Edge
   ↓
-VoiceAiProvider
+VoiceCallRouter
+  ├── Gemini Live      → Bidirectional Media Stream → audio nativo
+  └── OpenAI GPT-Live → SIP seguro / SRTP
   ↓
-Helvoca tools / business rules
+RecepVoz tools / business rules
   ↓
 PostgreSQL
 ```
@@ -67,58 +70,110 @@ Contratos principales:
 - `VoiceAiSession`
 - `VoiceTransportSession`
 - `VoiceAiProviderRegistry`
+- `VoiceCallRouter`
+- `VoiceProviderHealthRegistry`
 - `CallLifecycleService`
 
-`OpenAiRealtimeBridgeFactory` implementa `VoiceAiProvider` y `TwilioVoiceTransportSession` adapta el WebSocket de Twilio a `VoiceTransportSession`. El AI provider ya no necesita conocer el protocolo de Twilio.
-
-Selección actual:
+El orden se controla por configuración:
 
 ```text
 HELVOCA_TELEPHONY_PROVIDER=twilio
-HELVOCA_VOICE_AI_PROVIDER=openai
+HELVOCA_VOICE_PROVIDER_ORDER=gemini,openai-live
 ```
 
-La base queda preparada para añadir adapters Telnyx, SIP u otros motores de IA sin reescribir reservas, clientes, conocimiento ni reglas multi-tenant.
+El router selecciona el primer proveedor configurado y saludable. Si un proveedor devuelve un fallo operativo, su circuito se abre temporalmente y las llamadas posteriores pueden usar el siguiente proveedor. Si ninguno está listo, RecepVoz falla cerrado en vez de enviar llamadas hacia una IA que sabemos que no funciona.
+
+## Gemini Live
+
+Gemini usa Twilio Media Streams únicamente como transporte de audio. No se convierte la conversación en un pipeline tradicional de STT, modelo de texto y TTS.
+
+```text
+Teléfono
+  ↓ PCMU 8 kHz
+Twilio Media Stream
+  ↓
+RecepVoz Voice Edge
+  ↓ PCM16 16 kHz
+Gemini Live
+  ↓ PCM16 24 kHz
+RecepVoz Voice Edge
+  ↓ PCMU 8 kHz
+Twilio
+  ↓
+Teléfono
+```
+
+Configuración:
+
+```text
+GEMINI_LIVE_ENABLED=true
+GEMINI_API_KEY=tu_api_key
+GEMINI_LIVE_MODEL=gemini-3.1-flash-live-preview
+GEMINI_LIVE_VOICE=Kore
+```
+
+No habilites Gemini hasta haber configurado una credencial válida.
+
+## OpenAI GPT-Live
+
+GPT-Live conserva la ruta SIP directa y puede seguir formando parte del orden de failover:
+
+```text
+OPENAI_LIVE_ENABLED=true
+OPENAI_PROJECT_ID=tu_project_id
+OPENAI_WEBHOOK_SECRET=tu_webhook_secret
+OPENAI_LIVE_MODEL=gpt-live-1
+OPENAI_LIVE_VOICE=marin
+```
+
+Errores terminales como falta de créditos o autenticación abren el circuit breaker. RecepVoz también reconoce esos fallos como decisiones terminales para evitar redeliveries inútiles del mismo webhook.
+
+## Readiness operativo
+
+`/actuator/health` indica si la aplicación está viva. La capacidad real de atender llamadas se consulta mediante:
+
+```text
+GET /api/v1/operations/voice-readiness
+GET /api/v1/operations/readiness
+```
+
+Ejemplo conceptual:
+
+```text
+Gemini       READY
+OpenAI Live  OPEN / NO_CREDITS
+Selected     gemini
+Voice        READY
+```
+
+O, si ningún proveedor puede atender:
+
+```text
+Gemini       UNCONFIGURED
+OpenAI Live  OPEN / NO_CREDITS
+Selected     none
+Voice        NOT READY
+```
 
 ## Regla crítica multi-tenant
 
 Las APIs administrativas no confían en un `businessId` enviado por el frontend. El backend obtiene `business_id` desde el JWT mediante `TenantProvider` y filtra las consultas por tenant.
 
-Los webhooks de producción de Twilio se autentican mediante `X-Twilio-Signature`. Las tools de voz tampoco aceptan un tenant elegido por el modelo: utilizan un `RealtimeCallContext` construido desde una llamada previamente resuelta por Helvoca.
+Los webhooks HTTP de Twilio se autentican mediante `X-Twilio-Signature`. El inicio de cada Media Stream además lleva metadata de ruta firmada y de corta duración que liga negocio, caller, `CallSid` y proveedor. Las tools de voz tampoco aceptan un tenant elegido por el modelo: utilizan un `RealtimeCallContext` construido desde una llamada previamente resuelta por RecepVoz.
 
 ## Regla crítica de IA
 
 El modelo solicita acciones, pero el backend decide su resultado.
 
 ```text
-IA → function call → Helvoca → PostgreSQL → tool result → IA
+IA → function call → RecepVoz → PostgreSQL → tool result → IA
 ```
 
-Una reserva solo puede ser anunciada como confirmada si Helvoca devuelve éxito. Un error como `BOOKING_SLOT_UNAVAILABLE` debe comunicarse como error, nunca como una confirmación inventada.
-
-## Trazabilidad de proveedores
-
-Cada `call_session` registra:
-
-```text
-telephony_provider
-ai_provider
-```
-
-Eso permite construir después costos por llamada, comparación de proveedores, fallback y margen por negocio sin adivinar qué infraestructura atendió cada conversación.
+Una reserva solo puede ser anunciada como confirmada si RecepVoz devuelve éxito. Un error como `BOOKING_SLOT_UNAVAILABLE` debe comunicarse como error, nunca como una confirmación inventada.
 
 ## Base de datos
 
-Flyway aplica:
-
-- `V1__foundation.sql`
-- `V2__seed_roles.sql`
-- `V3__sprint2_core.sql`
-- `V4__sprint3_telephony.sql`
-- `V5__sprint4_ai_voice.sql`
-- `V6__provider_independent_voice.sql`
-
-V5 incorpora `call_summary`. V6 incorpora trazabilidad de proveedor telefónico y proveedor de IA en `call_session`.
+Flyway administra el esquema y PostgreSQL sigue siendo la fuente de verdad del negocio.
 
 ## Ejecutar con Docker
 
@@ -139,17 +194,16 @@ Health:
 http://localhost:8080/actuator/health
 ```
 
-## Configurar Twilio + OpenAI
+## Configurar Twilio
 
 No guardes tokens ni API keys reales en Git.
 
 ```text
 HELVOCA_TELEPHONY_PROVIDER=twilio
-HELVOCA_VOICE_AI_PROVIDER=openai
+HELVOCA_VOICE_PROVIDER_ORDER=gemini,openai-live
 TWILIO_AUTH_TOKEN=tu_token
 TWILIO_PUBLIC_BASE_URL=https://tu-dominio-publico
-TWILIO_MEDIA_STREAM_URL=wss://tu-dominio-publico/ws/twilio
-OPENAI_API_KEY=tu_api_key
+TWILIO_MEDIA_STREAM_PATH=/ws/v1/twilio/media
 ```
 
 Configura el número Twilio para llamar por POST a:
@@ -164,7 +218,13 @@ Callback de estados:
 https://tu-dominio-publico/webhooks/v1/twilio/status
 ```
 
-Después registra ese número en Helvoca mediante `POST /api/v1/phone-numbers`.
+Para una prueba outbound, la ruta canónica es:
+
+```text
+https://tu-dominio-publico/webhooks/v1/twilio/outbound-test
+```
+
+La ruta interna `/webhooks/v1/twilio/inbound-certification` está deshabilitada por defecto. Solo una certificación real explícitamente autorizada debe habilitarla temporalmente con `TWILIO_CERTIFICATION_INGRESS_ENABLED=true`, junto con la simulación y el caller de certificación correspondientes. La antigua ruta `/webhooks/v1/twilio/trial/voice` fue retirada.
 
 ## Documentación
 
@@ -173,23 +233,18 @@ Después registra ese número en Helvoca mediante `POST /api/v1/phone-numbers`.
 - `docs/SPRINT2.md`
 - `docs/SPRINT3.md`
 - `docs/SPRINT4.md`
-- `docs/TRIAL_VOICE.md`
 - `docs/API.md`
 - `docs/design/`
 
 ## Próximos hitos comerciales
 
-El orden recomendado desde aquí es:
-
-1. llamada telefónica real estable
-2. conversación Realtime estable
-3. configuración del agente por tenant
-4. horarios y excepciones
-5. transferencia humana
-6. dashboard mínimo
-7. onboarding self-service
-8. medición de uso y costo por llamada
-9. planes, límites y billing
-10. primer cliente pagado
-
-Redis, Telnyx, SIP y proveedores adicionales se incorporan cuando resuelvan una necesidad medida de escala, costo, disponibilidad o geografía. Helvoca se mantiene como monolito modular mientras esa sea la opción más simple y confiable.
+1. configurar al menos un proveedor Live con credenciales y capacidad activa
+2. certificar una llamada real completa con audio, interrupciones y tool calling
+3. agregar un tercer proveedor full-duplex como contingencia comercial
+4. configuración del agente por tenant
+5. horarios y excepciones
+6. transferencia humana
+7. dashboard mínimo
+8. onboarding self-service
+9. medición de uso y costo por llamada
+10. planes, límites y billing

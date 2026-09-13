@@ -1,5 +1,6 @@
 package cl.helvoca.auth;
 
+import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.common.ConflictException;
@@ -7,6 +8,7 @@ import cl.helvoca.user.AppUser;
 import cl.helvoca.user.AppUserRepository;
 import cl.helvoca.user.RoleCode;
 import cl.helvoca.user.RoleRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +23,7 @@ public class RegistrationService {
     private final RoleRepository roles;
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
+    private BusinessSubscriptionService subscriptions;
 
     public RegistrationService(BusinessRepository businesses,
                                AppUserRepository users,
@@ -32,6 +35,11 @@ public class RegistrationService {
         this.roles = roles;
         this.passwordEncoder = passwordEncoder;
         this.authService = authService;
+    }
+
+    @Autowired(required = false)
+    void setSubscriptions(BusinessSubscriptionService subscriptions) {
+        this.subscriptions = subscriptions;
     }
 
     @Transactional
@@ -48,6 +56,9 @@ public class RegistrationService {
         business.setLanguage(request.language().trim().toLowerCase(Locale.ROOT));
         business.setHumanTransferPhone(normalizePhone(request.humanTransferPhone()));
         business = businesses.saveAndFlush(business);
+        if (subscriptions != null) {
+            subscriptions.startBasicTrial(business.getId());
+        }
 
         var businessAdmin = roles.findByCode(RoleCode.BUSINESS_ADMIN)
                 .orElseThrow(() -> new IllegalStateException("BUSINESS_ADMIN role is not configured"));

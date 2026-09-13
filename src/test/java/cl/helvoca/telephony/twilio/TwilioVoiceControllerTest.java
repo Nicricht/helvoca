@@ -1,139 +1,154 @@
 package cl.helvoca.telephony.twilio;
 
-import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.call.CallSummaryService;
-import cl.helvoca.telephony.twilio.trial.TrialConversationStateService;
-import cl.helvoca.telephony.twilio.trial.TrialVoiceConversationService;
-import cl.helvoca.telephony.twilio.trial.TrialVoiceProperties;
-import cl.helvoca.telephony.twilio.trial.TrialVoiceReply;
+import cl.helvoca.telephony.CallCapacityExceededException;
+import cl.helvoca.voice.VoiceCallRouter;
 import org.junit.jupiter.api.Test;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 class TwilioVoiceControllerTest {
+    private static final String SILENT_HANGUP =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>";
+    private static final String BUSY_REJECT =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Reject reason=\"busy\"/></Response>";
+    private static final String CALL_SID = "CA0123456789abcdef0123456789abcdef";
+
+    private static TwilioVoiceController controller(TwilioCallService calls,
+                                                    VoiceCallRouter router,
+                                                    CallSummaryService summaries,
+                                                    boolean certificationEnabled) {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setCertificationIngressEnabled(certificationEnabled);
+        return new TwilioVoiceController(calls, router, summaries, properties);
+    }
+
+    @Test
+    void inboundIsAdmittedBeforeRouterDecision() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        String twiml = "<Response><Connect><Stream url=\"wss://example/ws\"/></Connect></Response>";
+        when(router.route("+14355652512", "+56911111111", CALL_SID))
+                .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
+                        "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
+
+        var response = controller(calls, router, summaries, false)
+                .incoming(CALL_SID, "+56911111111", "+14355652512");
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(twiml, response.getBody());
+        verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
+        verify(router).route("+14355652512", "+56911111111", CALL_SID);
+        verifyNoInteractions(summaries);
+    }
+
+    @Test
+    void capacityRejectionNeverTouchesVoiceProviderRouter() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        doThrow(new CallCapacityExceededException("full"))
+                .when(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
+
+        var response = controller(calls, router, summaries, false)
+                .incoming(CALL_SID, "+56911111111", "+14355652512");
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(BUSY_REJECT, response.getBody());
+        verifyNoInteractions(router, summaries);
+    }
+
+    @Test
+    void inboundCertificationUsesSameBusinessCallerMappingWhenExplicitlyEnabled() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        String twiml = "<Response><Connect><Stream url=\"wss://example/ws\"/></Connect></Response>";
+        when(router.route("+14355652512", "+56911111111", CALL_SID))
+                .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
+                        "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
+
+        var response = controller(calls, router, summaries, true)
+                .inboundCertification(CALL_SID, "+14355652512", "+56911111111");
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(twiml, response.getBody());
+        verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
+        verify(router).route("+14355652512", "+56911111111", CALL_SID);
+        verifyNoInteractions(summaries);
+    }
+
+    @Test
+    void inboundCertificationFailsClosedByDefault() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+
+        var response = controller(calls, router, summaries, false)
+                .inboundCertification(CALL_SID, "+14355652512", "+56911111111");
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(SILENT_HANGUP, response.getBody());
+        verifyNoInteractions(router, calls, summaries);
+    }
+
+    @Test
+    void inboundFailsClosedWhenNoVoiceProviderIsHealthy() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        when(router.route("+14355652512", "+56911111111", CALL_SID)).thenReturn(Optional.empty());
+
+        var response = controller(calls, router, summaries, false)
+                .incoming(CALL_SID, "+56911111111", "+14355652512");
+
+        assertEquals(SILENT_HANGUP, response.getBody());
+        verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
+        verifyNoInteractions(summaries);
+    }
+
+    @Test
+    void streamErrorMarksMediaStreamStopped() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+
+        var response = controller(calls, router, summaries, false)
+                .streamStatus("MZ-1", "stream-error", CALL_SID, "network");
+
+        assertEquals(204, response.getStatusCode().value());
+        verify(calls).markStreamStopped("MZ-1");
+    }
 
     @Test
     void terminalStatusGeneratesSummaryForPersistedCall() {
         TwilioCallService calls = mock(TwilioCallService.class);
-        TwimlFactory twiml = mock(TwimlFactory.class);
-        TrialVoiceProperties trial = mock(TrialVoiceProperties.class);
-        TrialVoiceConversationService conversation = mock(TrialVoiceConversationService.class);
-        TrialConversationStateService state = mock(TrialConversationStateService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
-        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, trial, conversation, state, summaries);
-
         UUID callId = UUID.randomUUID();
-        when(calls.updateStatus("CA-TERMINAL", "completed", 42)).thenReturn(callId);
+        when(calls.updateStatus(CALL_SID, "completed", 42)).thenReturn(callId);
 
-        var response = controller.status("CA-TERMINAL", "completed", 42);
+        var response = controller(calls, router, summaries, false).status(CALL_SID, "completed", 42);
 
         assertEquals(204, response.getStatusCode().value());
-        verify(calls).updateStatus("CA-TERMINAL", "completed", 42);
         verify(summaries).generate(callId);
     }
 
     @Test
     void nonTerminalStatusDoesNotGenerateSummary() {
         TwilioCallService calls = mock(TwilioCallService.class);
-        TwimlFactory twiml = mock(TwimlFactory.class);
-        TrialVoiceProperties trial = mock(TrialVoiceProperties.class);
-        TrialVoiceConversationService conversation = mock(TrialVoiceConversationService.class);
-        TrialConversationStateService state = mock(TrialConversationStateService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
-        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, trial, conversation, state, summaries);
+        when(calls.updateStatus(CALL_SID, "in-progress", null)).thenReturn(UUID.randomUUID());
 
-        UUID callId = UUID.randomUUID();
-        when(calls.updateStatus("CA-ACTIVE", "in-progress", null)).thenReturn(callId);
-
-        var response = controller.status("CA-ACTIVE", "in-progress", null);
+        var response = controller(calls, router, summaries, false).status(CALL_SID, "in-progress", null);
 
         assertEquals(204, response.getStatusCode().value());
-        verify(calls).updateStatus("CA-ACTIVE", "in-progress", null);
         verifyNoInteractions(summaries);
-    }
-
-    @Test
-    void trialGatherBridgesToTrustedHumanTargetWhenTransferWasRequested() {
-        TwilioCallService calls = mock(TwilioCallService.class);
-        TwimlFactory twiml = mock(TwimlFactory.class);
-        TrialVoiceProperties trial = mock(TrialVoiceProperties.class);
-        TrialVoiceConversationService conversation = mock(TrialVoiceConversationService.class);
-        TrialConversationStateService state = mock(TrialConversationStateService.class);
-        CallSummaryService summaries = mock(CallSummaryService.class);
-        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, trial, conversation, state, summaries);
-
-        UUID callId = UUID.randomUUID();
-        UUID businessId = UUID.randomUUID();
-        RealtimeCallContext context = new RealtimeCallContext(
-                callId, businessId, null, "+56911111111", "+17372508034", "trial:CA-TRANSFER");
-        when(trial.isEnabled()).thenReturn(true);
-        when(calls.getTrialContext("CA-TRANSFER")).thenReturn(context);
-        when(conversation.reply(context, "quiero hablar con una persona"))
-                .thenReturn(new TrialVoiceReply("Listo.", false));
-        when(state.consumeHumanTransferTarget(callId)).thenReturn("+56922222222");
-        when(twiml.trialTransfer("Claro, te comunico con una persona del negocio.", "+56922222222"))
-                .thenReturn("<Response><Dial/></Response>");
-
-        var response = controller.trialGather("CA-TRANSFER", "quiero hablar con una persona");
-
-        assertEquals(200, response.getStatusCode().value());
-        assertEquals("<Response><Dial/></Response>", response.getBody());
-        verify(twiml).trialTransfer("Claro, te comunico con una persona del negocio.", "+56922222222");
-        verify(twiml, never()).trialGather(anyString());
-    }
-
-    @Test
-    void failedHumanDialReturnsCallerToHelvoca() {
-        TwilioCallService calls = mock(TwilioCallService.class);
-        TwimlFactory twiml = mock(TwimlFactory.class);
-        TrialVoiceProperties trial = mock(TrialVoiceProperties.class);
-        TrialVoiceConversationService conversation = mock(TrialVoiceConversationService.class);
-        TrialConversationStateService state = mock(TrialConversationStateService.class);
-        CallSummaryService summaries = mock(CallSummaryService.class);
-        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, trial, conversation, state, summaries);
-
-        UUID callId = UUID.randomUUID();
-        RealtimeCallContext context = new RealtimeCallContext(
-                callId, UUID.randomUUID(), null, "+56911111111", "+17372508034", "trial:CA-DIAL");
-        when(trial.isEnabled()).thenReturn(true);
-        when(calls.getTrialContext("CA-DIAL")).thenReturn(context);
-        when(twiml.trialGather("No pude comunicarte con una persona en este momento. Puedo seguir ayudándote por aquí."))
-                .thenReturn("<Response><Gather/></Response>");
-
-        var response = controller.trialTransferResult("CA-DIAL", "no-answer");
-
-        assertEquals(200, response.getStatusCode().value());
-        assertEquals("<Response><Gather/></Response>", response.getBody());
-        verify(calls, never()).markTrialEnded(anyString());
-        verifyNoInteractions(summaries);
-    }
-
-    @Test
-    void completedHumanDialEndsAiSessionAndGeneratesSummary() {
-        TwilioCallService calls = mock(TwilioCallService.class);
-        TwimlFactory twiml = mock(TwimlFactory.class);
-        TrialVoiceProperties trial = mock(TrialVoiceProperties.class);
-        TrialVoiceConversationService conversation = mock(TrialVoiceConversationService.class);
-        TrialConversationStateService state = mock(TrialConversationStateService.class);
-        CallSummaryService summaries = mock(CallSummaryService.class);
-        TwilioVoiceController controller = new TwilioVoiceController(calls, twiml, trial, conversation, state, summaries);
-
-        UUID callId = UUID.randomUUID();
-        RealtimeCallContext context = new RealtimeCallContext(
-                callId, UUID.randomUUID(), null, "+56911111111", "+17372508034", "trial:CA-DIAL");
-        when(trial.isEnabled()).thenReturn(true);
-        when(calls.getTrialContext("CA-DIAL")).thenReturn(context);
-        when(twiml.trialSayAndHangup("Gracias por comunicarte con nosotros. Hasta luego."))
-                .thenReturn("<Response><Hangup/></Response>");
-
-        var response = controller.trialTransferResult("CA-DIAL", "completed");
-
-        assertEquals(200, response.getStatusCode().value());
-        verify(calls).markTrialEnded("CA-DIAL");
-        verify(state).clear(callId);
-        verify(summaries).generate(callId);
     }
 }

@@ -1,12 +1,9 @@
 package cl.helvoca.telephony.twilio;
 
-import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.common.NotFoundException;
-import cl.helvoca.telephony.twilio.trial.TrialConversationStateService;
-import cl.helvoca.telephony.twilio.trial.TrialVoiceConversationService;
-import cl.helvoca.telephony.twilio.trial.TrialVoiceProperties;
-import cl.helvoca.telephony.twilio.trial.TrialVoiceReply;
+import cl.helvoca.telephony.CallCapacityExceededException;
+import cl.helvoca.voice.VoiceCallRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -19,26 +16,24 @@ import java.util.UUID;
 @RequestMapping("/webhooks/v1/twilio")
 public class TwilioVoiceController {
     private static final Logger log = LoggerFactory.getLogger(TwilioVoiceController.class);
+    private static final String SILENT_HANGUP_TWIML =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>";
+    private static final String BUSY_REJECT_TWIML =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Reject reason=\"busy\"/></Response>";
 
     private final TwilioCallService calls;
-    private final TwimlFactory twiml;
-    private final TrialVoiceProperties trial;
-    private final TrialVoiceConversationService trialConversation;
-    private final TrialConversationStateService trialState;
+    private final VoiceCallRouter voiceRouter;
     private final CallSummaryService summaries;
+    private final TwilioProperties properties;
 
     public TwilioVoiceController(TwilioCallService calls,
-                                 TwimlFactory twiml,
-                                 TrialVoiceProperties trial,
-                                 TrialVoiceConversationService trialConversation,
-                                 TrialConversationStateService trialState,
-                                 CallSummaryService summaries) {
+                                 VoiceCallRouter voiceRouter,
+                                 CallSummaryService summaries,
+                                 TwilioProperties properties) {
         this.calls = calls;
-        this.twiml = twiml;
-        this.trial = trial;
-        this.trialConversation = trialConversation;
-        this.trialState = trialState;
+        this.voiceRouter = voiceRouter;
         this.summaries = summaries;
+        this.properties = properties;
     }
 
     @PostMapping(value = "/voice", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
@@ -46,77 +41,27 @@ public class TwilioVoiceController {
     public ResponseEntity<String> incoming(@RequestParam("CallSid") String callSid,
                                            @RequestParam("From") String from,
                                            @RequestParam("To") String to) {
-        try {
-            return ResponseEntity.ok(calls.startInboundCall(callSid, from, to));
-        } catch (NotFoundException e) {
-            return ResponseEntity.ok(twiml.rejectUnknownNumber());
-        }
+        return route(to, from, callSid, "inbound");
     }
 
-    @PostMapping(value = "/trial/voice", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+    @PostMapping(value = "/outbound-test", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
-    public ResponseEntity<String> trialIncoming(@RequestParam("CallSid") String callSid,
-                                                @RequestParam("From") String from,
-                                                @RequestParam("To") String to) {
-        if (!trial.isEnabled()) {
-            return ResponseEntity.ok(twiml.serviceUnavailable());
-        }
-        try {
-            calls.startTrialInboundCall(callSid, from, to);
-            return ResponseEntity.ok(twiml.trialGather(trial.getGreeting()));
-        } catch (NotFoundException | IllegalArgumentException e) {
-            return ResponseEntity.ok(twiml.trialSayAndHangup("No pude iniciar la demostración de Helvoca para este número."));
-        }
+    public ResponseEntity<String> outboundTest(@RequestParam("CallSid") String callSid,
+                                               @RequestParam("From") String from,
+                                               @RequestParam("To") String to) {
+        return route(from, to, callSid, "outbound-test");
     }
 
-    @PostMapping(value = "/trial/gather", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+    @PostMapping(value = "/inbound-certification", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
-    public ResponseEntity<String> trialGather(@RequestParam("CallSid") String callSid,
-                                              @RequestParam(value = "SpeechResult", required = false) String speechResult) {
-        if (!trial.isEnabled()) {
-            return ResponseEntity.ok(twiml.serviceUnavailable());
+    public ResponseEntity<String> inboundCertification(@RequestParam("CallSid") String callSid,
+                                                       @RequestParam("From") String from,
+                                                       @RequestParam("To") String to) {
+        if (!properties.isCertificationIngressEnabled()) {
+            log.warn("Blocked disabled Twilio certification ingress call={}", callSid);
+            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
-        try {
-            RealtimeCallContext context = calls.getTrialContext(callSid);
-            TrialVoiceReply reply = trialConversation.reply(context, speechResult);
-
-            String transferTarget = trialState.consumeHumanTransferTarget(context.callId());
-            if (transferTarget != null && !transferTarget.isBlank()) {
-                return ResponseEntity.ok(twiml.trialTransfer(
-                        "Claro, te comunico con una persona del negocio.", transferTarget));
-            }
-
-            if (reply.endCall()) {
-                calls.markTrialEnded(callSid);
-                summaries.generate(context.callId());
-                return ResponseEntity.ok(twiml.trialSayAndHangup(reply.text()));
-            }
-            return ResponseEntity.ok(twiml.trialGather(reply.text()));
-        } catch (NotFoundException | IllegalArgumentException e) {
-            return ResponseEntity.ok(twiml.trialSayAndHangup("La sesión de prueba ya no está disponible."));
-        }
-    }
-
-    @PostMapping(value = "/trial/transfer-result", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
-            produces = MediaType.APPLICATION_XML_VALUE)
-    public ResponseEntity<String> trialTransferResult(@RequestParam("CallSid") String callSid,
-                                                      @RequestParam(value = "DialCallStatus", required = false) String dialCallStatus) {
-        if (!trial.isEnabled()) {
-            return ResponseEntity.ok(twiml.serviceUnavailable());
-        }
-        try {
-            RealtimeCallContext context = calls.getTrialContext(callSid);
-            if ("completed".equalsIgnoreCase(dialCallStatus)) {
-                calls.markTrialEnded(callSid);
-                trialState.clear(context.callId());
-                summaries.generate(context.callId());
-                return ResponseEntity.ok(twiml.trialSayAndHangup("Gracias por comunicarte con nosotros. Hasta luego."));
-            }
-            return ResponseEntity.ok(twiml.trialGather(
-                    "No pude comunicarte con una persona en este momento. Puedo seguir ayudándote por aquí."));
-        } catch (NotFoundException | IllegalArgumentException e) {
-            return ResponseEntity.ok(twiml.trialSayAndHangup("La sesión de prueba ya no está disponible."));
-        }
+        return route(from, to, callSid, "inbound-certification");
     }
 
     @PostMapping(value = "/stream-status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -124,12 +69,13 @@ public class TwilioVoiceController {
                                              @RequestParam("StreamEvent") String streamEvent,
                                              @RequestParam(value = "CallSid", required = false) String callSid,
                                              @RequestParam(value = "StreamError", required = false) String streamError) {
-        if ("stream-stopped".equalsIgnoreCase(streamEvent) || "stream-error".equalsIgnoreCase(streamEvent)) {
+        if ("stream-stopped".equalsIgnoreCase(streamEvent)
+                || "stream-error".equalsIgnoreCase(streamEvent)) {
             calls.markStreamStopped(streamSid);
         }
         if ("stream-error".equalsIgnoreCase(streamEvent)) {
-            log.warn("Twilio Media Stream error call={} stream={} error={}", callSid, streamSid,
-                    streamError == null ? "unknown" : streamError);
+            log.warn("Twilio Media Stream error call={} stream={} error={}",
+                    callSid, streamSid, streamError == null ? "unknown" : streamError);
         } else {
             log.info("Twilio Media Stream event call={} stream={} event={}", callSid, streamSid, streamEvent);
         }
@@ -146,8 +92,37 @@ public class TwilioVoiceController {
                 summaries.generate(callId);
             }
         } catch (NotFoundException ignored) {
-            // A delayed callback for an unknown call is idempotently ignored.
+            log.debug("Ignoring Twilio status for untracked call={}", callSid);
         }
         return ResponseEntity.noContent().build();
+    }
+
+    private ResponseEntity<String> route(String businessPhone,
+                                         String callerPhone,
+                                         String callSid,
+                                         String direction) {
+        if (!"outbound-test".equals(direction)) {
+            try {
+                calls.startInboundCall(callSid, callerPhone, businessPhone);
+            } catch (CallCapacityExceededException e) {
+                log.warn("Rejecting Twilio {} call={} because tenant capacity is full", direction, callSid);
+                return ResponseEntity.ok(BUSY_REJECT_TWIML);
+            } catch (NotFoundException e) {
+                log.warn("Blocking Twilio {} call={} because destination is not registered", direction, callSid);
+                return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+            }
+        }
+
+        return voiceRouter.route(businessPhone, callerPhone, callSid)
+                .map(decision -> {
+                    log.info("Routing Twilio {} call={} provider={} mode={}",
+                            direction, callSid, decision.providerId(), decision.mode());
+                    return ResponseEntity.ok(decision.twiml());
+                })
+                .orElseGet(() -> {
+                    log.error("Blocking Twilio {} call={} because no healthy voice provider is available",
+                            direction, callSid);
+                    return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+                });
     }
 }

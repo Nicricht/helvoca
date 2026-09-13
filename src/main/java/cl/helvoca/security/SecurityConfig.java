@@ -11,6 +11,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -45,20 +46,26 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                            JwtAuthenticationConverter jwtConverter) throws Exception {
+                                            JwtAuthenticationConverter jwtConverter,
+                                            ApiRateLimitFilter apiRateLimitFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/index.html", "/app.js", "/styles.css",
+                                "/pricing.html", "/pricing.js", "/pricing.css",
                                 "/operations.html", "/operations.js", "/operations.css",
+                                "/simulator.html", "/simulator.js", "/simulator.css",
                                 "/favicon.ico", "/error").permitAll()
-                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register", "/actuator/health").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers("/webhooks/v1/twilio/**", "/ws/twilio").permitAll()
+                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register",
+                                "/api/v1/public/pricing", "/actuator/health").permitAll()
+                        .requestMatchers("/webhooks/v1/twilio/**", "/webhooks/v1/openai/**",
+                                "/webhooks/v1/mercadopago").permitAll()
+                        .requestMatchers("/ws/v1/twilio/**").permitAll()
                         .requestMatchers("/api/v1/platform/**").hasRole("PLATFORM_ADMIN")
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)));
+                .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)))
+                .addFilterAfter(apiRateLimitFilter, BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 }

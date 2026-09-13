@@ -1,35 +1,30 @@
 package cl.helvoca.call;
 
-import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
 public class CallSummaryService {
     private static final Logger log = LoggerFactory.getLogger(CallSummaryService.class);
+    private static final int MAX_SNIPPET = 220;
+
     private final CallTranscriptRepository transcripts;
     private final CallSummaryRepository summaries;
-    private final OpenAiRealtimeProperties openAi;
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private final CallActionRepository actions;
 
     public CallSummaryService(CallTranscriptRepository transcripts,
                               CallSummaryRepository summaries,
-                              OpenAiRealtimeProperties openAi) {
+                              CallActionRepository actions) {
         this.transcripts = transcripts;
         this.summaries = summaries;
-        this.openAi = openAi;
+        this.actions = actions;
     }
 
     @Async
@@ -37,41 +32,12 @@ public class CallSummaryService {
         try {
             Thread.sleep(500);
             if (summaries.findByCallId(callId).isPresent()) return;
+
             List<CallTranscript> items = transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId);
-            if (items.isEmpty()) return;
+            List<CallAction> callActions = actions.findAllByCallIdOrderByCreatedAtAsc(callId);
+            if (items.isEmpty() && callActions.isEmpty()) return;
 
-            String transcript = buildTranscript(items);
-            if (!openAi.hasApiKey()) {
-                save(callId, "La llamada registró " + items.size() + " intervenciones. No se generó resumen semántico porque OPENAI_API_KEY no está configurada.");
-                return;
-            }
-
-            JSONObject body = new JSONObject()
-                    .put("model", openAi.getSummaryModel())
-                    .put("instructions", "Resume esta llamada empresarial en español. Sé factual. Incluye motivo, datos importantes, acciones realmente confirmadas y pendientes. Nunca inventes una reserva, pago, pedido o resultado que no aparezca confirmado en la transcripción.")
-                    .put("input", transcript)
-                    .put("max_output_tokens", 350);
-
-            HttpRequest request = HttpRequest.newBuilder(URI.create(openAi.getResponsesUrl()))
-                    .timeout(Duration.ofSeconds(30))
-                    .header("Authorization", "Bearer " + openAi.getApiKey())
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-                    .build();
-
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() / 100 != 2) {
-                log.warn("OpenAI summary failed for call {} with HTTP {}", callId, response.statusCode());
-                save(callId, "La llamada registró " + items.size() + " intervenciones. El proveedor de IA no pudo generar el resumen automático.");
-                return;
-            }
-
-            String text = extractOutputText(new JSONObject(response.body()));
-            if (text == null || text.isBlank()) {
-                save(callId, "La llamada registró " + items.size() + " intervenciones. El proveedor no devolvió texto de resumen.");
-            } else {
-                save(callId, text.trim());
-            }
+            save(callId, buildLocalSummary(items, callActions));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
@@ -85,36 +51,123 @@ public class CallSummaryService {
         summary.setCallId(callId);
         summary.setSummary(text);
         summaries.save(summary);
-        log.info("Call summary persisted for call {}", callId);
+        log.info("Call summary persisted for call {} using local factual summarizer", callId);
     }
 
-    private static String buildTranscript(List<CallTranscript> items) {
+    static String buildLocalSummary(List<CallTranscript> items, List<CallAction> actions) {
         StringBuilder out = new StringBuilder();
-        for (CallTranscript item : items) {
-            if (out.length() > 12_000) break;
-            out.append(item.getSpeaker()).append(": ").append(item.getContent()).append('\n');
+        out.append("La llamada registró ").append(items.size()).append(" intervenciones.");
+
+        String firstUser = firstUserText(items);
+        if (firstUser != null) {
+            out.append(" Motivo inicial: ").append(snippet(firstUser)).append(".");
+        }
+
+        List<String> confirmed = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
+        boolean unanswered = false;
+
+        for (CallAction action : actions) {
+            String type = action.getActionType() == null ? "ACCIÓN" : action.getActionType();
+            if ("UNANSWERED_QUESTION_RECORDED".equals(type)) unanswered = true;
+
+            String label = actionLabel(type);
+            String detail = action.getDetail();
+            String rendered = detail == null || detail.isBlank()
+                    ? label
+                    : label + " (" + snippet(detail) + ")";
+
+            if (action.isSuccess()) {
+                if (isMeaningfulConfirmedAction(type)) confirmed.add(rendered);
+            } else {
+                String error = action.getErrorCode();
+                failed.add(error == null || error.isBlank()
+                        ? rendered
+                        : rendered + " [" + error + "]");
+            }
+        }
+
+        if (!confirmed.isEmpty()) {
+            out.append(" Acciones confirmadas: ").append(String.join("; ", confirmed)).append(".");
+        } else {
+            out.append(" No se registraron acciones de negocio confirmadas.");
+        }
+
+        if (!failed.isEmpty()) {
+            out.append(" Acciones no completadas: ").append(String.join("; ", failed)).append(".");
+        }
+        if (unanswered) {
+            out.append(" Quedó al menos una pregunta pendiente de respuesta del negocio.");
+        }
+
+        String lastUser = lastUserText(items);
+        if (lastUser != null && !lastUser.equals(firstUser)) {
+            out.append(" Último mensaje del cliente: ").append(snippet(lastUser)).append(".");
         }
         return out.toString();
     }
 
-    static String extractOutputText(JSONObject root) {
-        String direct = root.optString("output_text", "");
-        if (!direct.isBlank()) return direct;
-        JSONArray output = root.optJSONArray("output");
-        if (output == null) return null;
-        for (int i = 0; i < output.length(); i++) {
-            JSONObject item = output.optJSONObject(i);
-            if (item == null) continue;
-            JSONArray content = item.optJSONArray("content");
-            if (content == null) continue;
-            for (int j = 0; j < content.length(); j++) {
-                JSONObject part = content.optJSONObject(j);
-                if (part != null && "output_text".equals(part.optString("type"))) {
-                    String text = part.optString("text", "");
-                    if (!text.isBlank()) return text;
-                }
-            }
+    private static boolean isMeaningfulConfirmedAction(String type) {
+        return switch (type) {
+            case "CUSTOMER_REGISTERED", "BOOKING_CREATED", "BOOKING_RESCHEDULED", "BOOKING_CANCELLED",
+                    "REQUEST_CREATED", "HUMAN_TRANSFER", "UNANSWERED_QUESTION_RECORDED" -> true;
+            default -> false;
+        };
+    }
+
+    private static String actionLabel(String type) {
+        return switch (type) {
+            case "CUSTOMER_REGISTERED" -> "cliente registrado";
+            case "BOOKING_CREATED" -> "reserva creada";
+            case "BOOKING_RESCHEDULED" -> "reserva reprogramada";
+            case "BOOKING_CANCELLED" -> "reserva cancelada";
+            case "REQUEST_CREATED" -> "solicitud creada";
+            case "HUMAN_TRANSFER", "TRANSFER_REQUESTED" -> "transferencia a humano";
+            case "UNANSWERED_QUESTION_RECORDED" -> "pregunta pendiente registrada";
+            case "AVAILABILITY_LISTED", "AVAILABILITY_CHECKED" -> "disponibilidad consultada";
+            case "BUSINESS_INFORMATION" -> "información del negocio consultada";
+            case "SERVICES_LISTED" -> "servicios consultados";
+            case "KNOWLEDGE_SEARCH" -> "conocimiento consultado";
+            case "CALLER_LOOKUP" -> "cliente consultado";
+            case "BOOKINGS_LISTED" -> "reservas consultadas";
+            default -> type.toLowerCase(Locale.ROOT).replace('_', ' ');
+        };
+    }
+
+    private static String firstUserText(List<CallTranscript> items) {
+        for (CallTranscript item : items) {
+            if (isUser(item) && hasText(item)) return clean(item.getContent());
         }
         return null;
+    }
+
+    private static String lastUserText(List<CallTranscript> items) {
+        for (int i = items.size() - 1; i >= 0; i--) {
+            CallTranscript item = items.get(i);
+            if (isUser(item) && hasText(item)) return clean(item.getContent());
+        }
+        return null;
+    }
+
+    private static boolean isUser(CallTranscript item) {
+        return item != null && item.getSpeaker() != null
+                && ("USER".equalsIgnoreCase(item.getSpeaker()) || "CALLER".equalsIgnoreCase(item.getSpeaker()));
+    }
+
+    private static boolean hasText(CallTranscript item) {
+        return item.getContent() != null && !item.getContent().isBlank();
+    }
+
+    private static String clean(String value) {
+        String cleaned = value == null ? "" : value.replaceAll("\\s+", " ").trim();
+        if (cleaned.startsWith("[SIMULATED_CERTIFICATION]")) {
+            cleaned = cleaned.substring("[SIMULATED_CERTIFICATION]".length()).trim();
+        }
+        return cleaned;
+    }
+
+    private static String snippet(String value) {
+        String cleaned = clean(value);
+        return cleaned.length() <= MAX_SNIPPET ? cleaned : cleaned.substring(0, MAX_SNIPPET - 1) + "…";
     }
 }

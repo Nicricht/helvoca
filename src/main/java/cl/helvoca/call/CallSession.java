@@ -1,6 +1,7 @@
 package cl.helvoca.call;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -17,7 +18,7 @@ public class CallSession {
     @Column(name = "customer_id")
     private UUID customerId;
 
-    @Column(name = "phone_number_id", nullable = false)
+    @Column(name = "phone_number_id")
     private UUID phoneNumberId;
 
     @Column(name = "telephony_provider", nullable = false, length = 30)
@@ -55,6 +56,15 @@ public class CallSession {
     @Column(name = "duration_seconds")
     private Integer durationSeconds;
 
+    @Column(name = "estimated_telephony_cost_usd", precision = 12, scale = 6)
+    private BigDecimal estimatedTelephonyCostUsd;
+
+    @Column(name = "estimated_ai_cost_usd", precision = 12, scale = 6)
+    private BigDecimal estimatedAiCostUsd;
+
+    @Column(name = "estimated_total_cost_usd", precision = 12, scale = 6)
+    private BigDecimal estimatedTotalCostUsd;
+
     @Column(length = 80)
     private String resolution;
 
@@ -66,6 +76,12 @@ public class CallSession {
 
     @Column(name = "stream_ended_at")
     private Instant streamEndedAt;
+
+    @Column(name = "ai_setup_completed_at")
+    private Instant aiSetupCompletedAt;
+
+    @Column(name = "certification", nullable = false)
+    private boolean certification;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -112,6 +128,12 @@ public class CallSession {
     public void setEndedAt(Instant endedAt) { this.endedAt = endedAt; }
     public Integer getDurationSeconds() { return durationSeconds; }
     public void setDurationSeconds(Integer durationSeconds) { this.durationSeconds = durationSeconds; }
+    public BigDecimal getEstimatedTelephonyCostUsd() { return estimatedTelephonyCostUsd; }
+    public void setEstimatedTelephonyCostUsd(BigDecimal estimatedTelephonyCostUsd) { this.estimatedTelephonyCostUsd = estimatedTelephonyCostUsd; }
+    public BigDecimal getEstimatedAiCostUsd() { return estimatedAiCostUsd; }
+    public void setEstimatedAiCostUsd(BigDecimal estimatedAiCostUsd) { this.estimatedAiCostUsd = estimatedAiCostUsd; }
+    public BigDecimal getEstimatedTotalCostUsd() { return estimatedTotalCostUsd; }
+    public void setEstimatedTotalCostUsd(BigDecimal estimatedTotalCostUsd) { this.estimatedTotalCostUsd = estimatedTotalCostUsd; }
     public String getResolution() { return resolution; }
     public void setResolution(String resolution) { this.resolution = resolution; }
     public String getStreamSid() { return streamSid; }
@@ -120,6 +142,10 @@ public class CallSession {
     public void setStreamStartedAt(Instant streamStartedAt) { this.streamStartedAt = streamStartedAt; }
     public Instant getStreamEndedAt() { return streamEndedAt; }
     public void setStreamEndedAt(Instant streamEndedAt) { this.streamEndedAt = streamEndedAt; }
+    public Instant getAiSetupCompletedAt() { return aiSetupCompletedAt; }
+    public void setAiSetupCompletedAt(Instant aiSetupCompletedAt) { this.aiSetupCompletedAt = aiSetupCompletedAt; }
+    public boolean isCertification() { return certification; }
+    public void setCertification(boolean certification) { this.certification = certification; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
