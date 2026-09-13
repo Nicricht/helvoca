@@ -159,3 +159,10 @@
     if (advancedToggle) advancedToggle.addEventListener('click', () => loadStatus());
     if (sessionStorage.getItem('helvoca_access_token')) loadStatus();
 })();
+
+(() => {
+    const script = document.createElement('script');
+    script.src = '/commercial-status.js';
+    script.async = false;
+    document.head.appendChild(script);
+})();
