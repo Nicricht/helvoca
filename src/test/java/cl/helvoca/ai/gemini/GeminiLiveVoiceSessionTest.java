@@ -2,6 +2,7 @@ package cl.helvoca.ai.gemini;
 
 import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.ai.realtime.RealtimeToolService;
+import cl.helvoca.call.CallCertificationService;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.call.CallTranscriptService;
 import cl.helvoca.telephony.CallLifecycleService;
@@ -40,6 +41,7 @@ class GeminiLiveVoiceSessionTest {
                 mock(CallTranscriptService.class),
                 mock(CallSummaryService.class),
                 mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
                 new VoiceProviderHealthRegistry(),
                 HttpClient.newHttpClient());
 
@@ -74,11 +76,12 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
-    void binarySetupCompleteUnlocksProviderAndStartsOpeningTurn() {
+    void binarySetupCompleteUnlocksProviderPersistsMilestoneAndStartsOpeningTurn() {
         GeminiLiveProperties properties = properties();
         RealtimeCallContext context = context();
         RealtimeToolService tools = mock(RealtimeToolService.class);
         when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        CallLifecycleService lifecycle = mock(CallLifecycleService.class);
 
         VoiceProviderHealthRegistry health = new VoiceProviderHealthRegistry();
         health.failure(GeminiLiveVoiceProvider.ID,
@@ -98,7 +101,8 @@ class GeminiLiveVoiceSessionTest {
                 tools,
                 mock(CallTranscriptService.class),
                 mock(CallSummaryService.class),
-                mock(CallLifecycleService.class),
+                lifecycle,
+                mock(CallCertificationService.class),
                 health,
                 HttpClient.newHttpClient());
 
@@ -111,12 +115,29 @@ class GeminiLiveVoiceSessionTest {
 
         session.onBinary(socket, ByteBuffer.wrap(Arrays.copyOfRange(payload, split, payload.length)), true);
         assertEquals("READY", health.snapshot(GeminiLiveVoiceProvider.ID, true).state());
+        verify(lifecycle).markAiSetupCompleted(context.callId());
 
         ArgumentCaptor<CharSequence> sent = ArgumentCaptor.forClass(CharSequence.class);
         verify(socket, atLeast(2)).sendText(sent.capture(), eq(true));
         assertTrue(sent.getAllValues().stream()
                 .map(CharSequence::toString)
                 .anyMatch(message -> message.contains("[RECEPVOZ_CALL_CONNECTED]")));
+    }
+
+    @Test
+    void permissionDeniedAndAccessDeniedAreAuthFailures() {
+        assertEquals(VoiceProviderHealthRegistry.FailureKind.AUTH,
+                GeminiLiveVoiceSession.classifyFailure(403, "PERMISSION_DENIED"));
+        assertEquals(VoiceProviderHealthRegistry.FailureKind.AUTH,
+                GeminiLiveVoiceSession.classifyFailure(1008, "Your project has been denied access"));
+        assertEquals(VoiceProviderHealthRegistry.FailureKind.AUTH,
+                GeminiLiveVoiceSession.classifyFailure(null, "permission denied for API key"));
+    }
+
+    @Test
+    void policyCloseWithoutAuthSignalRemainsUpstream() {
+        assertEquals(VoiceProviderHealthRegistry.FailureKind.UPSTREAM,
+                GeminiLiveVoiceSession.classifyFailure(1008, "invalid setup payload"));
     }
 
     private static GeminiLiveProperties properties() {
