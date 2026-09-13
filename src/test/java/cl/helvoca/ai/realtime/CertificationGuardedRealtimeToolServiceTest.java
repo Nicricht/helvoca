@@ -15,6 +15,7 @@ import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 import java.util.Optional;
@@ -38,6 +39,7 @@ class CertificationGuardedRealtimeToolServiceTest {
         assertEquals(false, result.getBoolean("success"));
         assertEquals("CERTIFICATION_CUSTOMER_REQUIRED", result.getJSONObject("error").getString("code"));
         verifyNoInteractions(f.bookings);
+        verifyNoInteractions(f.jdbc);
         verify(f.trace).recordTool(eq(f.businessId), eq(f.callId), eq("create_booking"), any(JSONObject.class));
     }
 
@@ -52,6 +54,7 @@ class CertificationGuardedRealtimeToolServiceTest {
 
         assertEquals("CERTIFICATION_AVAILABILITY_REQUIRED", result.getJSONObject("error").getString("code"));
         verifyNoInteractions(f.bookings);
+        verifyNoInteractions(f.jdbc);
     }
 
     @Test
@@ -65,6 +68,7 @@ class CertificationGuardedRealtimeToolServiceTest {
 
         assertEquals("CERTIFICATION_AVAILABILITY_REQUIRED", result.getJSONObject("error").getString("code"));
         verifyNoInteractions(f.bookings);
+        verifyNoInteractions(f.jdbc);
     }
 
     @Test
@@ -107,6 +111,7 @@ class CertificationGuardedRealtimeToolServiceTest {
         final UnansweredQuestionService unanswered = mock(UnansweredQuestionService.class);
         final CallActionRepository actions = mock(CallActionRepository.class);
         final CallTraceService trace = mock(CallTraceService.class);
+        final JdbcTemplate jdbc = mock(JdbcTemplate.class);
         final CallSession call = new CallSession();
         final CertificationGuardedRealtimeToolService service;
 
@@ -116,7 +121,8 @@ class CertificationGuardedRealtimeToolServiceTest {
             call.setStreamSid(context.streamSid());
             when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
             service = new CertificationGuardedRealtimeToolService(
-                    businesses, customers, services, knowledge, bookings, calls, schedule, requests, unanswered, actions, trace);
+                    businesses, customers, services, knowledge, bookings, calls, schedule, requests, unanswered,
+                    actions, trace, jdbc);
         }
     }
 }
