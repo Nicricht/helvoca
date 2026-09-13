@@ -9,9 +9,10 @@ import java.util.Set;
 /**
  * Provider-neutral voice profiles exposed to Helvoca tenants.
  *
- * <p>The stored profile code is translated to a voice supported by the active
- * realtime provider. Legacy raw provider voice names remain accepted so
- * existing tenant configuration keeps working.</p>
+ * <p>New selections are stored using an OpenAI-safe canonical alias because
+ * OpenAI Live already consumes the tenant voice directly. Gemini translates
+ * that alias to its provider-specific equivalent at session creation. Known
+ * legacy provider values remain readable at runtime.</p>
  */
 public enum AgentVoiceProfile {
     NATURAL("natural", "Natural", "Equilibrada y conversacional", "marin", "Aoede"),
@@ -71,13 +72,9 @@ public enum AgentVoiceProfile {
 
     public static String normalizeForStorage(String value) {
         if (value == null || value.isBlank()) return null;
-        String trimmed = value.trim();
-        Optional<AgentVoiceProfile> profile = fromSelection(trimmed);
-        if (profile.isPresent()) return profile.get().code;
-        if (isOpenAiRealtimeVoice(trimmed)) return trimmed.toLowerCase(Locale.ROOT);
-        String gemini = canonicalGeminiVoice(trimmed);
-        if (gemini != null) return gemini;
-        throw new IllegalArgumentException("Unsupported agent voice");
+        return fromSelection(value)
+                .map(AgentVoiceProfile::openAiVoice)
+                .orElseThrow(() -> new IllegalArgumentException("Unsupported agent voice"));
     }
 
     public static String resolveOpenAi(String storedSelection, String fallback) {
