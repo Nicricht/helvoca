@@ -2,6 +2,7 @@ package cl.helvoca.ai.live;
 
 import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.ai.realtime.RealtimeCallContext;
+import cl.helvoca.ai.realtime.RealtimeToolDefinitions;
 import cl.helvoca.ai.realtime.RealtimeToolService;
 import cl.helvoca.telephony.CallLifecycleService;
 import cl.helvoca.voice.VoiceProviderHealthRegistry;
@@ -165,7 +166,8 @@ public class OpenAiLiveSipService {
             RealtimeCallContext context = lifecycle.markStreamStarted(
                     callId, twilioCallSid, "live:" + sessionId, PROVIDER_ID);
 
-            if (!tools.agentActive(context)) {
+            String configuredAgentName = tools.agentName(context, null);
+            if (configuredAgentName != null && !tools.agentActive(context)) {
                 markFailed(callId, sessionId);
                 processedWebhookIds.add(webhookId);
                 processedSessionIds.add(sessionId);
@@ -217,8 +219,13 @@ public class OpenAiLiveSipService {
     }
 
     private JSONObject acceptancePayload(RealtimeCallContext context, String businessName) {
-        String agentName = tools.agentName(context, "RecepVoz");
-        String greeting = tools.agentGreeting(context, openingLine(businessName));
+        String agentName = firstNonBlank(tools.agentName(context, null), "RecepVoz");
+        String defaultGreeting = openingLine(businessName);
+        String greeting = firstNonBlank(tools.agentGreeting(context, null), defaultGreeting);
+        JSONArray tenantTools = tools.toolDefinitions(context);
+        if (tenantTools == null) tenantTools = RealtimeToolDefinitions.all();
+        String voice = firstNonBlank(tools.agentVoice(context, null), live.getVoice());
+
         String frontendInstructions = """
                 Eres %s, la recepcionista por voz de %s. Habla de forma natural, cálida y breve.
                 Tu saludo inicial configurado es exactamente: "%s"
@@ -239,7 +246,7 @@ public class OpenAiLiveSipService {
         JSONObject responses = new JSONObject()
                 .put("model", live.getBackendModel())
                 .put("instructions", backendInstructions)
-                .put("tools", tools.toolDefinitions(context))
+                .put("tools", tenantTools)
                 .put("tool_choice", "auto")
                 .put("parallel_tool_calls", false)
                 .put("text", new JSONObject().put("verbosity", "low"));
@@ -249,7 +256,7 @@ public class OpenAiLiveSipService {
                 .put("model", live.getModel())
                 .put("instructions", frontendInstructions)
                 .put("audio", new JSONObject()
-                        .put("output", new JSONObject().put("voice", tools.agentVoice(context, live.getVoice()))))
+                        .put("output", new JSONObject().put("voice", voice)))
                 .put("delegation", new JSONObject()
                         .put("type", "responses")
                         .put("responses", responses));
