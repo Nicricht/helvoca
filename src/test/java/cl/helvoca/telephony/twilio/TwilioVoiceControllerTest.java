@@ -17,8 +17,11 @@ class TwilioVoiceControllerTest {
 
     private static TwilioVoiceController controller(TwilioCallService calls,
                                                     VoiceCallRouter router,
-                                                    CallSummaryService summaries) {
-        return new TwilioVoiceController(calls, router, summaries);
+                                                    CallSummaryService summaries,
+                                                    boolean certificationEnabled) {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setCertificationIngressEnabled(certificationEnabled);
+        return new TwilioVoiceController(calls, router, summaries, properties);
     }
 
     @Test
@@ -31,7 +34,7 @@ class TwilioVoiceControllerTest {
                 .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
                         "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
 
-        var response = controller(calls, router, summaries)
+        var response = controller(calls, router, summaries, false)
                 .incoming(CALL_SID, "+56911111111", "+14355652512");
 
         assertEquals(200, response.getStatusCode().value());
@@ -41,7 +44,7 @@ class TwilioVoiceControllerTest {
     }
 
     @Test
-    void inboundCertificationUsesSameBusinessCallerMappingAsRealInbound() {
+    void inboundCertificationUsesSameBusinessCallerMappingWhenExplicitlyEnabled() {
         TwilioCallService calls = mock(TwilioCallService.class);
         VoiceCallRouter router = mock(VoiceCallRouter.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
@@ -50,7 +53,7 @@ class TwilioVoiceControllerTest {
                 .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
                         "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
 
-        var response = controller(calls, router, summaries)
+        var response = controller(calls, router, summaries, true)
                 .inboundCertification(CALL_SID, "+14355652512", "+56911111111");
 
         assertEquals(200, response.getStatusCode().value());
@@ -60,13 +63,27 @@ class TwilioVoiceControllerTest {
     }
 
     @Test
+    void inboundCertificationFailsClosedByDefault() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+
+        var response = controller(calls, router, summaries, false)
+                .inboundCertification(CALL_SID, "+14355652512", "+56911111111");
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(SILENT_HANGUP, response.getBody());
+        verifyNoInteractions(router, calls, summaries);
+    }
+
+    @Test
     void inboundFailsClosedWhenNoVoiceProviderIsHealthy() {
         TwilioCallService calls = mock(TwilioCallService.class);
         VoiceCallRouter router = mock(VoiceCallRouter.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
         when(router.route("+14355652512", "+56911111111", CALL_SID)).thenReturn(Optional.empty());
 
-        var response = controller(calls, router, summaries)
+        var response = controller(calls, router, summaries, false)
                 .incoming(CALL_SID, "+56911111111", "+14355652512");
 
         assertEquals(SILENT_HANGUP, response.getBody());
@@ -79,7 +96,7 @@ class TwilioVoiceControllerTest {
         VoiceCallRouter router = mock(VoiceCallRouter.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
 
-        var response = controller(calls, router, summaries)
+        var response = controller(calls, router, summaries, false)
                 .streamStatus("MZ-1", "stream-error", CALL_SID, "network");
 
         assertEquals(204, response.getStatusCode().value());
@@ -94,7 +111,7 @@ class TwilioVoiceControllerTest {
         UUID callId = UUID.randomUUID();
         when(calls.updateStatus(CALL_SID, "completed", 42)).thenReturn(callId);
 
-        var response = controller(calls, router, summaries).status(CALL_SID, "completed", 42);
+        var response = controller(calls, router, summaries, false).status(CALL_SID, "completed", 42);
 
         assertEquals(204, response.getStatusCode().value());
         verify(summaries).generate(callId);
@@ -107,7 +124,7 @@ class TwilioVoiceControllerTest {
         CallSummaryService summaries = mock(CallSummaryService.class);
         when(calls.updateStatus(CALL_SID, "in-progress", null)).thenReturn(UUID.randomUUID());
 
-        var response = controller(calls, router, summaries).status(CALL_SID, "in-progress", null);
+        var response = controller(calls, router, summaries, false).status(CALL_SID, "in-progress", null);
 
         assertEquals(204, response.getStatusCode().value());
         verifyNoInteractions(summaries);
