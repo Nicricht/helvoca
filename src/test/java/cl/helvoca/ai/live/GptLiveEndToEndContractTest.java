@@ -7,6 +7,7 @@ import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.telephony.CallLifecycleService;
 import cl.helvoca.telephony.twilio.TwilioCallService;
 import cl.helvoca.telephony.twilio.TwilioMediaStreamTwimlFactory;
+import cl.helvoca.telephony.twilio.TwilioProperties;
 import cl.helvoca.telephony.twilio.TwilioVoiceController;
 import cl.helvoca.voice.VoiceAiProviderRegistry;
 import cl.helvoca.voice.VoiceCallRouter;
@@ -84,7 +85,7 @@ class GptLiveEndToEndContractTest {
                 mock(TwilioMediaStreamTwimlFactory.class),
                 liveSip);
         TwilioVoiceController controller = new TwilioVoiceController(
-                mock(TwilioCallService.class), router, mock(CallSummaryService.class));
+                mock(TwilioCallService.class), router, mock(CallSummaryService.class), new TwilioProperties());
 
         String callSid = "CA0123456789abcdef0123456789abcdef";
         String businessPhone = "+14355652512";
