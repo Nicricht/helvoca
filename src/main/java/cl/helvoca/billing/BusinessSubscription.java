@@ -47,18 +47,6 @@ public class BusinessSubscription {
     @Column(name = "external_subscription_id", length = 160)
     private String externalSubscriptionId;
 
-    @Column(name = "max_concurrent_calls_override")
-    private Integer maxConcurrentCallsOverride;
-
-    @Column(name = "included_minutes_override")
-    private Integer includedMinutesOverride;
-
-    @Column(name = "monthly_price_clp_override")
-    private Integer monthlyPriceClpOverride;
-
-    @Column(name = "overage_per_minute_clp_override")
-    private Integer overagePerMinuteClpOverride;
-
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -73,9 +61,7 @@ public class BusinessSubscription {
     }
 
     @PreUpdate
-    void preUpdate() {
-        updatedAt = Instant.now();
-    }
+    void preUpdate() { updatedAt = Instant.now(); }
 
     public UUID getId() { return id; }
     public UUID getBusinessId() { return businessId; }
@@ -94,14 +80,6 @@ public class BusinessSubscription {
     public void setExternalCustomerId(String externalCustomerId) { this.externalCustomerId = externalCustomerId; }
     public String getExternalSubscriptionId() { return externalSubscriptionId; }
     public void setExternalSubscriptionId(String externalSubscriptionId) { this.externalSubscriptionId = externalSubscriptionId; }
-    public Integer getMaxConcurrentCallsOverride() { return maxConcurrentCallsOverride; }
-    public void setMaxConcurrentCallsOverride(Integer maxConcurrentCallsOverride) { this.maxConcurrentCallsOverride = maxConcurrentCallsOverride; }
-    public Integer getIncludedMinutesOverride() { return includedMinutesOverride; }
-    public void setIncludedMinutesOverride(Integer includedMinutesOverride) { this.includedMinutesOverride = includedMinutesOverride; }
-    public Integer getMonthlyPriceClpOverride() { return monthlyPriceClpOverride; }
-    public void setMonthlyPriceClpOverride(Integer monthlyPriceClpOverride) { this.monthlyPriceClpOverride = monthlyPriceClpOverride; }
-    public Integer getOveragePerMinuteClpOverride() { return overagePerMinuteClpOverride; }
-    public void setOveragePerMinuteClpOverride(Integer overagePerMinuteClpOverride) { this.overagePerMinuteClpOverride = overagePerMinuteClpOverride; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
