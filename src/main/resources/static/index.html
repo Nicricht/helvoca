@@ -6,6 +6,16 @@
     <title>RecepVoz · Configura tu recepcionista con IA</title>
     <meta name="description" content="Pega el enlace de tu negocio y deja que RecepVoz prepare tu recepcionista telefónica con IA.">
     <link rel="stylesheet" href="/styles.css">
+    <style>
+        .agent-toggle { flex-direction: row; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; background: rgba(255,255,255,.02); }
+        .agent-toggle input, .agent-capability input { width: auto; min-height: auto; margin: 0; accent-color: var(--accent); }
+        .agent-capability-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .agent-capability { flex-direction: row; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid rgba(255,255,255,.06); border-radius: 10px; background: rgba(255,255,255,.018); font-weight: 600; }
+        .agent-help { color: var(--muted); font-size: 12px; line-height: 1.55; margin: 0; }
+        textarea[name="agentGreeting"] { min-height: 74px; resize: vertical; }
+        textarea[name="agentInstructions"] { min-height: 112px; resize: vertical; }
+        @media (max-width: 720px) { .agent-capability-grid { grid-template-columns: 1fr; } }
+    </style>
 </head>
 <body>
 <div class="shell">
@@ -120,7 +130,7 @@
 
             <div class="secondary-actions">
                 <button id="advancedToggleBtn" class="button ghost" type="button">Editar manualmente</button>
-                <span>Para ajustes finos, horarios partidos, transferencia humana y conocimiento.</span>
+                <span>Para ajustes finos, agente IA, horarios, transferencia humana y conocimiento.</span>
             </div>
 
             <div id="advancedPanel" class="admin-layout hidden">
@@ -133,6 +143,34 @@
                         <label>Idioma<input name="language" required value="es" maxlength="10"></label>
                     </div>
 
+                    <div class="section-heading divider">
+                        <div><div class="eyebrow">Agente IA</div><h2>Cómo debe atender RecepVoz</h2><p>Personaliza su identidad y limita sus acciones sin cambiar las reglas de seguridad del backend.</p></div>
+                    </div>
+                    <div class="two-col">
+                        <label>Nombre del agente<input name="agentName" maxlength="100" placeholder="RecepVoz"></label>
+                        <label>Voz <span class="optional">opcional</span><input name="agentVoice" maxlength="100" placeholder="Usar voz predeterminada del proveedor"></label>
+                    </div>
+                    <label>Saludo inicial<textarea name="agentGreeting" maxlength="2000" placeholder="Hola, gracias por llamar..."></textarea></label>
+                    <label>Instrucciones adicionales <span class="optional">opcional</span><textarea name="agentInstructions" maxlength="4000" placeholder="Ej.: habla de usted, prioriza consultas urgentes y mantén las respuestas breves."></textarea></label>
+                    <label class="agent-toggle"><input name="agentActive" type="checkbox" checked> Agente IA activo para este negocio</label>
+                    <p class="agent-help">Capacidades permitidas. Aunque un modelo intente saltarse esta selección, el backend bloqueará la operación.</p>
+                    <div class="agent-capability-grid" id="agentCapabilities">
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="GET_BUSINESS_INFORMATION"> Información del negocio</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="LIST_SERVICES"> Consultar servicios</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="SEARCH_KNOWLEDGE"> Buscar conocimiento</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="FIND_CALLER"> Identificar cliente</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="REGISTER_CALLER"> Registrar cliente</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="LIST_AVAILABLE_SLOTS"> Listar horarios disponibles</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="CHECK_BOOKING_AVAILABILITY"> Comprobar disponibilidad</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="CREATE_BOOKING"> Crear reservas</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="LIST_CUSTOMER_BOOKINGS"> Consultar reservas del cliente</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="RESCHEDULE_BOOKING"> Reprogramar reservas</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="CANCEL_BOOKING"> Cancelar reservas</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="CREATE_REQUEST"> Crear solicitudes</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="RECORD_UNANSWERED_QUESTION"> Aprender preguntas pendientes</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="TRANSFER_TO_HUMAN"> Transferir a una persona</label>
+                    </div>
+
                     <div class="section-heading divider"><div><div class="eyebrow">Servicios</div><h2>Qué puede reservar un cliente</h2></div><button id="addServiceBtn" class="button small ghost" type="button">+ Servicio</button></div>
                     <div id="servicesList" class="repeat-list"></div>
 
@@ -143,7 +181,7 @@
                     <div id="knowledgeList" class="repeat-list"></div>
 
                     <div id="setupMessage" class="message hidden"></div>
-                    <button class="button primary large" type="submit">Guardar cambios</button>
+                    <button class="button primary large" type="submit">Guardar negocio y agente</button>
                 </form>
 
                 <aside class="card side-card">
