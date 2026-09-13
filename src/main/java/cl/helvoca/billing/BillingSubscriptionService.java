@@ -31,6 +31,13 @@ public class BillingSubscriptionService {
         this.jdbc = jdbc;
     }
 
+    @Transactional(readOnly = true)
+    public BillingStatus status(UUID businessId) {
+        BusinessSubscription subscription = subscriptions.findByBusinessId(businessId)
+                .orElseThrow(() -> new IllegalStateException("Business subscription is not initialized"));
+        return snapshot(subscription);
+    }
+
     @Transactional
     public CheckoutResponse createCheckout(UUID businessId, String payerEmail, String publicPlanCode) {
         if (!properties.checkoutConfigured()) throw new IllegalStateException("Mercado Pago checkout is disabled or incomplete");
@@ -60,30 +67,29 @@ public class BillingSubscriptionService {
     }
 
     @Transactional
+    public BillingStatus refresh(UUID businessId) {
+        if (!properties.checkoutConfigured()) throw new IllegalStateException("Mercado Pago checkout is disabled or incomplete");
+        lockBusiness(businessId);
+        BusinessSubscription local = subscriptions.findByBusinessId(businessId)
+                .orElseThrow(() -> new IllegalStateException("Business subscription is not initialized"));
+
+        if (!PROVIDER.equals(local.getBillingProvider()) || !notBlank(local.getExternalSubscriptionId())) {
+            return snapshot(local);
+        }
+
+        SubscriptionPaymentGateway.RemoteSubscription remote = gateway.getSubscription(local.getExternalSubscriptionId());
+        requireExpectedReference(local, remote.externalReference());
+        applyRemoteSubscription(local, remote);
+        return snapshot(local);
+    }
+
+    @Transactional
     public void reconcileSubscription(String externalSubscriptionId) {
         SubscriptionPaymentGateway.RemoteSubscription remote = gateway.getSubscription(externalSubscriptionId);
         BusinessSubscription local = subscriptions.findByExternalSubscriptionId(remote.id())
                 .orElseThrow(() -> new IllegalArgumentException("Unknown Mercado Pago subscription"));
         requireExpectedReference(local, remote.externalReference());
-
-        String status = normalized(remote.status());
-        switch (status) {
-            case "authorized" -> activate(local, remote.nextPaymentDate() == null
-                    ? null : remote.nextPaymentDate().toInstant());
-            case "paused" -> {
-                local.setStatus(SubscriptionStatus.SUSPENDED);
-                local.setGraceUntil(null);
-            }
-            case "cancelled", "canceled" -> {
-                local.setStatus(SubscriptionStatus.CANCELED);
-                local.setGraceUntil(null);
-                local.setPendingPlanCode(null);
-                local.setBillingCheckoutUrl(null);
-            }
-            case "pending" -> { return; }
-            default -> { return; }
-        }
-        subscriptions.saveAndFlush(local);
+        applyRemoteSubscription(local, remote);
     }
 
     @Transactional
@@ -117,6 +123,54 @@ public class BillingSubscriptionService {
             local.setGraceUntil(now.plus(PAST_DUE_GRACE_DAYS, ChronoUnit.DAYS));
             subscriptions.saveAndFlush(local);
         }
+    }
+
+    private void applyRemoteSubscription(BusinessSubscription local,
+                                         SubscriptionPaymentGateway.RemoteSubscription remote) {
+        String status = normalized(remote.status());
+        switch (status) {
+            case "authorized" -> {
+                activate(local, remote.nextPaymentDate() == null ? null : remote.nextPaymentDate().toInstant());
+                subscriptions.saveAndFlush(local);
+            }
+            case "paused" -> {
+                local.setStatus(SubscriptionStatus.SUSPENDED);
+                local.setGraceUntil(null);
+                subscriptions.saveAndFlush(local);
+            }
+            case "cancelled", "canceled" -> {
+                local.setStatus(SubscriptionStatus.CANCELED);
+                local.setGraceUntil(null);
+                local.setPendingPlanCode(null);
+                local.setBillingCheckoutUrl(null);
+                subscriptions.saveAndFlush(local);
+            }
+            case "pending" -> {
+                // Provider has not authorized the subscription yet. Never activate from browser state alone.
+            }
+            default -> {
+                // Unknown provider states fail closed and leave the current local entitlement unchanged.
+            }
+        }
+    }
+
+    private BillingStatus snapshot(BusinessSubscription local) {
+        PlanCode current = local.getPlanCode();
+        PlanCode pending = local.getPendingPlanCode();
+        boolean awaitingProviderVerification = pending != null && notBlank(local.getExternalSubscriptionId());
+        return new BillingStatus(
+                blankToNull(local.getBillingProvider()),
+                properties.isEnabled(),
+                properties.checkoutConfigured(),
+                current.getPublicCode(),
+                current.getDisplayName(),
+                current.getMonthlyPriceClp(),
+                local.getStatus().name(),
+                pending == null ? null : pending.getPublicCode(),
+                pending == null ? null : pending.getDisplayName(),
+                pending == null ? null : pending.getMonthlyPriceClp(),
+                pending == null ? null : blankToNull(local.getBillingCheckoutUrl()),
+                awaitingProviderVerification);
     }
 
     private void activate(BusinessSubscription local, Instant suggestedEnd) {
@@ -156,8 +210,23 @@ public class BillingSubscriptionService {
     }
 
     private static boolean notBlank(String value) { return value != null && !value.isBlank(); }
+    private static String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
     private static String normalized(String value) { return value == null ? "" : value.trim().toLowerCase(Locale.ROOT); }
 
     public record CheckoutResponse(String subscriptionId, String checkoutUrl, String planCode,
                                    String planName, int monthlyPriceClp, boolean reused) {}
+
+    public record BillingStatus(
+            String provider,
+            boolean billingEnabled,
+            boolean checkoutConfigured,
+            String currentPlanCode,
+            String currentPlanName,
+            int currentMonthlyPriceClp,
+            String subscriptionStatus,
+            String pendingPlanCode,
+            String pendingPlanName,
+            Integer pendingMonthlyPriceClp,
+            String checkoutUrl,
+            boolean awaitingProviderVerification) {}
 }
