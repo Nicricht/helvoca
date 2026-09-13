@@ -161,8 +161,13 @@
 })();
 
 (() => {
-    const script = document.createElement('script');
-    script.src = '/commercial-status.js';
-    script.async = false;
-    document.head.appendChild(script);
+    const commercial = document.createElement('script');
+    commercial.src = '/commercial-status.js';
+    commercial.async = false;
+    document.head.appendChild(commercial);
+
+    const voices = document.createElement('script');
+    voices.src = '/voice-selector.js';
+    voices.async = false;
+    document.head.appendChild(voices);
 })();
