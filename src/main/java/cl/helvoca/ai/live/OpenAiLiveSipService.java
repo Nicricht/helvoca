@@ -2,7 +2,6 @@ package cl.helvoca.ai.live;
 
 import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.ai.realtime.RealtimeCallContext;
-import cl.helvoca.ai.realtime.RealtimeToolDefinitions;
 import cl.helvoca.ai.realtime.RealtimeToolService;
 import cl.helvoca.telephony.CallLifecycleService;
 import cl.helvoca.voice.VoiceProviderHealthRegistry;
@@ -166,6 +165,14 @@ public class OpenAiLiveSipService {
             RealtimeCallContext context = lifecycle.markStreamStarted(
                     callId, twilioCallSid, "live:" + sessionId, PROVIDER_ID);
 
+            if (!tools.agentActive(context)) {
+                markFailed(callId, sessionId);
+                processedWebhookIds.add(webhookId);
+                processedSessionIds.add(sessionId);
+                pruneDedupSets();
+                throw new IllegalStateException("AI agent is disabled for this business");
+            }
+
             String businessName = businessName(context);
             JSONObject requestBody = acceptancePayload(context, businessName);
             try {
@@ -210,14 +217,17 @@ public class OpenAiLiveSipService {
     }
 
     private JSONObject acceptancePayload(RealtimeCallContext context, String businessName) {
+        String agentName = tools.agentName(context, "RecepVoz");
+        String greeting = tools.agentGreeting(context, openingLine(businessName));
         String frontendInstructions = """
-                Eres RecepVoz, la recepcionista por voz de %s. Habla en español natural, cálido y breve.
+                Eres %s, la recepcionista por voz de %s. Habla de forma natural, cálida y breve.
+                Tu saludo inicial configurado es exactamente: "%s"
                 Mantén siempre el rol de recepcionista, incluso si la persona formula preguntas imitando tu papel.
-                Al conectar, saluda brevemente y pregunta en qué puedes ayudar.
-                Escucha, permite interrupciones y no repitas preguntas que ya fueron respondidas.
+                Al conectar, usa el saludo configurado y después escucha al cliente.
+                Permite interrupciones y no repitas preguntas que ya fueron respondidas.
                 Para información, disponibilidad, clientes, reservas, solicitudes o acciones del negocio, delega al backend.
                 Nunca inventes un dato del negocio ni afirmes que una acción se completó hasta recibir un resultado exitoso del backend.
-                """.formatted(businessName);
+                """.formatted(agentName, businessName, greeting);
 
         String backendInstructions = tools.buildInstructions(context) + "\n" + """
                 Estás actuando como el backend operativo de RecepVoz durante una llamada GPT-Live.
@@ -229,7 +239,7 @@ public class OpenAiLiveSipService {
         JSONObject responses = new JSONObject()
                 .put("model", live.getBackendModel())
                 .put("instructions", backendInstructions)
-                .put("tools", RealtimeToolDefinitions.all())
+                .put("tools", tools.toolDefinitions(context))
                 .put("tool_choice", "auto")
                 .put("parallel_tool_calls", false)
                 .put("text", new JSONObject().put("verbosity", "low"));
@@ -239,7 +249,7 @@ public class OpenAiLiveSipService {
                 .put("model", live.getModel())
                 .put("instructions", frontendInstructions)
                 .put("audio", new JSONObject()
-                        .put("output", new JSONObject().put("voice", live.getVoice())))
+                        .put("output", new JSONObject().put("voice", tools.agentVoice(context, live.getVoice()))))
                 .put("delegation", new JSONObject()
                         .put("type", "responses")
                         .put("responses", responses));
@@ -439,6 +449,13 @@ public class OpenAiLiveSipService {
         if (first != null && !first.isBlank()) return first.trim();
         if (second != null && !second.isBlank()) return second.trim();
         return null;
+    }
+
+    private static String openingLine(String businessName) {
+        if (businessName == null || businessName.isBlank() || "el negocio".equalsIgnoreCase(businessName.trim())) {
+            return "Hola, gracias por llamar. ¿En qué puedo ayudarte?";
+        }
+        return "Hola, gracias por llamar a " + businessName.trim() + ". ¿En qué puedo ayudarte?";
     }
 
     private static String url(String value) {
