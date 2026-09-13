@@ -10,16 +10,24 @@ import org.springframework.web.bind.annotation.*;
 public class OnboardingController {
     private final OnboardingService service;
     private final AutoOnboardingService autoOnboarding;
+    private final CommercialReadinessService commercialReadiness;
 
     public OnboardingController(OnboardingService service,
-                                AutoOnboardingService autoOnboarding) {
+                                AutoOnboardingService autoOnboarding,
+                                CommercialReadinessService commercialReadiness) {
         this.service = service;
         this.autoOnboarding = autoOnboarding;
+        this.commercialReadiness = commercialReadiness;
     }
 
     @GetMapping("/status")
     public OnboardingStatusResponse status() {
         return service.status();
+    }
+
+    @GetMapping("/readiness")
+    public CommercialReadinessResponse readiness() {
+        return commercialReadiness.current();
     }
 
     @PostMapping("/analyze")
