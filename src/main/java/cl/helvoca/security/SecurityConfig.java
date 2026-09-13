@@ -55,7 +55,6 @@ public class SecurityConfig {
                                 "/simulator.html", "/simulator.js", "/simulator.css",
                                 "/favicon.ico", "/error").permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register", "/actuator/health").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/webhooks/v1/twilio/**", "/webhooks/v1/openai/**").permitAll()
                         .requestMatchers("/ws/v1/twilio/**").permitAll()
                         .requestMatchers("/api/v1/platform/**").hasRole("PLATFORM_ADMIN")
