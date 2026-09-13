@@ -2,6 +2,7 @@ package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.common.NotFoundException;
+import cl.helvoca.telephony.CallCapacityExceededException;
 import cl.helvoca.voice.VoiceCallRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +18,8 @@ public class TwilioVoiceController {
     private static final Logger log = LoggerFactory.getLogger(TwilioVoiceController.class);
     private static final String SILENT_HANGUP_TWIML =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>";
+    private static final String BUSY_REJECT_TWIML =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Reject reason=\"busy\"/></Response>";
 
     private final TwilioCallService calls;
     private final VoiceCallRouter voiceRouter;
@@ -49,11 +52,6 @@ public class TwilioVoiceController {
         return route(from, to, callSid, "outbound-test");
     }
 
-    /**
-     * Internal, disabled-by-default ingress for an explicitly authorized
-     * inbound-equivalent certification call. Twilio signature validation still
-     * applies to this endpoint before the controller is reached.
-     */
     @PostMapping(value = "/inbound-certification", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> inboundCertification(@RequestParam("CallSid") String callSid,
@@ -103,6 +101,18 @@ public class TwilioVoiceController {
                                          String callerPhone,
                                          String callSid,
                                          String direction) {
+        if (!"outbound-test".equals(direction)) {
+            try {
+                calls.startInboundCall(callSid, callerPhone, businessPhone);
+            } catch (CallCapacityExceededException e) {
+                log.warn("Rejecting Twilio {} call={} because tenant capacity is full", direction, callSid);
+                return ResponseEntity.ok(BUSY_REJECT_TWIML);
+            } catch (NotFoundException e) {
+                log.warn("Blocking Twilio {} call={} because destination is not registered", direction, callSid);
+                return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+            }
+        }
+
         return voiceRouter.route(businessPhone, callerPhone, callSid)
                 .map(decision -> {
                     log.info("Routing Twilio {} call={} provider={} mode={}",
