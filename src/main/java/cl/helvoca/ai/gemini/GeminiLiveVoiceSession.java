@@ -117,6 +117,11 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     @Override
     public void acceptInboundAudio(String base64Audio) {
         if (closed.get() || base64Audio == null || base64Audio.isBlank()) return;
+        // Certification is a deterministic synthetic dialogue. Forwarding the
+        // real phone microphone here would let VAD/barge-in race the scripted
+        // realtime text turns and make the production certification flaky.
+        if (properties.isCertificationSimulation()) return;
+
         String pcm16k;
         try {
             pcm16k = PcmuAudioCodec.twilioMulaw8kToGeminiPcm16k(base64Audio);
@@ -225,10 +230,14 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             log.warn("Could not persist Gemini setup milestone call={}: {}", context.callId(), e.getMessage());
         }
 
-        sendClientText("[RECEPVOZ_CALL_CONNECTED]");
+        sendRealtimeText("[RECEPVOZ_CALL_CONNECTED]");
 
-        String frame;
-        while ((frame = pendingAudio.poll()) != null) sendAudio(frame);
+        if (properties.isCertificationSimulation()) {
+            pendingAudio.clear();
+        } else {
+            String frame;
+            while ((frame = pendingAudio.poll()) != null) sendAudio(frame);
+        }
         log.info("Gemini Live setup complete call={} certification_simulation={}",
                 context.callId(), properties.isCertificationSimulation());
     }
@@ -311,7 +320,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         if (!certificationStep.compareAndSet(step, nextStep)) return;
         transcripts.append(context.callId(), "USER", "[SIMULATED_CERTIFICATION] " + text);
         log.info("RECEPVOZ_CERTIFICATION_SCENARIO step={} call={}", nextStep, context.callId());
-        sendClientText(text);
+        sendRealtimeText(text);
     }
 
     private void recordCertificationToolOutcome(String name, boolean success) {
@@ -325,12 +334,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         }
     }
 
-    private void sendClientText(String text) {
-        send(new JSONObject().put("clientContent", new JSONObject()
-                .put("turns", new JSONArray().put(new JSONObject()
-                        .put("role", "user")
-                        .put("parts", new JSONArray().put(new JSONObject().put("text", text)))))
-                .put("turnComplete", true)));
+    private void sendRealtimeText(String text) {
+        send(new JSONObject().put("realtimeInput", new JSONObject().put("text", text)));
     }
 
     private void handleToolCall(JSONObject toolCall) {
