@@ -85,13 +85,13 @@ class BusinessSubscriptionServiceTest {
                 now.minus(1, ChronoUnit.DAYS), now.plus(29, ChronoUnit.DAYS), null);
         when(repository.findByBusinessId(businessId)).thenReturn(Optional.of(subscription));
         when(calls.sumDurationSecondsByBusinessAndPeriod(eq(businessId), any(), any(), eq("simulator")))
-                .thenReturn(301L * 60L);
+                .thenReturn(101L * 60L);
 
         var service = new BusinessSubscriptionService(
                 repository, calls, mock(TenantProvider.class), new CallCommercialProperties());
         var view = service.view(businessId);
 
-        assertEquals(301, view.usedMinutes());
+        assertEquals(101, view.usedMinutes());
         assertEquals(1, view.overageMinutes());
         assertTrue(view.serviceAllowed());
     }

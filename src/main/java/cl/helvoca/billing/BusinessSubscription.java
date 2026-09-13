@@ -61,9 +61,7 @@ public class BusinessSubscription {
     }
 
     @PreUpdate
-    void preUpdate() {
-        updatedAt = Instant.now();
-    }
+    void preUpdate() { updatedAt = Instant.now(); }
 
     public UUID getId() { return id; }
     public UUID getBusinessId() { return businessId; }

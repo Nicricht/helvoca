@@ -51,10 +51,12 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/index.html", "/app.js", "/styles.css",
+                                "/pricing.html", "/pricing.js", "/pricing.css",
                                 "/operations.html", "/operations.js", "/operations.css",
                                 "/simulator.html", "/simulator.js", "/simulator.css",
                                 "/favicon.ico", "/error").permitAll()
-                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register", "/actuator/health").permitAll()
+                        .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register",
+                                "/api/v1/public/pricing", "/actuator/health").permitAll()
                         .requestMatchers("/webhooks/v1/twilio/**", "/webhooks/v1/openai/**").permitAll()
                         .requestMatchers("/ws/v1/twilio/**").permitAll()
                         .requestMatchers("/api/v1/platform/**").hasRole("PLATFORM_ADMIN")
