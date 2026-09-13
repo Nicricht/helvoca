@@ -18,7 +18,8 @@ class MultiProviderVoiceRoutingTest {
 
     private static TwilioVoiceController controller(TwilioCallService calls,
                                                     VoiceCallRouter router) {
-        return new TwilioVoiceController(calls, router, mock(CallSummaryService.class));
+        return new TwilioVoiceController(
+                calls, router, mock(CallSummaryService.class), new TwilioProperties());
     }
 
     private static void assertNoLegacyVoice(String xml) {
@@ -61,23 +62,6 @@ class MultiProviderVoiceRoutingTest {
         assertEquals(twiml, response.getBody());
         assertNoLegacyVoice(response.getBody());
         verifyNoInteractions(calls);
-    }
-
-    @Test
-    void deprecatedTrialIngressStillUsesMultiProviderRouter() {
-        TwilioCallService calls = mock(TwilioCallService.class);
-        VoiceCallRouter router = mock(VoiceCallRouter.class);
-        String twiml = "<Response><Connect><Stream url=\"wss://example/ws\"/></Connect></Response>";
-        when(router.route("+14355652512", "+56966939611", OUTBOUND_SID))
-                .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
-                        "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
-
-        var response = controller(calls, router)
-                .legacyOutboundTest(OUTBOUND_SID, "+14355652512", "+56966939611");
-
-        assertEquals(200, response.getStatusCode().value());
-        assertNoLegacyVoice(response.getBody());
-        verify(router).route("+14355652512", "+56966939611", OUTBOUND_SID);
     }
 
     @Test

@@ -44,6 +44,7 @@ app:
     auth-token: ${TWILIO_AUTH_TOKEN:}
     public-base-url: ${TWILIO_PUBLIC_BASE_URL:}
     media-stream-path: ${TWILIO_MEDIA_STREAM_PATH:/ws/v1/twilio/media}
+    certification-ingress-enabled: ${TWILIO_CERTIFICATION_INGRESS_ENABLED:false}
   gemini:
     live:
       enabled: ${GEMINI_LIVE_ENABLED:false}
@@ -71,4 +72,4 @@ app:
       voice: ${OPENAI_LIVE_VOICE:marin}
       api-base-url: ${OPENAI_LIVE_API_BASE_URL:https://api.openai.com/v1}
       sideband-base-url: ${OPENAI_LIVE_SIDEBAND_BASE_URL:wss://api.openai.com/v1}
-      webhook-tolerance-seconds: ${OPENAI_WEBHOOK_TOLERANCE_SECONDS:300}
+      webhook-tolerance-seconds: ${OPENAI_LIVE_WEBHOOK_TOLERANCE_SECONDS:300}

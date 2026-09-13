@@ -2,6 +2,7 @@ package cl.helvoca.ai.gemini;
 
 import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.ai.realtime.RealtimeToolService;
+import cl.helvoca.call.CallCertificationService;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.call.CallTranscriptService;
 import cl.helvoca.telephony.CallLifecycleService;
@@ -23,6 +24,7 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
     private final CallTranscriptService transcripts;
     private final CallSummaryService summaries;
     private final CallLifecycleService lifecycle;
+    private final CallCertificationService certifications;
     private final VoiceProviderHealthRegistry health;
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(8))
@@ -33,12 +35,14 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
                                    CallTranscriptService transcripts,
                                    CallSummaryService summaries,
                                    CallLifecycleService lifecycle,
+                                   CallCertificationService certifications,
                                    VoiceProviderHealthRegistry health) {
         this.properties = properties;
         this.tools = tools;
         this.transcripts = transcripts;
         this.summaries = summaries;
         this.lifecycle = lifecycle;
+        this.certifications = certifications;
         this.health = health;
     }
 
@@ -53,9 +57,15 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
     }
 
     @Override
+    public boolean certificationSession(RealtimeCallContext context) {
+        return context != null && properties.certificationSimulationAllowedFor(context.callerNumber());
+    }
+
+    @Override
     public VoiceAiSession createSession(RealtimeCallContext context, VoiceTransportSession transport) {
         return new GeminiLiveVoiceSession(
-                context, transport, sessionProperties(context), tools, transcripts, summaries, lifecycle, health, http);
+                context, transport, sessionProperties(context), tools, transcripts, summaries,
+                lifecycle, certifications, health, http);
     }
 
     GeminiLiveProperties sessionProperties(RealtimeCallContext context) {

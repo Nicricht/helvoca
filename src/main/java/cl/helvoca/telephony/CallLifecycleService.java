@@ -96,6 +96,26 @@ public class CallLifecycleService {
     }
 
     @Transactional
+    public void markCertification(UUID callId) {
+        CallSession call = calls.findById(callId)
+                .orElseThrow(() -> new NotFoundException("Call not found"));
+        if (!call.isCertification()) {
+            call.setCertification(true);
+            calls.saveAndFlush(call);
+        }
+    }
+
+    @Transactional
+    public void markAiSetupCompleted(UUID callId) {
+        CallSession call = calls.findById(callId)
+                .orElseThrow(() -> new NotFoundException("Call not found"));
+        if (call.getAiSetupCompletedAt() == null) {
+            call.setAiSetupCompletedAt(Instant.now());
+            calls.saveAndFlush(call);
+        }
+    }
+
+    @Transactional
     public void markStreamStopped(String streamId) {
         if (streamId == null || streamId.isBlank()) return;
         calls.findByStreamSid(streamId).ifPresent(call -> call.setStreamEndedAt(Instant.now()));

@@ -21,13 +21,16 @@ public class TwilioVoiceController {
     private final TwilioCallService calls;
     private final VoiceCallRouter voiceRouter;
     private final CallSummaryService summaries;
+    private final TwilioProperties properties;
 
     public TwilioVoiceController(TwilioCallService calls,
                                  VoiceCallRouter voiceRouter,
-                                 CallSummaryService summaries) {
+                                 CallSummaryService summaries,
+                                 TwilioProperties properties) {
         this.calls = calls;
         this.voiceRouter = voiceRouter;
         this.summaries = summaries;
+        this.properties = properties;
     }
 
     @PostMapping(value = "/voice", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
@@ -47,34 +50,20 @@ public class TwilioVoiceController {
     }
 
     /**
-     * Certification-only ingress for an outbound Twilio call that must exercise
-     * the same business/caller mapping as a genuine inbound customer call.
-     *
-     * Twilio still originates the physical call from the purchased business
-     * number to the Chilean tester, but this endpoint intentionally interprets
-     * From as the business number and To as the caller number. The normal
-     * /voice endpoint remains the production ingress for real inbound calls.
+     * Internal, disabled-by-default ingress for an explicitly authorized
+     * inbound-equivalent certification call. Twilio signature validation still
+     * applies to this endpoint before the controller is reached.
      */
     @PostMapping(value = "/inbound-certification", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> inboundCertification(@RequestParam("CallSid") String callSid,
                                                        @RequestParam("From") String from,
                                                        @RequestParam("To") String to) {
+        if (!properties.isCertificationIngressEnabled()) {
+            log.warn("Blocked disabled Twilio certification ingress call={}", callSid);
+            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+        }
         return route(from, to, callSid, "inbound-certification");
-    }
-
-    /**
-     * Temporary compatibility ingress for stale Twilio console configuration.
-     * It routes into the exact same multi-provider voice edge and never restores
-     * the old Trial/Polly/TTS flow.
-     */
-    @PostMapping(value = "/trial/voice", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
-            produces = MediaType.APPLICATION_XML_VALUE)
-    public ResponseEntity<String> legacyOutboundTest(@RequestParam("CallSid") String callSid,
-                                                     @RequestParam("From") String from,
-                                                     @RequestParam("To") String to) {
-        log.warn("Deprecated Twilio route /trial/voice used; routing call={} to multi-provider voice edge", callSid);
-        return outboundTest(callSid, from, to);
     }
 
     @PostMapping(value = "/stream-status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)

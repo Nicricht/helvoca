@@ -9,6 +9,7 @@ public class TwilioProperties {
     private String authToken = "";
     private String publicBaseUrl = "";
     private String mediaStreamPath = "/ws/v1/twilio/media";
+    private boolean certificationIngressEnabled = false;
 
     public String getAuthToken() { return authToken; }
     public void setAuthToken(String authToken) { this.authToken = authToken; }
@@ -16,6 +17,10 @@ public class TwilioProperties {
     public void setPublicBaseUrl(String publicBaseUrl) { this.publicBaseUrl = publicBaseUrl; }
     public String getMediaStreamPath() { return mediaStreamPath; }
     public void setMediaStreamPath(String mediaStreamPath) { this.mediaStreamPath = mediaStreamPath; }
+    public boolean isCertificationIngressEnabled() { return certificationIngressEnabled; }
+    public void setCertificationIngressEnabled(boolean certificationIngressEnabled) {
+        this.certificationIngressEnabled = certificationIngressEnabled;
+    }
 
     public boolean hasAuthToken() { return authToken != null && !authToken.isBlank(); }
 

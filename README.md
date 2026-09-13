@@ -224,7 +224,7 @@ Para una prueba outbound, la ruta canónica es:
 https://tu-dominio-publico/webhooks/v1/twilio/outbound-test
 ```
 
-`/webhooks/v1/twilio/trial/voice` existe únicamente como compatibilidad temporal para configuraciones antiguas y debe eliminarse una vez que Twilio deje de apuntar allí.
+La ruta interna `/webhooks/v1/twilio/inbound-certification` está deshabilitada por defecto. Solo una certificación real explícitamente autorizada debe habilitarla temporalmente con `TWILIO_CERTIFICATION_INGRESS_ENABLED=true`, junto con la simulación y el caller de certificación correspondientes. La antigua ruta `/webhooks/v1/twilio/trial/voice` fue retirada.
 
 ## Documentación
 

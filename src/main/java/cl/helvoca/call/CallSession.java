@@ -67,6 +67,12 @@ public class CallSession {
     @Column(name = "stream_ended_at")
     private Instant streamEndedAt;
 
+    @Column(name = "ai_setup_completed_at")
+    private Instant aiSetupCompletedAt;
+
+    @Column(name = "certification", nullable = false)
+    private boolean certification;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -120,6 +126,10 @@ public class CallSession {
     public void setStreamStartedAt(Instant streamStartedAt) { this.streamStartedAt = streamStartedAt; }
     public Instant getStreamEndedAt() { return streamEndedAt; }
     public void setStreamEndedAt(Instant streamEndedAt) { this.streamEndedAt = streamEndedAt; }
+    public Instant getAiSetupCompletedAt() { return aiSetupCompletedAt; }
+    public void setAiSetupCompletedAt(Instant aiSetupCompletedAt) { this.aiSetupCompletedAt = aiSetupCompletedAt; }
+    public boolean isCertification() { return certification; }
+    public void setCertification(boolean certification) { this.certification = certification; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
