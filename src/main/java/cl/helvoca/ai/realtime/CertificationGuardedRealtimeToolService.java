@@ -56,7 +56,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     }
 
     @Override
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public String execute(RealtimeCallContext context, String toolName, String rawArguments) {
         CallSession call = calls.findByIdAndBusinessId(context.callId(), context.businessId()).orElse(null);
         if (call != null && call.isCertification()) {
