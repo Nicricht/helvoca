@@ -1,6 +1,7 @@
 package cl.helvoca.call;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -54,6 +55,15 @@ public class CallSession {
 
     @Column(name = "duration_seconds")
     private Integer durationSeconds;
+
+    @Column(name = "estimated_telephony_cost_usd", precision = 12, scale = 6)
+    private BigDecimal estimatedTelephonyCostUsd;
+
+    @Column(name = "estimated_ai_cost_usd", precision = 12, scale = 6)
+    private BigDecimal estimatedAiCostUsd;
+
+    @Column(name = "estimated_total_cost_usd", precision = 12, scale = 6)
+    private BigDecimal estimatedTotalCostUsd;
 
     @Column(length = 80)
     private String resolution;
@@ -118,6 +128,12 @@ public class CallSession {
     public void setEndedAt(Instant endedAt) { this.endedAt = endedAt; }
     public Integer getDurationSeconds() { return durationSeconds; }
     public void setDurationSeconds(Integer durationSeconds) { this.durationSeconds = durationSeconds; }
+    public BigDecimal getEstimatedTelephonyCostUsd() { return estimatedTelephonyCostUsd; }
+    public void setEstimatedTelephonyCostUsd(BigDecimal estimatedTelephonyCostUsd) { this.estimatedTelephonyCostUsd = estimatedTelephonyCostUsd; }
+    public BigDecimal getEstimatedAiCostUsd() { return estimatedAiCostUsd; }
+    public void setEstimatedAiCostUsd(BigDecimal estimatedAiCostUsd) { this.estimatedAiCostUsd = estimatedAiCostUsd; }
+    public BigDecimal getEstimatedTotalCostUsd() { return estimatedTotalCostUsd; }
+    public void setEstimatedTotalCostUsd(BigDecimal estimatedTotalCostUsd) { this.estimatedTotalCostUsd = estimatedTotalCostUsd; }
     public String getResolution() { return resolution; }
     public void setResolution(String resolution) { this.resolution = resolution; }
     public String getStreamSid() { return streamSid; }
