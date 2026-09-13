@@ -36,6 +36,18 @@ function fmtDate(value) {
   catch (_) { return value; }
 }
 
+function fmtDuration(seconds) {
+  const total = Math.max(0, Number(seconds || 0));
+  const minutes = Math.floor(total / 60);
+  const rest = total % 60;
+  return `${minutes}:${String(rest).padStart(2, "0")}`;
+}
+
+function fmtUsd(value) {
+  const number = Number(value || 0);
+  return new Intl.NumberFormat("es-CL", {minimumFractionDigits: 2, maximumFractionDigits: 4}).format(number);
+}
+
 function renderReadiness(data) {
   $("#readinessBadge").textContent = data.ready ? "LISTO" : `${data.requiredPassed}/${data.requiredTotal}`;
   const checks = $("#readinessChecks");
@@ -53,13 +65,44 @@ function renderReadiness(data) {
   warnings.innerHTML = (data.warnings || []).map(w => `<div class="empty">${esc(w)}</div>`).join("");
 }
 
+function renderCertification(data) {
+  const badge = $("#certificationBadge");
+  const meta = $("#certificationMeta");
+  const checks = $("#certificationChecks");
+
+  if (!data?.available) {
+    badge.textContent = "SIN EJECUTAR";
+    badge.className = "badge";
+    meta.innerHTML = '<span>No existe todavía una llamada de certificación registrada para este negocio.</span>';
+    checks.innerHTML = '<div class="empty">La certificación real sigue siendo una operación controlada y no se inicia desde este dashboard.</div>';
+    return;
+  }
+
+  const stateLabels = {PASSED: "APROBADA", FAILED: "FALLÓ", IN_PROGRESS: "EN CURSO", NOT_RUN: "SIN EJECUTAR"};
+  badge.textContent = stateLabels[data.state] || esc(data.state);
+  badge.className = `badge ${data.state === "FAILED" ? "bad" : ""}`;
+  meta.innerHTML = [
+    data.startedAt ? `<span>${fmtDate(data.startedAt)}</span>` : "",
+    data.telephonyProvider ? `<span>Telefonía: ${esc(data.telephonyProvider)}</span>` : "",
+    data.aiProvider ? `<span>IA: ${esc(data.aiProvider)}</span>` : "",
+    data.callStatus ? `<span>Llamada: ${esc(data.callStatus)}</span>` : "",
+    `<span>${Number(data.passedChecks || 0)}/${Number(data.totalChecks || 0)} controles</span>`
+  ].filter(Boolean).join("");
+
+  checks.innerHTML = (data.checks || []).map(c => `
+    <div class="item">
+      <div class="item-head"><strong>${esc(c.label)}</strong><span class="pill ${c.passed ? "" : "bad"}">${c.passed ? "OK" : "FALTA"}</span></div>
+      <div class="meta"><span>${esc(c.detail)}</span></div>
+    </div>`).join("");
+}
+
 function renderCalls(items = []) {
   const root = $("#callsList");
-  if (!items.length) { root.innerHTML = '<div class="empty">Todavía no hay llamadas.</div>'; return; }
+  if (!items.length) { root.innerHTML = '<div class="empty">Todavía no hay llamadas reales.</div>'; return; }
   root.innerHTML = items.map(c => `
     <div class="item" data-call-id="${esc(c.id)}">
       <div class="item-head"><strong>${esc(c.callerNumber || "Número oculto")}</strong><span class="pill ${c.status === "FAILED" ? "bad" : ""}">${esc(c.status)}</span></div>
-      <div class="meta"><span>${fmtDate(c.startedAt)}</span><span>${c.durationSeconds != null ? `${c.durationSeconds}s` : "sin duración"}</span>${c.resolution ? `<span>${esc(c.resolution)}</span>` : ""}</div>
+      <div class="meta"><span>${fmtDate(c.startedAt)}</span><span>${c.durationSeconds != null ? fmtDuration(c.durationSeconds) : "sin duración"}</span>${c.resolution ? `<span>${esc(c.resolution)}</span>` : ""}${c.estimatedTotalCostUsd != null ? `<span>USD ${fmtUsd(c.estimatedTotalCostUsd)}</span>` : ""}</div>
       <div class="actions call-actions"><button data-call-detail class="ghost">Ver detalle</button></div>
     </div>`).join("");
   root.querySelectorAll("[data-call-detail]").forEach(button => button.addEventListener("click", async e => {
@@ -86,7 +129,7 @@ function renderCallDetail(data) {
   const transcript = data.transcript || [];
   $("#callTranscript").innerHTML = transcript.length ? transcript.map(t => `
     <div class="transcript-line ${String(t.speaker || "").toLowerCase()}">
-      <strong>${esc(t.speaker === "USER" ? "Cliente" : t.speaker === "ASSISTANT" ? "Helvoca" : t.speaker)}</strong>
+      <strong>${esc(t.speaker === "USER" ? "Cliente" : t.speaker === "ASSISTANT" ? "RecepVoz" : t.speaker)}</strong>
       <p>${esc(t.content)}</p>
       <span>${fmtDate(t.createdAt)}</span>
     </div>`).join("") : '<div class="empty">No hay transcripción disponible.</div>';
@@ -121,7 +164,7 @@ function renderRequests(items = []) {
 
 function renderQuestions(items = []) {
   const root = $("#questionsList");
-  if (!items.length) { root.innerHTML = '<div class="empty">Helvoca no tiene preguntas pendientes. ✨</div>'; return; }
+  if (!items.length) { root.innerHTML = '<div class="empty">RecepVoz no tiene preguntas pendientes. ✨</div>'; return; }
   root.innerHTML = items.map(q => `
     <div class="item" data-question-id="${esc(q.id)}">
       <div class="item-head"><strong>${esc(q.question)}</strong><span class="pill">${q.occurrences}×</span></div>
@@ -131,7 +174,7 @@ function renderQuestions(items = []) {
   root.querySelectorAll("[data-answer-btn]").forEach(button => button.addEventListener("click", async e => {
     const item = e.target.closest("[data-question-id]");
     const answer = item.querySelector("[data-answer]").value.trim();
-    if (!answer) { toast("Escribe una respuesta antes de enseñar a Helvoca."); return; }
+    if (!answer) { toast("Escribe una respuesta antes de enseñar a RecepVoz."); return; }
     e.target.disabled = true;
     try {
       await api(`/api/v1/learning/questions/${item.dataset.questionId}/answer`, {method:"POST", body:JSON.stringify({answer})});
@@ -150,20 +193,24 @@ function renderQuestions(items = []) {
 
 async function load() {
   try {
-    const [data, readiness] = await Promise.all([
+    const [data, readiness, certification] = await Promise.all([
       api("/api/v1/operations/dashboard"),
-      api("/api/v1/operations/readiness")
+      api("/api/v1/operations/readiness"),
+      api("/api/v1/operations/certification")
     ]);
     $("#businessName").textContent = data.businessName;
     $("#localNow").textContent = `${data.timezone} · ${fmtDate(data.localNow)}`;
     $("#callsToday").textContent = data.callsToday;
+    $("#minutesToday").textContent = fmtDuration(data.callDurationSecondsToday);
     $("#bookingsToday").textContent = data.bookingsToday;
     $("#customersToday").textContent = data.newCustomersToday;
     $("#openRequests").textContent = data.openRequests;
     $("#unknownQuestions").textContent = data.unansweredQuestions;
     $("#failuresToday").textContent = data.callFailuresToday;
+    $("#costToday").textContent = fmtUsd(data.estimatedCallCostTodayUsd);
     $("#healthBadge").textContent = data.callFailuresToday ? `${data.callFailuresToday} llamada(s) con fallo` : "Operación saludable";
     renderReadiness(readiness);
+    renderCertification(certification);
     renderCalls(data.recentCalls);
     renderRequests(data.recentRequests);
     renderQuestions(data.unanswered);

@@ -63,18 +63,20 @@ public class OperationsDashboardService {
         Instant dayStart = now.toLocalDate().atStartOfDay(zone).toInstant();
         Instant dayEnd = now.toLocalDate().plusDays(1).atStartOfDay(zone).toInstant();
 
-        List<CallSession> recentCalls = calls.findAllByBusinessId(
-                businessId, PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "startedAt"))).getContent();
+        List<CallSession> recentCalls = calls.findAllByBusinessIdAndCertificationFalseAndTelephonyProviderNot(
+                businessId, SIMULATOR_PROVIDER, PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "startedAt"))).getContent();
         List<Booking> allBookings = bookings.findAllByBusinessIdOrderByStartAtDesc(businessId);
         var allCustomers = customers.findAllByBusinessIdOrderByCreatedAtDesc(businessId);
         var allRequests = requests.findAllByBusinessIdOrderByCreatedAtDesc(businessId);
         var openQuestions = questions.findAllByBusinessIdAndStatusOrderByLastSeenAtDesc(businessId, QuestionStatus.OPEN);
 
-        long callsToday = calls.countByBusinessIdAndTelephonyProviderNotAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+        long callsToday = calls.countByBusinessIdAndCertificationFalseAndTelephonyProviderNotAndStartedAtGreaterThanEqualAndStartedAtLessThan(
                 businessId, SIMULATOR_PROVIDER, dayStart, dayEnd);
-        long failuresToday = calls.countByBusinessIdAndTelephonyProviderNotAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+        long failuresToday = calls.countByBusinessIdAndCertificationFalseAndTelephonyProviderNotAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
                 businessId, SIMULATOR_PROVIDER, List.of(CallStatus.FAILED, CallStatus.NO_ANSWER), dayStart, dayEnd);
         BigDecimal estimatedCallCostToday = calls.sumEstimatedCostByBusinessAndPeriod(
+                businessId, dayStart, dayEnd, SIMULATOR_PROVIDER);
+        Long callDurationSecondsToday = calls.sumDurationSecondsByBusinessAndPeriod(
                 businessId, dayStart, dayEnd, SIMULATOR_PROVIDER);
         long bookingsToday = allBookings.stream()
                 .filter(b -> b.getStatus() != BookingStatus.CANCELLED && between(b.getCreatedAt(), dayStart, dayEnd)).count();
@@ -83,7 +85,8 @@ public class OperationsDashboardService {
 
         return new Dashboard(
                 business.getName(), business.getTimezone(), now.toOffsetDateTime().toString(),
-                callsToday, bookingsToday, customersToday, openRequests, openQuestions.size(), failuresToday,
+                callsToday, callDurationSecondsToday == null ? 0L : callDurationSecondsToday,
+                bookingsToday, customersToday, openRequests, openQuestions.size(), failuresToday,
                 estimatedCallCostToday == null ? BigDecimal.ZERO : estimatedCallCostToday,
                 recentCalls.stream().map(CallItem::from).toList(),
                 allRequests.stream().limit(10).map(RequestItem::from).toList(),
@@ -99,6 +102,7 @@ public class OperationsDashboardService {
             String timezone,
             String localNow,
             long callsToday,
+            long callDurationSecondsToday,
             long bookingsToday,
             long newCustomersToday,
             long openRequests,

@@ -16,7 +16,10 @@ public interface CallSessionRepository extends JpaRepository<CallSession, UUID> 
     Optional<CallSession> findByProviderCallId(String providerCallId);
     Optional<CallSession> findByStreamSid(String streamSid);
     Optional<CallSession> findByIdAndBusinessId(UUID id, UUID businessId);
+    Optional<CallSession> findFirstByBusinessIdAndCertificationTrueOrderByStartedAtDesc(UUID businessId);
     Page<CallSession> findAllByBusinessId(UUID businessId, Pageable pageable);
+    Page<CallSession> findAllByBusinessIdAndCertificationFalseAndTelephonyProviderNot(
+            UUID businessId, String excludedProvider, Pageable pageable);
     long countByBusinessIdAndStatusIn(UUID businessId, Collection<CallStatus> statuses);
     long countByBusinessIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
             UUID businessId, Instant start, Instant end);
@@ -26,6 +29,10 @@ public interface CallSessionRepository extends JpaRepository<CallSession, UUID> 
             UUID businessId, String excludedProvider, Instant start, Instant end);
     long countByBusinessIdAndTelephonyProviderNotAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
             UUID businessId, String excludedProvider, Collection<CallStatus> statuses, Instant start, Instant end);
+    long countByBusinessIdAndCertificationFalseAndTelephonyProviderNotAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+            UUID businessId, String excludedProvider, Instant start, Instant end);
+    long countByBusinessIdAndCertificationFalseAndTelephonyProviderNotAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+            UUID businessId, String excludedProvider, Collection<CallStatus> statuses, Instant start, Instant end);
 
     @Query("""
         select coalesce(sum(c.estimatedTotalCostUsd), 0) from CallSession c
@@ -33,6 +40,7 @@ public interface CallSessionRepository extends JpaRepository<CallSession, UUID> 
           and c.startedAt >= :start
           and c.startedAt < :end
           and c.telephonyProvider <> :excludedProvider
+          and c.certification = false
         """)
     BigDecimal sumEstimatedCostByBusinessAndPeriod(
             @Param("businessId") UUID businessId,
@@ -46,6 +54,7 @@ public interface CallSessionRepository extends JpaRepository<CallSession, UUID> 
           and c.startedAt >= :start
           and c.startedAt < :end
           and c.telephonyProvider <> :excludedProvider
+          and c.certification = false
           and c.durationSeconds is not null
         """)
     Long sumDurationSecondsByBusinessAndPeriod(
