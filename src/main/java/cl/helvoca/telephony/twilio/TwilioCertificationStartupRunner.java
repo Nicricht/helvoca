@@ -24,12 +24,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 /**
- * Explicitly opt-in one-shot real-call certification harness.
+ * Explicitly opt-in one-shot real-call harness.
  *
- * It is intentionally disabled by default and exists only so a deliberately
- * authorized production certification can be initiated from Railway without
- * requiring a human to click Twilio Console. The switch must be turned off
- * immediately after the authorized run.
+ * It exists so a deliberately authorized production test can be initiated
+ * from Railway without requiring a human to click Twilio Console. Outbound
+ * human tests are ended by the human caller. The automatic safety hangup is
+ * reserved for inbound certification runs only.
  */
 @Component
 public class TwilioCertificationStartupRunner implements ApplicationRunner {
@@ -96,7 +96,12 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 String callSid = createCall();
                 log.info("TWILIO_CERTIFICATION_CALL CREATED call={} direction={} from={} to={} max_seconds={}",
                         callSid, direction, mask(from), mask(to), maxSeconds);
-                scheduleSafetyHangup(callSid);
+                if (shouldScheduleSafetyHangup(direction)) {
+                    scheduleSafetyHangup(callSid);
+                } else {
+                    log.info("TWILIO_CERTIFICATION_CALL SAFETY_HANGUP disabled direction={} call={}; human controls hangup",
+                            direction, callSid);
+                }
             } catch (Exception e) {
                 log.error("TWILIO_CERTIFICATION_CALL FAILED direction={} reason={}", direction, rootMessage(e));
             } finally {
@@ -171,6 +176,10 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         if (value == null || value.isBlank()) return OUTBOUND_TEST;
         String normalized = value.trim().toLowerCase(Locale.ROOT);
         return INBOUND_CERTIFICATION.equals(normalized) ? INBOUND_CERTIFICATION : OUTBOUND_TEST;
+    }
+
+    static boolean shouldScheduleSafetyHangup(String direction) {
+        return INBOUND_CERTIFICATION.equals(normalizeDirection(direction));
     }
 
     private static String form(String key, String value) {
