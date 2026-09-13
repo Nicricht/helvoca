@@ -16,7 +16,8 @@ class TwilioOutboundLiveFlowTest {
         TwilioCallService calls = mock(TwilioCallService.class);
         VoiceCallRouter router = mock(VoiceCallRouter.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
-        TwilioVoiceController controller = new TwilioVoiceController(calls, router, summaries);
+        TwilioVoiceController controller = new TwilioVoiceController(
+                calls, router, summaries, new TwilioProperties());
         String callSid = "CA0123456789abcdef0123456789abcdef";
         String twiml = "<Response><Connect><Stream url=\"wss://example/ws\"/></Connect></Response>";
 
