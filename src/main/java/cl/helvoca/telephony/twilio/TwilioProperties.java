@@ -6,11 +6,15 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "app.twilio")
 public class TwilioProperties {
+    private String accountSid = "";
     private String authToken = "";
     private String publicBaseUrl = "";
     private String mediaStreamPath = "/ws/v1/twilio/media";
     private boolean certificationIngressEnabled = false;
+    private boolean provisioningEnabled = false;
 
+    public String getAccountSid() { return accountSid; }
+    public void setAccountSid(String accountSid) { this.accountSid = accountSid; }
     public String getAuthToken() { return authToken; }
     public void setAuthToken(String authToken) { this.authToken = authToken; }
     public String getPublicBaseUrl() { return publicBaseUrl; }
@@ -21,11 +25,18 @@ public class TwilioProperties {
     public void setCertificationIngressEnabled(boolean certificationIngressEnabled) {
         this.certificationIngressEnabled = certificationIngressEnabled;
     }
+    public boolean isProvisioningEnabled() { return provisioningEnabled; }
+    public void setProvisioningEnabled(boolean provisioningEnabled) { this.provisioningEnabled = provisioningEnabled; }
 
+    public boolean hasAccountSid() { return accountSid != null && !accountSid.isBlank(); }
     public boolean hasAuthToken() { return authToken != null && !authToken.isBlank(); }
 
     public boolean hasSecurePublicBaseUrl() {
         return publicBaseUrl != null && publicBaseUrl.trim().startsWith("https://");
+    }
+
+    public boolean hasCommercialProvisioningCredentials() {
+        return hasAccountSid() && hasAuthToken() && hasSecurePublicBaseUrl();
     }
 
     public String mediaStreamWebSocketUrl() {

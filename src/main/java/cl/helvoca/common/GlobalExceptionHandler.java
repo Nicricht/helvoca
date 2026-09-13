@@ -22,6 +22,12 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of("CONFLICT", ex.getMessage()));
     }
 
+    @ExceptionHandler(ExternalProviderException.class)
+    ResponseEntity<ApiError> providerFailure(ExternalProviderException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(ApiError.of("PROVIDER_ERROR", ex.getMessage()));
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     ResponseEntity<ApiError> unauthorized(AuthenticationException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
