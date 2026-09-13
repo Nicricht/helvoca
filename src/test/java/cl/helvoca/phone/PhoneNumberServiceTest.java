@@ -1,6 +1,7 @@
 package cl.helvoca.phone;
 
 import cl.helvoca.common.ConflictException;
+import cl.helvoca.common.NotFoundException;
 import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
 
@@ -57,5 +58,38 @@ class PhoneNumberServiceTest {
         assertEquals("Este número ya está conectado a otro negocio", error.getMessage());
         verify(repository, never()).save(any());
         verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void detachDeletesPhoneOwnedByCurrentTenant() {
+        PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        UUID businessId = UUID.randomUUID();
+        UUID phoneId = UUID.randomUUID();
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        when(repository.findByIdAndBusinessId(phoneId, businessId)).thenReturn(Optional.of(phone));
+
+        PhoneNumberService service = new PhoneNumberService(repository, tenantProvider);
+        service.detach(phoneId);
+
+        verify(repository).delete(phone);
+    }
+
+    @Test
+    void detachCannotDeletePhoneOwnedByAnotherTenant() {
+        PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        UUID currentBusiness = UUID.randomUUID();
+        UUID phoneId = UUID.randomUUID();
+        when(tenantProvider.requireBusinessId()).thenReturn(currentBusiness);
+        when(repository.findByIdAndBusinessId(phoneId, currentBusiness)).thenReturn(Optional.empty());
+
+        PhoneNumberService service = new PhoneNumberService(repository, tenantProvider);
+
+        assertThrows(NotFoundException.class, () -> service.detach(phoneId));
+        verify(repository, never()).delete(any());
     }
 }
