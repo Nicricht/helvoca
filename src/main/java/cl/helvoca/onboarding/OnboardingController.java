@@ -10,11 +10,11 @@ import org.springframework.web.bind.annotation.*;
 public class OnboardingController {
     private final OnboardingService service;
     private final AutoOnboardingService autoOnboarding;
-    private final CommercialReadinessService commercialReadiness;
+    private final SelfServiceReadinessService commercialReadiness;
 
     public OnboardingController(OnboardingService service,
                                 AutoOnboardingService autoOnboarding,
-                                CommercialReadinessService commercialReadiness) {
+                                SelfServiceReadinessService commercialReadiness) {
         this.service = service;
         this.autoOnboarding = autoOnboarding;
         this.commercialReadiness = commercialReadiness;
