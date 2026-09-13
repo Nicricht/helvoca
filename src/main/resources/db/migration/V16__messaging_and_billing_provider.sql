@@ -30,7 +30,8 @@ create index idx_messaging_message_conversation_created
 
 alter table business_subscription
     add column billing_provider varchar(30),
-    add column pending_plan_code varchar(20);
+    add column pending_plan_code varchar(20),
+    add column billing_checkout_url text;
 
 alter table business_subscription
     add constraint ck_business_subscription_pending_plan
