@@ -6,6 +6,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -22,6 +23,14 @@ public class AiAgentController {
     @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
     public Response current() {
         return Response.from(service.current(), service.configuredCurrent());
+    }
+
+    @GetMapping("/voices")
+    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    public List<VoiceProfileResponse> voices() {
+        return AgentVoiceProfile.catalog().stream()
+                .map(VoiceProfileResponse::from)
+                .toList();
     }
 
     @PutMapping
@@ -42,6 +51,18 @@ public class AiAgentController {
             boolean active,
             Set<AiCapability> capabilities
     ) {}
+
+    public record VoiceProfileResponse(
+            String code,
+            String selection,
+            String name,
+            String description
+    ) {
+        static VoiceProfileResponse from(AgentVoiceProfile profile) {
+            return new VoiceProfileResponse(
+                    profile.code(), profile.openAiVoice(), profile.displayName(), profile.description());
+        }
+    }
 
     public record Response(
             UUID id,

@@ -1,5 +1,6 @@
 package cl.helvoca.ai.gemini;
 
+import cl.helvoca.agent.AgentVoiceProfile;
 import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.ai.realtime.RealtimeToolService;
 import cl.helvoca.call.CallCertificationService;
@@ -78,7 +79,7 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
         session.setApiKey(properties.getApiKey());
         session.setModel(properties.getModel());
         String tenantVoice = context == null ? null : tools.agentVoice(context, null);
-        session.setVoice(tenantVoice == null || tenantVoice.isBlank() ? properties.getVoice() : tenantVoice);
+        session.setVoice(AgentVoiceProfile.resolveGemini(tenantVoice, properties.getVoice()));
         session.setWebsocketUrl(properties.getWebsocketUrl());
         session.setCertificationCaller(properties.getCertificationCaller());
         session.setCertificationSimulation(

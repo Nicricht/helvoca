@@ -55,7 +55,7 @@ public class AiAgentService {
         if (agent.getId() == null) agent.setBusinessId(businessId);
         agent.setName(defaultIfBlank(name, "RecepVoz"));
         agent.setLanguage(defaultIfBlank(language, business.getLanguage()));
-        agent.setVoice(blankToNull(voice));
+        agent.setVoice(AgentVoiceProfile.normalizeForStorage(voice));
         agent.setGreeting(defaultIfBlank(greeting,
                 "Hola, gracias por llamar a " + business.getName() + ". ¿En qué puedo ayudarte?"));
         agent.setInstructions(blankToNull(instructions));
