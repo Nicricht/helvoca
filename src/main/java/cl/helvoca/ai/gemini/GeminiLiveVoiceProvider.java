@@ -63,6 +63,10 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
 
     @Override
     public VoiceAiSession createSession(RealtimeCallContext context, VoiceTransportSession transport) {
+        String configuredAgent = tools.agentName(context, null);
+        if (configuredAgent != null && !tools.agentActive(context)) {
+            throw new IllegalStateException("AI agent is disabled for this business");
+        }
         return new GeminiLiveVoiceSession(
                 context, transport, sessionProperties(context), tools, transcripts, summaries,
                 lifecycle, certifications, health, http);
@@ -73,7 +77,8 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
         session.setEnabled(properties.isEnabled());
         session.setApiKey(properties.getApiKey());
         session.setModel(properties.getModel());
-        session.setVoice(properties.getVoice());
+        String tenantVoice = context == null ? null : tools.agentVoice(context, null);
+        session.setVoice(tenantVoice == null || tenantVoice.isBlank() ? properties.getVoice() : tenantVoice);
         session.setWebsocketUrl(properties.getWebsocketUrl());
         session.setCertificationCaller(properties.getCertificationCaller());
         session.setCertificationSimulation(

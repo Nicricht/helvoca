@@ -153,11 +153,8 @@ public class OpenAiLiveSidebandManager {
 
         private void startConversation() {
             if (!sessionStartedEvent.compareAndSet(false, true) || terminal.get()) return;
-            String opening = openingLine(businessName);
+            String opening = tools.agentGreeting(context, openingLine(businessName));
 
-            // Live commands are valid after session.started. Pair an instruction with
-            // speakable commentary so the receptionist reliably opens the call instead
-            // of racing the session startup or waiting indefinitely for the caller.
             send(new JSONObject()
                     .put("type", "session.instructions.append")
                     .put("event_id", eventId())
