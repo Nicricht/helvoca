@@ -36,26 +36,7 @@ jobs:
           node --check src/main/resources/static/simulator.js
 
       - name: Run backend tests
-        id: backend
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          mvn --batch-mode --no-transfer-progress test 2>&1 | tee maven-test.log
-
-      - name: Upload backend diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-diagnostics
-          path: |
-            maven-test.log
-            target/surefire-reports/
-          if-no-files-found: warn
-          retention-days: 1
-
-      - name: Fail if backend tests failed
-        if: steps.backend.outcome != 'success'
-        run: exit 1
+        run: mvn --batch-mode --no-transfer-progress test
 
       - name: Install browser test dependencies
         run: |
