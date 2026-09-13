@@ -160,7 +160,7 @@
             resume.type = 'button';
             resume.className = 'button small secondary';
             resume.style.marginTop = '10px';
-            resume.textContent = 'Continuar checkout pendiente';
+            resume.textContent = 'Retomar checkout pendiente';
             resume.addEventListener('click', () => openCheckout(currentBilling.checkoutUrl));
             box.appendChild(resume);
         }
