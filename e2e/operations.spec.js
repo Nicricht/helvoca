@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-test('operations console loads readiness, call trace, creates a request and teaches an unanswered question', async ({ page }) => {
+test('operations console loads readiness, certification, commercial metrics, call trace and learning', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
 
   const state = {
@@ -13,12 +13,14 @@ test('operations console loads readiness, call trace, creates a request and teac
     timezone: 'America/Santiago',
     localNow: '2026-09-11T08:00:00-03:00',
     callsToday: 12,
+    callDurationSecondsToday: 754,
     bookingsToday: 4,
     newCustomersToday: 3,
     openRequests: state.requests.filter(r => r.status === 'OPEN' || r.status === 'IN_PROGRESS').length,
     unansweredQuestions: state.questions.length,
     callFailuresToday: 1,
-    recentCalls: [{ id: 'c1', callerNumber: '+56911111111', status: 'COMPLETED', resolution: 'REQUEST_CREATED', startedAt: '2026-09-11T10:40:00Z', durationSeconds: 95 }],
+    estimatedCallCostTodayUsd: 1.2375,
+    recentCalls: [{ id: 'c1', callerNumber: '+56911111111', status: 'COMPLETED', resolution: 'REQUEST_CREATED', startedAt: '2026-09-11T10:40:00Z', durationSeconds: 95, estimatedTotalCostUsd: 0.1025 }],
     recentRequests: state.requests,
     unanswered: state.questions
   });
@@ -37,9 +39,31 @@ test('operations console loads readiness, call trace, creates a request and teac
     warnings: []
   };
 
+  const certification = {
+    available: true,
+    state: 'PASSED',
+    callId: 'cert-1',
+    startedAt: '2026-09-11T09:00:00Z',
+    aiProvider: 'gemini',
+    telephonyProvider: 'twilio',
+    callStatus: 'COMPLETED',
+    passedChecks: 8,
+    totalChecks: 8,
+    checks: [
+      { code: 'MEDIA_STARTED', label: 'Audio conectado', passed: true, detail: 'El stream de audio debe iniciar.' },
+      { code: 'AI_READY', label: 'IA configurada', passed: true, detail: 'El proveedor de IA debe completar la configuración de sesión.' },
+      { code: 'TRANSCRIPT', label: 'Transcripción', passed: true, detail: 'La llamada debe dejar transcripción persistida.' },
+      { code: 'SERVICES', label: 'Servicios consultados', passed: true, detail: 'El agente debe consultar el catálogo real del negocio.' },
+      { code: 'AVAILABILITY', label: 'Disponibilidad consultada', passed: true, detail: 'El agente debe comprobar disponibilidad mediante backend.' },
+      { code: 'BOOKING_CREATED', label: 'Reserva creada', passed: true, detail: 'Debe existir una reserva creada por una tool autorizada.' },
+      { code: 'BOOKING_CANCELLED', label: 'Reserva cancelada', passed: true, detail: 'La reserva de certificación debe cancelarse.' },
+      { code: 'SUMMARY', label: 'Resumen final', passed: true, detail: 'La llamada debe finalizar con resumen persistido.' }
+    ]
+  };
+
   const callDetail = {
     call: { id: 'c1', callerNumber: '+56911111111', status: 'COMPLETED', resolution: 'REQUEST_CREATED', startedAt: '2026-09-11T10:40:00Z', durationSeconds: 95 },
-    summary: 'El cliente solicitó una cotización. Helvoca registró la solicitud para seguimiento.',
+    summary: 'El cliente solicitó una cotización. RecepVoz registró la solicitud para seguimiento.',
     actions: [
       { id: 'a1', actionType: 'KNOWLEDGE_SEARCH', success: true, createdAt: '2026-09-11T10:40:20Z' },
       { id: 'a2', actionType: 'REQUEST_CREATED', success: true, entityType: 'BUSINESS_REQUEST', entityId: 'r1', detail: 'Revisar equipo', createdAt: '2026-09-11T10:40:50Z' }
@@ -58,6 +82,12 @@ test('operations console loads readiness, call trace, creates a request and teac
   await page.route('**/api/v1/operations/readiness', async route => {
     expect(route.request().headers().authorization).toBe('Bearer e2e-token');
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(readiness) });
+  });
+
+  await page.route('**/api/v1/operations/certification', async route => {
+    expect(route.request().headers().authorization).toBe('Bearer e2e-token');
+    expect(route.request().method()).toBe('GET');
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(certification) });
   });
 
   await page.route('**/api/v1/calls/c1', async route => {
@@ -87,9 +117,14 @@ test('operations console loads readiness, call trace, creates a request and teac
   await expect(page.getByText('OpenAI Realtime')).toBeVisible();
   await expect(page.getByText('VOICE_ASSISTANT ✓')).toBeVisible();
   await expect(page.locator('#callsToday')).toHaveText('12');
+  await expect(page.locator('#minutesToday')).toHaveText('12:34');
   await expect(page.locator('#bookingsToday')).toHaveText('4');
   await expect(page.locator('#openRequests')).toHaveText('1');
   await expect(page.locator('#unknownQuestions')).toHaveText('1');
+  await expect(page.locator('#costToday')).toHaveText('1,2375');
+  await expect(page.locator('#certificationBadge')).toHaveText('APROBADA');
+  await expect(page.locator('#certificationMeta')).toContainText('8/8 controles');
+  await expect(page.locator('#certificationChecks')).toContainText('Reserva cancelada');
 
   await page.locator('[data-call-id="c1"] [data-call-detail]').click();
   await expect(page.locator('#callDetailPanel')).toBeVisible();
@@ -97,7 +132,7 @@ test('operations console loads readiness, call trace, creates a request and teac
   await expect(page.locator('#callActions')).toContainText('REQUEST_CREATED');
   await expect(page.locator('#callActions')).toContainText('Revisar equipo');
   await expect(page.locator('#callTranscript')).toContainText('Necesito una cotización');
-  await expect(page.locator('#callTranscript')).toContainText('Perfecto, dejé registrada');
+  await expect(page.locator('#callTranscript')).toContainText('RecepVoz');
 
   await page.locator('#newRequestBtn').click();
   await page.locator('#requestForm [name=requestType]').fill('cotización');
@@ -114,6 +149,6 @@ test('operations console loads readiness, call trace, creates a request and teac
   await page.locator('[data-question-id="q1"] [data-answer-btn]').click();
 
   await expect(page.locator('#unknownQuestions')).toHaveText('0');
-  await expect(page.getByText('Helvoca no tiene preguntas pendientes. ✨')).toBeVisible();
+  await expect(page.getByText('RecepVoz no tiene preguntas pendientes. ✨')).toBeVisible();
   await expect(page.locator('#message')).toHaveText('Respuesta aprendida y guardada en conocimiento.');
 });
