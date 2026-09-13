@@ -123,6 +123,10 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
 
         UUID callId = lifecycle.startInboundCall("twilio", callSid, callerPhone, businessPhone);
         RealtimeCallContext context = lifecycle.markStreamStarted(callId, callSid, streamSid, provider.id());
+        if (provider.certificationSession(context)) {
+            lifecycle.markCertification(callId);
+            log.info("RECEPVOZ_CALL_CERTIFICATION armed call={} provider={}", callId, provider.id());
+        }
         TwilioVoiceTransportSession transport = new TwilioVoiceTransportSession(
                 socket, streamSid, accountSid, callSid, callControl);
         VoiceAiSession ai = provider.createSession(context, transport);
@@ -178,12 +182,12 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     private void closeState(StreamState state, boolean failed) {
         VoiceAiSession ai = state.ai;
         state.ai = null;
-        if (ai != null) {
-            try { ai.close(); }
-            catch (Exception ignored) { }
-        }
         if (state.streamSid != null) {
             try { lifecycle.markStreamStopped(state.streamSid); }
+            catch (Exception ignored) { }
+        }
+        if (ai != null) {
+            try { ai.close(); }
             catch (Exception ignored) { }
         }
         if (failed && state.callId != null) {
