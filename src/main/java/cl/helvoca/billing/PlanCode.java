@@ -1,11 +1,12 @@
 package cl.helvoca.billing;
 
 public enum PlanCode {
-    BASIC("Emprende", 1, 100, 24_990, 249, false, false),
-    PRO("Negocio", 3, 300, 49_990, 199, false, true),
-    BUSINESS("Pro", 10, 600, 99_990, 169, false, false),
-    ENTERPRISE("Enterprise", 10, 600, 199_990, null, true, false);
+    BASIC("EMPRENDE", "Emprende", 1, 100, 24_990, 249, false, false),
+    PRO("NEGOCIO", "Negocio", 3, 300, 49_990, 199, false, true),
+    BUSINESS("PRO", "Pro", 10, 600, 99_990, 169, false, false),
+    ENTERPRISE("ENTERPRISE", "Enterprise", 10, 600, 199_990, null, true, false);
 
+    private final String publicCode;
     private final String displayName;
     private final int maxConcurrentCalls;
     private final int includedMinutesPerPeriod;
@@ -14,9 +15,10 @@ public enum PlanCode {
     private final boolean customPricing;
     private final boolean recommended;
 
-    PlanCode(String displayName, int maxConcurrentCalls, int includedMinutesPerPeriod,
+    PlanCode(String publicCode, String displayName, int maxConcurrentCalls, int includedMinutesPerPeriod,
              int monthlyPriceClp, Integer overagePerMinuteClp,
              boolean customPricing, boolean recommended) {
+        this.publicCode = publicCode;
         this.displayName = displayName;
         this.maxConcurrentCalls = maxConcurrentCalls;
         this.includedMinutesPerPeriod = includedMinutesPerPeriod;
@@ -26,6 +28,7 @@ public enum PlanCode {
         this.recommended = recommended;
     }
 
+    public String getPublicCode() { return publicCode; }
     public String getDisplayName() { return displayName; }
     public int getMaxConcurrentCalls() { return maxConcurrentCalls; }
     public int getIncludedMinutesPerPeriod() { return includedMinutesPerPeriod; }
