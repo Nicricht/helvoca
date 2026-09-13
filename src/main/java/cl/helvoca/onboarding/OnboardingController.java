@@ -27,7 +27,7 @@ public class OnboardingController {
 
     @GetMapping("/readiness")
     public CommercialReadinessResponse readiness() {
-        return commercialReadiness.current();
+        return commercialReadiness.status();
     }
 
     @PostMapping("/analyze")
