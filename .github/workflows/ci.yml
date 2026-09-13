@@ -32,6 +32,10 @@ jobs:
       - name: Validate console JavaScript
         run: |
           node --check src/main/resources/static/app.js
+          node --check src/main/resources/static/phone-provisioning.js
+          node --check src/main/resources/static/commercial-status.js
+          node --check src/main/resources/static/voice-selector.js
+          node --check src/main/resources/static/pricing.js
           node --check src/main/resources/static/operations.js
           node --check src/main/resources/static/simulator.js
 
