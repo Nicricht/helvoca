@@ -15,7 +15,7 @@ import static org.mockito.Mockito.*;
 class BillingSubscriptionServiceTest {
 
     @Test
-    void checkoutKeepsCurrentPlanUntilProviderReconciliationConfirmsAuthorization() {
+    void checkoutAndSubscriptionAuthorizationKeepCurrentPlanUntilApprovedInvoice() {
         BusinessSubscriptionRepository subscriptions = mock(BusinessSubscriptionRepository.class);
         SubscriptionPaymentGateway gateway = mock(SubscriptionPaymentGateway.class);
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
@@ -39,13 +39,23 @@ class BillingSubscriptionServiceTest {
         assertEquals("pre-1", local.getExternalSubscriptionId());
         assertFalse(checkout.reused());
 
-        OffsetDateTime nextPayment = OffsetDateTime.now(ZoneOffset.UTC).plusMonths(1);
         when(gateway.getSubscription("pre-1"))
                 .thenReturn(new SubscriptionPaymentGateway.RemoteSubscription(
-                        "pre-1", "authorized", "helvoca:" + businessId + ":PRO", nextPayment));
+                        "pre-1", "authorized", "helvoca:" + businessId + ":PRO",
+                        OffsetDateTime.now(ZoneOffset.UTC).plusMonths(1)));
         when(subscriptions.findByExternalSubscriptionId("pre-1")).thenReturn(Optional.of(local));
 
         service.reconcileSubscription("pre-1");
+
+        assertEquals(PlanCode.BASIC, local.getPlanCode());
+        assertEquals(PlanCode.PRO, local.getPendingPlanCode());
+        assertEquals(SubscriptionStatus.ACTIVE, local.getStatus());
+
+        when(gateway.getInvoice("invoice-1"))
+                .thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
+                        "invoice-1", "pre-1", "approved", "", OffsetDateTime.now(ZoneOffset.UTC)));
+
+        service.reconcileAuthorizedPayment("invoice-1");
 
         assertEquals(PlanCode.PRO, local.getPlanCode());
         assertEquals(SubscriptionStatus.ACTIVE, local.getStatus());
@@ -53,6 +63,7 @@ class BillingSubscriptionServiceTest {
         assertNull(local.getBillingCheckoutUrl());
         verify(gateway).createCheckout(businessId, "owner@example.test", PlanCode.PRO);
         verify(gateway).getSubscription("pre-1");
+        verify(gateway).getInvoice("invoice-1");
     }
 
     @Test
@@ -87,7 +98,7 @@ class BillingSubscriptionServiceTest {
     }
 
     @Test
-    void manualRefreshActivatesOnlyAfterAuthoritativeProviderAuthorization() {
+    void subscriptionAuthorizationStillRequiresApprovedInvoice() {
         BusinessSubscriptionRepository subscriptions = mock(BusinessSubscriptionRepository.class);
         SubscriptionPaymentGateway gateway = mock(SubscriptionPaymentGateway.class);
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
@@ -101,6 +112,7 @@ class BillingSubscriptionServiceTest {
         local.setBillingCheckoutUrl("https://checkout.example.test/pre-authorized");
 
         when(subscriptions.findByBusinessId(businessId)).thenReturn(Optional.of(local));
+        when(subscriptions.findByExternalSubscriptionId("pre-authorized")).thenReturn(Optional.of(local));
         when(gateway.getSubscription("pre-authorized"))
                 .thenReturn(new SubscriptionPaymentGateway.RemoteSubscription(
                         "pre-authorized", "authorized", "helvoca:" + businessId + ":PRO",
@@ -109,13 +121,51 @@ class BillingSubscriptionServiceTest {
         BillingSubscriptionService service = new BillingSubscriptionService(subscriptions, gateway, properties, jdbc);
         var status = service.refresh(businessId);
 
+        assertEquals(PlanCode.BASIC, local.getPlanCode());
+        assertEquals(SubscriptionStatus.ACTIVE, local.getStatus());
+        assertEquals(PlanCode.PRO, local.getPendingPlanCode());
+        assertTrue(status.awaitingProviderVerification());
+        verify(subscriptions, never()).saveAndFlush(local);
+
+        when(gateway.getInvoice("invoice-authorized"))
+                .thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
+                        "invoice-authorized", "pre-authorized", "processed", "",
+                        OffsetDateTime.now(ZoneOffset.UTC)));
+
+        service.reconcileAuthorizedPayment("invoice-authorized");
+
         assertEquals(PlanCode.PRO, local.getPlanCode());
         assertEquals(SubscriptionStatus.ACTIVE, local.getStatus());
         assertNull(local.getPendingPlanCode());
-        assertNull(local.getBillingCheckoutUrl());
-        assertFalse(status.awaitingProviderVerification());
-        assertEquals("NEGOCIO", status.currentPlanCode());
+        assertFalse(service.status(businessId).awaitingProviderVerification());
         verify(subscriptions).saveAndFlush(local);
+    }
+
+    @Test
+    void mismatchedRemoteSubscriptionIdFailsClosed() {
+        BusinessSubscriptionRepository subscriptions = mock(BusinessSubscriptionRepository.class);
+        SubscriptionPaymentGateway gateway = mock(SubscriptionPaymentGateway.class);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        MercadoPagoProperties properties = configuredProperties();
+
+        UUID businessId = UUID.randomUUID();
+        BusinessSubscription local = activeBasic(businessId);
+        local.setBillingProvider("mercadopago");
+        local.setPendingPlanCode(PlanCode.PRO);
+        local.setExternalSubscriptionId("pre-expected");
+        local.setBillingCheckoutUrl("https://checkout.example.test/pre-expected");
+
+        when(subscriptions.findByBusinessId(businessId)).thenReturn(Optional.of(local));
+        when(gateway.getSubscription("pre-expected"))
+                .thenReturn(new SubscriptionPaymentGateway.RemoteSubscription(
+                        "pre-other", "authorized", "helvoca:" + businessId + ":PRO", null));
+
+        BillingSubscriptionService service = new BillingSubscriptionService(subscriptions, gateway, properties, jdbc);
+
+        assertThrows(IllegalStateException.class, () -> service.refresh(businessId));
+        assertEquals(PlanCode.BASIC, local.getPlanCode());
+        assertEquals(PlanCode.PRO, local.getPendingPlanCode());
+        verify(subscriptions, never()).saveAndFlush(local);
     }
 
     private static MercadoPagoProperties configuredProperties() {
