@@ -2,6 +2,7 @@ package cl.helvoca.billing;
 
 import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.security.TenantProvider;
+import cl.helvoca.telephony.CallCommercialProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,13 +20,16 @@ public class BusinessSubscriptionService {
     private final BusinessSubscriptionRepository subscriptions;
     private final CallSessionRepository calls;
     private final TenantProvider tenantProvider;
+    private final CallCommercialProperties commercial;
 
     public BusinessSubscriptionService(BusinessSubscriptionRepository subscriptions,
                                        CallSessionRepository calls,
-                                       TenantProvider tenantProvider) {
+                                       TenantProvider tenantProvider,
+                                       CallCommercialProperties commercial) {
         this.subscriptions = subscriptions;
         this.calls = calls;
         this.tenantProvider = tenantProvider;
+        this.commercial = commercial;
     }
 
     @Transactional
@@ -55,12 +59,13 @@ public class BusinessSubscriptionService {
             Instant start = now.truncatedTo(ChronoUnit.DAYS).minus(30, ChronoUnit.DAYS);
             Instant end = now.plus(1, ChronoUnit.DAYS);
             return buildView(businessId, PlanCode.PRO, SubscriptionStatus.ACTIVE,
-                    start, end, null, false, true, now);
+                    start, end, null, false, true, now,
+                    commercial.getMaxConcurrentPerBusiness());
         }
         return buildView(businessId, stored.getPlanCode(), stored.getStatus(),
                 stored.getCurrentPeriodStart(), stored.getCurrentPeriodEnd(), stored.getGraceUntil(),
                 stored.getExternalSubscriptionId() != null && !stored.getExternalSubscriptionId().isBlank(),
-                false, now);
+                false, now, stored.getPlanCode().getMaxConcurrentCalls());
     }
 
     @Transactional
@@ -72,6 +77,9 @@ public class BusinessSubscriptionService {
                                             Instant graceUntil,
                                             String externalCustomerId,
                                             String externalSubscriptionId) {
+        if (businessId == null || planCode == null || status == null) {
+            throw new IllegalArgumentException("Business, plan and status are required");
+        }
         if (periodStart == null || periodEnd == null || !periodEnd.isAfter(periodStart)) {
             throw new IllegalArgumentException("A valid subscription period is required");
         }
@@ -102,7 +110,8 @@ public class BusinessSubscriptionService {
                                        Instant graceUntil,
                                        boolean billingProviderConnected,
                                        boolean legacyFallback,
-                                       Instant now) {
+                                       Instant now,
+                                       int maxConcurrentCalls) {
         Long secondsValue = calls.sumDurationSecondsByBusinessAndPeriod(
                 businessId, periodStart, periodEnd, SIMULATOR_PROVIDER);
         long seconds = secondsValue == null ? 0L : Math.max(0L, secondsValue);
@@ -115,7 +124,7 @@ public class BusinessSubscriptionService {
                 plan.name(),
                 status.name(),
                 serviceAllowed,
-                plan.getMaxConcurrentCalls(),
+                maxConcurrentCalls,
                 plan.getIncludedMinutesPerPeriod(),
                 usedMinutes,
                 overageMinutes,
