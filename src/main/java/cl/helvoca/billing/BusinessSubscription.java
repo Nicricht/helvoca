@@ -1,15 +1,6 @@
 package cl.helvoca.billing;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -47,6 +38,16 @@ public class BusinessSubscription {
     @Column(name = "external_subscription_id", length = 160)
     private String externalSubscriptionId;
 
+    @Column(name = "billing_provider", length = 30)
+    private String billingProvider;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pending_plan_code", length = 20)
+    private PlanCode pendingPlanCode;
+
+    @Column(name = "billing_checkout_url", columnDefinition = "text")
+    private String billingCheckoutUrl;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -80,6 +81,12 @@ public class BusinessSubscription {
     public void setExternalCustomerId(String externalCustomerId) { this.externalCustomerId = externalCustomerId; }
     public String getExternalSubscriptionId() { return externalSubscriptionId; }
     public void setExternalSubscriptionId(String externalSubscriptionId) { this.externalSubscriptionId = externalSubscriptionId; }
+    public String getBillingProvider() { return billingProvider; }
+    public void setBillingProvider(String billingProvider) { this.billingProvider = billingProvider; }
+    public PlanCode getPendingPlanCode() { return pendingPlanCode; }
+    public void setPendingPlanCode(PlanCode pendingPlanCode) { this.pendingPlanCode = pendingPlanCode; }
+    public String getBillingCheckoutUrl() { return billingCheckoutUrl; }
+    public void setBillingCheckoutUrl(String billingCheckoutUrl) { this.billingCheckoutUrl = billingCheckoutUrl; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
