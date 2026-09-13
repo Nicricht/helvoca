@@ -5,6 +5,7 @@ import cl.helvoca.ai.realtime.RealtimeToolDefinitions;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.core.JsonValue;
+import com.openai.models.responses.EasyInputMessage;
 import com.openai.models.responses.FunctionTool;
 import com.openai.models.responses.ResponseCreateParams;
 import com.openai.models.responses.ResponseInputItem;
@@ -14,7 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 @Component
@@ -34,12 +34,12 @@ public class OpenAiMessagingAiClient implements MessagingAiClient {
         OpenAIClient client = OpenAIOkHttpClient.fromEnv();
         List<ResponseInputItem> inputs = new ArrayList<>();
         for (Turn turn : history) {
-            ResponseInputItem.Message.Role role = "assistant".equalsIgnoreCase(turn.role())
-                    ? ResponseInputItem.Message.Role.ASSISTANT
-                    : ResponseInputItem.Message.Role.USER;
-            inputs.add(ResponseInputItem.ofMessage(ResponseInputItem.Message.builder()
+            EasyInputMessage.Role role = "assistant".equalsIgnoreCase(turn.role())
+                    ? EasyInputMessage.Role.ASSISTANT
+                    : EasyInputMessage.Role.USER;
+            inputs.add(ResponseInputItem.ofEasyInputMessage(EasyInputMessage.builder()
                     .role(role)
-                    .addInputTextContent(turn.content())
+                    .content(turn.content())
                     .build()));
         }
 
