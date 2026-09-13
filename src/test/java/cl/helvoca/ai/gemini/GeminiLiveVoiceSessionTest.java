@@ -18,6 +18,7 @@ import java.net.http.WebSocket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -119,9 +120,15 @@ class GeminiLiveVoiceSessionTest {
 
         ArgumentCaptor<CharSequence> sent = ArgumentCaptor.forClass(CharSequence.class);
         verify(socket, atLeast(2)).sendText(sent.capture(), eq(true));
-        assertTrue(sent.getAllValues().stream()
+        String opening = sent.getAllValues().stream()
                 .map(CharSequence::toString)
-                .anyMatch(message -> message.contains("[RECEPVOZ_CALL_CONNECTED]")));
+                .filter(message -> message.contains("[RECEPVOZ_CALL_CONNECTED]"))
+                .findFirst()
+                .orElseThrow();
+        JSONObject openingJson = new JSONObject(opening);
+        assertFalse(openingJson.has("clientContent"));
+        assertEquals("[RECEPVOZ_CALL_CONNECTED]",
+                openingJson.getJSONObject("realtimeInput").getString("text"));
     }
 
     @Test
@@ -192,6 +199,53 @@ class GeminiLiveVoiceSessionTest {
         session.onText(socket, turnComplete(), true);
         verify(transcripts).append(eq(context.callId()), eq("USER"), contains("La cancelación ya devolvió success=true"));
         verify(transcripts, times(4)).append(eq(context.callId()), eq("USER"), anyString());
+
+        ArgumentCaptor<CharSequence> sent = ArgumentCaptor.forClass(CharSequence.class);
+        verify(socket, atLeast(5)).sendText(sent.capture(), eq(true));
+        assertTrue(sent.getAllValues().stream()
+                .map(CharSequence::toString)
+                .map(JSONObject::new)
+                .anyMatch(message -> message.optJSONObject("realtimeInput") != null
+                        && message.getJSONObject("realtimeInput").optString("text", "")
+                        .contains("Ejecuta ahora create_booking")));
+        assertTrue(sent.getAllValues().stream()
+                .map(CharSequence::toString)
+                .noneMatch(message -> message.contains("\"clientContent\"")));
+    }
+
+    @Test
+    void certificationSimulationDoesNotForwardCarrierMicrophoneAudio() {
+        GeminiLiveProperties properties = properties();
+        properties.setCertificationSimulation(true);
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+        when(socket.sendClose(anyInt(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        session.onOpen(socket);
+        session.onText(socket, "{\"setupComplete\":{}}", true);
+        clearInvocations(socket);
+
+        session.acceptInboundAudio(Base64.getEncoder().encodeToString(new byte[160]));
+
+        verify(socket, never()).sendText(any(CharSequence.class), anyBoolean());
     }
 
     @Test
