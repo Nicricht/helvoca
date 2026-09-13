@@ -45,6 +45,9 @@ public class BusinessSubscription {
     @Column(name = "pending_plan_code", length = 20)
     private PlanCode pendingPlanCode;
 
+    @Column(name = "billing_checkout_url", columnDefinition = "text")
+    private String billingCheckoutUrl;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -82,6 +85,8 @@ public class BusinessSubscription {
     public void setBillingProvider(String billingProvider) { this.billingProvider = billingProvider; }
     public PlanCode getPendingPlanCode() { return pendingPlanCode; }
     public void setPendingPlanCode(PlanCode pendingPlanCode) { this.pendingPlanCode = pendingPlanCode; }
+    public String getBillingCheckoutUrl() { return billingCheckoutUrl; }
+    public void setBillingCheckoutUrl(String billingCheckoutUrl) { this.billingCheckoutUrl = billingCheckoutUrl; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
