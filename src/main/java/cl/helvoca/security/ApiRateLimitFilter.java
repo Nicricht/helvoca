@@ -92,16 +92,22 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
     }
 
     static String clientAddress(HttpServletRequest request) {
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) return bounded(realIp.trim());
+
         String forwarded = request.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {
             int comma = forwarded.indexOf(',');
             String first = comma >= 0 ? forwarded.substring(0, comma) : forwarded;
-            if (!first.isBlank()) return first.trim().substring(0, Math.min(128, first.trim().length()));
+            if (!first.isBlank()) return bounded(first.trim());
         }
-        String realIp = request.getHeader("X-Real-IP");
-        if (realIp != null && !realIp.isBlank()) return realIp.trim().substring(0, Math.min(128, realIp.trim().length()));
+
         String remote = request.getRemoteAddr();
-        return remote == null || remote.isBlank() ? "unknown" : remote;
+        return remote == null || remote.isBlank() ? "unknown" : bounded(remote);
+    }
+
+    private static String bounded(String value) {
+        return value.substring(0, Math.min(128, value.length()));
     }
 
     static String sha256(String value) {
