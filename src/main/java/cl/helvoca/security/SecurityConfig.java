@@ -52,7 +52,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/index.html", "/app.js", "/phone-provisioning.js", "/billing.js", "/styles.css",
+                        .requestMatchers("/", "/index.html", "/app.js", "/phone-provisioning.js", "/styles.css",
                                 "/pricing.html", "/pricing.js", "/pricing.css",
                                 "/operations.html", "/operations.js", "/operations.css",
                                 "/simulator.html", "/simulator.js", "/simulator.css",
