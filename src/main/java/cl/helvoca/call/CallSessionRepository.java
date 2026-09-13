@@ -39,4 +39,18 @@ public interface CallSessionRepository extends JpaRepository<CallSession, UUID> 
             @Param("start") Instant start,
             @Param("end") Instant end,
             @Param("excludedProvider") String excludedProvider);
+
+    @Query("""
+        select coalesce(sum(c.durationSeconds), 0) from CallSession c
+        where c.businessId = :businessId
+          and c.startedAt >= :start
+          and c.startedAt < :end
+          and c.telephonyProvider <> :excludedProvider
+          and c.durationSeconds is not null
+        """)
+    Long sumDurationSecondsByBusinessAndPeriod(
+            @Param("businessId") UUID businessId,
+            @Param("start") Instant start,
+            @Param("end") Instant end,
+            @Param("excludedProvider") String excludedProvider);
 }
