@@ -1,6 +1,7 @@
 package cl.helvoca.phone;
 
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -53,5 +54,12 @@ public class PhoneNumberController {
     public PhoneNumberResponse setActive(@PathVariable UUID id,
                                          @RequestBody PhoneNumberActiveRequest request) {
         return service.setActive(id, request.active());
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public void detach(@PathVariable UUID id) {
+        service.detach(id);
     }
 }
