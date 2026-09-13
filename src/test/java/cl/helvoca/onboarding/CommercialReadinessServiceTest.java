@@ -24,7 +24,7 @@ class CommercialReadinessServiceTest {
                 true, true, true, false, false, true, true, "OPTIONAL_HUMAN_TRANSFER"));
         when(subscriptions.currentForTenant()).thenReturn(subscription("BASIC", "TRIALING", true, false));
 
-        CommercialReadinessResponse result = new CommercialReadinessService(
+        CommercialReadinessResponse result = new SelfServiceReadinessService(
                 onboarding, subscriptions, mercadoPago, whatsapp).current();
 
         assertEquals(100, result.progressPercent());
@@ -52,7 +52,7 @@ class CommercialReadinessServiceTest {
                 true, false, false, true, true, false, false, "ADD_SERVICE"));
         when(subscriptions.currentForTenant()).thenReturn(subscription("PRO", "SUSPENDED", false, true));
 
-        CommercialReadinessResponse result = new CommercialReadinessService(
+        CommercialReadinessResponse result = new SelfServiceReadinessService(
                 onboarding, subscriptions, mercadoPago, whatsapp).current();
 
         assertEquals(20, result.progressPercent());
