@@ -13,5 +13,9 @@ public interface VoiceAiProvider {
 
     boolean configured();
 
+    default boolean certificationSession(RealtimeCallContext context) {
+        return false;
+    }
+
     VoiceAiSession createSession(RealtimeCallContext context, VoiceTransportSession transport);
 }
