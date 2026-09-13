@@ -53,6 +53,16 @@ app:
     public-base-url: ${TWILIO_PUBLIC_BASE_URL:}
     media-stream-path: ${TWILIO_MEDIA_STREAM_PATH:/ws/v1/twilio/media}
     certification-ingress-enabled: ${TWILIO_CERTIFICATION_INGRESS_ENABLED:false}
+  whatsapp:
+    enabled: ${TWILIO_WHATSAPP_ENABLED:false}
+    webhook-validation-enabled: ${TWILIO_WHATSAPP_WEBHOOK_VALIDATION_ENABLED:true}
+    session-hours: ${TWILIO_WHATSAPP_SESSION_HOURS:24}
+  mercadopago:
+    enabled: ${MERCADOPAGO_ENABLED:false}
+    access-token: ${MERCADOPAGO_ACCESS_TOKEN:}
+    webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
+    back-url: ${MERCADOPAGO_BACK_URL:}
+    webhook-tolerance-seconds: ${MERCADOPAGO_WEBHOOK_TOLERANCE_SECONDS:300}
   gemini:
     live:
       enabled: ${GEMINI_LIVE_ENABLED:false}
