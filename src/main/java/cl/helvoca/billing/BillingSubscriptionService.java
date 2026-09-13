@@ -77,7 +77,11 @@ public class BillingSubscriptionService {
             return snapshot(local);
         }
 
-        SubscriptionPaymentGateway.RemoteSubscription remote = gateway.getSubscription(local.getExternalSubscriptionId());
+        String expectedExternalId = local.getExternalSubscriptionId();
+        SubscriptionPaymentGateway.RemoteSubscription remote = gateway.getSubscription(expectedExternalId);
+        if (!expectedExternalId.equals(remote.id())) {
+            throw new IllegalStateException("Mercado Pago subscription id mismatch");
+        }
         requireExpectedReference(local, remote.externalReference());
         applyRemoteSubscription(local, remote);
         return snapshot(local);
@@ -86,6 +90,9 @@ public class BillingSubscriptionService {
     @Transactional
     public void reconcileSubscription(String externalSubscriptionId) {
         SubscriptionPaymentGateway.RemoteSubscription remote = gateway.getSubscription(externalSubscriptionId);
+        if (!externalSubscriptionId.equals(remote.id())) {
+            throw new IllegalStateException("Mercado Pago subscription id mismatch");
+        }
         BusinessSubscription local = subscriptions.findByExternalSubscriptionId(remote.id())
                 .orElseThrow(() -> new IllegalArgumentException("Unknown Mercado Pago subscription"));
         requireExpectedReference(local, remote.externalReference());
@@ -130,8 +137,8 @@ public class BillingSubscriptionService {
         String status = normalized(remote.status());
         switch (status) {
             case "authorized" -> {
-                activate(local, remote.nextPaymentDate() == null ? null : remote.nextPaymentDate().toInstant());
-                subscriptions.saveAndFlush(local);
+                // Authorization links the recurring mandate, but does not prove that the first invoice was paid.
+                // Entitlements stay unchanged until subscription_authorized_payment is verified server-to-server.
             }
             case "paused" -> {
                 local.setStatus(SubscriptionStatus.SUSPENDED);
@@ -171,20 +178,6 @@ public class BillingSubscriptionService {
                 pending == null ? null : pending.getMonthlyPriceClp(),
                 pending == null ? null : blankToNull(local.getBillingCheckoutUrl()),
                 awaitingProviderVerification);
-    }
-
-    private void activate(BusinessSubscription local, Instant suggestedEnd) {
-        Instant now = Instant.now();
-        if (local.getPendingPlanCode() != null) {
-            local.setPlanCode(local.getPendingPlanCode());
-            local.setPendingPlanCode(null);
-        }
-        local.setStatus(SubscriptionStatus.ACTIVE);
-        local.setCurrentPeriodStart(now);
-        Instant defaultEnd = now.atOffset(ZoneOffset.UTC).plusMonths(1).toInstant();
-        local.setCurrentPeriodEnd(suggestedEnd != null && suggestedEnd.isAfter(now) ? suggestedEnd : defaultEnd);
-        local.setGraceUntil(null);
-        local.setBillingCheckoutUrl(null);
     }
 
     private static PlanCode resolvePublicPlan(String value) {
