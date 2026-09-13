@@ -1,5 +1,6 @@
 package cl.helvoca.onboarding;
 
+import cl.helvoca.agent.AiAgentService;
 import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.billing.MercadoPagoProperties;
 import cl.helvoca.billing.PlanCode;
@@ -15,20 +16,24 @@ public class SelfServiceReadinessService {
     private final BusinessSubscriptionService subscriptions;
     private final MercadoPagoProperties mercadoPago;
     private final WhatsAppProperties whatsapp;
+    private final AiAgentService aiAgents;
 
     public SelfServiceReadinessService(OnboardingService onboarding,
                                        BusinessSubscriptionService subscriptions,
                                        MercadoPagoProperties mercadoPago,
-                                       WhatsAppProperties whatsapp) {
+                                       WhatsAppProperties whatsapp,
+                                       AiAgentService aiAgents) {
         this.onboarding = onboarding;
         this.subscriptions = subscriptions;
         this.mercadoPago = mercadoPago;
         this.whatsapp = whatsapp;
+        this.aiAgents = aiAgents;
     }
 
     public CommercialReadinessResponse current() {
         OnboardingStatusResponse operational = onboarding.status();
         BusinessSubscriptionService.SubscriptionView subscription = subscriptions.currentForTenant();
+        boolean agentActive = aiAgents.current().isActive();
 
         List<String> blockers = new ArrayList<>();
         if (!operational.businessProfileConfigured()) blockers.add("BUSINESS_PROFILE_MISSING");
@@ -37,9 +42,13 @@ public class SelfServiceReadinessService {
         if (!operational.phoneConfigured()) blockers.add("PHONE_MISSING");
         if (!subscription.serviceAllowed()) blockers.add("SUBSCRIPTION_BLOCKED");
 
+        // Setup progress remains about the five commercial prerequisites. Pausing an already
+        // configured agent is an operational blocker, not lost setup progress.
         int completed = 5 - blockers.size();
         int progress = Math.max(0, Math.min(100, completed * 20));
-        boolean readyForCalls = operational.readyForCalls() && subscription.serviceAllowed();
+        if (!agentActive) blockers.add("AI_AGENT_DISABLED");
+
+        boolean readyForCalls = operational.readyForCalls() && subscription.serviceAllowed() && agentActive;
         boolean whatsappEnabled = whatsapp.isEnabled();
         boolean readyForWhatsApp = readyForCalls && whatsappEnabled;
 
