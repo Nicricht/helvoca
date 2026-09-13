@@ -1,5 +1,6 @@
 package cl.helvoca.ai.realtime;
 
+import cl.helvoca.booking.Booking;
 import cl.helvoca.booking.BookingRepository;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallAction;
@@ -15,6 +16,7 @@ import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.json.JSONObject;
 import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +30,9 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     private final CallSessionRepository calls;
     private final CallActionRepository actions;
     private final CustomerRepository customers;
+    private final BookingRepository bookings;
     private final CallTraceService trace;
+    private final JdbcTemplate jdbc;
 
     public CertificationGuardedRealtimeToolService(BusinessRepository businesses,
                                                     CustomerRepository customers,
@@ -40,12 +44,15 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                                                     BusinessRequestService requests,
                                                     UnansweredQuestionService unansweredQuestions,
                                                     CallActionRepository actions,
-                                                    CallTraceService trace) {
+                                                    CallTraceService trace,
+                                                    JdbcTemplate jdbc) {
         super(businesses, customers, services, knowledge, bookings, calls, schedule, requests, unansweredQuestions);
         this.calls = calls;
         this.actions = actions;
         this.customers = customers;
+        this.bookings = bookings;
         this.trace = trace;
+        this.jdbc = jdbc;
     }
 
     @Override
@@ -63,7 +70,32 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                 return blocked.toString();
             }
         }
+
+        lockBookingMutation(context, toolName, rawArguments);
         return super.execute(context, toolName, rawArguments);
+    }
+
+    private void lockBookingMutation(RealtimeCallContext context, String toolName, String rawArguments) {
+        UUID serviceId = null;
+        try {
+            JSONObject args = rawArguments == null || rawArguments.isBlank()
+                    ? new JSONObject()
+                    : new JSONObject(rawArguments);
+            if ("create_booking".equals(toolName)) {
+                serviceId = UUID.fromString(args.optString("serviceId", ""));
+            } else if ("reschedule_booking".equals(toolName)) {
+                UUID bookingId = UUID.fromString(args.optString("bookingId", ""));
+                Booking booking = bookings.findByIdAndBusinessId(bookingId, context.businessId()).orElse(null);
+                if (booking != null) serviceId = booking.getServiceId();
+            }
+        } catch (Exception ignored) {
+            return;
+        }
+        if (serviceId == null) return;
+
+        int businessKey = context.businessId().hashCode();
+        int serviceKey = serviceId.hashCode();
+        jdbc.execute("SELECT pg_advisory_xact_lock(" + businessKey + "," + serviceKey + ")");
     }
 
     private JSONObject guardCreate(RealtimeCallContext context, CallSession call) {
