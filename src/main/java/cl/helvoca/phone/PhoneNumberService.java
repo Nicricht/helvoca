@@ -62,6 +62,14 @@ public class PhoneNumberService {
         return PhoneNumberResponse.from(phone);
     }
 
+    @Transactional
+    public void detach(UUID id) {
+        UUID businessId = tenantProvider.requireBusinessId();
+        PhoneNumber phone = repository.findByIdAndBusinessId(id, businessId)
+                .orElseThrow(() -> new NotFoundException("Phone number not found"));
+        repository.delete(phone);
+    }
+
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
