@@ -9,27 +9,44 @@ import cl.helvoca.common.NotFoundException;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
 @Service
 public class CallLifecycleService {
+    private static final List<CallStatus> ACTIVE_STATUSES =
+            List.of(CallStatus.QUEUED, CallStatus.RINGING, CallStatus.IN_PROGRESS);
+
     private final PhoneNumberRepository phoneNumbers;
     private final CustomerRepository customers;
     private final CallSessionRepository calls;
+    private final JdbcTemplate jdbc;
+    private final CallCommercialProperties commercial;
+    private final MeterRegistry metrics;
 
     public CallLifecycleService(PhoneNumberRepository phoneNumbers,
                                 CustomerRepository customers,
-                                CallSessionRepository calls) {
+                                CallSessionRepository calls,
+                                JdbcTemplate jdbc,
+                                CallCommercialProperties commercial,
+                                MeterRegistry metrics) {
         this.phoneNumbers = phoneNumbers;
         this.customers = customers;
         this.calls = calls;
+        this.jdbc = jdbc;
+        this.commercial = commercial;
+        this.metrics = metrics;
     }
 
     @Transactional
@@ -43,10 +60,22 @@ public class CallLifecycleService {
         PhoneNumber phone = phoneNumbers.findByPhoneNumberAndActiveTrue(to)
                 .orElseThrow(() -> new NotFoundException("Destination phone number is not registered"));
 
+        lockBusinessCapacity(phone.getBusinessId());
+        existing = calls.findByProviderCallId(providerCallId).orElse(null);
+        if (existing != null) return existing.getId();
+
+        int limit = commercial.getMaxConcurrentPerBusiness();
+        long activeCalls = calls.countByBusinessIdAndStatusIn(phone.getBusinessId(), ACTIVE_STATUSES);
+        if (limit > 0 && activeCalls >= limit) {
+            metrics.counter("helvoca.calls.rejected", "reason", "capacity").increment();
+            throw new CallCapacityExceededException("Concurrent call capacity reached for business");
+        }
+
+        String normalizedProvider = normalizeProvider(telephonyProvider);
         CallSession call = new CallSession();
         call.setBusinessId(phone.getBusinessId());
         call.setPhoneNumberId(phone.getId());
-        call.setTelephonyProvider(normalizeProvider(telephonyProvider));
+        call.setTelephonyProvider(normalizedProvider);
         call.setProviderCallId(providerCallId);
         call.setCallerNumber(from);
         call.setDestinationNumber(to);
@@ -55,14 +84,16 @@ public class CallLifecycleService {
         call.setStartedAt(Instant.now());
         customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), from)
                 .ifPresent(customer -> call.setCustomerId(customer.getId()));
-        return calls.saveAndFlush(call).getId();
+        CallSession saved = calls.saveAndFlush(call);
+        metrics.counter("helvoca.calls.started", "provider", normalizedProvider).increment();
+        return saved.getId();
     }
 
     @Transactional
     public UUID updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {
         CallSession call = calls.findByProviderCallId(providerCallId)
                 .orElseThrow(() -> new NotFoundException("Call not found"));
-        applyStatus(call, providerStatus, durationSeconds, true);
+        updateStatusAndCommercialFields(call, providerStatus, durationSeconds, true);
         return call.getId();
     }
 
@@ -70,7 +101,7 @@ public class CallLifecycleService {
     public UUID updateStatus(UUID callId, String providerStatus, Integer durationSeconds) {
         CallSession call = calls.findById(callId)
                 .orElseThrow(() -> new NotFoundException("Call not found"));
-        applyStatus(call, providerStatus, durationSeconds, false);
+        updateStatusAndCommercialFields(call, providerStatus, durationSeconds, false);
         return call.getId();
     }
 
@@ -136,30 +167,67 @@ public class CallLifecycleService {
         };
     }
 
+    private void updateStatusAndCommercialFields(CallSession call,
+                                                 String providerStatus,
+                                                 Integer durationSeconds,
+                                                 boolean carrierCallback) {
+        boolean wasTerminal = call.getStatus() != null && call.getStatus().terminal();
+        applyStatus(call, providerStatus, durationSeconds, carrierCallback);
+        if (call.getStatus() != null && call.getStatus().terminal()) {
+            updateEstimatedCost(call);
+            if (!wasTerminal) {
+                metrics.counter("helvoca.calls.terminal",
+                        "status", call.getStatus().name().toLowerCase(Locale.ROOT)).increment();
+                if (call.getDurationSeconds() != null) {
+                    metrics.summary("helvoca.call.duration.seconds").record(call.getDurationSeconds());
+                }
+                if (call.getEstimatedTotalCostUsd() != null) {
+                    metrics.summary("helvoca.call.estimated.cost.usd")
+                            .record(call.getEstimatedTotalCostUsd().doubleValue());
+                }
+            }
+        }
+        calls.saveAndFlush(call);
+    }
+
+    private void updateEstimatedCost(CallSession call) {
+        Integer seconds = call.getDurationSeconds();
+        if (seconds == null || seconds < 0) return;
+        BigDecimal minutes = BigDecimal.valueOf(seconds)
+                .divide(BigDecimal.valueOf(60), 6, RoundingMode.HALF_UP);
+        BigDecimal telephony = commercial.getTelephonyCostPerMinuteUsd()
+                .multiply(minutes).setScale(6, RoundingMode.HALF_UP);
+        BigDecimal ai = call.getAiProvider() == null || call.getAiProvider().isBlank()
+                ? BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP)
+                : commercial.getAiCostPerMinuteUsd()
+                .multiply(minutes).setScale(6, RoundingMode.HALF_UP);
+        call.setEstimatedTelephonyCostUsd(telephony);
+        call.setEstimatedAiCostUsd(ai);
+        call.setEstimatedTotalCostUsd(telephony.add(ai).setScale(6, RoundingMode.HALF_UP));
+    }
+
+    private void lockBusinessCapacity(UUID businessId) {
+        long msb = businessId.getMostSignificantBits();
+        long lsb = businessId.getLeastSignificantBits();
+        int key1 = (int) (msb ^ (msb >>> 32));
+        int key2 = (int) (lsb ^ (lsb >>> 32));
+        jdbc.execute("SELECT pg_advisory_xact_lock(" + key1 + "," + key2 + ")");
+    }
+
     private static void applyStatus(CallSession call,
                                     String providerStatus,
                                     Integer durationSeconds,
                                     boolean carrierCallback) {
         CallStatus mapped = mapStatus(providerStatus);
         CallStatus current = call.getStatus();
-
-        // A carrier can report its SIP leg as "completed" after the AI path has already
-        // failed. Preserve that application-level failure instead of turning a broken
-        // customer interaction into a successful call in reporting.
         boolean preserveApplicationFailure = carrierCallback
                 && current == CallStatus.FAILED
                 && mapped == CallStatus.COMPLETED;
-        if (!preserveApplicationFailure) {
-            call.setStatus(mapped);
-        }
+        if (!preserveApplicationFailure) call.setStatus(mapped);
 
         Instant now = Instant.now();
-        if (mapped == CallStatus.IN_PROGRESS && call.getAnsweredAt() == null) {
-            call.setAnsweredAt(now);
-        }
-        if ((mapped.terminal() || preserveApplicationFailure) && call.getEndedAt() == null) {
-            call.setEndedAt(now);
-        }
+        if (mapped == CallStatus.IN_PROGRESS && call.getAnsweredAt() == null) call.setAnsweredAt(now);
+        if ((mapped.terminal() || preserveApplicationFailure) && call.getEndedAt() == null) call.setEndedAt(now);
         if (durationSeconds != null && durationSeconds >= 0) {
             call.setDurationSeconds(durationSeconds);
         } else if ((mapped.terminal() || preserveApplicationFailure)
@@ -171,18 +239,12 @@ public class CallLifecycleService {
 
     private static RealtimeCallContext context(CallSession call) {
         return new RealtimeCallContext(
-                call.getId(),
-                call.getBusinessId(),
-                call.getCustomerId(),
-                call.getCallerNumber(),
-                call.getDestinationNumber(),
-                call.getStreamSid());
+                call.getId(), call.getBusinessId(), call.getCustomerId(), call.getCallerNumber(),
+                call.getDestinationNumber(), call.getStreamSid());
     }
 
     private static String normalizeProvider(String provider) {
-        if (provider == null || provider.isBlank()) {
-            throw new IllegalArgumentException("Provider id is required");
-        }
+        if (provider == null || provider.isBlank()) throw new IllegalArgumentException("Provider id is required");
         return provider.trim().toLowerCase(Locale.ROOT);
     }
 }

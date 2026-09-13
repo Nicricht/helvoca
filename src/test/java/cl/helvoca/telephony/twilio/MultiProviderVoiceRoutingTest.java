@@ -47,7 +47,7 @@ class MultiProviderVoiceRoutingTest {
     }
 
     @Test
-    void productionVoiceCanRouteToOpenAiLiveSip() {
+    void productionVoiceAdmitsThenRoutesToOpenAiLiveSip() {
         TwilioCallService calls = mock(TwilioCallService.class);
         VoiceCallRouter router = mock(VoiceCallRouter.class);
         String twiml = "<Response><Dial><Sip>sip:proj_test@sip.api.openai.com;secure=true</Sip></Dial></Response>";
@@ -61,7 +61,8 @@ class MultiProviderVoiceRoutingTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals(twiml, response.getBody());
         assertNoLegacyVoice(response.getBody());
-        verifyNoInteractions(calls);
+        verify(calls).startInboundCall(INBOUND_SID, "+56966939611", "+14355652512");
+        verify(router).route("+14355652512", "+56966939611", INBOUND_SID);
     }
 
     @Test

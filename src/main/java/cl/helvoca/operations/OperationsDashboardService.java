@@ -19,6 +19,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -73,6 +74,8 @@ public class OperationsDashboardService {
                 businessId, SIMULATOR_PROVIDER, dayStart, dayEnd);
         long failuresToday = calls.countByBusinessIdAndTelephonyProviderNotAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
                 businessId, SIMULATOR_PROVIDER, List.of(CallStatus.FAILED, CallStatus.NO_ANSWER), dayStart, dayEnd);
+        BigDecimal estimatedCallCostToday = calls.sumEstimatedCostByBusinessAndPeriod(
+                businessId, dayStart, dayEnd, SIMULATOR_PROVIDER);
         long bookingsToday = allBookings.stream()
                 .filter(b -> b.getStatus() != BookingStatus.CANCELLED && between(b.getCreatedAt(), dayStart, dayEnd)).count();
         long customersToday = allCustomers.stream().filter(c -> between(c.getCreatedAt(), dayStart, dayEnd)).count();
@@ -81,6 +84,7 @@ public class OperationsDashboardService {
         return new Dashboard(
                 business.getName(), business.getTimezone(), now.toOffsetDateTime().toString(),
                 callsToday, bookingsToday, customersToday, openRequests, openQuestions.size(), failuresToday,
+                estimatedCallCostToday == null ? BigDecimal.ZERO : estimatedCallCostToday,
                 recentCalls.stream().map(CallItem::from).toList(),
                 allRequests.stream().limit(10).map(RequestItem::from).toList(),
                 openQuestions.stream().limit(10).map(QuestionItem::from).toList());
@@ -100,14 +104,23 @@ public class OperationsDashboardService {
             long openRequests,
             long unansweredQuestions,
             long callFailuresToday,
+            BigDecimal estimatedCallCostTodayUsd,
             List<CallItem> recentCalls,
             List<RequestItem> recentRequests,
             List<QuestionItem> unanswered
     ) {}
 
-    public record CallItem(UUID id, String callerNumber, String status, String resolution, Instant startedAt, Integer durationSeconds) {
+    public record CallItem(
+            UUID id,
+            String callerNumber,
+            String status,
+            String resolution,
+            Instant startedAt,
+            Integer durationSeconds,
+            BigDecimal estimatedTotalCostUsd) {
         static CallItem from(CallSession c) {
-            return new CallItem(c.getId(), c.getCallerNumber(), c.getStatus().name(), c.getResolution(), c.getStartedAt(), c.getDurationSeconds());
+            return new CallItem(c.getId(), c.getCallerNumber(), c.getStatus().name(), c.getResolution(),
+                    c.getStartedAt(), c.getDurationSeconds(), c.getEstimatedTotalCostUsd());
         }
     }
 

@@ -21,7 +21,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
 
 springdoc:
   api-docs:
@@ -39,6 +39,11 @@ app:
     enabled: ${SEED_ENABLED:false}
     admin-email: ${SEED_ADMIN_EMAIL:admin@helvoca.local}
     admin-password: ${SEED_ADMIN_PASSWORD:ChangeMe123!}
+  commercial:
+    calls:
+      max-concurrent-per-business: ${HELVOCA_MAX_CONCURRENT_CALLS_PER_BUSINESS:10}
+      telephony-cost-per-minute-usd: ${HELVOCA_TELEPHONY_COST_PER_MINUTE_USD:0}
+      ai-cost-per-minute-usd: ${HELVOCA_AI_COST_PER_MINUTE_USD:0}
   voice:
     telephony-provider: ${HELVOCA_TELEPHONY_PROVIDER:twilio}
     ai-provider: ${HELVOCA_VOICE_AI_PROVIDER:openai}
@@ -69,7 +74,7 @@ app:
     live:
       enabled: ${OPENAI_LIVE_ENABLED:false}
       project-id: ${OPENAI_PROJECT_ID:}
-      webhook-secret: ${OPENAI_WEBHOOK_SECRET:}
+      webhook-secret: ${OPENAI_LIVE_WEBHOOK_SECRET:${OPENAI_WEBHOOK_SECRET:}}
       model: ${OPENAI_LIVE_MODEL:gpt-live-1}
       backend-model: ${OPENAI_LIVE_BACKEND_MODEL:gpt-5.6-luna}
       voice: ${OPENAI_LIVE_VOICE:marin}

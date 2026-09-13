@@ -7,8 +7,7 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 
 /**
- * Thin Twilio adapter for carrier callbacks. Voice-provider-specific session
- * creation is owned by the voice edge and provider implementations.
+ * Thin Twilio adapter for carrier callbacks and pre-routing inbound admission.
  */
 @Service
 public class TwilioCallService {
@@ -16,6 +15,10 @@ public class TwilioCallService {
 
     public TwilioCallService(CallLifecycleService lifecycle) {
         this.lifecycle = lifecycle;
+    }
+
+    public UUID startInboundCall(String providerCallId, String caller, String destination) {
+        return lifecycle.startInboundCall("twilio", providerCallId, caller, destination);
     }
 
     public UUID updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {

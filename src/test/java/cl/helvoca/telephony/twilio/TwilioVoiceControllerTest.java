@@ -1,6 +1,7 @@
 package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.call.CallSummaryService;
+import cl.helvoca.telephony.CallCapacityExceededException;
 import cl.helvoca.voice.VoiceCallRouter;
 import org.junit.jupiter.api.Test;
 
@@ -13,6 +14,8 @@ import static org.mockito.Mockito.*;
 class TwilioVoiceControllerTest {
     private static final String SILENT_HANGUP =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>";
+    private static final String BUSY_REJECT =
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Reject reason=\"busy\"/></Response>";
     private static final String CALL_SID = "CA0123456789abcdef0123456789abcdef";
 
     private static TwilioVoiceController controller(TwilioCallService calls,
@@ -25,7 +28,7 @@ class TwilioVoiceControllerTest {
     }
 
     @Test
-    void inboundUsesRouterDecisionWithoutKnowingProviderProtocol() {
+    void inboundIsAdmittedBeforeRouterDecision() {
         TwilioCallService calls = mock(TwilioCallService.class);
         VoiceCallRouter router = mock(VoiceCallRouter.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
@@ -39,8 +42,25 @@ class TwilioVoiceControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(twiml, response.getBody());
+        verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
         verify(router).route("+14355652512", "+56911111111", CALL_SID);
-        verifyNoInteractions(calls, summaries);
+        verifyNoInteractions(summaries);
+    }
+
+    @Test
+    void capacityRejectionNeverTouchesVoiceProviderRouter() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        doThrow(new CallCapacityExceededException("full"))
+                .when(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
+
+        var response = controller(calls, router, summaries, false)
+                .incoming(CALL_SID, "+56911111111", "+14355652512");
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(BUSY_REJECT, response.getBody());
+        verifyNoInteractions(router, summaries);
     }
 
     @Test
@@ -58,8 +78,9 @@ class TwilioVoiceControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(twiml, response.getBody());
+        verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
         verify(router).route("+14355652512", "+56911111111", CALL_SID);
-        verifyNoInteractions(calls, summaries);
+        verifyNoInteractions(summaries);
     }
 
     @Test
@@ -87,7 +108,8 @@ class TwilioVoiceControllerTest {
                 .incoming(CALL_SID, "+56911111111", "+14355652512");
 
         assertEquals(SILENT_HANGUP, response.getBody());
-        verifyNoInteractions(calls, summaries);
+        verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
+        verifyNoInteractions(summaries);
     }
 
     @Test
