@@ -157,6 +157,31 @@ function renderKnowledge(items = []) {
     items.filter(i => i.active !== false).forEach(addKnowledgeRow);
 }
 
+function renderAgent(agent = {}, business = {}) {
+    setupForm.elements.agentName.value = agent.name || "RecepVoz";
+    setupForm.elements.agentVoice.value = agent.voice || "";
+    setupForm.elements.agentGreeting.value = agent.greeting ||
+        `Hola, gracias por llamar a ${business.name || "nuestro negocio"}. ¿En qué puedo ayudarte?`;
+    setupForm.elements.agentInstructions.value = agent.instructions || "";
+    setupForm.elements.agentActive.checked = agent.active !== false;
+    const enabled = new Set(agent.capabilities || []);
+    $$('input[name="agentCapability"]', setupForm).forEach(input => {
+        input.checked = enabled.has(input.value);
+    });
+}
+
+function collectAgent() {
+    return {
+        name: setupForm.elements.agentName.value.trim() || "RecepVoz",
+        language: setupForm.elements.language.value.trim() || detectedLanguage(),
+        voice: setupForm.elements.agentVoice.value.trim() || null,
+        greeting: setupForm.elements.agentGreeting.value.trim(),
+        instructions: setupForm.elements.agentInstructions.value.trim() || null,
+        active: setupForm.elements.agentActive.checked,
+        capabilities: $$('input[name="agentCapability"]:checked', setupForm).map(input => input.value)
+    };
+}
+
 function dayOptions(selected) {
     return DAYS.map(([value, label]) =>
         `<option value="${value}" ${Number(selected) === value ? "selected" : ""}>${label}</option>`
@@ -259,16 +284,17 @@ function applyStatus(status) {
 async function loadDashboard() {
     showDashboardShell();
     try {
-        const [me, business, status, services, hours, knowledge, phones] = await Promise.all([
+        const [me, business, status, services, hours, knowledge, phones, agent] = await Promise.all([
             api("/api/v1/auth/me"), api("/api/v1/business"), api("/api/v1/onboarding/status"),
             api("/api/v1/services"), api("/api/v1/business/hours"), api("/api/v1/knowledge?activeOnly=false"),
-            api("/api/v1/phone-numbers")
+            api("/api/v1/phone-numbers"), api("/api/v1/ai-agent")
         ]);
         $("#welcomeText").textContent = `${me.email} · Helvoca solo guardará lo que tú confirmes.`;
         setupForm.elements.businessName.value = business.name || "";
         setupForm.elements.timezone.value = business.timezone || detectedTimezone();
         setupForm.elements.language.value = business.language || detectedLanguage();
         setupForm.elements.humanTransferPhone.value = business.humanTransferPhone || "";
+        renderAgent(agent, business);
         renderServices(services);
         renderHours(hours);
         renderKnowledge(knowledge);
@@ -494,6 +520,7 @@ setupForm.addEventListener("submit", async event => {
     const hours = collectHours();
     if (!services.length) { showMessage(setupMessage, "Añade al menos un servicio antes de guardar."); return; }
     if (!hours.length) { showMessage(setupMessage, "Configura al menos un intervalo de atención."); return; }
+    if (!setupForm.elements.agentGreeting.value.trim()) { showMessage(setupMessage, "Define el saludo inicial del agente."); return; }
     setBusy(setupForm, true);
     try {
         const payload = {
@@ -504,8 +531,9 @@ setupForm.addEventListener("submit", async event => {
             services, hours, knowledge: collectKnowledge()
         };
         await api("/api/v1/onboarding/setup", { method: "PUT", body: JSON.stringify(payload) });
+        await api("/api/v1/ai-agent", { method: "PUT", body: JSON.stringify(collectAgent()) });
         await loadDashboard();
-        showMessage(setupMessage, "Cambios guardados correctamente.", "success");
+        showMessage(setupMessage, "Negocio y agente guardados correctamente.", "success");
     } catch (error) {
         if (error.status !== 401) showMessage(setupMessage, error.message || "No fue posible guardar la configuración.");
     } finally {
