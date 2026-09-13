@@ -75,7 +75,7 @@ public class WhatsAppReceptionistService {
                     .ifPresent(customer -> conversation.setCustomerId(customer.getId()));
         }
         conversation.setLastMessageAt(now);
-        conversation = conversations.saveAndFlush(conversation);
+        conversations.saveAndFlush(conversation);
 
         MessagingMessage inbound = prior == null ? new MessagingMessage() : prior;
         inbound.setConversationId(conversation.getId());
