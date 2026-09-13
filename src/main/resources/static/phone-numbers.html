@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RecepVoz · Números telefónicos</title>
+    <style>
+        :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background:#090d16; color:#f5f7ff; }
+        * { box-sizing:border-box; }
+        body { margin:0; min-height:100vh; background:radial-gradient(circle at top,#18233d,#090d16 55%); }
+        main { width:min(760px,calc(100% - 32px)); margin:48px auto; }
+        .brand { font-weight:900; letter-spacing:.12em; color:#9d86ff; }
+        .card { margin-top:20px; padding:24px; border:1px solid #29334a; border-radius:18px; background:#101726; box-shadow:0 18px 50px #0006; }
+        h1 { margin:8px 0; font-size:clamp(28px,5vw,42px); }
+        p { color:#aab3c8; line-height:1.6; }
+        .phone { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:16px 0; border-top:1px solid #273046; }
+        .phone:first-child { border-top:0; }
+        .number { font-weight:800; }
+        .state { font-size:12px; color:#9fe5b2; }
+        button,a { border:0; border-radius:10px; padding:10px 14px; font:inherit; font-weight:800; cursor:pointer; text-decoration:none; }
+        button { background:#ff637d; color:white; }
+        button:disabled { opacity:.5; cursor:wait; }
+        .back { display:inline-block; margin-top:18px; background:#222c42; color:#e8ecf8; }
+        .msg { margin-top:16px; padding:12px 14px; border-radius:10px; background:#172036; color:#cbd3e7; }
+        .error { background:#3b1821; color:#ffb6c2; }
+        .success { background:#153324; color:#aaf0c3; }
+    </style>
+</head>
+<body>
+<main>
+    <div class="brand">RECEPVOZ</div>
+    <h1>Números telefónicos</h1>
+    <p>Administra únicamente los números conectados a tu negocio actual. Desvincular un número no compra, libera ni elimina el número en Twilio. Solo quita su asociación con este negocio para que puedas conectarlo a otro.</p>
+    <section class="card">
+        <div id="list">Cargando…</div>
+        <div id="message" class="msg" hidden></div>
+        <a class="back" href="/">← Volver a RecepVoz</a>
+    </section>
+</main>
+<script>
+const TOKEN_KEY = "helvoca_access_token";
+const token = sessionStorage.getItem(TOKEN_KEY) || "";
+const list = document.querySelector("#list");
+const message = document.querySelector("#message");
+
+function showMessage(text, kind = "") {
+    message.textContent = text;
+    message.hidden = false;
+    message.className = `msg ${kind}`.trim();
+}
+
+async function api(path, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    const response = await fetch(path, { ...options, headers });
+    if (!response.ok) {
+        let text = `Error HTTP ${response.status}`;
+        try { const body = await response.json(); text = body.message || body.detail || body.error || text; } catch (_) {}
+        throw new Error(text);
+    }
+    if (response.status === 204) return null;
+    return response.json();
+}
+
+async function detach(phone) {
+    const accepted = window.confirm(`¿Desvincular ${phone.phoneNumber} de este negocio? El número seguirá existiendo en Twilio.`);
+    if (!accepted) return;
+    const button = document.querySelector(`[data-id="${phone.id}"]`);
+    if (button) button.disabled = true;
+    try {
+        await api(`/api/v1/phone-numbers/${phone.id}`, { method: "DELETE" });
+        showMessage("Número desvinculado correctamente. Ya puedes conectarlo a otro negocio.", "success");
+        await load();
+    } catch (error) {
+        showMessage(error.message || "No fue posible desvincular el número.", "error");
+        if (button) button.disabled = false;
+    }
+}
+
+async function load() {
+    if (!token) {
+        list.innerHTML = "No hay una sesión activa. Ingresa primero a RecepVoz con la cuenta propietaria del número.";
+        return;
+    }
+    try {
+        const phones = await api("/api/v1/phone-numbers");
+        if (!phones.length) {
+            list.innerHTML = "No hay números conectados a este negocio.";
+            return;
+        }
+        list.innerHTML = "";
+        phones.forEach(phone => {
+            const row = document.createElement("div");
+            row.className = "phone";
+            const info = document.createElement("div");
+            const number = document.createElement("div");
+            number.className = "number";
+            number.textContent = phone.phoneNumber;
+            const state = document.createElement("div");
+            state.className = "state";
+            state.textContent = phone.active ? "ACTIVO" : "INACTIVO";
+            info.append(number, state);
+            const button = document.createElement("button");
+            button.type = "button";
+            button.dataset.id = phone.id;
+            button.textContent = "Desvincular";
+            button.addEventListener("click", () => detach(phone));
+            row.append(info, button);
+            list.appendChild(row);
+        });
+    } catch (error) {
+        list.innerHTML = "";
+        showMessage(error.message || "No fue posible cargar los números.", "error");
+    }
+}
+
+load();
+</script>
+</body>
+</html>
