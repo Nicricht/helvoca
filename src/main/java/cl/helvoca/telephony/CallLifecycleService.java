@@ -1,6 +1,7 @@
 package cl.helvoca.telephony;
 
 import cl.helvoca.ai.realtime.RealtimeCallContext;
+import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.call.CallDirection;
 import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
@@ -10,6 +11,7 @@ import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ public class CallLifecycleService {
     private final JdbcTemplate jdbc;
     private final CallCommercialProperties commercial;
     private final MeterRegistry metrics;
+    private BusinessSubscriptionService subscriptions;
 
     public CallLifecycleService(PhoneNumberRepository phoneNumbers,
                                 CustomerRepository customers,
@@ -49,6 +52,11 @@ public class CallLifecycleService {
         this.metrics = metrics;
     }
 
+    @Autowired(required = false)
+    void setSubscriptions(BusinessSubscriptionService subscriptions) {
+        this.subscriptions = subscriptions;
+    }
+
     @Transactional
     public UUID startInboundCall(String telephonyProvider,
                                  String providerCallId,
@@ -60,12 +68,22 @@ public class CallLifecycleService {
         PhoneNumber phone = phoneNumbers.findByPhoneNumberAndActiveTrue(to)
                 .orElseThrow(() -> new NotFoundException("Destination phone number is not registered"));
 
-        lockBusinessCapacity(phone.getBusinessId());
+        UUID businessId = phone.getBusinessId();
+        lockBusinessCapacity(businessId);
         existing = calls.findByProviderCallId(providerCallId).orElse(null);
         if (existing != null) return existing.getId();
 
         int limit = commercial.getMaxConcurrentPerBusiness();
-        long activeCalls = calls.countByBusinessIdAndStatusIn(phone.getBusinessId(), ACTIVE_STATUSES);
+        if (subscriptions != null) {
+            var entitlement = subscriptions.view(businessId);
+            if (!entitlement.serviceAllowed()) {
+                metrics.counter("helvoca.calls.rejected", "reason", "subscription").increment();
+                throw new CallCapacityExceededException("Subscription does not currently allow voice service");
+            }
+            limit = entitlement.maxConcurrentCalls();
+        }
+
+        long activeCalls = calls.countByBusinessIdAndStatusIn(businessId, ACTIVE_STATUSES);
         if (limit > 0 && activeCalls >= limit) {
             metrics.counter("helvoca.calls.rejected", "reason", "capacity").increment();
             throw new CallCapacityExceededException("Concurrent call capacity reached for business");
@@ -73,7 +91,7 @@ public class CallLifecycleService {
 
         String normalizedProvider = normalizeProvider(telephonyProvider);
         CallSession call = new CallSession();
-        call.setBusinessId(phone.getBusinessId());
+        call.setBusinessId(businessId);
         call.setPhoneNumberId(phone.getId());
         call.setTelephonyProvider(normalizedProvider);
         call.setProviderCallId(providerCallId);
@@ -82,7 +100,7 @@ public class CallLifecycleService {
         call.setDirection(CallDirection.INBOUND);
         call.setStatus(CallStatus.RINGING);
         call.setStartedAt(Instant.now());
-        customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), from)
+        customers.findFirstByBusinessIdAndPhone(businessId, from)
                 .ifPresent(customer -> call.setCustomerId(customer.getId()));
         CallSession saved = calls.saveAndFlush(call);
         metrics.counter("helvoca.calls.started", "provider", normalizedProvider).increment();
