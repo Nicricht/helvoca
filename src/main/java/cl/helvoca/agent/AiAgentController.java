@@ -54,11 +54,13 @@ public class AiAgentController {
 
     public record VoiceProfileResponse(
             String code,
+            String selection,
             String name,
             String description
     ) {
         static VoiceProfileResponse from(AgentVoiceProfile profile) {
-            return new VoiceProfileResponse(profile.code(), profile.displayName(), profile.description());
+            return new VoiceProfileResponse(
+                    profile.code(), profile.openAiVoice(), profile.displayName(), profile.description());
         }
     }
 
