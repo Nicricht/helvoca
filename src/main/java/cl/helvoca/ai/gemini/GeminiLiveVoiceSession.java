@@ -62,6 +62,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final AtomicBoolean finalized = new AtomicBoolean(false);
     private final AtomicInteger pendingMessages = new AtomicInteger(0);
     private final AtomicInteger certificationStep = new AtomicInteger(0);
+    private final AtomicBoolean certificationAvailabilityResolved = new AtomicBoolean(false);
+    private final AtomicBoolean certificationBookingCreated = new AtomicBoolean(false);
+    private final AtomicBoolean certificationBookingCancelled = new AtomicBoolean(false);
     private final GeminiWebSocketJsonFrames inboundFrames = new GeminiWebSocketJsonFrames();
     private final StringBuilder userTranscript = new StringBuilder();
     private final StringBuilder assistantTranscript = new StringBuilder();
@@ -263,28 +266,63 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     private void advanceCertificationSimulation() {
         if (!properties.isCertificationSimulation() || closed.get()) return;
-        int step = certificationStep.getAndIncrement();
+
+        int step = certificationStep.get();
         String phone = context.callerNumber() == null || context.callerNumber().isBlank()
                 ? "el teléfono de esta llamada"
                 : context.callerNumber();
-        String text = switch (step) {
-            case 0 -> "Hola. Quiero hacer una reserva para mañana a las 19:00 para dos personas, "
+        int nextStep;
+        String text;
+
+        if (step == 0) {
+            nextStep = 1;
+            text = "Hola. Quiero hacer una reserva para mañana a las 19:00 para dos personas, "
                     + "a nombre de Nicolás Vega y con el teléfono " + phone + ". "
                     + "Primero consulta list_services y usa literalmente el serviceId devuelto por esa herramienta. "
-                    + "Si ese horario no está disponible, busca el horario disponible más cercano de mañana y reserva ese. "
-                    + "Confirma únicamente después de que la herramienta haya devuelto éxito.";
-            case 1 -> "Si la reserva anterior se creó correctamente, dime brevemente sus datos y luego cancélala "
-                    + "para dejar la base de datos como estaba. Si no se creó, explica brevemente el motivo sin inventar nada.";
-            case 2 -> "Gracias. Confirma brevemente el estado final y despídete. No hagas ninguna otra acción.";
-            default -> null;
-        };
-        if (text == null) {
-            log.info("RECEPVOZ_CERTIFICATION_SCENARIO COMPLETE call={}", context.callId());
+                    + "Confirmo explícitamente que quiero reservar ese servicio a las 19:00. "
+                    + "Si ese horario no está disponible, consulta list_available_slots y también confirmo de antemano "
+                    + "la alternativa disponible más cercana de mañana. No me pidas una confirmación adicional. "
+                    + "Ejecuta create_booking antes de afirmar que la reserva existe y confirma únicamente cuando devuelva success=true.";
+        } else if (certificationBookingCancelled.get() && step < 4) {
+            nextStep = 4;
+            text = "Gracias. La cancelación ya devolvió success=true. Confirma brevemente el estado final y despídete. "
+                    + "No hagas ninguna otra acción.";
+        } else if (certificationBookingCreated.get() && step < 3) {
+            nextStep = 3;
+            text = "La reserva ya fue creada con success=true. Usa literalmente el bookingId devuelto por create_booking "
+                    + "y ejecuta cancel_booking ahora para dejar la base de datos como estaba. "
+                    + "No vuelvas a buscar otra reserva si ya tienes ese bookingId y no confirmes la cancelación hasta success=true.";
+        } else if (certificationAvailabilityResolved.get() && step < 2) {
+            nextStep = 2;
+            text = "Ya consultaste la disponibilidad. Ejecuta ahora create_booking usando literalmente el serviceId del catálogo "
+                    + "y el startAt disponible que corresponda. Si las 19:00 no estaban disponibles, usa literalmente el startAt "
+                    + "de la alternativa más cercana devuelta por list_available_slots. Mi solicitud anterior ya fue una confirmación "
+                    + "explícita del servicio y del horario o su alternativa, así que no pidas otra confirmación. "
+                    + "No respondas como si la reserva existiera hasta que create_booking devuelva success=true.";
+        } else if (step == 4) {
+            if (certificationStep.compareAndSet(4, 5)) {
+                log.info("RECEPVOZ_CERTIFICATION_SCENARIO COMPLETE call={}", context.callId());
+            }
+            return;
+        } else {
             return;
         }
+
+        if (!certificationStep.compareAndSet(step, nextStep)) return;
         transcripts.append(context.callId(), "USER", "[SIMULATED_CERTIFICATION] " + text);
-        log.info("RECEPVOZ_CERTIFICATION_SCENARIO step={} call={}", step + 1, context.callId());
+        log.info("RECEPVOZ_CERTIFICATION_SCENARIO step={} call={}", nextStep, context.callId());
         sendClientText(text);
+    }
+
+    private void recordCertificationToolOutcome(String name, boolean success) {
+        if (!properties.isCertificationSimulation() || !success || name == null) return;
+        switch (name) {
+            case "check_booking_availability", "list_available_slots" -> certificationAvailabilityResolved.set(true);
+            case "create_booking" -> certificationBookingCreated.set(true);
+            case "cancel_booking" -> certificationBookingCancelled.set(true);
+            default -> {
+            }
+        }
     }
 
     private void sendClientText(String text) {
@@ -315,6 +353,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             String entityId = data == null ? null : firstEntityId(data);
             log.info("tool_call_completed call_id={} tool_name={} success={} entity_id={}",
                     context.callId(), name, success, entityId == null ? "none" : entityId);
+            recordCertificationToolOutcome(name, success);
             responses.put(new JSONObject()
                     .put("id", id)
                     .put("name", name)

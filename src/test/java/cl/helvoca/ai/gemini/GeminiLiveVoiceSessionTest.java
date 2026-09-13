@@ -125,6 +125,76 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void certificationScenarioWaitsForAvailabilityCreationAndCancellationMilestones() {
+        GeminiLiveProperties properties = properties();
+        properties.setCertificationSimulation(true);
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        UUID bookingId = UUID.randomUUID();
+        when(tools.execute(eq(context), anyString(), anyString())).thenAnswer(invocation -> {
+            String name = invocation.getArgument(1);
+            JSONObject data = new JSONObject();
+            if ("list_available_slots".equals(name)) {
+                data.put("slots", new JSONArray().put(new JSONObject()
+                        .put("startAt", "2026-09-14T22:00:00Z")));
+            }
+            if ("create_booking".equals(name) || "cancel_booking".equals(name)) {
+                data.put("bookingId", bookingId.toString());
+            }
+            return new JSONObject()
+                    .put("success", true)
+                    .put("data", data)
+                    .put("error", JSONObject.NULL)
+                    .toString();
+        });
+
+        CallTranscriptService transcripts = mock(CallTranscriptService.class);
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+        when(socket.sendClose(anyInt(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                transcripts,
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        session.onOpen(socket);
+        session.onText(socket, "{\"setupComplete\":{}}", true);
+
+        session.onText(socket, turnComplete(), true);
+        verify(transcripts, times(1)).append(eq(context.callId()), eq("USER"),
+                contains("Confirmo explícitamente"));
+
+        session.onText(socket, turnComplete(), true);
+        verify(transcripts, times(1)).append(eq(context.callId()), eq("USER"), anyString());
+
+        session.onText(socket, toolCall("slot-1", "list_available_slots"), true);
+        session.onText(socket, turnComplete(), true);
+        verify(transcripts).append(eq(context.callId()), eq("USER"), contains("Ejecuta ahora create_booking"));
+        verify(transcripts, times(2)).append(eq(context.callId()), eq("USER"), anyString());
+
+        session.onText(socket, toolCall("book-1", "create_booking"), true);
+        session.onText(socket, turnComplete(), true);
+        verify(transcripts).append(eq(context.callId()), eq("USER"), contains("ejecuta cancel_booking ahora"));
+        verify(transcripts, times(3)).append(eq(context.callId()), eq("USER"), anyString());
+
+        session.onText(socket, toolCall("cancel-1", "cancel_booking"), true);
+        session.onText(socket, turnComplete(), true);
+        verify(transcripts).append(eq(context.callId()), eq("USER"), contains("La cancelación ya devolvió success=true"));
+        verify(transcripts, times(4)).append(eq(context.callId()), eq("USER"), anyString());
+    }
+
+    @Test
     void permissionDeniedAndAccessDeniedAreAuthFailures() {
         assertEquals(VoiceProviderHealthRegistry.FailureKind.AUTH,
                 GeminiLiveVoiceSession.classifyFailure(403, "PERMISSION_DENIED"));
@@ -153,6 +223,22 @@ class GeminiLiveVoiceSessionTest {
         return new RealtimeCallContext(
                 UUID.randomUUID(), UUID.randomUUID(), null,
                 "+56911111111", "+14355652512", "MZ-test");
+    }
+
+    private static String turnComplete() {
+        return new JSONObject()
+                .put("serverContent", new JSONObject().put("turnComplete", true))
+                .toString();
+    }
+
+    private static String toolCall(String id, String name) {
+        return new JSONObject()
+                .put("toolCall", new JSONObject()
+                        .put("functionCalls", new JSONArray().put(new JSONObject()
+                                .put("id", id)
+                                .put("name", name)
+                                .put("args", new JSONObject()))))
+                .toString();
     }
 
     private static boolean hasFunction(JSONArray declarations, String name) {
