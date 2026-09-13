@@ -3,6 +3,7 @@ package cl.helvoca.ai.gemini;
 import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.ai.realtime.RealtimeToolDefinitions;
 import cl.helvoca.ai.realtime.RealtimeToolService;
+import cl.helvoca.call.CallCertificationService;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.call.CallTranscriptService;
 import cl.helvoca.telephony.CallLifecycleService;
@@ -51,6 +52,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final CallTranscriptService transcripts;
     private final CallSummaryService summaries;
     private final CallLifecycleService lifecycle;
+    private final CallCertificationService certifications;
     private final VoiceProviderHealthRegistry health;
     private final HttpClient http;
     private final Queue<String> pendingAudio = new ConcurrentLinkedQueue<>();
@@ -75,6 +77,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                            CallTranscriptService transcripts,
                            CallSummaryService summaries,
                            CallLifecycleService lifecycle,
+                           CallCertificationService certifications,
                            VoiceProviderHealthRegistry health,
                            HttpClient http) {
         this.context = context;
@@ -84,6 +87,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         this.transcripts = transcripts;
         this.summaries = summaries;
         this.lifecycle = lifecycle;
+        this.certifications = certifications;
         this.health = health;
         this.http = http;
     }
@@ -100,8 +104,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 .connectTimeout(Duration.ofSeconds(8))
                 .buildAsync(URI.create(url), this)
                 .exceptionally(error -> {
-                    fail("Could not open Gemini Live WebSocket: " + rootMessage(error),
-                            VoiceProviderHealthRegistry.FailureKind.UPSTREAM);
+                    String message = rootMessage(error);
+                    fail("Could not open Gemini Live WebSocket: " + message,
+                            classifyFailure(null, message));
                     return null;
                 });
     }
@@ -165,7 +170,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         inboundFrames.reset();
         if (!closed.get()) {
             fail("Gemini Live closed unexpectedly status=" + statusCode + " reason=" + reason,
-                    VoiceProviderHealthRegistry.FailureKind.UPSTREAM);
+                    classifyFailure(statusCode, reason));
         }
         return null;
     }
@@ -173,8 +178,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     @Override
     public void onError(WebSocket webSocket, Throwable error) {
         inboundFrames.reset();
-        fail("Gemini Live WebSocket error: " + rootMessage(error),
-                VoiceProviderHealthRegistry.FailureKind.UPSTREAM);
+        String message = rootMessage(error);
+        fail("Gemini Live WebSocket error: " + message,
+                classifyFailure(null, message));
     }
 
     private void handle(String payload) {
@@ -210,6 +216,11 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private void onSetupComplete() {
         if (!setupComplete.compareAndSet(false, true)) return;
         health.success(GeminiLiveVoiceProvider.ID);
+        try {
+            lifecycle.markAiSetupCompleted(context.callId());
+        } catch (Exception e) {
+            log.warn("Could not persist Gemini setup milestone call={}: {}", context.callId(), e.getMessage());
+        }
 
         sendClientText("[RECEPVOZ_CALL_CONNECTED]");
 
@@ -259,6 +270,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         String text = switch (step) {
             case 0 -> "Hola. Quiero hacer una reserva para mañana a las 19:00 para dos personas, "
                     + "a nombre de Nicolás Vega y con el teléfono " + phone + ". "
+                    + "Primero consulta list_services y usa literalmente el serviceId devuelto por esa herramienta. "
                     + "Si ese horario no está disponible, busca el horario disponible más cercano de mañana y reserva ese. "
                     + "Confirma únicamente después de que la herramienta haya devuelto éxito.";
             case 1 -> "Si la reserva anterior se creó correctamente, dime brevemente sus datos y luego cancélala "
@@ -296,7 +308,13 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             JSONObject args = function.optJSONObject("args");
             if (id == null || name == null || !completedToolCalls.add(id)) continue;
 
+            log.info("tool_call_started call_id={} tool_name={}", context.callId(), name);
             JSONObject result = executeTool(name, args == null ? new JSONObject() : args);
+            boolean success = result.optBoolean("success", false);
+            JSONObject data = result.optJSONObject("data");
+            String entityId = data == null ? null : firstEntityId(data);
+            log.info("tool_call_completed call_id={} tool_name={} success={} entity_id={}",
+                    context.callId(), name, success, entityId == null ? "none" : entityId);
             responses.put(new JSONObject()
                     .put("id", id)
                     .put("name", name)
@@ -329,18 +347,38 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         String status = error.optString("status", "");
         String message = error.optString("message", error.toString());
         int code = error.optInt("code", 0);
-        String normalized = (status + " " + message).toLowerCase();
-        VoiceProviderHealthRegistry.FailureKind kind;
-        if (normalized.contains("credit") || normalized.contains("billing") || normalized.contains("quota exhausted")) {
-            kind = VoiceProviderHealthRegistry.FailureKind.NO_CREDITS;
-        } else if (code == 401 || code == 403 || normalized.contains("unauthenticated") || normalized.contains("permission_denied")) {
-            kind = VoiceProviderHealthRegistry.FailureKind.AUTH;
-        } else if (code == 429 || normalized.contains("resource_exhausted") || normalized.contains("rate limit")) {
-            kind = VoiceProviderHealthRegistry.FailureKind.RATE_LIMIT;
-        } else {
-            kind = VoiceProviderHealthRegistry.FailureKind.UPSTREAM;
+        fail("Gemini Live provider error code=" + code + " status=" + status + " message=" + message,
+                classifyFailure(code, status + " " + message));
+    }
+
+    static VoiceProviderHealthRegistry.FailureKind classifyFailure(Integer code, String detail) {
+        String normalized = detail == null ? "" : detail.toLowerCase();
+        if (normalized.contains("credit") || normalized.contains("billing")
+                || normalized.contains("quota exhausted") || normalized.contains("insufficient_quota")) {
+            return VoiceProviderHealthRegistry.FailureKind.NO_CREDITS;
         }
-        fail("Gemini Live provider error code=" + code + " status=" + status + " message=" + message, kind);
+        if ((code != null && (code == 401 || code == 403))
+                || normalized.contains("unauthenticated")
+                || normalized.contains("permission_denied")
+                || normalized.contains("permission denied")
+                || normalized.contains("access denied")
+                || normalized.contains("denied access")
+                || normalized.contains("invalid api key")
+                || normalized.contains("invalid_api_key")
+                || normalized.contains("forbidden")) {
+            return VoiceProviderHealthRegistry.FailureKind.AUTH;
+        }
+        if (code != null && code == 1008
+                && (normalized.contains("permission") || normalized.contains("access")
+                || normalized.contains("auth") || normalized.contains("credential")
+                || normalized.contains("api key"))) {
+            return VoiceProviderHealthRegistry.FailureKind.AUTH;
+        }
+        if ((code != null && code == 429)
+                || normalized.contains("resource_exhausted") || normalized.contains("rate limit")) {
+            return VoiceProviderHealthRegistry.FailureKind.RATE_LIMIT;
+        }
+        return VoiceProviderHealthRegistry.FailureKind.UPSTREAM;
     }
 
     JSONObject buildSetup() {
@@ -418,8 +456,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                     .whenComplete((ignored, error) -> {
                         pendingMessages.decrementAndGet();
                         if (error != null && !closed.get()) {
-                            fail("Gemini send failed: " + rootMessage(error),
-                                    VoiceProviderHealthRegistry.FailureKind.UPSTREAM);
+                            String message = rootMessage(error);
+                            fail("Gemini send failed: " + message, classifyFailure(null, message));
                         }
                     });
         }
@@ -470,6 +508,13 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         } catch (Exception e) {
             log.warn("Could not summarize Gemini call {}: {}", context.callId(), e.getMessage());
         }
+        if (properties.isCertificationSimulation()) {
+            try {
+                certifications.verifyAfterCall(context.callId());
+            } catch (Exception e) {
+                log.warn("Could not schedule certification verification call={}: {}", context.callId(), e.getMessage());
+            }
+        }
     }
 
     @Override
@@ -492,6 +537,14 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 .put("success", false)
                 .put("data", JSONObject.NULL)
                 .put("error", new JSONObject().put("code", code).put("message", message));
+    }
+
+    private static String firstEntityId(JSONObject data) {
+        for (String key : new String[]{"bookingId", "customerId", "requestId", "questionId"}) {
+            String value = data.optString(key, null);
+            if (value != null && !value.isBlank()) return value;
+        }
+        return null;
     }
 
     private static String truncate(String value) {
