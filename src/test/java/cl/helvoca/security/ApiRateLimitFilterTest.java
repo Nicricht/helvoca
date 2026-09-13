@@ -87,10 +87,15 @@ class ApiRateLimitFilterTest {
     }
 
     @Test
-    void clientAddressUsesFirstForwardedAddress() {
-        HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getHeader("X-Forwarded-For")).thenReturn("198.51.100.9, 10.0.0.1");
-        assertEquals("198.51.100.9", ApiRateLimitFilter.clientAddress(request));
+    void clientAddressPrefersRailwayRealIpAndFallsBackToForwardedFor() {
+        HttpServletRequest railway = mock(HttpServletRequest.class);
+        when(railway.getHeader("X-Real-IP")).thenReturn("198.51.100.7");
+        when(railway.getHeader("X-Forwarded-For")).thenReturn("203.0.113.77, 10.0.0.1");
+        assertEquals("198.51.100.7", ApiRateLimitFilter.clientAddress(railway));
+
+        HttpServletRequest fallback = mock(HttpServletRequest.class);
+        when(fallback.getHeader("X-Forwarded-For")).thenReturn("198.51.100.9, 10.0.0.1");
+        assertEquals("198.51.100.9", ApiRateLimitFilter.clientAddress(fallback));
     }
 
     private static HttpServletRequest request(String method, String uri, String remoteAddr) {
