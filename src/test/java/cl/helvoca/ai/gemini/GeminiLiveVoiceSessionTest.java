@@ -120,15 +120,17 @@ class GeminiLiveVoiceSessionTest {
 
         ArgumentCaptor<CharSequence> sent = ArgumentCaptor.forClass(CharSequence.class);
         verify(socket, atLeast(2)).sendText(sent.capture(), eq(true));
-        String opening = sent.getAllValues().stream()
+        JSONObject opening = sent.getAllValues().stream()
                 .map(CharSequence::toString)
-                .filter(message -> message.contains("[RECEPVOZ_CALL_CONNECTED]"))
+                .map(JSONObject::new)
+                .filter(message -> message.optJSONObject("realtimeInput") != null)
+                .filter(message -> message.getJSONObject("realtimeInput").optString("text", "")
+                        .contains("[RECEPVOZ_CALL_CONNECTED]"))
                 .findFirst()
                 .orElseThrow();
-        JSONObject openingJson = new JSONObject(opening);
-        assertFalse(openingJson.has("clientContent"));
+        assertFalse(opening.has("clientContent"));
         assertEquals("[RECEPVOZ_CALL_CONNECTED]",
-                openingJson.getJSONObject("realtimeInput").getString("text"));
+                opening.getJSONObject("realtimeInput").getString("text"));
     }
 
     @Test
