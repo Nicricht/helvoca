@@ -19,17 +19,17 @@ public final class RealtimeToolDefinitions {
                                         .put("name", string("Nombre del cliente"))
                                         .put("email", string("Correo opcional")))
                                 .put("required", new JSONArray().put("name"))))
-                .put(function("list_available_slots", "Lista horarios realmente disponibles para un servicio en una fecha local del negocio. Si no tienes un serviceId devuelto literalmente por list_services, llama list_services primero. Nunca inventes UUID.",
+                .put(function("list_available_slots", "Lista horarios realmente disponibles para un servicio en una fecha local del negocio. Si no tienes un serviceId devuelto literalmente por list_services, llama list_services primero. Nunca inventes UUID. Si el cliente ya pidió reservar y ya confirmó el servicio y una alternativa horaria, usa literalmente uno de los startAt devueltos y continúa con create_booking antes de afirmar que la reserva existe.",
                         object().put("properties", new JSONObject()
                                         .put("serviceId", string("UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
                                         .put("date", string("Fecha local del negocio en formato YYYY-MM-DD")))
                                 .put("required", new JSONArray().put("serviceId").put("date"))))
-                .put(function("check_booking_availability", "Comprueba una hora exacta antes de prometer una reserva. El serviceId debe provenir literalmente de list_services. Si todavía no lo tienes, llama list_services primero. Nunca inventes UUID.",
+                .put(function("check_booking_availability", "Comprueba una hora exacta antes de prometer una reserva. El serviceId debe provenir literalmente de list_services. Si todavía no lo tienes, llama list_services primero. Nunca inventes UUID. Si devuelve available=true y el cliente ya confirmó que quiere reservar ese servicio y horario, continúa con create_booking antes de afirmar que la reserva existe.",
                         object().put("properties", new JSONObject()
                                         .put("serviceId", string("UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
                                         .put("startAt", string("Fecha y hora ISO-8601 con zona u offset")))
                                 .put("required", new JSONArray().put("serviceId").put("startAt"))))
-                .put(function("create_booking", "Crea una reserva real. Solo se considera confirmada cuando esta herramienta devuelve success=true y el cliente ya confirmó verbalmente servicio y fecha/hora. El serviceId debe provenir literalmente de list_services; si no lo tienes, llama list_services primero y nunca inventes UUID.",
+                .put(function("create_booking", "Crea una reserva real. Solo se considera confirmada cuando esta herramienta devuelve success=true y el cliente ya confirmó verbalmente servicio y fecha/hora. El serviceId debe provenir literalmente de list_services; si no lo tienes, llama list_services primero y nunca inventes UUID. Conserva el bookingId devuelto para cualquier cancelación o reprogramación posterior de esta misma reserva.",
                         object().put("properties", new JSONObject()
                                         .put("serviceId", string("UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
                                         .put("startAt", string("Fecha y hora ISO-8601 con zona u offset"))
@@ -38,12 +38,12 @@ public final class RealtimeToolDefinitions {
                 .put(function("list_customer_bookings", "Lista las próximas reservas confirmadas del cliente identificado por esta llamada. El cliente y negocio se obtienen del contexto verificado.", object()))
                 .put(function("reschedule_booking", "Reprograma una reserva del cliente de esta llamada. Solo comunica el cambio cuando success=true. El backend vuelve a validar horario y solapamientos.",
                         object().put("properties", new JSONObject()
-                                        .put("bookingId", string("UUID de la reserva obtenido desde list_customer_bookings"))
+                                        .put("bookingId", string("UUID de la reserva obtenido desde list_customer_bookings o desde create_booking en esta misma llamada"))
                                         .put("newStartAt", string("Nueva fecha y hora ISO-8601 con zona u offset")))
                                 .put("required", new JSONArray().put("bookingId").put("newStartAt"))))
-                .put(function("cancel_booking", "Cancela una reserva del cliente de esta llamada. Solo comunica la cancelación cuando success=true.",
+                .put(function("cancel_booking", "Cancela una reserva del cliente de esta llamada. Solo comunica la cancelación cuando success=true. Si acabas de crear la reserva en esta misma llamada, usa literalmente el bookingId devuelto por create_booking; no vuelvas a buscar ni inventes otro identificador.",
                         object().put("properties", new JSONObject()
-                                        .put("bookingId", string("UUID de la reserva obtenido desde list_customer_bookings")))
+                                        .put("bookingId", string("UUID exacto de la reserva devuelto por create_booking o list_customer_bookings")))
                                 .put("required", new JSONArray().put("bookingId"))))
                 .put(function("create_request", "Crea una solicitud real de seguimiento cuando la necesidad del cliente no corresponde a una reserva. Sirve para cotizaciones, soporte, visitas, leads, urgencias u otros casos configurables. Solo confirma al cliente cuando success=true.",
                         object().put("properties", new JSONObject()
