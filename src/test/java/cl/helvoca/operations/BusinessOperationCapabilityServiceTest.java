@@ -25,8 +25,6 @@ class BusinessOperationCapabilityServiceTest {
 
     @Test
     void deliveryAutomaticallyEnablesOrderAndCatalog() {
-        UUID businessId = UUID.randomUUID();
-        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
         BusinessOperationCapabilityService service = new BusinessOperationCapabilityService(aiAgents, tenantProvider);
 
         Set<BusinessOperationCapability> result = service.replaceCurrent(Set.of(BusinessOperationCapability.DELIVERY));
@@ -47,7 +45,6 @@ class BusinessOperationCapabilityServiceTest {
 
     @Test
     void quoteAutomaticallyEnablesCatalogButNotOrder() {
-        when(tenantProvider.requireBusinessId()).thenReturn(UUID.randomUUID());
         BusinessOperationCapabilityService service = new BusinessOperationCapabilityService(aiAgents, tenantProvider);
 
         Set<BusinessOperationCapability> result = service.replaceCurrent(Set.of(BusinessOperationCapability.QUOTE));
