@@ -1,14 +1,13 @@
 package cl.helvoca.call;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class CallSummaryServiceTest {
@@ -64,26 +63,23 @@ class CallSummaryServiceTest {
     }
 
     @Test
-    void duplicateSummaryRaceIsHandledAsAlreadyPersisted() {
+    void duplicateSummaryRaceIsHandledByAtomicInsert() {
         UUID callId = UUID.randomUUID();
         CallTranscriptRepository transcripts = mock(CallTranscriptRepository.class);
         CallSummaryRepository summaries = mock(CallSummaryRepository.class);
         CallActionRepository actions = mock(CallActionRepository.class);
-        CallSummary existing = new CallSummary();
-        existing.setCallId(callId);
 
-        when(summaries.findByCallId(callId))
-                .thenReturn(Optional.empty(), Optional.empty(), Optional.of(existing));
+        when(summaries.findByCallId(callId)).thenReturn(Optional.empty());
         when(transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId))
                 .thenReturn(List.of(transcript("USER", "Quiero reservar una hora")));
         when(actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(List.of());
-        when(summaries.saveAndFlush(any(CallSummary.class)))
-                .thenThrow(new DataIntegrityViolationException("duplicate call_id"));
+        when(summaries.insertIfAbsent(any(UUID.class), eq(callId), anyString())).thenReturn(0);
 
         CallSummaryService service = new CallSummaryService(transcripts, summaries, actions);
 
         assertDoesNotThrow(() -> service.generate(callId));
-        verify(summaries, times(1)).saveAndFlush(any(CallSummary.class));
+        verify(summaries, times(1)).insertIfAbsent(any(UUID.class), eq(callId), anyString());
+        verify(summaries, never()).saveAndFlush(any(CallSummary.class));
     }
 
     private static CallTranscript transcript(String speaker, String content) {
