@@ -2,6 +2,7 @@ package cl.helvoca.messaging;
 
 import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.ai.realtime.RealtimeToolDefinitions;
+import cl.helvoca.operations.CommercialToolDefinitions;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.core.JsonValue;
@@ -84,7 +85,7 @@ public class OpenAiMessagingAiClient implements MessagingAiClient {
     }
 
     private static void addTools(ResponseCreateParams.Builder builder, Set<String> allowedToolNames) {
-        JSONArray definitions = RealtimeToolDefinitions.all();
+        JSONArray definitions = allMessagingDefinitions();
         Set<String> allowed = allowedToolNames == null ? Set.of() : allowedToolNames;
         for (int i = 0; i < definitions.length(); i++) {
             JSONObject definition = definitions.getJSONObject(i);
@@ -103,6 +104,17 @@ public class OpenAiMessagingAiClient implements MessagingAiClient {
                     .strict(false)
                     .build());
         }
+    }
+
+    private static JSONArray allMessagingDefinitions() {
+        JSONArray combined = new JSONArray();
+        append(combined, RealtimeToolDefinitions.all());
+        append(combined, CommercialToolDefinitions.all());
+        return combined;
+    }
+
+    private static void append(JSONArray target, JSONArray source) {
+        for (int i = 0; i < source.length(); i++) target.put(source.getJSONObject(i));
     }
 
     private static String adaptDescription(String value) {
