@@ -39,7 +39,7 @@ public class AiAgent {
     @CollectionTable(name = "ai_agent_capability", joinColumns = @JoinColumn(name = "ai_agent_id"))
     @Enumerated(EnumType.STRING)
     @Column(name = "capability", nullable = false, length = 80)
-    private Set<AiCapability> capabilities = EnumSet.allOf(AiCapability.class);
+    private Set<AiCapability> capabilities = AiCapability.legacyDefaults();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
