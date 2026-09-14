@@ -1,7 +1,6 @@
 package cl.helvoca.ai.gemini;
 
 import cl.helvoca.ai.realtime.RealtimeCallContext;
-import cl.helvoca.ai.realtime.RealtimeToolDefinitions;
 import cl.helvoca.ai.realtime.RealtimeToolService;
 import cl.helvoca.call.CallCertificationService;
 import cl.helvoca.call.CallSummaryService;
@@ -448,7 +447,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     private JSONArray geminiFunctionDeclarations() {
         JSONArray out = new JSONArray();
-        JSONArray source = RealtimeToolDefinitions.all();
+        JSONArray source = tools.toolDefinitions(context);
+        if (source == null) source = new JSONArray();
         for (int i = 0; i < source.length(); i++) {
             JSONObject tool = source.getJSONObject(i);
             out.put(new JSONObject()
