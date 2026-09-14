@@ -1,6 +1,7 @@
 package cl.helvoca.operations;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Set;
@@ -15,13 +16,17 @@ public class BusinessOperationCapabilityController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
     public ResponseEntity<CapabilityResponse> current() {
         return ResponseEntity.ok(new CapabilityResponse(service.current()));
     }
 
     @PutMapping
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public ResponseEntity<CapabilityResponse> replace(@RequestBody CapabilityRequest request) {
-        Set<BusinessOperationCapability> requested = request == null ? Set.of() : request.capabilities();
+        Set<BusinessOperationCapability> requested = request == null || request.capabilities() == null
+                ? Set.of()
+                : request.capabilities();
         return ResponseEntity.ok(new CapabilityResponse(service.replaceCurrent(requested)));
     }
 
