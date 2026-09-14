@@ -1,38 +1,19 @@
 package cl.helvoca.ai.realtime;
 
-import cl.helvoca.booking.BookingRepository;
-import cl.helvoca.business.BusinessRepository;
-import cl.helvoca.call.CallSessionRepository;
-import cl.helvoca.customer.CustomerRepository;
-import cl.helvoca.knowledge.KnowledgeItemRepository;
-import cl.helvoca.learning.UnansweredQuestionService;
-import cl.helvoca.request.BusinessRequestService;
-import cl.helvoca.schedule.BusinessScheduleService;
-import cl.helvoca.servicecatalog.ServiceItemRepository;
-import org.springframework.context.annotation.Primary;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+/**
+ * Centralized conversational guidance for RecepVoz.
+ *
+ * This class deliberately is not a Spring bean. The existing
+ * CertificationGuardedRealtimeToolService remains the single @Primary
+ * RealtimeToolService so certification and booking-mutation guards cannot be bypassed.
+ */
+public final class RecepVozConversationPolicyService {
 
-@Service
-@Primary
-public class RecepVozConversationPolicyService extends RealtimeToolService {
-
-    public RecepVozConversationPolicyService(BusinessRepository businesses,
-                                              CustomerRepository customers,
-                                              ServiceItemRepository services,
-                                              KnowledgeItemRepository knowledge,
-                                              BookingRepository bookings,
-                                              CallSessionRepository calls,
-                                              BusinessScheduleService schedule,
-                                              BusinessRequestService requests,
-                                              UnansweredQuestionService unansweredQuestions) {
-        super(businesses, customers, services, knowledge, bookings, calls, schedule, requests, unansweredQuestions);
+    private RecepVozConversationPolicyService() {
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public String buildInstructions(RealtimeCallContext context) {
-        return super.buildInstructions(context) + "\n" + conversationGuidance();
+    static String appendTo(String baseInstructions) {
+        return baseInstructions + "\n" + conversationGuidance();
     }
 
     static String conversationGuidance() {
