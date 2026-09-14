@@ -180,3 +180,11 @@ test('plan checkout starts only after explicit confirmation and does not activat
     'https://checkout.example.test/pre-e2e-1'
   ]);
 });
+
+test('sales landing exposes pricing and signup paths', async ({ page }) => {
+  await page.goto('/sales.html');
+  await expect(page).toHaveTitle(/Helvoca/);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Tu negocio puede seguir atendiendo');
+  await expect(page.getByRole('link', { name: 'Crear mi recepcionista' })).toHaveAttribute('href', '/');
+  await expect(page.getByRole('link', { name: 'Ver planes' })).toHaveAttribute('href', '/pricing.html');
+});
