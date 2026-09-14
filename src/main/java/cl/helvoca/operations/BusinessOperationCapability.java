@@ -15,7 +15,7 @@ import java.util.Set;
 public enum BusinessOperationCapability {
     CATALOG(Set.of("list_catalog")),
     ORDER(Set.of("quote_order", "create_order", "get_order_status", "cancel_order")),
-    DELIVERY(Set.of("list_delivery_zones")),
+    DELIVERY(Set.of("list_delivery_zones", "validate_delivery_address")),
     QUOTE(Set.of("create_quote")),
     LEAD(Set.of("create_lead"));
 
