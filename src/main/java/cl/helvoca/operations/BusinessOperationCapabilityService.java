@@ -1,23 +1,24 @@
 package cl.helvoca.operations;
 
+import cl.helvoca.agent.AiAgent;
+import cl.helvoca.agent.AiAgentService;
 import cl.helvoca.security.TenantProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.EnumSet;
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class BusinessOperationCapabilityService {
-    private final BusinessOperationCapabilityRepository repository;
+    private final AiAgentService aiAgents;
     private final TenantProvider tenantProvider;
 
-    public BusinessOperationCapabilityService(BusinessOperationCapabilityRepository repository,
+    public BusinessOperationCapabilityService(AiAgentService aiAgents,
                                               TenantProvider tenantProvider) {
-        this.repository = repository;
+        this.aiAgents = aiAgents;
         this.tenantProvider = tenantProvider;
     }
 
@@ -28,38 +29,39 @@ public class BusinessOperationCapabilityService {
 
     @Transactional(readOnly = true)
     public Set<BusinessOperationCapability> enabled(UUID businessId) {
-        EnumSet<BusinessOperationCapability> out = EnumSet.noneOf(BusinessOperationCapability.class);
-        repository.findAllByBusinessIdOrderByCapabilityAsc(businessId)
-                .forEach(grant -> out.add(grant.getCapability()));
-        return Set.copyOf(out);
+        AiAgent agent = aiAgents.runtime(businessId);
+        if (!agent.isActive()) return Set.of();
+        return BusinessOperationCapability.fromAiCapabilities(agent.getCapabilities());
     }
 
     @Transactional(readOnly = true)
     public Set<String> allowedToolNames(UUID businessId) {
-        return BusinessOperationCapability.toolNamesFor(enabled(businessId));
+        return aiAgents.allowedToolNames(businessId).stream()
+                .filter(BusinessOperationCapability::isCommercialToolName)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     @Transactional(readOnly = true)
     public boolean isToolAllowed(UUID businessId, String toolName) {
-        return BusinessOperationCapability.fromToolName(toolName)
-                .map(capability -> repository.existsByBusinessIdAndCapability(businessId, capability))
-                .orElse(false);
+        return BusinessOperationCapability.isCommercialToolName(toolName)
+                && aiAgents.toolAllowed(businessId, toolName);
     }
 
     @Transactional(readOnly = true)
     public boolean isEnabled(UUID businessId, BusinessOperationCapability capability) {
-        return repository.existsByBusinessIdAndCapability(businessId, capability);
+        if (capability == null) return false;
+        AiAgent agent = aiAgents.runtime(businessId);
+        return agent.isActive() && agent.getCapabilities().containsAll(capability.aiCapabilities());
     }
 
     @Transactional
     public Set<BusinessOperationCapability> replaceCurrent(Set<BusinessOperationCapability> capabilities) {
-        UUID businessId = tenantProvider.requireBusinessId();
         EnumSet<BusinessOperationCapability> desired = capabilities == null || capabilities.isEmpty()
                 ? EnumSet.noneOf(BusinessOperationCapability.class)
                 : EnumSet.copyOf(capabilities);
 
-        // ORDER and QUOTE consume the universal catalog. DELIVERY also requires
-        // ORDER because delivery is a fulfillment mode of an order.
+        // High-level presets normalize their dependencies, while the concrete
+        // tool grants are persisted in AiAgent as AiCapability values.
         if (desired.contains(BusinessOperationCapability.ORDER)
                 || desired.contains(BusinessOperationCapability.QUOTE)) {
             desired.add(BusinessOperationCapability.CATALOG);
@@ -69,16 +71,7 @@ public class BusinessOperationCapabilityService {
             desired.add(BusinessOperationCapability.CATALOG);
         }
 
-        repository.deleteAllByBusinessId(businessId);
-        repository.flush();
-        List<BusinessOperationCapabilityGrant> grants = desired.stream().map(capability -> {
-            BusinessOperationCapabilityGrant grant = new BusinessOperationCapabilityGrant();
-            grant.setBusinessId(businessId);
-            grant.setCapability(capability);
-            return grant;
-        }).toList();
-        repository.saveAll(grants);
-        repository.flush();
-        return Set.copyOf(new LinkedHashSet<>(desired));
+        aiAgents.replaceCommercialCapabilities(BusinessOperationCapability.aiCapabilitiesFor(desired));
+        return Set.copyOf(desired);
     }
 }
