@@ -1,45 +1,78 @@
 package cl.helvoca.operations;
 
+import cl.helvoca.agent.AiCapability;
+
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * High-level commercial capabilities enabled explicitly per tenant.
- *
- * These are intentionally separate from AiCapability. AiCapability controls
- * the legacy receptionist tools while this enum controls business operations
- * that are not universally meaningful (orders, delivery, quotes and leads).
+ * High-level business presets. Runtime tool authorization is persisted and
+ * enforced by AiAgent/AiCapability, so there is one authority per tenant.
  */
 public enum BusinessOperationCapability {
-    CATALOG(Set.of("list_catalog")),
-    ORDER(Set.of("quote_order", "create_order", "get_order_status", "cancel_order")),
-    DELIVERY(Set.of("list_delivery_zones", "validate_delivery_address")),
-    QUOTE(Set.of("create_quote")),
-    LEAD(Set.of("create_lead"));
+    CATALOG(Set.of(AiCapability.LIST_CATALOG)),
+    ORDER(Set.of(
+            AiCapability.QUOTE_ORDER,
+            AiCapability.CREATE_ORDER,
+            AiCapability.GET_ORDER_STATUS,
+            AiCapability.CANCEL_ORDER)),
+    DELIVERY(Set.of(
+            AiCapability.LIST_DELIVERY_ZONES,
+            AiCapability.VALIDATE_DELIVERY_ADDRESS)),
+    QUOTE(Set.of(AiCapability.CREATE_QUOTE)),
+    LEAD(Set.of(AiCapability.CREATE_LEAD));
 
-    private final Set<String> toolNames;
+    private final Set<AiCapability> aiCapabilities;
 
-    BusinessOperationCapability(Set<String> toolNames) {
-        this.toolNames = Set.copyOf(toolNames);
+    BusinessOperationCapability(Set<AiCapability> aiCapabilities) {
+        this.aiCapabilities = Set.copyOf(aiCapabilities);
+    }
+
+    public Set<AiCapability> aiCapabilities() {
+        return aiCapabilities;
     }
 
     public Set<String> toolNames() {
-        return toolNames;
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        aiCapabilities.forEach(capability -> out.add(capability.toolName()));
+        return Set.copyOf(out);
     }
 
     public static Optional<BusinessOperationCapability> fromToolName(String toolName) {
         if (toolName == null) return Optional.empty();
         return Arrays.stream(values())
-                .filter(capability -> capability.toolNames.contains(toolName))
+                .filter(capability -> capability.toolNames().contains(toolName))
                 .findFirst();
     }
 
     public static Set<String> toolNamesFor(Set<BusinessOperationCapability> capabilities) {
         LinkedHashSet<String> out = new LinkedHashSet<>();
         if (capabilities == null) return Set.of();
-        capabilities.forEach(capability -> out.addAll(capability.toolNames));
+        capabilities.forEach(capability -> out.addAll(capability.toolNames()));
         return Set.copyOf(out);
+    }
+
+    public static Set<AiCapability> aiCapabilitiesFor(Set<BusinessOperationCapability> capabilities) {
+        EnumSet<AiCapability> out = EnumSet.noneOf(AiCapability.class);
+        if (capabilities != null) {
+            capabilities.forEach(capability -> out.addAll(capability.aiCapabilities));
+        }
+        return Set.copyOf(out);
+    }
+
+    public static Set<BusinessOperationCapability> fromAiCapabilities(Set<AiCapability> capabilities) {
+        EnumSet<BusinessOperationCapability> out = EnumSet.noneOf(BusinessOperationCapability.class);
+        if (capabilities == null) return Set.of();
+        for (BusinessOperationCapability capability : values()) {
+            if (capabilities.containsAll(capability.aiCapabilities)) out.add(capability);
+        }
+        return Set.copyOf(out);
+    }
+
+    public static boolean isCommercialToolName(String toolName) {
+        return fromToolName(toolName).isPresent();
     }
 }

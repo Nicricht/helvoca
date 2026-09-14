@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class AiAgentServiceTest {
@@ -38,9 +38,11 @@ class AiAgentServiceTest {
         assertEquals("es", runtime.getLanguage());
         assertNull(runtime.getVoice());
         assertTrue(runtime.isActive());
-        assertEquals(EnumSet.allOf(AiCapability.class), runtime.getCapabilities());
+        assertEquals(AiCapability.legacyDefaults(), runtime.getCapabilities());
         assertTrue(runtime.getGreeting().contains("Clínica Norte"));
         assertTrue(service.toolAllowed(businessId, "create_booking"));
+        assertFalse(service.toolAllowed(businessId, "create_order"));
+        assertFalse(service.toolAllowed(businessId, "list_catalog"));
     }
 
     @Test
@@ -64,6 +66,7 @@ class AiAgentServiceTest {
 
         assertTrue(service.toolAllowed(businessId, "list_services"));
         assertFalse(service.toolAllowed(businessId, "create_booking"));
+        assertFalse(service.toolAllowed(businessId, "create_order"));
         assertTrue(service.toolAllowed(businessId, "unknown_future_tool"));
     }
 
@@ -85,5 +88,42 @@ class AiAgentServiceTest {
 
         assertTrue(service.allowedToolNames(businessId).isEmpty());
         assertFalse(service.toolAllowed(businessId, "list_services"));
+        assertFalse(service.toolAllowed(businessId, "create_order"));
+    }
+
+    @Test
+    void replacingCommercialCapabilitiesPreservesLegacySelection() {
+        UUID businessId = UUID.randomUUID();
+        AiAgentRepository agents = mock(AiAgentRepository.class);
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        AuditService audit = mock(AuditService.class);
+
+        AiAgent configured = new AiAgent();
+        configured.setBusinessId(businessId);
+        configured.setName("Luna");
+        configured.setLanguage("es");
+        configured.setGreeting("Hola");
+        configured.setActive(true);
+        configured.setCapabilities(Set.of(
+                AiCapability.LIST_SERVICES,
+                AiCapability.CREATE_BOOKING,
+                AiCapability.CREATE_LEAD));
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(agents.findByBusinessId(businessId)).thenReturn(Optional.of(configured));
+        when(agents.saveAndFlush(any(AiAgent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AiAgentService service = new AiAgentService(agents, businesses, tenant, audit);
+        AiAgent saved = service.replaceCommercialCapabilities(Set.of(
+                AiCapability.LIST_CATALOG,
+                AiCapability.CREATE_ORDER));
+
+        assertTrue(saved.getCapabilities().contains(AiCapability.LIST_SERVICES));
+        assertTrue(saved.getCapabilities().contains(AiCapability.CREATE_BOOKING));
+        assertTrue(saved.getCapabilities().contains(AiCapability.LIST_CATALOG));
+        assertTrue(saved.getCapabilities().contains(AiCapability.CREATE_ORDER));
+        assertFalse(saved.getCapabilities().contains(AiCapability.CREATE_LEAD));
+        verify(audit).success(eq(businessId), eq("AI_AGENT_COMMERCIAL_CAPABILITY_UPDATE"), eq("AI_AGENT"), any());
     }
 }

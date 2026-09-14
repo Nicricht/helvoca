@@ -10,7 +10,7 @@ El mismo agente puede atender una peluquería, restaurante, taller, clínica, ti
 
 ### Capacidades explícitas por tenant
 
-`BusinessOperationCapability` incorpora:
+`BusinessOperationCapability` funciona como una capa de configuración/preset de negocio:
 
 - `CATALOG`: catálogo universal de productos y servicios.
 - `ORDER`: cotizar, crear, consultar y cancelar pedidos.
@@ -18,7 +18,11 @@ El mismo agente puede atender una peluquería, restaurante, taller, clínica, ti
 - `QUOTE`: cotizaciones estructuradas.
 - `LEAD`: captura estructurada de potenciales clientes.
 
-Las capacidades nuevas se almacenan en `business_operation_capability`. No se habilitan por defecto para tenants existentes.
+La autorización efectiva de herramientas tiene una sola fuente de verdad: `AiAgent` + `AiCapability`, persistida en `ai_agent_capability`. Los presets anteriores se traducen a capacidades concretas como `LIST_CATALOG`, `QUOTE_ORDER`, `CREATE_ORDER`, `GET_ORDER_STATUS`, `CANCEL_ORDER`, `LIST_DELIVERY_ZONES`, `VALIDATE_DELIVERY_ADDRESS`, `CREATE_QUOTE` y `CREATE_LEAD`.
+
+Las capacidades comerciales son opt-in. Los defaults legacy excluyen todas las capacidades comerciales, por lo que agregar una nueva constante al enum no puede habilitar una transacción automáticamente para tenants existentes.
+
+V22 migra grants existentes desde `business_operation_capability` hacia `ai_agent_capability`. La tabla antigua queda únicamente como artefacto de compatibilidad/migración y no participa en la autorización runtime.
 
 Dependencias normalizadas:
 
@@ -102,7 +106,7 @@ Cuando la capacidad correspondiente está habilitada, voz y WhatsApp pueden reci
 - `create_quote`
 - `create_lead`
 
-Los proveedores reciben únicamente las herramientas autorizadas para el tenant actual.
+Los proveedores reciben únicamente las herramientas autorizadas por el `AiAgent` del tenant actual. Voz y WhatsApp comparten las mismas definiciones y el mismo servicio de operaciones comerciales.
 
 ### Regla de pedido
 
