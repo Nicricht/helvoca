@@ -1,10 +1,10 @@
 package cl.helvoca.billing;
 
 public enum PlanCode {
-    BASIC("EMPRENDE", "Emprende", 1, 100, 24_990, 249, false, false),
-    PRO("NEGOCIO", "Negocio", 3, 300, 49_990, 199, false, true),
-    BUSINESS("PRO", "Pro", 10, 600, 99_990, 169, false, false),
-    ENTERPRISE("ENTERPRISE", "Enterprise", 10, 600, 199_990, null, true, false);
+    BASIC("EMPRENDE", "Emprende", 1, 100, 24_990, 149, false, false),
+    PRO("NEGOCIO", "Negocio", 3, 250, 39_990, 129, false, true),
+    BUSINESS("PRO", "Pro", 10, 500, 69_990, 109, false, false),
+    ENTERPRISE("ENTERPRISE", "Enterprise", 10, 1_000, 119_990, null, true, false);
 
     private final String publicCode;
     private final String displayName;
