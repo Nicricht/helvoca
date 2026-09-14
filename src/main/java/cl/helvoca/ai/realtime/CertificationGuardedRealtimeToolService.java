@@ -56,6 +56,12 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public String buildInstructions(RealtimeCallContext context) {
+        return RecepVozConversationPolicyService.appendTo(super.buildInstructions(context));
+    }
+
+    @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public String execute(RealtimeCallContext context, String toolName, String rawArguments) {
         CallSession call = calls.findByIdAndBusinessId(context.callId(), context.businessId()).orElse(null);
