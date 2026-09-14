@@ -2,13 +2,16 @@ package cl.helvoca.call;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class CallSummaryService {
@@ -18,6 +21,7 @@ public class CallSummaryService {
     private final CallTranscriptRepository transcripts;
     private final CallSummaryRepository summaries;
     private final CallActionRepository actions;
+    private final Set<UUID> summariesInFlight = ConcurrentHashMap.newKeySet();
 
     public CallSummaryService(CallTranscriptRepository transcripts,
                               CallSummaryRepository summaries,
@@ -29,6 +33,7 @@ public class CallSummaryService {
 
     @Async
     public void generate(UUID callId) {
+        if (callId == null || !summariesInFlight.add(callId)) return;
         try {
             Thread.sleep(500);
             if (summaries.findByCallId(callId).isPresent()) return;
@@ -42,6 +47,8 @@ public class CallSummaryService {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
             log.warn("Could not generate summary for call {}: {}", callId, e.getMessage());
+        } finally {
+            summariesInFlight.remove(callId);
         }
     }
 
@@ -50,8 +57,16 @@ public class CallSummaryService {
         CallSummary summary = new CallSummary();
         summary.setCallId(callId);
         summary.setSummary(text);
-        summaries.save(summary);
-        log.info("Call summary persisted for call {} using local factual summarizer", callId);
+        try {
+            summaries.saveAndFlush(summary);
+            log.info("Call summary persisted for call {} using local factual summarizer", callId);
+        } catch (DataIntegrityViolationException e) {
+            if (summaries.findByCallId(callId).isPresent()) {
+                log.debug("Call summary already persisted concurrently for call {}", callId);
+                return;
+            }
+            throw e;
+        }
     }
 
     static String buildLocalSummary(List<CallTranscript> items, List<CallAction> actions) {
