@@ -32,6 +32,7 @@ public class UniversalCatalogService {
     public ItemView create(ItemInput input) {
         UUID businessId = tenantProvider.requireBusinessId();
         validate(input);
+        requireDirectlyMutableKind(input.kind());
         if (repository.existsByBusinessIdAndKindAndNameIgnoreCase(businessId, input.kind(), input.name().trim())) {
             throw new ConflictException("A catalog item with that name and kind already exists");
         }
@@ -46,6 +47,8 @@ public class UniversalCatalogService {
         UUID businessId = tenantProvider.requireBusinessId();
         validate(input);
         CatalogItem item = require(id, businessId);
+        requireDirectlyMutable(item);
+        requireDirectlyMutableKind(input.kind());
         boolean identityChanged = item.getKind() != input.kind()
                 || !item.getName().equalsIgnoreCase(input.name().trim());
         if (identityChanged && repository.existsByBusinessIdAndKindAndNameIgnoreCase(
@@ -60,6 +63,7 @@ public class UniversalCatalogService {
     public void deactivate(UUID id) {
         UUID businessId = tenantProvider.requireBusinessId();
         CatalogItem item = require(id, businessId);
+        requireDirectlyMutable(item);
         item.setActive(false);
         repository.save(item);
     }
@@ -67,6 +71,18 @@ public class UniversalCatalogService {
     private CatalogItem require(UUID id, UUID businessId) {
         return repository.findByIdAndBusinessId(id, businessId)
                 .orElseThrow(() -> new NotFoundException("Catalog item not found"));
+    }
+
+    private static void requireDirectlyMutable(CatalogItem item) {
+        if (item.getLegacyServiceId() != null || item.getKind() == CatalogItem.Kind.SERVICE) {
+            throw new ConflictException("Bookable services must be managed through /api/v1/services so booking and catalog stay synchronized");
+        }
+    }
+
+    private static void requireDirectlyMutableKind(CatalogItem.Kind kind) {
+        if (kind != CatalogItem.Kind.PRODUCT) {
+            throw new ConflictException("Create and edit bookable services through /api/v1/services; the universal catalog manages products directly");
+        }
     }
 
     private static void validate(ItemInput input) {
