@@ -53,6 +53,7 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/index.html", "/app.js", "/phone-provisioning.js", "/commercial-status.js", "/voice-selector.js", "/styles.css",
+                                "/sales.html", "/sales.css",
                                 "/pricing.html", "/pricing.js", "/pricing.css",
                                 "/operations.html", "/operations.js", "/operations.css",
                                 "/simulator.html", "/simulator.js", "/simulator.css",
