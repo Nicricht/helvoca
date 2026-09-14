@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class CallSummaryService {
@@ -18,6 +20,7 @@ public class CallSummaryService {
     private final CallTranscriptRepository transcripts;
     private final CallSummaryRepository summaries;
     private final CallActionRepository actions;
+    private final Set<UUID> summariesInFlight = ConcurrentHashMap.newKeySet();
 
     public CallSummaryService(CallTranscriptRepository transcripts,
                               CallSummaryRepository summaries,
@@ -29,6 +32,7 @@ public class CallSummaryService {
 
     @Async
     public void generate(UUID callId) {
+        if (callId == null || !summariesInFlight.add(callId)) return;
         try {
             Thread.sleep(500);
             if (summaries.findByCallId(callId).isPresent()) return;
@@ -42,16 +46,18 @@ public class CallSummaryService {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
             log.warn("Could not generate summary for call {}: {}", callId, e.getMessage());
+        } finally {
+            summariesInFlight.remove(callId);
         }
     }
 
     private void save(UUID callId, String text) {
-        if (summaries.findByCallId(callId).isPresent()) return;
-        CallSummary summary = new CallSummary();
-        summary.setCallId(callId);
-        summary.setSummary(text);
-        summaries.save(summary);
-        log.info("Call summary persisted for call {} using local factual summarizer", callId);
+        int inserted = summaries.insertIfAbsent(UUID.randomUUID(), callId, text);
+        if (inserted == 1) {
+            log.info("Call summary persisted for call {} using local factual summarizer", callId);
+        } else {
+            log.debug("Call summary already persisted concurrently for call {}", callId);
+        }
     }
 
     static String buildLocalSummary(List<CallTranscript> items, List<CallAction> actions) {

@@ -3,8 +3,12 @@ package cl.helvoca.call;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class CallSummaryServiceTest {
 
@@ -56,6 +60,26 @@ class CallSummaryServiceTest {
 
         assertTrue(summary.contains("Motivo inicial: Necesito una reserva para mañana"));
         assertFalse(summary.contains("SIMULATED_CERTIFICATION"));
+    }
+
+    @Test
+    void duplicateSummaryRaceIsHandledByAtomicInsert() {
+        UUID callId = UUID.randomUUID();
+        CallTranscriptRepository transcripts = mock(CallTranscriptRepository.class);
+        CallSummaryRepository summaries = mock(CallSummaryRepository.class);
+        CallActionRepository actions = mock(CallActionRepository.class);
+
+        when(summaries.findByCallId(callId)).thenReturn(Optional.empty());
+        when(transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId))
+                .thenReturn(List.of(transcript("USER", "Quiero reservar una hora")));
+        when(actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(List.of());
+        when(summaries.insertIfAbsent(any(UUID.class), eq(callId), anyString())).thenReturn(0);
+
+        CallSummaryService service = new CallSummaryService(transcripts, summaries, actions);
+
+        assertDoesNotThrow(() -> service.generate(callId));
+        verify(summaries, times(1)).insertIfAbsent(any(UUID.class), eq(callId), anyString());
+        verify(summaries, never()).saveAndFlush(any(CallSummary.class));
     }
 
     private static CallTranscript transcript(String speaker, String content) {
