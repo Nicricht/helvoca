@@ -10,3 +10,5 @@ Expected sequence:
 3. Push CI for the merge commit succeeds.
 4. Railway creates a deployment for the same commit without changing service variables or manually redeploying.
 5. Production startup remains fail-closed for Twilio certification because no `TWILIO_CERTIFICATION_RUN_ID` is provided.
+
+Second pass: Railway `watchPatterns` is explicitly set to `**` so every repository path is eligible to trigger autodeploy.
