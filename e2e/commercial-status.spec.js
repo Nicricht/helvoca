@@ -45,10 +45,10 @@ async function mockBaseDashboard(page) {
     message: 'No disponible en E2E'
   })));
   await page.route('**/api/v1/public/pricing', route => route.fulfill(json([
-    { code: 'EMPRENDE', name: 'Emprende', monthlyPriceClp: 24990, includedMinutes: 100, maxConcurrentCalls: 1, overagePerMinuteClp: 249, customPricing: false, recommended: false },
-    { code: 'NEGOCIO', name: 'Negocio', monthlyPriceClp: 49990, includedMinutes: 300, maxConcurrentCalls: 3, overagePerMinuteClp: 199, customPricing: false, recommended: true },
-    { code: 'PRO', name: 'Pro', monthlyPriceClp: 99990, includedMinutes: 600, maxConcurrentCalls: 10, overagePerMinuteClp: 169, customPricing: false, recommended: false },
-    { code: 'ENTERPRISE', name: 'Enterprise', monthlyPriceClp: 199990, includedMinutes: 600, maxConcurrentCalls: 10, overagePerMinuteClp: null, customPricing: true, recommended: false }
+    { code: 'EMPRENDE', name: 'Emprende', monthlyPriceClp: 24990, includedMinutes: 100, maxConcurrentCalls: 1, overagePerMinuteClp: 149, customPricing: false, recommended: false },
+    { code: 'NEGOCIO', name: 'Negocio', monthlyPriceClp: 39990, includedMinutes: 250, maxConcurrentCalls: 3, overagePerMinuteClp: 129, customPricing: false, recommended: true },
+    { code: 'PRO', name: 'Pro', monthlyPriceClp: 69990, includedMinutes: 500, maxConcurrentCalls: 10, overagePerMinuteClp: 109, customPricing: false, recommended: false },
+    { code: 'ENTERPRISE', name: 'Enterprise', monthlyPriceClp: 119990, includedMinutes: 1000, maxConcurrentCalls: 10, overagePerMinuteClp: null, customPricing: true, recommended: false }
   ])));
 }
 
@@ -92,7 +92,7 @@ test('commercial dashboard shows confirmed and pending state without starting ch
       subscriptionStatus: 'TRIALING',
       pendingPlanCode: 'NEGOCIO',
       pendingPlanName: 'Negocio',
-      pendingMonthlyPriceClp: 49990,
+      pendingMonthlyPriceClp: 39990,
       checkoutUrl: 'https://checkout.example.test/pending',
       awaitingProviderVerification: true
     }));
@@ -153,7 +153,7 @@ test('plan checkout starts only after explicit confirmation and does not activat
       checkoutUrl: 'https://checkout.example.test/pre-e2e-1',
       planCode: 'NEGOCIO',
       planName: 'Negocio',
-      monthlyPriceClp: 49990,
+      monthlyPriceClp: 39990,
       reused: false
     }));
   });
