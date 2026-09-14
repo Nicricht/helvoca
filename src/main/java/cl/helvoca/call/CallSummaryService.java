@@ -2,7 +2,6 @@ package cl.helvoca.call;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -53,19 +52,11 @@ public class CallSummaryService {
     }
 
     private void save(UUID callId, String text) {
-        if (summaries.findByCallId(callId).isPresent()) return;
-        CallSummary summary = new CallSummary();
-        summary.setCallId(callId);
-        summary.setSummary(text);
-        try {
-            summaries.saveAndFlush(summary);
+        int inserted = summaries.insertIfAbsent(UUID.randomUUID(), callId, text);
+        if (inserted == 1) {
             log.info("Call summary persisted for call {} using local factual summarizer", callId);
-        } catch (DataIntegrityViolationException e) {
-            if (summaries.findByCallId(callId).isPresent()) {
-                log.debug("Call summary already persisted concurrently for call {}", callId);
-                return;
-            }
-            throw e;
+        } else {
+            log.debug("Call summary already persisted concurrently for call {}", callId);
         }
     }
 
