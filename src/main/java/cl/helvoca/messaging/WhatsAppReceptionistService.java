@@ -4,19 +4,23 @@ import cl.helvoca.agent.AiAgent;
 import cl.helvoca.agent.AiAgentService;
 import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.customer.CustomerRepository;
+import cl.helvoca.operations.BusinessOperationCapabilityService;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class WhatsAppReceptionistService {
@@ -32,6 +36,9 @@ public class WhatsAppReceptionistService {
     private final MessagingAiClient ai;
     private final WhatsAppProperties properties;
     private final AiAgentService aiAgents;
+
+    @Autowired(required = false)
+    private BusinessOperationCapabilityService operationCapabilities;
 
     public WhatsAppReceptionistService(PhoneNumberRepository phones,
                                        CustomerRepository customers,
@@ -100,7 +107,7 @@ public class WhatsAppReceptionistService {
         String reply;
         try {
             MessagingConversation current = conversation;
-            Set<String> allowedTools = aiAgents.allowedToolNames(phone.getBusinessId());
+            Set<String> allowedTools = allowedTools(phone.getBusinessId());
             reply = ai.respond(
                     omnichannelInstructions(tools.buildInstructions(current), agent),
                     history(current.getId()),
@@ -126,6 +133,14 @@ public class WhatsAppReceptionistService {
         conversation.setLastMessageAt(Instant.now());
         conversations.save(conversation);
         return reply;
+    }
+
+    private Set<String> allowedTools(UUID businessId) {
+        HashSet<String> allowed = new HashSet<>(aiAgents.allowedToolNames(businessId));
+        if (operationCapabilities != null) {
+            allowed.addAll(operationCapabilities.allowedToolNames(businessId));
+        }
+        return Set.copyOf(allowed);
     }
 
     private static String omnichannelInstructions(String base, AiAgent agent) {
@@ -178,7 +193,7 @@ public class WhatsAppReceptionistService {
         return conversation;
     }
 
-    private List<MessagingAiClient.Turn> history(java.util.UUID conversationId) {
+    private List<MessagingAiClient.Turn> history(UUID conversationId) {
         List<MessagingMessage> all = messages.findAllByConversationIdOrderByCreatedAtAsc(conversationId);
         int start = Math.max(0, all.size() - 18);
         List<MessagingAiClient.Turn> out = new ArrayList<>();
