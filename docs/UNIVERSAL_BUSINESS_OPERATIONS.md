@@ -14,7 +14,7 @@ El mismo agente puede atender una peluquería, restaurante, taller, clínica, ti
 
 - `CATALOG`: catálogo universal de productos y servicios.
 - `ORDER`: cotizar, crear, consultar y cancelar pedidos.
-- `DELIVERY`: zonas, costos y mínimos de despacho.
+- `DELIVERY`: cobertura, validación de dirección, costos y mínimos de despacho.
 - `QUOTE`: cotizaciones estructuradas.
 - `LEAD`: captura estructurada de potenciales clientes.
 
@@ -41,7 +41,7 @@ Ejemplo:
 
 ## Catálogo universal
 
-`catalog_item` reemplaza la suposición de que cada ítem es un servicio reservable.
+`catalog_item` elimina la suposición de que cada ítem comercial es necesariamente una reserva.
 
 Tipos:
 
@@ -52,6 +52,8 @@ Cada ítem puede contener nombre, descripción, precio, moneda, duración opcion
 
 Los registros existentes de `service` se copian automáticamente al catálogo y un trigger mantiene sincronizados los cambios futuros. Las reservas existentes continúan usando `service`, por lo que V20 no rompe el contrato actual de booking.
 
+Los `SERVICE` vinculados a booking se administran únicamente mediante `/api/v1/services`; el CRUD del catálogo universal permite administrar directamente `PRODUCT`. Esto evita que un servicio reservable tenga un nombre, precio o estado distinto entre booking y catálogo.
+
 API:
 
 - `GET /api/v1/catalog`
@@ -61,7 +63,21 @@ API:
 
 ## Delivery
 
-`delivery_zone` almacena cobertura comercial simple por zona, costo y compra mínima.
+`delivery_zone` almacena una zona comercial con:
+
+- nombre;
+- `coverageTerms` configurables, separados por coma, punto y coma, barra vertical o salto de línea;
+- costo de despacho;
+- compra mínima opcional;
+- estado activo/inactivo.
+
+Ejemplo de cobertura:
+
+```text
+Huechuraba; Pedro Fontova; Ciudad Empresarial
+```
+
+La dirección entregada por el cliente se normaliza en backend y se compara con las reglas activas del tenant. Se eliminan diferencias de mayúsculas y acentos para el matching. Si ninguna zona coincide, el despacho se rechaza. Si dos zonas empatan con la misma especificidad, el backend falla cerrado y exige revisar la cobertura antes de confirmar.
 
 API:
 
@@ -70,7 +86,7 @@ API:
 - `PUT /api/v1/delivery-zones/{id}`
 - `DELETE /api/v1/delivery-zones/{id}` (desactiva)
 
-Esta primera versión valida zonas configuradas. Geocodificación y polígonos quedan como adapters futuros y no forman parte de la lógica del LLM.
+Esta versión usa reglas textuales de cobertura. Geocodificación y polígonos podrán implementarse posteriormente como adapters sin mover la decisión de cobertura al LLM.
 
 ## Herramientas comerciales
 
@@ -78,6 +94,7 @@ Cuando la capacidad correspondiente está habilitada, voz y WhatsApp pueden reci
 
 - `list_catalog`
 - `list_delivery_zones`
+- `validate_delivery_address`
 - `quote_order`
 - `create_order`
 - `get_order_status`
@@ -96,9 +113,12 @@ Los proveedores reciben únicamente las herramientas autorizadas para el tenant 
 Para `DELIVERY`, el backend exige:
 
 - capability `DELIVERY` activa;
-- `deliveryZoneId` perteneciente al tenant y activo;
 - dirección no vacía;
-- compra mínima de la zona satisfecha.
+- dirección cubierta por exactamente una zona válida;
+- compra mínima de la zona satisfecha;
+- costo obtenido exclusivamente desde configuración backend.
+
+`deliveryZoneId` puede enviarse como referencia después de `validate_delivery_address`, pero el backend vuelve a resolver la dirección y rechaza cualquier ID que no corresponda con la cobertura calculada.
 
 El pedido confirmado persiste snapshots de nombre, cantidad, precio unitario y total de línea.
 
@@ -107,6 +127,17 @@ El pedido confirmado persiste snapshots de nombre, cantidad, precio unitario y t
 ### `business_order`
 
 Pedido real con fulfillment `PICKUP` o `DELIVERY`, estado, subtotal, despacho, total, moneda y origen (`VOICE`, `WHATSAPP`, `MANUAL`, `API`).
+
+Estados:
+
+`CONFIRMED -> PREPARING -> READY`
+
+Desde `READY`:
+
+- `PICKUP -> COMPLETED`
+- `DELIVERY -> DISPATCHED -> COMPLETED`
+
+`CONFIRMED` y `PREPARING` admiten cancelación. `COMPLETED` y `CANCELLED` son terminales. El backend rechaza saltos arbitrarios de estado.
 
 ### `business_order_line`
 
@@ -127,24 +158,37 @@ Lead estructurado con nombre, teléfono verificado del canal, correo opcional, i
 - `GET /api/v1/commercial/quotes`
 - `GET /api/v1/commercial/leads`
 
-Esto permite que el negocio vea lo que el agente creó y continúe el flujo operacional.
+Las consultas operativas requieren `BUSINESS_ADMIN` u `OPERATOR`. Las mutaciones de capacidades, catálogo, zonas y estado administrativo requieren `BUSINESS_ADMIN`.
 
 ## Ejemplo restaurante
 
 1. Cliente pide dos hamburguesas y despacho.
 2. El agente ejecuta `list_catalog`.
 3. Recoge modificadores del cliente.
-4. Ejecuta `list_delivery_zones`.
-5. Ejecuta `quote_order` con ítems, zona y dirección.
-6. Comunica el total real devuelto por backend.
-7. Cliente confirma.
-8. Ejecuta `create_order` con el mismo total como `expectedTotal`.
-9. Solo si `success=true` comunica que el pedido quedó confirmado.
+4. Pide la dirección de entrega.
+5. Ejecuta `validate_delivery_address`.
+6. Ejecuta `quote_order`; backend vuelve a comprobar dirección, precios, mínimo y despacho.
+7. Comunica el total real devuelto por backend.
+8. Cliente confirma.
+9. Ejecuta `create_order` con el mismo total como `expectedTotal`.
+10. El backend vuelve a recalcular todo.
+11. Solo si `success=true` comunica que el pedido quedó confirmado.
 
 No se crea una reserva y no se usa `create_request` como sustituto de un pedido.
+
+## Ejemplos por tipo de negocio
+
+- Restaurante: `CATALOG + ORDER + DELIVERY`.
+- Tienda con retiro: `CATALOG + ORDER`.
+- Peluquería: booking existente, sin necesidad de `ORDER`.
+- Taller: booking para hora de revisión y `QUOTE` para trabajos que deben presupuestarse.
+- Inmobiliaria: `LEAD` para captar interés y booking/request para coordinar visita según configuración.
+- Clínica o veterinaria: booking/request; las capacidades comerciales se activan solo si el negocio realmente las necesita.
+
+Los ejemplos son presets conceptuales, no ramas de código por industria.
 
 ## Principio de arquitectura
 
 Los verticales deben ser presets de configuración, no ramas de código.
 
-El backend define hechos, reglas y transacciones. El LLM interpreta lenguaje y reúne datos, pero no calcula precios, no inventa disponibilidad y no confirma operaciones antes de que el backend devuelva éxito.
+El backend define hechos, reglas y transacciones. El LLM interpreta lenguaje y reúne datos, pero no calcula precios, no decide cobertura, no inventa disponibilidad y no confirma operaciones antes de que el backend devuelva éxito.
