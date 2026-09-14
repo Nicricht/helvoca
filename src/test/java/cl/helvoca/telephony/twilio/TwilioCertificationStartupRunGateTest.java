@@ -1,6 +1,7 @@
 package cl.helvoca.telephony.twilio;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -25,28 +26,32 @@ class TwilioCertificationStartupRunGateTest {
     }
 
     @Test
-    void disabledFlagFailsClosedWithoutTouchingDatabase() {
+    void disabledFlagFailsClosedWithoutResolvingDatabase() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        ObjectProvider<JdbcTemplate> provider = providerFor(jdbc);
         TwilioCertificationStartupRunGate gate = new TwilioCertificationStartupRunGate(
                 false,
                 "deploy-20260914-001",
                 "outbound-test",
-                jdbc);
+                provider);
 
         assertFalse(gate.authorizeOnce());
+        verify(provider, never()).getObject();
         verify(jdbc, never()).update(anyString(), eq("deploy-20260914-001"), eq("outbound-test"));
     }
 
     @Test
-    void missingRunIdFailsClosedWithoutTouchingDatabase() {
+    void missingRunIdFailsClosedWithoutResolvingDatabase() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        ObjectProvider<JdbcTemplate> provider = providerFor(jdbc);
         TwilioCertificationStartupRunGate gate = new TwilioCertificationStartupRunGate(
                 true,
                 "",
                 "outbound-test",
-                jdbc);
+                provider);
 
         assertFalse(gate.authorizeOnce());
+        verify(provider, never()).getObject();
         verify(jdbc, never()).update(anyString(), eq(""), eq("outbound-test"));
     }
 
@@ -54,13 +59,15 @@ class TwilioCertificationStartupRunGateTest {
     void freshRunIdIsAuthorizedExactlyOnceByDatabaseClaim() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         when(jdbc.update(anyString(), eq("deploy-20260914-001"), eq("outbound-test"))).thenReturn(1);
+        ObjectProvider<JdbcTemplate> provider = providerFor(jdbc);
         TwilioCertificationStartupRunGate gate = new TwilioCertificationStartupRunGate(
                 true,
                 "deploy-20260914-001",
                 "outbound-test",
-                jdbc);
+                provider);
 
         assertTrue(gate.authorizeOnce());
+        verify(provider).getObject();
         verify(jdbc).update(anyString(), eq("deploy-20260914-001"), eq("outbound-test"));
     }
 
@@ -72,7 +79,7 @@ class TwilioCertificationStartupRunGateTest {
                 true,
                 "deploy-20260914-001",
                 "outbound-test",
-                jdbc);
+                providerFor(jdbc));
 
         assertFalse(gate.authorizeOnce());
     }
@@ -86,8 +93,15 @@ class TwilioCertificationStartupRunGateTest {
                 true,
                 "deploy-20260914-001",
                 "outbound-test",
-                jdbc);
+                providerFor(jdbc));
 
         assertFalse(gate.authorizeOnce());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<JdbcTemplate> providerFor(JdbcTemplate jdbc) {
+        ObjectProvider<JdbcTemplate> provider = mock(ObjectProvider.class);
+        when(provider.getObject()).thenReturn(jdbc);
+        return provider;
     }
 }
