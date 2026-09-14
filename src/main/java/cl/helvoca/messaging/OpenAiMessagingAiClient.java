@@ -87,7 +87,7 @@ public class OpenAiMessagingAiClient implements MessagingAiClient {
         for (int i = 0; i < definitions.length(); i++) {
             JSONObject definition = definitions.getJSONObject(i);
             String name = definition.getString("name");
-            if ("transfer_to_human".equals(name)) continue;
+            if ("transfer_to_human".equals(name) || "end_call".equals(name)) continue;
 
             FunctionTool.Parameters.Builder parameters = FunctionTool.Parameters.builder();
             Map<String, Object> schema = definition.getJSONObject("parameters").toMap();

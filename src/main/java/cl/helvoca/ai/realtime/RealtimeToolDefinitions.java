@@ -57,7 +57,14 @@ public final class RealtimeToolDefinitions {
                         object().put("properties", new JSONObject()
                                         .put("question", string("Pregunta exacta o fielmente resumida del cliente")))
                                 .put("required", new JSONArray().put("question"))))
-                .put(function("transfer_to_human", "Solicita transferir la llamada a una persona del negocio cuando el cliente lo pida o la atención automática no pueda resolver su necesidad. El destino se obtiene de la configuración segura del negocio, nunca de argumentos del modelo.", object()));
+                .put(function("transfer_to_human", "Solicita transferir la llamada a una persona del negocio cuando el cliente lo pida o la atención automática no pueda resolver su necesidad. El destino se obtiene de la configuración segura del negocio, nunca de argumentos del modelo.", object()))
+                .put(endCall());
+    }
+
+    public static JSONObject endCall() {
+        return function("end_call",
+                "Termina físicamente la llamada actual. Úsala solo cuando el cliente se despida claramente, diga que no necesita nada más, pida cortar/terminar la llamada o confirme que la atención terminó. Primero despídete de forma breve y luego invoca esta herramienta. No la uses por un silencio breve.",
+                object());
     }
 
     private static JSONObject function(String name, String description, JSONObject parameters) {
