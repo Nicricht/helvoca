@@ -60,16 +60,49 @@ public class AiAgentService {
                 "Hola, gracias por llamar a " + business.getName() + ". ¿En qué puedo ayudarte?"));
         agent.setInstructions(blankToNull(instructions));
         agent.setActive(active);
-        agent.setCapabilities(capabilities == null ? EnumSet.allOf(AiCapability.class) : capabilities);
+
+        // Null means "leave the capability selection as-is" for an existing
+        // agent. A newly created AiAgent already starts with legacyDefaults(),
+        // which deliberately excludes transactional commercial capabilities.
+        if (capabilities != null) agent.setCapabilities(capabilities);
 
         AiAgent saved = agents.saveAndFlush(agent);
         auditService.success(businessId, "AI_AGENT_UPDATE", "AI_AGENT", saved.getId());
         return saved;
     }
 
+    /**
+     * Replaces only the opt-in commercial subset while preserving booking,
+     * knowledge, request and other legacy receptionist capabilities.
+     */
+    @Transactional
+    public AiAgent replaceCommercialCapabilities(Set<AiCapability> commercialCapabilities) {
+        UUID businessId = tenantProvider.requireBusinessId();
+        AiAgent agent = agents.findByBusinessId(businessId).orElseGet(() -> defaultAgent(businessId));
+
+        EnumSet<AiCapability> next = agent.getCapabilities() == null || agent.getCapabilities().isEmpty()
+                ? EnumSet.noneOf(AiCapability.class)
+                : EnumSet.copyOf(agent.getCapabilities());
+        next.removeIf(AiCapability::isCommercialOperation);
+
+        if (commercialCapabilities != null) {
+            for (AiCapability capability : commercialCapabilities) {
+                if (capability == null || !capability.isCommercialOperation()) {
+                    throw new IllegalArgumentException("Only commercial operation capabilities can be replaced here");
+                }
+                next.add(capability);
+            }
+        }
+
+        agent.setCapabilities(next);
+        AiAgent saved = agents.saveAndFlush(agent);
+        auditService.success(businessId, "AI_AGENT_COMMERCIAL_CAPABILITY_UPDATE", "AI_AGENT", saved.getId());
+        return saved;
+    }
+
     @Transactional(readOnly = true)
     public AiAgent runtime(UUID businessId) {
-        return agents.findByBusinessId(businessId).orElseGet(() -> defaultRuntime(businessId));
+        return agents.findByBusinessId(businessId).orElseGet(() -> defaultAgent(businessId));
     }
 
     @Transactional(readOnly = true)
@@ -94,7 +127,7 @@ public class AiAgentService {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    private AiAgent defaultRuntime(UUID businessId) {
+    private AiAgent defaultAgent(UUID businessId) {
         Business business = requireBusiness(businessId);
         AiAgent agent = new AiAgent();
         agent.setBusinessId(businessId);
@@ -104,7 +137,7 @@ public class AiAgentService {
         agent.setGreeting("Hola, gracias por llamar a " + business.getName() + ". ¿En qué puedo ayudarte?");
         agent.setInstructions(null);
         agent.setActive(true);
-        agent.setCapabilities(EnumSet.allOf(AiCapability.class));
+        agent.setCapabilities(AiCapability.legacyDefaults());
         return agent;
     }
 
