@@ -3,6 +3,7 @@ package cl.helvoca.telephony.twilio;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.ApplicationRunner;
@@ -26,17 +27,17 @@ public class TwilioCertificationStartupRunGate implements BeanPostProcessor {
     private final boolean enabled;
     private final String runId;
     private final String direction;
-    private final JdbcTemplate jdbcTemplate;
+    private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
 
     public TwilioCertificationStartupRunGate(
             @Value("${TWILIO_CERTIFICATION_CALL_ON_STARTUP:false}") boolean enabled,
             @Value("${TWILIO_CERTIFICATION_RUN_ID:}") String runId,
             @Value("${TWILIO_CERTIFICATION_DIRECTION:outbound-test}") String direction,
-            JdbcTemplate jdbcTemplate) {
+            ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
         this.enabled = enabled;
         this.runId = runId;
         this.direction = TwilioCertificationStartupRunner.normalizeDirection(direction);
-        this.jdbcTemplate = jdbcTemplate;
+        this.jdbcTemplateProvider = jdbcTemplateProvider;
     }
 
     @Override
@@ -63,6 +64,7 @@ public class TwilioCertificationStartupRunGate implements BeanPostProcessor {
         }
 
         try {
+            JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getObject();
             int inserted = jdbcTemplate.update("""
                     INSERT INTO twilio_certification_run (run_id, direction, claimed_at)
                     VALUES (?, ?, CURRENT_TIMESTAMP)
