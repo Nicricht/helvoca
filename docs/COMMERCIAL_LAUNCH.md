@@ -40,27 +40,35 @@ Helvoca se vende como **recepción digital con IA para teléfono y WhatsApp**, n
 - SLA empresarial formal.
 - Cero errores de IA.
 - Superioridad frente a competidores sin evidencia.
-- Cumplimiento legal específico para industrias reguladas sin revisión correspondiente.
 
 ## Oferta para primeros clientes
 
 Vender como **piloto comercial pagado con configuración asistida**.
 
-Los precios públicos vigentes se obtienen desde `/api/v1/public/pricing`. No ofrecer precios distintos sin modificar primero el catálogo oficial o dejar por escrito que se trata de un acuerdo comercial especial.
+Catálogo público de lanzamiento:
 
-Para WhatsApp durante el piloto, acordar límites de uso y alcance de forma explícita hasta que exista metering de mensajes y coste por conversación.
+| Plan | Precio mensual | Voz incluida | Excedente voz | Enfoque |
+| --- | ---: | ---: | ---: | --- |
+| Emprende | $24.990 CLP | 100 min | $149/min | Independientes y negocios pequeños |
+| Negocio | $39.990 CLP | 250 min | $129/min | Plan recomendado para la mayoría de pymes |
+| Pro | $69.990 CLP | 500 min | $109/min | Mayor volumen y concurrencia |
+| Enterprise | Desde $119.990 CLP | Según cotización | Según cotización | Volumen, sedes o integraciones especiales |
+
+Los valores vigentes que ve el producto se obtienen desde `/api/v1/public/pricing`. No ofrecer precios distintos sin modificar primero el catálogo oficial o dejar por escrito que se trata de un acuerdo comercial especial.
+
+La configuración asistida se incluye durante la etapa inicial para reducir fricción comercial. Para WhatsApp durante el piloto, acordar límites de uso y alcance de forma explícita hasta que exista metering de mensajes y coste por conversación.
 
 ## Perfil de cliente inicial recomendado
 
-Priorizar negocios que:
+Helvoca es horizontal y puede configurarse para cualquier negocio donde existan consultas, reservas, citas, solicitudes o atención repetitiva. Esto incluye, entre otros, odontología, centros médicos y clínicas cuando el alcance sea administrativo, además de estética, talleres, restaurantes, inmobiliarias, servicios profesionales, veterinarias, academias y comercios.
+
+Priorizar prospectos que:
 
 1. reciben llamadas o mensajes mientras el equipo está ocupado;
-2. tienen catálogo relativamente claro;
+2. tienen catálogo o información relativamente clara;
 3. trabajan con citas, reservas o solicitudes;
 4. repiten muchas respuestas durante el día;
 5. pueden medir el valor de una reserva o lead recuperado.
-
-Evitar inicialmente operaciones de alto riesgo donde una respuesta incorrecta pueda producir daño importante sin una capa adicional de cumplimiento y revisión.
 
 ## Demo comercial de 5 minutos
 
