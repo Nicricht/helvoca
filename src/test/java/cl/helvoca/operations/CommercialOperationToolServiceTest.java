@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,20 +40,19 @@ class CommercialOperationToolServiceTest {
     }
 
     @Test
-    void quoteOrderUsesTenantCatalogPricesAndConfiguredDeliveryFee() {
+    void quoteOrderUsesTenantCatalogPricesAndAddressMatchedDeliveryFee() {
         UUID businessId = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
         UUID zoneId = UUID.randomUUID();
         CatalogItem burger = item(businessId, itemId, "Hamburguesa", "5000");
-        DeliveryZone zone = zone(businessId, zoneId, "Huechuraba", "1500", "8000");
+        DeliveryZone zone = zone(businessId, zoneId, "Huechuraba", "Huechuraba; Pedro Fontova", "1500", "8000");
 
         when(catalog.findByIdAndBusinessId(itemId, businessId)).thenReturn(Optional.of(burger));
-        when(deliveryZones.findByIdAndBusinessId(zoneId, businessId)).thenReturn(Optional.of(zone));
+        when(deliveryZones.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId)).thenReturn(List.of(zone));
         when(capabilities.isEnabled(businessId, BusinessOperationCapability.DELIVERY)).thenReturn(true);
 
         JSONObject args = orderArgs(itemId, 2, "DELIVERY")
-                .put("deliveryZoneId", zoneId.toString())
-                .put("address", "Av. Siempre Viva 123");
+                .put("address", "Av. Pedro Fontova 1234, Huechuraba");
 
         JSONObject result = new JSONObject(service.execute(
                 businessId, null, UUID.randomUUID(), "+56911111111", BusinessOrder.Source.VOICE,
@@ -65,6 +65,49 @@ class CommercialOperationToolServiceTest {
         assertEquals(new BigDecimal("11500"), decimal(data, "total"));
         assertEquals("CLP", data.getString("currency"));
         assertEquals("DELIVERY", data.getString("fulfillmentType"));
+        assertEquals(zoneId.toString(), data.getString("deliveryZoneId"));
+    }
+
+    @Test
+    void deliveryAddressOutsideConfiguredCoverageFailsClosed() {
+        UUID businessId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        CatalogItem burger = item(businessId, itemId, "Hamburguesa", "5000");
+        DeliveryZone zone = zone(businessId, UUID.randomUUID(), "Huechuraba", "Huechuraba; Pedro Fontova", "1500", "0");
+
+        when(catalog.findByIdAndBusinessId(itemId, businessId)).thenReturn(Optional.of(burger));
+        when(deliveryZones.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId)).thenReturn(List.of(zone));
+        when(capabilities.isEnabled(businessId, BusinessOperationCapability.DELIVERY)).thenReturn(true);
+
+        JSONObject result = new JSONObject(service.execute(
+                businessId, null, null, "+56911111111", BusinessOrder.Source.WHATSAPP,
+                "quote_order", orderArgs(itemId, 1, "DELIVERY")
+                        .put("address", "Providencia 123, Providencia")
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("INVALID_ARGUMENT", result.getJSONObject("error").getString("code"));
+        verify(orders, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void validateDeliveryAddressReturnsBackendResolvedZone() {
+        UUID businessId = UUID.randomUUID();
+        UUID zoneId = UUID.randomUUID();
+        DeliveryZone zone = zone(businessId, zoneId, "Santiago Norte", "Huechuraba; Quilicura", "1200", "6000");
+        when(capabilities.isEnabled(businessId, BusinessOperationCapability.DELIVERY)).thenReturn(true);
+        when(deliveryZones.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId)).thenReturn(List.of(zone));
+
+        JSONObject result = new JSONObject(service.execute(
+                businessId, null, null, "+56911111111", BusinessOrder.Source.VOICE,
+                "validate_delivery_address",
+                new JSONObject().put("address", "Los Libertadores 6500, Quilicura").toString()));
+
+        assertTrue(result.getBoolean("success"));
+        JSONObject data = result.getJSONObject("data");
+        assertTrue(data.getBoolean("covered"));
+        assertEquals(zoneId.toString(), data.getString("deliveryZoneId"));
+        assertEquals(new BigDecimal("1200"), decimal(data, "fee"));
     }
 
     @Test
@@ -162,11 +205,13 @@ class CommercialOperationToolServiceTest {
         return item;
     }
 
-    private static DeliveryZone zone(UUID businessId, UUID id, String name, String fee, String minimum) {
+    private static DeliveryZone zone(UUID businessId, UUID id, String name,
+                                     String coverageTerms, String fee, String minimum) {
         DeliveryZone zone = new DeliveryZone();
         zone.setId(id);
         zone.setBusinessId(businessId);
         zone.setName(name);
+        zone.setCoverageTerms(coverageTerms);
         zone.setFee(new BigDecimal(fee));
         zone.setMinimumOrder(new BigDecimal(minimum));
         zone.setActive(true);
