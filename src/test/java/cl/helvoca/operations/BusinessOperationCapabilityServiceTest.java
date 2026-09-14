@@ -69,7 +69,8 @@ class BusinessOperationCapabilityServiceTest {
         assertTrue(tools.contains("quote_order"));
         assertTrue(tools.contains("create_order"));
         assertTrue(tools.contains("list_delivery_zones"));
-        assertEquals(5, tools.size());
+        assertTrue(tools.contains("validate_delivery_address"));
+        assertEquals(6, tools.size());
     }
 
     private static BusinessOperationCapabilityGrant grant(UUID businessId, BusinessOperationCapability capability) {
