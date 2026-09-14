@@ -69,6 +69,9 @@ public class DeliveryZoneService {
         if (input == null || input.name() == null || input.name().isBlank()) {
             throw new IllegalArgumentException("Delivery zone name is required");
         }
+        if (input.coverageTerms() == null || input.coverageTerms().isBlank()) {
+            throw new IllegalArgumentException("Delivery coverage terms are required");
+        }
         if (input.fee() == null || input.fee().signum() < 0) {
             throw new IllegalArgumentException("Delivery fee must be zero or greater");
         }
@@ -79,16 +82,19 @@ public class DeliveryZoneService {
 
     private static void apply(DeliveryZone zone, ZoneInput input) {
         zone.setName(input.name().trim());
+        zone.setCoverageTerms(input.coverageTerms().trim());
         zone.setFee(input.fee());
         zone.setMinimumOrder(input.minimumOrder());
         if (input.active() != null) zone.setActive(input.active());
     }
 
-    public record ZoneInput(String name, BigDecimal fee, BigDecimal minimumOrder, Boolean active) {}
+    public record ZoneInput(String name, String coverageTerms, BigDecimal fee, BigDecimal minimumOrder, Boolean active) {}
 
-    public record ZoneView(UUID id, String name, BigDecimal fee, BigDecimal minimumOrder, boolean active) {
+    public record ZoneView(UUID id, String name, String coverageTerms,
+                           BigDecimal fee, BigDecimal minimumOrder, boolean active) {
         static ZoneView from(DeliveryZone zone) {
-            return new ZoneView(zone.getId(), zone.getName(), zone.getFee(), zone.getMinimumOrder(), zone.isActive());
+            return new ZoneView(zone.getId(), zone.getName(), zone.getCoverageTerms(),
+                    zone.getFee(), zone.getMinimumOrder(), zone.isActive());
         }
     }
 }
