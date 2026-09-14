@@ -1,6 +1,7 @@
 package cl.helvoca.ai.gemini;
 
 import cl.helvoca.ai.realtime.RealtimeCallContext;
+import cl.helvoca.ai.realtime.RealtimeToolDefinitions;
 import cl.helvoca.ai.realtime.RealtimeToolService;
 import cl.helvoca.call.CallCertificationService;
 import cl.helvoca.call.CallSummaryService;
@@ -33,6 +34,7 @@ class GeminiLiveVoiceSessionTest {
         RealtimeCallContext context = context();
         RealtimeToolService tools = mock(RealtimeToolService.class);
         when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
 
         GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
                 context,
@@ -74,6 +76,39 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(hasFunction(declarations, "transfer_to_human"));
         assertFalse(declarations.toString().contains("\"additionalProperties\""),
                 "Gemini Live rejects additionalProperties in FunctionDeclaration parameters");
+    }
+
+    @Test
+    void setupPublishesOnlyTenantAllowedTools() {
+        GeminiLiveProperties properties = properties();
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.toolDefinitions(context)).thenReturn(
+                new JSONArray().put(RealtimeToolDefinitions.endCall()));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        JSONArray declarations = session.buildSetup()
+                .getJSONObject("setup")
+                .getJSONArray("tools")
+                .getJSONObject(0)
+                .getJSONArray("functionDeclarations");
+
+        assertEquals(1, declarations.length());
+        assertTrue(hasFunction(declarations, "end_call"));
+        assertFalse(hasFunction(declarations, "create_booking"));
+        verify(tools).toolDefinitions(context);
     }
 
     @Test
