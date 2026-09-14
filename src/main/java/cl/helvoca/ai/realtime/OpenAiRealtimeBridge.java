@@ -168,10 +168,15 @@ public final class OpenAiRealtimeBridge implements WebSocket.Listener, VoiceAiSe
                 .put("instructions", instructions)
                 .put("output_modalities", new JSONArray().put("audio"))
                 .put("audio", new JSONObject().put("input", input).put("output", output))
-                .put("tools", RealtimeToolDefinitions.all())
+                .put("tools", publishedTools())
                 .put("tool_choice", "auto");
 
         sendOpenAi(new JSONObject().put("type", "session.update").put("session", session));
+    }
+
+    private JSONArray publishedTools() {
+        JSONArray tenantTools = tools.toolDefinitions(context);
+        return tenantTools == null ? new JSONArray() : tenantTools;
     }
 
     private static String conversationalGuidance() {
