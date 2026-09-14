@@ -14,7 +14,11 @@ import cl.helvoca.learning.UnansweredQuestionService;
 import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
+import cl.helvoca.telephony.twilio.TwilioCallControl;
+import cl.helvoca.telephony.twilio.TwilioProperties;
+import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -33,6 +37,12 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     private final BookingRepository bookings;
     private final CallTraceService trace;
     private final JdbcTemplate jdbc;
+
+    @Autowired(required = false)
+    private TwilioCallControl twilioCallControl;
+
+    @Autowired(required = false)
+    private TwilioProperties twilioProperties;
 
     public CertificationGuardedRealtimeToolService(BusinessRepository businesses,
                                                     CustomerRepository customers,
@@ -62,8 +72,29 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public JSONArray toolDefinitions(RealtimeCallContext context) {
+        JSONArray definitions = super.toolDefinitions(context);
+        boolean hasEndCall = false;
+        for (int i = 0; i < definitions.length(); i++) {
+            if ("end_call".equals(definitions.getJSONObject(i).optString("name"))) {
+                hasEndCall = true;
+                break;
+            }
+        }
+        if (!hasEndCall) definitions.put(RealtimeToolDefinitions.endCall());
+        return definitions;
+    }
+
+    @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public String execute(RealtimeCallContext context, String toolName, String rawArguments) {
+        if ("end_call".equals(toolName)) {
+            JSONObject result = endCall(context);
+            trace.recordTool(context.businessId(), context.callId(), toolName, result);
+            return result.toString();
+        }
+
         CallSession call = calls.findByIdAndBusinessId(context.callId(), context.businessId()).orElse(null);
         if (call != null && call.isCertification()) {
             JSONObject blocked = switch (toolName) {
@@ -79,6 +110,31 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
 
         lockBookingMutation(context, toolName, rawArguments);
         return super.execute(context, toolName, rawArguments);
+    }
+
+    private JSONObject endCall(RealtimeCallContext context) {
+        CallSession call = calls.findByIdAndBusinessId(context.callId(), context.businessId()).orElse(null);
+        if (call == null || context.streamSid() == null || !context.streamSid().equals(call.getStreamSid())) {
+            return error("CALL_CONTEXT_MISMATCH", "No pude verificar que esta llamada corresponda al contexto telefónico actual.");
+        }
+        if (call.getStatus() != null && call.getStatus().terminal()) {
+            return success(new JSONObject().put("ended", true).put("alreadyEnded", true));
+        }
+        if (!"twilio".equalsIgnoreCase(call.getTelephonyProvider())) {
+            return error("END_CALL_UNSUPPORTED", "El proveedor telefónico actual no admite cierre remoto desde este flujo.");
+        }
+        if (twilioCallControl == null || twilioProperties == null || !twilioProperties.hasAccountSid()) {
+            return error("END_CALL_UNAVAILABLE", "El control telefónico no está disponible en este momento.");
+        }
+        String providerCallId = call.getProviderCallId();
+        if (providerCallId == null || providerCallId.isBlank()) {
+            return error("END_CALL_UNAVAILABLE", "La llamada no tiene un identificador telefónico válido para finalizarla.");
+        }
+        boolean accepted = twilioCallControl.hangup(twilioProperties.getAccountSid().trim(), providerCallId);
+        if (!accepted) {
+            return error("END_CALL_FAILED", "No pude finalizar la llamada desde el proveedor telefónico.");
+        }
+        return success(new JSONObject().put("ended", true).put("alreadyEnded", false));
     }
 
     private void lockBookingMutation(RealtimeCallContext context, String toolName, String rawArguments) {
@@ -167,6 +223,13 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                     || "AVAILABILITY_LISTED".equals(action.getActionType())) return i;
         }
         return -1;
+    }
+
+    private static JSONObject success(JSONObject data) {
+        return new JSONObject()
+                .put("success", true)
+                .put("data", data)
+                .put("error", JSONObject.NULL);
     }
 
     private static JSONObject error(String code, String message) {
