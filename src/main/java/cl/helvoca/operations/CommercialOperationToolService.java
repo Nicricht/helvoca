@@ -11,7 +11,9 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -23,6 +25,7 @@ public class CommercialOperationToolService {
     private static final Set<String> SUPPORTED = Set.of(
             "list_catalog",
             "list_delivery_zones",
+            "validate_delivery_address",
             "quote_order",
             "create_order",
             "get_order_status",
@@ -74,6 +77,7 @@ public class CommercialOperationToolService {
             result = switch (toolName) {
                 case "list_catalog" -> listCatalog(businessId);
                 case "list_delivery_zones" -> listDeliveryZones(businessId);
+                case "validate_delivery_address" -> validateDeliveryAddress(businessId, args);
                 case "quote_order" -> quoteOrder(businessId, args);
                 case "create_order" -> createOrder(
                         businessId, customerId, sourceReferenceId, trustedPhone, source, args);
@@ -110,7 +114,24 @@ public class CommercialOperationToolService {
                     .put("fee", zone.getFee())
                     .put("minimumOrder", nullable(zone.getMinimumOrder())));
         }
-        return success(new JSONObject().put("zones", zones));
+        return success(new JSONObject()
+                .put("zones", zones)
+                .put("addressValidationRequired", true));
+    }
+
+    private JSONObject validateDeliveryAddress(UUID businessId, JSONObject args) {
+        if (!capabilities.isEnabled(businessId, BusinessOperationCapability.DELIVERY)) {
+            return error("DELIVERY_DISABLED", "El despacho no está habilitado para este negocio.");
+        }
+        String address = required(args, "address").trim();
+        DeliveryZone zone = resolveDeliveryZone(businessId, address);
+        return success(new JSONObject()
+                .put("covered", true)
+                .put("address", address)
+                .put("deliveryZoneId", zone.getId().toString())
+                .put("deliveryZone", zone.getName())
+                .put("fee", zone.getFee())
+                .put("minimumOrder", nullable(zone.getMinimumOrder())));
     }
 
     private JSONObject quoteOrder(UUID businessId, JSONObject args) {
@@ -319,12 +340,14 @@ public class CommercialOperationToolService {
             if (!capabilities.isEnabled(businessId, BusinessOperationCapability.DELIVERY)) {
                 throw new IllegalArgumentException("El despacho no está habilitado para este negocio.");
             }
-            UUID zoneId = uuid(required(args, "deliveryZoneId"));
-            zone = deliveryZones.findByIdAndBusinessId(zoneId, businessId)
-                    .filter(DeliveryZone::isActive)
-                    .orElseThrow(() -> new IllegalArgumentException("La zona de despacho no está disponible."));
             address = required(args, "address").trim();
             if (address.isBlank()) throw new IllegalArgumentException("La dirección de despacho es obligatoria.");
+            zone = resolveDeliveryZone(businessId, address);
+
+            String requestedZoneId = optional(args, "deliveryZoneId");
+            if (!blank(requestedZoneId) && !zone.getId().equals(uuid(requestedZoneId))) {
+                throw new IllegalArgumentException("La zona indicada no corresponde a la cobertura validada para esa dirección.");
+            }
             if (zone.getMinimumOrder() != null
                     && itemCalculation.subtotal().compareTo(zone.getMinimumOrder()) < 0) {
                 throw new IllegalArgumentException("El subtotal no alcanza la compra mínima de la zona de despacho.");
@@ -341,6 +364,48 @@ public class CommercialOperationToolService {
                 fulfillment,
                 zone,
                 address);
+    }
+
+    private DeliveryZone resolveDeliveryZone(UUID businessId, String address) {
+        String normalizedAddress = normalizeCoverage(address);
+        if (normalizedAddress.isBlank()) throw new IllegalArgumentException("La dirección de despacho es inválida.");
+
+        List<ZoneMatch> matches = new ArrayList<>();
+        for (DeliveryZone zone : deliveryZones.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId)) {
+            int score = coverageScore(zone, normalizedAddress);
+            if (score > 0) matches.add(new ZoneMatch(zone, score));
+        }
+        if (matches.isEmpty()) {
+            throw new IllegalArgumentException("La dirección no coincide con ninguna zona de despacho configurada.");
+        }
+        matches.sort(Comparator.comparingInt(ZoneMatch::score).reversed());
+        if (matches.size() > 1 && matches.get(0).score() == matches.get(1).score()) {
+            throw new IllegalArgumentException("La dirección coincide con más de una zona de despacho; la cobertura debe revisarse antes de confirmar.");
+        }
+        return matches.get(0).zone();
+    }
+
+    private static int coverageScore(DeliveryZone zone, String normalizedAddress) {
+        int best = 0;
+        String terms = zone.getCoverageTerms();
+        if (terms == null || terms.isBlank()) return 0;
+        for (String raw : terms.split("[,;|\\n\\r]+")) {
+            String term = normalizeCoverage(raw);
+            if (term.length() >= 3 && normalizedAddress.contains(term)) {
+                best = Math.max(best, term.length());
+            }
+        }
+        return best;
+    }
+
+    private static String normalizeCoverage(String value) {
+        if (value == null) return "";
+        String decomposed = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "");
+        return decomposed.toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private ItemCalculation calculateItems(UUID businessId, JSONArray items) {
@@ -498,4 +563,5 @@ public class CommercialOperationToolService {
                                     BusinessOrder.FulfillmentType fulfillmentType,
                                     DeliveryZone deliveryZone,
                                     String address) {}
+    private record ZoneMatch(DeliveryZone zone, int score) {}
 }
