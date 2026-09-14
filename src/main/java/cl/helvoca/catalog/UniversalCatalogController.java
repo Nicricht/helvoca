@@ -1,6 +1,7 @@
 package cl.helvoca.catalog;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -17,11 +18,13 @@ public class UniversalCatalogController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
     public ResponseEntity<List<UniversalCatalogService.ItemView>> list() {
         return ResponseEntity.ok(service.list());
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public ResponseEntity<UniversalCatalogService.ItemView> create(
             @RequestBody UniversalCatalogService.ItemInput input) {
         UniversalCatalogService.ItemView created = service.create(input);
@@ -29,6 +32,7 @@ public class UniversalCatalogController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public ResponseEntity<UniversalCatalogService.ItemView> update(
             @PathVariable UUID id,
             @RequestBody UniversalCatalogService.ItemInput input) {
@@ -36,6 +40,7 @@ public class UniversalCatalogController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public ResponseEntity<Void> deactivate(@PathVariable UUID id) {
         service.deactivate(id);
         return ResponseEntity.noContent().build();
