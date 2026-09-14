@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class OpenAiMessagingAiClient implements MessagingAiClient {
@@ -28,7 +29,7 @@ public class OpenAiMessagingAiClient implements MessagingAiClient {
     }
 
     @Override
-    public String respond(String instructions, List<Turn> history, ToolInvoker toolInvoker) {
+    public String respond(String instructions, List<Turn> history, Set<String> allowedToolNames, ToolInvoker toolInvoker) {
         if (!properties.hasApiKey()) throw new IllegalStateException("OpenAI is not configured");
 
         OpenAIClient client = OpenAIOkHttpClient.fromEnv();
@@ -47,7 +48,7 @@ public class OpenAiMessagingAiClient implements MessagingAiClient {
                 .model(properties.getSimulatorModel())
                 .instructions(instructions)
                 .maxOutputTokens(240);
-        addTools(builder);
+        addTools(builder, allowedToolNames);
 
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
             builder.input(ResponseCreateParams.Input.ofResponse(inputs));
@@ -82,12 +83,13 @@ public class OpenAiMessagingAiClient implements MessagingAiClient {
         return "No pude completar esa solicitud. ¿Quieres intentarlo de otra forma?";
     }
 
-    private static void addTools(ResponseCreateParams.Builder builder) {
+    private static void addTools(ResponseCreateParams.Builder builder, Set<String> allowedToolNames) {
         JSONArray definitions = RealtimeToolDefinitions.all();
+        Set<String> allowed = allowedToolNames == null ? Set.of() : allowedToolNames;
         for (int i = 0; i < definitions.length(); i++) {
             JSONObject definition = definitions.getJSONObject(i);
             String name = definition.getString("name");
-            if ("transfer_to_human".equals(name) || "end_call".equals(name)) continue;
+            if ("transfer_to_human".equals(name) || "end_call".equals(name) || !allowed.contains(name)) continue;
 
             FunctionTool.Parameters.Builder parameters = FunctionTool.Parameters.builder();
             Map<String, Object> schema = definition.getJSONObject("parameters").toMap();

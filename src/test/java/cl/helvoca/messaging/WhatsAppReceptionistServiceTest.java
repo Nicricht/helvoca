@@ -1,5 +1,6 @@
 package cl.helvoca.messaging;
 
+import cl.helvoca.agent.AiAgentService;
 import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.phone.PhoneNumberRepository;
@@ -22,19 +23,20 @@ class WhatsAppReceptionistServiceTest {
         BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
         MessagingAiClient ai = mock(MessagingAiClient.class);
         WhatsAppProperties properties = new WhatsAppProperties();
+        AiAgentService aiAgents = mock(AiAgentService.class);
 
         MessagingMessage previous = new MessagingMessage();
         previous.setReplyText("respuesta guardada");
         when(messages.findByExternalMessageId("SM-repeat")).thenReturn(Optional.of(previous));
 
         WhatsAppReceptionistService service = new WhatsAppReceptionistService(
-                phones, customers, conversations, messages, tools, subscriptions, ai, properties);
+                phones, customers, conversations, messages, tools, subscriptions, ai, properties, aiAgents);
 
         String reply = service.handle("SM-repeat", "whatsapp:+56911111111", "whatsapp:+56922222222", "hola");
 
         assertEquals("respuesta guardada", reply);
         verify(messages).findByExternalMessageId("SM-repeat");
         verifyNoMoreInteractions(messages);
-        verifyNoInteractions(phones, customers, conversations, tools, subscriptions, ai);
+        verifyNoInteractions(phones, customers, conversations, tools, subscriptions, ai, aiAgents);
     }
 }
