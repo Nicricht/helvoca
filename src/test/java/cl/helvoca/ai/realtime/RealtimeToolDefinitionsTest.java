@@ -26,6 +26,13 @@ class RealtimeToolDefinitionsTest {
         assertDescriptionContains(tools, "cancel_booking", "bookingId");
     }
 
+    @Test
+    void endCallRequiresClearClosingIntentAndFarewellFirst() {
+        JSONArray tools = RealtimeToolDefinitions.all();
+        assertDescriptionContains(tools, "end_call", "despídete");
+        assertDescriptionContains(tools, "end_call", "No la uses por un silencio breve");
+    }
+
     private static void assertCatalogSourced(JSONArray tools, String name) {
         for (int i = 0; i < tools.length(); i++) {
             JSONObject tool = tools.getJSONObject(i);
