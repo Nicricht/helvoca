@@ -14,9 +14,13 @@ public class CallTraceService {
             Map.entry("CUSTOMER_REGISTERED", 20),
             Map.entry("UNANSWERED_QUESTION", 40),
             Map.entry("REQUEST_CREATED", 80),
+            Map.entry("QUOTE_CREATED", 80),
+            Map.entry("LEAD_CREATED", 80),
             Map.entry("BOOKING_CREATED", 90),
             Map.entry("BOOKING_RESCHEDULED", 90),
             Map.entry("BOOKING_CANCELLED", 90),
+            Map.entry("ORDER_CREATED", 90),
+            Map.entry("ORDER_CANCELLED", 90),
             Map.entry("HUMAN_TRANSFERRED", 100),
             Map.entry("FAILED", 100)
     );
@@ -87,6 +91,14 @@ public class CallTraceService {
         return switch (toolName) {
             case "get_business_information" -> "BUSINESS_INFORMATION";
             case "list_services" -> "SERVICES_LISTED";
+            case "list_catalog" -> "CATALOG_LISTED";
+            case "list_delivery_zones" -> "DELIVERY_ZONES_LISTED";
+            case "quote_order" -> "ORDER_QUOTED";
+            case "create_order" -> "ORDER_CREATED";
+            case "get_order_status" -> "ORDER_STATUS_CHECKED";
+            case "cancel_order" -> "ORDER_CANCELLED";
+            case "create_quote" -> "QUOTE_CREATED";
+            case "create_lead" -> "LEAD_CREATED";
             case "search_knowledge" -> "KNOWLEDGE_SEARCH";
             case "find_caller" -> "CALLER_LOOKUP";
             case "register_caller" -> "CUSTOMER_REGISTERED";
@@ -99,17 +111,23 @@ public class CallTraceService {
             case "create_request" -> "REQUEST_CREATED";
             case "record_unanswered_question" -> "UNANSWERED_QUESTION_RECORDED";
             case "transfer_to_human" -> "TRANSFER_REQUESTED";
+            case "end_call" -> "CALL_ENDED";
             default -> toolName.toUpperCase();
         };
     }
 
     private static String resolution(String toolName) {
         return switch (toolName) {
-            case "get_business_information", "list_services", "search_knowledge" -> "INFORMATION_ONLY";
+            case "get_business_information", "list_services", "list_catalog", "list_delivery_zones",
+                    "quote_order", "get_order_status", "search_knowledge" -> "INFORMATION_ONLY";
             case "register_caller" -> "CUSTOMER_REGISTERED";
             case "create_booking" -> "BOOKING_CREATED";
             case "reschedule_booking" -> "BOOKING_RESCHEDULED";
             case "cancel_booking" -> "BOOKING_CANCELLED";
+            case "create_order" -> "ORDER_CREATED";
+            case "cancel_order" -> "ORDER_CANCELLED";
+            case "create_quote" -> "QUOTE_CREATED";
+            case "create_lead" -> "LEAD_CREATED";
             case "create_request" -> "REQUEST_CREATED";
             case "record_unanswered_question" -> "UNANSWERED_QUESTION";
             default -> null;
@@ -120,6 +138,9 @@ public class CallTraceService {
         return switch (toolName) {
             case "register_caller" -> "CUSTOMER";
             case "create_booking", "reschedule_booking", "cancel_booking" -> "BOOKING";
+            case "create_order", "cancel_order" -> "BUSINESS_ORDER";
+            case "create_quote" -> "BUSINESS_QUOTE";
+            case "create_lead" -> "BUSINESS_LEAD";
             case "create_request" -> "BUSINESS_REQUEST";
             case "record_unanswered_question" -> "UNANSWERED_QUESTION";
             default -> null;
@@ -130,6 +151,9 @@ public class CallTraceService {
         String key = switch (toolName) {
             case "register_caller" -> "customerId";
             case "create_booking", "reschedule_booking", "cancel_booking" -> "bookingId";
+            case "create_order", "cancel_order" -> "orderId";
+            case "create_quote" -> "quoteId";
+            case "create_lead" -> "leadId";
             case "create_request" -> "requestId";
             case "record_unanswered_question" -> "questionId";
             default -> null;
@@ -149,6 +173,13 @@ public class CallTraceService {
                 String when = data.optString("localStart", data.optString("startAt", ""));
                 yield when.isBlank() ? service : service + " · " + when;
             }
+            case "create_order", "cancel_order" -> {
+                String status = data.optString("status", "Pedido");
+                String total = data.has("total") ? String.valueOf(data.opt("total")) : "";
+                yield total.isBlank() ? status : status + " · total " + total;
+            }
+            case "create_quote" -> data.optString("title", "Cotización creada");
+            case "create_lead" -> data.optString("interest", data.optString("name", "Lead creado"));
             case "create_request" -> data.optString("title", "Solicitud creada");
             case "record_unanswered_question" -> data.optString("question", "Pregunta registrada");
             case "transfer_to_human" -> "Transferencia solicitada";
