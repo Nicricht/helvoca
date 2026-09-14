@@ -24,8 +24,8 @@ public final class CommercialToolDefinitions {
         JSONObject orderProperties = new JSONObject()
                 .put("items", itemsArray)
                 .put("fulfillmentType", string("PICKUP o DELIVERY"))
-                .put("deliveryZoneId", string("UUID de la zona devuelta por list_delivery_zones cuando sea DELIVERY"))
-                .put("address", string("Dirección de entrega cuando sea DELIVERY"));
+                .put("deliveryZoneId", string("UUID opcional devuelto por validate_delivery_address; el backend vuelve a comprobar que coincida con la dirección"))
+                .put("address", string("Dirección de entrega obligatoria cuando sea DELIVERY"));
 
         JSONObject quoteOrderParams = object()
                 .put("properties", orderProperties)
@@ -52,11 +52,16 @@ public final class CommercialToolDefinitions {
                 .put(function("list_delivery_zones",
                         "Lista las zonas de despacho configuradas, su costo y compra mínima. No inventes cobertura ni costo de despacho.",
                         object()))
+                .put(function("validate_delivery_address",
+                        "Valida en backend si una dirección pertenece a una zona de despacho configurada y devuelve la zona, costo y compra mínima. Úsala antes de prometer que existe despacho a una dirección.",
+                        object().put("properties", new JSONObject()
+                                        .put("address", string("Dirección completa entregada por el cliente")))
+                                .put("required", new JSONArray().put("address"))))
                 .put(function("quote_order",
-                        "Calcula en backend el subtotal, despacho y total de un pedido usando precios actuales del catálogo. Para DELIVERY requiere una zona configurada y una dirección. No confirma ni crea el pedido.",
+                        "Calcula en backend el subtotal, despacho y total de un pedido usando precios actuales del catálogo. Para DELIVERY requiere una dirección cubierta; el backend resuelve y valida la zona. No confirma ni crea el pedido.",
                         quoteOrderParams))
                 .put(function("create_order",
-                        "Crea un pedido real y confirmado. Debes llamar quote_order primero y solo usar create_order después de que el cliente confirme el total exacto. El backend recalcula todo y rechaza totales desactualizados o inventados.",
+                        "Crea un pedido real y confirmado. Debes llamar quote_order primero y solo usar create_order después de que el cliente confirme el total exacto. El backend recalcula precios y cobertura y rechaza totales desactualizados o inventados.",
                         createOrderParams))
                 .put(function("get_order_status",
                         "Consulta uno o los pedidos recientes del cliente actual. Si conoces un orderId puedes enviarlo; si no, devuelve los pedidos recientes asociados al cliente o teléfono verificado.",
@@ -107,7 +112,8 @@ public final class CommercialToolDefinitions {
                     .append("Un pedido solo existe si create_order devuelve success=true.\n");
         }
         if (enabled.contains(BusinessOperationCapability.DELIVERY)) {
-            out.append("Para despacho: consulta list_delivery_zones, pide la dirección exacta y no prometas cobertura ni costo fuera de lo configurado.\n");
+            out.append("Para despacho: pide la dirección exacta y usa validate_delivery_address antes de prometer cobertura. ")
+                    .append("El backend vuelve a validar la dirección al cotizar y crear el pedido; nunca elijas cobertura o costo por intuición.\n");
         }
         if (enabled.contains(BusinessOperationCapability.QUOTE)) {
             out.append("Para cotizaciones: usa create_quote. Si el backend no devuelve un monto, explica que quedó solicitada para evaluación; nunca inventes el precio.\n");
