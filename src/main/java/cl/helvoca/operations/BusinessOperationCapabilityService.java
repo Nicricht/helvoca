@@ -58,15 +58,19 @@ public class BusinessOperationCapabilityService {
                 ? EnumSet.noneOf(BusinessOperationCapability.class)
                 : EnumSet.copyOf(capabilities);
 
-        // ORDER needs the universal catalog. DELIVERY only makes sense when the
-        // tenant can also create orders, so normalize the configuration here.
-        if (desired.contains(BusinessOperationCapability.ORDER)) desired.add(BusinessOperationCapability.CATALOG);
+        // ORDER and QUOTE consume the universal catalog. DELIVERY also requires
+        // ORDER because delivery is a fulfillment mode of an order.
+        if (desired.contains(BusinessOperationCapability.ORDER)
+                || desired.contains(BusinessOperationCapability.QUOTE)) {
+            desired.add(BusinessOperationCapability.CATALOG);
+        }
         if (desired.contains(BusinessOperationCapability.DELIVERY)) {
             desired.add(BusinessOperationCapability.ORDER);
             desired.add(BusinessOperationCapability.CATALOG);
         }
 
         repository.deleteAllByBusinessId(businessId);
+        repository.flush();
         List<BusinessOperationCapabilityGrant> grants = desired.stream().map(capability -> {
             BusinessOperationCapabilityGrant grant = new BusinessOperationCapabilityGrant();
             grant.setBusinessId(businessId);
@@ -74,6 +78,7 @@ public class BusinessOperationCapabilityService {
             return grant;
         }).toList();
         repository.saveAll(grants);
+        repository.flush();
         return Set.copyOf(new LinkedHashSet<>(desired));
     }
 }
