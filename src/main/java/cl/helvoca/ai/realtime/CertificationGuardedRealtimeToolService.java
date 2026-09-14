@@ -11,6 +11,10 @@ import cl.helvoca.call.CallTraceService;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.learning.UnansweredQuestionService;
+import cl.helvoca.operations.BusinessOperationCapabilityService;
+import cl.helvoca.operations.BusinessOrder;
+import cl.helvoca.operations.CommercialOperationToolService;
+import cl.helvoca.operations.CommercialToolDefinitions;
 import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
@@ -26,6 +30,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -43,6 +48,12 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
 
     @Autowired(required = false)
     private TwilioProperties twilioProperties;
+
+    @Autowired(required = false)
+    private CommercialOperationToolService commercialOperations;
+
+    @Autowired(required = false)
+    private BusinessOperationCapabilityService operationCapabilities;
 
     public CertificationGuardedRealtimeToolService(BusinessRepository businesses,
                                                     CustomerRepository customers,
@@ -68,21 +79,28 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     @Override
     @Transactional(readOnly = true)
     public String buildInstructions(RealtimeCallContext context) {
-        return RecepVozConversationPolicyService.appendTo(super.buildInstructions(context));
+        String instructions = RecepVozConversationPolicyService.appendTo(super.buildInstructions(context));
+        if (operationCapabilities != null) {
+            instructions += CommercialToolDefinitions.instructions(operationCapabilities.enabled(context.businessId()));
+        }
+        return instructions;
     }
 
     @Override
     @Transactional(readOnly = true)
     public JSONArray toolDefinitions(RealtimeCallContext context) {
         JSONArray definitions = super.toolDefinitions(context);
-        boolean hasEndCall = false;
-        for (int i = 0; i < definitions.length(); i++) {
-            if ("end_call".equals(definitions.getJSONObject(i).optString("name"))) {
-                hasEndCall = true;
-                break;
+
+        if (operationCapabilities != null) {
+            Set<String> allowedCommercial = operationCapabilities.allowedToolNames(context.businessId());
+            JSONArray commercial = CommercialToolDefinitions.allowed(allowedCommercial);
+            for (int i = 0; i < commercial.length(); i++) {
+                JSONObject definition = commercial.getJSONObject(i);
+                if (!containsTool(definitions, definition.getString("name"))) definitions.put(definition);
             }
         }
-        if (!hasEndCall) definitions.put(RealtimeToolDefinitions.endCall());
+
+        if (!containsTool(definitions, "end_call")) definitions.put(RealtimeToolDefinitions.endCall());
         return definitions;
     }
 
@@ -91,6 +109,26 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     public String execute(RealtimeCallContext context, String toolName, String rawArguments) {
         if ("end_call".equals(toolName)) {
             JSONObject result = endCall(context);
+            trace.recordTool(context.businessId(), context.callId(), toolName, result);
+            return result.toString();
+        }
+
+        if (commercialOperations != null && commercialOperations.supports(toolName)) {
+            JSONObject result;
+            if (operationCapabilities == null || !operationCapabilities.isToolAllowed(context.businessId(), toolName)) {
+                result = error("TOOL_DISABLED", "Esta capacidad comercial no está habilitada para este negocio.");
+            } else {
+                CallSession call = calls.findByIdAndBusinessId(context.callId(), context.businessId()).orElse(null);
+                UUID customerId = call == null ? null : call.getCustomerId();
+                result = new JSONObject(commercialOperations.execute(
+                        context.businessId(),
+                        customerId,
+                        context.callId(),
+                        context.callerNumber(),
+                        BusinessOrder.Source.VOICE,
+                        toolName,
+                        rawArguments));
+            }
             trace.recordTool(context.businessId(), context.callId(), toolName, result);
             return result.toString();
         }
@@ -205,6 +243,13 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                     "La certificación solo puede cancelar la reserva creada con éxito en esta misma llamada.");
         }
         return null;
+    }
+
+    private static boolean containsTool(JSONArray definitions, String name) {
+        for (int i = 0; i < definitions.length(); i++) {
+            if (name.equals(definitions.getJSONObject(i).optString("name"))) return true;
+        }
+        return false;
     }
 
     private static int firstSuccessful(List<CallAction> history, String actionType, int start) {
