@@ -21,6 +21,9 @@ public class DeliveryZone {
     @Column(nullable = false, length = 120)
     private String name;
 
+    @Column(name = "coverage_terms", nullable = false, columnDefinition = "text")
+    private String coverageTerms = "";
+
     @Column(precision = 12, scale = 2, nullable = false)
     private BigDecimal fee = BigDecimal.ZERO;
 
@@ -52,6 +55,8 @@ public class DeliveryZone {
     public void setBusinessId(UUID businessId) { this.businessId = businessId; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+    public String getCoverageTerms() { return coverageTerms; }
+    public void setCoverageTerms(String coverageTerms) { this.coverageTerms = coverageTerms; }
     public BigDecimal getFee() { return fee; }
     public void setFee(BigDecimal fee) { this.fee = fee; }
     public BigDecimal getMinimumOrder() { return minimumOrder; }
