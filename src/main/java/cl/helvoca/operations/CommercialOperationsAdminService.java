@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -45,8 +46,12 @@ public class CommercialOperationsAdminService {
         UUID businessId = tenantProvider.requireBusinessId();
         BusinessOrder order = orders.findByIdAndBusinessId(orderId, businessId)
                 .orElseThrow(() -> new NotFoundException("Order not found"));
-        order.setStatus(status);
-        return orderView(orders.saveAndFlush(order));
+        validateTransition(order, status);
+        if (order.getStatus() != status) {
+            order.setStatus(status);
+            order = orders.saveAndFlush(order);
+        }
+        return orderView(order);
     }
 
     @Transactional(readOnly = true)
@@ -65,6 +70,24 @@ public class CommercialOperationsAdminService {
                 .limit(100)
                 .map(LeadView::from)
                 .toList();
+    }
+
+    private static void validateTransition(BusinessOrder order, BusinessOrder.Status next) {
+        BusinessOrder.Status current = order.getStatus();
+        if (current == next) return;
+
+        Set<BusinessOrder.Status> allowed = switch (current) {
+            case CONFIRMED -> Set.of(BusinessOrder.Status.PREPARING, BusinessOrder.Status.CANCELLED);
+            case PREPARING -> Set.of(BusinessOrder.Status.READY, BusinessOrder.Status.CANCELLED);
+            case READY -> order.getFulfillmentType() == BusinessOrder.FulfillmentType.DELIVERY
+                    ? Set.of(BusinessOrder.Status.DISPATCHED)
+                    : Set.of(BusinessOrder.Status.COMPLETED);
+            case DISPATCHED -> Set.of(BusinessOrder.Status.COMPLETED);
+            case COMPLETED, CANCELLED -> Set.of();
+        };
+        if (!allowed.contains(next)) {
+            throw new IllegalArgumentException("Invalid order status transition: " + current + " -> " + next);
+        }
     }
 
     private OrderView orderView(BusinessOrder order) {
