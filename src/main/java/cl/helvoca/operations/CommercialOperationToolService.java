@@ -27,6 +27,7 @@ public class CommercialOperationToolService {
             "list_delivery_zones",
             "validate_delivery_address",
             "quote_order",
+            "update_order",
             "create_order",
             "get_order_status",
             "cancel_order",
@@ -39,7 +40,9 @@ public class CommercialOperationToolService {
     private final BusinessOrderLineRepository orderLines;
     private final BusinessQuoteRepository quotes;
     private final BusinessLeadRepository leads;
+    private final BusinessOperationRepository operations;
     private final BusinessOperationCapabilityService capabilities;
+    private final OrderWorkflowService orderWorkflow;
 
     public CommercialOperationToolService(CatalogItemRepository catalog,
                                           DeliveryZoneRepository deliveryZones,
@@ -47,19 +50,21 @@ public class CommercialOperationToolService {
                                           BusinessOrderLineRepository orderLines,
                                           BusinessQuoteRepository quotes,
                                           BusinessLeadRepository leads,
-                                          BusinessOperationCapabilityService capabilities) {
+                                          BusinessOperationRepository operations,
+                                          BusinessOperationCapabilityService capabilities,
+                                          OrderWorkflowService orderWorkflow) {
         this.catalog = catalog;
         this.deliveryZones = deliveryZones;
         this.orders = orders;
         this.orderLines = orderLines;
         this.quotes = quotes;
         this.leads = leads;
+        this.operations = operations;
         this.capabilities = capabilities;
+        this.orderWorkflow = orderWorkflow;
     }
 
-    public boolean supports(String toolName) {
-        return SUPPORTED.contains(toolName);
-    }
+    public boolean supports(String toolName) { return SUPPORTED.contains(toolName); }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public String execute(UUID businessId,
@@ -78,8 +83,11 @@ public class CommercialOperationToolService {
                 case "list_catalog" -> listCatalog(businessId);
                 case "list_delivery_zones" -> listDeliveryZones(businessId);
                 case "validate_delivery_address" -> validateDeliveryAddress(businessId, args);
-                case "quote_order" -> quoteOrder(businessId, args);
-                case "create_order" -> createOrder(
+                case "quote_order" -> orderWorkflow.quote(
+                        businessId, customerId, sourceReferenceId, trustedPhone, source, args);
+                case "update_order" -> orderWorkflow.update(
+                        businessId, customerId, sourceReferenceId, trustedPhone, args);
+                case "create_order" -> orderWorkflow.confirm(
                         businessId, customerId, sourceReferenceId, trustedPhone, source, args);
                 case "get_order_status" -> getOrderStatus(businessId, customerId, trustedPhone, args);
                 case "cancel_order" -> cancelOrder(businessId, customerId, trustedPhone, args);
@@ -114,9 +122,7 @@ public class CommercialOperationToolService {
                     .put("fee", zone.getFee())
                     .put("minimumOrder", nullable(zone.getMinimumOrder())));
         }
-        return success(new JSONObject()
-                .put("zones", zones)
-                .put("addressValidationRequired", true));
+        return success(new JSONObject().put("zones", zones).put("addressValidationRequired", true));
     }
 
     private JSONObject validateDeliveryAddress(UUID businessId, JSONObject args) {
@@ -132,62 +138,6 @@ public class CommercialOperationToolService {
                 .put("deliveryZone", zone.getName())
                 .put("fee", zone.getFee())
                 .put("minimumOrder", nullable(zone.getMinimumOrder())));
-    }
-
-    private JSONObject quoteOrder(UUID businessId, JSONObject args) {
-        OrderCalculation calculation = calculateOrder(businessId, args);
-        return success(calculationData(calculation));
-    }
-
-    private JSONObject createOrder(UUID businessId,
-                                   UUID customerId,
-                                   UUID sourceReferenceId,
-                                   String trustedPhone,
-                                   BusinessOrder.Source source,
-                                   JSONObject args) {
-        if (customerId == null && blank(trustedPhone)) {
-            return error("CUSTOMER_CONTEXT_REQUIRED", "No puedo verificar al cliente que realiza el pedido.");
-        }
-
-        OrderCalculation calculation = calculateOrder(businessId, args);
-        BigDecimal expectedTotal = money(required(args, "expectedTotal"));
-        if (calculation.total().compareTo(expectedTotal) != 0) {
-            return error("ORDER_TOTAL_CHANGED",
-                    "El total cambió. Vuelve a cotizar el pedido y confirma el nuevo total con el cliente.");
-        }
-
-        BusinessOrder order = new BusinessOrder();
-        order.setBusinessId(businessId);
-        order.setCustomerId(customerId);
-        order.setSourceReferenceId(sourceReferenceId);
-        order.setContactName(optional(args, "contactName"));
-        order.setContactPhone(blank(trustedPhone) ? null : trustedPhone.trim());
-        order.setFulfillmentType(calculation.fulfillmentType());
-        order.setDeliveryZoneId(calculation.deliveryZone() == null ? null : calculation.deliveryZone().getId());
-        order.setDeliveryAddress(calculation.address());
-        order.setStatus(BusinessOrder.Status.CONFIRMED);
-        order.setSubtotal(calculation.subtotal());
-        order.setDeliveryFee(calculation.deliveryFee());
-        order.setTotal(calculation.total());
-        order.setCurrency(calculation.currency());
-        order.setSource(source == null ? BusinessOrder.Source.API : source);
-        order.setNotes(optional(args, "notes"));
-        order = orders.saveAndFlush(order);
-
-        List<BusinessOrderLine> persistedLines = new ArrayList<>();
-        for (LineCalculation line : calculation.lines()) {
-            BusinessOrderLine entity = new BusinessOrderLine();
-            entity.setOrderId(order.getId());
-            entity.setCatalogItemId(line.item().getId());
-            entity.setItemName(line.item().getName());
-            entity.setQuantity(line.quantity());
-            entity.setUnitPrice(line.item().getPrice());
-            entity.setLineTotal(line.total());
-            entity.setNotes(line.notes());
-            persistedLines.add(orderLines.save(entity));
-        }
-        orderLines.flush();
-        return success(orderData(order, persistedLines));
     }
 
     private JSONObject getOrderStatus(UUID businessId,
@@ -238,6 +188,11 @@ public class CommercialOperationToolService {
         }
         order.setStatus(BusinessOrder.Status.CANCELLED);
         order = orders.saveAndFlush(order);
+        operations.findByIdAndBusinessId(order.getOperationId(), businessId).ifPresent(operation -> {
+            operation.setStatus(BusinessOperation.Status.CANCELLED);
+            operation.setConfirmationToken(null);
+            operations.saveAndFlush(operation);
+        });
         return success(orderData(order, orderLines.findAllByOrderIdOrderByCreatedAtAsc(order.getId())));
     }
 
@@ -320,56 +275,9 @@ public class CommercialOperationToolService {
                 .put("status", lead.getStatus().name()));
     }
 
-    private OrderCalculation calculateOrder(UUID businessId, JSONObject args) {
-        JSONArray items = args.optJSONArray("items");
-        if (items == null || items.isEmpty()) throw new IllegalArgumentException("El pedido debe incluir al menos un ítem.");
-        ItemCalculation itemCalculation = calculateItems(businessId, items);
-
-        BusinessOrder.FulfillmentType fulfillment;
-        try {
-            fulfillment = BusinessOrder.FulfillmentType.valueOf(required(args, "fulfillmentType")
-                    .trim().toUpperCase(Locale.ROOT));
-        } catch (Exception e) {
-            throw new IllegalArgumentException("fulfillmentType debe ser PICKUP o DELIVERY.");
-        }
-
-        DeliveryZone zone = null;
-        BigDecimal deliveryFee = BigDecimal.ZERO;
-        String address = null;
-        if (fulfillment == BusinessOrder.FulfillmentType.DELIVERY) {
-            if (!capabilities.isEnabled(businessId, BusinessOperationCapability.DELIVERY)) {
-                throw new IllegalArgumentException("El despacho no está habilitado para este negocio.");
-            }
-            address = required(args, "address").trim();
-            if (address.isBlank()) throw new IllegalArgumentException("La dirección de despacho es obligatoria.");
-            zone = resolveDeliveryZone(businessId, address);
-
-            String requestedZoneId = optional(args, "deliveryZoneId");
-            if (!blank(requestedZoneId) && !zone.getId().equals(uuid(requestedZoneId))) {
-                throw new IllegalArgumentException("La zona indicada no corresponde a la cobertura validada para esa dirección.");
-            }
-            if (zone.getMinimumOrder() != null
-                    && itemCalculation.subtotal().compareTo(zone.getMinimumOrder()) < 0) {
-                throw new IllegalArgumentException("El subtotal no alcanza la compra mínima de la zona de despacho.");
-            }
-            deliveryFee = zone.getFee();
-        }
-
-        return new OrderCalculation(
-                itemCalculation.lines(),
-                itemCalculation.subtotal(),
-                deliveryFee,
-                itemCalculation.subtotal().add(deliveryFee),
-                itemCalculation.currency(),
-                fulfillment,
-                zone,
-                address);
-    }
-
     private DeliveryZone resolveDeliveryZone(UUID businessId, String address) {
         String normalizedAddress = normalizeCoverage(address);
         if (normalizedAddress.isBlank()) throw new IllegalArgumentException("La dirección de despacho es inválida.");
-
         List<ZoneMatch> matches = new ArrayList<>();
         for (DeliveryZone zone : deliveryZones.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId)) {
             int score = coverageScore(zone, normalizedAddress);
@@ -385,35 +293,10 @@ public class CommercialOperationToolService {
         return matches.get(0).zone();
     }
 
-    private static int coverageScore(DeliveryZone zone, String normalizedAddress) {
-        int best = 0;
-        String terms = zone.getCoverageTerms();
-        if (terms == null || terms.isBlank()) return 0;
-        for (String raw : terms.split("[,;|\\n\\r]+")) {
-            String term = normalizeCoverage(raw);
-            if (term.length() >= 3 && normalizedAddress.contains(term)) {
-                best = Math.max(best, term.length());
-            }
-        }
-        return best;
-    }
-
-    private static String normalizeCoverage(String value) {
-        if (value == null) return "";
-        String decomposed = Normalizer.normalize(value, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}+", "");
-        return decomposed.toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9]+", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
-    }
-
     private ItemCalculation calculateItems(UUID businessId, JSONArray items) {
         if (items == null || items.isEmpty()) throw new IllegalArgumentException("Se requiere al menos un ítem.");
-        List<LineCalculation> lines = new ArrayList<>();
         BigDecimal subtotal = BigDecimal.ZERO;
         String currency = null;
-
         for (int i = 0; i < items.length(); i++) {
             JSONObject requested = items.optJSONObject(i);
             if (requested == null) throw new IllegalArgumentException("Cada ítem debe ser un objeto válido.");
@@ -426,51 +309,34 @@ public class CommercialOperationToolService {
                     .filter(CatalogItem::isActive)
                     .orElseThrow(() -> new IllegalArgumentException("Un ítem del catálogo no existe o no está activo."));
             if (item.getPrice() == null) {
-                throw new IllegalArgumentException("Un ítem del pedido no tiene precio configurado y requiere cotización.");
+                throw new IllegalArgumentException("Un ítem de la cotización no tiene precio configurado.");
             }
             if (currency == null) currency = item.getCurrency();
             if (!Objects.equals(currency, item.getCurrency())) {
                 throw new IllegalArgumentException("No se pueden mezclar monedas distintas en una misma operación.");
             }
-            BigDecimal lineTotal = item.getPrice().multiply(BigDecimal.valueOf(quantity));
-            lines.add(new LineCalculation(item, quantity, optional(requested, "notes"), lineTotal));
-            subtotal = subtotal.add(lineTotal);
+            subtotal = subtotal.add(item.getPrice().multiply(BigDecimal.valueOf(quantity)));
         }
-        return new ItemCalculation(lines, subtotal, currency == null ? "CLP" : currency);
-    }
-
-    private static JSONObject calculationData(OrderCalculation calculation) {
-        JSONArray lines = new JSONArray();
-        for (LineCalculation line : calculation.lines()) {
-            lines.put(lineData(line));
-        }
-        return new JSONObject()
-                .put("items", lines)
-                .put("fulfillmentType", calculation.fulfillmentType().name())
-                .put("deliveryZoneId", calculation.deliveryZone() == null
-                        ? JSONObject.NULL : calculation.deliveryZone().getId().toString())
-                .put("deliveryZone", calculation.deliveryZone() == null
-                        ? JSONObject.NULL : calculation.deliveryZone().getName())
-                .put("address", nullable(calculation.address()))
-                .put("subtotal", calculation.subtotal())
-                .put("deliveryFee", calculation.deliveryFee())
-                .put("total", calculation.total())
-                .put("currency", calculation.currency());
+        return new ItemCalculation(subtotal, currency == null ? "CLP" : currency);
     }
 
     private static JSONObject orderData(BusinessOrder order, List<BusinessOrderLine> lines) {
         JSONArray items = new JSONArray();
         for (BusinessOrderLine line : lines) {
-            items.put(new JSONObject()
+            JSONObject item = new JSONObject()
                     .put("catalogItemId", line.getCatalogItemId().toString())
                     .put("name", line.getItemName())
                     .put("quantity", line.getQuantity())
                     .put("unitPrice", line.getUnitPrice())
                     .put("lineTotal", line.getLineTotal())
-                    .put("notes", nullable(line.getNotes())));
+                    .put("notes", nullable(line.getNotes()));
+            if (!blank(line.getModifiersJson())) item.put("modifiers", new JSONObject(line.getModifiersJson()));
+            else item.put("modifiers", JSONObject.NULL);
+            items.put(item);
         }
         return new JSONObject()
                 .put("orderId", order.getId().toString())
+                .put("operationId", order.getOperationId().toString())
                 .put("status", order.getStatus().name())
                 .put("fulfillmentType", order.getFulfillmentType().name())
                 .put("items", items)
@@ -492,21 +358,29 @@ public class CommercialOperationToolService {
                 .put("durationMinutes", nullable(item.getDurationMinutes()));
     }
 
-    private static JSONObject lineData(LineCalculation line) {
-        return new JSONObject()
-                .put("catalogItemId", line.item().getId().toString())
-                .put("name", line.item().getName())
-                .put("quantity", line.quantity())
-                .put("unitPrice", line.item().getPrice())
-                .put("lineTotal", line.total())
-                .put("notes", nullable(line.notes()));
-    }
-
     private static boolean ownedBy(BusinessOrder order, UUID customerId, String trustedPhone) {
         if (customerId != null && customerId.equals(order.getCustomerId())) return true;
-        return !blank(trustedPhone)
-                && order.getContactPhone() != null
-                && trustedPhone.trim().equals(order.getContactPhone());
+        return !blank(trustedPhone) && order.getContactPhone() != null && trustedPhone.trim().equals(order.getContactPhone());
+    }
+
+    private static int coverageScore(DeliveryZone zone, String normalizedAddress) {
+        int best = 0;
+        String terms = zone.getCoverageTerms();
+        if (terms == null || terms.isBlank()) return 0;
+        for (String raw : terms.split("[,;|\\n\\r]+")) {
+            String term = normalizeCoverage(raw);
+            if (term.length() >= 3 && normalizedAddress.contains(term)) best = Math.max(best, term.length());
+        }
+        return best;
+    }
+
+    private static String normalizeCoverage(String value) {
+        if (value == null) return "";
+        String decomposed = Normalizer.normalize(value, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
+        return decomposed.toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private static String required(JSONObject args, String key) {
@@ -534,34 +408,18 @@ public class CommercialOperationToolService {
         catch (Exception e) { throw new IllegalArgumentException("Se recibió un monto inválido."); }
     }
 
-    private static boolean blank(String value) {
-        return value == null || value.isBlank();
-    }
-
-    private static Object nullable(Object value) {
-        return value == null ? JSONObject.NULL : value;
-    }
+    private static boolean blank(String value) { return value == null || value.isBlank(); }
+    private static Object nullable(Object value) { return value == null ? JSONObject.NULL : value; }
 
     private static JSONObject success(JSONObject data) {
         return new JSONObject().put("success", true).put("data", data).put("error", JSONObject.NULL);
     }
 
     private static JSONObject error(String code, String message) {
-        return new JSONObject()
-                .put("success", false)
-                .put("data", JSONObject.NULL)
+        return new JSONObject().put("success", false).put("data", JSONObject.NULL)
                 .put("error", new JSONObject().put("code", code).put("message", message));
     }
 
-    private record LineCalculation(CatalogItem item, int quantity, String notes, BigDecimal total) {}
-    private record ItemCalculation(List<LineCalculation> lines, BigDecimal subtotal, String currency) {}
-    private record OrderCalculation(List<LineCalculation> lines,
-                                    BigDecimal subtotal,
-                                    BigDecimal deliveryFee,
-                                    BigDecimal total,
-                                    String currency,
-                                    BusinessOrder.FulfillmentType fulfillmentType,
-                                    DeliveryZone deliveryZone,
-                                    String address) {}
+    private record ItemCalculation(BigDecimal subtotal, String currency) {}
     private record ZoneMatch(DeliveryZone zone, int score) {}
 }
