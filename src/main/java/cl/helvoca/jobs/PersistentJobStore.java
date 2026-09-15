@@ -10,7 +10,9 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -192,6 +194,41 @@ public class PersistentJobStore {
                  LIMIT 100
                 """, MAPPER, businessId);
     }
+
+    @Transactional(readOnly = true)
+    public long countByStatus(PersistentJob.Status status) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM persistent_job WHERE status = ?",
+                Long.class,
+                status.name());
+        return count == null ? 0L : count;
+    }
+
+    @Transactional(readOnly = true)
+    public JobQueueSummary summary(UUID businessId) {
+        if (businessId == null) throw new IllegalArgumentException("businessId is required");
+        LinkedHashMap<String, Long> counts = new LinkedHashMap<>();
+        for (PersistentJob.Status status : PersistentJob.Status.values()) counts.put(status.name(), 0L);
+        for (Map<String, Object> row : jdbc.queryForList("""
+                SELECT status, COUNT(*) AS count
+                  FROM persistent_job
+                 WHERE business_id = ?
+                 GROUP BY status
+                """, businessId)) {
+            String status = String.valueOf(row.get("status"));
+            Number count = (Number) row.get("count");
+            if (counts.containsKey(status) && count != null) counts.put(status, count.longValue());
+        }
+        Timestamp oldest = jdbc.queryForObject("""
+                SELECT MIN(created_at)
+                  FROM persistent_job
+                 WHERE business_id = ?
+                   AND status IN ('PENDING','FAILED','RUNNING')
+                """, Timestamp.class, businessId);
+        return new JobQueueSummary(Map.copyOf(counts), oldest == null ? null : oldest.toInstant());
+    }
+
+    public record JobQueueSummary(Map<String, Long> byStatus, Instant oldestActiveCreatedAt) {}
 
     private boolean payloadMatches(UUID businessId, UUID jobId, String payloadJson) {
         Boolean matches = jdbc.queryForObject("""
