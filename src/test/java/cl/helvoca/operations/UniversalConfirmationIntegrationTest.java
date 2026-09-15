@@ -150,7 +150,7 @@ class UniversalConfirmationIntegrationTest {
         op.setStatus(BusinessOperation.Status.COMPLETED);
         operations.saveAndFlush(op);
 
-        var history = events.findAllByBusinessIdAndOperationIdOrderBySequenceNoAsc(business.getId(), op.getId());
+        var history = events.findTop100ByBusinessIdAndOperationIdOrderBySequenceNoDesc(business.getId(), op.getId());
         assertTrue(history.stream().anyMatch(event -> event.getStatus() == BusinessOperation.Status.PROPOSED));
         assertTrue(history.stream().anyMatch(event -> event.getStatus() == BusinessOperation.Status.EXECUTING));
         assertTrue(history.stream().anyMatch(event -> event.getStatus() == BusinessOperation.Status.COMPLETED));
