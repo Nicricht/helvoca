@@ -24,26 +24,27 @@ public final class RealtimeToolDefinitions {
                                         .put("serviceId", string("UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
                                         .put("date", string("Fecha local del negocio en formato YYYY-MM-DD")))
                                 .put("required", new JSONArray().put("serviceId").put("date"))))
-                .put(function("check_booking_availability", "Comprueba una hora exacta antes de prometer o crear una reserva. El serviceId debe provenir literalmente de list_services. Si todavía no lo tienes, llama list_services primero. Nunca inventes UUID. Solo si devuelve available=true puedes usar ese mismo startAt en create_booking. Si available=false, llama list_available_slots antes de intentar crear la reserva.",
+                .put(function("check_booking_availability", "Comprueba una hora exacta antes de prometer o proponer una reserva. El serviceId debe provenir literalmente de list_services. Si todavía no lo tienes, llama list_services primero. Nunca inventes UUID. Solo si devuelve available=true puedes usar ese mismo startAt para la primera fase de create_booking. Si available=false, llama list_available_slots antes de proponer la reserva.",
                         object().put("properties", new JSONObject()
                                         .put("serviceId", string("UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
                                         .put("startAt", string("Fecha y hora ISO-8601 con zona u offset")))
                                 .put("required", new JSONArray().put("serviceId").put("startAt"))))
-                .put(function("create_booking", "Crea una reserva real. PRECONDICIONES OBLIGATORIAS antes de invocarla: (1) ejecutar find_caller y, si found=false, completar register_caller; (2) ejecutar list_services y conservar literalmente el serviceId del catálogo; (3) verificar el horario con check_booking_availability y obtener available=true, o si no está disponible ejecutar list_available_slots y usar literalmente un startAt devuelto. Nunca llames create_booking antes de completar esas precondiciones. Solo se considera confirmada cuando esta herramienta devuelve success=true. Conserva el bookingId devuelto para cancelación o reprogramación posterior.",
+                .put(function("create_booking", "Reserva en dos fases. FASE 1: envía serviceId y startAt previamente validados, más notes opcional. El backend devolverá operationId, confirmationToken y requiresConfirmation=true, pero todavía NO existe una reserva. Presenta exactamente esas condiciones al cliente y pide confirmación explícita. FASE 2: solo tras esa confirmación, vuelve a llamar esta misma herramienta enviando únicamente operationId y confirmationToken devueltos por la fase 1. No mezcles condiciones nuevas con el token. Solo cuando la segunda fase devuelva success=true y bookingId existe se considera creada la reserva.",
                         object().put("properties", new JSONObject()
-                                        .put("serviceId", string("UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
-                                        .put("startAt", string("Fecha y hora previamente validada por check_booking_availability o devuelta por list_available_slots"))
-                                        .put("notes", string("Notas opcionales")))
-                                .put("required", new JSONArray().put("serviceId").put("startAt"))))
+                                .put("serviceId", string("FASE 1: UUID exacto del servicio devuelto por list_services"))
+                                .put("startAt", string("FASE 1: fecha/hora previamente validada"))
+                                .put("notes", string("FASE 1: notas opcionales"))
+                                .put("operationId", string("FASE 2: operationId exacto devuelto por la propuesta"))
+                                .put("confirmationToken", string("FASE 2: confirmationToken exacto devuelto por la propuesta"))))
                 .put(function("list_customer_bookings", "Lista las próximas reservas confirmadas del cliente identificado por esta llamada. El cliente y negocio se obtienen del contexto verificado.", object()))
                 .put(function("reschedule_booking", "Reprograma una reserva del cliente de esta llamada. Solo comunica el cambio cuando success=true. El backend vuelve a validar horario y solapamientos.",
                         object().put("properties", new JSONObject()
-                                        .put("bookingId", string("UUID de la reserva obtenido desde list_customer_bookings o desde create_booking en esta misma llamada"))
+                                        .put("bookingId", string("UUID de la reserva obtenido desde list_customer_bookings o desde create_booking después de la segunda fase confirmada"))
                                         .put("newStartAt", string("Nueva fecha y hora ISO-8601 con zona u offset")))
                                 .put("required", new JSONArray().put("bookingId").put("newStartAt"))))
-                .put(function("cancel_booking", "Cancela una reserva del cliente de esta llamada. Solo comunica la cancelación cuando success=true. Si acabas de crear la reserva en esta misma llamada, usa literalmente el bookingId devuelto por create_booking después de que create_booking haya devuelto success=true; nunca inventes otro identificador.",
+                .put(function("cancel_booking", "Cancela una reserva del cliente de esta llamada. Solo comunica la cancelación cuando success=true. Si acabas de crear la reserva en esta misma llamada, usa literalmente el bookingId devuelto por la segunda fase confirmada de create_booking; nunca uses operationId como bookingId.",
                         object().put("properties", new JSONObject()
-                                        .put("bookingId", string("UUID exacto de la reserva devuelto por create_booking o list_customer_bookings")))
+                                        .put("bookingId", string("UUID exacto de la reserva devuelto por create_booking confirmado o list_customer_bookings")))
                                 .put("required", new JSONArray().put("bookingId"))))
                 .put(function("create_request", "Crea una solicitud real de seguimiento cuando la necesidad del cliente no corresponde a una reserva. Sirve para cotizaciones, soporte, visitas, leads, urgencias u otros casos configurables. Solo confirma al cliente cuando success=true.",
                         object().put("properties", new JSONObject()
