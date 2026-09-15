@@ -56,6 +56,19 @@ class SafeOperationRetryEngineIntegrationTest {
                 "create_quote",
                 () -> {
                     int call = calls.incrementAndGet();
+
+                    // The same PK is inserted on every attempt. Attempts one and two
+                    // return a transient failure and must roll this insert back. The
+                    // third attempt can only insert and commit successfully if those
+                    // earlier side effects were truly reverted.
+                    jdbc.update("""
+                            INSERT INTO business_automation_policy(
+                                business_id, operation_type, auto_execute, customer_confirmation,
+                                payment_requirement, retry_policy, max_auto_retries, escalation_policy)
+                            VALUES (?, 'QUOTE', TRUE, 'NONE', 'NONE', 'SAFE_AUTOMATIC', 2,
+                                    'ONLY_IF_UNRESOLVABLE')
+                            """, business.getId());
+
                     if (call < 3) return failure("COMMERCIAL_OPERATION_FAILED").toString();
                     return success(new JSONObject().put("operationId", operationId.toString())).toString();
                 });
@@ -63,6 +76,10 @@ class SafeOperationRetryEngineIntegrationTest {
         JSONObject result = new JSONObject(raw);
         assertTrue(result.getBoolean("success"));
         assertEquals(3, calls.get());
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM business_automation_policy
+                WHERE business_id = ? AND operation_type = 'QUOTE'
+                """, Integer.class, business.getId()));
 
         List<Map<String, Object>> attempts = jdbc.queryForList("""
                 SELECT attempt_no, max_attempts, outcome, failure_class, error_code, delay_ms
