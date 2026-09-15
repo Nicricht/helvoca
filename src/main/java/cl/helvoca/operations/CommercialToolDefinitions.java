@@ -10,10 +10,15 @@ public final class CommercialToolDefinitions {
     private CommercialToolDefinitions() {}
 
     public static JSONArray all() {
+        JSONObject modifiers = new JSONObject()
+                .put("type", "object")
+                .put("description", "Modificadores estructurados del ítem, por ejemplo {remove:[\"cebolla\"], options:{size:\"grande\"}}")
+                .put("additionalProperties", true);
         JSONObject itemProperties = new JSONObject()
                 .put("catalogItemId", string("UUID exacto del producto o servicio devuelto por list_catalog"))
                 .put("quantity", integer("Cantidad solicitada, entre 1 y 100"))
-                .put("notes", string("Modificadores u observaciones del ítem, por ejemplo sin cebolla"));
+                .put("modifiers", modifiers)
+                .put("notes", string("Observaciones libres adicionales del ítem"));
         JSONObject itemSchema = object()
                 .put("properties", itemProperties)
                 .put("required", new JSONArray().put("catalogItemId").put("quantity"));
@@ -25,19 +30,25 @@ public final class CommercialToolDefinitions {
                 .put("items", itemsArray)
                 .put("fulfillmentType", string("PICKUP o DELIVERY"))
                 .put("deliveryZoneId", string("UUID opcional devuelto por validate_delivery_address; el backend vuelve a comprobar que coincida con la dirección"))
-                .put("address", string("Dirección de entrega obligatoria cuando sea DELIVERY"));
+                .put("address", string("Dirección de entrega obligatoria cuando sea DELIVERY"))
+                .put("contactName", string("Nombre del cliente si lo entregó"));
 
         JSONObject quoteOrderParams = object()
                 .put("properties", orderProperties)
                 .put("required", new JSONArray().put("items").put("fulfillmentType"));
 
-        JSONObject createOrderProperties = new JSONObject(orderProperties.toString())
-                .put("expectedTotal", number("Total exacto previamente devuelto por quote_order y confirmado por el cliente"))
-                .put("contactName", string("Nombre del cliente si lo entregó"))
-                .put("notes", string("Notas generales del pedido"));
+        JSONObject updateOrderProperties = new JSONObject(orderProperties.toString())
+                .put("operationId", string("UUID exacto del borrador devuelto por quote_order o update_order"));
+        JSONObject updateOrderParams = object()
+                .put("properties", updateOrderProperties)
+                .put("required", new JSONArray().put("operationId").put("items").put("fulfillmentType"));
+
         JSONObject createOrderParams = object()
-                .put("properties", createOrderProperties)
-                .put("required", new JSONArray().put("items").put("fulfillmentType").put("expectedTotal"));
+                .put("properties", new JSONObject()
+                        .put("operationId", string("UUID exacto del borrador más reciente"))
+                        .put("confirmationToken", string("Token exacto de la última cotización devuelta por quote_order o update_order"))
+                        .put("notes", string("Notas generales finales del pedido")))
+                .put("required", new JSONArray().put("operationId").put("confirmationToken"));
 
         JSONObject quoteProperties = new JSONObject()
                 .put("title", string("Resumen corto de lo que se debe cotizar"))
@@ -58,10 +69,13 @@ public final class CommercialToolDefinitions {
                                         .put("address", string("Dirección completa entregada por el cliente")))
                                 .put("required", new JSONArray().put("address"))))
                 .put(function("quote_order",
-                        "Calcula en backend el subtotal, despacho y total de un pedido usando precios actuales del catálogo. Para DELIVERY requiere una dirección cubierta; el backend resuelve y valida la zona. No confirma ni crea el pedido.",
+                        "Crea un borrador estructurado y calcula en backend subtotal, despacho y total usando precios actuales. Devuelve operationId, revision y confirmationToken. No crea el pedido final.",
                         quoteOrderParams))
+                .put(function("update_order",
+                        "Reemplaza el estado del borrador con la información más reciente del cliente y vuelve a cotizar. Usa el conjunto completo y actualizado de ítems. Cada cambio invalida el confirmationToken anterior.",
+                        updateOrderParams))
                 .put(function("create_order",
-                        "Crea un pedido real y confirmado. Debes llamar quote_order primero y solo usar create_order después de que el cliente confirme el total exacto. El backend recalcula precios y cobertura y rechaza totales desactualizados o inventados.",
+                        "Confirma un borrador ya cotizado. Llámala solo después de que el cliente confirme explícitamente el total más reciente, usando operationId y confirmationToken exactos de esa versión. El backend recalcula precios y cobertura y la operación es idempotente.",
                         createOrderParams))
                 .put(function("get_order_status",
                         "Consulta uno o los pedidos recientes del cliente actual. Si conoces un orderId puedes enviarlo; si no, devuelve los pedidos recientes asociados al cliente o teléfono verificado.",
@@ -103,17 +117,16 @@ public final class CommercialToolDefinitions {
         StringBuilder out = new StringBuilder("\nCAPACIDADES COMERCIALES ACTIVAS DEL NEGOCIO: ")
                 .append(enabled).append(".\n");
         if (enabled.contains(BusinessOperationCapability.CATALOG)) {
-            out.append("Usa list_catalog como fuente oficial de productos, servicios y precios comerciales. ")
-                    .append("No inventes ítems ni precios.\n");
+            out.append("Usa list_catalog como fuente oficial de productos, servicios y precios comerciales. No inventes ítems ni precios.\n");
         }
         if (enabled.contains(BusinessOperationCapability.ORDER)) {
-            out.append("Para pedidos: comprende los ítems y modificadores, usa quote_order para obtener el total real, ")
-                    .append("repítelo al cliente y crea el pedido únicamente después de una confirmación explícita mediante create_order. ")
-                    .append("Un pedido solo existe si create_order devuelve success=true.\n");
+            out.append("Para pedidos: usa quote_order para crear el borrador y obtener el total real. ")
+                    .append("Si el cliente corrige cantidades, productos, modificadores, retiro, despacho o dirección, usa update_order con el estado completo más reciente. ")
+                    .append("Cada actualización invalida la confirmación anterior. Presenta el total vigente y solo después de un sí explícito usa create_order con el último confirmationToken. ")
+                    .append("Un pedido final solo existe si create_order devuelve success=true.\n");
         }
         if (enabled.contains(BusinessOperationCapability.DELIVERY)) {
-            out.append("Para despacho: pide la dirección exacta y usa validate_delivery_address antes de prometer cobertura. ")
-                    .append("El backend vuelve a validar la dirección al cotizar y crear el pedido; nunca elijas cobertura o costo por intuición.\n");
+            out.append("Para despacho: pide la dirección exacta y usa validate_delivery_address antes de prometer cobertura. El backend vuelve a validar la dirección al cotizar y confirmar.\n");
         }
         if (enabled.contains(BusinessOperationCapability.QUOTE)) {
             out.append("Para cotizaciones: usa create_quote. Si el backend no devuelve un monto, explica que quedó solicitada para evaluación; nunca inventes el precio.\n");
@@ -125,11 +138,8 @@ public final class CommercialToolDefinitions {
     }
 
     private static JSONObject function(String name, String description, JSONObject parameters) {
-        return new JSONObject()
-                .put("type", "function")
-                .put("name", name)
-                .put("description", description)
-                .put("parameters", parameters);
+        return new JSONObject().put("type", "function").put("name", name)
+                .put("description", description).put("parameters", parameters);
     }
 
     private static JSONObject object() {
