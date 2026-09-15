@@ -1,11 +1,13 @@
 package cl.helvoca.messaging;
 
+import cl.helvoca.booking.BookingOperationSyncService;
 import cl.helvoca.booking.BookingRepository;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.customer.Customer;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.learning.UnansweredQuestionService;
+import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationCapabilityService;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.operations.CommercialOperationToolService;
@@ -22,14 +24,22 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
+
+import java.util.Set;
+import java.util.UUID;
 
 @Service
 @Primary
 public class UniversalWhatsAppToolService extends WhatsAppToolService {
+    private static final Set<String> BOOKING_MUTATIONS = Set.of(
+            "create_booking", "reschedule_booking", "cancel_booking");
+
     private final CommercialOperationToolService commercial;
     private final BusinessOperationCapabilityService capabilities;
     private final BusinessRequestService requests;
     private final CustomerRepository customers;
+    private final BookingOperationSyncService bookingOperations;
 
     public UniversalWhatsAppToolService(BusinessRepository businesses,
                                         CustomerRepository customers,
@@ -42,13 +52,15 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
                                         MessagingConversationRepository conversations,
                                         JdbcTemplate jdbc,
                                         CommercialOperationToolService commercial,
-                                        BusinessOperationCapabilityService capabilities) {
+                                        BusinessOperationCapabilityService capabilities,
+                                        BookingOperationSyncService bookingOperations) {
         super(businesses, customers, services, knowledge, bookings, schedule, requests,
                 unansweredQuestions, conversations, jdbc);
         this.commercial = commercial;
         this.capabilities = capabilities;
         this.requests = requests;
         this.customers = customers;
+        this.bookingOperations = bookingOperations;
     }
 
     @Override
@@ -57,18 +69,23 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
         if ("create_request".equals(toolName)) {
             return createRequestWithConversationContext(conversation, rawArguments).toString();
         }
-        if (!commercial.supports(toolName)) return super.execute(conversation, toolName, rawArguments);
-        if (!capabilities.isToolAllowed(conversation.getBusinessId(), toolName)) {
-            return disabled().toString();
+        if (commercial.supports(toolName)) {
+            if (!capabilities.isToolAllowed(conversation.getBusinessId(), toolName)) {
+                return disabled().toString();
+            }
+            return commercial.execute(
+                    conversation.getBusinessId(),
+                    conversation.getCustomerId(),
+                    conversation.getId(),
+                    conversation.getSender(),
+                    BusinessOrder.Source.WHATSAPP,
+                    toolName,
+                    rawArguments);
         }
-        return commercial.execute(
-                conversation.getBusinessId(),
-                conversation.getCustomerId(),
-                conversation.getId(),
-                conversation.getSender(),
-                BusinessOrder.Source.WHATSAPP,
-                toolName,
-                rawArguments);
+
+        String result = super.execute(conversation, toolName, rawArguments);
+        if (!BOOKING_MUTATIONS.contains(toolName)) return result;
+        return synchronizeBookingMutation(conversation, toolName, result);
     }
 
     @Override
@@ -76,6 +93,32 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     public String buildInstructions(MessagingConversation conversation) {
         return super.buildInstructions(conversation)
                 + CommercialToolDefinitions.instructions(capabilities.enabled(conversation.getBusinessId()));
+    }
+
+    private String synchronizeBookingMutation(MessagingConversation conversation,
+                                              String toolName,
+                                              String rawResult) {
+        JSONObject result = new JSONObject(rawResult);
+        if (!result.optBoolean("success", false)) return rawResult;
+        JSONObject data = result.optJSONObject("data");
+        if (data == null || data.optString("bookingId", "").isBlank()) return rawResult;
+
+        try {
+            UUID bookingId = UUID.fromString(data.getString("bookingId"));
+            BusinessOperation operation = bookingOperations.synchronize(
+                    conversation.getBusinessId(),
+                    bookingId,
+                    conversation.getId(),
+                    BusinessOrder.Source.WHATSAPP,
+                    toolName);
+            data.put("operationId", operation.getId().toString());
+            data.put("operationRevision", operation.getRevision());
+            return result.toString();
+        } catch (RuntimeException e) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return error("BOOKING_OPERATION_SYNC_FAILED",
+                    "La reserva no pudo sincronizarse de forma segura. No se aplicará el cambio.").toString();
+        }
     }
 
     private JSONObject createRequestWithConversationContext(MessagingConversation conversation, String rawArguments) {
