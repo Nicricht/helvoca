@@ -1,9 +1,12 @@
 package cl.helvoca.operations;
 
+import cl.helvoca.delivery.BusinessDelivery;
+import cl.helvoca.delivery.BusinessDeliveryRepository;
 import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,8 +28,8 @@ class CommercialOperationsAdminServiceTest {
         when(tenant.requireBusinessId()).thenReturn(businessId);
         when(orders.findByIdAndBusinessId(orderId, businessId)).thenReturn(Optional.of(order));
 
-        CommercialOperationsAdminService service = new CommercialOperationsAdminService(
-                orders, lines, mock(BusinessQuoteRepository.class), mock(BusinessLeadRepository.class), tenant);
+        CommercialOperationsAdminService service = service(orders, lines, tenant,
+                mock(BusinessDeliveryRepository.class), mock(BusinessOperationRepository.class));
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> service.updateOrderStatus(orderId, BusinessOrder.Status.COMPLETED));
@@ -36,7 +39,7 @@ class CommercialOperationsAdminServiceTest {
     }
 
     @Test
-    void readyDeliveryCanAdvanceToDispatched() {
+    void readyDeliveryOrderCanAdvanceToDispatched() {
         UUID businessId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
         BusinessOrderRepository orders = mock(BusinessOrderRepository.class);
@@ -49,8 +52,8 @@ class CommercialOperationsAdminServiceTest {
         when(orders.saveAndFlush(any(BusinessOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(lines.findAllByOrderIdOrderByCreatedAtAsc(orderId)).thenReturn(List.of());
 
-        CommercialOperationsAdminService service = new CommercialOperationsAdminService(
-                orders, lines, mock(BusinessQuoteRepository.class), mock(BusinessLeadRepository.class), tenant);
+        CommercialOperationsAdminService service = service(orders, lines, tenant,
+                mock(BusinessDeliveryRepository.class), mock(BusinessOperationRepository.class));
 
         var view = service.updateOrderStatus(orderId, BusinessOrder.Status.DISPATCHED);
 
@@ -69,13 +72,106 @@ class CommercialOperationsAdminServiceTest {
         when(tenant.requireBusinessId()).thenReturn(businessId);
         when(orders.findByIdAndBusinessId(orderId, businessId)).thenReturn(Optional.of(order));
 
-        CommercialOperationsAdminService service = new CommercialOperationsAdminService(
-                orders, mock(BusinessOrderLineRepository.class), mock(BusinessQuoteRepository.class),
-                mock(BusinessLeadRepository.class), tenant);
+        CommercialOperationsAdminService service = service(
+                orders,
+                mock(BusinessOrderLineRepository.class),
+                tenant,
+                mock(BusinessDeliveryRepository.class),
+                mock(BusinessOperationRepository.class));
 
         assertThrows(IllegalArgumentException.class,
                 () -> service.updateOrderStatus(orderId, BusinessOrder.Status.PREPARING));
         verify(orders, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void confirmedStandaloneDeliveryCanAdvanceToInTransitAndSyncUniversalOperation() {
+        UUID businessId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        BusinessDeliveryRepository deliveries = mock(BusinessDeliveryRepository.class);
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+
+        BusinessDelivery delivery = new BusinessDelivery();
+        delivery.setId(deliveryId);
+        delivery.setOperationId(operationId);
+        delivery.setBusinessId(businessId);
+        delivery.setDeliveryZoneId(UUID.randomUUID());
+        delivery.setDeliveryAddress("Apoquindo 3000");
+        delivery.setStatus(BusinessDelivery.Status.CONFIRMED);
+        delivery.setSource(BusinessOrder.Source.VOICE);
+
+        BusinessOperation operation = new BusinessOperation();
+        operation.setId(operationId);
+        operation.setBusinessId(businessId);
+        operation.setType(BusinessOperation.Type.DELIVERY);
+        operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        operation.setRevision(1);
+        operation.setMetadata(Map.of("intent", "DELIVERY"));
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(deliveries.findByIdAndBusinessId(deliveryId, businessId)).thenReturn(Optional.of(delivery));
+        when(deliveries.saveAndFlush(any(BusinessDelivery.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(operations.findByIdAndBusinessId(operationId, businessId)).thenReturn(Optional.of(operation));
+        when(operations.saveAndFlush(any(BusinessOperation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CommercialOperationsAdminService service = service(
+                mock(BusinessOrderRepository.class),
+                mock(BusinessOrderLineRepository.class),
+                tenant,
+                deliveries,
+                operations);
+
+        var view = service.updateDeliveryStatus(deliveryId, BusinessDelivery.Status.IN_TRANSIT);
+
+        assertEquals(BusinessDelivery.Status.IN_TRANSIT, view.status());
+        assertEquals(BusinessOperation.Status.CONFIRMED, operation.getStatus());
+        assertEquals(2, operation.getRevision());
+        assertEquals("IN_TRANSIT", operation.getMetadata().get("projectionStatus"));
+        verify(deliveries).saveAndFlush(delivery);
+        verify(operations).saveAndFlush(operation);
+    }
+
+    @Test
+    void deliveredStandaloneDeliveryIsTerminal() {
+        UUID businessId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        BusinessDeliveryRepository deliveries = mock(BusinessDeliveryRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        BusinessDelivery delivery = new BusinessDelivery();
+        delivery.setId(deliveryId);
+        delivery.setBusinessId(businessId);
+        delivery.setStatus(BusinessDelivery.Status.DELIVERED);
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(deliveries.findByIdAndBusinessId(deliveryId, businessId)).thenReturn(Optional.of(delivery));
+
+        CommercialOperationsAdminService service = service(
+                mock(BusinessOrderRepository.class),
+                mock(BusinessOrderLineRepository.class),
+                tenant,
+                deliveries,
+                mock(BusinessOperationRepository.class));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.updateDeliveryStatus(deliveryId, BusinessDelivery.Status.CANCELLED));
+        verify(deliveries, never()).saveAndFlush(any());
+    }
+
+    private static CommercialOperationsAdminService service(BusinessOrderRepository orders,
+                                                            BusinessOrderLineRepository lines,
+                                                            TenantProvider tenant,
+                                                            BusinessDeliveryRepository deliveries,
+                                                            BusinessOperationRepository operations) {
+        return new CommercialOperationsAdminService(
+                orders,
+                lines,
+                mock(BusinessQuoteRepository.class),
+                mock(BusinessLeadRepository.class),
+                deliveries,
+                operations,
+                tenant);
     }
 
     private static BusinessOrder order(UUID id,
