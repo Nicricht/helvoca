@@ -4,6 +4,9 @@ import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.customer.Customer;
 import cl.helvoca.customer.CustomerRepository;
+import cl.helvoca.operations.BusinessOperation;
+import cl.helvoca.operations.BusinessOperationRepository;
+import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.junit.jupiter.api.Test;
@@ -17,7 +20,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Instant;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
 @SpringBootTest
@@ -41,9 +44,10 @@ class BookingRepositoryIntegrationTest {
     @Autowired CustomerRepository customers;
     @Autowired ServiceItemRepository services;
     @Autowired BookingRepository bookings;
+    @Autowired BusinessOperationRepository operations;
 
     @Test
-    void flywayAndOverlapQueryWorkAgainstPostgres() {
+    void flywayOverlapAndUniversalBookingProjectionWorkAgainstPostgres() {
         Business business = new Business();
         business.setName("Integration Test Business");
         business = businesses.saveAndFlush(business);
@@ -71,7 +75,18 @@ class BookingRepositoryIntegrationTest {
         booking.setEndAt(end);
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setSource(BookingSource.ADMIN);
-        bookings.saveAndFlush(booking);
+        booking = bookings.saveAndFlush(booking);
+
+        assertNotNull(booking.getOperationId());
+        BusinessOperation operation = operations
+                .findByIdAndBusinessId(booking.getOperationId(), business.getId())
+                .orElseThrow();
+        assertEquals(BusinessOperation.Type.BOOKING, operation.getType());
+        assertEquals(BusinessOperation.Status.CONFIRMED, operation.getStatus());
+        assertEquals(BusinessOrder.Source.MANUAL, operation.getSource());
+        assertEquals(1, operation.getRevision());
+        assertEquals(booking.getId().toString(), operation.getMetadata().get("bookingId"));
+        assertEquals(service.getId().toString(), operation.getMetadata().get("serviceId"));
 
         long overlap = bookings.countOverlaps(
                 business.getId(),
@@ -93,5 +108,26 @@ class BookingRepositoryIntegrationTest {
 
         assertEquals(1L, overlap);
         assertEquals(0L, noOverlap);
+
+        Instant rescheduledStart = Instant.parse("2030-01-02T12:00:00Z");
+        booking.setStartAt(rescheduledStart);
+        booking.setEndAt(Instant.parse("2030-01-02T13:00:00Z"));
+        bookings.saveAndFlush(booking);
+
+        BusinessOperation rescheduled = operations
+                .findByIdAndBusinessId(booking.getOperationId(), business.getId())
+                .orElseThrow();
+        assertEquals(2, rescheduled.getRevision());
+        assertEquals(rescheduledStart.toString(), String.valueOf(rescheduled.getMetadata().get("startAt")));
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        bookings.saveAndFlush(booking);
+
+        BusinessOperation cancelled = operations
+                .findByIdAndBusinessId(booking.getOperationId(), business.getId())
+                .orElseThrow();
+        assertEquals(BusinessOperation.Status.CANCELLED, cancelled.getStatus());
+        assertEquals(3, cancelled.getRevision());
+        assertEquals("CANCELLED", cancelled.getMetadata().get("projectionStatus"));
     }
 }
