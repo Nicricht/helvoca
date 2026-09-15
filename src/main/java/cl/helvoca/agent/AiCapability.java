@@ -24,6 +24,7 @@ public enum AiCapability {
     LIST_DELIVERY_ZONES("list_delivery_zones", true),
     VALIDATE_DELIVERY_ADDRESS("validate_delivery_address", true),
     QUOTE_ORDER("quote_order", true),
+    UPDATE_ORDER("update_order", true),
     CREATE_ORDER("create_order", true),
     GET_ORDER_STATUS("get_order_status", true),
     CANCEL_ORDER("cancel_order", true),
@@ -38,27 +39,13 @@ public enum AiCapability {
         this.commercialOperation = commercialOperation;
     }
 
-    public String toolName() {
-        return toolName;
-    }
-
-    /**
-     * Commercial operation capabilities are opt-in. They must never be added
-     * automatically to a legacy tenant merely because a new enum constant was
-     * introduced.
-     */
-    public boolean isCommercialOperation() {
-        return commercialOperation;
-    }
+    public String toolName() { return toolName; }
+    public boolean isCommercialOperation() { return commercialOperation; }
 
     public static Optional<AiCapability> fromToolName(String toolName) {
         return Arrays.stream(values()).filter(value -> value.toolName.equals(toolName)).findFirst();
     }
 
-    /**
-     * Backward-compatible defaults for tenants that have not configured an
-     * AiAgent yet. Transactional commercial tools are intentionally excluded.
-     */
     public static EnumSet<AiCapability> legacyDefaults() {
         EnumSet<AiCapability> defaults = EnumSet.noneOf(AiCapability.class);
         for (AiCapability capability : values()) {

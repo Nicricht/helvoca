@@ -10,13 +10,13 @@ import java.util.Map;
 import java.util.UUID;
 
 @Entity
-@Table(name = "business_order_line")
-public class BusinessOrderLine {
+@Table(name = "business_operation_item")
+public class BusinessOperationItem {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    @Column(name = "order_id", nullable = false)
-    private UUID orderId;
+    @Column(name = "operation_id", nullable = false)
+    private UUID operationId;
     @Column(name = "catalog_item_id", nullable = false)
     private UUID catalogItemId;
     @Column(name = "item_name", nullable = false, length = 180)
@@ -40,8 +40,8 @@ public class BusinessOrderLine {
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
-    public UUID getOrderId() { return orderId; }
-    public void setOrderId(UUID orderId) { this.orderId = orderId; }
+    public UUID getOperationId() { return operationId; }
+    public void setOperationId(UUID operationId) { this.operationId = operationId; }
     public UUID getCatalogItemId() { return catalogItemId; }
     public void setCatalogItemId(UUID catalogItemId) { this.catalogItemId = catalogItemId; }
     public String getItemName() { return itemName; }
