@@ -168,6 +168,17 @@ public class BookingCalendarEventStore {
     }
 
     @Transactional(readOnly = true)
+    public long activeExternalEvents(UUID businessId) {
+        Long count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM booking_calendar_event
+                 WHERE business_id = ?
+                   AND external_event_id IS NOT NULL
+                   AND status <> 'DELETED'
+                """, Long.class, businessId);
+        return count == null ? 0L : count;
+    }
+
+    @Transactional(readOnly = true)
     public long activeExternalEventsForOtherProvider(UUID businessId, String providerCode) {
         Long count = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM booking_calendar_event
