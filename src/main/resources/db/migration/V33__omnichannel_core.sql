@@ -122,6 +122,9 @@ ALTER TABLE conversation_operation_state
         FOREIGN KEY (omnichannel_session_id, business_id)
         REFERENCES omnichannel_session(id, business_id) ON DELETE RESTRICT;
 
-CREATE INDEX idx_conversation_state_omnichannel
-    ON conversation_operation_state(business_id, omnichannel_session_id, updated_at DESC)
+-- Exactly one shared conversation state may belong to a tenant-scoped
+-- omnichannel session. Anonymous legacy rows remain governed by the existing
+-- channel/source unique constraint.
+CREATE UNIQUE INDEX uq_conversation_state_omnichannel
+    ON conversation_operation_state(business_id, omnichannel_session_id)
     WHERE omnichannel_session_id IS NOT NULL;
