@@ -11,6 +11,7 @@ import cl.helvoca.operations.OperationConfirmation;
 import cl.helvoca.operations.OperationConfirmationRepository;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
+import jakarta.persistence.EntityManager;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +53,7 @@ class BookingConfirmationWorkflowIntegrationTest {
     @Autowired BusinessOperationRepository operations;
     @Autowired OperationConfirmationRepository confirmations;
     @Autowired BookingConfirmationWorkflowService workflow;
+    @Autowired EntityManager entityManager;
 
     @Test
     void proposalDoesNotCreateBookingAndSameCustomerCanConfirmOnAnotherChannel() {
@@ -188,8 +190,11 @@ class BookingConfirmationWorkflowIntegrationTest {
         BusinessOperation expired = operations.findByIdAndBusinessId(operationId, fixture.business().getId()).orElseThrow();
         assertEquals(BusinessOperation.Status.EXPIRED, expired.getStatus());
         assertNull(expired.getConfirmationToken());
-        assertEquals(OperationConfirmation.State.EXPIRED,
-                confirmations.findByBusinessIdAndToken(fixture.business().getId(), token).orElseThrow().getState());
+        OperationConfirmation expiredConfirmation = confirmations
+                .findByBusinessIdAndToken(fixture.business().getId(), token)
+                .orElseThrow();
+        entityManager.refresh(expiredConfirmation);
+        assertEquals(OperationConfirmation.State.EXPIRED, expiredConfirmation.getState());
     }
 
     private Fixture fixture() {
