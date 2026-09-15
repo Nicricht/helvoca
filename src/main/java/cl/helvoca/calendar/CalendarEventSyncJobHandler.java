@@ -59,7 +59,6 @@ public class CalendarEventSyncJobHandler implements PersistentJobHandler {
         BookingCalendarEvent event = events.findById(job.businessId(), eventId)
                 .orElseThrow(() -> new PermanentJobException("Calendar event projection not found"));
         if (event.desiredVersion() != desiredVersion) {
-            // A newer booking mutation already superseded this durable job.
             return;
         }
 
@@ -81,7 +80,9 @@ public class CalendarEventSyncJobHandler implements PersistentJobHandler {
             throw new PermanentJobException("Calendar provider is unavailable for tenant", e);
         }
 
-        String idempotencyKey = "calendar-booking:" + booking.getId() + ":v" + desiredVersion;
+        // Stable per booking. Revisions update one external event instead of
+        // creating a new event when a stale worker finishes late.
+        String idempotencyKey = "calendar-booking:" + booking.getId();
         try {
             if (booking.getStatus() == BookingStatus.CANCELLED) {
                 if (event.externalEventId() != null && !event.externalEventId().isBlank()) {
@@ -116,12 +117,14 @@ public class CalendarEventSyncJobHandler implements PersistentJobHandler {
                 throw new CalendarProvider.ProviderException("Provider did not return an external event id", true);
             }
 
+            String externalEventId = result.externalEventId().trim();
+            events.recordExternalEventId(job.businessId(), event.id(), integration.providerCode(), externalEventId);
+
             String meetingUrl = null;
             if (integration.meetingsEnabled()) {
                 meetingUrl = requireHttpsMeetingUrl(result.meetingUrl());
             }
-            events.markSynced(job.businessId(), event.id(), desiredVersion,
-                    result.externalEventId().trim(), meetingUrl);
+            events.markSynced(job.businessId(), event.id(), desiredVersion, externalEventId, meetingUrl);
         } catch (PermanentJobException e) {
             events.markFailed(job.businessId(), event.id(), desiredVersion,
                     "CALENDAR_SYNC_INVALID_STATE", e.getMessage());
