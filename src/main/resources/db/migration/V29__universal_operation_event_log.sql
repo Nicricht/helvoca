@@ -5,7 +5,7 @@
 CREATE TABLE business_operation_event (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sequence_no BIGSERIAL NOT NULL UNIQUE,
-    business_id UUID NOT NULL REFERENCES business(id) ON DELETE CASCADE,
+    business_id UUID NOT NULL REFERENCES business(id) ON DELETE RESTRICT,
     operation_id UUID NOT NULL REFERENCES business_operation(id) ON DELETE RESTRICT,
     operation_type VARCHAR(20) NOT NULL,
     event_type VARCHAR(80) NOT NULL,
@@ -82,6 +82,7 @@ DECLARE
     v_previous_status VARCHAR(30);
     v_payment_status_before TEXT;
     v_payment_status_after TEXT;
+    v_actor_type VARCHAR(20);
 BEGIN
     IF TG_OP = 'INSERT' THEN
         v_previous_status := NULL;
@@ -127,6 +128,13 @@ BEGIN
         END IF;
     END IF;
 
+    v_actor_type := CASE
+        WHEN v_event_type = 'PAYMENT_STATUS_CHANGED' THEN 'PROVIDER'
+        WHEN NEW.source = 'MANUAL' THEN 'HUMAN'
+        WHEN NEW.source IN ('VOICE','WHATSAPP') THEN 'AI'
+        ELSE 'SYSTEM'
+    END;
+
     INSERT INTO business_operation_event (
         business_id,
         operation_id,
@@ -149,7 +157,7 @@ BEGIN
         GREATEST(COALESCE(NEW.revision, 1), 1),
         NEW.status,
         v_previous_status,
-        'SYSTEM',
+        v_actor_type,
         jsonb_strip_nulls(jsonb_build_object(
             'previousStatus', v_previous_status,
             'status', NEW.status,
