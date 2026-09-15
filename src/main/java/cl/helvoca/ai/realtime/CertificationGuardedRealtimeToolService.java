@@ -1,6 +1,7 @@
 package cl.helvoca.ai.realtime;
 
 import cl.helvoca.booking.Booking;
+import cl.helvoca.booking.BookingOperationSyncService;
 import cl.helvoca.booking.BookingRepository;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallAction;
@@ -11,6 +12,7 @@ import cl.helvoca.call.CallTraceService;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.learning.UnansweredQuestionService;
+import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationCapabilityService;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.operations.CommercialOperationToolService;
@@ -28,6 +30,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.util.List;
 import java.util.Set;
@@ -36,6 +39,9 @@ import java.util.UUID;
 @Service
 @Primary
 public class CertificationGuardedRealtimeToolService extends RealtimeToolService {
+    private static final Set<String> BOOKING_MUTATIONS = Set.of(
+            "create_booking", "reschedule_booking", "cancel_booking");
+
     private final CallSessionRepository calls;
     private final CallActionRepository actions;
     private final CustomerRepository customers;
@@ -54,6 +60,9 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
 
     @Autowired(required = false)
     private BusinessOperationCapabilityService operationCapabilities;
+
+    @Autowired
+    private BookingOperationSyncService bookingOperations;
 
     public CertificationGuardedRealtimeToolService(BusinessRepository businesses,
                                                     CustomerRepository customers,
@@ -147,7 +156,35 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
         }
 
         lockBookingMutation(context, toolName, rawArguments);
-        return super.execute(context, toolName, rawArguments);
+        String result = super.execute(context, toolName, rawArguments);
+        if (!BOOKING_MUTATIONS.contains(toolName)) return result;
+        return synchronizeBookingMutation(context, toolName, result);
+    }
+
+    private String synchronizeBookingMutation(RealtimeCallContext context,
+                                              String toolName,
+                                              String rawResult) {
+        JSONObject result = new JSONObject(rawResult);
+        if (!result.optBoolean("success", false)) return rawResult;
+        JSONObject data = result.optJSONObject("data");
+        if (data == null || data.optString("bookingId", "").isBlank()) return rawResult;
+
+        try {
+            UUID bookingId = UUID.fromString(data.getString("bookingId"));
+            BusinessOperation operation = bookingOperations.synchronize(
+                    context.businessId(),
+                    bookingId,
+                    context.callId(),
+                    BusinessOrder.Source.VOICE,
+                    toolName);
+            data.put("operationId", operation.getId().toString());
+            data.put("operationRevision", operation.getRevision());
+            return result.toString();
+        } catch (RuntimeException e) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            return error("BOOKING_OPERATION_SYNC_FAILED",
+                    "La reserva no pudo sincronizarse de forma segura. No se aplicará el cambio.").toString();
+        }
     }
 
     private JSONObject endCall(RealtimeCallContext context) {
