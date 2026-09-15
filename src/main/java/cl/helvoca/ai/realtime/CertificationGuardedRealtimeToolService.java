@@ -1,8 +1,10 @@
 package cl.helvoca.ai.realtime;
 
 import cl.helvoca.booking.Booking;
+import cl.helvoca.booking.BookingConfirmationWorkflowService;
 import cl.helvoca.booking.BookingOperationSyncService;
 import cl.helvoca.booking.BookingRepository;
+import cl.helvoca.booking.BookingSource;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallAction;
 import cl.helvoca.call.CallActionRepository;
@@ -66,6 +68,9 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     @Autowired
     private BookingOperationSyncService bookingOperations;
 
+    @Autowired
+    private BookingConfirmationWorkflowService bookingConfirmationWorkflow;
+
     @Autowired(required = false)
     private AutomationPolicyToolGate automationPolicies;
 
@@ -100,6 +105,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
         if (operationCapabilities != null) {
             instructions += CommercialToolDefinitions.instructions(operationCapabilities.enabled(context.businessId()));
         }
+        instructions += "\nPara create_booking usa siempre dos fases: primero llama con serviceId/startAt para obtener una propuesta, presenta esas condiciones y pide confirmación explícita; solo después vuelve a llamar create_booking con el operationId y confirmationToken devueltos. Una respuesta sin bookingId es solo una propuesta y NO significa que exista una reserva.";
         return instructions;
     }
 
@@ -186,6 +192,37 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                 trace.recordTool(context.businessId(), context.callId(), toolName, blocked);
                 return blocked.toString();
             }
+        }
+
+        if ("create_booking".equals(toolName)) {
+            JSONObject args;
+            try {
+                args = rawArguments == null || rawArguments.isBlank()
+                        ? new JSONObject()
+                        : new JSONObject(rawArguments);
+            } catch (Exception e) {
+                JSONObject invalid = error("INVALID_ARGUMENT", "Los datos de la reserva no son válidos.");
+                trace.recordTool(context.businessId(), context.callId(), toolName, invalid);
+                return invalid.toString();
+            }
+
+            UUID customerId = call == null ? null : call.getCustomerId();
+            if (customerId == null && context.callerNumber() != null && !context.callerNumber().isBlank()) {
+                customerId = customers.findFirstByBusinessIdAndPhone(context.businessId(), context.callerNumber())
+                        .map(customer -> customer.getId())
+                        .orElse(null);
+            }
+            JSONObject result = bookingConfirmationWorkflow.execute(
+                    context.businessId(),
+                    customerId,
+                    context.callId(),
+                    context.callerNumber(),
+                    BusinessOrder.Source.VOICE,
+                    BookingSource.AI_CALL,
+                    args);
+            String synchronizedResult = synchronizeBookingMutation(context, toolName, result.toString());
+            trace.recordTool(context.businessId(), context.callId(), toolName, new JSONObject(synchronizedResult));
+            return synchronizedResult;
         }
 
         lockBookingMutation(context, toolName, rawArguments);
