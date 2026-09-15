@@ -42,11 +42,29 @@ jobs:
       - name: Run backend tests
         run: mvn --batch-mode --no-transfer-progress test
 
-      - name: Print backend test diagnostics
+      - name: Summarize backend test diagnostics
         if: failure()
+        shell: bash
         run: |
-          echo "=== Surefire reports ==="
-          find . -type f \( -path '*/target/surefire-reports/*.txt' -o -path '*/target/failsafe-reports/*.txt' \) -print -exec sh -c 'echo "--- $1 ---"; cat "$1"' _ {} \;
+          {
+            echo "### Backend test diagnostics"
+            echo '```text'
+            find . -type f \( -path '*/target/surefire-reports/*.txt' -o -path '*/target/failsafe-reports/*.txt' \) -print0 \
+              | xargs -0 -r grep -Hn -E 'Tests run:|<<< FAILURE!|<<< ERROR!|AssertionFailedError|Caused by:|ERROR' \
+              | head -n 200 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload backend test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-diagnostics
+          path: |
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+          if-no-files-found: warn
+          retention-days: 1
 
       - name: Install browser test dependencies
         run: |
