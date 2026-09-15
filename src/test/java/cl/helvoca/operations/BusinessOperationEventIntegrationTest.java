@@ -16,6 +16,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -51,6 +52,7 @@ class BusinessOperationEventIntegrationTest {
         operation.setBusinessId(business.getId());
         operation.setType(BusinessOperation.Type.ORDER);
         operation.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
+        operation.setConfirmationToken(UUID.randomUUID());
         operation.setSource(BusinessOrder.Source.WHATSAPP);
         operation.setRevision(1);
         operation.setTotal(new BigDecimal("12500"));
@@ -64,6 +66,7 @@ class BusinessOperationEventIntegrationTest {
 
         operation.setRevision(3);
         operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        operation.setConfirmationToken(null);
         operation = operations.saveAndFlush(operation);
 
         List<BusinessOperationEvent> history = events
@@ -140,6 +143,7 @@ class BusinessOperationEventIntegrationTest {
         operation.setBusinessId(business.getId());
         operation.setType(BusinessOperation.Type.PAYMENT);
         operation.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
+        operation.setConfirmationToken(UUID.randomUUID());
         operation.setSource(BusinessOrder.Source.VOICE);
         operation.setRevision(1);
         operation.setTotal(new BigDecimal("5000"));
@@ -147,6 +151,7 @@ class BusinessOperationEventIntegrationTest {
         operation = operations.saveAndFlush(operation);
 
         operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        operation.setConfirmationToken(null);
         operation.setMetadata(Map.of("paymentStatus", "REQUIRES_ACTION"));
         operation = operations.saveAndFlush(operation);
 
