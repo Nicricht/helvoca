@@ -22,6 +22,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -95,9 +96,11 @@ class OutboundDispatchOutboxIntegrationTest {
                 messages.findByIdAndBusinessId(prepared.getId(), business.getId()).orElseThrow().getStatus());
         assertEquals(first.id(), jobs.findByIdempotencyKey(
                 business.getId(), "outbound-message-dispatch:" + prepared.getId()).orElseThrow().id());
-        assertThrows(IllegalStateException.class,
-                () -> outbound.dispatch(business.getId(), prepared.getId()));
+
+        UUID businessId = business.getId();
+        UUID messageId = prepared.getId();
+        assertThrows(IllegalStateException.class, () -> outbound.dispatch(businessId, messageId));
         assertEquals(OutboundMessage.Status.QUEUED,
-                messages.findByIdAndBusinessId(prepared.getId(), business.getId()).orElseThrow().getStatus());
+                messages.findByIdAndBusinessId(messageId, businessId).orElseThrow().getStatus());
     }
 }
