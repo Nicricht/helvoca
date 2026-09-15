@@ -19,6 +19,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -118,7 +119,9 @@ class BookingRepositoryIntegrationTest {
                 .findByIdAndBusinessId(booking.getOperationId(), business.getId())
                 .orElseThrow();
         assertEquals(2, rescheduled.getRevision());
-        assertEquals(rescheduledStart.toString(), String.valueOf(rescheduled.getMetadata().get("startAt")));
+        assertEquals(
+                rescheduledStart,
+                OffsetDateTime.parse(String.valueOf(rescheduled.getMetadata().get("startAt"))).toInstant());
 
         booking.setStatus(BookingStatus.CANCELLED);
         bookings.saveAndFlush(booking);
