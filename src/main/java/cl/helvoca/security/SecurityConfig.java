@@ -1,5 +1,6 @@
 package cl.helvoca.security;
 
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -42,6 +43,27 @@ public class SecurityConfig {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(scopes);
         return converter;
+    }
+
+    /**
+     * These filters are components because they have injected dependencies, but
+     * they must execute only inside Spring Security after bearer authentication.
+     * Disable servlet-container auto registration to avoid OncePerRequestFilter
+     * consuming its marker before the authenticated security-chain position.
+     */
+    @Bean
+    FilterRegistrationBean<TenantDatabaseContextFilter> tenantDatabaseContextFilterRegistration(
+            TenantDatabaseContextFilter filter) {
+        FilterRegistrationBean<TenantDatabaseContextFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    FilterRegistrationBean<ApiRateLimitFilter> apiRateLimitFilterRegistration(ApiRateLimitFilter filter) {
+        FilterRegistrationBean<ApiRateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean
