@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -62,7 +63,7 @@ public class OrderWorkflowService {
         operation.setContactName(optional(args, "contactName"));
         operation.setContactPhone(blank(trustedPhone) ? null : trustedPhone.trim());
         applyCalculation(operation, calculation);
-        operation.setMetadataJson(stateMetadata(true));
+        operation.setMetadata(stateMetadata(true));
         operation = operations.saveAndFlush(operation);
         replaceItems(operation.getId(), calculation.lines());
         return success(quoteData(operation, calculation));
@@ -87,7 +88,7 @@ public class OrderWorkflowService {
         operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
         operation.setConfirmationToken(UUID.randomUUID());
         operation.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
-        operation.setMetadataJson(stateMetadata(true));
+        operation.setMetadata(stateMetadata(true));
         operation = operations.saveAndFlush(operation);
         replaceItems(operation.getId(), calculation.lines());
         return success(quoteData(operation, calculation));
@@ -106,7 +107,7 @@ public class OrderWorkflowService {
         UUID operationId = uuid(required(args, "operationId"));
         BusinessOrder existing = orders.findByOperationIdAndBusinessId(operationId, businessId).orElse(null);
         if (existing != null) {
-            if (!ownedBy(existing, customerId, trustedPhone)) {
+            if (!orderOwnedBy(existing, customerId, sourceReferenceId, trustedPhone)) {
                 return error("ORDER_NOT_FOUND", "No encuentro ese pedido entre los pedidos del cliente actual.");
             }
             JSONObject data = orderData(existing, orderLines.findAllByOrderIdOrderByCreatedAtAsc(existing.getId()));
@@ -140,7 +141,7 @@ public class OrderWorkflowService {
             operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
             operation.setConfirmationToken(UUID.randomUUID());
             operation.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
-            operation.setMetadataJson(stateMetadata(true));
+            operation.setMetadata(stateMetadata(true));
             operation = operations.saveAndFlush(operation);
             replaceItems(operation.getId(), recalculated.lines());
             return errorWithData("ORDER_TOTAL_CHANGED",
@@ -176,7 +177,7 @@ public class OrderWorkflowService {
             entity.setQuantity(line.quantity());
             entity.setUnitPrice(line.item().getPrice());
             entity.setLineTotal(line.total());
-            entity.setModifiersJson(line.modifiersJson());
+            entity.setModifiers(line.modifiers());
             entity.setNotes(line.notes());
             persisted.add(orderLines.save(entity));
         }
@@ -184,7 +185,7 @@ public class OrderWorkflowService {
 
         operation.setStatus(BusinessOperation.Status.CONFIRMED);
         operation.setConfirmationToken(null);
-        operation.setMetadataJson(stateMetadata(false));
+        operation.setMetadata(stateMetadata(false));
         operations.saveAndFlush(operation);
 
         JSONObject data = orderData(order, persisted);
@@ -235,9 +236,9 @@ public class OrderWorkflowService {
             if (!Objects.equals(currency, item.getCurrency())) {
                 throw new IllegalArgumentException("No se pueden mezclar monedas distintas en una misma operación.");
             }
-            String modifiersJson = structuredModifiers(requested);
+            Map<String, Object> modifiers = structuredModifiers(requested);
             BigDecimal lineTotal = item.getPrice().multiply(BigDecimal.valueOf(quantity));
-            lines.add(new Line(item, quantity, modifiersJson, optional(requested, "notes"), lineTotal));
+            lines.add(new Line(item, quantity, modifiers, optional(requested, "notes"), lineTotal));
             subtotal = subtotal.add(lineTotal);
         }
 
@@ -312,7 +313,7 @@ public class OrderWorkflowService {
             item.setQuantity(line.quantity());
             item.setUnitPrice(line.item().getPrice());
             item.setLineTotal(line.total());
-            item.setModifiersJson(line.modifiersJson());
+            item.setModifiers(line.modifiers());
             item.setNotes(line.notes());
             replacements.add(item);
         }
@@ -327,7 +328,9 @@ public class OrderWorkflowService {
                     .put("catalogItemId", item.getCatalogItemId().toString())
                     .put("quantity", item.getQuantity());
             if (!blank(item.getNotes())) line.put("notes", item.getNotes());
-            if (!blank(item.getModifiersJson())) line.put("modifiers", new JSONObject(item.getModifiersJson()));
+            if (item.getModifiers() != null && !item.getModifiers().isEmpty()) {
+                line.put("modifiers", new JSONObject(item.getModifiers()));
+            }
             requested.put(line);
         }
         JSONObject args = new JSONObject()
@@ -348,8 +351,7 @@ public class OrderWorkflowService {
                     .put("unitPrice", line.item().getPrice())
                     .put("lineTotal", line.total())
                     .put("notes", nullable(line.notes()));
-            if (!blank(line.modifiersJson())) item.put("modifiers", new JSONObject(line.modifiersJson()));
-            else item.put("modifiers", JSONObject.NULL);
+            item.put("modifiers", line.modifiers() == null ? JSONObject.NULL : new JSONObject(line.modifiers()));
             lines.put(item);
         }
         return new JSONObject()
@@ -378,8 +380,7 @@ public class OrderWorkflowService {
                     .put("unitPrice", line.getUnitPrice())
                     .put("lineTotal", line.getLineTotal())
                     .put("notes", nullable(line.getNotes()));
-            if (!blank(line.getModifiersJson())) item.put("modifiers", new JSONObject(line.getModifiersJson()));
-            else item.put("modifiers", JSONObject.NULL);
+            item.put("modifiers", line.getModifiers() == null ? JSONObject.NULL : new JSONObject(line.getModifiers()));
             items.put(item);
         }
         return new JSONObject()
@@ -403,17 +404,20 @@ public class OrderWorkflowService {
         return operation.getSourceReferenceId() != null && operation.getSourceReferenceId().equals(sourceReferenceId);
     }
 
-    private static boolean ownedBy(BusinessOrder order, UUID customerId, String trustedPhone) {
-        if (customerId != null && customerId.equals(order.getCustomerId())) return true;
-        return !blank(trustedPhone) && order.getContactPhone() != null && trustedPhone.trim().equals(order.getContactPhone());
+    private static boolean orderOwnedBy(BusinessOrder order,
+                                        UUID customerId,
+                                        UUID sourceReferenceId,
+                                        String trustedPhone) {
+        if (order.getCustomerId() != null) return order.getCustomerId().equals(customerId);
+        if (!blank(order.getContactPhone())) return !blank(trustedPhone) && order.getContactPhone().equals(trustedPhone.trim());
+        return order.getSourceReferenceId() != null && order.getSourceReferenceId().equals(sourceReferenceId);
     }
 
-    private static String structuredModifiers(JSONObject requested) {
+    private static Map<String, Object> structuredModifiers(JSONObject requested) {
         if (!requested.has("modifiers") || requested.opt("modifiers") == JSONObject.NULL) return null;
         Object value = requested.get("modifiers");
-        if (value instanceof JSONObject object) return object.toString();
-        if (value instanceof JSONArray array) return array.toString();
-        throw new IllegalArgumentException("modifiers debe ser un objeto o arreglo JSON estructurado.");
+        if (value instanceof JSONObject object) return object.toMap();
+        throw new IllegalArgumentException("modifiers debe ser un objeto JSON estructurado.");
     }
 
     private static int coverageScore(DeliveryZone zone, String normalizedAddress) {
@@ -436,12 +440,11 @@ public class OrderWorkflowService {
                 .trim();
     }
 
-    private static String stateMetadata(boolean confirmationPending) {
-        return new JSONObject()
-                .put("intent", "ORDER")
-                .put("confirmationPending", confirmationPending)
-                .put("paymentPending", false)
-                .toString();
+    private static Map<String, Object> stateMetadata(boolean confirmationPending) {
+        return Map.of(
+                "intent", "ORDER",
+                "confirmationPending", confirmationPending,
+                "paymentPending", false);
     }
 
     private static String required(JSONObject args, String key) {
@@ -481,7 +484,7 @@ public class OrderWorkflowService {
                 .put("error", new JSONObject().put("code", code).put("message", message));
     }
 
-    private record Line(CatalogItem item, int quantity, String modifiersJson, String notes, BigDecimal total) {}
+    private record Line(CatalogItem item, int quantity, Map<String, Object> modifiers, String notes, BigDecimal total) {}
     private record Calculation(List<Line> lines,
                                BigDecimal subtotal,
                                BigDecimal deliveryFee,
