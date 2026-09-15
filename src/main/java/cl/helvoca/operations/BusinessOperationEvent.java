@@ -1,6 +1,7 @@
 package cl.helvoca.operations;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -9,6 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Entity
+@Immutable
 @Table(name = "business_operation_event")
 public class BusinessOperationEvent {
     public enum ActorType { SYSTEM, HUMAN, AI, PROVIDER }
