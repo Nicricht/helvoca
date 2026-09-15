@@ -75,7 +75,8 @@ class BusinessOperationEventIntegrationTest {
         assertEquals("ORDER_QUOTED", history.get(2).getEventType());
         assertEquals(BusinessOperationEvent.ActorType.AI, history.get(2).getActorType());
         assertEquals(BusinessOperation.Status.AWAITING_CONFIRMATION, history.get(0).getPreviousStatus());
-        assertEquals(new BigDecimal("13900.00"), new BigDecimal(history.get(0).getPayload().get("total").toString()));
+        assertEquals(0, new BigDecimal(history.get(0).getPayload().get("total").toString())
+                .compareTo(new BigDecimal("13900")));
         assertFalse(history.stream().anyMatch(event -> event.getPayload().containsKey("secretLikeValue")));
     }
 
@@ -102,6 +103,31 @@ class BusinessOperationEventIntegrationTest {
         assertThrows(DataAccessException.class, () -> jdbc.update(
                 "DELETE FROM business_operation_event WHERE id = ?",
                 event.getId()));
+    }
+
+    @Test
+    void operationDeletionCreatesHistoricalEventWithoutBlockingCleanup() {
+        Business business = new Business();
+        business.setName("Delete Event Test");
+        business = businesses.saveAndFlush(business);
+
+        BusinessOperation operation = new BusinessOperation();
+        operation.setBusinessId(business.getId());
+        operation.setType(BusinessOperation.Type.LEAD);
+        operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        operation.setSource(BusinessOrder.Source.MANUAL);
+        operation = operations.saveAndFlush(operation);
+
+        var operationId = operation.getId();
+        var businessId = business.getId();
+        operations.deleteById(operationId);
+        operations.flush();
+
+        List<BusinessOperationEvent> history = events
+                .findTop100ByBusinessIdAndOperationIdOrderBySequenceNoDesc(businessId, operationId);
+        assertEquals("LEAD_DELETED", history.getFirst().getEventType());
+        assertEquals(BusinessOperationEvent.ActorType.HUMAN, history.getFirst().getActorType());
+        assertFalse(operations.existsById(operationId));
     }
 
     @Test
