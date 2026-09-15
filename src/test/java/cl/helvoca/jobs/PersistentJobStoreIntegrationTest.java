@@ -52,19 +52,42 @@ class PersistentJobStoreIntegrationTest {
     }
 
     @Test
-    void enqueueIsTenantScopedAndIdempotent() {
+    void enqueueIsTenantScopedAndIdempotentForEquivalentJsonPayload() {
         Business business = business("Job idempotency");
+        UUID messageId = UUID.randomUUID();
+        String firstPayload = "{\"messageId\":\"" + messageId + "\",\"metadata\":{\"source\":\"test\"}}";
+        String equivalentPayload = "{\"metadata\":{\"source\":\"test\"},\"messageId\":\"" + messageId + "\"}";
 
         PersistentJob first = store.enqueue(
                 business.getId(), null, PersistentJob.Type.OUTBOUND_MESSAGE_DISPATCH,
-                "dispatch:one", "{\"messageId\":\"" + UUID.randomUUID() + "\"}", 5, Instant.now());
+                "dispatch:one", firstPayload, 5, Instant.now());
         PersistentJob replay = store.enqueue(
                 business.getId(), null, PersistentJob.Type.OUTBOUND_MESSAGE_DISPATCH,
-                "dispatch:one", "{\"messageId\":\"" + UUID.randomUUID() + "\"}", 5, Instant.now());
+                "dispatch:one", equivalentPayload, 5, Instant.now());
 
         assertEquals(first.id(), replay.id());
         assertEquals(PersistentJob.Status.PENDING, replay.status());
         assertEquals(0, replay.attemptCount());
+    }
+
+    @Test
+    void reusingIdempotencyKeyWithDifferentPayloadFailsClosed() {
+        Business business = business("Job payload conflict");
+        UUID firstMessageId = UUID.randomUUID();
+        UUID secondMessageId = UUID.randomUUID();
+
+        store.enqueue(
+                business.getId(), null, PersistentJob.Type.OUTBOUND_MESSAGE_DISPATCH,
+                "dispatch:payload-conflict", "{\"messageId\":\"" + firstMessageId + "\"}", 5, Instant.now());
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> store.enqueue(
+                business.getId(), null, PersistentJob.Type.OUTBOUND_MESSAGE_DISPATCH,
+                "dispatch:payload-conflict", "{\"messageId\":\"" + secondMessageId + "\"}", 5, Instant.now()));
+
+        assertTrue(error.getMessage().contains("different durable job"));
+        assertEquals(1L, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM persistent_job WHERE business_id = ? AND idempotency_key = ?",
+                Long.class, business.getId(), "dispatch:payload-conflict"));
     }
 
     @Test
