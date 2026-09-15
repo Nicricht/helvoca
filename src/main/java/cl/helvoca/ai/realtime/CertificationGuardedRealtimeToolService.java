@@ -18,6 +18,7 @@ import cl.helvoca.operations.BusinessOperationCapabilityService;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.operations.CommercialOperationToolService;
 import cl.helvoca.operations.CommercialToolDefinitions;
+import cl.helvoca.operations.SafeOperationRetryEngine;
 import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
@@ -67,6 +68,9 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
 
     @Autowired(required = false)
     private AutomationPolicyToolGate automationPolicies;
+
+    @Autowired(required = false)
+    private SafeOperationRetryEngine retryEngine;
 
     public CertificationGuardedRealtimeToolService(BusinessRepository businesses,
                                                     CustomerRepository customers,
@@ -126,14 +130,31 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
             return result.toString();
         }
 
+        BusinessOperation.Type operationType = null;
         if (automationPolicies != null) {
             JSONObject policyBlock = automationPolicies.blockIfAutomationDisabled(context.businessId(), toolName);
             if (policyBlock != null) {
                 trace.recordTool(context.businessId(), context.callId(), toolName, policyBlock);
                 return policyBlock.toString();
             }
+            operationType = automationPolicies.operationType(toolName);
         }
 
+        if (retryEngine != null && operationType != null) {
+            BusinessOperation.Type retryType = operationType;
+            return retryEngine.execute(
+                    context.businessId(),
+                    retryType,
+                    context.callId(),
+                    toolName,
+                    () -> executeOperationOnce(context, toolName, rawArguments));
+        }
+        return executeOperationOnce(context, toolName, rawArguments);
+    }
+
+    private String executeOperationOnce(RealtimeCallContext context,
+                                        String toolName,
+                                        String rawArguments) {
         if (commercialOperations != null && commercialOperations.supports(toolName)) {
             JSONObject result;
             if (operationCapabilities == null || !operationCapabilities.isToolAllowed(context.businessId(), toolName)) {
