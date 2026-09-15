@@ -1,5 +1,6 @@
 package cl.helvoca.operations;
 
+import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,11 +16,14 @@ public class UniversalConfirmationService {
 
     private final BusinessOperationRepository operations;
     private final OperationConfirmationRepository confirmations;
+    private final EntityManager entityManager;
 
     public UniversalConfirmationService(BusinessOperationRepository operations,
-                                        OperationConfirmationRepository confirmations) {
+                                        OperationConfirmationRepository confirmations,
+                                        EntityManager entityManager) {
         this.operations = operations;
         this.confirmations = confirmations;
+        this.entityManager = entityManager;
     }
 
     /**
@@ -39,22 +43,31 @@ public class UniversalConfirmationService {
         if (operation == null) return Authorization.NOT_FOUND;
         if (!ownedBy(operation, customerId, sourceReferenceId, trustedPhone)) return Authorization.NOT_OWNED;
 
-        OperationConfirmation confirmation = confirmations
-                .findByBusinessIdAndOperationIdAndOperationRevision(
-                        businessId, operationId, operation.getRevision() == null ? 1 : operation.getRevision())
-                .orElse(null);
-
-        if (operation.getStatus() == BusinessOperation.Status.CONFIRMED
-                && confirmation != null
-                && confirmation.getState() == OperationConfirmation.State.CONSUMED
-                && token != null
-                && Objects.equals(token, confirmation.getToken())) {
+        // A consumed token remains the durable idempotency key even if a downstream
+        // workflow advances the operation revision after confirmation (for example,
+        // payment execution/webhook processing). Resolve replay by exact token first,
+        // while still requiring the token to belong to this tenant and operation.
+        OperationConfirmation tokenConfirmation = token == null
+                ? null
+                : confirmations.findByBusinessIdAndToken(businessId, token).orElse(null);
+        refreshFromDatabase(tokenConfirmation);
+        if (tokenConfirmation != null
+                && operationId.equals(tokenConfirmation.getOperationId())
+                && tokenConfirmation.getState() == OperationConfirmation.State.CONSUMED
+                && replayableStatus(operation.getStatus())) {
             return Authorization.IDEMPOTENT_REPLAY;
         }
 
         if (operation.getStatus() != BusinessOperation.Status.AWAITING_CONFIRMATION) {
             return Authorization.NOT_AWAITING;
         }
+
+        OperationConfirmation confirmation = confirmations
+                .findByBusinessIdAndOperationIdAndOperationRevision(
+                        businessId, operationId, operation.getRevision() == null ? 1 : operation.getRevision())
+                .orElse(null);
+        refreshFromDatabase(confirmation);
+
         if (confirmation == null || token == null || !Objects.equals(token, confirmation.getToken())) {
             return Authorization.STALE;
         }
@@ -80,7 +93,14 @@ public class UniversalConfirmationService {
                 ? confirmations.findFirstByBusinessIdAndOperationIdOrderByOperationRevisionDesc(businessId, operationId).orElse(null)
                 : confirmations.findByBusinessIdAndToken(businessId, token).orElse(null);
         if (confirmation == null || !operationId.equals(confirmation.getOperationId())) return;
+
+        // business_operation has an AFTER trigger that consumes/invalidates the
+        // durable confirmation. Hibernate does not automatically observe a row
+        // changed by a database trigger inside the same persistence context, so
+        // reload it before deciding whether resolution metadata may be written.
+        refreshFromDatabase(confirmation);
         if (confirmation.getState() != OperationConfirmation.State.CONSUMED) return;
+
         if (confirmation.getResolvedAt() == null) confirmation.setResolvedAt(Instant.now());
         if (confirmation.getResolvedChannel() == null) {
             confirmation.setResolvedChannel(channel == null ? BusinessOrder.Source.API : channel);
@@ -93,16 +113,35 @@ public class UniversalConfirmationService {
 
     @Transactional(readOnly = true)
     public OperationConfirmation latest(UUID businessId, UUID operationId) {
-        return confirmations.findFirstByBusinessIdAndOperationIdOrderByOperationRevisionDesc(businessId, operationId)
+        OperationConfirmation confirmation = confirmations
+                .findFirstByBusinessIdAndOperationIdOrderByOperationRevisionDesc(businessId, operationId)
                 .orElse(null);
+        refreshFromDatabase(confirmation);
+        return confirmation;
+    }
+
+    private void refreshFromDatabase(OperationConfirmation confirmation) {
+        if (confirmation != null && entityManager.contains(confirmation)) {
+            entityManager.refresh(confirmation);
+        }
+    }
+
+    private static boolean replayableStatus(BusinessOperation.Status status) {
+        return status == BusinessOperation.Status.CONFIRMED
+                || status == BusinessOperation.Status.EXECUTING
+                || status == BusinessOperation.Status.COMPLETED;
     }
 
     private static boolean ownedBy(BusinessOperation operation,
                                    UUID customerId,
                                    UUID sourceReferenceId,
                                    String trustedPhone) {
-        if (customerId != null && operation.getCustomerId() != null) {
-            return customerId.equals(operation.getCustomerId());
+        // Once an operation has an explicit customer identity, never downgrade to
+        // weaker source/phone matching. Cross-channel confirmation is allowed only
+        // for that same customer. Fallback identifiers are reserved for operations
+        // that genuinely have no customer binding.
+        if (operation.getCustomerId() != null) {
+            return customerId != null && customerId.equals(operation.getCustomerId());
         }
         if (sourceReferenceId != null && operation.getSourceReferenceId() != null
                 && sourceReferenceId.equals(operation.getSourceReferenceId())) return true;
