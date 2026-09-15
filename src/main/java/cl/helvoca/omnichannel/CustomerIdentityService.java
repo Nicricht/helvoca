@@ -110,20 +110,24 @@ public class CustomerIdentityService {
                         businessId, customerId, CustomerIdentity.Type.PHONE, normalized)
                 .orElseGet(CustomerIdentity::new);
 
-        if (identity.getId() == null) {
+        boolean isNew = identity.getId() == null;
+        if (isNew) {
             identity.setBusinessId(businessId);
             identity.setCustomerId(customerId);
             identity.setIdentityType(CustomerIdentity.Type.PHONE);
             identity.setNormalizedValue(normalized);
-        }
-
-        CustomerIdentity.VerificationStatus current = identity.getVerificationStatus();
-        if (current == null || trustRank(requestedStatus) > trustRank(current)) {
             identity.setVerificationStatus(requestedStatus);
             identity.setSource(normalizeSource(source));
             if (requestedStatus.permitsAutomaticLinking()) identity.setVerifiedAt(Instant.now());
-        } else if (identity.getSource() == null || identity.getSource().isBlank()) {
-            identity.setSource(normalizeSource(source));
+        } else {
+            CustomerIdentity.VerificationStatus current = identity.getVerificationStatus();
+            if (current == null || trustRank(requestedStatus) > trustRank(current)) {
+                identity.setVerificationStatus(requestedStatus);
+                identity.setSource(normalizeSource(source));
+                if (requestedStatus.permitsAutomaticLinking()) identity.setVerifiedAt(Instant.now());
+            } else if (identity.getSource() == null || identity.getSource().isBlank()) {
+                identity.setSource(normalizeSource(source));
+            }
         }
         return Optional.of(identities.saveAndFlush(identity));
     }
