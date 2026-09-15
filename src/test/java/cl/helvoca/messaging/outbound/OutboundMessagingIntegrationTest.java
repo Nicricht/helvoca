@@ -22,7 +22,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -55,8 +54,9 @@ class OutboundMessagingIntegrationTest {
     void verifiedRecipientAndBackendPaymentLinkAreRequiredAndPreparationIsIdempotent() {
         Business business = business("Outbound tenant");
         Customer customer = customer(business, "+56911112222");
+        BusinessOperation targetOperation = operation(business, customer, BusinessOperation.Type.ORDER);
         BusinessOperation paymentOperation = operation(business, customer, BusinessOperation.Type.PAYMENT);
-        payment(paymentOperation, customer, "https://sandbox.example.test/pay/abc");
+        payment(paymentOperation, targetOperation, customer, "https://sandbox.example.test/pay/abc");
 
         assertThrows(IllegalStateException.class, () -> outbound.prepare(
                 business.getId(), customer.getId(), OutboundMessage.Channel.WHATSAPP,
@@ -129,12 +129,15 @@ class OutboundMessagingIntegrationTest {
         return operations.saveAndFlush(op);
     }
 
-    private BusinessPayment payment(BusinessOperation operation, Customer customer, String checkoutUrl) {
+    private BusinessPayment payment(BusinessOperation operation,
+                                    BusinessOperation targetOperation,
+                                    Customer customer,
+                                    String checkoutUrl) {
         BusinessPayment p = new BusinessPayment();
         p.setOperationId(operation.getId());
         p.setBusinessId(operation.getBusinessId());
         p.setCustomerId(customer.getId());
-        p.setTargetOperationId(UUID.randomUUID());
+        p.setTargetOperationId(targetOperation.getId());
         p.setProvider("TEST_SANDBOX");
         p.setIdempotencyKey("test:" + operation.getId());
         p.setAmount(new BigDecimal("24990"));
