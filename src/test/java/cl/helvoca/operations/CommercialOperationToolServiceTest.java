@@ -1,6 +1,8 @@
 package cl.helvoca.operations;
 
 import cl.helvoca.catalog.CatalogItemRepository;
+import cl.helvoca.delivery.DeliveryCoverageService;
+import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZone;
 import cl.helvoca.delivery.DeliveryZoneRepository;
 import org.json.JSONObject;
@@ -29,16 +31,20 @@ class CommercialOperationToolServiceTest {
     @Mock BusinessOperationRepository operations;
     @Mock BusinessOperationCapabilityService capabilities;
     @Mock OrderWorkflowService orderWorkflow;
+    @Mock DeliveryWorkflowService deliveryWorkflow;
     @Mock UniversalOperationWorkflowService universalOperations;
     @Mock ConversationStateService conversationState;
 
+    private DeliveryCoverageService deliveryCoverage;
     private CommercialOperationToolService service;
 
     @BeforeEach
     void setUp() {
+        deliveryCoverage = new DeliveryCoverageService(deliveryZones);
         service = new CommercialOperationToolService(
-                catalog, deliveryZones, orders, orderLines,
-                operations, capabilities, orderWorkflow, universalOperations, conversationState);
+                catalog, deliveryZones, deliveryCoverage, orders, orderLines,
+                operations, capabilities, orderWorkflow, deliveryWorkflow,
+                universalOperations, conversationState);
     }
 
     @Test
@@ -83,10 +89,45 @@ class CommercialOperationToolServiceTest {
     }
 
     @Test
-    void updateOrderIsAFirstClassSupportedTool() {
+    void standaloneDeliveryUsesTheSameSharedDomainFromAnyChannel() {
+        UUID businessId = UUID.randomUUID();
+        UUID sourceReferenceId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        JSONObject domainResult = new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("operationId", operationId.toString())
+                        .put("revision", 1)
+                        .put("status", "AWAITING_CONFIRMATION")
+                        .put("confirmationToken", UUID.randomUUID().toString())
+                        .put("fee", 1500)
+                        .put("currency", "CLP"))
+                .put("error", JSONObject.NULL);
+        when(capabilities.isToolAllowed(businessId, "quote_delivery")).thenReturn(true);
+        when(deliveryWorkflow.quote(eq(businessId), isNull(), eq(sourceReferenceId),
+                eq("+56911111111"), eq(BusinessOrder.Source.WHATSAPP), any(JSONObject.class)))
+                .thenReturn(domainResult);
+
+        JSONObject result = new JSONObject(service.execute(
+                businessId, null, sourceReferenceId, "+56911111111", BusinessOrder.Source.WHATSAPP,
+                "quote_delivery", new JSONObject().put("address", "Quilicura 123").toString()));
+
+        assertTrue(result.getBoolean("success"));
+        verify(deliveryWorkflow).quote(eq(businessId), isNull(), eq(sourceReferenceId),
+                eq("+56911111111"), eq(BusinessOrder.Source.WHATSAPP), any(JSONObject.class));
+        verifyNoInteractions(conversationState);
+    }
+
+    @Test
+    void updateOrderAndDeliveryAreFirstClassSupportedTools() {
         assertTrue(service.supports("update_order"));
         assertTrue(service.supports("quote_order"));
         assertTrue(service.supports("create_order"));
+        assertTrue(service.supports("quote_delivery"));
+        assertTrue(service.supports("update_delivery"));
+        assertTrue(service.supports("create_delivery"));
+        assertTrue(service.supports("get_delivery_status"));
+        assertTrue(service.supports("cancel_delivery"));
     }
 
     @Test
@@ -164,7 +205,7 @@ class CommercialOperationToolServiceTest {
 
         assertFalse(result.getBoolean("success"));
         assertEquals("TOOL_DISABLED", result.getJSONObject("error").getString("code"));
-        verifyNoInteractions(orderWorkflow, universalOperations, conversationState);
+        verifyNoInteractions(orderWorkflow, deliveryWorkflow, universalOperations, conversationState);
     }
 
     @Test
@@ -181,7 +222,6 @@ class CommercialOperationToolServiceTest {
         zone.setActive(true);
 
         when(capabilities.isToolAllowed(businessId, "validate_delivery_address")).thenReturn(true);
-        when(capabilities.isEnabled(businessId, BusinessOperationCapability.DELIVERY)).thenReturn(true);
         when(deliveryZones.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId)).thenReturn(List.of(zone));
 
         JSONObject result = new JSONObject(service.execute(
@@ -197,10 +237,9 @@ class CommercialOperationToolServiceTest {
     }
 
     @Test
-    void disabledDeliveryFailsClosed() {
+    void disabledDeliveryValidationFailsClosedBeforeCoverageLookup() {
         UUID businessId = UUID.randomUUID();
-        when(capabilities.isToolAllowed(businessId, "validate_delivery_address")).thenReturn(true);
-        when(capabilities.isEnabled(businessId, BusinessOperationCapability.DELIVERY)).thenReturn(false);
+        when(capabilities.isToolAllowed(businessId, "validate_delivery_address")).thenReturn(false);
 
         JSONObject result = new JSONObject(service.execute(
                 businessId, null, null, "+56911111111", BusinessOrder.Source.WHATSAPP,
@@ -208,7 +247,7 @@ class CommercialOperationToolServiceTest {
                 new JSONObject().put("address", "Providencia 123").toString()));
 
         assertFalse(result.getBoolean("success"));
-        assertEquals("DELIVERY_DISABLED", result.getJSONObject("error").getString("code"));
-        verifyNoInteractions(deliveryZones);
+        assertEquals("TOOL_DISABLED", result.getJSONObject("error").getString("code"));
+        verifyNoInteractions(deliveryZones, deliveryWorkflow);
     }
 }

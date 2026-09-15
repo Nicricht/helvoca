@@ -14,7 +14,7 @@ Presets comerciales actuales:
 
 - `CATALOG`: catálogo universal.
 - `ORDER`: cotizar, actualizar, confirmar, consultar y cancelar pedidos.
-- `DELIVERY`: zonas, cobertura y costos de despacho.
+- `DELIVERY`: validar cobertura y ejecutar despachos autónomos versionados.
 - `QUOTE`: cotizaciones estructuradas.
 - `LEAD`: captura estructurada de potenciales clientes.
 
@@ -22,9 +22,9 @@ Dependencias normalizadas:
 
 - `ORDER` implica `CATALOG`.
 - `QUOTE` implica `CATALOG`.
-- `DELIVERY` implica `ORDER + CATALOG`.
+- `DELIVERY` es autónomo y no obliga a habilitar `ORDER` ni `CATALOG`.
 
-Las capacidades comerciales son opt-in. Los tenants legacy no reciben automáticamente nuevas herramientas transaccionales.
+Las capacidades comerciales son opt-in. V26 agrega herramientas transaccionales de DELIVERY únicamente a tenants que ya tenían habilitadas las dos capacidades de delivery previas (`LIST_DELIVERY_ZONES` y `VALIDATE_DELIVERY_ADDRESS`). Los tenants sin delivery permanecen intactos.
 
 API de configuración:
 
@@ -84,12 +84,15 @@ La universalización es evolutiva, no un reemplazo destructivo. Las tablas opera
 - `business_lead`
 - `business_request`
 - `booking`
+- `business_delivery`
 
 V23 convirtió ORDER en una proyección 1:1 de `business_operation`.
 
 V24 hizo lo mismo con QUOTE, LEAD y REQUEST y migró los registros existentes.
 
 V25 incorpora BOOKING. Cada `booking` tiene un `operation_id` único y no nulo. Los registros históricos se migran reutilizando el UUID de la reserva como UUID de operación. Las nuevas reservas obtienen su operación universal automáticamente en la misma transacción.
+
+V26 agrega `business_delivery` como proyección 1:1 de una operación `DELIVERY` autónoma. Los ORDER existentes con `fulfillment_type=DELIVERY` siguen siendo operaciones ORDER y no se duplican como entregas autónomas.
 
 ## Conversation State Engine
 
@@ -114,6 +117,8 @@ Para REQUEST, `business_request.call_id` sigue reservado a llamadas reales. What
 
 Para BOOKING, voz y WhatsApp enlazan la operación con el `callId` o `conversationId` real y actualizan el estado estructurado después de una creación, reprogramación o cancelación exitosa.
 
+Para DELIVERY autónomo, `quote_delivery`, `update_delivery`, `create_delivery` y `cancel_delivery` actualizan el estado estructurado con operación, revisión, dirección, zona, costo y confirmación vigente.
+
 ## Policy Engine
 
 `OperationPolicyService` centraliza la política base de confirmación y revisión humana.
@@ -126,7 +131,7 @@ Política actual:
 
 La política no la decide el LLM. Esta primera versión es una política backend centralizada; todavía no es una matriz configurable por tenant en base de datos.
 
-BOOKING conserva por ahora sus guardas conversacionales y de certificación existentes. Declarar `BOOKING` como `EXPLICIT` no equivale a afirmar que ya usa el token/versionado de ORDER. Ese mecanismo solo existe hoy para ORDER.
+BOOKING conserva por ahora sus guardas conversacionales y de certificación existentes. Declarar `BOOKING` como `EXPLICIT` no equivale a afirmar que ya usa el token/versionado de ORDER o DELIVERY.
 
 ## Herramientas comerciales
 
@@ -135,6 +140,11 @@ Cuando el `AiAgent` del tenant las autoriza, voz y WhatsApp pueden publicar:
 - `list_catalog`
 - `list_delivery_zones`
 - `validate_delivery_address`
+- `quote_delivery`
+- `update_delivery`
+- `create_delivery`
+- `get_delivery_status`
+- `cancel_delivery`
 - `quote_order`
 - `update_order`
 - `create_order`
@@ -143,7 +153,7 @@ Cuando el `AiAgent` del tenant las autoriza, voz y WhatsApp pueden publicar:
 - `create_quote`
 - `create_lead`
 
-El servicio comercial vuelve a validar la capability en runtime y falla cerrado aunque un adapter futuro publique accidentalmente una herramienta no autorizada.
+El servicio comercial vuelve a validar la capability exacta en runtime y falla cerrado aunque un adapter futuro publique accidentalmente una herramienta no autorizada.
 
 ## ORDER
 
@@ -180,21 +190,30 @@ Las respuestas exitosas de mutaciones de BOOKING en los wrappers universales pue
 
 Esto no reemplaza aún el flujo de BOOKING por un draft tokenizado estilo ORDER. La disponibilidad y confirmación conversacional existente siguen siendo la autoridad de ejecución.
 
-## Delivery
+## DELIVERY
 
-`delivery_zone` almacena nombre, términos de cobertura, costo de despacho, mínimo opcional y estado.
+`delivery_zone` almacena nombre, términos de cobertura, costo de despacho, mínimo opcional y estado. `DeliveryCoverageService` es el resolvedor backend común de cobertura para las herramientas autónomas.
 
-El backend normaliza la dirección y exige:
+DELIVERY autónomo utiliza un flujo estructurado:
 
-- capability `DELIVERY` activa;
-- dirección no vacía;
-- coincidencia inequívoca con una zona activa;
-- compra mínima satisfecha;
-- costo de despacho obtenido del backend.
+1. `validate_delivery_address` comprueba cobertura sin crear una operación.
+2. `quote_delivery` crea un `business_operation` tipo `DELIVERY` en `AWAITING_CONFIRMATION` y devuelve `operationId`, `revision`, `confirmationToken`, zona y costo.
+3. La dirección siempre se vuelve a resolver en backend. Un `deliveryZoneId` enviado por el modelo nunca sustituye esa resolución.
+4. Si el usuario corrige dirección, pedido vinculado o instrucciones, `update_delivery` reemplaza el estado vigente, incrementa revisión y genera un token nuevo.
+5. El token anterior queda inválido.
+6. `create_delivery` solo debe invocarse después de confirmación explícita de las condiciones más recientes.
+7. Antes de materializar, el backend vuelve a resolver cobertura y costo. Si zona, costo o moneda cambian devuelve `DELIVERY_TERMS_CHANGED`, renueva revisión/token y no crea `business_delivery`.
+8. Si las condiciones siguen vigentes, crea una única proyección `business_delivery`.
+9. Un retry secuencial de la confirmación devuelve el mismo despacho como replay idempotente.
+10. `get_delivery_status` consulta el despacho del cliente actual y `cancel_delivery` solo permite cancelar mientras siga `CONFIRMED`.
 
-`deliveryZoneId` nunca reemplaza la validación de la dirección. El backend vuelve a resolver cobertura antes de confirmar.
+Un DELIVERY puede enlazarse opcionalmente a un `business_order` del mismo tenant y cliente. Si existe `minimum_order`, el backend puede verificarla usando el subtotal persistido del pedido enlazado. Sin `orderId`, el mínimo se reporta como información pero no se confía en un subtotal enviado por el LLM.
 
-DELIVERY está integrado actualmente en ORDER. El tipo universal `DELIVERY` existe, pero un workflow de entrega autónoma todavía es una evolución posterior.
+La proyección `business_delivery` tiene estados operativos `CONFIRMED`, `IN_TRANSIT`, `DELIVERED` y `CANCELLED`. La API administrativa controla transiciones válidas y sincroniza `projectionStatus` y revisión en `business_operation`.
+
+El costo de DELIVERY es un hecho operativo de cobertura; V26 no ejecuta pagos ni cobra dos veces un despacho ya incluido en un ORDER. PAYMENT sigue siendo un dominio futuro.
+
+Al igual que ORDER, el token/versionado protege la versión del borrador que se materializa, pero no constituye prueba semántica o criptográfica de que el humano dijo “sí”. La capa conversacional sigue siendo responsable de solicitar confirmación explícita antes de llamar `create_delivery`.
 
 ## QUOTE
 
@@ -226,15 +245,18 @@ Los cambios administrativos de estado de REQUEST también sincronizan el estado 
 
 - `GET /api/v1/commercial/orders`
 - `PATCH /api/v1/commercial/orders/{id}/status`
+- `GET /api/v1/commercial/deliveries`
+- `PATCH /api/v1/commercial/deliveries/{id}/status`
 - `GET /api/v1/commercial/quotes`
 - `GET /api/v1/commercial/leads`
 
-Las consultas operativas requieren `BUSINESS_ADMIN` u `OPERATOR`. Las mutaciones de configuración requieren los permisos administrativos correspondientes.
+Las consultas operativas requieren `BUSINESS_ADMIN` u `OPERATOR`. Las mutaciones de estado requieren `BUSINESS_ADMIN`.
 
 ## Ejemplos de presets
 
 - Restaurante: `CATALOG + ORDER + DELIVERY`.
-- Tienda: `CATALOG + ORDER`.
+- Tienda: `CATALOG + ORDER + DELIVERY` cuando ofrece despacho.
+- Courier o logística: `DELIVERY` sin necesidad de `ORDER`.
 - Taller: `CATALOG + QUOTE + BOOKING`.
 - Inmobiliaria: `CATALOG + LEAD + BOOKING/REQUEST`.
 - Clínica o veterinaria: `CATALOG + BOOKING + REQUEST` según configuración.
