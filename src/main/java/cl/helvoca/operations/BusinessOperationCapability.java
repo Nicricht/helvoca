@@ -16,6 +16,7 @@ public enum BusinessOperationCapability {
     CATALOG(Set.of(AiCapability.LIST_CATALOG)),
     ORDER(Set.of(
             AiCapability.QUOTE_ORDER,
+            AiCapability.UPDATE_ORDER,
             AiCapability.CREATE_ORDER,
             AiCapability.GET_ORDER_STATUS,
             AiCapability.CANCEL_ORDER)),
@@ -31,9 +32,7 @@ public enum BusinessOperationCapability {
         this.aiCapabilities = Set.copyOf(aiCapabilities);
     }
 
-    public Set<AiCapability> aiCapabilities() {
-        return aiCapabilities;
-    }
+    public Set<AiCapability> aiCapabilities() { return aiCapabilities; }
 
     public Set<String> toolNames() {
         LinkedHashSet<String> out = new LinkedHashSet<>();
@@ -43,9 +42,7 @@ public enum BusinessOperationCapability {
 
     public static Optional<BusinessOperationCapability> fromToolName(String toolName) {
         if (toolName == null) return Optional.empty();
-        return Arrays.stream(values())
-                .filter(capability -> capability.toolNames().contains(toolName))
-                .findFirst();
+        return Arrays.stream(values()).filter(capability -> capability.toolNames().contains(toolName)).findFirst();
     }
 
     public static Set<String> toolNamesFor(Set<BusinessOperationCapability> capabilities) {
@@ -57,9 +54,7 @@ public enum BusinessOperationCapability {
 
     public static Set<AiCapability> aiCapabilitiesFor(Set<BusinessOperationCapability> capabilities) {
         EnumSet<AiCapability> out = EnumSet.noneOf(AiCapability.class);
-        if (capabilities != null) {
-            capabilities.forEach(capability -> out.addAll(capability.aiCapabilities));
-        }
+        if (capabilities != null) capabilities.forEach(capability -> out.addAll(capability.aiCapabilities));
         return Set.copyOf(out);
     }
 
@@ -72,7 +67,5 @@ public enum BusinessOperationCapability {
         return Set.copyOf(out);
     }
 
-    public static boolean isCommercialToolName(String toolName) {
-        return fromToolName(toolName).isPresent();
-    }
+    public static boolean isCommercialToolName(String toolName) { return fromToolName(toolName).isPresent(); }
 }
