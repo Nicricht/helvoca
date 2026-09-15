@@ -42,6 +42,25 @@ jobs:
       - name: Run backend tests
         run: mvn --batch-mode --no-transfer-progress test
 
+      - name: Surface Maven test failures
+        if: failure()
+        run: |
+          echo "=== Surefire / Failsafe reports ==="
+          found=0
+          for dir in target/surefire-reports target/failsafe-reports; do
+            if [ -d "$dir" ]; then
+              while IFS= read -r -d '' report; do
+                found=1
+                echo
+                echo "===== $report ====="
+                cat "$report"
+              done < <(find "$dir" -maxdepth 1 -type f \( -name '*.txt' -o -name 'TEST-*.xml' \) -print0 | sort -z)
+            fi
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "No Maven test report files were produced."
+          fi
+
       - name: Install browser test dependencies
         run: |
           npm install --no-audit --no-fund
