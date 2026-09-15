@@ -2,6 +2,8 @@ package cl.helvoca.operations;
 
 import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
+import cl.helvoca.delivery.DeliveryCoverageService;
+import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZone;
 import cl.helvoca.delivery.DeliveryZoneRepository;
 import org.json.JSONArray;
@@ -10,13 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.text.Normalizer;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -27,6 +24,11 @@ public class CommercialOperationToolService {
             "list_catalog",
             "list_delivery_zones",
             "validate_delivery_address",
+            "quote_delivery",
+            "update_delivery",
+            "create_delivery",
+            "get_delivery_status",
+            "cancel_delivery",
             "quote_order",
             "update_order",
             "create_order",
@@ -36,7 +38,6 @@ public class CommercialOperationToolService {
             "create_lead");
 
     private static final Set<String> ORDER_STATE_TOOLS = Set.of(
-            "validate_delivery_address",
             "quote_order",
             "update_order",
             "create_order",
@@ -44,30 +45,36 @@ public class CommercialOperationToolService {
 
     private final CatalogItemRepository catalog;
     private final DeliveryZoneRepository deliveryZones;
+    private final DeliveryCoverageService deliveryCoverage;
     private final BusinessOrderRepository orders;
     private final BusinessOrderLineRepository orderLines;
     private final BusinessOperationRepository operations;
     private final BusinessOperationCapabilityService capabilities;
     private final OrderWorkflowService orderWorkflow;
+    private final DeliveryWorkflowService deliveryWorkflow;
     private final UniversalOperationWorkflowService universalOperations;
     private final ConversationStateService conversationState;
 
     public CommercialOperationToolService(CatalogItemRepository catalog,
                                           DeliveryZoneRepository deliveryZones,
+                                          DeliveryCoverageService deliveryCoverage,
                                           BusinessOrderRepository orders,
                                           BusinessOrderLineRepository orderLines,
                                           BusinessOperationRepository operations,
                                           BusinessOperationCapabilityService capabilities,
                                           OrderWorkflowService orderWorkflow,
+                                          DeliveryWorkflowService deliveryWorkflow,
                                           UniversalOperationWorkflowService universalOperations,
                                           ConversationStateService conversationState) {
         this.catalog = catalog;
         this.deliveryZones = deliveryZones;
+        this.deliveryCoverage = deliveryCoverage;
         this.orders = orders;
         this.orderLines = orderLines;
         this.operations = operations;
         this.capabilities = capabilities;
         this.orderWorkflow = orderWorkflow;
+        this.deliveryWorkflow = deliveryWorkflow;
         this.universalOperations = universalOperations;
         this.conversationState = conversationState;
     }
@@ -98,6 +105,16 @@ public class CommercialOperationToolService {
                 case "list_catalog" -> listCatalog(businessId);
                 case "list_delivery_zones" -> listDeliveryZones(businessId);
                 case "validate_delivery_address" -> validateDeliveryAddress(businessId, args);
+                case "quote_delivery" -> deliveryWorkflow.quote(
+                        businessId, customerId, sourceReferenceId, trustedPhone, source, args);
+                case "update_delivery" -> deliveryWorkflow.update(
+                        businessId, customerId, sourceReferenceId, trustedPhone, source, args);
+                case "create_delivery" -> deliveryWorkflow.confirm(
+                        businessId, customerId, sourceReferenceId, trustedPhone, source, args);
+                case "get_delivery_status" -> deliveryWorkflow.status(
+                        businessId, customerId, sourceReferenceId, trustedPhone, args);
+                case "cancel_delivery" -> deliveryWorkflow.cancel(
+                        businessId, customerId, sourceReferenceId, trustedPhone, source, args);
                 case "quote_order" -> orderWorkflow.quote(
                         businessId, customerId, sourceReferenceId, trustedPhone, source, args);
                 case "update_order" -> orderWorkflow.update(
@@ -113,8 +130,12 @@ public class CommercialOperationToolService {
                 default -> error("UNKNOWN_COMMERCIAL_TOOL", "La operación comercial solicitada no existe.");
             };
 
-            recordConversationResult(businessId, sourceReferenceId,
-                    source == null ? BusinessOrder.Source.API : source, toolName, result);
+            recordConversationResult(
+                    businessId,
+                    sourceReferenceId,
+                    source == null ? BusinessOrder.Source.API : source,
+                    toolName,
+                    result);
         } catch (IllegalArgumentException e) {
             result = error("INVALID_ARGUMENT", e.getMessage());
         } catch (Exception e) {
@@ -144,11 +165,8 @@ public class CommercialOperationToolService {
     }
 
     private JSONObject validateDeliveryAddress(UUID businessId, JSONObject args) {
-        if (!capabilities.isEnabled(businessId, BusinessOperationCapability.DELIVERY)) {
-            return error("DELIVERY_DISABLED", "El despacho no está habilitado para este negocio.");
-        }
         String address = required(args, "address").trim();
-        DeliveryZone zone = resolveDeliveryZone(businessId, address);
+        DeliveryZone zone = deliveryCoverage.resolve(businessId, address);
         return success(new JSONObject()
                 .put("covered", true)
                 .put("address", address)
@@ -285,24 +303,6 @@ public class CommercialOperationToolService {
         else target.put(targetKey, value);
     }
 
-    private DeliveryZone resolveDeliveryZone(UUID businessId, String address) {
-        String normalizedAddress = normalizeCoverage(address);
-        if (normalizedAddress.isBlank()) throw new IllegalArgumentException("La dirección de despacho es inválida.");
-        List<ZoneMatch> matches = new ArrayList<>();
-        for (DeliveryZone zone : deliveryZones.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId)) {
-            int score = coverageScore(zone, normalizedAddress);
-            if (score > 0) matches.add(new ZoneMatch(zone, score));
-        }
-        if (matches.isEmpty()) {
-            throw new IllegalArgumentException("La dirección no coincide con ninguna zona de despacho configurada.");
-        }
-        matches.sort(Comparator.comparingInt(ZoneMatch::score).reversed());
-        if (matches.size() > 1 && matches.get(0).score() == matches.get(1).score()) {
-            throw new IllegalArgumentException("La dirección coincide con más de una zona de despacho; la cobertura debe revisarse antes de confirmar.");
-        }
-        return matches.get(0).zone();
-    }
-
     private static JSONObject orderData(BusinessOrder order, List<BusinessOrderLine> lines) {
         JSONArray items = new JSONArray();
         for (BusinessOrderLine line : lines) {
@@ -342,27 +342,9 @@ public class CommercialOperationToolService {
 
     private static boolean ownedBy(BusinessOrder order, UUID customerId, String trustedPhone) {
         if (customerId != null && customerId.equals(order.getCustomerId())) return true;
-        return !blank(trustedPhone) && order.getContactPhone() != null && trustedPhone.trim().equals(order.getContactPhone());
-    }
-
-    private static int coverageScore(DeliveryZone zone, String normalizedAddress) {
-        int best = 0;
-        String terms = zone.getCoverageTerms();
-        if (terms == null || terms.isBlank()) return 0;
-        for (String raw : terms.split("[,;|\\n\\r]+")) {
-            String term = normalizeCoverage(raw);
-            if (term.length() >= 3 && normalizedAddress.contains(term)) best = Math.max(best, term.length());
-        }
-        return best;
-    }
-
-    private static String normalizeCoverage(String value) {
-        if (value == null) return "";
-        String decomposed = Normalizer.normalize(value, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
-        return decomposed.toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9]+", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
+        return !blank(trustedPhone)
+                && order.getContactPhone() != null
+                && trustedPhone.trim().equals(order.getContactPhone());
     }
 
     private static String required(JSONObject args, String key) {
@@ -396,6 +378,4 @@ public class CommercialOperationToolService {
         return new JSONObject().put("success", false).put("data", JSONObject.NULL)
                 .put("error", new JSONObject().put("code", code).put("message", message));
     }
-
-    private record ZoneMatch(DeliveryZone zone, int score) {}
 }
