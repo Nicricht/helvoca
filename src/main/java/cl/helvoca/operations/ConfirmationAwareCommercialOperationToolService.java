@@ -19,6 +19,7 @@ import java.util.UUID;
 public class ConfirmationAwareCommercialOperationToolService extends CommercialOperationToolService {
     private static final Set<String> CONFIRM_TOOLS = Set.of("create_order", "create_delivery", "create_payment");
     private final UniversalConfirmationService confirmations;
+    private final OperationExecutionLockService executionLocks;
 
     public ConfirmationAwareCommercialOperationToolService(
             CatalogItemRepository catalog,
@@ -33,10 +34,12 @@ public class ConfirmationAwareCommercialOperationToolService extends CommercialO
             UniversalOperationWorkflowService universalOperations,
             PaymentWorkflowService paymentWorkflow,
             ConversationStateService conversationState,
-            UniversalConfirmationService confirmations) {
+            UniversalConfirmationService confirmations,
+            OperationExecutionLockService executionLocks) {
         super(catalog, deliveryZones, deliveryCoverage, orders, orderLines, operations, capabilities,
                 orderWorkflow, deliveryWorkflow, universalOperations, paymentWorkflow, conversationState);
         this.confirmations = confirmations;
+        this.executionLocks = executionLocks;
     }
 
     @Override
@@ -59,6 +62,12 @@ public class ConfirmationAwareCommercialOperationToolService extends CommercialO
             } catch (Exception e) {
                 return error("INVALID_CONFIRMATION", "La confirmación requiere una operación y token válidos.").toString();
             }
+
+            // Fence the exact tenant operation before authorization and before any
+            // domain workflow can materialize a projection or call an external
+            // provider. A concurrent replay waits here, then observes the committed
+            // projection/consumed confirmation from the first execution.
+            executionLocks.lock(businessId, operationId);
 
             UniversalConfirmationService.Authorization authorization = confirmations.authorize(
                     businessId, operationId, customerId, sourceReferenceId, trustedPhone, token);
