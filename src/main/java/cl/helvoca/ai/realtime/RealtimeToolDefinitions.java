@@ -35,7 +35,7 @@ public final class RealtimeToolDefinitions {
                                 .put("startAt", string("FASE 1: fecha/hora previamente validada"))
                                 .put("notes", string("FASE 1: notas opcionales"))
                                 .put("operationId", string("FASE 2: operationId exacto devuelto por la propuesta"))
-                                .put("confirmationToken", string("FASE 2: confirmationToken exacto devuelto por la propuesta"))))
+                                .put("confirmationToken", string("FASE 2: confirmationToken exacto devuelto por la propuesta")))))
                 .put(function("list_customer_bookings", "Lista las próximas reservas confirmadas del cliente identificado por esta llamada. El cliente y negocio se obtienen del contexto verificado.", object()))
                 .put(function("reschedule_booking", "Reprograma una reserva del cliente de esta llamada. Solo comunica el cambio cuando success=true. El backend vuelve a validar horario y solapamientos.",
                         object().put("properties", new JSONObject()
