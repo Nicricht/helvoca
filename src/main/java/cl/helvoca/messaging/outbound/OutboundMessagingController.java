@@ -1,5 +1,6 @@
 package cl.helvoca.messaging.outbound;
 
+import cl.helvoca.jobs.PersistentJob;
 import cl.helvoca.security.TenantProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,10 +15,14 @@ import java.util.UUID;
 @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
 public class OutboundMessagingController {
     private final OutboundMessagingService service;
+    private final OutboundDispatchOutboxService outbox;
     private final TenantProvider tenantProvider;
 
-    public OutboundMessagingController(OutboundMessagingService service, TenantProvider tenantProvider) {
+    public OutboundMessagingController(OutboundMessagingService service,
+                                       OutboundDispatchOutboxService outbox,
+                                       TenantProvider tenantProvider) {
         this.service = service;
+        this.outbox = outbox;
         this.tenantProvider = tenantProvider;
     }
 
@@ -39,6 +44,12 @@ public class OutboundMessagingController {
                 request.recipientIdentityId())));
     }
 
+    @PostMapping("/{messageId}/queue")
+    public ResponseEntity<QueueView> queue(@PathVariable UUID messageId) {
+        PersistentJob job = outbox.queue(tenantProvider.requireBusinessId(), messageId);
+        return ResponseEntity.ok(new QueueView(job.id(), job.status().name(), job.attemptCount(), job.nextAttemptAt()));
+    }
+
     @PostMapping("/{messageId}/dispatch")
     public ResponseEntity<View> dispatch(@PathVariable UUID messageId) {
         return ResponseEntity.ok(View.from(service.dispatch(tenantProvider.requireBusinessId(), messageId)));
@@ -54,6 +65,11 @@ public class OutboundMessagingController {
                                  OutboundMessage.Purpose purpose,
                                  UUID operationId,
                                  UUID recipientIdentityId) { }
+
+    public record QueueView(UUID jobId,
+                            String status,
+                            int attemptCount,
+                            Instant nextAttemptAt) { }
 
     public record View(UUID id,
                        UUID customerId,
