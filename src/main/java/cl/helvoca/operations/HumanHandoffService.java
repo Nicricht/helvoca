@@ -1,7 +1,6 @@
 package cl.helvoca.operations;
 
 import cl.helvoca.security.TenantProvider;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -20,9 +19,13 @@ public class HumanHandoffService {
 
     public record Creation(UUID handoffId, boolean created, Status status) { }
 
+    private record SourceContext(UUID customerId, String channel) { }
+
     public record HandoffView(
             UUID id,
             long sequenceNo,
+            UUID customerId,
+            String channel,
             UUID sourceReferenceId,
             UUID operationId,
             BusinessOperation.Type operationType,
@@ -78,22 +81,18 @@ public class HumanHandoffService {
         String priority = operationType == BusinessOperation.Type.PAYMENT ? "HIGH" : "NORMAL";
         String summary = sanitize("La automatización no pudo resolver de forma segura la operación "
                 + operationType.name() + ". Motivo: " + safeReason + ".", 500, null);
+        SourceContext context = sourceContext(businessId, sourceReferenceId);
 
         UUID handoffId = UUID.randomUUID();
-        int inserted;
-        try {
-            inserted = jdbc.update("""
-                    INSERT INTO human_handoff(
-                        id, business_id, source_reference_id, operation_id, operation_type,
-                        tool_name, reason_code, failure_class, fallback_action, retry_count,
-                        priority, status, safe_summary)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'UNRESOLVABLE', 'HUMAN_HANDOFF', ?, ?, 'OPEN', ?)
-                    ON CONFLICT DO NOTHING
-                    """, handoffId, businessId, sourceReferenceId, operationId, operationType.name(),
-                    safeTool, safeReason, safeRetryCount, priority, summary);
-        } catch (DataIntegrityViolationException e) {
-            inserted = 0;
-        }
+        int inserted = jdbc.update("""
+                INSERT INTO human_handoff(
+                    id, business_id, customer_id, channel, source_reference_id, operation_id,
+                    operation_type, tool_name, reason_code, failure_class, fallback_action,
+                    retry_count, priority, status, safe_summary)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'UNRESOLVABLE', 'HUMAN_HANDOFF', ?, ?, 'OPEN', ?)
+                ON CONFLICT DO NOTHING
+                """, handoffId, businessId, context.customerId(), context.channel(), sourceReferenceId,
+                operationId, operationType.name(), safeTool, safeReason, safeRetryCount, priority, summary);
 
         if (inserted == 1) {
             appendEvent(handoffId, businessId, "CREATED", null, Status.OPEN,
@@ -190,7 +189,11 @@ public class HumanHandoffService {
                                    String assignee) {
         UUID businessId = tenantProvider.requireBusinessId();
         HandoffView current = requireOwnedHandoff(businessId, handoffId);
-        if (current.status() == target && target != Status.RESOLVED && target != Status.CANCELLED) {
+        if (current.status() == Status.ACKNOWLEDGED && target == Status.ACKNOWLEDGED) {
+            return current;
+        }
+        if (current.status() == Status.ASSIGNED && target == Status.ASSIGNED
+                && assignee != null && assignee.equals(current.assignedTo())) {
             return current;
         }
         if (!allowed.contains(current.status())) {
@@ -232,6 +235,33 @@ public class HumanHandoffService {
         return requireOwnedHandoff(businessId, handoffId);
     }
 
+    private SourceContext sourceContext(UUID businessId, UUID sourceReferenceId) {
+        if (sourceReferenceId == null) return new SourceContext(null, null);
+
+        SourceContext callContext = jdbc.query("""
+                        SELECT customer_id
+                        FROM call_session
+                        WHERE business_id = ? AND id = ?
+                        LIMIT 1
+                        """,
+                (rs, rowNum) -> new SourceContext(rs.getObject("customer_id", UUID.class), "VOICE"),
+                businessId, sourceReferenceId)
+                .stream().findFirst().orElse(null);
+        if (callContext != null) return callContext;
+
+        return jdbc.query("""
+                        SELECT customer_id, channel
+                        FROM messaging_conversation
+                        WHERE business_id = ? AND id = ?
+                        LIMIT 1
+                        """,
+                (rs, rowNum) -> new SourceContext(
+                        rs.getObject("customer_id", UUID.class), normalizeChannel(rs.getString("channel"))),
+                businessId, sourceReferenceId)
+                .stream().findFirst()
+                .orElse(new SourceContext(null, null));
+    }
+
     private HandoffView requireOwnedHandoff(UUID businessId, UUID handoffId) {
         if (handoffId == null) throw new IllegalArgumentException("handoffId is required");
         return jdbc.query("SELECT * FROM human_handoff WHERE business_id = ? AND id = ?",
@@ -262,6 +292,8 @@ public class HumanHandoffService {
         return new HandoffView(
                 rs.getObject("id", UUID.class),
                 rs.getLong("sequence_no"),
+                rs.getObject("customer_id", UUID.class),
+                rs.getString("channel"),
                 rs.getObject("source_reference_id", UUID.class),
                 rs.getObject("operation_id", UUID.class),
                 BusinessOperation.Type.valueOf(rs.getString("operation_type")),
@@ -295,6 +327,15 @@ public class HumanHandoffService {
                 rs.getString("actor_reference"),
                 rs.getString("payload"),
                 instant(rs, "created_at"));
+    }
+
+    private static String normalizeChannel(String channel) {
+        if (channel == null || channel.isBlank()) return null;
+        String normalized = channel.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "VOICE", "WHATSAPP", "MANUAL", "API" -> normalized;
+            default -> null;
+        };
     }
 
     private static Instant instant(ResultSet rs, String column) throws SQLException {
