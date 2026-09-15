@@ -42,6 +42,7 @@ public class PaymentWebhookService {
                                   String providerCode,
                                   String eventId,
                                   String externalId,
+                                  String externalReference,
                                   String rawBody) {
         PaymentWebhookEvent existing = events
                 .findByBusinessIdAndProviderAndEventId(businessId, providerCode, eventId)
@@ -66,11 +67,27 @@ public class PaymentWebhookService {
         BusinessPayment payment = payments
                 .findByBusinessIdAndProviderIgnoreCaseAndExternalId(businessId, providerCode, externalId)
                 .orElse(null);
+        UUID operationId = uuidOrNull(externalReference);
+        if (payment == null && operationId != null) {
+            payment = payments.findByOperationIdAndBusinessId(operationId, businessId).orElse(null);
+            if (payment != null && payment.getExternalId() == null) {
+                payment.setExternalId(externalId);
+                payment = payments.saveAndFlush(payment);
+            }
+        }
         if (payment == null) {
-            event.setStatus(PaymentWebhookEvent.Status.IGNORED);
+            event.setStatus(operationId == null
+                    ? PaymentWebhookEvent.Status.IGNORED
+                    : PaymentWebhookEvent.Status.FAILED);
             event.setProcessedAt(Instant.now());
             events.saveAndFlush(event);
-            return Result.IGNORED;
+            return operationId == null ? Result.IGNORED : Result.FAILED;
+        }
+        if (payment.getExternalId() != null && !payment.getExternalId().equals(externalId)) {
+            event.setStatus(PaymentWebhookEvent.Status.FAILED);
+            event.setProcessedAt(Instant.now());
+            events.saveAndFlush(event);
+            return Result.FAILED;
         }
 
         PaymentProviderAdapter provider = providers.byCode(businessId, providerCode).orElse(null);
@@ -177,6 +194,12 @@ public class PaymentWebhookService {
         if (current != null) merged.putAll(current);
         if (patch != null) merged.putAll(patch);
         return merged.isEmpty() ? null : merged;
+    }
+
+    private static UUID uuidOrNull(String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return UUID.fromString(value.trim()); }
+        catch (Exception ignored) { return null; }
     }
 
     private static String sha256(String body) {
