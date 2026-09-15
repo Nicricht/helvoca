@@ -41,6 +41,21 @@ class BusinessOperationCapabilityServiceTest {
     }
 
     @Test
+    void paymentIsStandaloneExplicitOptInAndDoesNotForceOtherCapabilities() {
+        BusinessOperationCapabilityService service = new BusinessOperationCapabilityService(aiAgents, tenantProvider);
+
+        Set<BusinessOperationCapability> result = service.replaceCurrent(Set.of(BusinessOperationCapability.PAYMENT));
+
+        assertEquals(Set.of(BusinessOperationCapability.PAYMENT), result);
+        verify(aiAgents).replaceCommercialCapabilities(argThat(actual -> actual.equals(Set.of(
+                AiCapability.QUOTE_PAYMENT,
+                AiCapability.UPDATE_PAYMENT,
+                AiCapability.CREATE_PAYMENT,
+                AiCapability.GET_PAYMENT_STATUS,
+                AiCapability.CANCEL_PAYMENT))));
+    }
+
+    @Test
     void quoteAutomaticallyEnablesCatalogButNotOrder() {
         BusinessOperationCapabilityService service = new BusinessOperationCapabilityService(aiAgents, tenantProvider);
 
@@ -61,7 +76,8 @@ class BusinessOperationCapabilityServiceTest {
                 "update_order",
                 "create_order",
                 "validate_delivery_address",
-                "quote_delivery"));
+                "quote_delivery",
+                "quote_payment"));
 
         BusinessOperationCapabilityService service = new BusinessOperationCapabilityService(aiAgents, tenantProvider);
         Set<String> tools = service.allowedToolNames(businessId);
@@ -71,7 +87,8 @@ class BusinessOperationCapabilityServiceTest {
                 "update_order",
                 "create_order",
                 "validate_delivery_address",
-                "quote_delivery"), tools);
+                "quote_delivery",
+                "quote_payment"), tools);
         assertFalse(tools.contains("list_services"));
     }
 
@@ -106,5 +123,20 @@ class BusinessOperationCapabilityServiceTest {
 
         assertFalse(service.enabled(businessId).contains(BusinessOperationCapability.DELIVERY));
         assertFalse(service.isEnabled(businessId, BusinessOperationCapability.DELIVERY));
+    }
+
+    @Test
+    void highLevelPaymentRequiresItsCompleteToolSet() {
+        UUID businessId = UUID.randomUUID();
+        AiAgent agent = new AiAgent();
+        agent.setBusinessId(businessId);
+        agent.setActive(true);
+        agent.setCapabilities(Set.of(AiCapability.QUOTE_PAYMENT, AiCapability.CREATE_PAYMENT));
+        when(aiAgents.runtime(businessId)).thenReturn(agent);
+
+        BusinessOperationCapabilityService service = new BusinessOperationCapabilityService(aiAgents, tenantProvider);
+
+        assertFalse(service.enabled(businessId).contains(BusinessOperationCapability.PAYMENT));
+        assertFalse(service.isEnabled(businessId, BusinessOperationCapability.PAYMENT));
     }
 }
