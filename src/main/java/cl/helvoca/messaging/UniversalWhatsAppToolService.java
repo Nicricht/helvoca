@@ -125,7 +125,7 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     public String buildInstructions(MessagingConversation conversation) {
         return super.buildInstructions(conversation)
                 + CommercialToolDefinitions.instructions(capabilities.enabled(conversation.getBusinessId()))
-                + "\nSi una herramienta devuelve automation.fallbackAction, aplica esa alternativa con las herramientas disponibles antes de pedir intervención humana. No repitas manualmente una operación que automation ya reintentó.";
+                + "\nSi una herramienta devuelve automation.fallbackAction, aplica esa alternativa con las herramientas disponibles antes de pedir intervención humana. No repitas manualmente una operación que automation ya reintentó. Solo informa que el caso quedó escalado a atención humana cuando automation.fallbackAction=HUMAN_HANDOFF, automation.humanEscalation=true y exista automation.handoffId. Si devuelve STOP_SAFELY o humanEscalation=false, no afirmes que una persona fue avisada.";
     }
 
     private String synchronizeBookingMutation(MessagingConversation conversation,
