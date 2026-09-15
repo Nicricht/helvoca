@@ -76,6 +76,13 @@ public class CommercialOperationToolService {
                           String rawArguments) {
         JSONObject result;
         try {
+            if (!SUPPORTED.contains(toolName)) {
+                return error("UNKNOWN_COMMERCIAL_TOOL", "La operación comercial solicitada no existe.").toString();
+            }
+            if (!capabilities.isToolAllowed(businessId, toolName)) {
+                return error("TOOL_DISABLED", "La operación comercial no está habilitada para este negocio.").toString();
+            }
+
             JSONObject args = rawArguments == null || rawArguments.isBlank()
                     ? new JSONObject()
                     : new JSONObject(rawArguments);
