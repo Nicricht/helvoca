@@ -3,7 +3,6 @@ package cl.helvoca.payment;
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationRepository;
 import cl.helvoca.operations.ConversationStateService;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,24 +43,26 @@ public class PaymentWebhookService {
                                   String externalId,
                                   String externalReference,
                                   String rawBody) {
-        PaymentWebhookEvent existing = events
+        String payloadHash = sha256(rawBody);
+        PaymentWebhookEvent event = events
                 .findByBusinessIdAndProviderAndEventId(businessId, providerCode, eventId)
                 .orElse(null);
-        if (existing != null && existing.getStatus() != PaymentWebhookEvent.Status.FAILED) {
+        if (event != null && event.getStatus() != PaymentWebhookEvent.Status.FAILED) {
             return Result.DUPLICATE;
         }
 
-        PaymentWebhookEvent event = existing == null ? new PaymentWebhookEvent() : existing;
-        event.setBusinessId(businessId);
-        event.setProvider(providerCode);
-        event.setEventId(eventId);
-        event.setExternalId(externalId);
-        event.setPayloadHash(sha256(rawBody));
-        event.setStatus(PaymentWebhookEvent.Status.RECEIVED);
-        try {
+        if (event == null) {
+            int claimed = events.claim(
+                    UUID.randomUUID(), businessId, providerCode, eventId, externalId, payloadHash);
+            if (claimed != 1) return Result.DUPLICATE;
+            event = events.findByBusinessIdAndProviderAndEventId(businessId, providerCode, eventId)
+                    .orElseThrow(() -> new IllegalStateException("Claimed webhook event is missing."));
+        } else {
+            event.setExternalId(externalId);
+            event.setPayloadHash(payloadHash);
+            event.setStatus(PaymentWebhookEvent.Status.RECEIVED);
+            event.setProcessedAt(null);
             event = events.saveAndFlush(event);
-        } catch (DataIntegrityViolationException duplicate) {
-            return Result.DUPLICATE;
         }
 
         BusinessPayment payment = payments
