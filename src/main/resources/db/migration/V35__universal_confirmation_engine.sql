@@ -8,6 +8,27 @@ ALTER TABLE business_operation ADD CONSTRAINT ck_business_operation_status
         'COMPLETED','CANCELLED','EXPIRED','FAILED'
     ));
 
+-- V29's append-only event log is authoritative for operation history. Keep its
+-- status contract aligned before any new lifecycle state can be persisted, or
+-- a valid operation transition would fail while its immutable event is appended.
+ALTER TABLE business_operation_event
+    DROP CONSTRAINT ck_business_operation_event_status;
+ALTER TABLE business_operation_event
+    ADD CONSTRAINT ck_business_operation_event_status
+        CHECK (status IN (
+            'DRAFT','PROPOSED','AWAITING_CONFIRMATION','CONFIRMED','EXECUTING',
+            'COMPLETED','CANCELLED','EXPIRED','FAILED'
+        ));
+
+ALTER TABLE business_operation_event
+    DROP CONSTRAINT ck_business_operation_event_previous_status;
+ALTER TABLE business_operation_event
+    ADD CONSTRAINT ck_business_operation_event_previous_status
+        CHECK (previous_status IS NULL OR previous_status IN (
+            'DRAFT','PROPOSED','AWAITING_CONFIRMATION','CONFIRMED','EXECUTING',
+            'COMPLETED','CANCELLED','EXPIRED','FAILED'
+        ));
+
 CREATE TABLE operation_confirmation (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     business_id UUID NOT NULL REFERENCES business(id) ON DELETE CASCADE,
@@ -66,7 +87,7 @@ BEGIN
                 OR NEW.status IS DISTINCT FROM OLD.status
            ) THEN
             terminal_state := CASE
-                WHEN NEW.status = 'CONFIRMED' THEN 'CONSUMED'
+                WHEN NEW.status IN ('CONFIRMED','EXECUTING','COMPLETED') THEN 'CONSUMED'
                 WHEN NEW.status = 'CANCELLED' THEN 'CANCELLED'
                 WHEN NEW.status = 'EXPIRED' THEN 'EXPIRED'
                 ELSE 'INVALIDATED'
