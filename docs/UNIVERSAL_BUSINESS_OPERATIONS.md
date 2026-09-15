@@ -60,6 +60,7 @@ Tipos actuales:
 - `LEAD`
 - `DELIVERY`
 - `REQUEST`
+- `BOOKING`
 
 Estados universales:
 
@@ -82,12 +83,13 @@ La universalización es evolutiva, no un reemplazo destructivo. Las tablas opera
 - `business_quote`
 - `business_lead`
 - `business_request`
+- `booking`
 
 V23 convirtió ORDER en una proyección 1:1 de `business_operation`.
 
-V24 hace lo mismo con QUOTE, LEAD y REQUEST y migra los registros existentes. Cada nueva proyección guarda un `operation_id` único y no nulo.
+V24 hizo lo mismo con QUOTE, LEAD y REQUEST y migró los registros existentes.
 
-BOOKING conserva por ahora su dominio especializado y todavía no es una proyección de `business_operation`.
+V25 incorpora BOOKING. Cada `booking` tiene un `operation_id` único y no nulo. Los registros históricos se migran reutilizando el UUID de la reserva como UUID de operación. Las nuevas reservas obtienen su operación universal automáticamente en la misma transacción.
 
 ## Conversation State Engine
 
@@ -104,11 +106,13 @@ El estado incluye:
 - revisión incremental;
 - timestamps.
 
-Semántica principal: la corrección más reciente reemplaza el valor anterior incompatible. Por ejemplo, si el cliente cambia dirección o cantidad, el nuevo valor sustituye al anterior y aumenta la revisión.
+Semántica principal: la corrección más reciente reemplaza el valor anterior incompatible. Por ejemplo, si el cliente cambia dirección, cantidad u horario, el nuevo valor sustituye al anterior y aumenta la revisión correspondiente.
 
 El estado está aislado por tenant y canal. Un patch que no trae una nueva operación activa conserva la operación actual en vez de borrarla accidentalmente.
 
 Para REQUEST, `business_request.call_id` sigue reservado a llamadas reales. WhatsApp y otros canales conservan su referencia en `business_operation.source_reference_id`.
+
+Para BOOKING, voz y WhatsApp enlazan la operación con el `callId` o `conversationId` real y actualizan el estado estructurado después de una creación, reprogramación o cancelación exitosa.
 
 ## Policy Engine
 
@@ -116,11 +120,13 @@ Para REQUEST, `business_request.call_id` sigue reservado a llamadas reales. What
 
 Política actual:
 
-- `ORDER` y `DELIVERY`: confirmación explícita.
+- `ORDER`, `DELIVERY` y `BOOKING`: confirmación explícita.
 - `QUOTE`, `LEAD` y `REQUEST`: no requieren confirmación transaccional adicional.
 - todas pueden derivar a revisión humana ante fallo.
 
 La política no la decide el LLM. Esta primera versión es una política backend centralizada; todavía no es una matriz configurable por tenant en base de datos.
+
+BOOKING conserva por ahora sus guardas conversacionales y de certificación existentes. Declarar `BOOKING` como `EXPLICIT` no equivale a afirmar que ya usa el token/versionado de ORDER. Ese mecanismo solo existe hoy para ORDER.
 
 ## Herramientas comerciales
 
@@ -157,6 +163,22 @@ ORDER utiliza un flujo estructurado:
 El token/versionado garantiza que solo la versión más reciente del borrador pueda materializarse. No pretende demostrar criptográficamente que una persona pronunció una palabra concreta; la capa conversacional debe solicitar y observar confirmación explícita antes de invocar `create_order`.
 
 La conversación estructurada también se actualiza cuando `ORDER_TOTAL_CHANGED` devuelve una nueva cotización, aunque la respuesta de la herramienta tenga `success=false`.
+
+## BOOKING
+
+V25 mantiene la lógica de booking existente para disponibilidad, solapamientos, propiedad del cliente, horarios y guardas de certificación, pero convierte `booking` en una proyección obligatoria de `business_operation`.
+
+La invariancia se protege en PostgreSQL:
+
+1. antes de insertar una reserva, un trigger garantiza un `operation_id` y crea la operación `BOOKING` dentro de la misma transacción;
+2. una reprogramación sincroniza `startAt`, `endAt`, metadata y aumenta la revisión universal;
+3. una cancelación sincroniza el estado universal a `CANCELLED`;
+4. voz y WhatsApp agregan su referencia real de conversación y proyectan la mutación al Conversation State Engine;
+5. si esa sincronización de canal falla, el wrapper transaccional marca la mutación para rollback.
+
+Las respuestas exitosas de mutaciones de BOOKING en los wrappers universales pueden incluir `operationId` y `operationRevision` además del `bookingId` legacy.
+
+Esto no reemplaza aún el flujo de BOOKING por un draft tokenizado estilo ORDER. La disponibilidad y confirmación conversacional existente siguen siendo la autoridad de ejecución.
 
 ## Delivery
 

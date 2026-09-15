@@ -12,7 +12,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "business_operation")
 public class BusinessOperation {
-    public enum Type { ORDER, QUOTE, LEAD, DELIVERY, REQUEST }
+    public enum Type { ORDER, QUOTE, LEAD, DELIVERY, REQUEST, BOOKING }
     public enum Status { DRAFT, AWAITING_CONFIRMATION, CONFIRMED, CANCELLED, EXPIRED, FAILED }
 
     @Id

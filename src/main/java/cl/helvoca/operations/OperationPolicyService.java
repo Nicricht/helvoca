@@ -22,7 +22,7 @@ public class OperationPolicyService {
     public Policy resolve(BusinessOperation.Type type) {
         if (type == null) throw new IllegalArgumentException("Operation type is required");
         return switch (type) {
-            case ORDER, DELIVERY -> new Policy(
+            case ORDER, DELIVERY, BOOKING -> new Policy(
                     ConfirmationRequirement.EXPLICIT,
                     HumanReviewRequirement.ON_FAILURE);
             case QUOTE, LEAD, REQUEST -> new Policy(

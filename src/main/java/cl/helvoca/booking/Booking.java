@@ -11,6 +11,9 @@ public class Booking {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "operation_id", nullable = false, unique = true)
+    private UUID operationId;
+
     @Column(name = "business_id", nullable = false)
     private UUID businessId;
 
@@ -48,12 +51,15 @@ public class Booking {
         var now = Instant.now();
         createdAt = now;
         updatedAt = now;
+        if (operationId == null) operationId = UUID.randomUUID();
     }
 
     @PreUpdate
     void preUpdate() { updatedAt = Instant.now(); }
 
     public UUID getId() { return id; }
+    public UUID getOperationId() { return operationId; }
+    public void setOperationId(UUID operationId) { this.operationId = operationId; }
     public UUID getBusinessId() { return businessId; }
     public void setBusinessId(UUID businessId) { this.businessId = businessId; }
     public UUID getCustomerId() { return customerId; }
