@@ -2,27 +2,21 @@
 
 ## Objetivo
 
-RecepVoz/Helvoca no debe asumir que todo negocio agenda horas. La plataforma separa ahora el cerebro conversacional de las operaciones comerciales que cada tenant puede ejecutar.
+Helvoca separa el cerebro conversacional de las operaciones que cada tenant puede ejecutar. Un restaurante, taller, clínica, tienda o inmobiliaria usa el mismo dominio; los verticales son presets de configuración, no ramas `if restaurant`, `if clinic`, etc.
 
-El mismo agente puede atender una peluquería, restaurante, taller, clínica, tienda o inmobiliaria sin agregar condicionales por industria en producción.
+El LLM interpreta lenguaje y reúne datos. El backend conserva autoridad sobre permisos, catálogo, precios, cobertura, estados, confirmaciones y persistencia.
 
-## Modelo
+## Autorización por tenant
 
-### Capacidades explícitas por tenant
+`BusinessOperationCapability` es una capa de configuración/preset. La autorización efectiva de herramientas tiene una única fuente de verdad runtime: `AiAgent` + `AiCapability`, persistida en `ai_agent_capability`.
 
-`BusinessOperationCapability` funciona como una capa de configuración/preset de negocio:
+Presets comerciales actuales:
 
-- `CATALOG`: catálogo universal de productos y servicios.
-- `ORDER`: cotizar, crear, consultar y cancelar pedidos.
-- `DELIVERY`: cobertura, validación de dirección, costos y mínimos de despacho.
+- `CATALOG`: catálogo universal.
+- `ORDER`: cotizar, actualizar, confirmar, consultar y cancelar pedidos.
+- `DELIVERY`: zonas, cobertura y costos de despacho.
 - `QUOTE`: cotizaciones estructuradas.
 - `LEAD`: captura estructurada de potenciales clientes.
-
-La autorización efectiva de herramientas tiene una sola fuente de verdad: `AiAgent` + `AiCapability`, persistida en `ai_agent_capability`. Los presets anteriores se traducen a capacidades concretas como `LIST_CATALOG`, `QUOTE_ORDER`, `CREATE_ORDER`, `GET_ORDER_STATUS`, `CANCEL_ORDER`, `LIST_DELIVERY_ZONES`, `VALIDATE_DELIVERY_ADDRESS`, `CREATE_QUOTE` y `CREATE_LEAD`.
-
-Las capacidades comerciales son opt-in. Los defaults legacy excluyen todas las capacidades comerciales, por lo que agregar una nueva constante al enum no puede habilitar una transacción automáticamente para tenants existentes.
-
-V22 migra grants existentes desde `business_operation_capability` hacia `ai_agent_capability`. La tabla antigua queda únicamente como artefacto de compatibilidad/migración y no participa en la autorización runtime.
 
 Dependencias normalizadas:
 
@@ -30,130 +24,181 @@ Dependencias normalizadas:
 - `QUOTE` implica `CATALOG`.
 - `DELIVERY` implica `ORDER + CATALOG`.
 
+Las capacidades comerciales son opt-in. Los tenants legacy no reciben automáticamente nuevas herramientas transaccionales.
+
 API de configuración:
 
 - `GET /api/v1/business-capabilities`
 - `PUT /api/v1/business-capabilities`
 
-Ejemplo:
-
-```json
-{
-  "capabilities": ["ORDER", "DELIVERY", "QUOTE"]
-}
-```
-
 ## Catálogo universal
 
-`catalog_item` elimina la suposición de que cada ítem comercial es necesariamente una reserva.
+`catalog_item` representa productos y servicios sin asumir que cada ítem debe convertirse en una reserva.
 
 Tipos:
 
 - `SERVICE`
 - `PRODUCT`
 
-Cada ítem puede contener nombre, descripción, precio, moneda, duración opcional y metadata adicional.
-
-Los registros existentes de `service` se copian automáticamente al catálogo y un trigger mantiene sincronizados los cambios futuros. Las reservas existentes continúan usando `service`, por lo que V20 no rompe el contrato actual de booking.
-
-Los `SERVICE` vinculados a booking se administran únicamente mediante `/api/v1/services`; el CRUD del catálogo universal permite administrar directamente `PRODUCT`. Esto evita que un servicio reservable tenga un nombre, precio o estado distinto entre booking y catálogo.
+Cada ítem puede contener nombre, descripción, precio, moneda, duración opcional y metadata. Los servicios legacy se sincronizan con el catálogo sin romper el dominio de booking existente.
 
 API:
 
 - `GET /api/v1/catalog`
 - `POST /api/v1/catalog`
 - `PUT /api/v1/catalog/{id}`
-- `DELETE /api/v1/catalog/{id}` (desactiva)
+- `DELETE /api/v1/catalog/{id}`
 
-## Delivery
+## Business Operation Engine
 
-`delivery_zone` almacena una zona comercial con:
+Desde V23 existe `business_operation` como envolvente universal de una operación conversacional.
 
-- nombre;
-- `coverageTerms` configurables, separados por coma, punto y coma, barra vertical o salto de línea;
-- costo de despacho;
-- compra mínima opcional;
-- estado activo/inactivo.
+Tipos actuales:
 
-Ejemplo de cobertura:
+- `ORDER`
+- `QUOTE`
+- `LEAD`
+- `DELIVERY`
+- `REQUEST`
 
-```text
-Huechuraba; Pedro Fontova; Ciudad Empresarial
-```
+Estados universales:
 
-La dirección entregada por el cliente se normaliza en backend y se compara con las reglas activas del tenant. Se eliminan diferencias de mayúsculas y acentos para el matching. Si ninguna zona coincide, el despacho se rechaza. Si dos zonas empatan con la misma especificidad, el backend falla cerrado y exige revisar la cobertura antes de confirmar.
+- `DRAFT`
+- `AWAITING_CONFIRMATION`
+- `CONFIRMED`
+- `CANCELLED`
+- `EXPIRED`
+- `FAILED`
 
-API:
+La envolvente conserva tenant, cliente, referencia del canal, origen, revisión, token de confirmación cuando corresponde, datos de contacto, valores monetarios y `metadata_json` estructurada.
 
-- `GET /api/v1/delivery-zones`
-- `POST /api/v1/delivery-zones`
-- `PUT /api/v1/delivery-zones/{id}`
-- `DELETE /api/v1/delivery-zones/{id}` (desactiva)
+`business_operation_item` conserva snapshots estructurados de ítems de catálogo, cantidades, precios y modificadores.
 
-Esta versión usa reglas textuales de cobertura. Geocodificación y polígonos podrán implementarse posteriormente como adapters sin mover la decisión de cobertura al LLM.
+### Proyecciones tipadas
+
+La universalización es evolutiva, no un reemplazo destructivo. Las tablas operativas especializadas siguen existiendo como proyecciones compatibles:
+
+- `business_order`
+- `business_quote`
+- `business_lead`
+- `business_request`
+
+V23 convirtió ORDER en una proyección 1:1 de `business_operation`.
+
+V24 hace lo mismo con QUOTE, LEAD y REQUEST y migra los registros existentes. Cada nueva proyección guarda un `operation_id` único y no nulo.
+
+BOOKING conserva por ahora su dominio especializado y todavía no es una proyección de `business_operation`.
+
+## Conversation State Engine
+
+V24 agrega `conversation_operation_state` para que el estado operativo no dependa únicamente del historial textual del modelo.
+
+La clave lógica es:
+
+`business_id + channel + source_reference_id`
+
+El estado incluye:
+
+- operación activa;
+- JSON estructurado de conversación;
+- revisión incremental;
+- timestamps.
+
+Semántica principal: la corrección más reciente reemplaza el valor anterior incompatible. Por ejemplo, si el cliente cambia dirección o cantidad, el nuevo valor sustituye al anterior y aumenta la revisión.
+
+El estado está aislado por tenant y canal. Un patch que no trae una nueva operación activa conserva la operación actual en vez de borrarla accidentalmente.
+
+Para REQUEST, `business_request.call_id` sigue reservado a llamadas reales. WhatsApp y otros canales conservan su referencia en `business_operation.source_reference_id`.
+
+## Policy Engine
+
+`OperationPolicyService` centraliza la política base de confirmación y revisión humana.
+
+Política actual:
+
+- `ORDER` y `DELIVERY`: confirmación explícita.
+- `QUOTE`, `LEAD` y `REQUEST`: no requieren confirmación transaccional adicional.
+- todas pueden derivar a revisión humana ante fallo.
+
+La política no la decide el LLM. Esta primera versión es una política backend centralizada; todavía no es una matriz configurable por tenant en base de datos.
 
 ## Herramientas comerciales
 
-Cuando la capacidad correspondiente está habilitada, voz y WhatsApp pueden recibir:
+Cuando el `AiAgent` del tenant las autoriza, voz y WhatsApp pueden publicar:
 
 - `list_catalog`
 - `list_delivery_zones`
 - `validate_delivery_address`
 - `quote_order`
+- `update_order`
 - `create_order`
 - `get_order_status`
 - `cancel_order`
 - `create_quote`
 - `create_lead`
 
-Los proveedores reciben únicamente las herramientas autorizadas por el `AiAgent` del tenant actual. Voz y WhatsApp comparten las mismas definiciones y el mismo servicio de operaciones comerciales.
+El servicio comercial vuelve a validar la capability en runtime y falla cerrado aunque un adapter futuro publique accidentalmente una herramienta no autorizada.
 
-### Regla de pedido
+## ORDER
 
-`quote_order` siempre recalcula precios usando el catálogo actual.
+ORDER utiliza un flujo estructurado:
 
-`create_order` exige `expectedTotal`, que debe coincidir exactamente con el total recalculado por backend. Esto evita que el modelo cree un pedido con un precio inventado, manipulado o desactualizado.
+1. `quote_order` crea un `business_operation` en `AWAITING_CONFIRMATION`.
+2. El backend calcula precios, cantidades, moneda, cobertura, mínimo y despacho.
+3. Devuelve `operationId`, `revision` y `confirmationToken`.
+4. Si el cliente corrige el pedido, `update_order` reemplaza el estado completo del borrador, incrementa revisión y genera un token nuevo.
+5. El token anterior queda inválido.
+6. Solo después de una confirmación explícita en la conversación se llama `create_order` con `operationId + confirmationToken`.
+7. El backend vuelve a recalcular usando el estado actual.
+8. Si precio o total cambió, responde `ORDER_TOTAL_CHANGED`, genera nueva revisión/token y no materializa el pedido.
+9. Si todo coincide, crea una única proyección `business_order` y snapshots de líneas.
+10. Un retry secuencial devuelve el mismo pedido como replay idempotente.
 
-Para `DELIVERY`, el backend exige:
+El token/versionado garantiza que solo la versión más reciente del borrador pueda materializarse. No pretende demostrar criptográficamente que una persona pronunció una palabra concreta; la capa conversacional debe solicitar y observar confirmación explícita antes de invocar `create_order`.
+
+La conversación estructurada también se actualiza cuando `ORDER_TOTAL_CHANGED` devuelve una nueva cotización, aunque la respuesta de la herramienta tenga `success=false`.
+
+## Delivery
+
+`delivery_zone` almacena nombre, términos de cobertura, costo de despacho, mínimo opcional y estado.
+
+El backend normaliza la dirección y exige:
 
 - capability `DELIVERY` activa;
 - dirección no vacía;
-- dirección cubierta por exactamente una zona válida;
-- compra mínima de la zona satisfecha;
-- costo obtenido exclusivamente desde configuración backend.
+- coincidencia inequívoca con una zona activa;
+- compra mínima satisfecha;
+- costo de despacho obtenido del backend.
 
-`deliveryZoneId` puede enviarse como referencia después de `validate_delivery_address`, pero el backend vuelve a resolver la dirección y rechaza cualquier ID que no corresponda con la cobertura calculada.
+`deliveryZoneId` nunca reemplaza la validación de la dirección. El backend vuelve a resolver cobertura antes de confirmar.
 
-El pedido confirmado persiste snapshots de nombre, cantidad, precio unitario y total de línea.
+DELIVERY está integrado actualmente en ORDER. El tipo universal `DELIVERY` existe, pero un workflow de entrega autónoma todavía es una evolución posterior.
 
-## Entidades transaccionales
+## QUOTE
 
-### `business_order`
+`create_quote` pasa por `UniversalOperationWorkflowService`.
 
-Pedido real con fulfillment `PICKUP` o `DELIVERY`, estado, subtotal, despacho, total, moneda y origen (`VOICE`, `WHATSAPP`, `MANUAL`, `API`).
+Si se entregan ítems:
 
-Estados:
+- el backend consulta solo el catálogo del tenant;
+- rechaza ítems inactivos o ajenos;
+- calcula cantidad, precio y moneda en backend;
+- persiste snapshots en `business_operation_item`;
+- crea la proyección `business_quote` enlazada al `operationId`.
 
-`CONFIRMED -> PREPARING -> READY`
+Si no hay precio determinista, la proyección puede quedar `REQUESTED` sin inventar un monto.
 
-Desde `READY`:
+## LEAD
 
-- `PICKUP -> COMPLETED`
-- `DELIVERY -> DISPATCHED -> COMPLETED`
+`create_lead` crea primero una operación universal y luego su proyección `business_lead`. Nombre e interés son obligatorios; correo, presupuesto y notas son opcionales. El presupuesto no puede ser negativo.
 
-`CONFIRMED` y `PREPARING` admiten cancelación. `COMPLETED` y `CANCELLED` son terminales. El backend rechaza saltos arbitrarios de estado.
+## REQUEST
 
-### `business_order_line`
+`create_request`, tanto manual como desde IA, crea primero una operación universal y después la proyección `business_request`.
 
-Líneas estructuradas del pedido. No se persiste el pedido como texto libre.
+Voz utiliza el `call_id` legacy además de `source_reference_id`. WhatsApp utiliza el ID de conversación únicamente como `source_reference_id`, evitando mezclar IDs de conversación con la FK de llamadas.
 
-### `business_quote`
-
-Cotización independiente. Si todos los ítems tienen precio oficial, puede quedar `READY` con monto calculado. Si necesita evaluación humana, queda `REQUESTED` sin inventar monto.
-
-### `business_lead`
-
-Lead estructurado con nombre, teléfono verificado del canal, correo opcional, interés y presupuesto opcional.
+Los cambios administrativos de estado de REQUEST también sincronizan el estado y revisión de su operación universal.
 
 ## Consola/API operativa
 
@@ -162,37 +207,22 @@ Lead estructurado con nombre, teléfono verificado del canal, correo opcional, i
 - `GET /api/v1/commercial/quotes`
 - `GET /api/v1/commercial/leads`
 
-Las consultas operativas requieren `BUSINESS_ADMIN` u `OPERATOR`. Las mutaciones de capacidades, catálogo, zonas y estado administrativo requieren `BUSINESS_ADMIN`.
+Las consultas operativas requieren `BUSINESS_ADMIN` u `OPERATOR`. Las mutaciones de configuración requieren los permisos administrativos correspondientes.
 
-## Ejemplo restaurante
-
-1. Cliente pide dos hamburguesas y despacho.
-2. El agente ejecuta `list_catalog`.
-3. Recoge modificadores del cliente.
-4. Pide la dirección de entrega.
-5. Ejecuta `validate_delivery_address`.
-6. Ejecuta `quote_order`; backend vuelve a comprobar dirección, precios, mínimo y despacho.
-7. Comunica el total real devuelto por backend.
-8. Cliente confirma.
-9. Ejecuta `create_order` con el mismo total como `expectedTotal`.
-10. El backend vuelve a recalcular todo.
-11. Solo si `success=true` comunica que el pedido quedó confirmado.
-
-No se crea una reserva y no se usa `create_request` como sustituto de un pedido.
-
-## Ejemplos por tipo de negocio
+## Ejemplos de presets
 
 - Restaurante: `CATALOG + ORDER + DELIVERY`.
-- Tienda con retiro: `CATALOG + ORDER`.
-- Peluquería: booking existente, sin necesidad de `ORDER`.
-- Taller: booking para hora de revisión y `QUOTE` para trabajos que deben presupuestarse.
-- Inmobiliaria: `LEAD` para captar interés y booking/request para coordinar visita según configuración.
-- Clínica o veterinaria: booking/request; las capacidades comerciales se activan solo si el negocio realmente las necesita.
+- Tienda: `CATALOG + ORDER`.
+- Taller: `CATALOG + QUOTE + BOOKING`.
+- Inmobiliaria: `CATALOG + LEAD + BOOKING/REQUEST`.
+- Clínica o veterinaria: `CATALOG + BOOKING + REQUEST` según configuración.
 
-Los ejemplos son presets conceptuales, no ramas de código por industria.
+Estos nombres sirven para configuración inicial. No introducen lógica de dominio por industria.
 
 ## Principio de arquitectura
 
-Los verticales deben ser presets de configuración, no ramas de código.
+La dirección del producto es:
 
-El backend define hechos, reglas y transacciones. El LLM interpreta lenguaje y reúne datos, pero no calcula precios, no decide cobertura, no inventa disponibilidad y no confirma operaciones antes de que el backend devuelva éxito.
+`Conversation -> structured state -> policy -> universal operation -> typed projection -> audit/integration`
+
+El backend define hechos y transacciones. La IA interpreta lenguaje. Los adapters de voz y mensajería deben permanecer delgados y compartir el mismo dominio.
