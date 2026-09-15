@@ -66,22 +66,26 @@ public class SafeOperationRetryEngine {
 
     private final OperationPolicyService policies;
     private final OperationRetryAuditService audit;
+    private final HumanHandoffService handoffs;
     private final PlatformTransactionManager transactionManager;
     private final Sleeper sleeper;
 
     @Autowired
     public SafeOperationRetryEngine(OperationPolicyService policies,
                                     OperationRetryAuditService audit,
+                                    HumanHandoffService handoffs,
                                     PlatformTransactionManager transactionManager) {
-        this(policies, audit, transactionManager, Thread::sleep);
+        this(policies, audit, handoffs, transactionManager, Thread::sleep);
     }
 
     SafeOperationRetryEngine(OperationPolicyService policies,
                              OperationRetryAuditService audit,
+                             HumanHandoffService handoffs,
                              PlatformTransactionManager transactionManager,
                              Sleeper sleeper) {
         this.policies = policies;
         this.audit = audit;
+        this.handoffs = handoffs;
         this.transactionManager = transactionManager;
         this.sleeper = sleeper;
     }
@@ -149,14 +153,35 @@ public class SafeOperationRetryEngine {
                         failure.fallbackAction(), false, attemptNo - 1);
             }
 
-            boolean humanEscalation = policy.shouldEscalate(failure.failureClass());
+            boolean escalationAllowed = policy.shouldEscalate(failure.failureClass());
+            HumanHandoffService.Creation handoff = null;
+            if (escalationAllowed && handoffs != null) {
+                try {
+                    handoff = handoffs.createForUnresolvable(
+                            businessId,
+                            operationType,
+                            sourceReferenceId,
+                            operationId(attempt.rawResult()),
+                            toolName,
+                            failure.errorCode(),
+                            attemptNo - 1);
+                } catch (RuntimeException ignored) {
+                    // Never tell the customer that a human was engaged if durable
+                    // handoff persistence did not succeed.
+                    handoff = null;
+                }
+            }
+
             safeAudit(businessId, operationType, sourceReferenceId,
                     operationId(attempt.rawResult()), toolName, attemptNo, maxAttempts,
                     OperationRetryAuditService.Outcome.UNRESOLVABLE,
                     failure.failureClass(), failure.errorCode(), 0);
-            return enrichFailure(attempt.rawResult(), failure,
+
+            boolean humanEscalation = handoff != null;
+            String enriched = enrichFailure(attempt.rawResult(), failure,
                     humanEscalation ? "HUMAN_HANDOFF" : "STOP_SAFELY",
                     humanEscalation, attemptNo - 1);
+            return attachHandoff(enriched, handoff, escalationAllowed);
         }
 
         return error("AUTOMATION_RETRY_EXHAUSTED",
@@ -174,8 +199,6 @@ public class SafeOperationRetryEngine {
                 Failure failure = classifyResult(raw);
                 if (failure != null
                         && failure.failureClass() == OperationPolicyService.FailureClass.TRANSIENT) {
-                    // A transient failure result may have been produced after partial work was
-                    // attempted. Never commit that attempt before trying again.
                     status.setRollbackOnly();
                 }
                 return new Attempt(raw, failure);
@@ -291,6 +314,23 @@ public class SafeOperationRetryEngine {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private static String attachHandoff(String enriched,
+                                        HumanHandoffService.Creation handoff,
+                                        boolean escalationAllowed) {
+        JSONObject root = new JSONObject(enriched);
+        JSONObject automation = root.getJSONObject("automation");
+        automation.put("handoffCreated", handoff != null && handoff.created());
+        automation.put("handoffRequested", escalationAllowed);
+        if (handoff != null) {
+            automation.put("handoffId", handoff.handoffId().toString());
+            automation.put("handoffStatus", handoff.status().name());
+        } else {
+            automation.put("handoffId", JSONObject.NULL);
+            automation.put("handoffStatus", JSONObject.NULL);
+        }
+        return root.toString();
     }
 
     private static String enrichFailure(String rawResult,
