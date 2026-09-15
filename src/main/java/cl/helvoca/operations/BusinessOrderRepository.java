@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public interface BusinessOrderRepository extends JpaRepository<BusinessOrder, UUID> {
     Optional<BusinessOrder> findByIdAndBusinessId(UUID id, UUID businessId);
+    Optional<BusinessOrder> findByOperationIdAndBusinessId(UUID operationId, UUID businessId);
     List<BusinessOrder> findTop5ByBusinessIdAndCustomerIdOrderByCreatedAtDesc(UUID businessId, UUID customerId);
     List<BusinessOrder> findTop5ByBusinessIdAndContactPhoneOrderByCreatedAtDesc(UUID businessId, String contactPhone);
     List<BusinessOrder> findAllByBusinessIdOrderByCreatedAtDesc(UUID businessId);
