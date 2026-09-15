@@ -51,8 +51,7 @@ public class PaymentWorkflowService {
         UUID targetOperationId = uuid(required(args, "targetOperationId"));
         Calculation calculation;
         try {
-            calculation = calculate(
-                    businessId, customerId, sourceReferenceId, trustedPhone, targetOperationId);
+            calculation = calculate(businessId, customerId, sourceReferenceId, trustedPhone, targetOperationId);
         } catch (PaymentRuleException e) {
             return error(e.code, e.getMessage());
         }
@@ -68,9 +67,7 @@ public class PaymentWorkflowService {
         operation.setSource(safeSource);
         operation.setRevision(1);
         operation.setContactName(calculation.target().getContactName());
-        operation.setContactPhone(!blank(trustedPhone)
-                ? trustedPhone.trim()
-                : calculation.target().getContactPhone());
+        operation.setContactPhone(!blank(trustedPhone) ? trustedPhone.trim() : calculation.target().getContactPhone());
         operation.setSubtotal(null);
         operation.setDeliveryFee(null);
         operation.setTotal(calculation.amount());
@@ -82,13 +79,7 @@ public class PaymentWorkflowService {
         operation.setMetadata(operationMetadata(calculation, policy.requiresExplicitConfirmation(), null));
         operation = operations.saveAndFlush(operation);
 
-        recordConversation(
-                businessId,
-                sourceReferenceId,
-                safeSource,
-                operation,
-                "quote_payment",
-                null);
+        recordConversation(businessId, sourceReferenceId, safeSource, operation, "quote_payment", null);
         return success(quoteData(operation, calculation));
     }
 
@@ -109,8 +100,7 @@ public class PaymentWorkflowService {
         UUID targetOperationId = uuid(required(args, "targetOperationId"));
         Calculation calculation;
         try {
-            calculation = calculate(
-                    businessId, customerId, sourceReferenceId, trustedPhone, targetOperationId);
+            calculation = calculate(businessId, customerId, sourceReferenceId, trustedPhone, targetOperationId);
         } catch (PaymentRuleException e) {
             return error(e.code, e.getMessage());
         }
@@ -155,7 +145,6 @@ public class PaymentWorkflowService {
             if (!paymentOwnedBy(existing, customerId, sourceReferenceId, trustedPhone)) {
                 return error("PAYMENT_NOT_FOUND", "No encuentro ese pago entre los pagos del cliente actual.");
             }
-            JSONObject data = paymentData(existing).put("idempotentReplay", true);
             BusinessOperation operation = operations.findByIdAndBusinessId(operationId, businessId).orElse(null);
             if (operation != null) {
                 recordConversation(
@@ -166,7 +155,7 @@ public class PaymentWorkflowService {
                         "create_payment",
                         existing);
             }
-            return success(data);
+            return success(paymentData(existing).put("idempotentReplay", true));
         }
 
         BusinessOperation operation = operations.findByIdAndBusinessId(operationId, businessId).orElse(null);
@@ -192,8 +181,7 @@ public class PaymentWorkflowService {
 
         Calculation recalculated;
         try {
-            recalculated = calculate(
-                    businessId, customerId, sourceReferenceId, trustedPhone, targetOperationId);
+            recalculated = calculate(businessId, customerId, sourceReferenceId, trustedPhone, targetOperationId);
         } catch (PaymentRuleException e) {
             return error(e.code, e.getMessage());
         }
@@ -220,7 +208,7 @@ public class PaymentWorkflowService {
         }
 
         PaymentProviderAdapter provider = providers.resolve(businessId).orElse(null);
-        if (provider == null) {
+        if (provider == null || blank(provider.providerCode())) {
             return error("PAYMENT_PROVIDER_UNAVAILABLE",
                     "Este negocio todavía no tiene un proveedor de pagos comerciales configurado.");
         }
@@ -236,7 +224,8 @@ public class PaymentWorkflowService {
                     recalculated.currency(),
                     idempotencyKey,
                     !blank(trustedPhone) ? trustedPhone.trim() : operation.getContactPhone(),
-                    Map.of("paymentOperationId", operation.getId().toString(),
+                    Map.of(
+                            "paymentOperationId", operation.getId().toString(),
                             "targetOperationId", recalculated.target().getId().toString())));
         } catch (Exception e) {
             return error("PAYMENT_PROVIDER_FAILED",
@@ -252,12 +241,11 @@ public class PaymentWorkflowService {
         payment.setOperationId(operation.getId());
         payment.setBusinessId(businessId);
         payment.setCustomerId(customerId != null ? customerId : operation.getCustomerId());
-        payment.setSourceReferenceId(
-                sourceReferenceId != null ? sourceReferenceId : operation.getSourceReferenceId());
+        payment.setSourceReferenceId(sourceReferenceId != null ? sourceReferenceId : operation.getSourceReferenceId());
         payment.setTargetOperationId(recalculated.target().getId());
         payment.setContactPhone(!blank(trustedPhone) ? trustedPhone.trim() : operation.getContactPhone());
-        payment.setProvider(provider.providerCode());
-        payment.setExternalId(providerResult.externalId());
+        payment.setProvider(provider.providerCode().trim());
+        payment.setExternalId(providerResult.externalId().trim());
         payment.setIdempotencyKey(idempotencyKey);
         payment.setAmount(recalculated.amount());
         payment.setCurrency(recalculated.currency());
@@ -280,10 +268,9 @@ public class PaymentWorkflowService {
                 "create_payment",
                 payment);
 
-        JSONObject data = paymentData(payment)
+        return success(paymentData(payment)
                 .put("operationRevision", operation.getRevision())
-                .put("idempotentReplay", false);
-        return success(data);
+                .put("idempotentReplay", false));
     }
 
     @Transactional
@@ -319,11 +306,9 @@ public class PaymentWorkflowService {
         if (customerId != null) {
             recent = payments.findTop5ByBusinessIdAndCustomerIdOrderByCreatedAtDesc(businessId, customerId);
         } else if (!blank(trustedPhone)) {
-            recent = payments.findTop5ByBusinessIdAndContactPhoneOrderByCreatedAtDesc(
-                    businessId, trustedPhone.trim());
+            recent = payments.findTop5ByBusinessIdAndContactPhoneOrderByCreatedAtDesc(businessId, trustedPhone.trim());
         } else if (sourceReferenceId != null) {
-            recent = payments.findTop5ByBusinessIdAndSourceReferenceIdOrderByCreatedAtDesc(
-                    businessId, sourceReferenceId);
+            recent = payments.findTop5ByBusinessIdAndSourceReferenceIdOrderByCreatedAtDesc(businessId, sourceReferenceId);
         } else {
             return error("CUSTOMER_CONTEXT_REQUIRED", "No puedo verificar qué pagos pertenecen al cliente actual.");
         }
@@ -365,8 +350,7 @@ public class PaymentWorkflowService {
             result = provider.cancel(new PaymentProviderAdapter.CancelCommand(
                     businessId, payment.getExternalId(), payment.getIdempotencyKey()));
         } catch (Exception e) {
-            return error("PAYMENT_PROVIDER_FAILED",
-                    "El proveedor de pagos no pudo cancelar la intención.");
+            return error("PAYMENT_PROVIDER_FAILED", "El proveedor de pagos no pudo cancelar la intención.");
         }
         if (result == null || result.status() == null) {
             return error("PAYMENT_PROVIDER_FAILED",
@@ -405,13 +389,14 @@ public class PaymentWorkflowService {
                 payments.saveAndFlush(payment);
             }
         } catch (Exception ignored) {
-            // Status reads degrade to the last verified local state.
+            // A status read degrades to the last provider-verified state persisted locally.
         }
     }
 
     private void syncOperation(BusinessPayment payment, UUID businessId) {
         BusinessOperation operation = operations.findByIdAndBusinessId(payment.getOperationId(), businessId).orElse(null);
         if (operation == null || operation.getType() != BusinessOperation.Type.PAYMENT) return;
+
         BusinessOperation.Status next = operationStatus(payment.getStatus());
         if (operation.getStatus() != next) {
             operation.setStatus(next);
@@ -435,7 +420,8 @@ public class PaymentWorkflowService {
                                   String trustedPhone,
                                   UUID targetOperationId) {
         BusinessOperation target = operations.findByIdAndBusinessId(targetOperationId, businessId).orElse(null);
-        if (target == null || target.getType() == BusinessOperation.Type.PAYMENT
+        if (target == null
+                || target.getType() == BusinessOperation.Type.PAYMENT
                 || !operationOwnedBy(target, customerId, sourceReferenceId, trustedPhone)) {
             throw new PaymentRuleException(
                     "PAYMENT_TARGET_NOT_FOUND",
@@ -451,7 +437,9 @@ public class PaymentWorkflowService {
                     "PAYMENT_AMOUNT_UNAVAILABLE",
                     "La operación no tiene un monto backend-autoritativo disponible para pagar.");
         }
-        if (blank(target.getCurrency()) || target.getCurrency().length() != 3) {
+
+        String currency = target.getCurrency() == null ? null : target.getCurrency().trim().toUpperCase();
+        if (blank(currency) || currency.length() != 3) {
             throw new PaymentRuleException(
                     "PAYMENT_CURRENCY_UNAVAILABLE",
                     "La operación no tiene una moneda válida para pagar.");
@@ -470,7 +458,7 @@ public class PaymentWorkflowService {
                     "PAYMENT_ALREADY_SATISFIED",
                     "La operación ya registra el monto completo como pagado.");
         }
-        return new Calculation(target, remaining, target.getCurrency().trim().toUpperCase());
+        return new Calculation(target, remaining, currency);
     }
 
     private BusinessOperation requireEditableOperation(UUID businessId,
@@ -496,6 +484,7 @@ public class PaymentWorkflowService {
                                     String lastTool,
                                     BusinessPayment payment) {
         if (sourceReferenceId == null || operation == null) return;
+
         Map<String, Object> patch = new LinkedHashMap<>();
         patch.put("intent", "PAYMENT");
         patch.put("lastTool", lastTool);
@@ -510,6 +499,7 @@ public class PaymentWorkflowService {
                 operation.getConfirmationToken() == null ? null : operation.getConfirmationToken().toString());
         UUID targetOperationId = metadataUuid(operation, "targetOperationId");
         if (targetOperationId != null) patch.put("targetOperationId", targetOperationId.toString());
+
         if (payment != null) {
             patch.put("paymentId", payment.getId().toString());
             patch.put("paymentStatus", payment.getStatus().name());
@@ -519,6 +509,7 @@ public class PaymentWorkflowService {
         } else {
             patch.put("paymentPending", true);
         }
+
         conversationState.apply(
                 businessId,
                 sourceReferenceId,
@@ -532,7 +523,10 @@ public class PaymentWorkflowService {
                 .put("operationId", operation.getId().toString())
                 .put("revision", operation.getRevision())
                 .put("status", operation.getStatus().name())
-                .put("confirmationToken", nullable(operation.getConfirmationToken()))
+                .put("confirmationToken",
+                        operation.getConfirmationToken() == null
+                                ? JSONObject.NULL
+                                : operation.getConfirmationToken().toString())
                 .put("targetOperationId", calculation.target().getId().toString())
                 .put("amount", calculation.amount())
                 .put("currency", calculation.currency());
@@ -567,8 +561,7 @@ public class PaymentWorkflowService {
         return metadata;
     }
 
-    private static Map<String, Object> mergeMetadata(Map<String, Object> current,
-                                                     Map<String, Object> patch) {
+    private static Map<String, Object> mergeMetadata(Map<String, Object> current, Map<String, Object> patch) {
         Map<String, Object> merged = new LinkedHashMap<>();
         if (current != null) merged.putAll(current);
         if (patch != null) merged.putAll(patch);
@@ -605,9 +598,7 @@ public class PaymentWorkflowService {
                 && trustedPhone.trim().equals(payment.getContactPhone().trim());
     }
 
-    private static boolean hasVerifiedContext(UUID customerId,
-                                              UUID sourceReferenceId,
-                                              String trustedPhone) {
+    private static boolean hasVerifiedContext(UUID customerId, UUID sourceReferenceId, String trustedPhone) {
         return customerId != null || sourceReferenceId != null || !blank(trustedPhone);
     }
 
@@ -615,8 +606,11 @@ public class PaymentWorkflowService {
         if (operation == null || operation.getMetadata() == null) return null;
         Object value = operation.getMetadata().get(key);
         if (value == null) return null;
-        try { return UUID.fromString(String.valueOf(value)); }
-        catch (Exception ignored) { return null; }
+        try {
+            return UUID.fromString(String.valueOf(value));
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private static BusinessOperation.Status operationStatus(BusinessPayment.Status status) {
@@ -656,27 +650,39 @@ public class PaymentWorkflowService {
     }
 
     private static UUID uuid(String value) {
-        try { return UUID.fromString(value.trim()); }
-        catch (Exception e) { throw new IllegalArgumentException("Se recibió un identificador inválido."); }
+        try {
+            return UUID.fromString(value.trim());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Se recibió un identificador inválido.");
+        }
     }
 
-    private static boolean blank(String value) { return value == null || value.isBlank(); }
+    private static boolean blank(String value) {
+        return value == null || value.isBlank();
+    }
 
     private static Object nullable(Object value) {
         return value == null ? JSONObject.NULL : value;
     }
 
     private static JSONObject success(JSONObject data) {
-        return new JSONObject().put("success", true).put("data", data).put("error", JSONObject.NULL);
+        return new JSONObject()
+                .put("success", true)
+                .put("data", data)
+                .put("error", JSONObject.NULL);
     }
 
     private static JSONObject error(String code, String message) {
-        return new JSONObject().put("success", false).put("data", JSONObject.NULL)
+        return new JSONObject()
+                .put("success", false)
+                .put("data", JSONObject.NULL)
                 .put("error", new JSONObject().put("code", code).put("message", message));
     }
 
     private static JSONObject errorWithData(String code, String message, JSONObject data) {
-        return new JSONObject().put("success", false).put("data", data)
+        return new JSONObject()
+                .put("success", false)
+                .put("data", data)
                 .put("error", new JSONObject().put("code", code).put("message", message));
     }
 
