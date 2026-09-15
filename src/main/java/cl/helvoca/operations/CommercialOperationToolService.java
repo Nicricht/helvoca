@@ -330,8 +330,7 @@ public class CommercialOperationToolService {
                     .put("unitPrice", line.getUnitPrice())
                     .put("lineTotal", line.getLineTotal())
                     .put("notes", nullable(line.getNotes()));
-            if (!blank(line.getModifiersJson())) item.put("modifiers", new JSONObject(line.getModifiersJson()));
-            else item.put("modifiers", JSONObject.NULL);
+            item.put("modifiers", line.getModifiers() == null ? JSONObject.NULL : new JSONObject(line.getModifiers()));
             items.put(item);
         }
         return new JSONObject()
