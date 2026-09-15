@@ -42,6 +42,12 @@ jobs:
       - name: Run backend tests
         run: mvn --batch-mode --no-transfer-progress test
 
+      - name: Print backend test diagnostics
+        if: failure()
+        run: |
+          echo "=== Surefire reports ==="
+          find . -type f \( -path '*/target/surefire-reports/*.txt' -o -path '*/target/failsafe-reports/*.txt' \) -print -exec sh -c 'echo "--- $1 ---"; cat "$1"' _ {} \;
+
       - name: Install browser test dependencies
         run: |
           npm install --no-audit --no-fund
