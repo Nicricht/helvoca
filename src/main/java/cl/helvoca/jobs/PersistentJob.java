@@ -23,7 +23,8 @@ public record PersistentJob(
         Instant updatedAt) {
 
     public enum Type {
-        OUTBOUND_MESSAGE_DISPATCH
+        OUTBOUND_MESSAGE_DISPATCH,
+        CALENDAR_EVENT_SYNC
     }
 
     public enum Status {

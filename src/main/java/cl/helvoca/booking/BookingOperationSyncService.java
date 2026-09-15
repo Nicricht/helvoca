@@ -1,10 +1,12 @@
 package cl.helvoca.booking;
 
+import cl.helvoca.calendar.CalendarSyncOutboxService;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationRepository;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.operations.ConversationStateService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +24,27 @@ public class BookingOperationSyncService {
     private final BookingRepository bookings;
     private final BusinessOperationRepository operations;
     private final ConversationStateService conversationState;
+    private final CalendarSyncOutboxService calendarSync;
 
+    @Autowired
     public BookingOperationSyncService(BookingRepository bookings,
                                        BusinessOperationRepository operations,
-                                       ConversationStateService conversationState) {
+                                       ConversationStateService conversationState,
+                                       CalendarSyncOutboxService calendarSync) {
         this.bookings = bookings;
         this.operations = operations;
         this.conversationState = conversationState;
+        this.calendarSync = calendarSync;
+    }
+
+    // Kept package-visible for focused unit tests that do not bootstrap calendar infrastructure.
+    BookingOperationSyncService(BookingRepository bookings,
+                                BusinessOperationRepository operations,
+                                ConversationStateService conversationState) {
+        this.bookings = bookings;
+        this.operations = operations;
+        this.conversationState = conversationState;
+        this.calendarSync = null;
     }
 
     @Transactional
@@ -94,6 +110,9 @@ public class BookingOperationSyncService {
                     patch);
         }
 
+        if (calendarSync != null) {
+            calendarSync.enqueueIfConnected(booking);
+        }
         return operation;
     }
 }
