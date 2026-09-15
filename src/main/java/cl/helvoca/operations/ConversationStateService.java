@@ -17,7 +17,8 @@ public class ConversationStateService {
 
     /**
      * Applies a top-level state patch. A newer value replaces the previous
-     * conflicting value. A null value removes the key entirely.
+     * conflicting value. A null patch value removes the key entirely. A null
+     * activeOperationId preserves the currently active operation.
      */
     @Transactional
     public ConversationOperationState apply(UUID businessId,
@@ -51,7 +52,7 @@ public class ConversationStateService {
             }
         }
 
-        state.setActiveOperationId(activeOperationId);
+        if (activeOperationId != null) state.setActiveOperationId(activeOperationId);
         state.setState(next);
         if (existing) state.setRevision(state.getRevision() == null ? 1 : state.getRevision() + 1);
         return repository.saveAndFlush(state);
