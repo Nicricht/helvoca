@@ -58,11 +58,16 @@ public class AutomationPolicyAdminService {
                 ? effective.retryPolicy() : request.retryPolicy();
         OperationPolicyService.EscalationPolicy escalation = request.escalationPolicy() == null
                 ? effective.escalationPolicy() : request.escalationPolicy();
-        int maxRetries = request.maxAutoRetries() == null
-                ? effective.maxAutoRetries() : request.maxAutoRetries();
+        int maxRetries;
+        if (retry == OperationPolicyService.RetryPolicy.NONE) {
+            maxRetries = 0;
+        } else {
+            maxRetries = request.maxAutoRetries() == null
+                    ? Math.max(1, effective.maxAutoRetries())
+                    : request.maxAutoRetries();
+        }
 
         validate(type, confirmation, payment, retry, maxRetries);
-        if (retry == OperationPolicyService.RetryPolicy.NONE) maxRetries = 0;
 
         BusinessAutomationPolicy entity = repository
                 .findByBusinessIdAndOperationType(businessId, type)
