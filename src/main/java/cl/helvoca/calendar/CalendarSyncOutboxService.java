@@ -55,6 +55,7 @@ public class CalendarSyncOutboxService {
         String canonical = String.join("|",
                 integration.id().toString(),
                 integration.providerCode(),
+                integration.externalCalendarId() == null ? "" : integration.externalCalendarId(),
                 Boolean.toString(integration.meetingsEnabled()),
                 booking.getId().toString(),
                 booking.getOperationId() == null ? "" : booking.getOperationId().toString(),
