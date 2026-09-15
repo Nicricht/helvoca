@@ -23,9 +23,14 @@ GRANT helvoca_runtime TO CURRENT_USER;
 GRANT helvoca_system TO CURRENT_USER;
 GRANT USAGE ON SCHEMA public TO helvoca_runtime, helvoca_system;
 
--- Normal tenant runtime can read global reference tables but cannot mutate them.
+-- Tenant runtime may read global reference tables. Tenant-owned tables receive
+-- their DML grants below after their RLS policy is installed.
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO helvoca_runtime;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO helvoca_runtime;
+
+-- The distributed limiter is intentionally global infrastructure. It contains
+-- no customer payload and must be writable before tenant identity is known.
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.api_rate_limit_bucket TO helvoca_runtime;
 
 -- Controlled system paths need the existing application capabilities across tenants.
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO helvoca_system;
@@ -112,6 +117,51 @@ BEGIN
     );
 END
 $$;
+
+-- Some sensitive child tables predate the rule that every tenant-owned table
+-- carries business_id directly. They inherit tenant ownership through an FK.
+-- Their policies deliberately rely on the already-RLS-protected parent table.
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.call_transcript TO helvoca_runtime;
+ALTER TABLE public.call_transcript ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.call_transcript FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS helvoca_call_transcript_isolation ON public.call_transcript;
+CREATE POLICY helvoca_call_transcript_isolation ON public.call_transcript TO PUBLIC
+USING (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.call_session parent WHERE parent.id = call_transcript.call_id)
+)
+WITH CHECK (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.call_session parent WHERE parent.id = call_transcript.call_id)
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.call_summary TO helvoca_runtime;
+ALTER TABLE public.call_summary ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.call_summary FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS helvoca_call_summary_isolation ON public.call_summary;
+CREATE POLICY helvoca_call_summary_isolation ON public.call_summary TO PUBLIC
+USING (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.call_session parent WHERE parent.id = call_summary.call_id)
+)
+WITH CHECK (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.call_session parent WHERE parent.id = call_summary.call_id)
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_role TO helvoca_runtime;
+ALTER TABLE public.user_role ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_role FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS helvoca_user_role_isolation ON public.user_role;
+CREATE POLICY helvoca_user_role_isolation ON public.user_role TO PUBLIC
+USING (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.app_user parent WHERE parent.id = user_role.user_id)
+)
+WITH CHECK (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.app_user parent WHERE parent.id = user_role.user_id)
+);
 
 -- Runtime code never needs Flyway history. Keep migration metadata owner-only.
 REVOKE ALL ON TABLE public.flyway_schema_history FROM helvoca_runtime, helvoca_system;
