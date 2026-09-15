@@ -6,6 +6,7 @@ import cl.helvoca.delivery.DeliveryCoverageService;
 import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZone;
 import cl.helvoca.delivery.DeliveryZoneRepository;
+import cl.helvoca.payment.PaymentWorkflowService;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
@@ -35,7 +36,12 @@ public class CommercialOperationToolService {
             "get_order_status",
             "cancel_order",
             "create_quote",
-            "create_lead");
+            "create_lead",
+            "quote_payment",
+            "update_payment",
+            "create_payment",
+            "get_payment_status",
+            "cancel_payment");
 
     private static final Set<String> ORDER_STATE_TOOLS = Set.of(
             "quote_order",
@@ -53,6 +59,7 @@ public class CommercialOperationToolService {
     private final OrderWorkflowService orderWorkflow;
     private final DeliveryWorkflowService deliveryWorkflow;
     private final UniversalOperationWorkflowService universalOperations;
+    private final PaymentWorkflowService paymentWorkflow;
     private final ConversationStateService conversationState;
 
     public CommercialOperationToolService(CatalogItemRepository catalog,
@@ -65,6 +72,7 @@ public class CommercialOperationToolService {
                                           OrderWorkflowService orderWorkflow,
                                           DeliveryWorkflowService deliveryWorkflow,
                                           UniversalOperationWorkflowService universalOperations,
+                                          PaymentWorkflowService paymentWorkflow,
                                           ConversationStateService conversationState) {
         this.catalog = catalog;
         this.deliveryZones = deliveryZones;
@@ -76,6 +84,7 @@ public class CommercialOperationToolService {
         this.orderWorkflow = orderWorkflow;
         this.deliveryWorkflow = deliveryWorkflow;
         this.universalOperations = universalOperations;
+        this.paymentWorkflow = paymentWorkflow;
         this.conversationState = conversationState;
     }
 
@@ -126,6 +135,16 @@ public class CommercialOperationToolService {
                 case "create_quote" -> universalOperations.createQuote(
                         businessId, customerId, sourceReferenceId, trustedPhone, source, args);
                 case "create_lead" -> universalOperations.createLead(
+                        businessId, customerId, sourceReferenceId, trustedPhone, source, args);
+                case "quote_payment" -> paymentWorkflow.quote(
+                        businessId, customerId, sourceReferenceId, trustedPhone, source, args);
+                case "update_payment" -> paymentWorkflow.update(
+                        businessId, customerId, sourceReferenceId, trustedPhone, source, args);
+                case "create_payment" -> paymentWorkflow.confirm(
+                        businessId, customerId, sourceReferenceId, trustedPhone, source, args);
+                case "get_payment_status" -> paymentWorkflow.status(
+                        businessId, customerId, sourceReferenceId, trustedPhone, source, args);
+                case "cancel_payment" -> paymentWorkflow.cancel(
                         businessId, customerId, sourceReferenceId, trustedPhone, source, args);
                 default -> error("UNKNOWN_COMMERCIAL_TOOL", "La operación comercial solicitada no existe.");
             };
