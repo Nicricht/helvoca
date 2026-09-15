@@ -10,4 +10,8 @@ public interface ConversationOperationStateRepository extends JpaRepository<Conv
             UUID businessId,
             BusinessOrder.Source channel,
             UUID sourceReferenceId);
+
+    Optional<ConversationOperationState> findFirstByBusinessIdAndOmnichannelSessionIdOrderByUpdatedAtDesc(
+            UUID businessId,
+            UUID omnichannelSessionId);
 }

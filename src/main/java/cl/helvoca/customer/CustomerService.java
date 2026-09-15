@@ -2,7 +2,9 @@ package cl.helvoca.customer;
 
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.NotFoundException;
+import cl.helvoca.omnichannel.CustomerIdentityService;
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +16,9 @@ public class CustomerService {
     private final CustomerRepository customers;
     private final TenantProvider tenantProvider;
     private final AuditService auditService;
+
+    @Autowired(required = false)
+    private CustomerIdentityService customerIdentities;
 
     public CustomerService(CustomerRepository customers, TenantProvider tenantProvider, AuditService auditService) {
         this.customers = customers;
@@ -34,10 +39,11 @@ public class CustomerService {
         return CustomerResponse.from(requireCustomer(id, businessId));
     }
 
+    /** Administrative search only. This does not establish channel identity. */
     @Transactional(readOnly = true)
     public CustomerResponse findByPhone(String phone) {
         UUID businessId = tenantProvider.requireBusinessId();
-        return CustomerResponse.from(customers.findFirstByBusinessIdAndPhone(businessId, phone)
+        return CustomerResponse.from(customers.findFirstRawByBusinessIdAndPhone(businessId, phone)
                 .orElseThrow(() -> new NotFoundException("Customer not found")));
     }
 
@@ -47,7 +53,8 @@ public class CustomerService {
         Customer customer = new Customer();
         customer.setBusinessId(businessId);
         apply(customer, request);
-        Customer saved = customers.save(customer);
+        Customer saved = customers.saveAndFlush(customer);
+        recordDeclaredPhone(saved);
         auditService.success(businessId, "CUSTOMER_CREATE", "CUSTOMER", saved.getId());
         return CustomerResponse.from(saved);
     }
@@ -57,8 +64,16 @@ public class CustomerService {
         UUID businessId = tenantProvider.requireBusinessId();
         Customer customer = requireCustomer(id, businessId);
         apply(customer, request);
+        Customer saved = customers.saveAndFlush(customer);
+        recordDeclaredPhone(saved);
         auditService.success(businessId, "CUSTOMER_UPDATE", "CUSTOMER", id);
-        return CustomerResponse.from(customer);
+        return CustomerResponse.from(saved);
+    }
+
+    private void recordDeclaredPhone(Customer customer) {
+        if (customerIdentities == null) return;
+        customerIdentities.recordDeclaredPhone(
+                customer.getBusinessId(), customer.getId(), customer.getPhone(), "CUSTOMER_FIELD");
     }
 
     private Customer requireCustomer(UUID id, UUID businessId) {

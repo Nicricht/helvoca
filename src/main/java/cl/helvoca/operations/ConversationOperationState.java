@@ -28,6 +28,9 @@ public class ConversationOperationState {
     @Column(nullable = false, length = 20)
     private BusinessOrder.Source channel;
 
+    @Column(name = "omnichannel_session_id")
+    private UUID omnichannelSessionId;
+
     @Column(name = "active_operation_id")
     private UUID activeOperationId;
 
@@ -63,6 +66,8 @@ public class ConversationOperationState {
     public void setSourceReferenceId(UUID sourceReferenceId) { this.sourceReferenceId = sourceReferenceId; }
     public BusinessOrder.Source getChannel() { return channel; }
     public void setChannel(BusinessOrder.Source channel) { this.channel = channel; }
+    public UUID getOmnichannelSessionId() { return omnichannelSessionId; }
+    public void setOmnichannelSessionId(UUID omnichannelSessionId) { this.omnichannelSessionId = omnichannelSessionId; }
     public UUID getActiveOperationId() { return activeOperationId; }
     public void setActiveOperationId(UUID activeOperationId) { this.activeOperationId = activeOperationId; }
     public Map<String, Object> getState() { return state; }

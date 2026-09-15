@@ -4,6 +4,7 @@ import cl.helvoca.agent.AiAgent;
 import cl.helvoca.agent.AiAgentService;
 import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.customer.CustomerRepository;
+import cl.helvoca.omnichannel.CustomerIdentityService;
 import cl.helvoca.operations.BusinessOperationCapabilityService;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
@@ -39,6 +40,9 @@ public class WhatsAppReceptionistService {
 
     @Autowired(required = false)
     private BusinessOperationCapabilityService operationCapabilities;
+
+    @Autowired(required = false)
+    private CustomerIdentityService customerIdentities;
 
     public WhatsAppReceptionistService(PhoneNumberRepository phones,
                                        CustomerRepository customers,
@@ -89,10 +93,7 @@ public class WhatsAppReceptionistService {
                         phone.getBusinessId(), CHANNEL, from, to, after)
                 .orElseGet(() -> newConversation(phone, from, to, now));
 
-        if (conversation.getCustomerId() == null) {
-            customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), from)
-                    .ifPresent(customer -> conversation.setCustomerId(customer.getId()));
-        }
+        attachVerifiedCustomer(conversation, phone.getBusinessId(), from);
         conversation.setLastMessageAt(now);
         conversations.saveAndFlush(conversation);
 
@@ -188,9 +189,14 @@ public class WhatsAppReceptionistService {
         conversation.setRecipient(to);
         conversation.setOpenedAt(now);
         conversation.setLastMessageAt(now);
-        customers.findFirstByBusinessIdAndPhone(phone.getBusinessId(), from)
-                .ifPresent(customer -> conversation.setCustomerId(customer.getId()));
+        attachVerifiedCustomer(conversation, phone.getBusinessId(), from);
         return conversation;
+    }
+
+    private void attachVerifiedCustomer(MessagingConversation conversation, UUID businessId, String from) {
+        if (conversation.getCustomerId() != null || customerIdentities == null) return;
+        customerIdentities.resolveVerifiedPhone(businessId, from)
+                .ifPresent(conversation::setCustomerId);
     }
 
     private List<MessagingAiClient.Turn> history(UUID conversationId) {

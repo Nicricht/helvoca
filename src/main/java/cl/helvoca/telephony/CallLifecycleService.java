@@ -8,6 +8,7 @@ import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.call.CallStatus;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.customer.CustomerRepository;
+import cl.helvoca.omnichannel.CustomerIdentityService;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -37,6 +38,7 @@ public class CallLifecycleService {
     private final CallCommercialProperties commercial;
     private final MeterRegistry metrics;
     private BusinessSubscriptionService subscriptions;
+    private CustomerIdentityService customerIdentities;
 
     public CallLifecycleService(PhoneNumberRepository phoneNumbers,
                                 CustomerRepository customers,
@@ -55,6 +57,11 @@ public class CallLifecycleService {
     @Autowired(required = false)
     void setSubscriptions(BusinessSubscriptionService subscriptions) {
         this.subscriptions = subscriptions;
+    }
+
+    @Autowired(required = false)
+    void setCustomerIdentities(CustomerIdentityService customerIdentities) {
+        this.customerIdentities = customerIdentities;
     }
 
     @Transactional
@@ -100,8 +107,10 @@ public class CallLifecycleService {
         call.setDirection(CallDirection.INBOUND);
         call.setStatus(CallStatus.RINGING);
         call.setStartedAt(Instant.now());
-        customers.findFirstByBusinessIdAndPhone(businessId, from)
-                .ifPresent(customer -> call.setCustomerId(customer.getId()));
+        if (customerIdentities != null) {
+            customerIdentities.resolveVerifiedPhone(businessId, from)
+                    .ifPresent(call::setCustomerId);
+        }
         CallSession saved = calls.saveAndFlush(call);
         metrics.counter("helvoca.calls.started", "provider", normalizedProvider).increment();
         return saved.getId();

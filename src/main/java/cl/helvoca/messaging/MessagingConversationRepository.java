@@ -9,4 +9,6 @@ import java.util.UUID;
 public interface MessagingConversationRepository extends JpaRepository<MessagingConversation, UUID> {
     Optional<MessagingConversation> findFirstByBusinessIdAndChannelAndSenderAndRecipientAndLastMessageAtAfterOrderByLastMessageAtDesc(
             UUID businessId, String channel, String sender, String recipient, Instant after);
+
+    Optional<MessagingConversation> findByIdAndBusinessId(UUID id, UUID businessId);
 }
