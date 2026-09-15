@@ -25,7 +25,14 @@ public class BusinessRequest {
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
 
-    @PrePersist void prePersist() { var now = Instant.now(); createdAt = now; updatedAt = now; }
+    @PrePersist
+    void prePersist() {
+        var now = Instant.now();
+        createdAt = now;
+        updatedAt = now;
+        if (source != RequestSource.AI_CALL) callId = null;
+    }
+
     @PreUpdate void preUpdate() { updatedAt = Instant.now(); }
 
     public UUID getId() { return id; }
