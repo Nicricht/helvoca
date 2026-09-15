@@ -4,6 +4,7 @@ import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.customer.Customer;
 import cl.helvoca.customer.CustomerRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -41,6 +42,7 @@ class UniversalConfirmationIntegrationTest {
     @Autowired OperationConfirmationRepository confirmations;
     @Autowired BusinessOperationEventRepository events;
     @Autowired UniversalConfirmationService service;
+    @Autowired EntityManager entityManager;
 
     @Test
     void confirmationIsDurableRevisionedAndCrossChannel() {
@@ -79,8 +81,10 @@ class UniversalConfirmationIntegrationTest {
         op.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
         operations.saveAndFlush(op);
 
-        assertEquals(OperationConfirmation.State.INVALIDATED,
-                confirmations.findById(first.getId()).orElseThrow().getState());
+        // The confirmation lifecycle is maintained by a PostgreSQL trigger. Refresh
+        // the managed entity so this assertion observes the database-owned state.
+        entityManager.refresh(first);
+        assertEquals(OperationConfirmation.State.INVALIDATED, first.getState());
         assertEquals(UniversalConfirmationService.Authorization.STALE,
                 service.authorize(business.getId(), op.getId(), customer.getId(), UUID.randomUUID(), null,
                         token1));
@@ -91,21 +95,73 @@ class UniversalConfirmationIntegrationTest {
         op.setStatus(BusinessOperation.Status.CONFIRMED);
         op.setConfirmationToken(null);
         operations.saveAndFlush(op);
-        service.recordResolution(business.getId(), op.getId(), token2, BusinessOrder.Source.WHATSAPP, UUID.randomUUID());
+        UUID whatsappSource = UUID.randomUUID();
+        service.recordResolution(business.getId(), op.getId(), token2, BusinessOrder.Source.WHATSAPP, whatsappSource);
         OperationConfirmation consumed = confirmations.findByBusinessIdAndToken(business.getId(), token2).orElseThrow();
+        entityManager.refresh(consumed);
         assertEquals(OperationConfirmation.State.CONSUMED, consumed.getState());
         assertEquals(BusinessOrder.Source.WHATSAPP, consumed.getResolvedChannel());
+        assertEquals(whatsappSource, consumed.getResolvedSourceReferenceId());
         assertNotNull(consumed.getResolvedAt());
 
         assertEquals(UniversalConfirmationService.Authorization.IDEMPOTENT_REPLAY,
                 service.authorize(business.getId(), op.getId(), customer.getId(), UUID.randomUUID(), null,
                         token2));
+
+        // Consumed confirmation remains the idempotency key even if a downstream
+        // workflow advances the operation revision after confirmation.
+        op.setRevision(3);
+        op.setStatus(BusinessOperation.Status.EXECUTING);
+        operations.saveAndFlush(op);
+        assertEquals(UniversalConfirmationService.Authorization.IDEMPOTENT_REPLAY,
+                service.authorize(business.getId(), op.getId(), customer.getId(), UUID.randomUUID(), null,
+                        token2));
+
         assertEquals(UniversalConfirmationService.Authorization.NOT_AWAITING,
                 service.authorize(business.getId(), op.getId(), customer.getId(), UUID.randomUUID(), null,
                         null));
         assertEquals(UniversalConfirmationService.Authorization.NOT_AWAITING,
                 service.authorize(business.getId(), op.getId(), customer.getId(), UUID.randomUUID(), null,
                         UUID.randomUUID()));
+    }
+
+    @Test
+    void explicitCustomerBindingCannotFallBackToPhoneOrSourceReference() {
+        Business business = new Business();
+        business.setName("Ownership tenant");
+        business = businesses.saveAndFlush(business);
+
+        Customer owner = new Customer();
+        owner.setBusinessId(business.getId());
+        owner.setName("Owner");
+        owner = customers.saveAndFlush(owner);
+        Customer other = new Customer();
+        other.setBusinessId(business.getId());
+        other.setName("Other");
+        other = customers.saveAndFlush(other);
+
+        UUID sourceReference = UUID.randomUUID();
+        UUID token = UUID.randomUUID();
+        BusinessOperation op = new BusinessOperation();
+        op.setBusinessId(business.getId());
+        op.setCustomerId(owner.getId());
+        op.setSourceReferenceId(sourceReference);
+        op.setContactPhone("+56911111111");
+        op.setType(BusinessOperation.Type.BOOKING);
+        op.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
+        op.setSource(BusinessOrder.Source.VOICE);
+        op.setRevision(1);
+        op.setConfirmationToken(token);
+        op = operations.saveAndFlush(op);
+
+        assertEquals(UniversalConfirmationService.Authorization.NOT_OWNED,
+                service.authorize(business.getId(), op.getId(), other.getId(), sourceReference,
+                        "+56911111111", token));
+        assertEquals(UniversalConfirmationService.Authorization.NOT_OWNED,
+                service.authorize(business.getId(), op.getId(), null, sourceReference,
+                        "+56911111111", token));
+        assertEquals(UniversalConfirmationService.Authorization.AUTHORIZED,
+                service.authorize(business.getId(), op.getId(), owner.getId(), UUID.randomUUID(), null, token));
     }
 
     @Test
