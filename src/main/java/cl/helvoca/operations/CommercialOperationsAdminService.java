@@ -1,13 +1,17 @@
 package cl.helvoca.operations;
 
 import cl.helvoca.common.NotFoundException;
+import cl.helvoca.delivery.BusinessDelivery;
+import cl.helvoca.delivery.BusinessDeliveryRepository;
 import cl.helvoca.security.TenantProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -17,17 +21,23 @@ public class CommercialOperationsAdminService {
     private final BusinessOrderLineRepository orderLines;
     private final BusinessQuoteRepository quotes;
     private final BusinessLeadRepository leads;
+    private final BusinessDeliveryRepository deliveries;
+    private final BusinessOperationRepository operations;
     private final TenantProvider tenantProvider;
 
     public CommercialOperationsAdminService(BusinessOrderRepository orders,
                                             BusinessOrderLineRepository orderLines,
                                             BusinessQuoteRepository quotes,
                                             BusinessLeadRepository leads,
+                                            BusinessDeliveryRepository deliveries,
+                                            BusinessOperationRepository operations,
                                             TenantProvider tenantProvider) {
         this.orders = orders;
         this.orderLines = orderLines;
         this.quotes = quotes;
         this.leads = leads;
+        this.deliveries = deliveries;
+        this.operations = operations;
         this.tenantProvider = tenantProvider;
     }
 
@@ -52,6 +62,30 @@ public class CommercialOperationsAdminService {
             order = orders.saveAndFlush(order);
         }
         return orderView(order);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DeliveryView> deliveries() {
+        UUID businessId = tenantProvider.requireBusinessId();
+        return deliveries.findAllByBusinessIdOrderByCreatedAtDesc(businessId).stream()
+                .limit(100)
+                .map(DeliveryView::from)
+                .toList();
+    }
+
+    @Transactional
+    public DeliveryView updateDeliveryStatus(UUID deliveryId, BusinessDelivery.Status status) {
+        if (status == null) throw new IllegalArgumentException("Delivery status is required");
+        UUID businessId = tenantProvider.requireBusinessId();
+        BusinessDelivery delivery = deliveries.findByIdAndBusinessId(deliveryId, businessId)
+                .orElseThrow(() -> new NotFoundException("Delivery not found"));
+        validateDeliveryTransition(delivery, status);
+        if (delivery.getStatus() != status) {
+            delivery.setStatus(status);
+            delivery = deliveries.saveAndFlush(delivery);
+            synchronizeDeliveryOperation(businessId, delivery);
+        }
+        return DeliveryView.from(delivery);
     }
 
     @Transactional(readOnly = true)
@@ -90,6 +124,43 @@ public class CommercialOperationsAdminService {
         }
     }
 
+    private static void validateDeliveryTransition(BusinessDelivery delivery, BusinessDelivery.Status next) {
+        BusinessDelivery.Status current = delivery.getStatus();
+        if (current == next) return;
+
+        Set<BusinessDelivery.Status> allowed = switch (current) {
+            case CONFIRMED -> Set.of(BusinessDelivery.Status.IN_TRANSIT, BusinessDelivery.Status.CANCELLED);
+            case IN_TRANSIT -> Set.of(BusinessDelivery.Status.DELIVERED);
+            case DELIVERED, CANCELLED -> Set.of();
+        };
+        if (!allowed.contains(next)) {
+            throw new IllegalArgumentException("Invalid delivery status transition: " + current + " -> " + next);
+        }
+    }
+
+    private void synchronizeDeliveryOperation(UUID businessId, BusinessDelivery delivery) {
+        BusinessOperation operation = operations
+                .findByIdAndBusinessId(delivery.getOperationId(), businessId)
+                .orElseThrow(() -> new IllegalStateException("Delivery operation projection is missing"));
+        if (operation.getType() != BusinessOperation.Type.DELIVERY) {
+            throw new IllegalStateException("Delivery points to a non-delivery operation");
+        }
+
+        operation.setStatus(delivery.getStatus() == BusinessDelivery.Status.CANCELLED
+                ? BusinessOperation.Status.CANCELLED
+                : BusinessOperation.Status.CONFIRMED);
+        operation.setConfirmationToken(null);
+        operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (operation.getMetadata() != null) metadata.putAll(operation.getMetadata());
+        metadata.put("intent", "DELIVERY");
+        metadata.put("confirmationPending", false);
+        metadata.put("projectionStatus", delivery.getStatus().name());
+        metadata.put("deliveryId", delivery.getId().toString());
+        operation.setMetadata(metadata);
+        operations.saveAndFlush(operation);
+    }
+
     private OrderView orderView(BusinessOrder order) {
         List<OrderLineView> lines = orderLines.findAllByOrderIdOrderByCreatedAtAsc(order.getId()).stream()
                 .map(OrderLineView::from)
@@ -113,6 +184,30 @@ public class CommercialOperationsAdminService {
                             BigDecimal subtotal, BigDecimal deliveryFee, BigDecimal total, String currency,
                             BusinessOrder.Source source, List<OrderLineView> lines,
                             Instant createdAt, Instant updatedAt) {}
+
+    public record DeliveryView(UUID id, UUID operationId, UUID orderId,
+                               BusinessDelivery.Status status, String contactName, String contactPhone,
+                               UUID deliveryZoneId, String deliveryAddress, BigDecimal fee, String currency,
+                               BusinessOrder.Source source, String notes,
+                               Instant createdAt, Instant updatedAt) {
+        static DeliveryView from(BusinessDelivery delivery) {
+            return new DeliveryView(
+                    delivery.getId(),
+                    delivery.getOperationId(),
+                    delivery.getOrderId(),
+                    delivery.getStatus(),
+                    delivery.getContactName(),
+                    delivery.getContactPhone(),
+                    delivery.getDeliveryZoneId(),
+                    delivery.getDeliveryAddress(),
+                    delivery.getFee(),
+                    delivery.getCurrency(),
+                    delivery.getSource(),
+                    delivery.getNotes(),
+                    delivery.getCreatedAt(),
+                    delivery.getUpdatedAt());
+        }
+    }
 
     public record QuoteView(UUID id, String title, String description, BigDecimal amount, String currency,
                             BusinessQuote.Status status, String contactName, String contactPhone,
