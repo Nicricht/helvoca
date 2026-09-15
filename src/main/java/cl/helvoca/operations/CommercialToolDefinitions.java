@@ -50,6 +50,26 @@ public final class CommercialToolDefinitions {
                         .put("notes", string("Notas generales finales del pedido")))
                 .put("required", new JSONArray().put("operationId").put("confirmationToken"));
 
+        JSONObject deliveryProperties = new JSONObject()
+                .put("address", string("Dirección completa del despacho autónomo"))
+                .put("deliveryZoneId", string("UUID opcional de la zona ya validada; el backend vuelve a resolver la cobertura"))
+                .put("orderId", string("UUID opcional de un pedido existente del mismo cliente para vincularlo y verificar compra mínima"))
+                .put("contactName", string("Nombre del cliente si lo entregó"))
+                .put("notes", string("Instrucciones operativas del despacho"));
+        JSONObject quoteDeliveryParams = object()
+                .put("properties", deliveryProperties)
+                .put("required", new JSONArray().put("address"));
+        JSONObject updateDeliveryProperties = new JSONObject(deliveryProperties.toString())
+                .put("operationId", string("UUID exacto del borrador devuelto por quote_delivery o update_delivery"));
+        JSONObject updateDeliveryParams = object()
+                .put("properties", updateDeliveryProperties)
+                .put("required", new JSONArray().put("operationId").put("address"));
+        JSONObject createDeliveryParams = object()
+                .put("properties", new JSONObject()
+                        .put("operationId", string("UUID exacto del borrador de despacho más reciente"))
+                        .put("confirmationToken", string("Token exacto de la última versión devuelta por quote_delivery o update_delivery")))
+                .put("required", new JSONArray().put("operationId").put("confirmationToken"));
+
         JSONObject quoteProperties = new JSONObject()
                 .put("title", string("Resumen corto de lo que se debe cotizar"))
                 .put("description", string("Detalle de la necesidad del cliente"))
@@ -68,6 +88,24 @@ public final class CommercialToolDefinitions {
                         object().put("properties", new JSONObject()
                                         .put("address", string("Dirección completa entregada por el cliente")))
                                 .put("required", new JSONArray().put("address"))))
+                .put(function("quote_delivery",
+                        "Crea un borrador DELIVERY autónomo y devuelve operationId, revision, confirmationToken, zona y costo vigentes. No crea el despacho final. orderId es opcional y solo puede vincular un pedido del cliente actual.",
+                        quoteDeliveryParams))
+                .put(function("update_delivery",
+                        "Reemplaza el estado del borrador DELIVERY con la dirección y datos más recientes. Cada corrección genera una revisión y confirmationToken nuevos e invalida la confirmación anterior.",
+                        updateDeliveryParams))
+                .put(function("create_delivery",
+                        "Confirma un despacho autónomo ya cotizado. Llámala solo después de un sí explícito del cliente sobre la dirección, zona y costo más recientes. El backend vuelve a validar cobertura y costo y la confirmación es idempotente.",
+                        createDeliveryParams))
+                .put(function("get_delivery_status",
+                        "Consulta un despacho o los despachos recientes del cliente actual. Si conoces deliveryId envíalo; si no, usa el contexto verificado del cliente o conversación.",
+                        object().put("properties", new JSONObject()
+                                .put("deliveryId", string("UUID opcional del despacho")))))
+                .put(function("cancel_delivery",
+                        "Cancela un despacho autónomo del cliente actual solo si todavía está en estado CONFIRMED. No confirmes la cancelación antes de success=true.",
+                        object().put("properties", new JSONObject()
+                                        .put("deliveryId", string("UUID exacto del despacho")))
+                                .put("required", new JSONArray().put("deliveryId"))))
                 .put(function("quote_order",
                         "Crea un borrador estructurado y calcula en backend subtotal, despacho y total usando precios actuales. Devuelve operationId, revision y confirmationToken. No crea el pedido final.",
                         quoteOrderParams))
@@ -126,7 +164,10 @@ public final class CommercialToolDefinitions {
                     .append("Un pedido final solo existe si create_order devuelve success=true.\n");
         }
         if (enabled.contains(BusinessOperationCapability.DELIVERY)) {
-            out.append("Para despacho: pide la dirección exacta y usa validate_delivery_address antes de prometer cobertura. El backend vuelve a validar la dirección al cotizar y confirmar.\n");
+            out.append("Para un despacho autónomo: valida la dirección, usa quote_delivery y presenta zona y costo. ")
+                    .append("Si cambia dirección, pedido vinculado o instrucciones, usa update_delivery con el estado completo más reciente. ")
+                    .append("Cada cambio invalida la confirmación anterior; solo después de un sí explícito usa create_delivery con el último confirmationToken. ")
+                    .append("Si el despacho solo forma parte de un ORDER que aún se está armando, conserva el flujo quote_order/update_order/create_order y no crees un DELIVERY separado salvo que el cliente realmente solicite una operación de despacho independiente.\n");
         }
         if (enabled.contains(BusinessOperationCapability.QUOTE)) {
             out.append("Para cotizaciones: usa create_quote. Si el backend no devuelve un monto, explica que quedó solicitada para evaluación; nunca inventes el precio.\n");
