@@ -36,6 +36,7 @@ class BusinessOperationCapabilityServiceTest {
         verify(aiAgents).replaceCommercialCapabilities(argThat(actual -> actual.equals(Set.of(
                 AiCapability.LIST_CATALOG,
                 AiCapability.QUOTE_ORDER,
+                AiCapability.UPDATE_ORDER,
                 AiCapability.CREATE_ORDER,
                 AiCapability.GET_ORDER_STATUS,
                 AiCapability.CANCEL_ORDER,
@@ -61,13 +62,14 @@ class BusinessOperationCapabilityServiceTest {
         when(aiAgents.allowedToolNames(businessId)).thenReturn(Set.of(
                 "list_services",
                 "quote_order",
+                "update_order",
                 "create_order",
                 "validate_delivery_address"));
 
         BusinessOperationCapabilityService service = new BusinessOperationCapabilityService(aiAgents, tenantProvider);
         Set<String> tools = service.allowedToolNames(businessId);
 
-        assertEquals(Set.of("quote_order", "create_order", "validate_delivery_address"), tools);
+        assertEquals(Set.of("quote_order", "update_order", "create_order", "validate_delivery_address"), tools);
         assertFalse(tools.contains("list_services"));
     }
 
