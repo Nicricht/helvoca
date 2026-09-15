@@ -96,6 +96,16 @@ class UniversalConfirmationIntegrationTest {
         assertEquals(OperationConfirmation.State.CONSUMED, consumed.getState());
         assertEquals(BusinessOrder.Source.WHATSAPP, consumed.getResolvedChannel());
         assertNotNull(consumed.getResolvedAt());
+
+        assertEquals(UniversalConfirmationService.Authorization.IDEMPOTENT_REPLAY,
+                service.authorize(business.getId(), op.getId(), customer.getId(), UUID.randomUUID(), null,
+                        token2));
+        assertEquals(UniversalConfirmationService.Authorization.NOT_AWAITING,
+                service.authorize(business.getId(), op.getId(), customer.getId(), UUID.randomUUID(), null,
+                        null));
+        assertEquals(UniversalConfirmationService.Authorization.NOT_AWAITING,
+                service.authorize(business.getId(), op.getId(), customer.getId(), UUID.randomUUID(), null,
+                        UUID.randomUUID()));
     }
 
     @Test
