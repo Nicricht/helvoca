@@ -85,6 +85,48 @@ class OutboundMessagingIntegrationTest {
     }
 
     @Test
+    void multipleVerifiedRecipientsRequireExplicitIdentity() {
+        Business business = business("Multiple phones");
+        Customer customer = customer(business, "+56910000001");
+        BusinessOperation quote = operation(business, customer, BusinessOperation.Type.QUOTE);
+        quote.setTotal(new BigDecimal("7000"));
+        quote = operations.saveAndFlush(quote);
+        CustomerIdentity first = identities.verifyPhone(
+                business.getId(), customer.getId(), "+56910000001",
+                CustomerIdentity.VerificationStatus.CUSTOMER_VERIFIED, "TEST");
+        identities.verifyPhone(
+                business.getId(), customer.getId(), "+56910000002",
+                CustomerIdentity.VerificationStatus.CUSTOMER_VERIFIED, "TEST");
+
+        BusinessOperation finalQuote = quote;
+        assertThrows(IllegalStateException.class, () -> outbound.prepare(
+                business.getId(), customer.getId(), OutboundMessage.Channel.WHATSAPP,
+                OutboundMessage.Purpose.QUOTE, finalQuote.getId(), null));
+
+        OutboundMessage prepared = outbound.prepare(
+                business.getId(), customer.getId(), OutboundMessage.Channel.WHATSAPP,
+                OutboundMessage.Purpose.QUOTE, finalQuote.getId(), first.getId());
+        assertEquals(first.getNormalizedValue(), prepared.getRecipientAddress());
+    }
+
+    @Test
+    void unsafeBackendUrlIsRejectedBeforeMessagePersistence() {
+        Business business = business("Unsafe url");
+        Customer customer = customer(business, "+56922223333");
+        BusinessOperation target = operation(business, customer, BusinessOperation.Type.ORDER);
+        BusinessOperation paymentOperation = operation(business, customer, BusinessOperation.Type.PAYMENT);
+        payment(paymentOperation, target, customer, "http://not-secure.example.test/pay");
+        CustomerIdentity identity = identities.verifyPhone(
+                business.getId(), customer.getId(), customer.getPhone(),
+                CustomerIdentity.VerificationStatus.CUSTOMER_VERIFIED, "TEST");
+
+        assertThrows(IllegalStateException.class, () -> outbound.prepare(
+                business.getId(), customer.getId(), OutboundMessage.Channel.WHATSAPP,
+                OutboundMessage.Purpose.PAYMENT_LINK, paymentOperation.getId(), identity.getId()));
+        assertEquals(0L, messages.count());
+    }
+
+    @Test
     void tenantAndCustomerMismatchesFailClosed() {
         Business tenantA = business("A");
         Business tenantB = business("B");
