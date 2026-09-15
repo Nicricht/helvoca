@@ -43,6 +43,11 @@ public class OmnichannelSessionService {
      * Resolves a universal session only for a source that is already attached
      * to an explicit customer inside the same tenant. Unknown/anonymous sources
      * intentionally remain channel-local until identity has been established.
+     *
+     * The returned session is transaction-locked with a PostgreSQL advisory
+     * lock. Callers that resolve the same omnichannel session from different
+     * channels are therefore serialized before reading or mutating shared
+     * conversation state.
      */
     @Transactional
     public OmnichannelSession resolve(UUID businessId,
@@ -65,6 +70,7 @@ public class OmnichannelSessionService {
                     && !source.customerId().equals(existingSession.getCustomerId())) {
                 throw new IllegalStateException("Channel source is already linked to a different customer");
             }
+            lock(existingSession.getId());
             touch(existingSession, existingLink);
             return existingSession;
         }
@@ -79,6 +85,7 @@ public class OmnichannelSessionService {
                 .findFirstByBusinessIdAndCustomerIdAndStatusOrderByLastActivityAtDesc(
                         businessId, source.customerId(), OmnichannelSession.Status.ACTIVE)
                 .orElseGet(() -> newSession(businessId, source.customerId()));
+        lock(session.getId());
 
         OmnichannelChannelSession link = new OmnichannelChannelSession();
         link.setBusinessId(businessId);
