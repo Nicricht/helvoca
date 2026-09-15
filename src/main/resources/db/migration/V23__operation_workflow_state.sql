@@ -145,3 +145,27 @@ ALTER TABLE business_order
 
 CREATE INDEX idx_business_order_operation
     ON business_order(operation_id);
+
+-- UPDATE_ORDER is new in V23. Only tenants that had already explicitly opted
+-- into the complete ORDER transaction set receive it. Legacy tenants remain
+-- untouched and therefore cannot publish the new transactional tool.
+INSERT INTO ai_agent_capability (ai_agent_id, capability)
+SELECT aa.id, 'UPDATE_ORDER'
+FROM ai_agent aa
+WHERE EXISTS (
+    SELECT 1 FROM ai_agent_capability c
+    WHERE c.ai_agent_id = aa.id AND c.capability = 'QUOTE_ORDER'
+)
+AND EXISTS (
+    SELECT 1 FROM ai_agent_capability c
+    WHERE c.ai_agent_id = aa.id AND c.capability = 'CREATE_ORDER'
+)
+AND EXISTS (
+    SELECT 1 FROM ai_agent_capability c
+    WHERE c.ai_agent_id = aa.id AND c.capability = 'GET_ORDER_STATUS'
+)
+AND EXISTS (
+    SELECT 1 FROM ai_agent_capability c
+    WHERE c.ai_agent_id = aa.id AND c.capability = 'CANCEL_ORDER'
+)
+ON CONFLICT (ai_agent_id, capability) DO NOTHING;
