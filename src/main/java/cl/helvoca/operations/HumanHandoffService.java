@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -201,7 +202,7 @@ public class HumanHandoffService {
                     + current.status() + " to " + target);
         }
 
-        Instant now = Instant.now();
+        Timestamp now = Timestamp.from(Instant.now());
         int updated;
         if (target == Status.ASSIGNED) {
             updated = jdbc.update("""
