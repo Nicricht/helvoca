@@ -6,6 +6,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -14,32 +15,23 @@ public class BusinessOrderLine {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-
     @Column(name = "order_id", nullable = false)
     private UUID orderId;
-
     @Column(name = "catalog_item_id", nullable = false)
     private UUID catalogItemId;
-
     @Column(name = "item_name", nullable = false, length = 180)
     private String itemName;
-
     @Column(nullable = false)
     private Integer quantity;
-
     @Column(name = "unit_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal unitPrice;
-
     @Column(name = "line_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal lineTotal;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "modifiers_json", columnDefinition = "jsonb")
-    private String modifiersJson;
-
+    private Map<String, Object> modifiers;
     @Column(columnDefinition = "text")
     private String notes;
-
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -60,8 +52,8 @@ public class BusinessOrderLine {
     public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
     public BigDecimal getLineTotal() { return lineTotal; }
     public void setLineTotal(BigDecimal lineTotal) { this.lineTotal = lineTotal; }
-    public String getModifiersJson() { return modifiersJson; }
-    public void setModifiersJson(String modifiersJson) { this.modifiersJson = modifiersJson; }
+    public Map<String, Object> getModifiers() { return modifiers; }
+    public void setModifiers(Map<String, Object> modifiers) { this.modifiers = modifiers; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     public Instant getCreatedAt() { return createdAt; }
