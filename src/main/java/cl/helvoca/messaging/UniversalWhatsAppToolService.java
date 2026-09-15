@@ -7,6 +7,7 @@ import cl.helvoca.customer.Customer;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.learning.UnansweredQuestionService;
+import cl.helvoca.operations.AutomationPolicyToolGate;
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationCapabilityService;
 import cl.helvoca.operations.BusinessOrder;
@@ -19,6 +20,7 @@ import cl.helvoca.request.RequestSource;
 import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,9 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     private final BusinessRequestService requests;
     private final CustomerRepository customers;
     private final BookingOperationSyncService bookingOperations;
+
+    @Autowired(required = false)
+    private AutomationPolicyToolGate automationPolicies;
 
     public UniversalWhatsAppToolService(BusinessRepository businesses,
                                         CustomerRepository customers,
@@ -66,6 +71,12 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public String execute(MessagingConversation conversation, String toolName, String rawArguments) {
+        if (automationPolicies != null) {
+            JSONObject policyBlock = automationPolicies.blockIfAutomationDisabled(
+                    conversation.getBusinessId(), toolName);
+            if (policyBlock != null) return policyBlock.toString();
+        }
+
         if ("create_request".equals(toolName)) {
             return createRequestWithConversationContext(conversation, rawArguments).toString();
         }
@@ -96,8 +107,8 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     }
 
     private String synchronizeBookingMutation(MessagingConversation conversation,
-                                              String toolName,
-                                              String rawResult) {
+                                               String toolName,
+                                               String rawResult) {
         JSONObject result = new JSONObject(rawResult);
         if (!result.optBoolean("success", false)) return rawResult;
         JSONObject data = result.optJSONObject("data");

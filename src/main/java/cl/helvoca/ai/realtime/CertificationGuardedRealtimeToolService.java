@@ -12,6 +12,7 @@ import cl.helvoca.call.CallTraceService;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.learning.UnansweredQuestionService;
+import cl.helvoca.operations.AutomationPolicyToolGate;
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationCapabilityService;
 import cl.helvoca.operations.BusinessOrder;
@@ -63,6 +64,9 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
 
     @Autowired
     private BookingOperationSyncService bookingOperations;
+
+    @Autowired(required = false)
+    private AutomationPolicyToolGate automationPolicies;
 
     public CertificationGuardedRealtimeToolService(BusinessRepository businesses,
                                                     CustomerRepository customers,
@@ -122,6 +126,14 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
             return result.toString();
         }
 
+        if (automationPolicies != null) {
+            JSONObject policyBlock = automationPolicies.blockIfAutomationDisabled(context.businessId(), toolName);
+            if (policyBlock != null) {
+                trace.recordTool(context.businessId(), context.callId(), toolName, policyBlock);
+                return policyBlock.toString();
+            }
+        }
+
         if (commercialOperations != null && commercialOperations.supports(toolName)) {
             JSONObject result;
             if (operationCapabilities == null || !operationCapabilities.isToolAllowed(context.businessId(), toolName)) {
@@ -162,8 +174,8 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     }
 
     private String synchronizeBookingMutation(RealtimeCallContext context,
-                                              String toolName,
-                                              String rawResult) {
+                                               String toolName,
+                                               String rawResult) {
         JSONObject result = new JSONObject(rawResult);
         if (!result.optBoolean("success", false)) return rawResult;
         JSONObject data = result.optJSONObject("data");

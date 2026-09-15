@@ -4,7 +4,10 @@ import cl.helvoca.audit.AuditService;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.common.NotFoundException;
+import cl.helvoca.operations.BusinessOperation;
+import cl.helvoca.operations.OperationPolicyService;
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,15 +22,26 @@ public class AiAgentService {
     private final BusinessRepository businesses;
     private final TenantProvider tenantProvider;
     private final AuditService auditService;
+    private final OperationPolicyService policies;
 
     public AiAgentService(AiAgentRepository agents,
                           BusinessRepository businesses,
                           TenantProvider tenantProvider,
                           AuditService auditService) {
+        this(agents, businesses, tenantProvider, auditService, null);
+    }
+
+    @Autowired
+    public AiAgentService(AiAgentRepository agents,
+                          BusinessRepository businesses,
+                          TenantProvider tenantProvider,
+                          AuditService auditService,
+                          OperationPolicyService policies) {
         this.agents = agents;
         this.businesses = businesses;
         this.tenantProvider = tenantProvider;
         this.auditService = auditService;
+        this.policies = policies;
     }
 
     @Transactional(readOnly = true)
@@ -115,7 +129,9 @@ public class AiAgentService {
         AiCapability capability = AiCapability.fromToolName(toolName).orElse(null);
         if (capability == null) return true;
         AiAgent agent = runtime(businessId);
-        return agent.isActive() && agent.getCapabilities().contains(capability);
+        return agent.isActive()
+                && agent.getCapabilities().contains(capability)
+                && automationAllowsTool(businessId, toolName);
     }
 
     @Transactional(readOnly = true)
@@ -124,7 +140,32 @@ public class AiAgentService {
         if (!agent.isActive()) return Set.of();
         return agent.getCapabilities().stream()
                 .map(AiCapability::toolName)
+                .filter(toolName -> automationAllowsTool(businessId, toolName))
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    /**
+     * Automation policy gates only tools that mutate a universal business
+     * operation. Discovery/status tools stay visible so the assistant can still
+     * help the customer even when an administrator pauses automatic execution.
+     */
+    private boolean automationAllowsTool(UUID businessId, String toolName) {
+        if (policies == null || businessId == null || toolName == null) return true;
+        BusinessOperation.Type type = mutatingOperationType(toolName);
+        return type == null || policies.allowsAutomaticExecution(businessId, type);
+    }
+
+    private static BusinessOperation.Type mutatingOperationType(String toolName) {
+        return switch (toolName) {
+            case "create_booking", "reschedule_booking", "cancel_booking" -> BusinessOperation.Type.BOOKING;
+            case "create_request" -> BusinessOperation.Type.REQUEST;
+            case "quote_order", "update_order", "create_order", "cancel_order" -> BusinessOperation.Type.ORDER;
+            case "quote_delivery", "update_delivery", "create_delivery", "cancel_delivery" -> BusinessOperation.Type.DELIVERY;
+            case "create_quote" -> BusinessOperation.Type.QUOTE;
+            case "create_lead" -> BusinessOperation.Type.LEAD;
+            case "quote_payment", "update_payment", "create_payment", "cancel_payment" -> BusinessOperation.Type.PAYMENT;
+            default -> null;
+        };
     }
 
     private AiAgent defaultAgent(UUID businessId) {
