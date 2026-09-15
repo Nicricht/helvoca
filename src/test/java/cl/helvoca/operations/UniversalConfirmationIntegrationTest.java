@@ -39,6 +39,7 @@ class UniversalConfirmationIntegrationTest {
     @Autowired CustomerRepository customers;
     @Autowired BusinessOperationRepository operations;
     @Autowired OperationConfirmationRepository confirmations;
+    @Autowired BusinessOperationEventRepository events;
     @Autowired UniversalConfirmationService service;
 
     @Test
@@ -117,5 +118,31 @@ class UniversalConfirmationIntegrationTest {
                 service.authorize(a.getId(), op.getId(), customer.getId(), null, null, token));
         assertEquals(UniversalConfirmationService.Authorization.NOT_FOUND,
                 service.authorize(b.getId(), op.getId(), customer.getId(), null, null, token));
+    }
+
+    @Test
+    void expandedOperationLifecycleRemainsCompatibleWithImmutableEventLog() {
+        Business business = new Business();
+        business.setName("Lifecycle tenant");
+        business = businesses.saveAndFlush(business);
+
+        BusinessOperation op = new BusinessOperation();
+        op.setBusinessId(business.getId());
+        op.setType(BusinessOperation.Type.REQUEST);
+        op.setStatus(BusinessOperation.Status.DRAFT);
+        op.setSource(BusinessOrder.Source.API);
+        op = operations.saveAndFlush(op);
+
+        op.setStatus(BusinessOperation.Status.PROPOSED);
+        op = operations.saveAndFlush(op);
+        op.setStatus(BusinessOperation.Status.EXECUTING);
+        op = operations.saveAndFlush(op);
+        op.setStatus(BusinessOperation.Status.COMPLETED);
+        operations.saveAndFlush(op);
+
+        var history = events.findAllByBusinessIdAndOperationIdOrderBySequenceNoAsc(business.getId(), op.getId());
+        assertTrue(history.stream().anyMatch(event -> "PROPOSED".equals(event.getStatus())));
+        assertTrue(history.stream().anyMatch(event -> "EXECUTING".equals(event.getStatus())));
+        assertTrue(history.stream().anyMatch(event -> "COMPLETED".equals(event.getStatus())));
     }
 }
