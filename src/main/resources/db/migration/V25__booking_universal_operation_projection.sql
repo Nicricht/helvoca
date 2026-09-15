@@ -90,6 +90,7 @@ BEGIN
         'CLP',
         jsonb_strip_nulls(jsonb_build_object(
             'intent', 'BOOKING',
+            'bookingId', NEW.id::text,
             'serviceId', NEW.service_id::text,
             'startAt', NEW.start_at,
             'endAt', NEW.end_at,
