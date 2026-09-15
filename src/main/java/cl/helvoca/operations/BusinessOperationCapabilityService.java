@@ -3,6 +3,7 @@ package cl.helvoca.operations;
 import cl.helvoca.agent.AiAgent;
 import cl.helvoca.agent.AiAgentService;
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,11 +16,20 @@ import java.util.stream.Collectors;
 public class BusinessOperationCapabilityService {
     private final AiAgentService aiAgents;
     private final TenantProvider tenantProvider;
+    private final OperationPolicyService policies;
 
     public BusinessOperationCapabilityService(AiAgentService aiAgents,
                                               TenantProvider tenantProvider) {
+        this(aiAgents, tenantProvider, null);
+    }
+
+    @Autowired
+    public BusinessOperationCapabilityService(AiAgentService aiAgents,
+                                              TenantProvider tenantProvider,
+                                              OperationPolicyService policies) {
         this.aiAgents = aiAgents;
         this.tenantProvider = tenantProvider;
+        this.policies = policies;
     }
 
     @Transactional(readOnly = true)
@@ -38,13 +48,15 @@ public class BusinessOperationCapabilityService {
     public Set<String> allowedToolNames(UUID businessId) {
         return aiAgents.allowedToolNames(businessId).stream()
                 .filter(BusinessOperationCapability::isCommercialToolName)
+                .filter(toolName -> automationAllowsTool(businessId, toolName))
                 .collect(Collectors.toUnmodifiableSet());
     }
 
     @Transactional(readOnly = true)
     public boolean isToolAllowed(UUID businessId, String toolName) {
         return BusinessOperationCapability.isCommercialToolName(toolName)
-                && aiAgents.toolAllowed(businessId, toolName);
+                && aiAgents.toolAllowed(businessId, toolName)
+                && automationAllowsTool(businessId, toolName);
     }
 
     @Transactional(readOnly = true)
@@ -61,7 +73,7 @@ public class BusinessOperationCapabilityService {
                 : EnumSet.copyOf(capabilities);
 
         // High-level presets normalize only real functional dependencies. ORDER
-        // and QUOTE depend on the catalog; DELIVERY is now an autonomous domain.
+        // and QUOTE depend on the catalog; DELIVERY is an autonomous domain.
         if (desired.contains(BusinessOperationCapability.ORDER)
                 || desired.contains(BusinessOperationCapability.QUOTE)) {
             desired.add(BusinessOperationCapability.CATALOG);
@@ -69,5 +81,27 @@ public class BusinessOperationCapabilityService {
 
         aiAgents.replaceCommercialCapabilities(BusinessOperationCapability.aiCapabilitiesFor(desired));
         return Set.copyOf(desired);
+    }
+
+    /**
+     * Read-only discovery/status tools remain available even if automatic
+     * mutation is disabled. Mutating tools are hidden and rejected consistently
+     * by the same capability authority used by voice and WhatsApp.
+     */
+    private boolean automationAllowsTool(UUID businessId, String toolName) {
+        if (policies == null || businessId == null || toolName == null) return true;
+        BusinessOperation.Type type = mutatingOperationType(toolName);
+        return type == null || policies.allowsAutomaticExecution(businessId, type);
+    }
+
+    private static BusinessOperation.Type mutatingOperationType(String toolName) {
+        return switch (toolName) {
+            case "quote_order", "update_order", "create_order", "cancel_order" -> BusinessOperation.Type.ORDER;
+            case "quote_delivery", "update_delivery", "create_delivery", "cancel_delivery" -> BusinessOperation.Type.DELIVERY;
+            case "create_quote" -> BusinessOperation.Type.QUOTE;
+            case "create_lead" -> BusinessOperation.Type.LEAD;
+            case "quote_payment", "update_payment", "create_payment", "cancel_payment" -> BusinessOperation.Type.PAYMENT;
+            default -> null;
+        };
     }
 }
