@@ -1,6 +1,8 @@
 package cl.helvoca.operations;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -31,6 +33,10 @@ public class BusinessOrderLine {
     @Column(name = "line_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal lineTotal;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "modifiers_json", columnDefinition = "jsonb")
+    private String modifiersJson;
+
     @Column(columnDefinition = "text")
     private String notes;
 
@@ -54,6 +60,8 @@ public class BusinessOrderLine {
     public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
     public BigDecimal getLineTotal() { return lineTotal; }
     public void setLineTotal(BigDecimal lineTotal) { this.lineTotal = lineTotal; }
+    public String getModifiersJson() { return modifiersJson; }
+    public void setModifiersJson(String modifiersJson) { this.modifiersJson = modifiersJson; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     public Instant getCreatedAt() { return createdAt; }
