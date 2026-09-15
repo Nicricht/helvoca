@@ -45,21 +45,31 @@ jobs:
       - name: Surface Maven test failures
         if: failure()
         run: |
-          echo "=== Surefire / Failsafe reports ==="
-          found=0
-          for dir in target/surefire-reports target/failsafe-reports; do
-            if [ -d "$dir" ]; then
-              while IFS= read -r -d '' report; do
-                found=1
-                echo
-                echo "===== $report ====="
-                cat "$report"
-              done < <(find "$dir" -maxdepth 1 -type f \( -name '*.txt' -o -name 'TEST-*.xml' \) -print0 | sort -z)
-            fi
-          done
-          if [ "$found" -eq 0 ]; then
-            echo "No Maven test report files were produced."
+          set +e
+          echo "=== Compact Surefire / Failsafe diagnostics ==="
+          : > maven-failure-summary.txt
+          grep -R -n -E \
+            'Tests run:|Failures:|Errors:|<<< FAILURE|<<< ERROR|Caused by:|Exception|AssertionFailedError|FlywayException|PSQLException|BeanCreationException|ApplicationContext' \
+            target/surefire-reports target/failsafe-reports 2>/dev/null \
+            | grep -v '^.*testsuite.*errors="0".*failures="0"' \
+            | head -n 300 \
+            | tee maven-failure-summary.txt
+          if [ ! -s maven-failure-summary.txt ]; then
+            echo "No compact Maven failure lines were found." | tee maven-failure-summary.txt
           fi
+          echo "=== End compact diagnostics ==="
+
+      - name: Upload Maven failure reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-failure-reports
+          path: |
+            maven-failure-summary.txt
+            target/surefire-reports
+            target/failsafe-reports
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: Install browser test dependencies
         run: |
