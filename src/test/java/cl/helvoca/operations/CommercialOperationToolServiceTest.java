@@ -7,14 +7,17 @@ import org.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -23,28 +26,35 @@ class CommercialOperationToolServiceTest {
     @Mock DeliveryZoneRepository deliveryZones;
     @Mock BusinessOrderRepository orders;
     @Mock BusinessOrderLineRepository orderLines;
-    @Mock BusinessQuoteRepository quotes;
-    @Mock BusinessLeadRepository leads;
     @Mock BusinessOperationRepository operations;
     @Mock BusinessOperationCapabilityService capabilities;
     @Mock OrderWorkflowService orderWorkflow;
+    @Mock UniversalOperationWorkflowService universalOperations;
+    @Mock ConversationStateService conversationState;
 
     private CommercialOperationToolService service;
 
     @BeforeEach
     void setUp() {
         service = new CommercialOperationToolService(
-                catalog, deliveryZones, orders, orderLines, quotes, leads,
-                operations, capabilities, orderWorkflow);
+                catalog, deliveryZones, orders, orderLines,
+                operations, capabilities, orderWorkflow, universalOperations, conversationState);
     }
 
     @Test
-    void voiceAndWhatsAppAdapterUsesTheSameOrderWorkflowDomain() {
+    void voiceAndWhatsAppAdapterUsesTheSameOrderWorkflowDomainAndRecordsStructuredState() {
         UUID businessId = UUID.randomUUID();
         UUID sourceReferenceId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
         JSONObject domainResult = new JSONObject()
                 .put("success", true)
-                .put("data", new JSONObject().put("operationId", UUID.randomUUID().toString()))
+                .put("data", new JSONObject()
+                        .put("operationId", operationId.toString())
+                        .put("revision", 1)
+                        .put("status", "AWAITING_CONFIRMATION")
+                        .put("confirmationToken", UUID.randomUUID().toString())
+                        .put("total", 9900)
+                        .put("currency", "CLP"))
                 .put("error", JSONObject.NULL);
         when(capabilities.isToolAllowed(businessId, "quote_order")).thenReturn(true);
         when(orderWorkflow.quote(eq(businessId), isNull(), eq(sourceReferenceId),
@@ -61,6 +71,15 @@ class CommercialOperationToolServiceTest {
         assertTrue(result.getBoolean("success"));
         verify(orderWorkflow).quote(eq(businessId), isNull(), eq(sourceReferenceId),
                 eq("+56911111111"), eq(BusinessOrder.Source.VOICE), any(JSONObject.class));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> patch = ArgumentCaptor.forClass(Map.class);
+        verify(conversationState).apply(eq(businessId), eq(sourceReferenceId),
+                eq(BusinessOrder.Source.VOICE), eq(operationId), patch.capture());
+        assertEquals("ORDER", patch.getValue().get("intent"));
+        assertEquals("quote_order", patch.getValue().get("lastTool"));
+        assertEquals(true, patch.getValue().get("confirmationPending"));
+        assertEquals(9900, patch.getValue().get("total"));
     }
 
     @Test
@@ -68,6 +87,70 @@ class CommercialOperationToolServiceTest {
         assertTrue(service.supports("update_order"));
         assertTrue(service.supports("quote_order"));
         assertTrue(service.supports("create_order"));
+    }
+
+    @Test
+    void createQuoteDelegatesToUniversalOperationEngine() {
+        UUID businessId = UUID.randomUUID();
+        UUID sourceReferenceId = UUID.randomUUID();
+        JSONObject domainResult = new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("operationId", UUID.randomUUID().toString())
+                        .put("quoteId", UUID.randomUUID().toString()))
+                .put("error", JSONObject.NULL);
+        when(capabilities.isToolAllowed(businessId, "create_quote")).thenReturn(true);
+        when(universalOperations.createQuote(eq(businessId), isNull(), eq(sourceReferenceId),
+                eq("+56911111111"), eq(BusinessOrder.Source.WHATSAPP), any(JSONObject.class)))
+                .thenReturn(domainResult);
+
+        JSONObject result = new JSONObject(service.execute(
+                businessId, null, sourceReferenceId, "+56911111111", BusinessOrder.Source.WHATSAPP,
+                "create_quote", new JSONObject().put("title", "Cotizar instalación").toString()));
+
+        assertTrue(result.getBoolean("success"));
+        verify(universalOperations).createQuote(eq(businessId), isNull(), eq(sourceReferenceId),
+                eq("+56911111111"), eq(BusinessOrder.Source.WHATSAPP), any(JSONObject.class));
+    }
+
+    @Test
+    void orderTotalChangedStillRefreshesConversationState() {
+        UUID businessId = UUID.randomUUID();
+        UUID sourceReferenceId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        String newToken = UUID.randomUUID().toString();
+        JSONObject domainResult = new JSONObject()
+                .put("success", false)
+                .put("data", new JSONObject()
+                        .put("operationId", operationId.toString())
+                        .put("revision", 4)
+                        .put("confirmationToken", newToken)
+                        .put("status", "AWAITING_CONFIRMATION")
+                        .put("total", 14500)
+                        .put("currency", "CLP"))
+                .put("error", new JSONObject()
+                        .put("code", "ORDER_TOTAL_CHANGED")
+                        .put("message", "changed"));
+        when(capabilities.isToolAllowed(businessId, "create_order")).thenReturn(true);
+        when(orderWorkflow.confirm(eq(businessId), isNull(), eq(sourceReferenceId),
+                eq("+56911111111"), eq(BusinessOrder.Source.VOICE), any(JSONObject.class)))
+                .thenReturn(domainResult);
+
+        JSONObject result = new JSONObject(service.execute(
+                businessId, null, sourceReferenceId, "+56911111111", BusinessOrder.Source.VOICE,
+                "create_order", new JSONObject()
+                        .put("operationId", operationId.toString())
+                        .put("confirmationToken", UUID.randomUUID().toString())
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> patch = ArgumentCaptor.forClass(Map.class);
+        verify(conversationState).apply(eq(businessId), eq(sourceReferenceId),
+                eq(BusinessOrder.Source.VOICE), eq(operationId), patch.capture());
+        assertEquals(4, patch.getValue().get("operationRevision"));
+        assertEquals(newToken, patch.getValue().get("confirmationToken"));
+        assertEquals(true, patch.getValue().get("confirmationPending"));
     }
 
     @Test
@@ -81,7 +164,7 @@ class CommercialOperationToolServiceTest {
 
         assertFalse(result.getBoolean("success"));
         assertEquals("TOOL_DISABLED", result.getJSONObject("error").getString("code"));
-        verifyNoInteractions(orderWorkflow);
+        verifyNoInteractions(orderWorkflow, universalOperations, conversationState);
     }
 
     @Test
