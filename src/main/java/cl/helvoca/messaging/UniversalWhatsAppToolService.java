@@ -20,6 +20,7 @@ import cl.helvoca.request.RequestSource;
 import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,9 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     private final BusinessRequestService requests;
     private final CustomerRepository customers;
     private final BookingOperationSyncService bookingOperations;
-    private final AutomationPolicyToolGate automationPolicies;
+
+    @Autowired(required = false)
+    private AutomationPolicyToolGate automationPolicies;
 
     public UniversalWhatsAppToolService(BusinessRepository businesses,
                                         CustomerRepository customers,
@@ -55,8 +58,7 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
                                         JdbcTemplate jdbc,
                                         CommercialOperationToolService commercial,
                                         BusinessOperationCapabilityService capabilities,
-                                        BookingOperationSyncService bookingOperations,
-                                        AutomationPolicyToolGate automationPolicies) {
+                                        BookingOperationSyncService bookingOperations) {
         super(businesses, customers, services, knowledge, bookings, schedule, requests,
                 unansweredQuestions, conversations, jdbc);
         this.commercial = commercial;
@@ -64,15 +66,16 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
         this.requests = requests;
         this.customers = customers;
         this.bookingOperations = bookingOperations;
-        this.automationPolicies = automationPolicies;
     }
 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public String execute(MessagingConversation conversation, String toolName, String rawArguments) {
-        JSONObject policyBlock = automationPolicies.blockIfAutomationDisabled(
-                conversation.getBusinessId(), toolName);
-        if (policyBlock != null) return policyBlock.toString();
+        if (automationPolicies != null) {
+            JSONObject policyBlock = automationPolicies.blockIfAutomationDisabled(
+                    conversation.getBusinessId(), toolName);
+            if (policyBlock != null) return policyBlock.toString();
+        }
 
         if ("create_request".equals(toolName)) {
             return createRequestWithConversationContext(conversation, rawArguments).toString();
