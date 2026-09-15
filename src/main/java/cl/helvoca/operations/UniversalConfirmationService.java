@@ -46,10 +46,10 @@ public class UniversalConfirmationService {
 
         if (operation.getStatus() == BusinessOperation.Status.CONFIRMED
                 && confirmation != null
-                && confirmation.getState() == OperationConfirmation.State.CONSUMED) {
-            if (token == null || Objects.equals(token, confirmation.getToken())) {
-                return Authorization.IDEMPOTENT_REPLAY;
-            }
+                && confirmation.getState() == OperationConfirmation.State.CONSUMED
+                && token != null
+                && Objects.equals(token, confirmation.getToken())) {
+            return Authorization.IDEMPOTENT_REPLAY;
         }
 
         if (operation.getStatus() != BusinessOperation.Status.AWAITING_CONFIRMATION) {
