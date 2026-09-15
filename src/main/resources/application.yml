@@ -77,6 +77,9 @@ app:
     enabled: ${TWILIO_WHATSAPP_ENABLED:false}
     webhook-validation-enabled: ${TWILIO_WHATSAPP_WEBHOOK_VALIDATION_ENABLED:true}
     session-hours: ${TWILIO_WHATSAPP_SESSION_HOURS:24}
+  outbound:
+    delivery-enabled: ${HELVOCA_OUTBOUND_DELIVERY_ENABLED:false}
+    provider: ${HELVOCA_OUTBOUND_PROVIDER:NONE}
   mercadopago:
     enabled: ${MERCADOPAGO_ENABLED:false}
     access-token: ${MERCADOPAGO_ACCESS_TOKEN:}

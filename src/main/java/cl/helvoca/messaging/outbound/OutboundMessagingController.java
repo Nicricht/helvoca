@@ -1,0 +1,78 @@
+package cl.helvoca.messaging.outbound;
+
+import cl.helvoca.security.TenantProvider;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1/outbound-messages")
+@PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+public class OutboundMessagingController {
+    private final OutboundMessagingService service;
+    private final TenantProvider tenantProvider;
+
+    public OutboundMessagingController(OutboundMessagingService service, TenantProvider tenantProvider) {
+        this.service = service;
+        this.tenantProvider = tenantProvider;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<View>> recent() {
+        UUID businessId = tenantProvider.requireBusinessId();
+        return ResponseEntity.ok(service.recent(businessId).stream().map(View::from).toList());
+    }
+
+    @PostMapping("/prepare")
+    public ResponseEntity<View> prepare(@RequestBody PrepareRequest request) {
+        UUID businessId = tenantProvider.requireBusinessId();
+        return ResponseEntity.ok(View.from(service.prepare(
+                businessId,
+                request.customerId(),
+                request.channel(),
+                request.purpose(),
+                request.operationId(),
+                request.recipientIdentityId())));
+    }
+
+    @PostMapping("/{messageId}/dispatch")
+    public ResponseEntity<View> dispatch(@PathVariable UUID messageId) {
+        return ResponseEntity.ok(View.from(service.dispatch(tenantProvider.requireBusinessId(), messageId)));
+    }
+
+    @PostMapping("/{messageId}/cancel")
+    public ResponseEntity<View> cancel(@PathVariable UUID messageId) {
+        return ResponseEntity.ok(View.from(service.cancel(tenantProvider.requireBusinessId(), messageId)));
+    }
+
+    public record PrepareRequest(UUID customerId,
+                                 OutboundMessage.Channel channel,
+                                 OutboundMessage.Purpose purpose,
+                                 UUID operationId,
+                                 UUID recipientIdentityId) { }
+
+    public record View(UUID id,
+                       UUID customerId,
+                       UUID operationId,
+                       String channel,
+                       String purpose,
+                       String recipient,
+                       String provider,
+                       String status,
+                       String content,
+                       String providerMessageId,
+                       String failureCode,
+                       Instant createdAt,
+                       Instant sentAt) {
+        static View from(OutboundMessage message) {
+            return new View(message.getId(), message.getCustomerId(), message.getOperationId(),
+                    message.getChannel().name(), message.getPurpose().name(), message.getRecipientAddress(),
+                    message.getProvider(), message.getStatus().name(), message.getContentText(),
+                    message.getProviderMessageId(), message.getFailureCode(), message.getCreatedAt(), message.getSentAt());
+        }
+    }
+}

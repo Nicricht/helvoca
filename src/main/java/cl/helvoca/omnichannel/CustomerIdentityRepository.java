@@ -14,6 +14,12 @@ public interface CustomerIdentityRepository extends JpaRepository<CustomerIdenti
             String normalizedValue,
             Collection<CustomerIdentity.VerificationStatus> statuses);
 
+    List<CustomerIdentity> findAllByBusinessIdAndCustomerIdAndIdentityTypeAndVerificationStatusIn(
+            UUID businessId,
+            UUID customerId,
+            CustomerIdentity.Type identityType,
+            Collection<CustomerIdentity.VerificationStatus> statuses);
+
     Optional<CustomerIdentity> findByBusinessIdAndCustomerIdAndIdentityTypeAndNormalizedValue(
             UUID businessId,
             UUID customerId,
