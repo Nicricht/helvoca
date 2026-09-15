@@ -2,6 +2,8 @@ CREATE TABLE human_handoff (
     id UUID PRIMARY KEY,
     sequence_no BIGSERIAL NOT NULL UNIQUE,
     business_id UUID NOT NULL REFERENCES business(id) ON DELETE CASCADE,
+    customer_id UUID REFERENCES customer(id) ON DELETE SET NULL,
+    channel VARCHAR(20),
     source_reference_id UUID,
     operation_id UUID,
     operation_type VARCHAR(20) NOT NULL,
@@ -20,6 +22,8 @@ CREATE TABLE human_handoff (
     resolved_at TIMESTAMPTZ,
     cancelled_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT ck_human_handoff_channel
+        CHECK (channel IS NULL OR channel IN ('VOICE','WHATSAPP','MANUAL','API')),
     CONSTRAINT ck_human_handoff_operation_type
         CHECK (operation_type IN ('ORDER','QUOTE','LEAD','DELIVERY','REQUEST','BOOKING','PAYMENT')),
     CONSTRAINT ck_human_handoff_failure_class
@@ -51,6 +55,8 @@ CREATE INDEX idx_human_handoff_business_source
     ON human_handoff(business_id, source_reference_id, sequence_no DESC);
 CREATE INDEX idx_human_handoff_business_operation
     ON human_handoff(business_id, operation_id, sequence_no DESC);
+CREATE INDEX idx_human_handoff_business_customer
+    ON human_handoff(business_id, customer_id, sequence_no DESC);
 
 CREATE TABLE human_handoff_event (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
