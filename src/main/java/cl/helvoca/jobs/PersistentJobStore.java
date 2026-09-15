@@ -56,7 +56,8 @@ public class PersistentJobStore {
                 ? findById(businessId, id).orElseThrow()
                 : findByIdempotencyKey(businessId, idempotencyKey.trim()).orElseThrow();
 
-        if (job.jobType() != type || !Objects.equals(job.operationId(), operationId)) {
+        if (job.jobType() != type || !Objects.equals(job.operationId(), operationId)
+                || !payloadMatches(businessId, job.id(), safePayload)) {
             throw new IllegalStateException("Idempotency key is already bound to a different durable job");
         }
         return job;
@@ -190,6 +191,15 @@ public class PersistentJobStore {
                  ORDER BY created_at DESC
                  LIMIT 100
                 """, MAPPER, businessId);
+    }
+
+    private boolean payloadMatches(UUID businessId, UUID jobId, String payloadJson) {
+        Boolean matches = jdbc.queryForObject("""
+                SELECT payload = CAST(? AS jsonb)
+                  FROM persistent_job
+                 WHERE id = ? AND business_id = ?
+                """, Boolean.class, payloadJson, jobId, businessId);
+        return Boolean.TRUE.equals(matches);
     }
 
     private static PersistentJob map(ResultSet rs, int rowNum) throws SQLException {
