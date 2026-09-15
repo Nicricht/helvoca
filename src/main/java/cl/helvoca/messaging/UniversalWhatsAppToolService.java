@@ -1,7 +1,9 @@
 package cl.helvoca.messaging;
 
+import cl.helvoca.booking.BookingConfirmationWorkflowService;
 import cl.helvoca.booking.BookingOperationSyncService;
 import cl.helvoca.booking.BookingRepository;
+import cl.helvoca.booking.BookingSource;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.customer.Customer;
 import cl.helvoca.customer.CustomerRepository;
@@ -43,6 +45,7 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     private final BusinessRequestService requests;
     private final CustomerRepository customers;
     private final BookingOperationSyncService bookingOperations;
+    private final BookingConfirmationWorkflowService bookingConfirmationWorkflow;
 
     @Autowired(required = false)
     private AutomationPolicyToolGate automationPolicies;
@@ -62,7 +65,8 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
                                         JdbcTemplate jdbc,
                                         CommercialOperationToolService commercial,
                                         BusinessOperationCapabilityService capabilities,
-                                        BookingOperationSyncService bookingOperations) {
+                                        BookingOperationSyncService bookingOperations,
+                                        BookingConfirmationWorkflowService bookingConfirmationWorkflow) {
         super(businesses, customers, services, knowledge, bookings, schedule, requests,
                 unansweredQuestions, conversations, jdbc);
         this.commercial = commercial;
@@ -70,6 +74,7 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
         this.requests = requests;
         this.customers = customers;
         this.bookingOperations = bookingOperations;
+        this.bookingConfirmationWorkflow = bookingConfirmationWorkflow;
     }
 
     @Override
@@ -114,6 +119,26 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
                     toolName,
                     rawArguments);
         }
+        if ("create_booking".equals(toolName)) {
+            JSONObject args;
+            try {
+                args = rawArguments == null || rawArguments.isBlank()
+                        ? new JSONObject()
+                        : new JSONObject(rawArguments);
+            } catch (Exception e) {
+                return error("INVALID_ARGUMENT", "Los datos de la reserva no son válidos.").toString();
+            }
+            Customer customer = currentCustomer(conversation);
+            JSONObject result = bookingConfirmationWorkflow.execute(
+                    conversation.getBusinessId(),
+                    customer == null ? null : customer.getId(),
+                    conversation.getId(),
+                    conversation.getSender(),
+                    BusinessOrder.Source.WHATSAPP,
+                    BookingSource.AI_WHATSAPP,
+                    args);
+            return synchronizeBookingMutation(conversation, toolName, result.toString());
+        }
 
         String result = super.execute(conversation, toolName, rawArguments);
         if (!BOOKING_MUTATIONS.contains(toolName)) return result;
@@ -125,6 +150,7 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     public String buildInstructions(MessagingConversation conversation) {
         return super.buildInstructions(conversation)
                 + CommercialToolDefinitions.instructions(capabilities.enabled(conversation.getBusinessId()))
+                + "\nPara create_booking usa siempre dos fases: primero crea una propuesta con serviceId/startAt, presenta literalmente sus condiciones al cliente y pide confirmación explícita; solo después vuelve a llamar create_booking con operationId y confirmationToken devueltos. Una propuesta sin bookingId NO es una reserva creada."
                 + "\nSi una herramienta devuelve automation.fallbackAction, aplica esa alternativa con las herramientas disponibles antes de pedir intervención humana. No repitas manualmente una operación que automation ya reintentó. Solo informa que el caso quedó escalado a atención humana cuando automation.fallbackAction=HUMAN_HANDOFF, automation.humanEscalation=true y exista automation.handoffId. Si devuelve STOP_SAFELY o humanEscalation=false, no afirmes que una persona fue avisada.";
     }
 
