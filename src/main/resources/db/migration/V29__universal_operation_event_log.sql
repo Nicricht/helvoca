@@ -1,12 +1,14 @@
 -- Immutable, tenant-scoped event history for every universal business operation.
 -- The database is the authoritative capture layer so new workflows/adapters
 -- cannot accidentally bypass event creation.
+-- IDs are intentionally snapshots rather than foreign keys: audit history must
+-- survive resource deletion and must not block cleanup of operational tables.
 
 CREATE TABLE business_operation_event (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sequence_no BIGSERIAL NOT NULL UNIQUE,
-    business_id UUID NOT NULL REFERENCES business(id) ON DELETE RESTRICT,
-    operation_id UUID NOT NULL REFERENCES business_operation(id) ON DELETE RESTRICT,
+    business_id UUID NOT NULL,
+    operation_id UUID NOT NULL,
     operation_type VARCHAR(20) NOT NULL,
     event_type VARCHAR(80) NOT NULL,
     channel VARCHAR(20) NOT NULL,
@@ -78,13 +80,21 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 DECLARE
+    v_row business_operation%ROWTYPE;
     v_event_type VARCHAR(80);
     v_previous_status VARCHAR(30);
     v_payment_status_before TEXT;
     v_payment_status_after TEXT;
     v_actor_type VARCHAR(20);
 BEGIN
-    IF TG_OP = 'INSERT' THEN
+    IF TG_OP = 'DELETE' THEN
+        v_row := OLD;
+        v_previous_status := OLD.status;
+        v_event_type := OLD.type || '_DELETED';
+        v_payment_status_before := CASE WHEN OLD.metadata_json IS NULL THEN NULL ELSE OLD.metadata_json ->> 'paymentStatus' END;
+        v_payment_status_after := NULL;
+    ELSIF TG_OP = 'INSERT' THEN
+        v_row := NEW;
         v_previous_status := NULL;
         v_event_type := CASE NEW.type
             WHEN 'ORDER' THEN CASE WHEN NEW.status = 'AWAITING_CONFIRMATION' THEN 'ORDER_QUOTED' ELSE 'ORDER_CREATED' END
@@ -97,6 +107,7 @@ BEGIN
             ELSE NEW.type || '_CREATED'
         END;
     ELSE
+        v_row := NEW;
         v_previous_status := OLD.status;
         v_payment_status_before := CASE WHEN OLD.metadata_json IS NULL THEN NULL ELSE OLD.metadata_json ->> 'paymentStatus' END;
         v_payment_status_after := CASE WHEN NEW.metadata_json IS NULL THEN NULL ELSE NEW.metadata_json ->> 'paymentStatus' END;
@@ -130,8 +141,8 @@ BEGIN
 
     v_actor_type := CASE
         WHEN v_event_type = 'PAYMENT_STATUS_CHANGED' THEN 'PROVIDER'
-        WHEN NEW.source = 'MANUAL' THEN 'HUMAN'
-        WHEN NEW.source IN ('VOICE','WHATSAPP') THEN 'AI'
+        WHEN v_row.source = 'MANUAL' THEN 'HUMAN'
+        WHEN v_row.source IN ('VOICE','WHATSAPP') THEN 'AI'
         ELSE 'SYSTEM'
     END;
 
@@ -148,28 +159,31 @@ BEGIN
         actor_type,
         payload_json
     ) VALUES (
-        NEW.business_id,
-        NEW.id,
-        NEW.type,
+        v_row.business_id,
+        v_row.id,
+        v_row.type,
         v_event_type,
-        NEW.source,
-        NEW.source_reference_id,
-        GREATEST(COALESCE(NEW.revision, 1), 1),
-        NEW.status,
+        v_row.source,
+        v_row.source_reference_id,
+        GREATEST(COALESCE(v_row.revision, 1), 1),
+        v_row.status,
         v_previous_status,
         v_actor_type,
         jsonb_strip_nulls(jsonb_build_object(
             'previousStatus', v_previous_status,
-            'status', NEW.status,
-            'total', NEW.total,
-            'currency', NEW.currency,
-            'fulfillmentType', NEW.fulfillment_type,
-            'deliveryFee', NEW.delivery_fee,
+            'status', v_row.status,
+            'total', v_row.total,
+            'currency', v_row.currency,
+            'fulfillmentType', v_row.fulfillment_type,
+            'deliveryFee', v_row.delivery_fee,
             'paymentStatusBefore', v_payment_status_before,
             'paymentStatusAfter', v_payment_status_after
         ))
     );
 
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
     RETURN NEW;
 END;
 $$;
@@ -181,6 +195,11 @@ EXECUTE FUNCTION append_business_operation_event();
 
 CREATE TRIGGER trg_business_operation_event_update
 AFTER UPDATE ON business_operation
+FOR EACH ROW
+EXECUTE FUNCTION append_business_operation_event();
+
+CREATE TRIGGER trg_business_operation_event_delete
+AFTER DELETE ON business_operation
 FOR EACH ROW
 EXECUTE FUNCTION append_business_operation_event();
 
