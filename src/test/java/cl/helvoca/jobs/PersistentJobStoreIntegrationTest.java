@@ -2,6 +2,7 @@ package cl.helvoca.jobs;
 
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -44,6 +45,11 @@ class PersistentJobStoreIntegrationTest {
     @Autowired PersistentJobStore store;
     @Autowired BusinessRepository businesses;
     @Autowired JdbcTemplate jdbc;
+
+    @BeforeEach
+    void clearDurableJobs() {
+        jdbc.update("DELETE FROM persistent_job");
+    }
 
     @Test
     void enqueueIsTenantScopedAndIdempotent() {
