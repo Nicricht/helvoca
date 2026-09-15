@@ -141,8 +141,8 @@ class UniversalConfirmationIntegrationTest {
         operations.saveAndFlush(op);
 
         var history = events.findAllByBusinessIdAndOperationIdOrderBySequenceNoAsc(business.getId(), op.getId());
-        assertTrue(history.stream().anyMatch(event -> "PROPOSED".equals(event.getStatus())));
-        assertTrue(history.stream().anyMatch(event -> "EXECUTING".equals(event.getStatus())));
-        assertTrue(history.stream().anyMatch(event -> "COMPLETED".equals(event.getStatus())));
+        assertTrue(history.stream().anyMatch(event -> event.getStatus() == BusinessOperation.Status.PROPOSED));
+        assertTrue(history.stream().anyMatch(event -> event.getStatus() == BusinessOperation.Status.EXECUTING));
+        assertTrue(history.stream().anyMatch(event -> event.getStatus() == BusinessOperation.Status.COMPLETED));
     }
 }
