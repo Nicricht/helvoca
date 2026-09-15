@@ -94,6 +94,32 @@ public class BookingCalendarEventStore {
                 """, MAPPER, businessId);
     }
 
+    /**
+     * External event identity is stable across booking revisions. Record it even
+     * if the producing job became stale while the provider call was in flight.
+     */
+    @Transactional
+    public void recordExternalEventId(UUID businessId,
+                                      UUID id,
+                                      String providerCode,
+                                      String externalEventId) {
+        if (externalEventId == null || externalEventId.isBlank()) {
+            throw new IllegalArgumentException("externalEventId is required");
+        }
+        int updated = jdbc.update("""
+                UPDATE booking_calendar_event
+                   SET external_event_id = ?,
+                       updated_at = NOW()
+                 WHERE id = ?
+                   AND business_id = ?
+                   AND upper(provider_code) = upper(?)
+                   AND (external_event_id IS NULL OR external_event_id = ?)
+                """, externalEventId.trim(), id, businessId, providerCode, externalEventId.trim());
+        if (updated != 1) {
+            throw new IllegalStateException("External calendar event identity conflicts with current projection");
+        }
+    }
+
     @Transactional
     public boolean markSynced(UUID businessId,
                               UUID id,
