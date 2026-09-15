@@ -60,14 +60,10 @@ public class BusinessOperationCapabilityService {
                 ? EnumSet.noneOf(BusinessOperationCapability.class)
                 : EnumSet.copyOf(capabilities);
 
-        // High-level presets normalize their dependencies, while the concrete
-        // tool grants are persisted in AiAgent as AiCapability values.
+        // High-level presets normalize only real functional dependencies. ORDER
+        // and QUOTE depend on the catalog; DELIVERY is now an autonomous domain.
         if (desired.contains(BusinessOperationCapability.ORDER)
                 || desired.contains(BusinessOperationCapability.QUOTE)) {
-            desired.add(BusinessOperationCapability.CATALOG);
-        }
-        if (desired.contains(BusinessOperationCapability.DELIVERY)) {
-            desired.add(BusinessOperationCapability.ORDER);
             desired.add(BusinessOperationCapability.CATALOG);
         }
 
