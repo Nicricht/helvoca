@@ -17,6 +17,9 @@ public class BusinessOrder {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "operation_id", nullable = false, unique = true)
+    private UUID operationId;
+
     @Column(name = "business_id", nullable = false)
     private UUID businessId;
 
@@ -83,6 +86,8 @@ public class BusinessOrder {
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
+    public UUID getOperationId() { return operationId; }
+    public void setOperationId(UUID operationId) { this.operationId = operationId; }
     public UUID getBusinessId() { return businessId; }
     public void setBusinessId(UUID businessId) { this.businessId = businessId; }
     public UUID getCustomerId() { return customerId; }
