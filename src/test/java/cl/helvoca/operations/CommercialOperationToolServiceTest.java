@@ -5,6 +5,7 @@ import cl.helvoca.delivery.DeliveryCoverageService;
 import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZone;
 import cl.helvoca.delivery.DeliveryZoneRepository;
+import cl.helvoca.payment.PaymentWorkflowService;
 import org.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,7 @@ class CommercialOperationToolServiceTest {
     @Mock OrderWorkflowService orderWorkflow;
     @Mock DeliveryWorkflowService deliveryWorkflow;
     @Mock UniversalOperationWorkflowService universalOperations;
+    @Mock PaymentWorkflowService paymentWorkflow;
     @Mock ConversationStateService conversationState;
 
     private DeliveryCoverageService deliveryCoverage;
@@ -44,7 +46,7 @@ class CommercialOperationToolServiceTest {
         service = new CommercialOperationToolService(
                 catalog, deliveryZones, deliveryCoverage, orders, orderLines,
                 operations, capabilities, orderWorkflow, deliveryWorkflow,
-                universalOperations, conversationState);
+                universalOperations, paymentWorkflow, conversationState);
     }
 
     @Test
@@ -119,7 +121,37 @@ class CommercialOperationToolServiceTest {
     }
 
     @Test
-    void updateOrderAndDeliveryAreFirstClassSupportedTools() {
+    void paymentUsesTheSameSharedDomainFromVoiceAndWhatsApp() {
+        UUID businessId = UUID.randomUUID();
+        UUID sourceReferenceId = UUID.randomUUID();
+        UUID targetOperationId = UUID.randomUUID();
+        JSONObject domainResult = new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("operationId", UUID.randomUUID().toString())
+                        .put("targetOperationId", targetOperationId.toString())
+                        .put("amount", 24990)
+                        .put("currency", "CLP"))
+                .put("error", JSONObject.NULL);
+        when(capabilities.isToolAllowed(businessId, "quote_payment")).thenReturn(true);
+        when(paymentWorkflow.quote(eq(businessId), isNull(), eq(sourceReferenceId),
+                eq("+56911111111"), eq(BusinessOrder.Source.WHATSAPP), any(JSONObject.class)))
+                .thenReturn(domainResult);
+
+        JSONObject result = new JSONObject(service.execute(
+                businessId, null, sourceReferenceId, "+56911111111", BusinessOrder.Source.WHATSAPP,
+                "quote_payment", new JSONObject()
+                        .put("targetOperationId", targetOperationId.toString())
+                        .toString()));
+
+        assertTrue(result.getBoolean("success"));
+        verify(paymentWorkflow).quote(eq(businessId), isNull(), eq(sourceReferenceId),
+                eq("+56911111111"), eq(BusinessOrder.Source.WHATSAPP), any(JSONObject.class));
+        verifyNoInteractions(conversationState);
+    }
+
+    @Test
+    void updateOrderDeliveryAndPaymentAreFirstClassSupportedTools() {
         assertTrue(service.supports("update_order"));
         assertTrue(service.supports("quote_order"));
         assertTrue(service.supports("create_order"));
@@ -128,6 +160,11 @@ class CommercialOperationToolServiceTest {
         assertTrue(service.supports("create_delivery"));
         assertTrue(service.supports("get_delivery_status"));
         assertTrue(service.supports("cancel_delivery"));
+        assertTrue(service.supports("quote_payment"));
+        assertTrue(service.supports("update_payment"));
+        assertTrue(service.supports("create_payment"));
+        assertTrue(service.supports("get_payment_status"));
+        assertTrue(service.supports("cancel_payment"));
     }
 
     @Test
@@ -205,7 +242,7 @@ class CommercialOperationToolServiceTest {
 
         assertFalse(result.getBoolean("success"));
         assertEquals("TOOL_DISABLED", result.getJSONObject("error").getString("code"));
-        verifyNoInteractions(orderWorkflow, deliveryWorkflow, universalOperations, conversationState);
+        verifyNoInteractions(orderWorkflow, deliveryWorkflow, universalOperations, paymentWorkflow, conversationState);
     }
 
     @Test

@@ -76,6 +76,21 @@ public final class CommercialToolDefinitions {
                 .put("items", itemsArray)
                 .put("contactName", string("Nombre del cliente si lo entregó"));
 
+        JSONObject quotePaymentParams = object()
+                .put("properties", new JSONObject()
+                        .put("targetOperationId", string("UUID exacto de la operación CONFIRMED que se quiere pagar. El backend obtiene monto y moneda; nunca envíes un monto inventado.")))
+                .put("required", new JSONArray().put("targetOperationId"));
+        JSONObject updatePaymentParams = object()
+                .put("properties", new JSONObject()
+                        .put("operationId", string("UUID exacto del borrador PAYMENT devuelto por quote_payment o update_payment"))
+                        .put("targetOperationId", string("UUID exacto y vigente de la operación que se quiere pagar")))
+                .put("required", new JSONArray().put("operationId").put("targetOperationId"));
+        JSONObject createPaymentParams = object()
+                .put("properties", new JSONObject()
+                        .put("operationId", string("UUID exacto del borrador PAYMENT más reciente"))
+                        .put("confirmationToken", string("Token exacto de la última versión devuelta por quote_payment o update_payment")))
+                .put("required", new JSONArray().put("operationId").put("confirmationToken"));
+
         return new JSONArray()
                 .put(function("list_catalog",
                         "Lista el catálogo universal activo del negocio con productos y servicios, precios y moneda. Úsala antes de recomendar, cotizar o armar un pedido.",
@@ -136,7 +151,25 @@ public final class CommercialToolDefinitions {
                                         .put("interest", string("Qué producto, servicio o solución le interesa"))
                                         .put("budget", number("Presupuesto opcional informado por el cliente"))
                                         .put("notes", string("Contexto adicional útil para seguimiento")))
-                                .put("required", new JSONArray().put("name").put("interest"))));
+                                .put("required", new JSONArray().put("name").put("interest"))))
+                .put(function("quote_payment",
+                        "Crea un borrador PAYMENT para una operación confirmada del cliente. El backend obtiene el saldo y la moneda desde la operación de origen; nunca acepta un monto decidido por la IA. Devuelve operationId, revision y confirmationToken y todavía no crea una intención en el proveedor.",
+                        quotePaymentParams))
+                .put(function("update_payment",
+                        "Reemplaza el objetivo del borrador PAYMENT y recalcula el saldo backend-autoritativo. Cada corrección rota confirmationToken e invalida confirmaciones antiguas.",
+                        updatePaymentParams))
+                .put(function("create_payment",
+                        "Crea la intención en el proveedor comercial configurado solo después de un sí explícito sobre el monto y moneda más recientes. Usa el último confirmationToken. Nunca pidas ni almacenes credenciales de tarjeta. Un checkoutUrl no significa pagado.",
+                        createPaymentParams))
+                .put(function("get_payment_status",
+                        "Consulta el estado verificado de un pago del cliente actual. Solo considera el pago completado cuando status sea SUCCEEDED; REQUIRES_ACTION o PENDING todavía no significan pagado.",
+                        object().put("properties", new JSONObject()
+                                .put("paymentId", string("UUID opcional del pago")))))
+                .put(function("cancel_payment",
+                        "Solicita cancelación de una intención de pago REQUIRES_ACTION o PENDING del cliente actual. No intentes cancelar pagos SUCCEEDED ni confirmes la cancelación antes de success=true.",
+                        object().put("properties", new JSONObject()
+                                        .put("paymentId", string("UUID exacto del pago")))
+                                .put("required", new JSONArray().put("paymentId"))));
     }
 
     public static JSONArray allowed(Set<String> allowedToolNames) {
@@ -174,6 +207,12 @@ public final class CommercialToolDefinitions {
         }
         if (enabled.contains(BusinessOperationCapability.LEAD)) {
             out.append("Para potenciales clientes que requieren seguimiento comercial usa create_lead y conserva únicamente datos entregados por la persona.\n");
+        }
+        if (enabled.contains(BusinessOperationCapability.PAYMENT)) {
+            out.append("Para pagos: nunca decidas el monto ni la moneda. Usa quote_payment con la operación CONFIRMED que el cliente quiere pagar. ")
+                    .append("Presenta el monto backend-autoritativo y solo después de un sí explícito usa create_payment con el último confirmationToken. ")
+                    .append("Si cambia la operación objetivo usa update_payment; la confirmación anterior queda inválida. ")
+                    .append("Nunca solicites números de tarjeta, CVV ni credenciales de pago. Un checkoutUrl solo inicia el pago: considera pagado únicamente un status SUCCEEDED verificado por el proveedor.\n");
         }
         return out.toString();
     }

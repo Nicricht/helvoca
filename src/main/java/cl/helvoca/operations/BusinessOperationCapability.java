@@ -29,7 +29,13 @@ public enum BusinessOperationCapability {
             AiCapability.GET_DELIVERY_STATUS,
             AiCapability.CANCEL_DELIVERY)),
     QUOTE(Set.of(AiCapability.CREATE_QUOTE)),
-    LEAD(Set.of(AiCapability.CREATE_LEAD));
+    LEAD(Set.of(AiCapability.CREATE_LEAD)),
+    PAYMENT(Set.of(
+            AiCapability.QUOTE_PAYMENT,
+            AiCapability.UPDATE_PAYMENT,
+            AiCapability.CREATE_PAYMENT,
+            AiCapability.GET_PAYMENT_STATUS,
+            AiCapability.CANCEL_PAYMENT));
 
     private final Set<AiCapability> aiCapabilities;
 

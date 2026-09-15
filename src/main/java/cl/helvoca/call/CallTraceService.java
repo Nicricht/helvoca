@@ -99,6 +99,11 @@ public class CallTraceService {
             case "cancel_order" -> "ORDER_CANCELLED";
             case "create_quote" -> "QUOTE_CREATED";
             case "create_lead" -> "LEAD_CREATED";
+            case "quote_payment" -> "PAYMENT_QUOTED";
+            case "update_payment" -> "PAYMENT_UPDATED";
+            case "create_payment" -> "PAYMENT_INTENT_CREATED";
+            case "get_payment_status" -> "PAYMENT_STATUS_CHECKED";
+            case "cancel_payment" -> "PAYMENT_CANCEL_REQUESTED";
             case "search_knowledge" -> "KNOWLEDGE_SEARCH";
             case "find_caller" -> "CALLER_LOOKUP";
             case "register_caller" -> "CUSTOMER_REGISTERED";
@@ -119,7 +124,7 @@ public class CallTraceService {
     private static String resolution(String toolName) {
         return switch (toolName) {
             case "get_business_information", "list_services", "list_catalog", "list_delivery_zones",
-                    "quote_order", "get_order_status", "search_knowledge" -> "INFORMATION_ONLY";
+                    "quote_order", "get_order_status", "quote_payment", "get_payment_status", "search_knowledge" -> "INFORMATION_ONLY";
             case "register_caller" -> "CUSTOMER_REGISTERED";
             case "create_booking" -> "BOOKING_CREATED";
             case "reschedule_booking" -> "BOOKING_RESCHEDULED";
@@ -141,6 +146,7 @@ public class CallTraceService {
             case "create_order", "cancel_order" -> "BUSINESS_ORDER";
             case "create_quote" -> "BUSINESS_QUOTE";
             case "create_lead" -> "BUSINESS_LEAD";
+            case "create_payment", "get_payment_status", "cancel_payment" -> "BUSINESS_PAYMENT";
             case "create_request" -> "BUSINESS_REQUEST";
             case "record_unanswered_question" -> "UNANSWERED_QUESTION";
             default -> null;
@@ -154,6 +160,7 @@ public class CallTraceService {
             case "create_order", "cancel_order" -> "orderId";
             case "create_quote" -> "quoteId";
             case "create_lead" -> "leadId";
+            case "create_payment", "get_payment_status", "cancel_payment" -> "paymentId";
             case "create_request" -> "requestId";
             case "record_unanswered_question" -> "questionId";
             default -> null;
@@ -177,6 +184,13 @@ public class CallTraceService {
                 String status = data.optString("status", "Pedido");
                 String total = data.has("total") ? String.valueOf(data.opt("total")) : "";
                 yield total.isBlank() ? status : status + " · total " + total;
+            }
+            case "quote_payment", "update_payment", "create_payment", "get_payment_status", "cancel_payment" -> {
+                String status = data.optString("status", "Pago");
+                String amount = data.has("amount") ? String.valueOf(data.opt("amount")) : "";
+                String currency = data.optString("currency", "");
+                String monetary = amount.isBlank() ? "" : amount + (currency.isBlank() ? "" : " " + currency);
+                yield monetary.isBlank() ? status : status + " · " + monetary;
             }
             case "create_quote" -> data.optString("title", "Cotización creada");
             case "create_lead" -> data.optString("interest", data.optString("name", "Lead creado"));

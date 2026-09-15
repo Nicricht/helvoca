@@ -16,6 +16,13 @@ class OperationPolicyServiceTest {
     }
 
     @Test
+    void paymentRequiresExplicitConfirmationByPolicy() {
+        OperationPolicyService.Policy policy = policies.resolve(BusinessOperation.Type.PAYMENT);
+        assertTrue(policy.requiresExplicitConfirmation());
+        assertEquals(OperationPolicyService.HumanReviewRequirement.ON_FAILURE, policy.humanReview());
+    }
+
+    @Test
     void quoteLeadAndRequestRemainNonTransactionalConfirmationPolicies() {
         assertFalse(policies.resolve(BusinessOperation.Type.QUOTE).requiresExplicitConfirmation());
         assertFalse(policies.resolve(BusinessOperation.Type.LEAD).requiresExplicitConfirmation());
