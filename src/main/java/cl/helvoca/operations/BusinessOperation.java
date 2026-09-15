@@ -13,7 +13,10 @@ import java.util.UUID;
 @Table(name = "business_operation")
 public class BusinessOperation {
     public enum Type { ORDER, QUOTE, LEAD, DELIVERY, REQUEST, BOOKING, PAYMENT }
-    public enum Status { DRAFT, AWAITING_CONFIRMATION, CONFIRMED, CANCELLED, EXPIRED, FAILED }
+    public enum Status {
+        DRAFT, PROPOSED, AWAITING_CONFIRMATION, CONFIRMED, EXECUTING,
+        COMPLETED, CANCELLED, EXPIRED, FAILED
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

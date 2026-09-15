@@ -37,6 +37,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers
@@ -65,7 +66,7 @@ class BookingConcurrencyIntegrationTest {
     @Autowired RealtimeToolService tools;
 
     @Test
-    void simultaneousCallsCannotDoubleBookSameServiceAndTime() throws Exception {
+    void simultaneousConfirmationsCannotDoubleBookSameServiceAndTime() throws Exception {
         ZoneId zone = ZoneId.of("America/Santiago");
         LocalDate date = LocalDate.now(zone).plusDays(1);
 
@@ -102,19 +103,37 @@ class BookingConcurrencyIntegrationTest {
 
         Instant startAt = date.atTime(10, 0).atZone(zone).toInstant();
         Instant endAt = startAt.plusSeconds(1800);
-        JSONObject args = new JSONObject()
+        JSONObject proposalArgs = new JSONObject()
                 .put("serviceId", service.getId().toString())
                 .put("startAt", startAt.toString());
 
         RealtimeCallContext firstContext = context(firstCall, business.getId(), customer.getId(), customer.getPhone());
         RealtimeCallContext secondContext = context(secondCall, business.getId(), customer.getId(), customer.getPhone());
 
+        JSONObject firstProposal = new JSONObject(tools.execute(firstContext, "create_booking", proposalArgs.toString()));
+        JSONObject secondProposal = new JSONObject(tools.execute(secondContext, "create_booking", proposalArgs.toString()));
+        assertTrue(firstProposal.optBoolean("success", false));
+        assertTrue(secondProposal.optBoolean("success", false));
+        assertFalse(firstProposal.getJSONObject("data").optBoolean("bookingCreated", true));
+        assertFalse(secondProposal.getJSONObject("data").optBoolean("bookingCreated", true));
+        assertEquals(0L, bookings.countOverlaps(
+                business.getId(), service.getId(), startAt, endAt, BookingStatus.CANCELLED, null));
+
+        JSONObject firstData = firstProposal.getJSONObject("data");
+        JSONObject secondData = secondProposal.getJSONObject("data");
+        JSONObject firstConfirmation = new JSONObject()
+                .put("operationId", firstData.getString("operationId"))
+                .put("confirmationToken", firstData.getString("confirmationToken"));
+        JSONObject secondConfirmation = new JSONObject()
+                .put("operationId", secondData.getString("operationId"))
+                .put("confirmationToken", secondData.getString("confirmationToken"));
+
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch fire = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
-            Future<JSONObject> first = executor.submit(() -> executeConcurrent(firstContext, args, ready, fire));
-            Future<JSONObject> second = executor.submit(() -> executeConcurrent(secondContext, args, ready, fire));
+            Future<JSONObject> first = executor.submit(() -> executeConcurrent(firstContext, firstConfirmation, ready, fire));
+            Future<JSONObject> second = executor.submit(() -> executeConcurrent(secondContext, secondConfirmation, ready, fire));
             assertTrue(ready.await(5, TimeUnit.SECONDS));
             fire.countDown();
 
