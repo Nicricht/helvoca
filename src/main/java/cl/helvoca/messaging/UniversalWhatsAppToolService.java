@@ -13,6 +13,7 @@ import cl.helvoca.operations.BusinessOperationCapabilityService;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.operations.CommercialOperationToolService;
 import cl.helvoca.operations.CommercialToolDefinitions;
+import cl.helvoca.operations.SafeOperationRetryEngine;
 import cl.helvoca.request.BusinessRequest;
 import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.request.RequestPriority;
@@ -46,6 +47,9 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     @Autowired(required = false)
     private AutomationPolicyToolGate automationPolicies;
 
+    @Autowired(required = false)
+    private SafeOperationRetryEngine retryEngine;
+
     public UniversalWhatsAppToolService(BusinessRepository businesses,
                                         CustomerRepository customers,
                                         ServiceItemRepository services,
@@ -71,12 +75,29 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public String execute(MessagingConversation conversation, String toolName, String rawArguments) {
+        BusinessOperation.Type operationType = null;
         if (automationPolicies != null) {
             JSONObject policyBlock = automationPolicies.blockIfAutomationDisabled(
                     conversation.getBusinessId(), toolName);
             if (policyBlock != null) return policyBlock.toString();
+            operationType = automationPolicies.operationType(toolName);
         }
 
+        if (retryEngine != null && operationType != null) {
+            BusinessOperation.Type retryType = operationType;
+            return retryEngine.execute(
+                    conversation.getBusinessId(),
+                    retryType,
+                    conversation.getId(),
+                    toolName,
+                    () -> executeOperationOnce(conversation, toolName, rawArguments));
+        }
+        return executeOperationOnce(conversation, toolName, rawArguments);
+    }
+
+    private String executeOperationOnce(MessagingConversation conversation,
+                                        String toolName,
+                                        String rawArguments) {
         if ("create_request".equals(toolName)) {
             return createRequestWithConversationContext(conversation, rawArguments).toString();
         }
@@ -103,7 +124,8 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     @Transactional(readOnly = true)
     public String buildInstructions(MessagingConversation conversation) {
         return super.buildInstructions(conversation)
-                + CommercialToolDefinitions.instructions(capabilities.enabled(conversation.getBusinessId()));
+                + CommercialToolDefinitions.instructions(capabilities.enabled(conversation.getBusinessId()))
+                + "\nSi una herramienta devuelve automation.fallbackAction, aplica esa alternativa con las herramientas disponibles antes de pedir intervención humana. No repitas manualmente una operación que automation ya reintentó.";
     }
 
     private String synchronizeBookingMutation(MessagingConversation conversation,
