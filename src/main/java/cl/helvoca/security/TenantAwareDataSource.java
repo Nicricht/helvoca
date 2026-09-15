@@ -11,6 +11,7 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 import java.util.Objects;
+import java.util.concurrent.Executor;
 import java.util.logging.Logger;
 
 /**
@@ -20,6 +21,7 @@ import java.util.logging.Logger;
 public final class TenantAwareDataSource implements DataSource {
     static final String TENANT_ROLE = "helvoca_runtime";
     static final String SYSTEM_ROLE = "helvoca_system";
+    private static final Executor DIRECT_EXECUTOR = Runnable::run;
 
     private final DataSource delegate;
     private final TenantDatabaseContext context;
@@ -41,7 +43,6 @@ public final class TenantAwareDataSource implements DataSource {
 
     private Connection prepare(Connection connection) throws SQLException {
         TenantDatabaseContext.Access access = context.currentOrInternalSystem();
-        boolean prepared = false;
         try {
             reset(connection);
             String role = access.mode() == TenantDatabaseContext.Mode.SYSTEM ? SYSTEM_ROLE : TENANT_ROLE;
@@ -56,13 +57,10 @@ public final class TenantAwareDataSource implements DataSource {
                 statement.setString(1, tenantId);
                 statement.execute();
             }
-            prepared = true;
             return wrap(connection);
-        } finally {
-            if (!prepared) {
-                try { reset(connection); } catch (SQLException ignored) { }
-                try { connection.close(); } catch (SQLException ignored) { }
-            }
+        } catch (SQLException e) {
+            discard(connection, e);
+            throw e;
         }
     }
 
@@ -91,6 +89,17 @@ public final class TenantAwareDataSource implements DataSource {
         if (first != null) throw first;
     }
 
+    /** A connection that could not be scrubbed must never re-enter the pool. */
+    private static void discard(Connection connection, SQLException cause) {
+        if (connection == null) return;
+        try {
+            connection.abort(DIRECT_EXECUTOR);
+        } catch (SQLException abortFailure) {
+            cause.addSuppressed(abortFailure);
+            try { connection.close(); } catch (SQLException closeFailure) { cause.addSuppressed(closeFailure); }
+        }
+    }
+
     private static final class ConnectionHandler implements java.lang.reflect.InvocationHandler {
         private final Connection delegate;
         private boolean closed;
@@ -105,19 +114,13 @@ public final class TenantAwareDataSource implements DataSource {
             if ("close".equals(name) && method.getParameterCount() == 0) {
                 if (closed) return null;
                 closed = true;
-                SQLException resetFailure = null;
                 try {
                     reset(delegate);
-                } catch (SQLException e) {
-                    resetFailure = e;
+                } catch (SQLException resetFailure) {
+                    discard(delegate, resetFailure);
+                    throw resetFailure;
                 }
-                try {
-                    delegate.close();
-                } catch (SQLException e) {
-                    if (resetFailure != null) e.addSuppressed(resetFailure);
-                    throw e;
-                }
-                if (resetFailure != null) throw resetFailure;
+                delegate.close();
                 return null;
             }
             if ("isClosed".equals(name) && method.getParameterCount() == 0 && closed) return true;
