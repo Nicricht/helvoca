@@ -60,7 +60,7 @@ public class ConfirmationAwareCommercialOperationToolService extends CommercialO
                 String tokenRaw = args.optString("confirmationToken", null);
                 token = tokenRaw == null || tokenRaw.isBlank() ? null : UUID.fromString(tokenRaw);
             } catch (Exception e) {
-                return error("INVALID_CONFIRMIRMATION", "La confirmación requiere una operación y token válidos.").toString();
+                return error("INVALID_CONFIRMATION", "La confirmación requiere una operación y token válidos.").toString();
             }
 
             // Fence the exact tenant operation before authorization and before any
