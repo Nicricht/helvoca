@@ -18,7 +18,9 @@ Si el almacenamiento del handoff falla, Helvoca devuelve `STOP_SAFELY` y `automa
 
 `human_handoff` mantiene una cola por tenant con:
 
-- referencia de conversación/canal mediante `source_reference_id`;
+- `customer_id` cuando la conversación ya está asociada a un cliente;
+- canal `VOICE` o `WHATSAPP` inferido desde la fuente real;
+- referencia de conversación mediante `source_reference_id`;
 - operación universal y `operation_id` cuando está disponible;
 - herramienta que originó el fallo;
 - código de motivo;
@@ -29,13 +31,15 @@ Si el almacenamiento del handoff falla, Helvoca devuelve `STOP_SAFELY` y `automa
 - asignación;
 - timestamps de lifecycle.
 
+La identidad contextual se obtiene desde `call_session` o `messaging_conversation` del mismo tenant. No se copia el teléfono, sender, dirección ni el contenido crudo de la conversación al registro de handoff.
+
 Los estados son:
 
 `OPEN -> ACKNOWLEDGED -> ASSIGNED -> RESOLVED`
 
 También se puede pasar desde un estado activo a `CANCELLED`.
 
-La asignación puede hacerse directamente desde `OPEN` o `ACKNOWLEDGED`.
+La asignación puede hacerse directamente desde `OPEN` o `ACKNOWLEDGED`, y un handoff asignado puede reasignarse a otro operador manteniendo historial.
 
 ## Deduplicación
 
@@ -79,6 +83,8 @@ Cuando V31 detecta un fallo irresoluble, `automation` incluye además:
 - `handoffStatus`: estado del handoff.
 
 `automation.humanEscalation=true` implica que `handoffId` existe.
+
+Voz y WhatsApp tienen instrucciones explícitas para no afirmar que una persona fue avisada si `humanEscalation=false`, falta `handoffId` o el fallback es `STOP_SAFELY`.
 
 ## Seguridad
 
