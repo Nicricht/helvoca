@@ -22,6 +22,7 @@ import static org.mockito.Mockito.*;
 class BusinessOperationCapabilityServiceTest {
     @Mock AiAgentService aiAgents;
     @Mock TenantProvider tenantProvider;
+    @Mock OperationPolicyService policies;
 
     @Test
     void deliveryIsStandaloneAndDoesNotForceOrderOrCatalog() {
@@ -90,6 +91,36 @@ class BusinessOperationCapabilityServiceTest {
                 "quote_delivery",
                 "quote_payment"), tools);
         assertFalse(tools.contains("list_services"));
+    }
+
+    @Test
+    void disabledAutomationHidesMutatingToolsButKeepsReadOnlyStatusTools() {
+        UUID businessId = UUID.randomUUID();
+        when(aiAgents.allowedToolNames(businessId)).thenReturn(Set.of(
+                "quote_order",
+                "create_order",
+                "get_order_status",
+                "list_catalog"));
+        when(policies.allowsAutomaticExecution(businessId, BusinessOperation.Type.ORDER)).thenReturn(false);
+
+        BusinessOperationCapabilityService service = new BusinessOperationCapabilityService(
+                aiAgents, tenantProvider, policies);
+        Set<String> tools = service.allowedToolNames(businessId);
+
+        assertEquals(Set.of("get_order_status", "list_catalog"), tools);
+        assertFalse(service.isToolAllowed(businessId, "create_order"));
+    }
+
+    @Test
+    void automationFirstDefaultAllowsMutatingToolWhenPolicyAllowsIt() {
+        UUID businessId = UUID.randomUUID();
+        when(aiAgents.toolAllowed(businessId, "create_payment")).thenReturn(true);
+        when(policies.allowsAutomaticExecution(businessId, BusinessOperation.Type.PAYMENT)).thenReturn(true);
+
+        BusinessOperationCapabilityService service = new BusinessOperationCapabilityService(
+                aiAgents, tenantProvider, policies);
+
+        assertTrue(service.isToolAllowed(businessId, "create_payment"));
     }
 
     @Test
