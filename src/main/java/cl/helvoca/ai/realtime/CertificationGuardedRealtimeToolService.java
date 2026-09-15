@@ -65,7 +65,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     @Autowired
     private BookingOperationSyncService bookingOperations;
 
-    @Autowired
+    @Autowired(required = false)
     private AutomationPolicyToolGate automationPolicies;
 
     public CertificationGuardedRealtimeToolService(BusinessRepository businesses,
@@ -126,10 +126,12 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
             return result.toString();
         }
 
-        JSONObject policyBlock = automationPolicies.blockIfAutomationDisabled(context.businessId(), toolName);
-        if (policyBlock != null) {
-            trace.recordTool(context.businessId(), context.callId(), toolName, policyBlock);
-            return policyBlock.toString();
+        if (automationPolicies != null) {
+            JSONObject policyBlock = automationPolicies.blockIfAutomationDisabled(context.businessId(), toolName);
+            if (policyBlock != null) {
+                trace.recordTool(context.businessId(), context.callId(), toolName, policyBlock);
+                return policyBlock.toString();
+            }
         }
 
         if (commercialOperations != null && commercialOperations.supports(toolName)) {
