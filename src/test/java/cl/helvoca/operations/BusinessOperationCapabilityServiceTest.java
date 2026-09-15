@@ -24,24 +24,20 @@ class BusinessOperationCapabilityServiceTest {
     @Mock TenantProvider tenantProvider;
 
     @Test
-    void deliveryAutomaticallyEnablesOrderAndCatalog() {
+    void deliveryIsStandaloneAndDoesNotForceOrderOrCatalog() {
         BusinessOperationCapabilityService service = new BusinessOperationCapabilityService(aiAgents, tenantProvider);
 
         Set<BusinessOperationCapability> result = service.replaceCurrent(Set.of(BusinessOperationCapability.DELIVERY));
 
-        assertEquals(Set.of(
-                BusinessOperationCapability.DELIVERY,
-                BusinessOperationCapability.ORDER,
-                BusinessOperationCapability.CATALOG), result);
+        assertEquals(Set.of(BusinessOperationCapability.DELIVERY), result);
         verify(aiAgents).replaceCommercialCapabilities(argThat(actual -> actual.equals(Set.of(
-                AiCapability.LIST_CATALOG,
-                AiCapability.QUOTE_ORDER,
-                AiCapability.UPDATE_ORDER,
-                AiCapability.CREATE_ORDER,
-                AiCapability.GET_ORDER_STATUS,
-                AiCapability.CANCEL_ORDER,
                 AiCapability.LIST_DELIVERY_ZONES,
-                AiCapability.VALIDATE_DELIVERY_ADDRESS))));
+                AiCapability.VALIDATE_DELIVERY_ADDRESS,
+                AiCapability.QUOTE_DELIVERY,
+                AiCapability.UPDATE_DELIVERY,
+                AiCapability.CREATE_DELIVERY,
+                AiCapability.GET_DELIVERY_STATUS,
+                AiCapability.CANCEL_DELIVERY))));
     }
 
     @Test
@@ -64,12 +60,18 @@ class BusinessOperationCapabilityServiceTest {
                 "quote_order",
                 "update_order",
                 "create_order",
-                "validate_delivery_address"));
+                "validate_delivery_address",
+                "quote_delivery"));
 
         BusinessOperationCapabilityService service = new BusinessOperationCapabilityService(aiAgents, tenantProvider);
         Set<String> tools = service.allowedToolNames(businessId);
 
-        assertEquals(Set.of("quote_order", "update_order", "create_order", "validate_delivery_address"), tools);
+        assertEquals(Set.of(
+                "quote_order",
+                "update_order",
+                "create_order",
+                "validate_delivery_address",
+                "quote_delivery"), tools);
         assertFalse(tools.contains("list_services"));
     }
 
@@ -87,5 +89,22 @@ class BusinessOperationCapabilityServiceTest {
         assertFalse(service.enabled(businessId).contains(BusinessOperationCapability.ORDER));
         assertFalse(service.isEnabled(businessId, BusinessOperationCapability.ORDER));
         assertTrue(agent.getCapabilities().contains(AiCapability.CREATE_ORDER));
+    }
+
+    @Test
+    void highLevelDeliveryRequiresItsCompleteStandaloneToolSet() {
+        UUID businessId = UUID.randomUUID();
+        AiAgent agent = new AiAgent();
+        agent.setBusinessId(businessId);
+        agent.setActive(true);
+        agent.setCapabilities(Set.of(
+                AiCapability.LIST_DELIVERY_ZONES,
+                AiCapability.VALIDATE_DELIVERY_ADDRESS));
+        when(aiAgents.runtime(businessId)).thenReturn(agent);
+
+        BusinessOperationCapabilityService service = new BusinessOperationCapabilityService(aiAgents, tenantProvider);
+
+        assertFalse(service.enabled(businessId).contains(BusinessOperationCapability.DELIVERY));
+        assertFalse(service.isEnabled(businessId, BusinessOperationCapability.DELIVERY));
     }
 }
