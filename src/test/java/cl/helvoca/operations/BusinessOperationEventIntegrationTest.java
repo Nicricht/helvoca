@@ -131,6 +131,35 @@ class BusinessOperationEventIntegrationTest {
     }
 
     @Test
+    void paymentMaterializationIsRecordedAsPaymentConfirmed() {
+        Business business = new Business();
+        business.setName("Payment Confirmation Event Test");
+        business = businesses.saveAndFlush(business);
+
+        BusinessOperation operation = new BusinessOperation();
+        operation.setBusinessId(business.getId());
+        operation.setType(BusinessOperation.Type.PAYMENT);
+        operation.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
+        operation.setSource(BusinessOrder.Source.VOICE);
+        operation.setRevision(1);
+        operation.setTotal(new BigDecimal("5000"));
+        operation.setCurrency("CLP");
+        operation = operations.saveAndFlush(operation);
+
+        operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        operation.setMetadata(Map.of("paymentStatus", "REQUIRES_ACTION"));
+        operation = operations.saveAndFlush(operation);
+
+        BusinessOperationEvent latest = events
+                .findTop100ByBusinessIdAndOperationIdOrderBySequenceNoDesc(business.getId(), operation.getId())
+                .getFirst();
+
+        assertEquals("PAYMENT_CONFIRMED", latest.getEventType());
+        assertEquals(BusinessOperationEvent.ActorType.AI, latest.getActorType());
+        assertEquals("REQUIRES_ACTION", latest.getPayload().get("paymentStatusAfter"));
+    }
+
+    @Test
     void paymentStatusChangeIsAttributedToProvider() {
         Business business = new Business();
         business.setName("Provider Event Test");
