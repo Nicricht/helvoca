@@ -88,15 +88,16 @@ public class BusinessRequestService {
     }
 
     @Transactional
-    public BusinessRequest createFromAi(UUID businessId, UUID customerId, UUID callId,
+    public BusinessRequest createFromAi(UUID businessId, UUID customerId, UUID sourceReferenceId,
                                         String requestType, String title, String description,
                                         String contactName, String contactPhone,
                                         RequestPriority priority, String detailsJson,
                                         RequestSource source) {
-        return universalOperations.createRequest(
+        RequestSource safeSource = source == null ? RequestSource.AI_CALL : source;
+        BusinessRequest request = universalOperations.createRequest(
                 businessId,
                 customerId,
-                callId,
+                sourceReferenceId,
                 clean(requestType, 80),
                 clean(title, 200),
                 description,
@@ -104,7 +105,15 @@ public class BusinessRequestService {
                 contactPhone,
                 priority == null ? RequestPriority.NORMAL : priority,
                 detailsJson,
-                source == null ? RequestSource.AI_CALL : source);
+                safeSource);
+
+        // business_request.call_id is a legacy voice-only projection. The
+        // universal operation keeps the source reference for WhatsApp/API.
+        if (safeSource != RequestSource.AI_CALL && request.getCallId() != null) {
+            request.setCallId(null);
+            request = repository.save(request);
+        }
+        return request;
     }
 
     private static String clean(String value, int max) {
