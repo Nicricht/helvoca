@@ -11,7 +11,6 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 import java.util.Objects;
-import java.util.concurrent.Executor;
 import java.util.logging.Logger;
 
 /**
@@ -21,7 +20,6 @@ import java.util.logging.Logger;
 public final class TenantAwareDataSource implements DataSource {
     static final String TENANT_ROLE = "helvoca_runtime";
     static final String SYSTEM_ROLE = "helvoca_system";
-    private static final Executor DIRECT_EXECUTOR = Runnable::run;
 
     private final DataSource delegate;
     private final TenantDatabaseContext context;
@@ -43,8 +41,9 @@ public final class TenantAwareDataSource implements DataSource {
 
     private Connection prepare(Connection connection) throws SQLException {
         TenantDatabaseContext.Access access = context.currentOrInternalSystem();
+        boolean prepared = false;
         try {
-            reset(connection);
+            scrubOutsideTransaction(connection);
             String role = access.mode() == TenantDatabaseContext.Mode.SYSTEM ? SYSTEM_ROLE : TENANT_ROLE;
             try (Statement statement = connection.createStatement()) {
                 statement.execute("SET ROLE " + role);
@@ -57,10 +56,13 @@ public final class TenantAwareDataSource implements DataSource {
                 statement.setString(1, tenantId);
                 statement.execute();
             }
+            prepared = true;
             return wrap(connection);
-        } catch (SQLException e) {
-            discard(connection, e);
-            throw e;
+        } finally {
+            if (!prepared) {
+                try { scrubOutsideTransaction(connection); } catch (SQLException ignored) { }
+                try { connection.close(); } catch (SQLException ignored) { }
+            }
         }
     }
 
@@ -71,33 +73,49 @@ public final class TenantAwareDataSource implements DataSource {
                 new ConnectionHandler(connection));
     }
 
-    private static void reset(Connection connection) throws SQLException {
+    /**
+     * Session state must be reset outside a transaction. If RESET ROLE or
+     * set_config were executed inside a transaction and Hikari later rolled it
+     * back, PostgreSQL could restore the previous tenant/role on the pooled
+     * physical connection.
+     */
+    private static void scrubOutsideTransaction(Connection connection) throws SQLException {
         if (connection == null || connection.isClosed()) return;
+
         SQLException first = null;
-        try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT set_config('app.tenant_id', '', false)")) {
-            statement.execute();
+        try {
+            if (!connection.getAutoCommit()) {
+                try {
+                    connection.rollback();
+                } catch (SQLException e) {
+                    first = e;
+                }
+                try {
+                    connection.setAutoCommit(true);
+                } catch (SQLException e) {
+                    if (first == null) first = e;
+                    else first.addSuppressed(e);
+                }
+            }
         } catch (SQLException e) {
             first = e;
         }
-        try (Statement statement = connection.createStatement()) {
-            statement.execute("RESET ROLE");
-        } catch (SQLException e) {
-            if (first == null) first = e;
-            else first.addSuppressed(e);
+
+        if (first == null) {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT set_config('app.tenant_id', '', false)")) {
+                statement.execute();
+            } catch (SQLException e) {
+                first = e;
+            }
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("RESET ROLE");
+            } catch (SQLException e) {
+                if (first == null) first = e;
+                else first.addSuppressed(e);
+            }
         }
         if (first != null) throw first;
-    }
-
-    /** A connection that could not be scrubbed must never re-enter the pool. */
-    private static void discard(Connection connection, SQLException cause) {
-        if (connection == null) return;
-        try {
-            connection.abort(DIRECT_EXECUTOR);
-        } catch (SQLException abortFailure) {
-            cause.addSuppressed(abortFailure);
-            try { connection.close(); } catch (SQLException closeFailure) { cause.addSuppressed(closeFailure); }
-        }
     }
 
     private static final class ConnectionHandler implements java.lang.reflect.InvocationHandler {
@@ -114,13 +132,19 @@ public final class TenantAwareDataSource implements DataSource {
             if ("close".equals(name) && method.getParameterCount() == 0) {
                 if (closed) return null;
                 closed = true;
+                SQLException resetFailure = null;
                 try {
-                    reset(delegate);
-                } catch (SQLException resetFailure) {
-                    discard(delegate, resetFailure);
-                    throw resetFailure;
+                    scrubOutsideTransaction(delegate);
+                } catch (SQLException e) {
+                    resetFailure = e;
                 }
-                delegate.close();
+                try {
+                    delegate.close();
+                } catch (SQLException e) {
+                    if (resetFailure != null) e.addSuppressed(resetFailure);
+                    throw e;
+                }
+                if (resetFailure != null) throw resetFailure;
                 return null;
             }
             if ("isClosed".equals(name) && method.getParameterCount() == 0 && closed) return true;
