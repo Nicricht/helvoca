@@ -1,10 +1,14 @@
 package cl.helvoca.request;
 
 import cl.helvoca.common.NotFoundException;
+import cl.helvoca.operations.BusinessOperation;
+import cl.helvoca.operations.BusinessOperationRepository;
+import cl.helvoca.operations.UniversalOperationWorkflowService;
 import cl.helvoca.security.TenantProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,10 +16,17 @@ import java.util.UUID;
 public class BusinessRequestService {
     private final BusinessRequestRepository repository;
     private final TenantProvider tenantProvider;
+    private final UniversalOperationWorkflowService universalOperations;
+    private final BusinessOperationRepository operations;
 
-    public BusinessRequestService(BusinessRequestRepository repository, TenantProvider tenantProvider) {
+    public BusinessRequestService(BusinessRequestRepository repository,
+                                  TenantProvider tenantProvider,
+                                  UniversalOperationWorkflowService universalOperations,
+                                  BusinessOperationRepository operations) {
         this.repository = repository;
         this.tenantProvider = tenantProvider;
+        this.universalOperations = universalOperations;
+        this.operations = operations;
     }
 
     @Transactional(readOnly = true)
@@ -28,18 +39,19 @@ public class BusinessRequestService {
     @Transactional
     public BusinessRequestDtos.Response create(BusinessRequestDtos.Create input) {
         UUID businessId = tenantProvider.requireBusinessId();
-        BusinessRequest request = new BusinessRequest();
-        request.setBusinessId(businessId);
-        request.setRequestType(clean(input.requestType(), 80));
-        request.setTitle(clean(input.title(), 200));
-        request.setDescription(blankToNull(input.description()));
-        request.setContactName(blankToNull(input.contactName()));
-        request.setContactPhone(blankToNull(input.contactPhone()));
-        request.setPriority(input.priority() == null ? RequestPriority.NORMAL : input.priority());
-        request.setStatus(RequestStatus.OPEN);
-        request.setSource(RequestSource.MANUAL);
-        request.setDetailsJson(blankToNull(input.detailsJson()));
-        return BusinessRequestDtos.Response.from(repository.saveAndFlush(request));
+        BusinessRequest request = universalOperations.createRequest(
+                businessId,
+                null,
+                null,
+                clean(input.requestType(), 80),
+                clean(input.title(), 200),
+                input.description(),
+                input.contactName(),
+                input.contactPhone(),
+                input.priority() == null ? RequestPriority.NORMAL : input.priority(),
+                input.detailsJson(),
+                RequestSource.MANUAL);
+        return BusinessRequestDtos.Response.from(request);
     }
 
     @Transactional
@@ -49,7 +61,21 @@ public class BusinessRequestService {
         BusinessRequest request = repository.findByIdAndBusinessId(id, businessId)
                 .orElseThrow(() -> new NotFoundException("Request not found"));
         request.setStatus(status);
-        return BusinessRequestDtos.Response.from(repository.save(request));
+        request = repository.save(request);
+
+        BusinessRequest saved = request;
+        operations.findByIdAndBusinessId(saved.getOperationId(), businessId).ifPresent(operation -> {
+            operation.setStatus(status == RequestStatus.CANCELLED
+                    ? BusinessOperation.Status.CANCELLED
+                    : BusinessOperation.Status.CONFIRMED);
+            operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
+            LinkedHashMap<String, Object> metadata = new LinkedHashMap<>();
+            if (operation.getMetadata() != null) metadata.putAll(operation.getMetadata());
+            metadata.put("projectionStatus", status.name());
+            operation.setMetadata(metadata);
+            operations.save(operation);
+        });
+        return BusinessRequestDtos.Response.from(request);
     }
 
     @Transactional
@@ -62,34 +88,37 @@ public class BusinessRequestService {
     }
 
     @Transactional
-    public BusinessRequest createFromAi(UUID businessId, UUID customerId, UUID callId,
+    public BusinessRequest createFromAi(UUID businessId, UUID customerId, UUID sourceReferenceId,
                                         String requestType, String title, String description,
                                         String contactName, String contactPhone,
                                         RequestPriority priority, String detailsJson,
                                         RequestSource source) {
-        BusinessRequest request = new BusinessRequest();
-        request.setBusinessId(businessId);
-        request.setCustomerId(customerId);
-        request.setCallId(callId);
-        request.setRequestType(clean(requestType, 80));
-        request.setTitle(clean(title, 200));
-        request.setDescription(blankToNull(description));
-        request.setContactName(blankToNull(contactName));
-        request.setContactPhone(blankToNull(contactPhone));
-        request.setPriority(priority == null ? RequestPriority.NORMAL : priority);
-        request.setStatus(RequestStatus.OPEN);
-        request.setSource(source == null ? RequestSource.AI_CALL : source);
-        request.setDetailsJson(blankToNull(detailsJson));
-        return repository.saveAndFlush(request);
+        RequestSource safeSource = source == null ? RequestSource.AI_CALL : source;
+        BusinessRequest request = universalOperations.createRequest(
+                businessId,
+                customerId,
+                sourceReferenceId,
+                clean(requestType, 80),
+                clean(title, 200),
+                description,
+                contactName,
+                contactPhone,
+                priority == null ? RequestPriority.NORMAL : priority,
+                detailsJson,
+                safeSource);
+
+        // business_request.call_id is a legacy voice-only projection. The
+        // universal operation keeps the source reference for WhatsApp/API.
+        if (safeSource != RequestSource.AI_CALL && request.getCallId() != null) {
+            request.setCallId(null);
+            request = repository.save(request);
+        }
+        return request;
     }
 
     private static String clean(String value, int max) {
         if (value == null || value.isBlank()) throw new IllegalArgumentException("Required value is missing");
         String v = value.trim();
         return v.length() > max ? v.substring(0, max) : v;
-    }
-
-    private static String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
     }
 }
