@@ -2,6 +2,10 @@ package cl.helvoca.operations;
 
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
+import cl.helvoca.customer.Customer;
+import cl.helvoca.customer.CustomerRepository;
+import cl.helvoca.messaging.MessagingConversation;
+import cl.helvoca.messaging.MessagingConversationRepository;
 import org.json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +48,8 @@ class HumanHandoffIntegrationTest {
     @Autowired SafeOperationRetryEngine retries;
     @Autowired HumanHandoffService handoffs;
     @Autowired BusinessRepository businesses;
+    @Autowired CustomerRepository customers;
+    @Autowired MessagingConversationRepository conversations;
     @Autowired JdbcTemplate jdbc;
 
     @AfterEach
@@ -88,6 +94,35 @@ class HumanHandoffIntegrationTest {
         assertEquals(1, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM human_handoff_event WHERE handoff_id = ? AND event_type = 'CREATED'",
                 Integer.class, handoffId));
+    }
+
+    @Test
+    void capturesCustomerAndChannelWithoutCopyingPhoneIntoSummary() {
+        Business business = business("WhatsApp Context");
+        Customer customer = new Customer();
+        customer.setBusinessId(business.getId());
+        customer.setName("Cliente Contexto");
+        customer.setPhone("+56911112222");
+        customer = customers.saveAndFlush(customer);
+
+        MessagingConversation conversation = new MessagingConversation();
+        conversation.setBusinessId(business.getId());
+        conversation.setCustomerId(customer.getId());
+        conversation.setChannel("WHATSAPP");
+        conversation.setSender("whatsapp:+56911112222");
+        conversation.setRecipient("whatsapp:+56933334444");
+        conversation = conversations.saveAndFlush(conversation);
+
+        handoffs.createForUnresolvable(
+                business.getId(), BusinessOperation.Type.REQUEST, conversation.getId(), null,
+                "create_request", "UNEXPECTED_OPERATION_FAILURE", 0);
+
+        authenticate(business.getId());
+        HumanHandoffService.HandoffView handoff = handoffs.recent("OPEN").getFirst();
+        assertEquals(customer.getId(), handoff.customerId());
+        assertEquals("WHATSAPP", handoff.channel());
+        assertEquals(conversation.getId(), handoff.sourceReferenceId());
+        assertFalse(handoff.safeSummary().contains(customer.getPhone()));
     }
 
     @Test
@@ -153,12 +188,15 @@ class HumanHandoffIntegrationTest {
                 created.handoffId(), "operador@negocio.cl", "admin@negocio.cl");
         assertEquals(HumanHandoffService.Status.ASSIGNED, assigned.status());
         assertEquals("operador@negocio.cl", assigned.assignedTo());
+        HumanHandoffService.HandoffView reassigned = handoffs.assign(
+                created.handoffId(), "operador2@negocio.cl", "admin@negocio.cl");
+        assertEquals("operador2@negocio.cl", reassigned.assignedTo());
         HumanHandoffService.HandoffView resolved = handoffs.resolve(
                 created.handoffId(), "admin@negocio.cl");
         assertEquals(HumanHandoffService.Status.RESOLVED, resolved.status());
 
         List<HumanHandoffService.EventView> history = handoffs.history(created.handoffId());
-        assertEquals(List.of("CREATED", "ASSIGNED", "RESOLVED"),
+        assertEquals(List.of("CREATED", "ASSIGNED", "ASSIGNED", "RESOLVED"),
                 history.stream().map(HumanHandoffService.EventView::eventType).toList());
 
         UUID eventId = history.getFirst().id();
