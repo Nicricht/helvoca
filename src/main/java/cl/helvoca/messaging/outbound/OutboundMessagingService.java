@@ -124,10 +124,11 @@ public class OutboundMessagingService {
             return messages.saveAndFlush(message);
         } catch (RuntimeException e) {
             message.setProvider(provider.id());
+            message.setProviderMessageId(null);
+            message.setSentAt(null);
             message.setFailureCode(safeFailureCode(e));
             message.setStatus(OutboundMessage.Status.FAILED);
-            messages.saveAndFlush(message);
-            throw e;
+            return messages.saveAndFlush(message);
         }
     }
 
