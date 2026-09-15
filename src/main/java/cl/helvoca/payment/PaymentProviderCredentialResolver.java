@@ -12,8 +12,9 @@ public class PaymentProviderCredentialResolver {
         String prefix = "HELVOCA_PAYMENT_" + credentialRef.toUpperCase(Locale.ROOT) + "_";
         String accessToken = env(prefix + "ACCESS_TOKEN");
         String webhookSecret = env(prefix + "WEBHOOK_SECRET");
-        if (accessToken.isBlank() || webhookSecret.isBlank()) return Optional.empty();
-        return Optional.of(new Credentials(accessToken, webhookSecret));
+        boolean sandboxConfirmed = Boolean.parseBoolean(env(prefix + "SANDBOX_CONFIRMED"));
+        if (accessToken.isBlank() || webhookSecret.isBlank() || !sandboxConfirmed) return Optional.empty();
+        return Optional.of(new Credentials(accessToken, webhookSecret, true));
     }
 
     private static String env(String name) {
@@ -21,5 +22,5 @@ public class PaymentProviderCredentialResolver {
         return value == null ? "" : value.trim();
     }
 
-    public record Credentials(String accessToken, String webhookSecret) {}
+    public record Credentials(String accessToken, String webhookSecret, boolean sandboxConfirmed) {}
 }
