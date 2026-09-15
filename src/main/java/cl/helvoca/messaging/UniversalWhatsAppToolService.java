@@ -7,6 +7,7 @@ import cl.helvoca.customer.Customer;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.learning.UnansweredQuestionService;
+import cl.helvoca.operations.AutomationPolicyToolGate;
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationCapabilityService;
 import cl.helvoca.operations.BusinessOrder;
@@ -40,6 +41,7 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     private final BusinessRequestService requests;
     private final CustomerRepository customers;
     private final BookingOperationSyncService bookingOperations;
+    private final AutomationPolicyToolGate automationPolicies;
 
     public UniversalWhatsAppToolService(BusinessRepository businesses,
                                         CustomerRepository customers,
@@ -53,7 +55,8 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
                                         JdbcTemplate jdbc,
                                         CommercialOperationToolService commercial,
                                         BusinessOperationCapabilityService capabilities,
-                                        BookingOperationSyncService bookingOperations) {
+                                        BookingOperationSyncService bookingOperations,
+                                        AutomationPolicyToolGate automationPolicies) {
         super(businesses, customers, services, knowledge, bookings, schedule, requests,
                 unansweredQuestions, conversations, jdbc);
         this.commercial = commercial;
@@ -61,11 +64,16 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
         this.requests = requests;
         this.customers = customers;
         this.bookingOperations = bookingOperations;
+        this.automationPolicies = automationPolicies;
     }
 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public String execute(MessagingConversation conversation, String toolName, String rawArguments) {
+        JSONObject policyBlock = automationPolicies.blockIfAutomationDisabled(
+                conversation.getBusinessId(), toolName);
+        if (policyBlock != null) return policyBlock.toString();
+
         if ("create_request".equals(toolName)) {
             return createRequestWithConversationContext(conversation, rawArguments).toString();
         }
@@ -96,8 +104,8 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     }
 
     private String synchronizeBookingMutation(MessagingConversation conversation,
-                                              String toolName,
-                                              String rawResult) {
+                                               String toolName,
+                                               String rawResult) {
         JSONObject result = new JSONObject(rawResult);
         if (!result.optBoolean("success", false)) return rawResult;
         JSONObject data = result.optJSONObject("data");
