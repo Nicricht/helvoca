@@ -101,6 +101,7 @@ public class OutboundMessagingService {
         OutboundMessage message = require(businessId, messageId);
         if (message.getStatus() == OutboundMessage.Status.SENT) return message;
         if (message.getStatus() != OutboundMessage.Status.PREPARED
+                && message.getStatus() != OutboundMessage.Status.QUEUED
                 && message.getStatus() != OutboundMessage.Status.FAILED) {
             throw new IllegalStateException("Outbound message cannot be dispatched from current state");
         }
