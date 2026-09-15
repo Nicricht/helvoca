@@ -22,7 +22,12 @@ public enum BusinessOperationCapability {
             AiCapability.CANCEL_ORDER)),
     DELIVERY(Set.of(
             AiCapability.LIST_DELIVERY_ZONES,
-            AiCapability.VALIDATE_DELIVERY_ADDRESS)),
+            AiCapability.VALIDATE_DELIVERY_ADDRESS,
+            AiCapability.QUOTE_DELIVERY,
+            AiCapability.UPDATE_DELIVERY,
+            AiCapability.CREATE_DELIVERY,
+            AiCapability.GET_DELIVERY_STATUS,
+            AiCapability.CANCEL_DELIVERY)),
     QUOTE(Set.of(AiCapability.CREATE_QUOTE)),
     LEAD(Set.of(AiCapability.CREATE_LEAD));
 
