@@ -47,6 +47,7 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
                                             JwtAuthenticationConverter jwtConverter,
+                                            TenantDatabaseContextFilter tenantDatabaseContextFilter,
                                             ApiRateLimitFilter apiRateLimitFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
@@ -66,7 +67,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/platform/**").hasRole("PLATFORM_ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)))
-                .addFilterAfter(apiRateLimitFilter, BearerTokenAuthenticationFilter.class);
+                .addFilterAfter(tenantDatabaseContextFilter, BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(apiRateLimitFilter, TenantDatabaseContextFilter.class);
         return http.build();
     }
 }
