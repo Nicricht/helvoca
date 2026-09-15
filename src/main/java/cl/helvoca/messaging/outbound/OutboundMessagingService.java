@@ -5,7 +5,7 @@ import cl.helvoca.omnichannel.CustomerIdentity;
 import cl.helvoca.omnichannel.CustomerIdentityRepository;
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationRepository;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +28,7 @@ public class OutboundMessagingService {
     private final OutboundContentResolver content;
     private final OutboundMessagingProperties properties;
     private final MessagingProviderRegistry providers;
+    private final JdbcTemplate jdbc;
 
     public OutboundMessagingService(OutboundMessageRepository messages,
                                     CustomerRepository customers,
@@ -35,7 +36,8 @@ public class OutboundMessagingService {
                                     BusinessOperationRepository operations,
                                     OutboundContentResolver content,
                                     OutboundMessagingProperties properties,
-                                    MessagingProviderRegistry providers) {
+                                    MessagingProviderRegistry providers,
+                                    JdbcTemplate jdbc) {
         this.messages = messages;
         this.customers = customers;
         this.identities = identities;
@@ -43,6 +45,7 @@ public class OutboundMessagingService {
         this.content = content;
         this.properties = properties;
         this.providers = providers;
+        this.jdbc = jdbc;
     }
 
     @Transactional
@@ -71,6 +74,11 @@ public class OutboundMessagingService {
         String rendered = content.render(businessId, customerId, purpose, operation);
         String key = purpose.name() + ":" + operationId + ":" + identity.getId() + ":r" + safeRevision(operation.getRevision());
 
+        // Serialize the logical idempotency key before lookup+insert. The unique
+        // constraint remains the final database guard; the advisory lock avoids
+        // poisoning the current JPA transaction with an expected duplicate-key
+        // exception when two channel requests prepare the same message at once.
+        jdbc.execute("SELECT pg_advisory_xact_lock(" + businessId.hashCode() + "," + key.hashCode() + ")");
         OutboundMessage existing = messages.findByBusinessIdAndIdempotencyKey(businessId, key).orElse(null);
         if (existing != null) return existing;
 
@@ -85,11 +93,7 @@ public class OutboundMessagingService {
         message.setStatus(OutboundMessage.Status.PREPARED);
         message.setIdempotencyKey(key);
         message.setContentText(rendered);
-        try {
-            return messages.saveAndFlush(message);
-        } catch (DataIntegrityViolationException duplicate) {
-            return messages.findByBusinessIdAndIdempotencyKey(businessId, key).orElseThrow(() -> duplicate);
-        }
+        return messages.saveAndFlush(message);
     }
 
     @Transactional
