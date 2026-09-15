@@ -5,7 +5,7 @@ CREATE TABLE business_automation_policy (
     customer_confirmation VARCHAR(20) NOT NULL,
     payment_requirement VARCHAR(30) NOT NULL DEFAULT 'NONE',
     retry_policy VARCHAR(30) NOT NULL DEFAULT 'SAFE_AUTOMATIC',
-    max_auto_retries SMALLINT NOT NULL DEFAULT 2,
+    max_auto_retries INTEGER NOT NULL DEFAULT 2,
     escalation_policy VARCHAR(40) NOT NULL DEFAULT 'ONLY_IF_UNRESOLVABLE',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
