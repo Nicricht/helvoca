@@ -40,13 +40,14 @@ class PostgresRowLevelSecurityIntegrationTest {
 
     @Autowired JdbcTemplate runtimeJdbc;
     @Autowired TenantDatabaseContext databaseContext;
+    @Autowired @Qualifier("migrationDataSource") DataSource migrationDataSource;
     JdbcTemplate ownerJdbc;
 
     private UUID businessA;
     private UUID businessB;
 
     @BeforeEach
-    void seed(@Qualifier("migrationDataSource") @Autowired DataSource migrationDataSource) {
+    void seed() {
         ownerJdbc = new JdbcTemplate(migrationDataSource);
 
         ownerJdbc.update("DELETE FROM user_role");
@@ -111,11 +112,10 @@ class PostgresRowLevelSecurityIntegrationTest {
 
     @Test
     void deniedContextFailsClosedWhileSystemScopeCanSeeBothTenants() {
-        long denied = databaseContext.callAsSystem(() -> {
-            try (TenantDatabaseContext.Scope ignored = databaseContext.deny()) {
-                return runtimeJdbc.queryForObject("SELECT COUNT(*) FROM customer", Long.class);
-            }
-        });
+        long denied;
+        try (TenantDatabaseContext.Scope ignored = databaseContext.deny()) {
+            denied = runtimeJdbc.queryForObject("SELECT COUNT(*) FROM customer", Long.class);
+        }
         long system = databaseContext.callAsSystem(
                 () -> runtimeJdbc.queryForObject("SELECT COUNT(*) FROM customer", Long.class));
 
