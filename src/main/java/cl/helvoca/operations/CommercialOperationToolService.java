@@ -14,9 +14,10 @@ import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -34,34 +35,41 @@ public class CommercialOperationToolService {
             "create_quote",
             "create_lead");
 
+    private static final Set<String> ORDER_STATE_TOOLS = Set.of(
+            "validate_delivery_address",
+            "quote_order",
+            "update_order",
+            "create_order",
+            "cancel_order");
+
     private final CatalogItemRepository catalog;
     private final DeliveryZoneRepository deliveryZones;
     private final BusinessOrderRepository orders;
     private final BusinessOrderLineRepository orderLines;
-    private final BusinessQuoteRepository quotes;
-    private final BusinessLeadRepository leads;
     private final BusinessOperationRepository operations;
     private final BusinessOperationCapabilityService capabilities;
     private final OrderWorkflowService orderWorkflow;
+    private final UniversalOperationWorkflowService universalOperations;
+    private final ConversationStateService conversationState;
 
     public CommercialOperationToolService(CatalogItemRepository catalog,
                                           DeliveryZoneRepository deliveryZones,
                                           BusinessOrderRepository orders,
                                           BusinessOrderLineRepository orderLines,
-                                          BusinessQuoteRepository quotes,
-                                          BusinessLeadRepository leads,
                                           BusinessOperationRepository operations,
                                           BusinessOperationCapabilityService capabilities,
-                                          OrderWorkflowService orderWorkflow) {
+                                          OrderWorkflowService orderWorkflow,
+                                          UniversalOperationWorkflowService universalOperations,
+                                          ConversationStateService conversationState) {
         this.catalog = catalog;
         this.deliveryZones = deliveryZones;
         this.orders = orders;
         this.orderLines = orderLines;
-        this.quotes = quotes;
-        this.leads = leads;
         this.operations = operations;
         this.capabilities = capabilities;
         this.orderWorkflow = orderWorkflow;
+        this.universalOperations = universalOperations;
+        this.conversationState = conversationState;
     }
 
     public boolean supports(String toolName) { return SUPPORTED.contains(toolName); }
@@ -98,12 +106,15 @@ public class CommercialOperationToolService {
                         businessId, customerId, sourceReferenceId, trustedPhone, source, args);
                 case "get_order_status" -> getOrderStatus(businessId, customerId, trustedPhone, args);
                 case "cancel_order" -> cancelOrder(businessId, customerId, trustedPhone, args);
-                case "create_quote" -> createQuote(
+                case "create_quote" -> universalOperations.createQuote(
                         businessId, customerId, sourceReferenceId, trustedPhone, source, args);
-                case "create_lead" -> createLead(
+                case "create_lead" -> universalOperations.createLead(
                         businessId, customerId, sourceReferenceId, trustedPhone, source, args);
                 default -> error("UNKNOWN_COMMERCIAL_TOOL", "La operación comercial solicitada no existe.");
             };
+
+            recordConversationResult(businessId, sourceReferenceId,
+                    source == null ? BusinessOrder.Source.API : source, toolName, result);
         } catch (IllegalArgumentException e) {
             result = error("INVALID_ARGUMENT", e.getMessage());
         } catch (Exception e) {
@@ -198,88 +209,80 @@ public class CommercialOperationToolService {
         operations.findByIdAndBusinessId(order.getOperationId(), businessId).ifPresent(operation -> {
             operation.setStatus(BusinessOperation.Status.CANCELLED);
             operation.setConfirmationToken(null);
+            operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
             operations.saveAndFlush(operation);
         });
         return success(orderData(order, orderLines.findAllByOrderIdOrderByCreatedAtAsc(order.getId())));
     }
 
-    private JSONObject createQuote(UUID businessId,
-                                   UUID customerId,
-                                   UUID sourceReferenceId,
-                                   String trustedPhone,
-                                   BusinessOrder.Source source,
-                                   JSONObject args) {
-        String title = required(args, "title").trim();
-        if (title.isBlank()) throw new IllegalArgumentException("La cotización necesita un título.");
+    private void recordConversationResult(UUID businessId,
+                                          UUID sourceReferenceId,
+                                          BusinessOrder.Source source,
+                                          String toolName,
+                                          JSONObject result) {
+        if (sourceReferenceId == null || !ORDER_STATE_TOOLS.contains(toolName) || result == null) return;
 
-        BigDecimal amount = null;
-        String currency = "CLP";
-        JSONArray items = args.optJSONArray("items");
-        if (items != null && !items.isEmpty()) {
-            ItemCalculation calculation = calculateItems(businessId, items);
-            amount = calculation.subtotal();
-            currency = calculation.currency();
+        boolean success = result.optBoolean("success", false);
+        JSONObject error = result.optJSONObject("error");
+        String errorCode = error == null ? null : error.optString("code", null);
+        if (!success && !"ORDER_TOTAL_CHANGED".equals(errorCode)) return;
+
+        JSONObject data = result.optJSONObject("data");
+        if (data == null) return;
+
+        Map<String, Object> patch = new LinkedHashMap<>();
+        patch.put("lastTool", toolName);
+        patch.put("intent", "ORDER");
+
+        copyJsonValue(data, patch, "revision", "operationRevision");
+        copyJsonValue(data, patch, "status", "operationStatus");
+        copyJsonValue(data, patch, "total", "total");
+        copyJsonValue(data, patch, "currency", "currency");
+        copyJsonValue(data, patch, "fulfillmentType", "fulfillmentType");
+        copyJsonValue(data, patch, "address", "deliveryAddress");
+        copyJsonValue(data, patch, "deliveryAddress", "deliveryAddress");
+        copyJsonValue(data, patch, "deliveryZoneId", "deliveryZoneId");
+        copyJsonValue(data, patch, "orderId", "orderId");
+        copyJsonValue(data, patch, "confirmationToken", "confirmationToken");
+
+        if (data.has("confirmationToken") && data.opt("confirmationToken") != JSONObject.NULL) {
+            patch.put("confirmationPending", true);
+        } else if ("create_order".equals(toolName) && success) {
+            patch.put("confirmationPending", false);
+            patch.put("operationStatus", "CONFIRMED");
+            patch.put("confirmationToken", null);
+        } else if ("cancel_order".equals(toolName) && success) {
+            patch.put("confirmationPending", false);
+            patch.put("operationStatus", "CANCELLED");
+            patch.put("confirmationToken", null);
         }
 
-        BusinessQuote quote = new BusinessQuote();
-        quote.setBusinessId(businessId);
-        quote.setCustomerId(customerId);
-        quote.setSourceReferenceId(sourceReferenceId);
-        quote.setContactName(optional(args, "contactName"));
-        quote.setContactPhone(blank(trustedPhone) ? null : trustedPhone.trim());
-        quote.setTitle(title);
-        quote.setDescription(optional(args, "description"));
-        quote.setAmount(amount);
-        quote.setCurrency(currency);
-        quote.setStatus(amount == null ? BusinessQuote.Status.REQUESTED : BusinessQuote.Status.READY);
-        quote.setSource(source == null ? BusinessOrder.Source.API : source);
-        quote = quotes.saveAndFlush(quote);
+        UUID operationId = null;
+        String operationIdRaw = data.optString("operationId", null);
+        if (!blank(operationIdRaw)) {
+            operationId = uuid(operationIdRaw);
+            patch.put("operationId", operationIdRaw);
+            patch.put("operationType", "ORDER");
+        }
 
-        return success(new JSONObject()
-                .put("quoteId", quote.getId().toString())
-                .put("title", quote.getTitle())
-                .put("status", quote.getStatus().name())
-                .put("amount", nullable(quote.getAmount()))
-                .put("currency", quote.getCurrency()));
+        conversationState.apply(
+                businessId,
+                sourceReferenceId,
+                source == null ? BusinessOrder.Source.API : source,
+                operationId,
+                patch);
     }
 
-    private JSONObject createLead(UUID businessId,
-                                  UUID customerId,
-                                  UUID sourceReferenceId,
-                                  String trustedPhone,
-                                  BusinessOrder.Source source,
-                                  JSONObject args) {
-        String name = required(args, "name").trim();
-        String interest = required(args, "interest").trim();
-        if (name.isBlank() || interest.isBlank()) {
-            throw new IllegalArgumentException("El lead necesita nombre e interés.");
-        }
-
-        BigDecimal budget = null;
-        if (args.has("budget") && args.opt("budget") != JSONObject.NULL) {
-            budget = money(args.get("budget"));
-            if (budget.signum() < 0) throw new IllegalArgumentException("El presupuesto no puede ser negativo.");
-        }
-
-        BusinessLead lead = new BusinessLead();
-        lead.setBusinessId(businessId);
-        lead.setCustomerId(customerId);
-        lead.setSourceReferenceId(sourceReferenceId);
-        lead.setName(name);
-        lead.setPhone(blank(trustedPhone) ? null : trustedPhone.trim());
-        lead.setEmail(optional(args, "email"));
-        lead.setInterest(interest);
-        lead.setBudget(budget);
-        lead.setNotes(optional(args, "notes"));
-        lead.setStatus(BusinessLead.Status.NEW);
-        lead.setSource(source == null ? BusinessOrder.Source.API : source);
-        lead = leads.saveAndFlush(lead);
-
-        return success(new JSONObject()
-                .put("leadId", lead.getId().toString())
-                .put("name", lead.getName())
-                .put("interest", lead.getInterest())
-                .put("status", lead.getStatus().name()));
+    private static void copyJsonValue(JSONObject source,
+                                      Map<String, Object> target,
+                                      String sourceKey,
+                                      String targetKey) {
+        if (!source.has(sourceKey)) return;
+        Object value = source.opt(sourceKey);
+        if (value == null || value == JSONObject.NULL) return;
+        if (value instanceof JSONObject object) target.put(targetKey, object.toMap());
+        else if (value instanceof JSONArray array) target.put(targetKey, array.toList());
+        else target.put(targetKey, value);
     }
 
     private DeliveryZone resolveDeliveryZone(UUID businessId, String address) {
@@ -298,33 +301,6 @@ public class CommercialOperationToolService {
             throw new IllegalArgumentException("La dirección coincide con más de una zona de despacho; la cobertura debe revisarse antes de confirmar.");
         }
         return matches.get(0).zone();
-    }
-
-    private ItemCalculation calculateItems(UUID businessId, JSONArray items) {
-        if (items == null || items.isEmpty()) throw new IllegalArgumentException("Se requiere al menos un ítem.");
-        BigDecimal subtotal = BigDecimal.ZERO;
-        String currency = null;
-        for (int i = 0; i < items.length(); i++) {
-            JSONObject requested = items.optJSONObject(i);
-            if (requested == null) throw new IllegalArgumentException("Cada ítem debe ser un objeto válido.");
-            UUID itemId = uuid(required(requested, "catalogItemId"));
-            int quantity = requested.optInt("quantity", 0);
-            if (quantity < 1 || quantity > 100) {
-                throw new IllegalArgumentException("La cantidad de cada ítem debe estar entre 1 y 100.");
-            }
-            CatalogItem item = catalog.findByIdAndBusinessId(itemId, businessId)
-                    .filter(CatalogItem::isActive)
-                    .orElseThrow(() -> new IllegalArgumentException("Un ítem del catálogo no existe o no está activo."));
-            if (item.getPrice() == null) {
-                throw new IllegalArgumentException("Un ítem de la cotización no tiene precio configurado.");
-            }
-            if (currency == null) currency = item.getCurrency();
-            if (!Objects.equals(currency, item.getCurrency())) {
-                throw new IllegalArgumentException("No se pueden mezclar monedas distintas en una misma operación.");
-            }
-            subtotal = subtotal.add(item.getPrice().multiply(BigDecimal.valueOf(quantity)));
-        }
-        return new ItemCalculation(subtotal, currency == null ? "CLP" : currency);
     }
 
     private static JSONObject orderData(BusinessOrder order, List<BusinessOrderLine> lines) {
@@ -409,11 +385,6 @@ public class CommercialOperationToolService {
         catch (Exception e) { throw new IllegalArgumentException("Se recibió un identificador inválido."); }
     }
 
-    private static BigDecimal money(Object value) {
-        try { return new BigDecimal(String.valueOf(value)); }
-        catch (Exception e) { throw new IllegalArgumentException("Se recibió un monto inválido."); }
-    }
-
     private static boolean blank(String value) { return value == null || value.isBlank(); }
     private static Object nullable(Object value) { return value == null ? JSONObject.NULL : value; }
 
@@ -426,6 +397,5 @@ public class CommercialOperationToolService {
                 .put("error", new JSONObject().put("code", code).put("message", message));
     }
 
-    private record ItemCalculation(BigDecimal subtotal, String currency) {}
     private record ZoneMatch(DeliveryZone zone, int score) {}
 }
