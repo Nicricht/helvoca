@@ -79,6 +79,12 @@ public class UniversalConfirmationService {
             confirmations.saveAndFlush(confirmation);
             return Authorization.EXPIRED;
         }
+
+        // The database trigger owns the lifecycle transition that follows an
+        // authorized confirmation. Do not keep an AWAITING entity pinned in the
+        // persistence context, otherwise a same-transaction lookup can observe
+        // stale state after the trigger consumes or expires that row.
+        if (entityManager.contains(confirmation)) entityManager.detach(confirmation);
         return Authorization.AUTHORIZED;
     }
 
