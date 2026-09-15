@@ -46,6 +46,7 @@ class CommercialOperationToolServiceTest {
                 .put("success", true)
                 .put("data", new JSONObject().put("operationId", UUID.randomUUID().toString()))
                 .put("error", JSONObject.NULL);
+        when(capabilities.isToolAllowed(businessId, "quote_order")).thenReturn(true);
         when(orderWorkflow.quote(eq(businessId), isNull(), eq(sourceReferenceId),
                 eq("+56911111111"), eq(BusinessOrder.Source.VOICE), any(JSONObject.class)))
                 .thenReturn(domainResult);
@@ -70,6 +71,20 @@ class CommercialOperationToolServiceTest {
     }
 
     @Test
+    void commercialToolDisabledForTenantFailsClosedBeforeDomainExecution() {
+        UUID businessId = UUID.randomUUID();
+        when(capabilities.isToolAllowed(businessId, "quote_order")).thenReturn(false);
+
+        JSONObject result = new JSONObject(service.execute(
+                businessId, null, UUID.randomUUID(), "+56911111111", BusinessOrder.Source.WHATSAPP,
+                "quote_order", new JSONObject().toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("TOOL_DISABLED", result.getJSONObject("error").getString("code"));
+        verifyNoInteractions(orderWorkflow);
+    }
+
+    @Test
     void validateDeliveryAddressReturnsBackendResolvedZone() {
         UUID businessId = UUID.randomUUID();
         UUID zoneId = UUID.randomUUID();
@@ -82,6 +97,7 @@ class CommercialOperationToolServiceTest {
         zone.setMinimumOrder(new BigDecimal("6000"));
         zone.setActive(true);
 
+        when(capabilities.isToolAllowed(businessId, "validate_delivery_address")).thenReturn(true);
         when(capabilities.isEnabled(businessId, BusinessOperationCapability.DELIVERY)).thenReturn(true);
         when(deliveryZones.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId)).thenReturn(List.of(zone));
 
@@ -100,6 +116,7 @@ class CommercialOperationToolServiceTest {
     @Test
     void disabledDeliveryFailsClosed() {
         UUID businessId = UUID.randomUUID();
+        when(capabilities.isToolAllowed(businessId, "validate_delivery_address")).thenReturn(true);
         when(capabilities.isEnabled(businessId, BusinessOperationCapability.DELIVERY)).thenReturn(false);
 
         JSONObject result = new JSONObject(service.execute(
