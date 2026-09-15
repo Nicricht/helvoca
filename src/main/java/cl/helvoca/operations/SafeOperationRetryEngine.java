@@ -1,6 +1,7 @@
 package cl.helvoca.operations;
 
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.TransientDataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.CannotCreateTransactionException;
@@ -68,6 +69,7 @@ public class SafeOperationRetryEngine {
     private final PlatformTransactionManager transactionManager;
     private final Sleeper sleeper;
 
+    @Autowired
     public SafeOperationRetryEngine(OperationPolicyService policies,
                                     OperationRetryAuditService audit,
                                     PlatformTransactionManager transactionManager) {
