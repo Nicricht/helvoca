@@ -2,9 +2,13 @@
 
 ## Objetivo
 
-Helvoca separa el cerebro conversacional de las operaciones que cada tenant puede ejecutar. Un restaurante, taller, clínica, tienda o inmobiliaria usa el mismo dominio; los verticales son presets de configuración, no ramas `if restaurant`, `if clinic`, etc.
+Helvoca separa el cerebro conversacional de las operaciones que cada tenant puede ejecutar. Un restaurante, taller, clínica, tienda, courier o inmobiliaria usa el mismo dominio; los verticales son presets de configuración y no ramas del tipo `if restaurant`, `if clinic`, etc.
 
-El LLM interpreta lenguaje y reúne datos. El backend conserva autoridad sobre permisos, catálogo, precios, cobertura, estados, confirmaciones y persistencia.
+El LLM interpreta lenguaje y reúne datos. El backend conserva autoridad sobre permisos, catálogo, precios, cobertura, estados, confirmaciones, importes, moneda y persistencia. En pagos, la IA tampoco maneja credenciales de tarjeta ni decide si un pago fue exitoso.
+
+La dirección del producto es:
+
+`Conversation -> structured state -> policy -> universal operation -> typed projection -> provider/integration -> audit`
 
 ## Autorización por tenant
 
@@ -17,14 +21,16 @@ Presets comerciales actuales:
 - `DELIVERY`: validar cobertura y ejecutar despachos autónomos versionados.
 - `QUOTE`: cotizaciones estructuradas.
 - `LEAD`: captura estructurada de potenciales clientes.
+- `PAYMENT`: preparar, confirmar, consultar y cancelar intenciones de pago usando un adapter comercial configurado para el tenant.
 
 Dependencias normalizadas:
 
 - `ORDER` implica `CATALOG`.
 - `QUOTE` implica `CATALOG`.
 - `DELIVERY` es autónomo y no obliga a habilitar `ORDER` ni `CATALOG`.
+- `PAYMENT` es autónomo como capability. Requiere una operación pagable confirmada y un provider adapter configurado para poder materializar una intención de pago.
 
-Las capacidades comerciales son opt-in. V26 agrega herramientas transaccionales de DELIVERY únicamente a tenants que ya tenían habilitadas las dos capacidades de delivery previas (`LIST_DELIVERY_ZONES` y `VALIDATE_DELIVERY_ADDRESS`). Los tenants sin delivery permanecen intactos.
+Las capacidades comerciales son opt-in. V26 agregó las herramientas transaccionales de DELIVERY solo a tenants que ya tenían las capacidades de delivery previas. V27 **no concede PAYMENT a ningún tenant existente**: debe habilitarse explícitamente y el provider se resuelve fail-closed.
 
 API de configuración:
 
@@ -61,6 +67,7 @@ Tipos actuales:
 - `DELIVERY`
 - `REQUEST`
 - `BOOKING`
+- `PAYMENT`
 
 Estados universales:
 
@@ -77,7 +84,7 @@ La envolvente conserva tenant, cliente, referencia del canal, origen, revisión,
 
 ### Proyecciones tipadas
 
-La universalización es evolutiva, no un reemplazo destructivo. Las tablas operativas especializadas siguen existiendo como proyecciones compatibles:
+La universalización es evolutiva, no un reemplazo destructivo. Las tablas especializadas siguen existiendo como proyecciones compatibles:
 
 - `business_order`
 - `business_quote`
@@ -85,39 +92,36 @@ La universalización es evolutiva, no un reemplazo destructivo. Las tablas opera
 - `business_request`
 - `booking`
 - `business_delivery`
+- `business_payment`
 
 V23 convirtió ORDER en una proyección 1:1 de `business_operation`.
 
 V24 hizo lo mismo con QUOTE, LEAD y REQUEST y migró los registros existentes.
 
-V25 incorpora BOOKING. Cada `booking` tiene un `operation_id` único y no nulo. Los registros históricos se migran reutilizando el UUID de la reserva como UUID de operación. Las nuevas reservas obtienen su operación universal automáticamente en la misma transacción.
+V25 incorporó BOOKING. Cada `booking` tiene un `operation_id` único y no nulo; las reservas históricas fueron migradas y las nuevas reservas se sincronizan dentro de la misma transacción.
 
-V26 agrega `business_delivery` como proyección 1:1 de una operación `DELIVERY` autónoma. Los ORDER existentes con `fulfillment_type=DELIVERY` siguen siendo operaciones ORDER y no se duplican como entregas autónomas.
+V26 agregó `business_delivery` como proyección 1:1 de una operación `DELIVERY` autónoma. Los ORDER existentes con `fulfillment_type=DELIVERY` siguen siendo ORDER y no se duplican como entregas autónomas.
+
+V27 agrega `business_payment` como proyección 1:1 de una operación `PAYMENT`. El pago apunta mediante `target_operation_id` a la operación comercial que se está pagando, conserva snapshot monetario, provider, referencia externa e idempotency key.
 
 ## Conversation State Engine
 
-V24 agrega `conversation_operation_state` para que el estado operativo no dependa únicamente del historial textual del modelo.
+`conversation_operation_state` evita que el estado operativo dependa únicamente del historial textual del modelo.
 
 La clave lógica es:
 
 `business_id + channel + source_reference_id`
 
-El estado incluye:
+El estado incluye operación activa, JSON estructurado, revisión incremental y timestamps. Una corrección nueva reemplaza el valor anterior incompatible.
 
-- operación activa;
-- JSON estructurado de conversación;
-- revisión incremental;
-- timestamps.
+Ejemplos:
 
-Semántica principal: la corrección más reciente reemplaza el valor anterior incompatible. Por ejemplo, si el cliente cambia dirección, cantidad u horario, el nuevo valor sustituye al anterior y aumenta la revisión correspondiente.
+- ORDER reemplaza cantidades, dirección o fulfillment cuando el cliente corrige el pedido.
+- DELIVERY reemplaza dirección, zona resuelta e instrucciones y rota su confirmación.
+- BOOKING sincroniza creación, reprogramación y cancelación desde voz o WhatsApp.
+- PAYMENT conserva operación objetivo, monto backend-autoritativo, moneda, confirmación vigente, `paymentId`, provider, `checkoutUrl`, `paymentStatus` y `paymentPending` cuando corresponda.
 
-El estado está aislado por tenant y canal. Un patch que no trae una nueva operación activa conserva la operación actual en vez de borrarla accidentalmente.
-
-Para REQUEST, `business_request.call_id` sigue reservado a llamadas reales. WhatsApp y otros canales conservan su referencia en `business_operation.source_reference_id`.
-
-Para BOOKING, voz y WhatsApp enlazan la operación con el `callId` o `conversationId` real y actualizan el estado estructurado después de una creación, reprogramación o cancelación exitosa.
-
-Para DELIVERY autónomo, `quote_delivery`, `update_delivery`, `create_delivery` y `cancel_delivery` actualizan el estado estructurado con operación, revisión, dirección, zona, costo y confirmación vigente.
+No se almacenan credenciales de tarjeta, CVV ni secretos de pago en Conversation State.
 
 ## Policy Engine
 
@@ -125,17 +129,17 @@ Para DELIVERY autónomo, `quote_delivery`, `update_delivery`, `create_delivery` 
 
 Política actual:
 
-- `ORDER`, `DELIVERY` y `BOOKING`: confirmación explícita.
+- `ORDER`, `DELIVERY`, `BOOKING` y `PAYMENT`: confirmación explícita.
 - `QUOTE`, `LEAD` y `REQUEST`: no requieren confirmación transaccional adicional.
 - todas pueden derivar a revisión humana ante fallo.
 
-La política no la decide el LLM. Esta primera versión es una política backend centralizada; todavía no es una matriz configurable por tenant en base de datos.
+La política no la decide el LLM. Esta versión sigue siendo backend centralizado; todavía no existe una matriz configurable por tenant en base de datos.
 
-BOOKING conserva por ahora sus guardas conversacionales y de certificación existentes. Declarar `BOOKING` como `EXPLICIT` no equivale a afirmar que ya usa el token/versionado de ORDER o DELIVERY.
+BOOKING conserva por ahora sus guardas conversacionales y de certificación existentes. Declararlo `EXPLICIT` no significa que ya use exactamente el token/versionado de ORDER, DELIVERY o PAYMENT.
 
 ## Herramientas comerciales
 
-Cuando el `AiAgent` del tenant las autoriza, voz y WhatsApp pueden publicar:
+Cuando el `AiAgent` del tenant las autoriza, voz y WhatsApp pueden publicar dinámicamente:
 
 - `list_catalog`
 - `list_delivery_zones`
@@ -152,121 +156,145 @@ Cuando el `AiAgent` del tenant las autoriza, voz y WhatsApp pueden publicar:
 - `cancel_order`
 - `create_quote`
 - `create_lead`
+- `quote_payment`
+- `update_payment`
+- `create_payment`
+- `get_payment_status`
+- `cancel_payment`
 
-El servicio comercial vuelve a validar la capability exacta en runtime y falla cerrado aunque un adapter futuro publique accidentalmente una herramienta no autorizada.
+El servicio comercial vuelve a validar la capability exacta en runtime y falla cerrado aunque un adapter publique accidentalmente una herramienta no autorizada.
 
 ## ORDER
 
-ORDER utiliza un flujo estructurado:
+ORDER utiliza un flujo versionado:
 
 1. `quote_order` crea un `business_operation` en `AWAITING_CONFIRMATION`.
 2. El backend calcula precios, cantidades, moneda, cobertura, mínimo y despacho.
 3. Devuelve `operationId`, `revision` y `confirmationToken`.
-4. Si el cliente corrige el pedido, `update_order` reemplaza el estado completo del borrador, incrementa revisión y genera un token nuevo.
+4. `update_order` reemplaza el estado completo más reciente, incrementa revisión y rota token.
 5. El token anterior queda inválido.
-6. Solo después de una confirmación explícita en la conversación se llama `create_order` con `operationId + confirmationToken`.
-7. El backend vuelve a recalcular usando el estado actual.
-8. Si precio o total cambió, responde `ORDER_TOTAL_CHANGED`, genera nueva revisión/token y no materializa el pedido.
-9. Si todo coincide, crea una única proyección `business_order` y snapshots de líneas.
+6. Solo después de una confirmación explícita se invoca `create_order` con la última versión.
+7. El backend recalcula antes de materializar.
+8. Si cambió el total responde `ORDER_TOTAL_CHANGED`, rota revisión/token y no crea el pedido.
+9. Si todo coincide crea una única proyección `business_order` y snapshots de líneas.
 10. Un retry secuencial devuelve el mismo pedido como replay idempotente.
 
-El token/versionado garantiza que solo la versión más reciente del borrador pueda materializarse. No pretende demostrar criptográficamente que una persona pronunció una palabra concreta; la capa conversacional debe solicitar y observar confirmación explícita antes de invocar `create_order`.
-
-La conversación estructurada también se actualiza cuando `ORDER_TOTAL_CHANGED` devuelve una nueva cotización, aunque la respuesta de la herramienta tenga `success=false`.
+El token protege la versión del borrador, no demuestra criptográficamente que una persona dijo “sí”. La capa conversacional debe solicitar confirmación explícita antes de ejecutar la mutación final.
 
 ## BOOKING
 
-V25 mantiene la lógica de booking existente para disponibilidad, solapamientos, propiedad del cliente, horarios y guardas de certificación, pero convierte `booking` en una proyección obligatoria de `business_operation`.
+BOOKING conserva la lógica existente para disponibilidad, solapamientos, ownership, horarios y guardas de certificación, pero `booking` es una proyección obligatoria de `business_operation`.
 
-La invariancia se protege en PostgreSQL:
-
-1. antes de insertar una reserva, un trigger garantiza un `operation_id` y crea la operación `BOOKING` dentro de la misma transacción;
-2. una reprogramación sincroniza `startAt`, `endAt`, metadata y aumenta la revisión universal;
-3. una cancelación sincroniza el estado universal a `CANCELLED`;
-4. voz y WhatsApp agregan su referencia real de conversación y proyectan la mutación al Conversation State Engine;
-5. si esa sincronización de canal falla, el wrapper transaccional marca la mutación para rollback.
-
-Las respuestas exitosas de mutaciones de BOOKING en los wrappers universales pueden incluir `operationId` y `operationRevision` además del `bookingId` legacy.
-
-Esto no reemplaza aún el flujo de BOOKING por un draft tokenizado estilo ORDER. La disponibilidad y confirmación conversacional existente siguen siendo la autoridad de ejecución.
+Las creaciones, reprogramaciones y cancelaciones sincronizan la operación universal y Conversation State. BOOKING aún no usa un draft tokenizado idéntico a ORDER/DELIVERY/PAYMENT.
 
 ## DELIVERY
-
-`delivery_zone` almacena nombre, términos de cobertura, costo de despacho, mínimo opcional y estado. `DeliveryCoverageService` es el resolvedor backend común de cobertura para las herramientas autónomas.
 
 DELIVERY autónomo utiliza un flujo estructurado:
 
 1. `validate_delivery_address` comprueba cobertura sin crear una operación.
-2. `quote_delivery` crea un `business_operation` tipo `DELIVERY` en `AWAITING_CONFIRMATION` y devuelve `operationId`, `revision`, `confirmationToken`, zona y costo.
-3. La dirección siempre se vuelve a resolver en backend. Un `deliveryZoneId` enviado por el modelo nunca sustituye esa resolución.
-4. Si el usuario corrige dirección, pedido vinculado o instrucciones, `update_delivery` reemplaza el estado vigente, incrementa revisión y genera un token nuevo.
-5. El token anterior queda inválido.
-6. `create_delivery` solo debe invocarse después de confirmación explícita de las condiciones más recientes.
-7. Antes de materializar, el backend vuelve a resolver cobertura y costo. Si zona, costo o moneda cambian devuelve `DELIVERY_TERMS_CHANGED`, renueva revisión/token y no crea `business_delivery`.
-8. Si las condiciones siguen vigentes, crea una única proyección `business_delivery`.
-9. Un retry secuencial de la confirmación devuelve el mismo despacho como replay idempotente.
-10. `get_delivery_status` consulta el despacho del cliente actual y `cancel_delivery` solo permite cancelar mientras siga `CONFIRMED`.
+2. `quote_delivery` crea un borrador `DELIVERY` en `AWAITING_CONFIRMATION`.
+3. La dirección se vuelve a resolver siempre en backend.
+4. `update_delivery` reemplaza el estado vigente, incrementa revisión y rota token.
+5. `create_delivery` solo debe ejecutarse tras confirmación explícita.
+6. El backend recalcula cobertura/costo antes de materializar.
+7. Si zona, costo o moneda cambian devuelve `DELIVERY_TERMS_CHANGED` y exige nueva confirmación.
+8. Si siguen vigentes crea una única proyección `business_delivery`.
+9. Un retry secuencial devuelve el mismo despacho como replay idempotente.
 
-Un DELIVERY puede enlazarse opcionalmente a un `business_order` del mismo tenant y cliente. Si existe `minimum_order`, el backend puede verificarla usando el subtotal persistido del pedido enlazado. Sin `orderId`, el mínimo se reporta como información pero no se confía en un subtotal enviado por el LLM.
+Un DELIVERY puede enlazarse opcionalmente a un `business_order` del mismo tenant y cliente. El costo de delivery es un hecho operativo y no implica por sí mismo un segundo cobro.
 
-La proyección `business_delivery` tiene estados operativos `CONFIRMED`, `IN_TRANSIT`, `DELIVERED` y `CANCELLED`. La API administrativa controla transiciones válidas y sincroniza `projectionStatus` y revisión en `business_operation`.
+La proyección tiene estados `CONFIRMED`, `IN_TRANSIT`, `DELIVERED` y `CANCELLED`.
 
-El costo de DELIVERY es un hecho operativo de cobertura; V26 no ejecuta pagos ni cobra dos veces un despacho ya incluido en un ORDER. PAYMENT sigue siendo un dominio futuro.
+## PAYMENT
 
-Al igual que ORDER, el token/versionado protege la versión del borrador que se materializa, pero no constituye prueba semántica o criptográfica de que el humano dijo “sí”. La capa conversacional sigue siendo responsable de solicitar confirmación explícita antes de llamar `create_delivery`.
+V27 introduce la base universal de PAYMENT sin acoplar el dominio a Mercado Pago, Stripe, WebPay u otro proveedor.
+
+### Regla monetaria
+
+El LLM **no envía ni decide `amount` o `currency`**. Las herramientas reciben `targetOperationId`; el backend carga la operación confirmada del mismo tenant/cliente y obtiene el monto desde `business_operation.total`.
+
+Si existen pagos `SUCCEEDED` previos contra la misma operación, el backend calcula el saldo restante. Si el saldo ya es cero, responde `PAYMENT_ALREADY_SATISFIED`.
+
+Solo pueden pagarse operaciones:
+
+- del mismo tenant;
+- verificadas como pertenecientes al cliente/conversación actual;
+- en estado universal `CONFIRMED`;
+- con `total > 0` y moneda válida;
+- que no sean a su vez una operación PAYMENT.
+
+### Flujo
+
+1. `quote_payment(targetOperationId)` calcula el saldo real y crea un PAYMENT en `AWAITING_CONFIRMATION`.
+2. Devuelve `operationId`, `revision`, `confirmationToken`, `amount` y `currency`.
+3. Si cambia el objetivo, `update_payment` recalcula y rota el token.
+4. `create_payment` solo debe llamarse después de un sí explícito sobre el monto y moneda más recientes.
+5. Antes de contactar un provider se recalcula el target. Si cambió saldo, moneda u objetivo, responde `PAYMENT_TERMS_CHANGED` con nueva revisión/token y no crea ninguna intención externa.
+6. El provider se resuelve por tenant mediante `PaymentProviderRegistry`. Cero o múltiples adapters compatibles fallan cerrado con `PAYMENT_PROVIDER_UNAVAILABLE`.
+7. El adapter recibe una idempotency key estable: `payment-operation:<operationId>`.
+8. Solo después de una respuesta válida del adapter se materializa `business_payment`.
+9. Un retry secuencial devuelve la misma proyección como `idempotentReplay=true` y no vuelve a invocar el provider.
+10. `get_payment_status` puede refrescar estados no terminales usando el adapter y conserva el último estado verificado si el provider temporalmente no responde.
+11. `cancel_payment` solo intenta cancelación automática para `REQUIRES_ACTION` o `PENDING`; estados terminales requieren semántica específica o revisión humana.
+
+Estados tipados:
+
+- `REQUIRES_ACTION`
+- `PENDING`
+- `SUCCEEDED`
+- `FAILED`
+- `CANCELLED`
+- `EXPIRED`
+- `REFUNDED`
+
+Un `checkoutUrl` **no significa que exista un pago exitoso**. Para lógica comercial, el pago solo se considera completado cuando el estado verificado sea `SUCCEEDED`.
+
+### Provider adapters
+
+`PaymentProviderAdapter` es la frontera externa. Una implementación concreta debe encargarse de:
+
+- credenciales comerciales por tenant;
+- creación idempotente de intentos;
+- consulta de estado;
+- cancelación cuando el proveedor la permita;
+- validación criptográfica de webhooks/eventos;
+- traducción de estados externos a los estados universales.
+
+Las credenciales `MERCADOPAGO_*` existentes pertenecen al billing de suscripciones de Helvoca y **no se reutilizan** para cobrar a los clientes de los tenants.
+
+V27 contiene la arquitectura universal y persiste los estados, pero no habilita un provider comercial real por defecto ni realiza cobros reales durante despliegue o pruebas.
+
+### Concurrencia
+
+V27 incorpora idempotency key estable y constraints únicas para operación, idempotency key y referencia externa del provider. Esto endurece retries y duplicados, pero la garantía exactamente-una-vez bajo dos confirmaciones verdaderamente simultáneas requiere un hardening posterior con locking y/o recuperación explícita de unique violations.
 
 ## QUOTE
 
-`create_quote` pasa por `UniversalOperationWorkflowService`.
-
-Si se entregan ítems:
-
-- el backend consulta solo el catálogo del tenant;
-- rechaza ítems inactivos o ajenos;
-- calcula cantidad, precio y moneda en backend;
-- persiste snapshots en `business_operation_item`;
-- crea la proyección `business_quote` enlazada al `operationId`.
-
-Si no hay precio determinista, la proyección puede quedar `REQUESTED` sin inventar un monto.
+`create_quote` pasa por `UniversalOperationWorkflowService`. Si se entregan ítems, el backend consulta el catálogo del tenant, calcula cantidades/precios/moneda y persiste snapshots. Si no hay un precio determinista, puede quedar `REQUESTED` sin inventar un monto.
 
 ## LEAD
 
-`create_lead` crea primero una operación universal y luego su proyección `business_lead`. Nombre e interés son obligatorios; correo, presupuesto y notas son opcionales. El presupuesto no puede ser negativo.
+`create_lead` crea una operación universal y su proyección `business_lead`. Nombre e interés son obligatorios; correo, presupuesto y notas son opcionales.
 
 ## REQUEST
 
-`create_request`, tanto manual como desde IA, crea primero una operación universal y después la proyección `business_request`.
-
-Voz utiliza el `call_id` legacy además de `source_reference_id`. WhatsApp utiliza el ID de conversación únicamente como `source_reference_id`, evitando mezclar IDs de conversación con la FK de llamadas.
-
-Los cambios administrativos de estado de REQUEST también sincronizan el estado y revisión de su operación universal.
+`create_request`, tanto manual como desde IA, crea una operación universal y la proyección `business_request`. Voz conserva `call_id` para llamadas reales; WhatsApp usa `source_reference_id` y no mezcla IDs de conversación con la FK de llamadas.
 
 ## Consola/API operativa
 
-- `GET /api/v1/commercial/orders`
-- `PATCH /api/v1/commercial/orders/{id}/status`
-- `GET /api/v1/commercial/deliveries`
-- `PATCH /api/v1/commercial/deliveries/{id}/status`
-- `GET /api/v1/commercial/quotes`
-- `GET /api/v1/commercial/leads`
-
-Las consultas operativas requieren `BUSINESS_ADMIN` u `OPERATOR`. Las mutaciones de estado requieren `BUSINESS_ADMIN`.
+Actualmente existen APIs operativas para pedidos, deliveries, cotizaciones y leads. PAYMENT en V27 queda disponible a través del dominio/herramientas compartidas y su proyección; la consola administrativa específica de pagos puede añadirse junto con el primer provider adapter comercial.
 
 ## Ejemplos de presets
 
-- Restaurante: `CATALOG + ORDER + DELIVERY`.
-- Tienda: `CATALOG + ORDER + DELIVERY` cuando ofrece despacho.
-- Courier o logística: `DELIVERY` sin necesidad de `ORDER`.
-- Taller: `CATALOG + QUOTE + BOOKING`.
+- Restaurante: `CATALOG + ORDER + DELIVERY`, y opcionalmente `PAYMENT`.
+- Tienda: `CATALOG + ORDER + DELIVERY + PAYMENT` cuando acepta cobro remoto.
+- Courier/logística: `DELIVERY`, con `PAYMENT` opcional si cobra el servicio en línea.
+- Taller: `CATALOG + QUOTE + BOOKING`, con `PAYMENT` para anticipos cuando la operación pagable tenga monto definitivo.
 - Inmobiliaria: `CATALOG + LEAD + BOOKING/REQUEST`.
-- Clínica o veterinaria: `CATALOG + BOOKING + REQUEST` según configuración.
+- Clínica/veterinaria: `CATALOG + BOOKING + REQUEST`, y `PAYMENT` solo cuando su política comercial lo permita.
 
-Estos nombres sirven para configuración inicial. No introducen lógica de dominio por industria.
+Estos nombres sirven como configuración inicial. No introducen lógica de dominio por industria.
 
 ## Principio de arquitectura
 
-La dirección del producto es:
-
-`Conversation -> structured state -> policy -> universal operation -> typed projection -> audit/integration`
-
-El backend define hechos y transacciones. La IA interpreta lenguaje. Los adapters de voz y mensajería deben permanecer delgados y compartir el mismo dominio.
+El backend define hechos y transacciones. La IA interpreta lenguaje. Los adapters de voz, mensajería y proveedores externos deben permanecer delgados y compartir el mismo dominio universal.
