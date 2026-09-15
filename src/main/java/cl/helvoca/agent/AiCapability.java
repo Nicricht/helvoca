@@ -34,7 +34,12 @@ public enum AiCapability {
     GET_ORDER_STATUS("get_order_status", true),
     CANCEL_ORDER("cancel_order", true),
     CREATE_QUOTE("create_quote", true),
-    CREATE_LEAD("create_lead", true);
+    CREATE_LEAD("create_lead", true),
+    QUOTE_PAYMENT("quote_payment", true),
+    UPDATE_PAYMENT("update_payment", true),
+    CREATE_PAYMENT("create_payment", true),
+    GET_PAYMENT_STATUS("get_payment_status", true),
+    CANCEL_PAYMENT("cancel_payment", true);
 
     private final String toolName;
     private final boolean commercialOperation;
