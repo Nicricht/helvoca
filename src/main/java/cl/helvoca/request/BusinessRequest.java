@@ -9,6 +9,7 @@ import java.util.UUID;
 public class BusinessRequest {
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+    @Column(name = "operation_id", nullable = false, unique = true) private UUID operationId;
     @Column(name = "business_id", nullable = false) private UUID businessId;
     @Column(name = "customer_id") private UUID customerId;
     @Column(name = "call_id") private UUID callId;
@@ -28,6 +29,8 @@ public class BusinessRequest {
     @PreUpdate void preUpdate() { updatedAt = Instant.now(); }
 
     public UUID getId() { return id; }
+    public UUID getOperationId() { return operationId; }
+    public void setOperationId(UUID v) { operationId = v; }
     public UUID getBusinessId() { return businessId; }
     public void setBusinessId(UUID v) { businessId = v; }
     public UUID getCustomerId() { return customerId; }
