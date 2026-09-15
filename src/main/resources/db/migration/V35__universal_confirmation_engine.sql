@@ -106,11 +106,14 @@ BEGIN
                AND state = 'AWAITING';
         END IF;
 
+        -- A token is bound to one exact revision. If buggy/legacy code advances
+        -- only the revision while reusing the same token, invalidate the old row
+        -- above but do not mint a new confirmation with that stale token. The
+        -- operation remains fail-closed until the application rotates the token.
         should_issue := NEW.status = 'AWAITING_CONFIRMATION'
             AND NEW.confirmation_token IS NOT NULL
             AND (
                 OLD.confirmation_token IS DISTINCT FROM NEW.confirmation_token
-                OR OLD.revision IS DISTINCT FROM NEW.revision
                 OR OLD.status IS DISTINCT FROM NEW.status
             );
     ELSE
