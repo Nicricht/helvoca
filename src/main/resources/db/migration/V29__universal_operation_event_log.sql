@@ -112,11 +112,10 @@ BEGIN
         v_payment_status_before := CASE WHEN OLD.metadata_json IS NULL THEN NULL ELSE OLD.metadata_json ->> 'paymentStatus' END;
         v_payment_status_after := CASE WHEN NEW.metadata_json IS NULL THEN NULL ELSE NEW.metadata_json ->> 'paymentStatus' END;
 
-        IF NEW.type = 'PAYMENT'
-           AND v_payment_status_before IS DISTINCT FROM v_payment_status_after
-           AND v_payment_status_after IS NOT NULL THEN
-            v_event_type := 'PAYMENT_STATUS_CHANGED';
-        ELSIF OLD.status IS DISTINCT FROM NEW.status THEN
+        -- Universal lifecycle transitions win over provider-detail changes.
+        -- This keeps materialization as PAYMENT_CONFIRMED, while later provider
+        -- changes on an already confirmed operation become PAYMENT_STATUS_CHANGED.
+        IF OLD.status IS DISTINCT FROM NEW.status THEN
             v_event_type := NEW.type || '_' || CASE NEW.status
                 WHEN 'CONFIRMED' THEN 'CONFIRMED'
                 WHEN 'CANCELLED' THEN 'CANCELLED'
@@ -126,6 +125,10 @@ BEGIN
                 WHEN 'DRAFT' THEN 'DRAFTED'
                 ELSE 'STATUS_CHANGED'
             END;
+        ELSIF NEW.type = 'PAYMENT'
+           AND v_payment_status_before IS DISTINCT FROM v_payment_status_after
+           AND v_payment_status_after IS NOT NULL THEN
+            v_event_type := 'PAYMENT_STATUS_CHANGED';
         ELSIF OLD.revision IS DISTINCT FROM NEW.revision
            OR OLD.total IS DISTINCT FROM NEW.total
            OR OLD.currency IS DISTINCT FROM NEW.currency
@@ -140,7 +143,11 @@ BEGIN
     END IF;
 
     v_actor_type := CASE
-        WHEN v_event_type = 'PAYMENT_STATUS_CHANGED' THEN 'PROVIDER'
+        WHEN TG_OP = 'UPDATE'
+             AND v_row.type = 'PAYMENT'
+             AND OLD.status = 'CONFIRMED'
+             AND v_payment_status_before IS DISTINCT FROM v_payment_status_after
+             AND v_payment_status_after IS NOT NULL THEN 'PROVIDER'
         WHEN v_row.source = 'MANUAL' THEN 'HUMAN'
         WHEN v_row.source IN ('VOICE','WHATSAPP') THEN 'AI'
         ELSE 'SYSTEM'
