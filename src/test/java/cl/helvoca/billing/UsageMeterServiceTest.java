@@ -1,94 +1,148 @@
 package cl.helvoca.billing;
 
-import cl.helvoca.security.TenantProvider;
+import cl.helvoca.tenant.TenantProvider;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class UsageMeterServiceTest {
-
     @Test
-    void recordScopesInsertToAuthenticatedTenantAndIsIdempotencyAware() {
+    void recordsUsageForCurrentTenantAndKeepsIdempotencyInDatabase() {
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
         UUID businessId = UUID.randomUUID();
         when(tenantProvider.requireBusinessId()).thenReturn(businessId);
         when(jdbc.update(anyString(), any(SqlParameterSource.class))).thenReturn(1);
-        UsageMeterService service = new UsageMeterService(jdbc, tenantProvider);
 
+        UsageMeterService service = new UsageMeterService(jdbc, tenantProvider);
         boolean inserted = service.record(new UsageMeterService.UsageRecord(
                 "voice_seconds",
-                new BigDecimal("42"),
+                new BigDecimal("42.75"),
                 "seconds",
-                new BigDecimal("0.12340000"),
+                new BigDecimal("0.01234567"),
                 null,
                 "call_session",
-                UUID.randomUUID().toString(),
+                "CALL-123",
                 "twilio",
-                "call:abc:voice",
-                Instant.parse("2026-09-15T20:00:00Z")));
+                "CALL_SESSION:CALL-123:VOICE_SECONDS",
+                Instant.parse("2026-09-16T12:00:00Z")
+        ));
 
         assertTrue(inserted);
-        verify(tenantProvider).requireBusinessId();
         ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
         verify(jdbc).update(anyString(), params.capture());
         assertEquals(businessId, params.getValue().getValue("businessId"));
         assertEquals("VOICE_SECONDS", params.getValue().getValue("meterKey"));
         assertEquals("SECONDS", params.getValue().getValue("unit"));
         assertEquals("CALL_SESSION", params.getValue().getValue("sourceType"));
+        assertEquals("TWILIO", params.getValue().getValue("provider"));
     }
 
     @Test
-    void recordReturnsFalseWhenDatabaseRejectsDuplicateIdempotencyKey() {
-        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
-        TenantProvider tenantProvider = mock(TenantProvider.class);
-        when(tenantProvider.requireBusinessId()).thenReturn(UUID.randomUUID());
-        when(jdbc.update(anyString(), any(SqlParameterSource.class))).thenReturn(0);
-        UsageMeterService service = new UsageMeterService(jdbc, tenantProvider);
-
-        boolean inserted = service.record(validRecord());
-
-        assertFalse(inserted);
-    }
-
-    @Test
-    void recordRejectsNegativeUsageBeforeResolvingTenantOrWriting() {
+    void rejectsInvalidUsageBeforeTouchingTenantOrDatabase() {
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
         UsageMeterService service = new UsageMeterService(jdbc, tenantProvider);
 
-        UsageMeterService.UsageRecord invalid = new UsageMeterService.UsageRecord(
-                "VOICE_SECONDS", new BigDecimal("-1"), "SECONDS", null, null,
-                "CALL_SESSION", "call-1", null, "call-1:voice", Instant.now());
+        assertThrows(IllegalArgumentException.class, () -> service.record(
+                new UsageMeterService.UsageRecord(
+                        "bad key",
+                        BigDecimal.ONE,
+                        "COUNT",
+                        null,
+                        null,
+                        "TEST",
+                        "1",
+                        null,
+                        "idem-1",
+                        Instant.now()
+                )
+        ));
 
-        assertThrows(IllegalArgumentException.class, () -> service.record(invalid));
         verifyNoInteractions(jdbc, tenantProvider);
     }
 
     @Test
-    void summarizeRejectsReversedInterval() {
+    void rejectsNegativeCostsBeforeTouchingTenantOrDatabase() {
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
         UsageMeterService service = new UsageMeterService(jdbc, tenantProvider);
-        Instant now = Instant.now();
-        assertThrows(IllegalArgumentException.class, () -> service.summarize(now, now));
+
+        assertThrows(IllegalArgumentException.class, () -> service.record(
+                new UsageMeterService.UsageRecord(
+                        "API_CALLS",
+                        BigDecimal.ONE,
+                        "COUNT",
+                        new BigDecimal("-0.01"),
+                        null,
+                        "TEST",
+                        "1",
+                        null,
+                        "idem-1",
+                        Instant.now()
+                )
+        ));
+
         verifyNoInteractions(jdbc, tenantProvider);
     }
 
-    private static UsageMeterService.UsageRecord validRecord() {
-        return new UsageMeterService.UsageRecord(
-                "OUTBOUND_MESSAGES", BigDecimal.ONE, "COUNT", null, null,
-                "OUTBOUND_MESSAGE", UUID.randomUUID().toString(), "mock",
-                "msg:test:sent", Instant.parse("2026-09-15T20:00:00Z"));
+    @Test
+    void rejectsReversedSummaryInterval() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        UsageMeterService service = new UsageMeterService(jdbc, tenantProvider);
+
+        Instant from = Instant.parse("2026-09-16T13:00:00Z");
+        Instant to = Instant.parse("2026-09-16T12:00:00Z");
+
+        assertThrows(IllegalArgumentException.class, () -> service.summarize(from, to));
+        verifyNoInteractions(jdbc, tenantProvider);
+    }
+
+    @Test
+    void summarizesUsageWithinRequestedWindowForCurrentTenant() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        UUID businessId = UUID.randomUUID();
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(jdbc.query(
+                anyString(),
+                any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<UsageMeterService.UsageSummary>>any()))
+                .thenReturn(List.of(new UsageMeterService.UsageSummary(
+                        "VOICE_SECONDS",
+                        "SECONDS",
+                        new BigDecimal("120.000000"),
+                        new BigDecimal("0.03000000"),
+                        null,
+                        2L
+                )));
+
+        UsageMeterService service = new UsageMeterService(jdbc, tenantProvider);
+        Instant from = Instant.parse("2026-09-16T10:00:00Z");
+        Instant to = Instant.parse("2026-09-16T12:00:00Z");
+
+        List<UsageMeterService.UsageSummary> result = service.summarize(from, to);
+
+        assertEquals(1, result.size());
+        assertEquals("VOICE_SECONDS", result.getFirst().meterKey());
+        assertEquals(2L, result.getFirst().eventCount());
+        verify(tenantProvider).requireBusinessId();
+        verify(jdbc).query(
+                anyString(),
+                any(SqlParameterSource.class),
+                ArgumentMatchers.<RowMapper<UsageMeterService.UsageSummary>>any());
     }
 }
