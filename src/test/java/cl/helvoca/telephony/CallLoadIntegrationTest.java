@@ -1,5 +1,9 @@
 package cl.helvoca.telephony;
 
+import cl.helvoca.billing.BusinessSubscription;
+import cl.helvoca.billing.BusinessSubscriptionRepository;
+import cl.helvoca.billing.PlanCode;
+import cl.helvoca.billing.SubscriptionStatus;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallSessionRepository;
@@ -7,15 +11,19 @@ import cl.helvoca.call.CallStatus;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -47,18 +55,23 @@ class CallLoadIntegrationTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("app.seed.enabled", () -> "false");
-        registry.add("app.commercial.calls.max-concurrent-per-business", () -> "60");
     }
 
     @Autowired CallLifecycleService lifecycle;
-    @Autowired CallCommercialProperties commercial;
     @Autowired BusinessRepository businesses;
     @Autowired PhoneNumberRepository phoneNumbers;
+    @Autowired BusinessSubscriptionRepository subscriptions;
     @Autowired CallSessionRepository calls;
+    @Autowired JdbcTemplate jdbc;
+
+    @BeforeEach
+    void configureLoadCapacity() {
+        setEnterpriseCapacity(60);
+    }
 
     @AfterEach
-    void restoreCapacity() {
-        commercial.setMaxConcurrentPerBusiness(60);
+    void restoreCatalogCapacity() {
+        setEnterpriseCapacity(10);
     }
 
     @Test
@@ -83,7 +96,7 @@ class CallLoadIntegrationTest {
 
     @Test
     void rejectsExcessLoadAtConfiguredTenantLimitWithoutErrors() throws Exception {
-        commercial.setMaxConcurrentPerBusiness(10);
+        setEnterpriseCapacity(10);
         TenantFixture tenant = tenant("Load Limited Tenant", nextPhone());
 
         LoadResult result = runBurst(tenant, 25, "limited");
@@ -96,7 +109,7 @@ class CallLoadIntegrationTest {
 
     @Test
     void simultaneousTenantsDoNotConsumeEachOthersCapacity() throws Exception {
-        commercial.setMaxConcurrentPerBusiness(25);
+        setEnterpriseCapacity(25);
         TenantFixture tenantA = tenant("Load Tenant A", nextPhone());
         TenantFixture tenantB = tenant("Load Tenant B", nextPhone());
 
@@ -207,6 +220,7 @@ class CallLoadIntegrationTest {
         business.setTimezone("America/Santiago");
         business.setLanguage("es");
         business = businesses.saveAndFlush(business);
+        activateSubscription(business.getId());
 
         PhoneNumber phone = new PhoneNumber();
         phone.setBusinessId(business.getId());
@@ -215,6 +229,27 @@ class CallLoadIntegrationTest {
         phone.setActive(true);
         phoneNumbers.saveAndFlush(phone);
         return new TenantFixture(business.getId(), phoneValue);
+    }
+
+    private void activateSubscription(UUID businessId) {
+        Instant now = Instant.now();
+        BusinessSubscription subscription = new BusinessSubscription();
+        subscription.setBusinessId(businessId);
+        subscription.setPlanCode(PlanCode.ENTERPRISE);
+        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        subscription.setCurrentPeriodStart(now.minus(1, ChronoUnit.DAYS));
+        subscription.setCurrentPeriodEnd(now.plus(30, ChronoUnit.DAYS));
+        subscriptions.saveAndFlush(subscription);
+    }
+
+    private void setEnterpriseCapacity(int capacity) {
+        int updated = jdbc.update("""
+                UPDATE commercial_plan_entitlement
+                   SET limit_value = ?
+                 WHERE plan_code = 'ENTERPRISE'
+                   AND entitlement_key = 'CONCURRENT_CALLS'
+                """, capacity);
+        assertEquals(1, updated);
     }
 
     private static long elapsedMillis(long started) {

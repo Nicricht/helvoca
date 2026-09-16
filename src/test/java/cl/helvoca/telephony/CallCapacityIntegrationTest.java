@@ -1,5 +1,9 @@
 package cl.helvoca.telephony;
 
+import cl.helvoca.billing.BusinessSubscription;
+import cl.helvoca.billing.BusinessSubscriptionRepository;
+import cl.helvoca.billing.PlanCode;
+import cl.helvoca.billing.SubscriptionStatus;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallSessionRepository;
@@ -15,6 +19,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -42,12 +48,12 @@ class CallCapacityIntegrationTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("app.seed.enabled", () -> "false");
-        registry.add("app.commercial.calls.max-concurrent-per-business", () -> "1");
     }
 
     @Autowired CallLifecycleService lifecycle;
     @Autowired BusinessRepository businesses;
     @Autowired PhoneNumberRepository phoneNumbers;
+    @Autowired BusinessSubscriptionRepository subscriptions;
     @Autowired CallSessionRepository calls;
 
     @Test
@@ -103,6 +109,7 @@ class CallCapacityIntegrationTest {
         business.setTimezone("America/Santiago");
         business.setLanguage("es");
         business = businesses.saveAndFlush(business);
+        activateSubscription(business.getId());
 
         PhoneNumber phone = new PhoneNumber();
         phone.setBusinessId(business.getId());
@@ -111,6 +118,17 @@ class CallCapacityIntegrationTest {
         phone.setActive(true);
         phoneNumbers.saveAndFlush(phone);
         return new TenantFixture(business.getId(), phoneValue);
+    }
+
+    private void activateSubscription(UUID businessId) {
+        Instant now = Instant.now();
+        BusinessSubscription subscription = new BusinessSubscription();
+        subscription.setBusinessId(businessId);
+        subscription.setPlanCode(PlanCode.BASIC);
+        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        subscription.setCurrentPeriodStart(now.minus(1, ChronoUnit.DAYS));
+        subscription.setCurrentPeriodEnd(now.plus(30, ChronoUnit.DAYS));
+        subscriptions.saveAndFlush(subscription);
     }
 
     private record TenantFixture(UUID businessId, String phone) {}
