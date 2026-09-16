@@ -2,6 +2,7 @@ package cl.helvoca.billing;
 
 import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 
@@ -39,11 +40,12 @@ class UsageMeterServiceTest {
 
         assertTrue(inserted);
         verify(tenantProvider).requireBusinessId();
-        verify(jdbc).update(anyString(), argThat(params ->
-                businessId.equals(params.getValue("businessId"))
-                        && "VOICE_SECONDS".equals(params.getValue("meterKey"))
-                        && "SECONDS".equals(params.getValue("unit"))
-                        && "CALL_SESSION".equals(params.getValue("sourceType"))));
+        ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
+        verify(jdbc).update(anyString(), params.capture());
+        assertEquals(businessId, params.getValue().getValue("businessId"));
+        assertEquals("VOICE_SECONDS", params.getValue().getValue("meterKey"));
+        assertEquals("SECONDS", params.getValue().getValue("unit"));
+        assertEquals("CALL_SESSION", params.getValue().getValue("sourceType"));
     }
 
     @Test
@@ -60,7 +62,7 @@ class UsageMeterServiceTest {
     }
 
     @Test
-    void recordRejectsNegativeUsageBeforeWriting() {
+    void recordRejectsNegativeUsageBeforeResolvingTenantOrWriting() {
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
         UsageMeterService service = new UsageMeterService(jdbc, tenantProvider);
@@ -70,15 +72,17 @@ class UsageMeterServiceTest {
                 "CALL_SESSION", "call-1", null, "call-1:voice", Instant.now());
 
         assertThrows(IllegalArgumentException.class, () -> service.record(invalid));
-        verifyNoInteractions(jdbc);
+        verifyNoInteractions(jdbc, tenantProvider);
     }
 
     @Test
     void summarizeRejectsReversedInterval() {
-        UsageMeterService service = new UsageMeterService(
-                mock(NamedParameterJdbcTemplate.class), mock(TenantProvider.class));
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        UsageMeterService service = new UsageMeterService(jdbc, tenantProvider);
         Instant now = Instant.now();
         assertThrows(IllegalArgumentException.class, () -> service.summarize(now, now));
+        verifyNoInteractions(jdbc, tenantProvider);
     }
 
     private static UsageMeterService.UsageRecord validRecord() {

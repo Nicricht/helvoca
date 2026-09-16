@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 
 @Service
 public class UsageMeterService {
-    private static final Pattern TOKEN = Pattern.compile("[A-Z0-9][A-Z0-9_.:-]{0,79}");
+    private static final Pattern TOKEN = Pattern.compile("[A-Z0-9][A-Z0-9_.:-]*");
 
     private final NamedParameterJdbcTemplate jdbc;
     private final TenantProvider tenantProvider;
@@ -34,8 +34,8 @@ public class UsageMeterService {
     @Transactional
     public boolean record(UsageRecord record) {
         Objects.requireNonNull(record, "record");
-        UUID businessId = tenantProvider.requireBusinessId();
         UsageRecord normalized = normalize(record);
+        UUID businessId = tenantProvider.requireBusinessId();
 
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("businessId", businessId)
@@ -99,12 +99,12 @@ public class UsageMeterService {
     }
 
     private static UsageRecord normalize(UsageRecord value) {
-        String meterKey = token(value.meterKey(), "meterKey");
-        String unit = token(value.unit(), "unit");
-        String sourceType = token(value.sourceType(), "sourceType");
+        String meterKey = token(value.meterKey(), "meterKey", 80);
+        String unit = token(value.unit(), "unit", 30);
+        String sourceType = token(value.sourceType(), "sourceType", 50);
         String sourceId = required(value.sourceId(), "sourceId", 180);
         String idempotencyKey = required(value.idempotencyKey(), "idempotencyKey", 240);
-        String provider = optional(value.provider(), 60);
+        String provider = optional(value.provider(), "provider", 60);
         BigDecimal quantity = nonNegative(value.quantity(), "quantity");
         BigDecimal estimated = nullableNonNegative(value.estimatedCostUsd(), "estimatedCostUsd");
         BigDecimal actual = nullableNonNegative(value.actualCostUsd(), "actualCostUsd");
@@ -113,8 +113,8 @@ public class UsageMeterService {
                 sourceType, sourceId, provider, idempotencyKey, occurredAt);
     }
 
-    private static String token(String value, String field) {
-        String normalized = required(value, field, 80).toUpperCase(Locale.ROOT);
+    private static String token(String value, String field, int maxLength) {
+        String normalized = required(value, field, maxLength).toUpperCase(Locale.ROOT);
         if (!TOKEN.matcher(normalized).matches()) {
             throw new IllegalArgumentException(field + " contains unsupported characters");
         }
@@ -128,10 +128,10 @@ public class UsageMeterService {
         return normalized;
     }
 
-    private static String optional(String value, int maxLength) {
+    private static String optional(String value, String field, int maxLength) {
         if (value == null || value.isBlank()) return null;
         String normalized = value.trim();
-        if (normalized.length() > maxLength) throw new IllegalArgumentException("provider is too long");
+        if (normalized.length() > maxLength) throw new IllegalArgumentException(field + " is too long");
         return normalized;
     }
 
