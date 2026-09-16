@@ -12,9 +12,9 @@ No considerar suficiente un cierre ambiguo como “mándame información y despu
 
 ## Estado comercial actual
 
-La producción estable incluye el core multi-tenant, catálogo, conocimiento, reservas, operaciones universales, Policy Engine, Safe Retry, handoff humano durable, omnicanalidad, mensajería saliente, confirmaciones, jobs persistentes, calendario provider-neutral, observabilidad, RLS PostgreSQL y metering de uso.
+La producción estable incluye el core multi-tenant, catálogo, conocimiento, reservas, operaciones universales, Policy Engine, Safe Retry, handoff humano durable, omnicanalidad, mensajería saliente, confirmaciones, jobs persistentes, calendario provider-neutral, observabilidad, RLS PostgreSQL, metering de uso y V42 Plans / Entitlements / Billing.
 
-V42 Plans / Entitlements / Billing sigue en desarrollo y no debe bloquear la primera venta. Hasta cerrar V42, los primeros clientes se incorporan mediante onboarding y configuración asistidos.
+V42 ya está en producción. Los primeros clientes siguen incorporándose mediante onboarding y configuración asistidos para aprender con uso real y mantener controlado el alcance de cada piloto.
 
 Regla: que una capacidad exista en el core no significa que un proveedor externo esté activo para todos los tenants. Voz, WhatsApp, outbound, calendario y pagos solo se ofrecen como activos cuando la integración concreta del cliente está configurada y probada.
 
@@ -118,12 +118,12 @@ Capacidades: CATALOG + LEAD + BOOKING + REQUEST.
 - funciones no habilitadas para ese tenant;
 - integraciones externas no conectadas;
 - pago real sin merchant configurado;
-- onboarding 100% automático mientras V42 y el provisionamiento comercial sigan cerrándose;
+- onboarding 100% automático mientras el provisionamiento comercial siga siendo asistido;
 - ROI garantizado.
 
 ## Oferta de lanzamiento
 
-Catálogo vigente mientras V42 no lo sustituya formalmente:
+Catálogo vigente respaldado por V42:
 
 - Emprende: $24.990 CLP/mes, 100 minutos incluidos, excedente $149/min.
 - Negocio: $39.990 CLP/mes, 250 minutos incluidos, excedente $129/min.
