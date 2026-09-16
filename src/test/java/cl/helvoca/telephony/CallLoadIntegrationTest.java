@@ -2,7 +2,6 @@ package cl.helvoca.telephony;
 
 import cl.helvoca.billing.BusinessSubscription;
 import cl.helvoca.billing.BusinessSubscriptionRepository;
-import cl.helvoca.billing.PlanCode;
 import cl.helvoca.billing.SubscriptionStatus;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
@@ -237,7 +236,7 @@ class CallLoadIntegrationTest {
         Instant now = Instant.now();
         BusinessSubscription subscription = new BusinessSubscription();
         subscription.setBusinessId(businessId);
-        subscription.setPlanCode(PlanCode.ENTERPRISE);
+        subscription.setPlanCode("ENTERPRISE");
         subscription.setStatus(SubscriptionStatus.ACTIVE);
         subscription.setCurrentPeriodStart(now.minus(1, ChronoUnit.DAYS));
         subscription.setCurrentPeriodEnd(now.plus(30, ChronoUnit.DAYS));
