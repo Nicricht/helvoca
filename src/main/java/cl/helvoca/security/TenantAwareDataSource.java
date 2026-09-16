@@ -1,5 +1,7 @@
 package cl.helvoca.security;
 
+import com.zaxxer.hikari.HikariDataSource;
+
 import javax.sql.DataSource;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
@@ -41,7 +43,6 @@ public final class TenantAwareDataSource implements DataSource {
 
     private Connection prepare(Connection connection) throws SQLException {
         TenantDatabaseContext.Access access = context.currentOrInternalSystem();
-        boolean prepared = false;
         try {
             scrubOutsideTransaction(connection);
             String role = access.mode() == TenantDatabaseContext.Mode.SYSTEM ? SYSTEM_ROLE : TENANT_ROLE;
@@ -56,13 +57,10 @@ public final class TenantAwareDataSource implements DataSource {
                 statement.setString(1, tenantId);
                 statement.execute();
             }
-            prepared = true;
             return wrap(connection);
-        } finally {
-            if (!prepared) {
-                try { scrubOutsideTransaction(connection); } catch (SQLException ignored) { }
-                try { connection.close(); } catch (SQLException ignored) { }
-            }
+        } catch (SQLException | RuntimeException e) {
+            discardConnection(connection, e);
+            throw e;
         }
     }
 
@@ -118,12 +116,41 @@ public final class TenantAwareDataSource implements DataSource {
         if (first != null) throw first;
     }
 
-    private static final class ConnectionHandler implements java.lang.reflect.InvocationHandler {
-        private final Connection delegate;
+    /**
+     * A connection whose tenant/role scrub failed must never be returned to the
+     * pool. Hikari eviction is the primary path; generic DataSource delegates
+     * fall back to JDBC abort before close.
+     */
+    private void discardConnection(Connection connection, Throwable primary) {
+        if (connection == null) return;
+
+        if (delegate instanceof HikariDataSource hikari) {
+            try {
+                hikari.evictConnection(connection);
+                return;
+            } catch (RuntimeException e) {
+                primary.addSuppressed(e);
+            }
+        }
+
+        try {
+            connection.abort(Runnable::run);
+        } catch (SQLException | RuntimeException e) {
+            primary.addSuppressed(e);
+        }
+        try {
+            connection.close();
+        } catch (SQLException | RuntimeException e) {
+            primary.addSuppressed(e);
+        }
+    }
+
+    private final class ConnectionHandler implements java.lang.reflect.InvocationHandler {
+        private final Connection physical;
         private boolean closed;
 
-        private ConnectionHandler(Connection delegate) {
-            this.delegate = delegate;
+        private ConnectionHandler(Connection physical) {
+            this.physical = physical;
         }
 
         @Override
@@ -132,19 +159,13 @@ public final class TenantAwareDataSource implements DataSource {
             if ("close".equals(name) && method.getParameterCount() == 0) {
                 if (closed) return null;
                 closed = true;
-                SQLException resetFailure = null;
                 try {
-                    scrubOutsideTransaction(delegate);
+                    scrubOutsideTransaction(physical);
                 } catch (SQLException e) {
-                    resetFailure = e;
-                }
-                try {
-                    delegate.close();
-                } catch (SQLException e) {
-                    if (resetFailure != null) e.addSuppressed(resetFailure);
+                    discardConnection(physical, e);
                     throw e;
                 }
-                if (resetFailure != null) throw resetFailure;
+                physical.close();
                 return null;
             }
             if ("isClosed".equals(name) && method.getParameterCount() == 0 && closed) return true;
@@ -155,7 +176,7 @@ public final class TenantAwareDataSource implements DataSource {
                 if (type.isInstance(proxy)) return true;
             }
             try {
-                return method.invoke(delegate, args);
+                return method.invoke(physical, args);
             } catch (InvocationTargetException e) {
                 throw e.getCause();
             }
