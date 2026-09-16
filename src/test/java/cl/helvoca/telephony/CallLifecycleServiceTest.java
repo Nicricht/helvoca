@@ -1,5 +1,6 @@
 package cl.helvoca.telephony;
 
+import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.call.CallStatus;
@@ -12,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -84,13 +86,15 @@ class CallLifecycleServiceTest {
     }
 
     @Test
-    void tenantCapacityRejectsCallBeforePersistingAnotherSession() {
+    void subscriptionCapacityRejectsCallBeforePersistingAnotherSession() {
         PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
         CustomerRepository customers = mock(CustomerRepository.class);
         CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
         CallCommercialProperties properties = new CallCommercialProperties();
-        properties.setMaxConcurrentPerBusiness(2);
+        properties.setMaxConcurrentPerBusiness(100);
         CallLifecycleService lifecycle = lifecycle(phones, customers, calls, properties);
+        lifecycle.setSubscriptions(subscriptions);
 
         UUID businessId = UUID.randomUUID();
         PhoneNumber phone = mock(PhoneNumber.class);
@@ -98,11 +102,44 @@ class CallLifecycleServiceTest {
         when(phones.findByPhoneNumberAndActiveTrue("+14355550000")).thenReturn(Optional.of(phone));
         when(calls.findByProviderCallId("CA-capacity")).thenReturn(Optional.empty());
         when(calls.countByBusinessIdAndStatusIn(eq(businessId), anyCollection())).thenReturn(2L);
+        when(subscriptions.view(businessId)).thenReturn(activeSubscription(businessId, 2));
 
         assertThrows(CallCapacityExceededException.class,
                 () -> lifecycle.startInboundCall("twilio", "CA-capacity", "+56911111111", "+14355550000"));
 
+        verify(calls).countByBusinessIdAndStatusIn(eq(businessId), anyCollection());
         verify(calls, never()).saveAndFlush(any(CallSession.class));
+    }
+
+    @Test
+    void missingSubscriptionServiceFailsClosedBeforeLegacyCapacityFallback() {
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setMaxConcurrentPerBusiness(100);
+        CallLifecycleService lifecycle = lifecycle(
+                phones, mock(CustomerRepository.class), calls, properties);
+
+        UUID businessId = UUID.randomUUID();
+        PhoneNumber phone = mock(PhoneNumber.class);
+        when(phone.getBusinessId()).thenReturn(businessId);
+        when(phones.findByPhoneNumberAndActiveTrue("+14355550003")).thenReturn(Optional.of(phone));
+        when(calls.findByProviderCallId("CA-no-subscription-service")).thenReturn(Optional.empty());
+
+        assertThrows(CallCapacityExceededException.class, () -> lifecycle.startInboundCall(
+                "twilio", "CA-no-subscription-service", "+56911111112", "+14355550003"));
+
+        verify(calls, never()).countByBusinessIdAndStatusIn(eq(businessId), anyCollection());
+        verify(calls, never()).saveAndFlush(any(CallSession.class));
+    }
+
+    private static BusinessSubscriptionService.SubscriptionView activeSubscription(UUID businessId,
+                                                                                    int maxConcurrentCalls) {
+        Instant now = Instant.now();
+        return new BusinessSubscriptionService.SubscriptionView(
+                businessId, "BASIC", "EMPRENDE", "Emprende", "ACTIVE", true,
+                maxConcurrentCalls, 300, 0, 0,
+                now.minusSeconds(60), now.plusSeconds(3600), null, false, List.of(), false);
     }
 
     private static CallLifecycleService lifecycle(PhoneNumberRepository phones,

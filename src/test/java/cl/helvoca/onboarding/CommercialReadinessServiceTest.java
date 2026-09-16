@@ -8,6 +8,7 @@ import cl.helvoca.messaging.WhatsAppProperties;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -102,9 +103,11 @@ class CommercialReadinessServiceTest {
     private static BusinessSubscriptionService.SubscriptionView subscription(
             String plan, String status, boolean allowed, boolean billingConnected) {
         Instant now = Instant.now();
+        String publicCode = "BASIC".equals(plan) ? "EMPRENDE" : "NEGOCIO";
+        String planName = "BASIC".equals(plan) ? "Emprende" : "Negocio";
         return new BusinessSubscriptionService.SubscriptionView(
-                UUID.randomUUID(), plan, status, allowed, 3, 300, 42, 0,
+                UUID.randomUUID(), plan, publicCode, planName, status, allowed, 3, 300, 42, 0,
                 now.minusSeconds(3600), now.plusSeconds(86400), null,
-                billingConnected, false);
+                billingConnected, List.of(), false);
     }
 }

@@ -3,7 +3,6 @@ package cl.helvoca.onboarding;
 import cl.helvoca.agent.AiAgentService;
 import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.billing.MercadoPagoProperties;
-import cl.helvoca.billing.PlanCode;
 import cl.helvoca.messaging.WhatsAppProperties;
 import org.springframework.stereotype.Service;
 
@@ -42,8 +41,6 @@ public class SelfServiceReadinessService {
         if (!operational.phoneConfigured()) blockers.add("PHONE_MISSING");
         if (!subscription.serviceAllowed()) blockers.add("SUBSCRIPTION_BLOCKED");
 
-        // Setup progress remains about the five commercial prerequisites. Pausing an already
-        // configured agent is an operational blocker, not lost setup progress.
         int completed = 5 - blockers.size();
         int progress = Math.max(0, Math.min(100, completed * 20));
         if (!agentActive) blockers.add("AI_AGENT_DISABLED");
@@ -59,14 +56,13 @@ public class SelfServiceReadinessService {
         if (!operational.humanTransferConfigured()) warnings.add("HUMAN_TRANSFER_NOT_CONFIGURED");
         if (!operational.knowledgeConfigured()) warnings.add("KNOWLEDGE_NOT_CONFIGURED");
 
-        PlanCode plan = PlanCode.valueOf(subscription.plan());
         return new CommercialReadinessResponse(
                 progress,
                 readyForCalls,
                 readyForCalls,
                 readyForWhatsApp,
-                plan.getPublicCode(),
-                plan.getDisplayName(),
+                subscription.publicPlanCode(),
+                subscription.planName(),
                 subscription.status(),
                 subscription.serviceAllowed(),
                 subscription.includedMinutes(),

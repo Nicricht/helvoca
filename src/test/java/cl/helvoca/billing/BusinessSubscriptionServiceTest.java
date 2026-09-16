@@ -1,132 +1,115 @@
 package cl.helvoca.billing;
 
-import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.security.TenantProvider;
-import cl.helvoca.telephony.CallCommercialProperties;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class BusinessSubscriptionServiceTest {
 
     @Test
-    void missingSubscriptionPreservesLegacyCapacity() {
+    void missingSubscriptionFailsClosedInsteadOfGrantingLegacyPro() {
         BusinessSubscriptionRepository repository = mock(BusinessSubscriptionRepository.class);
-        CallSessionRepository calls = mock(CallSessionRepository.class);
-        CallCommercialProperties properties = new CallCommercialProperties();
-        properties.setMaxConcurrentPerBusiness(25);
+        CommercialEntitlementService entitlements = mock(CommercialEntitlementService.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        CommercialPlanCatalogService catalog = mock(CommercialPlanCatalogService.class);
         UUID businessId = UUID.randomUUID();
-        when(repository.findByBusinessId(businessId)).thenReturn(Optional.empty());
-        when(calls.sumDurationSecondsByBusinessAndPeriod(eq(businessId), any(), any(), eq("simulator")))
-                .thenReturn(61L);
+        when(entitlements.snapshot(businessId))
+                .thenThrow(new IllegalStateException("Business subscription is not initialized"));
 
-        var service = new BusinessSubscriptionService(repository, calls, mock(TenantProvider.class), properties);
+        var service = new BusinessSubscriptionService(repository, entitlements, tenantProvider, catalog);
+
+        assertThrows(IllegalStateException.class, () -> service.view(businessId));
+        verify(entitlements).snapshot(businessId);
+        verifyNoInteractions(catalog);
+    }
+
+    @Test
+    void compatibilityVoiceFieldsComeFromGenericEntitlementSnapshot() {
+        BusinessSubscriptionRepository repository = mock(BusinessSubscriptionRepository.class);
+        CommercialEntitlementService entitlements = mock(CommercialEntitlementService.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        CommercialPlanCatalogService catalog = mock(CommercialPlanCatalogService.class);
+        UUID businessId = UUID.randomUUID();
+        Instant start = Instant.now().minusSeconds(3600);
+        Instant end = Instant.now().plusSeconds(86400);
+        when(entitlements.snapshot(businessId)).thenReturn(snapshot(
+                businessId, start, end, true, new BigDecimal("6060.000000")));
+
+        var service = new BusinessSubscriptionService(repository, entitlements, tenantProvider, catalog);
         var view = service.view(businessId);
 
-        assertEquals("PRO", view.plan());
+        assertEquals("BASIC", view.plan());
+        assertEquals("EMPRENDE", view.publicPlanCode());
+        assertEquals("Emprende", view.planName());
+        assertEquals("ACTIVE", view.status());
         assertTrue(view.serviceAllowed());
-        assertTrue(view.legacyFallback());
-        assertEquals(25, view.maxConcurrentCalls());
-        assertEquals(2, view.usedMinutes());
-    }
-
-    @Test
-    void expiredTrialBlocksService() {
-        BusinessSubscriptionRepository repository = mock(BusinessSubscriptionRepository.class);
-        CallSessionRepository calls = mock(CallSessionRepository.class);
-        UUID businessId = UUID.randomUUID();
-        BusinessSubscription subscription = subscription(
-                businessId, PlanCode.BASIC, SubscriptionStatus.TRIALING,
-                Instant.now().minus(20, ChronoUnit.DAYS), Instant.now().minus(6, ChronoUnit.DAYS), null);
-        when(repository.findByBusinessId(businessId)).thenReturn(Optional.of(subscription));
-        when(calls.sumDurationSecondsByBusinessAndPeriod(eq(businessId), any(), any(), eq("simulator")))
-                .thenReturn(0L);
-
-        var service = new BusinessSubscriptionService(
-                repository, calls, mock(TenantProvider.class), new CallCommercialProperties());
-
-        assertFalse(service.view(businessId).serviceAllowed());
-    }
-
-    @Test
-    void pastDueWithinGraceStillAllowsService() {
-        BusinessSubscriptionRepository repository = mock(BusinessSubscriptionRepository.class);
-        CallSessionRepository calls = mock(CallSessionRepository.class);
-        UUID businessId = UUID.randomUUID();
-        Instant now = Instant.now();
-        BusinessSubscription subscription = subscription(
-                businessId, PlanCode.PRO, SubscriptionStatus.PAST_DUE,
-                now.minus(10, ChronoUnit.DAYS), now.plus(20, ChronoUnit.DAYS), now.plus(3, ChronoUnit.DAYS));
-        when(repository.findByBusinessId(businessId)).thenReturn(Optional.of(subscription));
-        when(calls.sumDurationSecondsByBusinessAndPeriod(eq(businessId), any(), any(), eq("simulator")))
-                .thenReturn(0L);
-
-        var service = new BusinessSubscriptionService(
-                repository, calls, mock(TenantProvider.class), new CallCommercialProperties());
-
-        assertTrue(service.view(businessId).serviceAllowed());
-    }
-
-    @Test
-    void usageAboveIncludedMinutesBecomesOverageWithoutBlockingService() {
-        BusinessSubscriptionRepository repository = mock(BusinessSubscriptionRepository.class);
-        CallSessionRepository calls = mock(CallSessionRepository.class);
-        UUID businessId = UUID.randomUUID();
-        Instant now = Instant.now();
-        BusinessSubscription subscription = subscription(
-                businessId, PlanCode.BASIC, SubscriptionStatus.ACTIVE,
-                now.minus(1, ChronoUnit.DAYS), now.plus(29, ChronoUnit.DAYS), null);
-        when(repository.findByBusinessId(businessId)).thenReturn(Optional.of(subscription));
-        when(calls.sumDurationSecondsByBusinessAndPeriod(eq(businessId), any(), any(), eq("simulator")))
-                .thenReturn(101L * 60L);
-
-        var service = new BusinessSubscriptionService(
-                repository, calls, mock(TenantProvider.class), new CallCommercialProperties());
-        var view = service.view(businessId);
-
+        assertEquals(1, view.maxConcurrentCalls());
+        assertEquals(100, view.includedMinutes());
         assertEquals(101, view.usedMinutes());
         assertEquals(1, view.overageMinutes());
-        assertTrue(view.serviceAllowed());
+        assertEquals(2, view.entitlements().size());
+        assertFalse(view.legacyFallback());
+        assertEquals(start, view.currentPeriodStart());
+        assertEquals(end, view.currentPeriodEnd());
     }
 
     @Test
-    void newBusinessGetsBasicTrial() {
+    void currentTenantIdentityComesFromTenantProvider() {
         BusinessSubscriptionRepository repository = mock(BusinessSubscriptionRepository.class);
-        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CommercialEntitlementService entitlements = mock(CommercialEntitlementService.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        CommercialPlanCatalogService catalog = mock(CommercialPlanCatalogService.class);
+        UUID businessId = UUID.randomUUID();
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(entitlements.snapshot(businessId)).thenReturn(snapshot(
+                businessId, Instant.now().minusSeconds(60), Instant.now().plusSeconds(3600), true, BigDecimal.ZERO));
+
+        var service = new BusinessSubscriptionService(repository, entitlements, tenantProvider, catalog);
+
+        assertEquals(businessId, service.currentForTenant().businessId());
+        verify(tenantProvider).requireBusinessId();
+    }
+
+    @Test
+    void newBusinessStillGetsBasicTrialUsingTechnicalStringCode() {
+        BusinessSubscriptionRepository repository = mock(BusinessSubscriptionRepository.class);
         UUID businessId = UUID.randomUUID();
         when(repository.findByBusinessId(businessId)).thenReturn(Optional.empty());
         when(repository.saveAndFlush(any(BusinessSubscription.class))).thenAnswer(i -> i.getArgument(0));
 
         var service = new BusinessSubscriptionService(
-                repository, calls, mock(TenantProvider.class), new CallCommercialProperties());
+                repository, mock(CommercialEntitlementService.class), mock(TenantProvider.class),
+                mock(CommercialPlanCatalogService.class));
         BusinessSubscription created = service.startBasicTrial(businessId);
 
         assertEquals(businessId, created.getBusinessId());
-        assertEquals(PlanCode.BASIC, created.getPlanCode());
+        assertEquals("BASIC", created.getPlanCode());
         assertEquals(SubscriptionStatus.TRIALING, created.getStatus());
         assertTrue(created.getCurrentPeriodEnd().isAfter(created.getCurrentPeriodStart()));
     }
 
-    private static BusinessSubscription subscription(UUID businessId,
-                                                     PlanCode plan,
-                                                     SubscriptionStatus status,
-                                                     Instant start,
-                                                     Instant end,
-                                                     Instant graceUntil) {
-        BusinessSubscription subscription = new BusinessSubscription();
-        subscription.setBusinessId(businessId);
-        subscription.setPlanCode(plan);
-        subscription.setStatus(status);
-        subscription.setCurrentPeriodStart(start);
-        subscription.setCurrentPeriodEnd(end);
-        subscription.setGraceUntil(graceUntil);
-        return subscription;
+    private static CommercialEntitlementService.SubscriptionEntitlements snapshot(
+            UUID businessId, Instant start, Instant end, boolean allowed, BigDecimal usedVoiceSeconds) {
+        BigDecimal voiceLimit = new BigDecimal("6000");
+        BigDecimal overage = usedVoiceSeconds.subtract(voiceLimit).max(BigDecimal.ZERO);
+        BigDecimal remaining = voiceLimit.subtract(usedVoiceSeconds).max(BigDecimal.ZERO);
+        return new CommercialEntitlementService.SubscriptionEntitlements(
+                businessId, "BASIC", "EMPRENDE", "Emprende", "ACTIVE", allowed,
+                start, end, null, false,
+                List.of(
+                        new CommercialEntitlementService.EntitlementUsage(
+                                "VOICE_SECONDS", "USAGE", "VOICE_SECONDS", voiceLimit, "SECONDS", false,
+                                usedVoiceSeconds, remaining, overage, false, new BigDecimal("60"), 149),
+                        new CommercialEntitlementService.EntitlementUsage(
+                                "CONCURRENT_CALLS", "CAPACITY", null, BigDecimal.ONE, "COUNT", true,
+                                BigDecimal.ZERO, BigDecimal.ONE, BigDecimal.ZERO, false, null, null)));
     }
 }

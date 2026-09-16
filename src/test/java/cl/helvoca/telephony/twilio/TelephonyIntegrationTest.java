@@ -1,5 +1,8 @@
 package cl.helvoca.telephony.twilio;
 
+import cl.helvoca.billing.BusinessSubscription;
+import cl.helvoca.billing.BusinessSubscriptionRepository;
+import cl.helvoca.billing.SubscriptionStatus;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallSessionRepository;
@@ -15,6 +18,9 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -39,6 +45,7 @@ class TelephonyIntegrationTest {
 
     @Autowired BusinessRepository businesses;
     @Autowired PhoneNumberRepository phoneNumbers;
+    @Autowired BusinessSubscriptionRepository subscriptions;
     @Autowired CallSessionRepository calls;
     @Autowired CallLifecycleService lifecycle;
     @Autowired TwilioCallService twilio;
@@ -48,6 +55,7 @@ class TelephonyIntegrationTest {
         Business business = new Business();
         business.setName("Telephony Test Business");
         business = businesses.saveAndFlush(business);
+        activateSubscription(business, "BASIC");
 
         PhoneNumber phone = new PhoneNumber();
         phone.setBusinessId(business.getId());
@@ -80,5 +88,16 @@ class TelephonyIntegrationTest {
         assertEquals(CallStatus.COMPLETED, call.getStatus());
         assertEquals(42, call.getDurationSeconds());
         assertNotNull(call.getEndedAt());
+    }
+
+    private void activateSubscription(Business business, String plan) {
+        Instant now = Instant.now();
+        BusinessSubscription subscription = new BusinessSubscription();
+        subscription.setBusinessId(business.getId());
+        subscription.setPlanCode(plan);
+        subscription.setStatus(SubscriptionStatus.ACTIVE);
+        subscription.setCurrentPeriodStart(now.minus(1, ChronoUnit.DAYS));
+        subscription.setCurrentPeriodEnd(now.plus(30, ChronoUnit.DAYS));
+        subscriptions.saveAndFlush(subscription);
     }
 }

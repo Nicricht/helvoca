@@ -21,23 +21,27 @@ public class MercadoPagoSubscriptionGateway implements SubscriptionPaymentGatewa
     }
 
     @Override
-    public Checkout createCheckout(UUID businessId, String payerEmail, PlanCode plan) {
+    public Checkout createCheckout(UUID businessId, String payerEmail, PaymentPlan plan) {
         if (!properties.checkoutConfigured()) throw new IllegalStateException("Mercado Pago checkout is not configured");
-        if (plan.isCustomPricing()) throw new IllegalArgumentException("Enterprise requires a custom commercial agreement");
+        if (plan == null) throw new IllegalArgumentException("Payment plan is required");
+        if (plan.customPricing()) throw new IllegalArgumentException("Enterprise requires a custom commercial agreement");
+        if (plan.monthlyPriceClp() == null || plan.monthlyPriceClp() <= 0) {
+            throw new IllegalArgumentException("Payment plan requires a fixed positive price");
+        }
         if (payerEmail == null || payerEmail.isBlank()) throw new IllegalArgumentException("Payer email is required");
 
         try {
             PreApprovalAutoRecurringCreateRequest recurring = PreApprovalAutoRecurringCreateRequest.builder()
                     .frequency(1)
                     .frequencyType("months")
-                    .transactionAmount(BigDecimal.valueOf(plan.getMonthlyPriceClp()))
+                    .transactionAmount(BigDecimal.valueOf(plan.monthlyPriceClp()))
                     .currencyId("CLP")
                     .build();
-            String reference = "helvoca:" + businessId + ":" + plan.name();
+            String reference = "helvoca:" + businessId + ":" + plan.code();
             PreapprovalCreateRequest request = PreapprovalCreateRequest.builder()
                     .payerEmail(payerEmail.trim())
                     .backUrl(properties.getBackUrl())
-                    .reason("Helvoca " + plan.getDisplayName())
+                    .reason("Helvoca " + plan.displayName())
                     .externalReference(reference)
                     .status("pending")
                     .autoRecurring(recurring)

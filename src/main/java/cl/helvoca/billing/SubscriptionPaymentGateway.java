@@ -4,7 +4,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 public interface SubscriptionPaymentGateway {
-    Checkout createCheckout(UUID businessId, String payerEmail, PlanCode plan);
+    Checkout createCheckout(UUID businessId, String payerEmail, PaymentPlan plan);
     RemoteSubscription getSubscription(String externalSubscriptionId);
     RemoteInvoice getInvoice(String externalInvoiceId);
 
