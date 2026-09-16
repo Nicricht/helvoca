@@ -40,7 +40,7 @@ class CommercialEntitlementServiceTest {
         UUID businessId = UUID.randomUUID();
         Instant now = Instant.now();
         BusinessSubscription subscription = subscription(
-                businessId, PlanCode.BASIC, SubscriptionStatus.ACTIVE,
+                businessId, "BASIC", SubscriptionStatus.ACTIVE,
                 now.minus(5, ChronoUnit.DAYS), now.plus(25, ChronoUnit.DAYS), null);
         when(subscriptions.findByBusinessId(businessId)).thenReturn(Optional.of(subscription));
         when(catalog.requireByCode("BASIC")).thenReturn(basicPlan());
@@ -76,7 +76,7 @@ class CommercialEntitlementServiceTest {
         UUID businessId = UUID.randomUUID();
         Instant now = Instant.now();
         BusinessSubscription subscription = subscription(
-                businessId, PlanCode.BASIC, SubscriptionStatus.ACTIVE,
+                businessId, "BASIC", SubscriptionStatus.ACTIVE,
                 now.minus(1, ChronoUnit.DAYS), now.plus(29, ChronoUnit.DAYS), null);
         when(subscriptions.findByBusinessId(businessId)).thenReturn(Optional.of(subscription));
         var voiceOnly = new CommercialPlanCatalogService.Plan(
@@ -104,7 +104,7 @@ class CommercialEntitlementServiceTest {
         UUID businessId = UUID.randomUUID();
         Instant now = Instant.now();
         BusinessSubscription subscription = subscription(
-                businessId, PlanCode.BASIC, SubscriptionStatus.TRIALING,
+                businessId, "BASIC", SubscriptionStatus.TRIALING,
                 now.minus(20, ChronoUnit.DAYS), now.minus(6, ChronoUnit.DAYS), null);
         when(subscriptions.findByBusinessId(businessId)).thenReturn(Optional.of(subscription));
         when(catalog.requireByCode("BASIC")).thenReturn(basicPlan());
@@ -130,7 +130,7 @@ class CommercialEntitlementServiceTest {
     }
 
     private static BusinessSubscription subscription(UUID businessId,
-                                                     PlanCode plan,
+                                                     String plan,
                                                      SubscriptionStatus status,
                                                      Instant start,
                                                      Instant end,
