@@ -163,6 +163,62 @@ WITH CHECK (
     OR EXISTS (SELECT 1 FROM public.app_user parent WHERE parent.id = user_role.user_id)
 );
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.ai_agent_capability TO helvoca_runtime;
+ALTER TABLE public.ai_agent_capability ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_agent_capability FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS helvoca_ai_agent_capability_isolation ON public.ai_agent_capability;
+CREATE POLICY helvoca_ai_agent_capability_isolation ON public.ai_agent_capability TO PUBLIC
+USING (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.ai_agent parent WHERE parent.id = ai_agent_capability.ai_agent_id)
+)
+WITH CHECK (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.ai_agent parent WHERE parent.id = ai_agent_capability.ai_agent_id)
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.business_operation_item TO helvoca_runtime;
+ALTER TABLE public.business_operation_item ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.business_operation_item FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS helvoca_business_operation_item_isolation ON public.business_operation_item;
+CREATE POLICY helvoca_business_operation_item_isolation ON public.business_operation_item TO PUBLIC
+USING (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.business_operation parent WHERE parent.id = business_operation_item.operation_id)
+)
+WITH CHECK (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.business_operation parent WHERE parent.id = business_operation_item.operation_id)
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.business_order_line TO helvoca_runtime;
+ALTER TABLE public.business_order_line ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.business_order_line FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS helvoca_business_order_line_isolation ON public.business_order_line;
+CREATE POLICY helvoca_business_order_line_isolation ON public.business_order_line TO PUBLIC
+USING (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.business_order parent WHERE parent.id = business_order_line.order_id)
+)
+WITH CHECK (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.business_order parent WHERE parent.id = business_order_line.order_id)
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.messaging_message TO helvoca_runtime;
+ALTER TABLE public.messaging_message ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messaging_message FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS helvoca_messaging_message_isolation ON public.messaging_message;
+CREATE POLICY helvoca_messaging_message_isolation ON public.messaging_message TO PUBLIC
+USING (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.messaging_conversation parent WHERE parent.id = messaging_message.conversation_id)
+)
+WITH CHECK (
+    current_user = 'helvoca_system'
+    OR EXISTS (SELECT 1 FROM public.messaging_conversation parent WHERE parent.id = messaging_message.conversation_id)
+);
+
 -- Runtime code never needs Flyway history. Keep migration metadata owner-only.
 REVOKE ALL ON TABLE public.flyway_schema_history FROM helvoca_runtime, helvoca_system;
 
