@@ -1,7 +1,9 @@
 package cl.helvoca.call;
 
+import cl.helvoca.security.TenantDatabaseContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -20,14 +22,28 @@ public class CallSummaryService {
     private final CallTranscriptRepository transcripts;
     private final CallSummaryRepository summaries;
     private final CallActionRepository actions;
+    private final CallSessionRepository calls;
+    private final TenantDatabaseContext databaseContext;
     private final Set<UUID> summariesInFlight = ConcurrentHashMap.newKeySet();
 
+    @Autowired
     public CallSummaryService(CallTranscriptRepository transcripts,
                               CallSummaryRepository summaries,
-                              CallActionRepository actions) {
+                              CallActionRepository actions,
+                              CallSessionRepository calls,
+                              TenantDatabaseContext databaseContext) {
         this.transcripts = transcripts;
         this.summaries = summaries;
         this.actions = actions;
+        this.calls = calls;
+        this.databaseContext = databaseContext;
+    }
+
+    // Retained for focused unit tests that do not bootstrap database RLS context.
+    public CallSummaryService(CallTranscriptRepository transcripts,
+                              CallSummaryRepository summaries,
+                              CallActionRepository actions) {
+        this(transcripts, summaries, actions, null, null);
     }
 
     @Async
@@ -35,13 +51,15 @@ public class CallSummaryService {
         if (callId == null || !summariesInFlight.add(callId)) return;
         try {
             Thread.sleep(500);
-            if (summaries.findByCallId(callId).isPresent()) return;
+            if (databaseContext == null || calls == null) {
+                generateForTenant(callId);
+                return;
+            }
 
-            List<CallTranscript> items = transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId);
-            List<CallAction> callActions = actions.findAllByCallIdOrderByCreatedAtAsc(callId);
-            if (items.isEmpty() && callActions.isEmpty()) return;
-
-            save(callId, buildLocalSummary(items, callActions));
+            UUID businessId = databaseContext.callAsSystem(() ->
+                    calls.findById(callId).map(CallSession::getBusinessId).orElse(null));
+            if (businessId == null) return;
+            databaseContext.runAsTenant(businessId, () -> generateForTenant(callId));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
@@ -49,6 +67,16 @@ public class CallSummaryService {
         } finally {
             summariesInFlight.remove(callId);
         }
+    }
+
+    private void generateForTenant(UUID callId) {
+        if (summaries.findByCallId(callId).isPresent()) return;
+
+        List<CallTranscript> items = transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId);
+        List<CallAction> callActions = actions.findAllByCallIdOrderByCreatedAtAsc(callId);
+        if (items.isEmpty() && callActions.isEmpty()) return;
+
+        save(callId, buildLocalSummary(items, callActions));
     }
 
     private void save(UUID callId, String text) {
