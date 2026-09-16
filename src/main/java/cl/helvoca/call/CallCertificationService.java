@@ -3,8 +3,10 @@ package cl.helvoca.call;
 import cl.helvoca.booking.Booking;
 import cl.helvoca.booking.BookingRepository;
 import cl.helvoca.booking.BookingStatus;
+import cl.helvoca.security.TenantDatabaseContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,22 +26,47 @@ public class CallCertificationService {
     private final CallTranscriptRepository transcripts;
     private final CallSummaryRepository summaries;
     private final BookingRepository bookings;
+    private final TenantDatabaseContext databaseContext;
 
+    @Autowired
     public CallCertificationService(CallSessionRepository calls,
                                     CallActionRepository actions,
                                     CallTranscriptRepository transcripts,
                                     CallSummaryRepository summaries,
-                                    BookingRepository bookings) {
+                                    BookingRepository bookings,
+                                    TenantDatabaseContext databaseContext) {
         this.calls = calls;
         this.actions = actions;
         this.transcripts = transcripts;
         this.summaries = summaries;
         this.bookings = bookings;
+        this.databaseContext = databaseContext;
+    }
+
+    // Retained for focused unit tests that do not bootstrap database RLS context.
+    public CallCertificationService(CallSessionRepository calls,
+                                    CallActionRepository actions,
+                                    CallTranscriptRepository transcripts,
+                                    CallSummaryRepository summaries,
+                                    BookingRepository bookings) {
+        this(calls, actions, transcripts, summaries, bookings, null);
     }
 
     @Async
     public void verifyAfterCall(UUID callId) {
         if (callId == null) return;
+        if (databaseContext == null) {
+            verifyAfterCallForTenant(callId);
+            return;
+        }
+
+        UUID businessId = databaseContext.callAsSystem(() ->
+                calls.findById(callId).map(CallSession::getBusinessId).orElse(null));
+        if (businessId == null) return;
+        databaseContext.runAsTenant(businessId, () -> verifyAfterCallForTenant(callId));
+    }
+
+    private void verifyAfterCallForTenant(UUID callId) {
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
             CallSession call = calls.findById(callId).orElse(null);
             if (call == null || !call.isCertification()) return;

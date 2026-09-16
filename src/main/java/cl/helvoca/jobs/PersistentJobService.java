@@ -1,6 +1,7 @@
 package cl.helvoca.jobs;
 
 import cl.helvoca.observability.OperationalMetrics;
+import cl.helvoca.security.TenantDatabaseContext;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,23 +21,26 @@ public class PersistentJobService {
     private final PersistentJobHandlerRegistry handlers;
     private final PersistentJobProperties properties;
     private final OperationalMetrics metrics;
+    private final TenantDatabaseContext databaseContext;
 
     @Autowired
     public PersistentJobService(PersistentJobStore store,
                                 PersistentJobHandlerRegistry handlers,
                                 PersistentJobProperties properties,
-                                OperationalMetrics metrics) {
+                                OperationalMetrics metrics,
+                                TenantDatabaseContext databaseContext) {
         this.store = store;
         this.handlers = handlers;
         this.properties = properties;
         this.metrics = metrics;
+        this.databaseContext = databaseContext;
     }
 
-    // Retained for focused unit tests that do not bootstrap Micrometer.
+    // Retained for focused unit tests that do not bootstrap Micrometer/RLS.
     public PersistentJobService(PersistentJobStore store,
                                 PersistentJobHandlerRegistry handlers,
                                 PersistentJobProperties properties) {
-        this(store, handlers, properties, null);
+        this(store, handlers, properties, null, null);
     }
 
     public PersistentJob enqueue(UUID businessId,
@@ -60,13 +64,24 @@ public class PersistentJobService {
     }
 
     /**
-     * Claims and executes at most one durable job. Claiming is committed before
-     * handler execution, so workers do not hold row locks while performing I/O.
+     * Claims globally under controlled SYSTEM scope, then narrows execution to
+     * the job tenant before the handler touches business data.
      */
     public boolean processOne(String workerId) {
-        PersistentJob job = store.claimNext(workerId, Duration.ofSeconds(properties.getLeaseSeconds())).orElse(null);
+        PersistentJob job;
+        if (databaseContext == null) {
+            job = store.claimNext(workerId, Duration.ofSeconds(properties.getLeaseSeconds())).orElse(null);
+        } else {
+            job = databaseContext.callAsSystem(() ->
+                    store.claimNext(workerId, Duration.ofSeconds(properties.getLeaseSeconds())).orElse(null));
+        }
         if (job == null) return false;
 
+        if (databaseContext == null) return executeClaimed(job, workerId);
+        return databaseContext.callAsTenant(job.businessId(), () -> executeClaimed(job, workerId));
+    }
+
+    private boolean executeClaimed(PersistentJob job, String workerId) {
         long started = System.nanoTime();
         String outcome = "unknown";
         MDC.put("jobId", job.id().toString());

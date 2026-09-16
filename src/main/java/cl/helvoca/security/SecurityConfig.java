@@ -1,5 +1,6 @@
 package cl.helvoca.security;
 
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -44,9 +45,31 @@ public class SecurityConfig {
         return converter;
     }
 
+    /**
+     * These filters are components because they have injected dependencies, but
+     * they must execute only inside Spring Security after bearer authentication.
+     * Disable servlet-container auto registration to avoid OncePerRequestFilter
+     * consuming its marker before the authenticated security-chain position.
+     */
+    @Bean
+    FilterRegistrationBean<TenantDatabaseContextFilter> tenantDatabaseContextFilterRegistration(
+            TenantDatabaseContextFilter filter) {
+        FilterRegistrationBean<TenantDatabaseContextFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    FilterRegistrationBean<ApiRateLimitFilter> apiRateLimitFilterRegistration(ApiRateLimitFilter filter) {
+        FilterRegistrationBean<ApiRateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
                                             JwtAuthenticationConverter jwtConverter,
+                                            TenantDatabaseContextFilter tenantDatabaseContextFilter,
                                             ApiRateLimitFilter apiRateLimitFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
@@ -66,7 +89,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/platform/**").hasRole("PLATFORM_ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)))
-                .addFilterAfter(apiRateLimitFilter, BearerTokenAuthenticationFilter.class);
+                .addFilterAfter(tenantDatabaseContextFilter, BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(apiRateLimitFilter, TenantDatabaseContextFilter.class);
         return http.build();
     }
 }
