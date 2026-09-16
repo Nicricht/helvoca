@@ -15,13 +15,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -62,7 +65,6 @@ class CallLoadIntegrationTest {
     @Autowired PhoneNumberRepository phoneNumbers;
     @Autowired BusinessSubscriptionRepository subscriptions;
     @Autowired CallSessionRepository calls;
-    @Autowired JdbcTemplate jdbc;
 
     @BeforeEach
     void configureLoadCapacity() {
@@ -243,13 +245,19 @@ class CallLoadIntegrationTest {
     }
 
     private void setEnterpriseCapacity(int capacity) {
-        int updated = jdbc.update("""
-                UPDATE commercial_plan_entitlement
-                   SET limit_value = ?
-                 WHERE plan_code = 'ENTERPRISE'
-                   AND entitlement_key = 'CONCURRENT_CALLS'
-                """, capacity);
-        assertEquals(1, updated);
+        try (Connection connection = DriverManager.getConnection(
+                    postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE commercial_plan_entitlement
+                        SET limit_value = ?
+                      WHERE plan_code = 'ENTERPRISE'
+                        AND entitlement_key = 'CONCURRENT_CALLS'
+                     """)) {
+            statement.setInt(1, capacity);
+            assertEquals(1, statement.executeUpdate());
+        } catch (SQLException e) {
+            throw new IllegalStateException("Failed to configure test-only Enterprise capacity", e);
+        }
     }
 
     private static long elapsedMillis(long started) {
