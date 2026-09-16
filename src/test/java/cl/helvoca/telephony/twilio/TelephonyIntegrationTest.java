@@ -2,7 +2,6 @@ package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.billing.BusinessSubscription;
 import cl.helvoca.billing.BusinessSubscriptionRepository;
-import cl.helvoca.billing.PlanCode;
 import cl.helvoca.billing.SubscriptionStatus;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
@@ -56,7 +55,7 @@ class TelephonyIntegrationTest {
         Business business = new Business();
         business.setName("Telephony Test Business");
         business = businesses.saveAndFlush(business);
-        activateSubscription(business, PlanCode.BASIC);
+        activateSubscription(business, "BASIC");
 
         PhoneNumber phone = new PhoneNumber();
         phone.setBusinessId(business.getId());
@@ -91,7 +90,7 @@ class TelephonyIntegrationTest {
         assertNotNull(call.getEndedAt());
     }
 
-    private void activateSubscription(Business business, PlanCode plan) {
+    private void activateSubscription(Business business, String plan) {
         Instant now = Instant.now();
         BusinessSubscription subscription = new BusinessSubscription();
         subscription.setBusinessId(business.getId());
