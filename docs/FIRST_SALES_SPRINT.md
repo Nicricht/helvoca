@@ -2,7 +2,13 @@
 
 ## Objetivo
 
-Conseguir los primeros 5 clientes pagadores. La prioridad del producto durante este sprint es ventas, activación y corrección de bloqueos que impidan cerrar o retener clientes.
+Conseguir los primeros 5 clientes pagadores mediante venta y onboarding asistidos. Durante este sprint, la prioridad de producto es adquisición, activación, calidad del servicio, retención y corrección de bloqueos que impidan cerrar o mantener clientes.
+
+## Estado de salida
+
+Helvoca puede venderse hoy como piloto asistido. V42 Plans / Entitlements / Billing sigue en desarrollo y no debe bloquear prospección, demos ni los primeros pilotos. Hasta su certificación, los límites y condiciones comerciales de cada cliente se documentan durante el onboarding.
+
+Las capacidades externas se ofrecen solo cuando el tenant concreto tiene el proveedor/canal configurado y probado. Que el core soporte una operación no equivale a que una cuenta de Twilio, WhatsApp, calendario o pagos esté activa para todos los clientes.
 
 ## Oferta de lanzamiento
 
@@ -11,19 +17,25 @@ Conseguir los primeros 5 clientes pagadores. La prioridad del producto durante e
 - Pro: $69.990 CLP/mes, 500 minutos incluidos, excedente $109/min.
 - Enterprise: desde $119.990 CLP/mes, cotización personalizada.
 
-La configuración asistida se incluye durante el lanzamiento. WhatsApp se presenta como canal habilitable de forma controlada, no como uso ilimitado.
+La configuración inicial asistida se incluye durante el lanzamiento. WhatsApp y otras integraciones se habilitan según el alcance acordado; no se venden como uso ilimitado por defecto.
 
 ## Propuesta comercial
 
-Helvoca atiende a los clientes de un negocio por teléfono y WhatsApp usando la información real de la empresa. Puede responder preguntas frecuentes, explicar servicios, consultar disponibilidad y gestionar reservas o solicitudes mientras el equipo está ocupado.
+Helvoca ayuda a evitar que una llamada o mensaje sin responder se convierta en una oportunidad perdida. Usa la información real del negocio y, según las capacidades habilitadas, puede responder consultas y avanzar a una reserva, pedido, cotización, lead, solicitud, delivery, pago o handoff humano.
 
-No vender la tecnología. Vender el resultado: menos oportunidades perdidas y menos interrupciones para el equipo.
+No vender la tecnología. Vender el resultado: menos oportunidades perdidas, menos interrupciones y acciones concretas realizadas con reglas del negocio.
 
-## Mercado
+## Mercado inicial
 
-Helvoca es horizontal. Buscar negocios donde existan consultas repetitivas, llamadas o mensajes que interrumpen el trabajo, reservas, citas, solicitudes o derivaciones a una persona.
+Helvoca es horizontal. Priorizar negocios donde se combinen:
 
-Ejemplos: odontología, centros de atención, veterinarias, estética, peluquerías, talleres, restaurantes, inmobiliarias, academias, gimnasios, servicios técnicos y servicios profesionales.
+- consultas repetitivas;
+- llamadas o mensajes mientras el personal está ocupado;
+- una acción posterior clara y valiosa;
+- pérdida visible de oportunidades por falta de respuesta;
+- disposición a probar un piloto pequeño.
+
+Ejemplos: odontología, veterinarias, estética, peluquerías, talleres, restaurantes, inmobiliarias, academias, gimnasios, servicios técnicos y servicios profesionales.
 
 ## Meta diaria
 
@@ -37,14 +49,17 @@ Ejemplos: odontología, centros de atención, veterinarias, estética, peluquer�
 
 1. NEW — prospecto identificado.
 2. CONTACTED — primer contacto realizado.
-3. DEMO — aceptó ver una demostración.
-4. PILOT — comenzó prueba/configuración.
-5. CUSTOMER — cliente pagador.
-6. CLOSED — no continúa por ahora.
+3. QUALIFIED — confirmó problema real y encaje inicial.
+4. DEMO — aceptó ver una demostración.
+5. PILOT — aceptó configuración/prueba.
+6. CUSTOMER — cliente pagador.
+7. CLOSED — no continúa por ahora.
+
+Nunca dejar un prospecto abierto sin `next_action` y `follow_up_date`.
 
 ## Mensaje inicial por WhatsApp o DM
 
-Hola. Estoy trabajando con Helvoca, una recepción con IA para negocios que reciben consultas mientras el equipo está ocupado. Puede atender por teléfono y WhatsApp usando los servicios, precios y horarios reales del negocio y también gestionar reservas. ¿Te puedo mostrar una demo corta de cómo funcionaría para tu negocio?
+Hola. Estoy trabajando con Helvoca, una recepcionista digital para empresas que reciben llamadas o mensajes mientras el equipo está ocupado. Usa la información real del negocio y puede ayudar con acciones como reservas, solicitudes, cotizaciones o pedidos según la configuración. Estoy incorporando los primeros negocios con configuración asistida. ¿Te puedo mostrar una demo corta aplicada a tu negocio?
 
 ## Mensaje inicial por email
 
@@ -52,84 +67,88 @@ Asunto: Una forma de atender consultas sin interrumpir a tu equipo
 
 Hola,
 
-Estoy trabajando con Helvoca, una recepción digital con IA que puede atender consultas por teléfono y WhatsApp usando la información real de cada negocio. Puede responder preguntas frecuentes, consultar disponibilidad y gestionar reservas o solicitudes.
+Estoy trabajando con Helvoca, una recepcionista digital con IA que puede atender consultas usando la información real de cada negocio y avanzar a acciones como reservas, solicitudes, cotizaciones o pedidos según la configuración.
 
-Estoy incorporando los primeros negocios y la configuración inicial se hace de forma asistida. Si te interesa, puedo mostrarte una demo breve aplicada a tu negocio.
+Estoy incorporando los primeros negocios mediante pilotos asistidos. Si te interesa, puedo mostrarte una demo breve aplicada a tu negocio.
 
 Saludos.
 
-## Guion de llamada comercial
+## Guion de contacto presencial o llamada
 
 1. Preguntar si reciben llamadas o mensajes mientras están atendiendo clientes o trabajando.
 2. Preguntar qué ocurre cuando no pueden responder.
-3. Explicar Helvoca en una frase.
-4. No explicar arquitectura, proveedores de IA ni detalles técnicos salvo que lo pidan.
-5. Ofrecer una demo breve aplicada al negocio.
-6. Si existe interés, cerrar una siguiente acción concreta: demo, configuración piloto o creación de cuenta.
+3. Preguntar qué acción suele venir después de responder.
+4. Explicar Helvoca en una frase.
+5. No explicar arquitectura, proveedores de IA ni detalles técnicos salvo que lo pidan.
+6. Ofrecer una demo breve aplicada al negocio.
+7. Cerrar una siguiente acción concreta: demo, configuración piloto o creación de cuenta.
 
-## Demo de 5 minutos
+## Demo de 5–10 minutos
 
-1. Mostrar la landing comercial.
-2. Explicar el problema: llamadas y mensajes que quedan sin respuesta o interrumpen al equipo.
-3. Mostrar un negocio configurado con servicios y horarios.
-4. Simular una consulta real.
-5. Consultar disponibilidad.
-6. Crear una reserva.
-7. Cambiar la hora y demostrar que se reprograma sin duplicar.
-8. Mostrar la convivencia entre teléfono y WhatsApp cuando el canal está habilitado.
-9. Mostrar los planes.
-10. Cerrar preguntando si quiere configurar Helvoca con su negocio.
+1. Mostrar `/sales.html`.
+2. Conectar con el problema que el prospecto acaba de describir.
+3. Mostrar un tenant demo configurado.
+4. Hacer una consulta real de información/precio.
+5. Ejecutar la acción principal del caso de uso.
+6. Corregir un dato para demostrar que la nueva versión reemplaza la anterior.
+7. Mostrar el resultado persistido.
+8. Mostrar `/pricing.html`.
+9. Preguntar si quiere configurar un piloto con sus propios datos.
+
+Si se demuestra voz o WhatsApp real, ese canal debe estar previamente configurado y probado. Nunca improvisar una integración externa durante una reunión comercial.
 
 ## Respuestas a objeciones
 
 ### Ya uso WhatsApp
 
-Helvoca no busca reemplazar WhatsApp. La idea es atender automáticamente parte de esas conversaciones y conectarlas con la misma información y agenda que usa la atención telefónica.
+Helvoca no busca reemplazar WhatsApp. Automatiza parte de la atención y puede compartir la misma información y operaciones del negocio con otros canales habilitados.
 
-### Ya tengo una agenda online
+### Ya tengo agenda online
 
-Helvoca no compite solo como agenda. Puede conversar con el cliente antes de la reserva, responder preguntas, ayudar a elegir un servicio y ejecutar la acción cuando corresponde.
+Helvoca no es solo una agenda. Puede conversar antes de la reserva, responder preguntas, ayudar a elegir y ejecutar la acción cuando corresponde.
 
 ### Es caro
 
-Partimos desde $24.990 CLP al mes. La comparación útil es cuánto vale una reserva, solicitud o cliente que hoy se pierde porque nadie alcanzó a responder.
+La entrada parte desde $24.990 CLP al mes. La comparación útil es cuánto vale una oportunidad que hoy se pierde porque nadie alcanzó a responder. No prometer ROI; medirlo durante el piloto.
 
 ### No confío en una IA atendiendo clientes
 
-La configuración se prueba antes de operar. Helvoca consulta datos configurados del negocio y las acciones críticas pasan por herramientas y validaciones del backend.
+La configuración se prueba antes de operar. Las acciones críticas pasan por servicios y validaciones del backend; la IA no decide por sí sola precios, disponibilidad ni estados operativos.
 
 ### Quiero hablar yo con los clientes
 
-Helvoca puede encargarse de las consultas repetitivas y derivar a una persona cuando corresponde. No obliga a eliminar la atención humana.
+Helvoca puede encargarse de consultas repetitivas y dejar intervención humana para los casos donde aporta más valor.
 
 ## Cierre recomendado
 
-No preguntar solamente si le gustó. Preguntar por una acción concreta:
+> ¿Quieres que configuremos una prueba con tus servicios, horarios y reglas para que veas cómo atendería Helvoca a un cliente real de tu negocio?
 
-“¿Quieres que configuremos una prueba con tus servicios y horarios para que escuches cómo atendería Helvoca a un cliente de tu negocio?”
+Si acepta, completar `docs/FIRST_CUSTOMER_ONBOARDING_FORM.md`.
 
 ## Registro mínimo de prospectos
 
-Mantener una hoja con:
+Usar `docs/FIRST_PROSPECTS_TRACKER.csv` y mantener como mínimo:
 
 - negocio;
 - rubro;
-- ciudad;
+- ciudad/comuna;
 - canal de contacto público;
 - fecha del primer contacto;
 - estado del pipeline;
-- principal problema detectado;
-- plan sugerido;
+- problema principal;
+- capacidad de mayor interés;
+- plan/piloto discutido;
 - siguiente acción;
 - fecha de seguimiento;
 - motivo de cierre si no continúa.
 
-No almacenar información personal innecesaria.
+No almacenar información personal innecesaria ni datos sensibles.
 
 ## Métricas semanales
 
 - prospectos nuevos;
 - contactos realizados;
+- conversaciones reales;
 - tasa de respuesta;
 - demos agendadas;
 - demos realizadas;
@@ -137,7 +156,7 @@ No almacenar información personal innecesaria.
 - clientes pagadores;
 - ingreso mensual recurrente nuevo;
 - principal objeción;
-- principal bloqueo de producto reportado por prospectos.
+- principal bloqueo de producto reportado.
 
 ## Regla de desarrollo durante el sprint
 
