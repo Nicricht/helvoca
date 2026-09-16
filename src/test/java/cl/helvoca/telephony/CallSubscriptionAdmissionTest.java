@@ -69,6 +69,28 @@ class CallSubscriptionAdmissionTest {
         verify(calls, never()).saveAndFlush(any(CallSession.class));
     }
 
+    @Test
+    void missingCommercialConfigurationRejectsAsSubscriptionFailure() {
+        UUID businessId = UUID.randomUUID();
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+
+        when(phone.getBusinessId()).thenReturn(businessId);
+        when(phones.findByPhoneNumberAndActiveTrue("+14355551002")).thenReturn(Optional.of(phone));
+        when(calls.findByProviderCallId("CA-missing-commercial")).thenReturn(Optional.empty());
+        when(subscriptions.view(businessId)).thenThrow(new IllegalStateException("Business subscription is not initialized"));
+
+        CallLifecycleService lifecycle = lifecycle(phones, calls);
+        lifecycle.setSubscriptions(subscriptions);
+
+        assertThrows(CallCapacityExceededException.class, () -> lifecycle.startInboundCall(
+                "twilio", "CA-missing-commercial", "+56910000002", "+14355551002"));
+        verify(calls, never()).countByBusinessIdAndStatusIn(eq(businessId), anyCollection());
+        verify(calls, never()).saveAndFlush(any(CallSession.class));
+    }
+
     private static BusinessSubscriptionService.SubscriptionView view(UUID businessId,
                                                                      boolean allowed,
                                                                      int maxConcurrent) {
