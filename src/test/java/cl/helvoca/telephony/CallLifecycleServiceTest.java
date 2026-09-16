@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -136,9 +137,9 @@ class CallLifecycleServiceTest {
                                                                                     int maxConcurrentCalls) {
         Instant now = Instant.now();
         return new BusinessSubscriptionService.SubscriptionView(
-                businessId, "BASIC", "ACTIVE", true,
+                businessId, "BASIC", "EMPRENDE", "Emprende", "ACTIVE", true,
                 maxConcurrentCalls, 300, 0, 0,
-                now.minusSeconds(60), now.plusSeconds(3600), null, false, false);
+                now.minusSeconds(60), now.plusSeconds(3600), null, false, List.of(), false);
     }
 
     private static CallLifecycleService lifecycle(PhoneNumberRepository phones,
