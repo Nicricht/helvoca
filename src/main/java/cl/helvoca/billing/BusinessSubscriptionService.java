@@ -9,6 +9,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -37,7 +38,7 @@ public class BusinessSubscriptionService {
             Instant now = Instant.now();
             BusinessSubscription subscription = new BusinessSubscription();
             subscription.setBusinessId(businessId);
-            subscription.setPlanCode(PlanCode.BASIC);
+            subscription.setPlanCode("BASIC");
             subscription.setStatus(SubscriptionStatus.TRIALING);
             subscription.setCurrentPeriodStart(now);
             subscription.setCurrentPeriodEnd(now.plus(TRIAL_DAYS, ChronoUnit.DAYS));
@@ -73,6 +74,8 @@ public class BusinessSubscriptionService {
         return new SubscriptionView(
                 snapshot.businessId(),
                 snapshot.planCode(),
+                snapshot.publicPlanCode(),
+                snapshot.planName(),
                 snapshot.status(),
                 snapshot.serviceAllowed(),
                 maxConcurrentCalls,
@@ -83,28 +86,31 @@ public class BusinessSubscriptionService {
                 snapshot.currentPeriodEnd(),
                 snapshot.graceUntil(),
                 snapshot.billingProviderConnected(),
+                List.copyOf(snapshot.entitlements()),
                 false);
     }
 
     @Transactional
     public BusinessSubscription synchronize(UUID businessId,
-                                            PlanCode planCode,
+                                            String planCode,
                                             SubscriptionStatus status,
                                             Instant periodStart,
                                             Instant periodEnd,
                                             Instant graceUntil,
                                             String externalCustomerId,
                                             String externalSubscriptionId) {
-        if (businessId == null || planCode == null || status == null) {
+        if (businessId == null || planCode == null || planCode.isBlank() || status == null) {
             throw new IllegalArgumentException("Business, plan and status are required");
         }
         if (periodStart == null || periodEnd == null || !periodEnd.isAfter(periodStart)) {
             throw new IllegalArgumentException("A valid subscription period is required");
         }
+        String normalizedPlanCode = planCode.trim().toUpperCase(Locale.ROOT);
+        catalog.requireByCode(normalizedPlanCode);
         BusinessSubscription subscription = subscriptions.findByBusinessId(businessId)
                 .orElseGet(BusinessSubscription::new);
         subscription.setBusinessId(businessId);
-        subscription.setPlanCode(planCode);
+        subscription.setPlanCode(normalizedPlanCode);
         subscription.setStatus(status);
         subscription.setCurrentPeriodStart(periodStart);
         subscription.setCurrentPeriodEnd(periodEnd);
@@ -129,7 +135,7 @@ public class BusinessSubscriptionService {
                     } catch (ArithmeticException e) {
                         throw new IllegalStateException("Commercial plan capacity is not an integer: " + plan.code(), e);
                     }
-                    return new PlanView(plan.code(), maxConcurrent, wholeMinutesFloor(voice.limitValue()));
+                    return new PlanView(plan.publicCode(), plan.displayName(), maxConcurrent, wholeMinutesFloor(voice.limitValue()));
                 })
                 .toList();
     }
@@ -151,6 +157,8 @@ public class BusinessSubscriptionService {
     public record SubscriptionView(
             UUID businessId,
             String plan,
+            String publicPlanCode,
+            String planName,
             String status,
             boolean serviceAllowed,
             int maxConcurrentCalls,
@@ -161,7 +169,8 @@ public class BusinessSubscriptionService {
             Instant currentPeriodEnd,
             Instant graceUntil,
             boolean billingProviderConnected,
+            List<CommercialEntitlementService.EntitlementUsage> entitlements,
             boolean legacyFallback) {}
 
-    public record PlanView(String code, int maxConcurrentCalls, int includedMinutes) {}
+    public record PlanView(String code, String name, int maxConcurrentCalls, int includedMinutes) {}
 }
