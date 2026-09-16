@@ -7,7 +7,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -20,15 +19,18 @@ public class BillingSubscriptionService {
     private final SubscriptionPaymentGateway gateway;
     private final MercadoPagoProperties properties;
     private final JdbcTemplate jdbc;
+    private final CommercialPlanCatalogService catalog;
 
     public BillingSubscriptionService(BusinessSubscriptionRepository subscriptions,
                                       SubscriptionPaymentGateway gateway,
                                       MercadoPagoProperties properties,
-                                      JdbcTemplate jdbc) {
+                                      JdbcTemplate jdbc,
+                                      CommercialPlanCatalogService catalog) {
         this.subscriptions = subscriptions;
         this.gateway = gateway;
         this.properties = properties;
         this.jdbc = jdbc;
+        this.catalog = catalog;
     }
 
     @Transactional(readOnly = true)
@@ -41,29 +43,30 @@ public class BillingSubscriptionService {
     @Transactional
     public CheckoutResponse createCheckout(UUID businessId, String payerEmail, String publicPlanCode) {
         if (!properties.checkoutConfigured()) throw new IllegalStateException("Mercado Pago checkout is disabled or incomplete");
-        PlanCode plan = resolvePublicPlan(publicPlanCode);
-        if (plan.isCustomPricing()) throw new IllegalArgumentException("Enterprise requiere cotización personalizada.");
+        CommercialPlanCatalogService.Plan plan = catalog.findActiveByPublicCode(publicPlanCode);
+        if (plan.customPricing()) throw new IllegalArgumentException("Enterprise requiere cotización personalizada.");
+        PaymentPlan paymentPlan = new PaymentPlan(plan.code(), plan.displayName(), plan.monthlyPriceClp(), plan.customPricing());
 
         lockBusiness(businessId);
         BusinessSubscription subscription = subscriptions.findByBusinessId(businessId)
                 .orElseThrow(() -> new IllegalStateException("Business subscription is not initialized"));
 
         if (PROVIDER.equals(subscription.getBillingProvider())
-                && plan == subscription.getPendingPlanCode()
+                && plan.code().equalsIgnoreCase(subscription.getPendingPlanCode())
                 && notBlank(subscription.getExternalSubscriptionId())
                 && notBlank(subscription.getBillingCheckoutUrl())) {
             return new CheckoutResponse(subscription.getExternalSubscriptionId(), subscription.getBillingCheckoutUrl(),
-                    plan.getPublicCode(), plan.getDisplayName(), plan.getMonthlyPriceClp(), true);
+                    plan.publicCode(), plan.displayName(), requireFixedPrice(plan), true);
         }
 
-        SubscriptionPaymentGateway.Checkout checkout = gateway.createCheckout(businessId, payerEmail, plan);
+        SubscriptionPaymentGateway.Checkout checkout = gateway.createCheckout(businessId, payerEmail, paymentPlan);
         subscription.setBillingProvider(PROVIDER);
-        subscription.setPendingPlanCode(plan);
+        subscription.setPendingPlanCode(plan.code());
         subscription.setExternalSubscriptionId(checkout.subscriptionId());
         subscription.setBillingCheckoutUrl(checkout.checkoutUrl());
         subscriptions.saveAndFlush(subscription);
-        return new CheckoutResponse(checkout.subscriptionId(), checkout.checkoutUrl(), plan.getPublicCode(),
-                plan.getDisplayName(), plan.getMonthlyPriceClp(), false);
+        return new CheckoutResponse(checkout.subscriptionId(), checkout.checkoutUrl(), plan.publicCode(),
+                plan.displayName(), requireFixedPrice(plan), false);
     }
 
     @Transactional
@@ -116,6 +119,7 @@ public class BillingSubscriptionService {
             local.setCurrentPeriodEnd(start.atOffset(ZoneOffset.UTC).plusMonths(1).toInstant());
             local.setGraceUntil(null);
             if (local.getPendingPlanCode() != null) {
+                catalog.requireByCode(local.getPendingPlanCode());
                 local.setPlanCode(local.getPendingPlanCode());
                 local.setPendingPlanCode(null);
                 local.setBillingCheckoutUrl(null);
@@ -137,8 +141,7 @@ public class BillingSubscriptionService {
         String status = normalized(remote.status());
         switch (status) {
             case "authorized" -> {
-                // Authorization links the recurring mandate, but does not prove that the first invoice was paid.
-                // Entitlements stay unchanged until subscription_authorized_payment is verified server-to-server.
+                // The recurring mandate is linked, but service entitlements change only after a verified paid invoice.
             }
             case "paused" -> {
                 local.setStatus(SubscriptionStatus.SUSPENDED);
@@ -162,36 +165,37 @@ public class BillingSubscriptionService {
     }
 
     private BillingStatus snapshot(BusinessSubscription local) {
-        PlanCode current = local.getPlanCode();
-        PlanCode pending = local.getPendingPlanCode();
+        CommercialPlanCatalogService.Plan current = catalog.requireByCode(local.getPlanCode());
+        CommercialPlanCatalogService.Plan pending = local.getPendingPlanCode() == null
+                ? null : catalog.requireByCode(local.getPendingPlanCode());
         boolean awaitingProviderVerification = pending != null && notBlank(local.getExternalSubscriptionId());
         return new BillingStatus(
                 blankToNull(local.getBillingProvider()),
                 properties.isEnabled(),
                 properties.checkoutConfigured(),
-                current.getPublicCode(),
-                current.getDisplayName(),
-                current.getMonthlyPriceClp(),
+                current.publicCode(),
+                current.displayName(),
+                current.monthlyPriceClp() == null ? 0 : current.monthlyPriceClp(),
                 local.getStatus().name(),
-                pending == null ? null : pending.getPublicCode(),
-                pending == null ? null : pending.getDisplayName(),
-                pending == null ? null : pending.getMonthlyPriceClp(),
+                pending == null ? null : pending.publicCode(),
+                pending == null ? null : pending.displayName(),
+                pending == null ? null : pending.monthlyPriceClp(),
                 pending == null ? null : blankToNull(local.getBillingCheckoutUrl()),
                 awaitingProviderVerification);
     }
 
-    private static PlanCode resolvePublicPlan(String value) {
-        if (value == null || value.isBlank()) throw new IllegalArgumentException("plan is required");
-        return Arrays.stream(PlanCode.values())
-                .filter(plan -> plan.getPublicCode().equalsIgnoreCase(value.trim()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Unknown plan"));
+    private static void requireExpectedReference(BusinessSubscription local, String reference) {
+        String expectedPlan = local.getPendingPlanCode() == null ? local.getPlanCode() : local.getPendingPlanCode();
+        if (!notBlank(expectedPlan)) throw new IllegalStateException("Subscription plan is missing");
+        String expected = "helvoca:" + local.getBusinessId() + ":" + expectedPlan.trim().toUpperCase(Locale.ROOT);
+        if (!expected.equals(reference)) throw new IllegalStateException("Mercado Pago external reference mismatch");
     }
 
-    private static void requireExpectedReference(BusinessSubscription local, String reference) {
-        PlanCode expectedPlan = local.getPendingPlanCode() == null ? local.getPlanCode() : local.getPendingPlanCode();
-        String expected = "helvoca:" + local.getBusinessId() + ":" + expectedPlan.name();
-        if (!expected.equals(reference)) throw new IllegalStateException("Mercado Pago external reference mismatch");
+    private static int requireFixedPrice(CommercialPlanCatalogService.Plan plan) {
+        if (plan.monthlyPriceClp() == null || plan.monthlyPriceClp() <= 0) {
+            throw new IllegalStateException("Commercial plan has no fixed positive checkout price");
+        }
+        return plan.monthlyPriceClp();
     }
 
     private void lockBusiness(UUID businessId) {
