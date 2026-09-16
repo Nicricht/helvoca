@@ -47,12 +47,15 @@ class BusinessSubscriptionServiceTest {
         var view = service.view(businessId);
 
         assertEquals("BASIC", view.plan());
+        assertEquals("EMPRENDE", view.publicPlanCode());
+        assertEquals("Emprende", view.planName());
         assertEquals("ACTIVE", view.status());
         assertTrue(view.serviceAllowed());
         assertEquals(1, view.maxConcurrentCalls());
         assertEquals(100, view.includedMinutes());
         assertEquals(101, view.usedMinutes());
         assertEquals(1, view.overageMinutes());
+        assertEquals(2, view.entitlements().size());
         assertFalse(view.legacyFallback());
         assertEquals(start, view.currentPeriodStart());
         assertEquals(end, view.currentPeriodEnd());
@@ -76,7 +79,7 @@ class BusinessSubscriptionServiceTest {
     }
 
     @Test
-    void newBusinessStillGetsBasicTrial() {
+    void newBusinessStillGetsBasicTrialUsingTechnicalStringCode() {
         BusinessSubscriptionRepository repository = mock(BusinessSubscriptionRepository.class);
         UUID businessId = UUID.randomUUID();
         when(repository.findByBusinessId(businessId)).thenReturn(Optional.empty());
@@ -88,7 +91,7 @@ class BusinessSubscriptionServiceTest {
         BusinessSubscription created = service.startBasicTrial(businessId);
 
         assertEquals(businessId, created.getBusinessId());
-        assertEquals(PlanCode.BASIC, created.getPlanCode());
+        assertEquals("BASIC", created.getPlanCode());
         assertEquals(SubscriptionStatus.TRIALING, created.getStatus());
         assertTrue(created.getCurrentPeriodEnd().isAfter(created.getCurrentPeriodStart()));
     }
