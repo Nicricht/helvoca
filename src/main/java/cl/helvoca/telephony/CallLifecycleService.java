@@ -82,7 +82,13 @@ public class CallLifecycleService {
 
         int limit = commercial.getMaxConcurrentPerBusiness();
         if (subscriptions != null) {
-            var entitlement = subscriptions.view(businessId);
+            final BusinessSubscriptionService.SubscriptionView entitlement;
+            try {
+                entitlement = subscriptions.view(businessId);
+            } catch (IllegalStateException e) {
+                metrics.counter("helvoca.calls.rejected", "reason", "subscription").increment();
+                throw new CallCapacityExceededException("Subscription commercial configuration is unavailable");
+            }
             if (!entitlement.serviceAllowed()) {
                 metrics.counter("helvoca.calls.rejected", "reason", "subscription").increment();
                 throw new CallCapacityExceededException("Subscription does not currently allow voice service");
@@ -90,8 +96,12 @@ public class CallLifecycleService {
             limit = entitlement.maxConcurrentCalls();
         }
 
+        if (limit <= 0) {
+            metrics.counter("helvoca.calls.rejected", "reason", "capacity").increment();
+            throw new CallCapacityExceededException("Concurrent call capacity is not configured for business");
+        }
         long activeCalls = calls.countByBusinessIdAndStatusIn(businessId, ACTIVE_STATUSES);
-        if (limit > 0 && activeCalls >= limit) {
+        if (activeCalls >= limit) {
             metrics.counter("helvoca.calls.rejected", "reason", "capacity").increment();
             throw new CallCapacityExceededException("Concurrent call capacity reached for business");
         }

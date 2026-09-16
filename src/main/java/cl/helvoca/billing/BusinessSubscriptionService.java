@@ -1,35 +1,34 @@
 package cl.helvoca.billing;
 
-import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.security.TenantProvider;
-import cl.helvoca.telephony.CallCommercialProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
 @Service
 public class BusinessSubscriptionService {
-    private static final String SIMULATOR_PROVIDER = "simulator";
     private static final int TRIAL_DAYS = 14;
+    private static final BigDecimal SECONDS_PER_MINUTE = BigDecimal.valueOf(60);
 
     private final BusinessSubscriptionRepository subscriptions;
-    private final CallSessionRepository calls;
+    private final CommercialEntitlementService entitlements;
     private final TenantProvider tenantProvider;
-    private final CallCommercialProperties commercial;
+    private final CommercialPlanCatalogService catalog;
 
     public BusinessSubscriptionService(BusinessSubscriptionRepository subscriptions,
-                                       CallSessionRepository calls,
+                                       CommercialEntitlementService entitlements,
                                        TenantProvider tenantProvider,
-                                       CallCommercialProperties commercial) {
+                                       CommercialPlanCatalogService catalog) {
         this.subscriptions = subscriptions;
-        this.calls = calls;
+        this.entitlements = entitlements;
         this.tenantProvider = tenantProvider;
-        this.commercial = commercial;
+        this.catalog = catalog;
     }
 
     @Transactional
@@ -53,19 +52,38 @@ public class BusinessSubscriptionService {
 
     @Transactional(readOnly = true)
     public SubscriptionView view(UUID businessId) {
-        Instant now = Instant.now();
-        BusinessSubscription stored = subscriptions.findByBusinessId(businessId).orElse(null);
-        if (stored == null) {
-            Instant start = now.truncatedTo(ChronoUnit.DAYS).minus(30, ChronoUnit.DAYS);
-            Instant end = now.plus(1, ChronoUnit.DAYS);
-            return buildView(businessId, PlanCode.PRO, SubscriptionStatus.ACTIVE,
-                    start, end, null, false, true, now,
-                    commercial.getMaxConcurrentPerBusiness());
+        CommercialEntitlementService.SubscriptionEntitlements snapshot = entitlements.snapshot(businessId);
+        CommercialEntitlementService.EntitlementUsage voice = snapshot.requireEntitlement("VOICE_SECONDS");
+        CommercialEntitlementService.EntitlementUsage capacity = snapshot.requireEntitlement("CONCURRENT_CALLS");
+
+        if (!"USAGE".equalsIgnoreCase(voice.kind()) || !"SECONDS".equalsIgnoreCase(voice.unit())) {
+            throw new IllegalStateException("VOICE_SECONDS entitlement has an incompatible shape");
         }
-        return buildView(businessId, stored.getPlanCode(), stored.getStatus(),
-                stored.getCurrentPeriodStart(), stored.getCurrentPeriodEnd(), stored.getGraceUntil(),
-                stored.getExternalSubscriptionId() != null && !stored.getExternalSubscriptionId().isBlank(),
-                false, now, stored.getPlanCode().getMaxConcurrentCalls());
+        if (!"CAPACITY".equalsIgnoreCase(capacity.kind())) {
+            throw new IllegalStateException("CONCURRENT_CALLS entitlement has an incompatible shape");
+        }
+
+        int maxConcurrentCalls;
+        try {
+            maxConcurrentCalls = capacity.limit().intValueExact();
+        } catch (ArithmeticException e) {
+            throw new IllegalStateException("CONCURRENT_CALLS capacity must be an integer", e);
+        }
+
+        return new SubscriptionView(
+                snapshot.businessId(),
+                snapshot.planCode(),
+                snapshot.status(),
+                snapshot.serviceAllowed(),
+                maxConcurrentCalls,
+                wholeMinutesFloor(voice.limit()),
+                wholeMinutesCeil(voice.used()),
+                wholeMinutesCeil(voice.overage()),
+                snapshot.currentPeriodStart(),
+                snapshot.currentPeriodEnd(),
+                snapshot.graceUntil(),
+                snapshot.billingProviderConnected(),
+                false);
     }
 
     @Transactional
@@ -96,43 +114,34 @@ public class BusinessSubscriptionService {
         return subscriptions.saveAndFlush(subscription);
     }
 
+    @Transactional(readOnly = true)
     public List<PlanView> plans() {
-        return Arrays.stream(PlanCode.values())
-                .map(plan -> new PlanView(plan.name(), plan.getMaxConcurrentCalls(), plan.getIncludedMinutesPerPeriod()))
+        return catalog.activePlans().stream()
+                .map(plan -> {
+                    CommercialPlanCatalogService.EntitlementRule voice = plan.entitlement("VOICE_SECONDS");
+                    CommercialPlanCatalogService.EntitlementRule capacity = plan.entitlement("CONCURRENT_CALLS");
+                    if (voice == null || capacity == null) {
+                        throw new IllegalStateException("Commercial plan is missing required voice entitlements: " + plan.code());
+                    }
+                    int maxConcurrent;
+                    try {
+                        maxConcurrent = capacity.limitValue().intValueExact();
+                    } catch (ArithmeticException e) {
+                        throw new IllegalStateException("Commercial plan capacity is not an integer: " + plan.code(), e);
+                    }
+                    return new PlanView(plan.code(), maxConcurrent, wholeMinutesFloor(voice.limitValue()));
+                })
                 .toList();
     }
 
-    private SubscriptionView buildView(UUID businessId,
-                                       PlanCode plan,
-                                       SubscriptionStatus status,
-                                       Instant periodStart,
-                                       Instant periodEnd,
-                                       Instant graceUntil,
-                                       boolean billingProviderConnected,
-                                       boolean legacyFallback,
-                                       Instant now,
-                                       int maxConcurrentCalls) {
-        Long secondsValue = calls.sumDurationSecondsByBusinessAndPeriod(
-                businessId, periodStart, periodEnd, SIMULATOR_PROVIDER);
-        long seconds = secondsValue == null ? 0L : Math.max(0L, secondsValue);
-        long usedMinutes = (seconds + 59L) / 60L;
-        long overageMinutes = Math.max(0L, usedMinutes - plan.getIncludedMinutesPerPeriod());
-        boolean serviceAllowed = status.allowsService(now, graceUntil)
-                && (status != SubscriptionStatus.TRIALING || now.isBefore(periodEnd));
-        return new SubscriptionView(
-                businessId,
-                plan.name(),
-                status.name(),
-                serviceAllowed,
-                maxConcurrentCalls,
-                plan.getIncludedMinutesPerPeriod(),
-                usedMinutes,
-                overageMinutes,
-                periodStart,
-                periodEnd,
-                graceUntil,
-                billingProviderConnected,
-                legacyFallback);
+    private static int wholeMinutesFloor(BigDecimal seconds) {
+        if (seconds == null || seconds.signum() < 0) throw new IllegalStateException("Usage quantity must be non-negative");
+        return seconds.divide(SECONDS_PER_MINUTE, 0, RoundingMode.FLOOR).intValueExact();
+    }
+
+    private static long wholeMinutesCeil(BigDecimal seconds) {
+        if (seconds == null || seconds.signum() < 0) throw new IllegalStateException("Usage quantity must be non-negative");
+        return seconds.divide(SECONDS_PER_MINUTE, 0, RoundingMode.CEILING).longValueExact();
     }
 
     private static String blankToNull(String value) {
