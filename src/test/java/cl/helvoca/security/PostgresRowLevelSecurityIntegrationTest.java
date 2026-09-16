@@ -14,6 +14,9 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,7 +34,10 @@ class PostgresRowLevelSecurityIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "1");
+        // Flyway can hold one connection while opening another migration connection.
+        // Two connections avoid startup starvation while still letting the scrub test
+        // borrow the complete runtime pool simultaneously.
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "2");
         registry.add("spring.datasource.hikari.minimum-idle", () -> "1");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.flyway.enabled", () -> "true");
@@ -124,7 +130,7 @@ class PostgresRowLevelSecurityIntegrationTest {
     }
 
     @Test
-    void pooledPhysicalConnectionIsScrubbedBetweenTenantAndOwnerUse() {
+    void pooledPhysicalConnectionsAreScrubbedBetweenTenantAndOwnerUse() throws Exception {
         String tenantRole = databaseContext.callAsTenant(businessA,
                 () -> runtimeJdbc.queryForObject("SELECT current_user", String.class));
         String tenantSetting = databaseContext.callAsTenant(businessA,
@@ -133,19 +139,32 @@ class PostgresRowLevelSecurityIntegrationTest {
         assertEquals(TenantAwareDataSource.TENANT_ROLE, tenantRole);
         assertEquals(businessA.toString(), tenantSetting);
 
-        // Pool size is one, so the raw migration datasource must receive the same
-        // physical connection after the tenant-aware wrapper closes it.
-        String ownerRole = ownerJdbc.queryForObject("SELECT current_user", String.class);
-        String ownerTenantSetting = ownerJdbc.queryForObject(
-                "SELECT current_setting('app.tenant_id', true)", String.class);
-
-        assertNotEquals(TenantAwareDataSource.TENANT_ROLE, ownerRole);
-        assertNotEquals(TenantAwareDataSource.SYSTEM_ROLE, ownerRole);
-        assertTrue(ownerTenantSetting == null || ownerTenantSetting.isBlank());
+        // Borrow the whole two-connection pool at once. The connection used by the
+        // tenant-aware datasource must therefore be one of these physical sessions,
+        // and every returned session must already have been scrubbed.
+        try (Connection first = migrationDataSource.getConnection();
+             Connection second = migrationDataSource.getConnection()) {
+            assertOwnerSessionScrubbed(first);
+            assertOwnerSessionScrubbed(second);
+        }
 
         long visibleB = databaseContext.callAsTenant(businessB,
                 () -> runtimeJdbc.queryForObject("SELECT COUNT(*) FROM customer", Long.class));
         assertEquals(1L, visibleB);
+    }
+
+    private void assertOwnerSessionScrubbed(Connection connection) throws Exception {
+        try (Statement statement = connection.createStatement();
+             ResultSet result = statement.executeQuery(
+                     "SELECT current_user, current_setting('app.tenant_id', true)")) {
+            assertTrue(result.next());
+            String ownerRole = result.getString(1);
+            String ownerTenantSetting = result.getString(2);
+
+            assertNotEquals(TenantAwareDataSource.TENANT_ROLE, ownerRole);
+            assertNotEquals(TenantAwareDataSource.SYSTEM_ROLE, ownerRole);
+            assertTrue(ownerTenantSetting == null || ownerTenantSetting.isBlank());
+        }
     }
 
     @Test
