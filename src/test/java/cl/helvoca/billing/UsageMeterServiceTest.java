@@ -1,6 +1,6 @@
 package cl.helvoca.billing;
 
-import cl.helvoca.tenant.TenantProvider;
+import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;

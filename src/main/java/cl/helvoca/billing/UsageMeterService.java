@@ -130,9 +130,7 @@ public class UsageMeterService {
 
     private static String optional(String value, String field, int maxLength) {
         if (value == null || value.isBlank()) return null;
-        String normalized = value.trim();
-        if (normalized.length() > maxLength) throw new IllegalArgumentException(field + " is too long");
-        return normalized;
+        return token(value, field, maxLength);
     }
 
     private static BigDecimal nonNegative(BigDecimal value, String field) {
