@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -96,9 +97,10 @@ class CallSubscriptionAdmissionTest {
                                                                      int maxConcurrent) {
         Instant now = Instant.now();
         return new BusinessSubscriptionService.SubscriptionView(
-                businessId, "BASIC", allowed ? "ACTIVE" : "SUSPENDED", allowed,
+                businessId, "BASIC", "EMPRENDE", "Emprende",
+                allowed ? "ACTIVE" : "SUSPENDED", allowed,
                 maxConcurrent, 300, 0, 0,
-                now.minusSeconds(60), now.plusSeconds(3600), null, false, false);
+                now.minusSeconds(60), now.plusSeconds(3600), null, false, List.of(), false);
     }
 
     private static CallLifecycleService lifecycle(PhoneNumberRepository phones,
