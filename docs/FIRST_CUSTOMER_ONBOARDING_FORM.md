@@ -35,6 +35,10 @@ Marcar solo lo necesario para el piloto inicial.
 - [ ] PICKUP
 - [ ] PAYMENT
 - [ ] Human handoff
+- [ ] Outbound messaging
+- [ ] Calendar / meeting sync
+
+Una capacidad disponible en el core no implica que el proveedor externo correspondiente esté activo. Cada canal o integración debe quedar configurado y probado para este tenant antes de prometerlo como parte del piloto.
 
 ## 4. Servicios o productos
 
@@ -97,15 +101,25 @@ Registrar las preguntas que más se repiten y la respuesta aprobada por el negoc
 
 - Número actual del negocio:
 - ¿Se conectará un número existente o se provisionará otro?
+- Proveedor previsto:
+- Estado de credenciales/configuración:
 - Número/persona de transferencia humana:
+- Readiness probado: sí / no
+- Llamada real de prueba completada: sí / no
+
+No activar voz comercial si el provider Live no está READY para el tenant.
 
 ### WhatsApp
 
 - Número de WhatsApp Business:
+- Proveedor/canal actual:
 - Estado actual del canal:
 - Alcance acordado para el piloto:
+- Inbound probado: sí / no
+- Outbound requerido: sí / no
+- Outbound probado: sí / no
 
-No prometer outbound automático Voice → WhatsApp hasta que el Outbound Messaging Engine esté implementado y certificado.
+El Outbound Messaging Engine existe, pero la entrega externa debe permanecer deshabilitada hasta que el proveedor, las credenciales y el alcance del tenant estén configurados y certificados. No prometer WhatsApp ilimitado ni campañas masivas como parte automática del piloto.
 
 ## 10. Integraciones existentes
 
@@ -116,7 +130,26 @@ No prometer outbound automático Voice → WhatsApp hasta que el Outbound Messag
 - Proveedor de pagos:
 - Otras herramientas importantes:
 
-Registrar necesidades futuras aunque todavía no formen parte del piloto. No prometer fecha de integración durante la reunión.
+### Calendar / meeting
+
+- Proveedor requerido:
+- Cuenta/conexión disponible:
+- Alcance: crear / reagendar / cancelar / enlace de reunión
+- Integración probada para el tenant: sí / no
+
+El core de sincronización de calendario existe, pero una integración externa solo forma parte del piloto cuando el proveedor concreto está conectado y probado.
+
+### Pagos
+
+- Merchant/proveedor:
+- Cuenta comercial disponible:
+- Checkout requerido:
+- Cobro real autorizado para el piloto: sí / no
+- Integración probada: sí / no
+
+No activar cobros reales sin cuenta merchant y autorización explícita del cliente.
+
+Registrar necesidades futuras aunque todavía no formen parte del piloto. No prometer fechas de integración no comprometidas.
 
 ## 11. Plan comercial
 
@@ -124,10 +157,13 @@ Registrar necesidades futuras aunque todavía no formen parte del piloto. No pro
 - Precio oficial:
 - Minutos incluidos:
 - Alcance WhatsApp acordado:
+- Integraciones incluidas:
 - Configuración inicial incluida: sí durante lanzamiento
 - Fecha objetivo de activación:
 - Responsable por parte de Helvoca:
 - Responsable por parte del cliente:
+
+Mientras V42 Plans / Entitlements / Billing no esté certificado en producción, el alta de los primeros clientes es asistida y los límites/condiciones deben quedar documentados expresamente.
 
 ## 12. Criterios para activar
 
@@ -142,8 +178,12 @@ No activar hasta cumplir:
 - [ ] límites y alcance del piloto entendidos;
 - [ ] pruebas de conversación realizadas;
 - [ ] acciones mutantes probadas;
+- [ ] handoff humano probado si se ofrece;
 - [ ] voz certificada si se habilita;
-- [ ] WhatsApp certificado si se habilita.
+- [ ] WhatsApp certificado si se habilita;
+- [ ] outbound certificado si se habilita;
+- [ ] calendario certificado si se habilita;
+- [ ] pagos certificados y autorizados si se habilitan.
 
 ## 13. Éxito del piloto
 
