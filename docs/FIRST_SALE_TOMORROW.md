@@ -1,143 +1,129 @@
-# Helvoca — primera venta mañana
+# Helvoca — primera venta hoy
 
 ## Objetivo
 
-Salir de la reunión con una acción concreta, en este orden de preferencia:
+Helvoca ya puede salir a venta asistida. El objetivo de cada reunión es terminar con una acción concreta, en este orden:
 
-1. cliente pagador;
-2. piloto aceptado con fecha de activación;
-3. segunda demo acordada usando datos reales del negocio.
+1. piloto pagado;
+2. piloto aceptado con fecha de configuración;
+3. segunda demo agendada usando datos reales del negocio.
 
 No considerar suficiente un cierre ambiguo como “mándame información y después vemos”.
 
-## Regla de alcance
+## Estado comercial actual
 
-Durante la preparación comercial se congela temporalmente el desarrollo de nuevas capacidades grandes. No se elimina ni desactiva nada existente. V32 Omnichannel Core sigue siendo el siguiente gran bloque técnico, pero no se implementa antes de la primera reunión si no mejora directamente la probabilidad de cerrar.
+La producción estable incluye el core multi-tenant, catálogo, conocimiento, reservas, operaciones universales, Policy Engine, Safe Retry, handoff humano durable, omnicanalidad, mensajería saliente, confirmaciones, jobs persistentes, calendario provider-neutral, observabilidad, RLS PostgreSQL y metering de uso.
 
-No tocar ni degradar:
+V42 Plans / Entitlements / Billing sigue en desarrollo y no debe bloquear la primera venta. Hasta cerrar V42, los primeros clientes se incorporan mediante onboarding y configuración asistidos.
 
-- Voice;
-- WhatsApp existente;
-- ORDER;
-- BOOKING;
-- QUOTE;
-- LEAD;
-- REQUEST;
-- DELIVERY;
-- PAYMENT;
-- Policy Engine;
-- Event Log;
-- Safe Retry Engine.
+Regla: que una capacidad exista en el core no significa que un proveedor externo esté activo para todos los tenants. Voz, WhatsApp, outbound, calendario y pagos solo se ofrecen como activos cuando la integración concreta del cliente está configurada y probada.
 
 ## Qué vender
 
-No vender “un chatbot” ni explicar arquitectura.
+No vender “un chatbot” ni explicar arquitectura salvo que el prospecto lo pida.
 
 Mensaje central:
 
 > Helvoca ayuda a que una llamada o un WhatsApp sin responder no se convierta en un cliente perdido. Atiende usando la información real del negocio y, según la configuración, puede transformar la conversación en una reserva, pedido, cotización, solicitud o siguiente paso concreto.
 
-## Preguntas de descubrimiento antes de mostrar la demo
+La promesa comercial inicial es un piloto asistido con alcance definido y medible.
+
+## Pitch de 30 segundos
+
+> Helvoca es una recepcionista digital para empresas. Atiende llamadas y canales habilitados usando la información real del negocio y puede hacer cosas concretas como reservar, cotizar, registrar solicitudes o tomar pedidos. Nosotros configuramos el primer piloto con tus datos y lo probamos contigo antes de activarlo.
+
+## Preguntas de descubrimiento
 
 1. ¿Qué ocurre cuando entra una llamada o WhatsApp y el equipo está ocupado?
 2. ¿Qué preguntan los clientes una y otra vez?
-3. ¿Qué acciones hacen normalmente después de responder: reservar, cotizar, pedir datos, tomar un pedido o derivar a alguien?
+3. ¿Qué acción hacen normalmente después de responder: reservar, cotizar, tomar un pedido, registrar datos o derivar a alguien?
 4. ¿Cuánto vale aproximadamente una reserva, pedido o cliente promedio?
 5. ¿Qué parte de esa atención les quita más tiempo actualmente?
 
-No interrogar durante demasiado tiempo. El objetivo es descubrir el dolor principal y adaptar la demo a él.
+No convertir la reunión en un interrogatorio. Identificar el dolor principal y adaptar la demo.
 
 ## Demo principal de 5–10 minutos
 
-### Apertura
-
-Decir en una frase qué resuelve Helvoca y conectar con el problema que el prospecto acaba de describir.
-
-### Secuencia
-
-1. Mostrar la landing comercial.
-2. Mostrar el negocio demo configurado.
-3. Hacer una consulta real de servicio/producto/precio.
-4. Pedir disponibilidad o una acción equivalente del rubro.
-5. Ejecutar una acción real permitida por el backend.
-6. Hacer una corrección del cliente para demostrar que la información nueva reemplaza la anterior cuando corresponde.
-7. Mostrar el resultado en el sistema.
-8. Mostrar planes.
+1. Mostrar `/sales.html`.
+2. Mostrar el tenant demo ya configurado.
+3. Hacer una consulta real de servicio, producto, precio o información.
+4. Pedir disponibilidad o la acción equivalente del negocio.
+5. Ejecutar una acción permitida por el backend.
+6. Corregir un dato para demostrar que la versión nueva reemplaza a la anterior cuando corresponde.
+7. Mostrar el resultado persistido en el sistema.
+8. Mostrar `/pricing.html`.
 9. Cerrar con una acción concreta.
 
-## Escenarios por tipo de negocio
+## Escenarios de demo
 
 ### Negocios con agenda
 
-Ejemplos: clínica administrativa, odontología, veterinaria, peluquería, estética, academia, gimnasio.
+Ejemplos: odontología, veterinaria, peluquería, estética, academia, gimnasio y atención administrativa.
 
-Demo:
-
-- preguntar por un servicio;
-- preguntar precio/duración si están configurados;
+- consultar servicio;
+- consultar precio/duración;
 - consultar disponibilidad;
 - crear reserva;
-- cambiar hora;
-- demostrar que se modifica la reserva y no se duplica;
-- cancelar si conviene demostrarlo.
+- reagendar;
+- comprobar que no se duplica;
+- cancelar si sirve para la demo.
 
-Capacidades principales: CATALOG + BOOKING + REQUEST + PAYMENT cuando esté configurado.
+Capacidades: CATALOG + BOOKING + REQUEST. PAYMENT solo cuando el proveedor del tenant esté configurado.
 
 ### Talleres y servicios profesionales
 
-Demo:
+- consultar servicios;
+- responder información oficial;
+- registrar necesidad;
+- crear cotización o solicitud;
+- reservar revisión o visita si corresponde.
 
-- consultar un servicio;
-- explicar información oficial;
-- registrar necesidad del cliente;
-- generar cotización o solicitud según alcance configurado;
-- agendar revisión/visita si corresponde.
-
-Capacidades principales: CATALOG + QUOTE + BOOKING + REQUEST.
+Capacidades: CATALOG + QUOTE + BOOKING + REQUEST.
 
 ### Restaurantes y comercios
 
-Demo:
-
 - consultar catálogo;
 - elegir productos;
-- crear pedido;
-- corregir cantidad o selección;
+- crear/corregir un pedido;
 - mostrar total calculado por backend;
-- explicar delivery/pickup si la capacidad está habilitada;
-- mostrar PAYMENT solo si el proveedor del tenant está configurado.
+- explicar pickup/delivery si está habilitado;
+- mostrar PAYMENT solo con integración merchant activa.
 
-Capacidades principales: CATALOG + ORDER + DELIVERY/PICKUP + PAYMENT.
+Capacidades: CATALOG + ORDER + DELIVERY/PICKUP + PAYMENT cuando corresponda.
 
 ### Inmobiliarias y negocios orientados a leads
 
-Demo:
-
-- consultar propiedad/servicio disponible;
-- recopilar necesidad real del cliente;
+- consultar información disponible;
+- recopilar necesidad;
 - registrar lead;
 - solicitar visita o seguimiento;
-- derivar si el caso requiere persona.
+- derivar a una persona cuando corresponda.
 
-Capacidades principales: CATALOG + LEAD + VISIT/BOOKING + REQUEST.
+Capacidades: CATALOG + LEAD + BOOKING + REQUEST.
 
-## Qué NO prometer mañana
+## Qué sí existe pero requiere activación concreta
 
-- continuidad perfecta Voice → WhatsApp como una única sesión antes de V32;
-- envío outbound automático de links por WhatsApp desde una llamada hasta implementar el Outbound Messaging Engine;
-- videollamada automática Google Meet/Zoom/Teams hasta integrar MeetingProvider;
+- continuidad omnicanal Voice / WhatsApp: el core existe, pero solo demostrarla con canales e identidad del tenant configurados y probados;
+- outbound messaging: el motor durable existe, pero la entrega externa permanece controlada por configuración/proveedor;
+- calendario y reuniones: el core de sincronización existe, pero una integración externa solo se promete cuando el proveedor del tenant esté conectado y certificado;
+- pagos: la operación y los adapters existen, pero el cobro real depende de la cuenta merchant y configuración del tenant;
+- voz: solo ofrecer demo telefónica real cuando readiness y proveedor Live estén operativos.
+
+## Qué NO prometer
+
 - WhatsApp ilimitado;
-- campañas masivas;
+- campañas masivas sin alcance contratado y proveedor adecuado;
 - cero errores de IA;
-- SLA enterprise;
-- funciones específicas no configuradas para ese tenant;
-- pago real si el tenant no tiene proveedor merchant configurado.
-
-Sí se puede explicar que estas piezas forman parte del roadmap cuando corresponda, diferenciando claramente “ya disponible” de “próximo”.
+- SLA enterprise no contratado;
+- funciones no habilitadas para ese tenant;
+- integraciones externas no conectadas;
+- pago real sin merchant configurado;
+- onboarding 100% automático mientras V42 y el provisionamiento comercial sigan cerrándose;
+- ROI garantizado.
 
 ## Oferta de lanzamiento
 
-Usar el catálogo oficial vigente:
+Catálogo vigente mientras V42 no lo sustituya formalmente:
 
 - Emprende: $24.990 CLP/mes, 100 minutos incluidos, excedente $149/min.
 - Negocio: $39.990 CLP/mes, 250 minutos incluidos, excedente $129/min.
@@ -146,23 +132,15 @@ Usar el catálogo oficial vigente:
 
 Durante el lanzamiento, la configuración inicial asistida está incluida.
 
-No inventar descuentos durante la reunión. Si se desea una condición especial para el primer cliente, dejarla por escrito y actualizar la oferta oficial antes de publicarla como precio general.
+No inventar descuentos durante una reunión. Cualquier condición especial debe quedar documentada.
 
-## Forma de explicar el precio
+## Cómo explicar el precio
 
-No defender el precio hablando de servidores, modelos o minutos.
+No defender el precio hablando de servidores, modelos o tokens.
 
-Preguntar cuánto vale un cliente promedio y comparar contra oportunidades recuperadas.
+Preguntar cuánto vale una oportunidad promedio y comparar el plan contra llamadas, reservas o ventas que hoy se pierden. Presentarlo como hipótesis de valor, no como retorno garantizado.
 
-Ejemplo:
-
-> Si una sola reserva que hoy se pierde vale más que el plan mensual, recuperar una de esas oportunidades ya puede justificar el piloto.
-
-No prometer un retorno que todavía no esté medido.
-
-## Cierre recomendado
-
-Cierre principal:
+## Cierre
 
 > Puedo configurarlo con sus servicios, horarios y forma de atender para que lo prueben directamente con su negocio. La configuración inicial está incluida y el plan parte desde $24.990 al mes. ¿Avanzamos con un piloto?
 
@@ -172,52 +150,30 @@ Si responde “mándame información”:
 
 Si responde “lo voy a pensar”:
 
-> Perfecto. ¿Qué parte necesitas evaluar antes de tomar la decisión: precio, confianza en la atención, integración o utilidad para el negocio?
+> Perfecto. ¿Qué parte necesitas evaluar antes de decidir: precio, confianza en la atención, integración o utilidad para el negocio?
 
-El objetivo no es presionar. Es descubrir la objeción real y acordar una siguiente acción concreta.
+El objetivo es descubrir la objeción real y acordar una siguiente acción, no presionar.
 
-## Objeciones frecuentes
+## Checklist técnico antes de salir
 
-### “Ya usamos WhatsApp”
+- [ ] producción Railway en SUCCESS;
+- [ ] `main` corresponde al SHA desplegado;
+- [ ] landing `/sales.html` disponible;
+- [ ] `/pricing.html` disponible y precios revisados;
+- [ ] tenant demo activo;
+- [ ] servicios/productos demo revisados;
+- [ ] precios demo confirmados;
+- [ ] horarios demo revisados;
+- [ ] Knowledge/FAQ demo revisado;
+- [ ] agente activo y saludo revisado;
+- [ ] capacidades demo habilitadas;
+- [ ] cinco conversaciones ensayadas;
+- [ ] corrección de datos ensayada;
+- [ ] caso desconocido ensayado sin inventar;
+- [ ] si se muestra voz real, readiness y llamada real comprobados;
+- [ ] si se muestra WhatsApp real, flujo del alcance acordado comprobado.
 
-Helvoca no busca reemplazar WhatsApp. Automatiza parte de la atención y comparte la misma información del negocio con otros canales habilitados.
-
-### “Ya tenemos agenda online”
-
-Helvoca no es solo una agenda. Puede conversar antes de la reserva, responder preguntas y ejecutar la acción cuando corresponde.
-
-### “Es caro”
-
-La entrada parte desde $24.990 al mes. Comparar contra el valor de una oportunidad que hoy se pierde cuando nadie responde.
-
-### “No confío en una IA atendiendo”
-
-Se configura y prueba antes de activar. Los datos y acciones críticas dependen de herramientas y validaciones del backend, no de que el modelo invente resultados.
-
-### “Quiero seguir hablando con mis clientes”
-
-Helvoca puede encargarse de consultas repetitivas y dejar intervención humana para los casos donde aporta más valor.
-
-## Checklist técnico antes de salir a la reunión
-
-- [ ] Production healthcheck verde.
-- [ ] CI de main verde.
-- [ ] Landing `/sales.html` abre correctamente.
-- [ ] `/pricing.html` abre y carga los precios oficiales.
-- [ ] Tenant demo activo.
-- [ ] Servicios/productos demo revisados.
-- [ ] Precios demo revisados.
-- [ ] Horarios demo revisados.
-- [ ] Knowledge/FAQ demo revisado.
-- [ ] Agente activo y saludo revisado.
-- [ ] Capacidades demo habilitadas correctamente.
-- [ ] Cinco conversaciones de demo probadas.
-- [ ] Al menos un flujo con corrección del usuario probado.
-- [ ] Flujo de error/desconocido probado sin inventar información.
-- [ ] Si se muestra voz real, llamada certificada.
-- [ ] Si se muestra WhatsApp real, flujo certificado para el alcance demostrado.
-
-## Cinco conversaciones que deben estar ensayadas
+## Cinco conversaciones obligatorias para la demo
 
 1. consulta simple de información;
 2. consulta de precio/servicio;
@@ -225,16 +181,21 @@ Helvoca puede encargarse de consultas repetitivas y dejar intervención humana p
 4. cambio de opinión/corrección;
 5. pregunta que Helvoca no sabe y debe manejar sin inventar.
 
-## Después de la reunión
+## Si acepta el piloto
 
-Registrar inmediatamente:
+Completar `docs/FIRST_CUSTOMER_ONBOARDING_FORM.md` antes de activar canales reales. Definir alcance, datos oficiales, capacidades, responsables, fecha y criterios de éxito.
 
-- problema principal detectado;
+## Después de cada reunión
+
+Registrar:
+
+- empresa y contacto;
+- problema principal;
 - capacidad que más valoró;
 - objeción principal;
-- plan sugerido;
+- plan o piloto discutido;
 - siguiente acción;
 - fecha acordada;
-- cambios de producto solicitados.
+- cambios solicitados.
 
-La primera venta debe alimentar el roadmap. Una necesidad expresada por un cliente que paga pesa más que una feature imaginada sin evidencia.
+La primera venta debe alimentar el roadmap. Una necesidad repetida por prospectos reales pesa más que una feature imaginada sin evidencia.
