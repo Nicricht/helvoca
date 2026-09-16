@@ -6,9 +6,9 @@ Conseguir los primeros 5 clientes pagadores mediante venta y onboarding asistido
 
 ## Estado de salida
 
-Helvoca puede venderse hoy como piloto asistido. V42 Plans / Entitlements / Billing sigue en desarrollo y no debe bloquear prospección, demos ni los primeros pilotos. Hasta su certificación, los límites y condiciones comerciales de cada cliente se documentan durante el onboarding.
+Helvoca puede venderse hoy como piloto asistido. V42 Plans / Entitlements / Billing ya está en producción, con planes, límites y entitlements respaldados por PostgreSQL y consumo medido desde V41.
 
-Las capacidades externas se ofrecen solo cuando el tenant concreto tiene el proveedor/canal configurado y probado. Que el core soporte una operación no equivale a que una cuenta de Twilio, WhatsApp, calendario o pagos esté activa para todos los clientes.
+Los primeros clientes continúan con onboarding asistido para controlar el alcance y aprender con uso real. Las capacidades externas se ofrecen solo cuando el tenant concreto tiene el proveedor/canal configurado y probado. Que el core soporte una operación no equivale a que una cuenta de Twilio, WhatsApp, calendario o pagos esté activa para todos los clientes.
 
 ## Oferta de lanzamiento
 
@@ -90,7 +90,7 @@ Saludos.
 3. Mostrar un tenant demo configurado.
 4. Hacer una consulta real de información/precio.
 5. Ejecutar la acción principal del caso de uso.
-6. Corregir un dato para demostrar que la nueva versión reemplaza la anterior.
+6. Corregir un dato para demostrar que la nueva versión reemplaza a la anterior.
 7. Mostrar el resultado persistido.
 8. Mostrar `/pricing.html`.
 9. Preguntar si quiere configurar un piloto con sus propios datos.
