@@ -469,40 +469,13 @@
         if (!dashboard.classList.contains('hidden')) load();
     }).observe(dashboard, { attributes: true, attributeFilter: ['class'] });
 
-    // The UX layer replaces the original advanced panel with a new shell.
-    // Pause observation while normalizing that shell so our own synchronous
-    // DOM writes cannot recursively schedule the observer again.
-    const configurationObserverOptions = {
-        childList: true,
-        subtree: true,
-        characterData: true,
-        attributes: true,
-        attributeFilter: ['aria-expanded']
-    };
-    const configurationObserver = new MutationObserver(() => {
-        configurationObserver.disconnect();
-        try {
-            const hub = document.querySelector('#advancedPanel.ux-config-hub');
-            if (hub) {
-                hub.dataset.uxEnhanced = 'true';
-                compactConfigNav();
-                cleanBusinessHeadings();
-                compactBusinessPanel();
-                compactPermissionsPanel();
-                setupBusinessDisclosure();
-            }
-            compactCommercialStatus();
-        } finally {
-            configurationObserver.observe(document.body, configurationObserverOptions);
-        }
-    });
-    configurationObserver.observe(document.body, configurationObserverOptions);
-
+    // The UX shell is built synchronously before this dynamically loaded script runs.
+    // Normalize it once. A global DOM observer here can feed back into the UX observer
+    // and keep the browser main thread busy after asynchronous dashboard updates.
     compactConfigNav();
     cleanBusinessHeadings();
     compactBusinessPanel();
     compactPermissionsPanel();
     setupBusinessDisclosure();
-    compactCommercialStatus();
     if (sessionStorage.getItem('helvoca_access_token')) load();
 })();

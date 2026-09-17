@@ -235,8 +235,9 @@
         if (!rows.length) {
             summary?.remove();
             modes.classList.remove('hidden');
-            existingPanel.classList.remove('hidden');
-            newPanel.classList.add('hidden');
+            if (existingPanel.classList.contains('hidden') && newPanel.classList.contains('hidden')) {
+                existingPanel.classList.remove('hidden');
+            }
             return;
         }
 
