@@ -365,3 +365,37 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
     color: var(--text) !important;
     background: rgba(255,255,255,.035) !important;
 }
+
+/* Compact configuration forms: same controls, less vertical weight. */
+#advancedPanel .ux-config-panel label {
+    gap: 4px !important;
+    font-size: 11px !important;
+}
+#advancedPanel .ux-config-panel input,
+#advancedPanel .ux-config-panel select {
+    min-height: 36px !important;
+    padding: 7px 9px !important;
+    border-radius: 9px !important;
+    font-size: 12px !important;
+}
+#advancedPanel .ux-config-panel textarea {
+    min-height: 72px !important;
+    padding: 8px 9px !important;
+    border-radius: 9px !important;
+    font-size: 12px !important;
+}
+#advancedPanel .ux-config-panel .two-col { gap: 8px !important; }
+#advancedPanel .repeat-list { gap: 7px !important; }
+#advancedPanel .repeat-row {
+    gap: 8px !important;
+    padding: 9px !important;
+    border-radius: 10px !important;
+}
+#advancedPanel .hour-row { gap: 7px !important; padding: 8px !important; }
+#advancedPanel .ux-config-panel .section-heading h2 { font-size: 15px !important; }
+#advancedPanel .ux-config-save { padding-top: 12px !important; }
+#advancedPanel .ux-config-save .button.large {
+    min-width: 150px !important;
+    min-height: 36px !important;
+    font-size: 12px !important;
+}
