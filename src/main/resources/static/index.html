@@ -12,6 +12,25 @@
         .agent-capability-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
         .agent-capability { flex-direction: row; align-items: center; gap: 9px; padding: 10px 12px; border: 1px solid rgba(255,255,255,.06); border-radius: 10px; background: rgba(255,255,255,.018); font-weight: 600; }
         .agent-help { color: var(--muted); font-size: 12px; line-height: 1.55; margin: 0; }
+        #configPermissionsPanel .agent-capability-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+        #configPermissionsPanel .agent-capability { min-height: 38px; justify-content: space-between; gap: 8px; padding: 7px 9px; font-size: 11px; font-weight: 650; }
+        #configPermissionsPanel .agent-capability input {
+            order: 2;
+            flex: 0 0 30px;
+            width: 30px;
+            height: 18px;
+            appearance: none;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: radial-gradient(circle at 7px 50%, #98a4b8 0 4px, transparent 5px), rgba(255,255,255,.04);
+            cursor: pointer;
+            transition: .16s ease;
+        }
+        #configPermissionsPanel .agent-capability input:checked {
+            border-color: rgba(124,92,255,.7);
+            background: radial-gradient(circle at 22px 50%, #fff 0 4px, transparent 5px), rgba(124,92,255,.55);
+        }
+        #configPermissionsPanel .agent-capability input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         textarea[name="agentGreeting"] { min-height: 74px; resize: vertical; }
         textarea[name="agentInstructions"] { min-height: 112px; resize: vertical; }
         #configKnowledgePanel .section-heading { align-items: center; margin-bottom: 8px; }
@@ -30,13 +49,14 @@
         #configKnowledgePanel .knowledge-row label { min-width: 0; gap: 3px !important; font-size: 10px !important; color: var(--muted); }
         #configKnowledgePanel .knowledge-row input { min-height: 34px !important; padding: 6px 8px !important; font-size: 12px !important; }
         #configKnowledgePanel .knowledge-row .remove-row { width: 30px !important; height: 34px !important; font-size: 18px !important; border-color: transparent !important; }
+        @media (max-width: 900px) { #configPermissionsPanel .agent-capability-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 760px) {
             #configKnowledgePanel .knowledge-row { grid-template-columns: 1fr 1fr; }
             #configKnowledgePanel .knowledge-row > label:first-child,
             #configKnowledgePanel .knowledge-row > label.grow { grid-column: 1 / -1; }
             #configKnowledgePanel .knowledge-row .remove-row { grid-column: 2; justify-self: end; }
         }
-        @media (max-width: 720px) { .agent-capability-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 720px) { .agent-capability-grid, #configPermissionsPanel .agent-capability-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -177,20 +197,20 @@
                     <label class="agent-toggle"><input name="agentActive" type="checkbox" checked> Agente IA activo para este negocio</label>
                     <p class="agent-help">Capacidades permitidas. Aunque un modelo intente saltarse esta selección, el backend bloqueará la operación.</p>
                     <div class="agent-capability-grid" id="agentCapabilities">
-                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="GET_BUSINESS_INFORMATION"> Información del negocio</label>
-                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="LIST_SERVICES"> Consultar servicios</label>
-                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="SEARCH_KNOWLEDGE"> Buscar conocimiento</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="GET_BUSINESS_INFORMATION"> Información</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="LIST_SERVICES"> Servicios</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="SEARCH_KNOWLEDGE"> Conocimiento</label>
                         <label class="agent-capability"><input type="checkbox" name="agentCapability" value="FIND_CALLER"> Identificar cliente</label>
                         <label class="agent-capability"><input type="checkbox" name="agentCapability" value="REGISTER_CALLER"> Registrar cliente</label>
-                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="LIST_AVAILABLE_SLOTS"> Listar horarios disponibles</label>
-                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="CHECK_BOOKING_AVAILABILITY"> Comprobar disponibilidad</label>
-                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="CREATE_BOOKING"> Crear reservas</label>
-                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="LIST_CUSTOMER_BOOKINGS"> Consultar reservas del cliente</label>
-                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="RESCHEDULE_BOOKING"> Reprogramar reservas</label>
-                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="CANCEL_BOOKING"> Cancelar reservas</label>
-                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="CREATE_REQUEST"> Crear solicitudes</label>
-                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="RECORD_UNANSWERED_QUESTION"> Aprender preguntas pendientes</label>
-                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="TRANSFER_TO_HUMAN"> Transferir a una persona</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="LIST_AVAILABLE_SLOTS"> Ver horarios</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="CHECK_BOOKING_AVAILABILITY"> Comprobar horario</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="CREATE_BOOKING"> Crear reserva</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="LIST_CUSTOMER_BOOKINGS"> Ver reservas</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="RESCHEDULE_BOOKING"> Reprogramar</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="CANCEL_BOOKING"> Cancelar reserva</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="CREATE_REQUEST"> Crear solicitud</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="RECORD_UNANSWERED_QUESTION"> Guardar pregunta</label>
+                        <label class="agent-capability"><input type="checkbox" name="agentCapability" value="TRANSFER_TO_HUMAN"> Transferir a persona</label>
                     </div>
 
                     <div class="section-heading divider"><div><div class="eyebrow">Servicios</div><h2>Qué puede reservar un cliente</h2></div><button id="addServiceBtn" class="button small ghost" type="button">+ Servicio</button></div>
