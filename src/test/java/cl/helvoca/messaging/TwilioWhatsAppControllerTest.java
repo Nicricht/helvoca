@@ -72,6 +72,37 @@ class TwilioWhatsAppControllerTest {
     }
 
     @Test
+    void realisticTwilioPayloadPreservesMessageFields() {
+        WhatsAppReceptionistService receptionist = mock(WhatsAppReceptionistService.class);
+        WhatsAppProperties properties = new WhatsAppProperties();
+        properties.setEnabled(true);
+        properties.setWebhookValidationEnabled(false);
+        TwilioProperties twilio = new TwilioProperties();
+
+        LinkedMultiValueMap<String, String> payload = new LinkedMultiValueMap<>();
+        payload.add("MessageSid", "SM-real-123");
+        payload.add("From", "whatsapp:+56912345678");
+        payload.add("To", "whatsapp:+56987654321");
+        payload.add("Body", "  Quiero reservar a las 18:30 & pagar  ");
+        when(receptionist.handle(
+                "SM-real-123",
+                "whatsapp:+56912345678",
+                "whatsapp:+56987654321",
+                "  Quiero reservar a las 18:30 & pagar  "))
+                .thenReturn("ok");
+
+        var response = new TwilioWhatsAppController(receptionist, properties, twilio)
+                .inbound(null, payload);
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(receptionist).handle(
+                "SM-real-123",
+                "whatsapp:+56912345678",
+                "whatsapp:+56987654321",
+                "  Quiero reservar a las 18:30 & pagar  ");
+    }
+
+    @Test
     void acceptedWebhookEscapesReplyInTwiml() {
         WhatsAppReceptionistService receptionist = mock(WhatsAppReceptionistService.class);
         WhatsAppProperties properties = new WhatsAppProperties();
