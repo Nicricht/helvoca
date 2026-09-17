@@ -158,7 +158,7 @@ function renderKnowledge(items = []) {
 }
 
 function renderAgent(agent = {}, business = {}) {
-    setupForm.elements.agentName.value = agent.name || "RecepVoz";
+    setupForm.elements.agentName.value = agent.name || "Helvoca";
     setupForm.elements.agentVoice.value = agent.voice || "";
     setupForm.elements.agentGreeting.value = agent.greeting ||
         `Hola, gracias por llamar a ${business.name || "nuestro negocio"}. ¿En qué puedo ayudarte?`;
@@ -172,7 +172,7 @@ function renderAgent(agent = {}, business = {}) {
 
 function collectAgent() {
     return {
-        name: setupForm.elements.agentName.value.trim() || "RecepVoz",
+        name: setupForm.elements.agentName.value.trim() || "Helvoca",
         language: setupForm.elements.language.value.trim() || detectedLanguage(),
         voice: setupForm.elements.agentVoice.value.trim() || null,
         greeting: setupForm.elements.agentGreeting.value.trim(),
