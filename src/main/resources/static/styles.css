@@ -345,3 +345,23 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
         align-items: center !important;
     }
 }
+
+/* Compact secondary dashboard action: keep configuration one click away. */
+#dashboardView .secondary-actions {
+    justify-content: flex-end !important;
+    margin: 8px 0 6px !important;
+    gap: 0 !important;
+}
+#dashboardView .secondary-actions > span { display: none !important; }
+#dashboardView #advancedToggleBtn {
+    min-height: 30px !important;
+    padding: 0 9px !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    color: var(--muted) !important;
+    font-size: 11px !important;
+}
+#dashboardView #advancedToggleBtn:hover {
+    color: var(--text) !important;
+    background: rgba(255,255,255,.035) !important;
+}
