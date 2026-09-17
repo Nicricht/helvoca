@@ -97,8 +97,35 @@
             display: none !important;
         }
         #dashboardView .dashboard-heading { margin-bottom: 12px !important; }
-        #dashboardView .status-card { min-height: 52px !important; }
         #dashboardView .ai-onboarding-card { padding-top: 16px !important; }
+
+        #dashboardView .status-grid {
+            display: flex !important;
+            flex-wrap: wrap;
+            gap: 6px !important;
+            margin: 0 0 12px !important;
+        }
+        #dashboardView .status-card {
+            flex: 0 0 auto;
+            min-height: 30px !important;
+            padding: 5px 9px !important;
+            gap: 6px !important;
+            border: 0 !important;
+            border-radius: 999px !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+        #dashboardView .status-card .dot {
+            flex: 0 0 7px !important;
+            width: 7px !important;
+            height: 7px !important;
+            box-shadow: none !important;
+        }
+        #dashboardView .status-card.done .dot { box-shadow: none !important; }
+        #dashboardView .status-card strong {
+            font-size: 11px !important;
+            font-weight: 700 !important;
+        }
     `;
     document.head.appendChild(actionStyle);
 
