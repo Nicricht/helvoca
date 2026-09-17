@@ -95,16 +95,18 @@ test('ready customer sees an operational dashboard with progressive disclosure',
 
   await expect(page.locator('#advancedPanel')).toBeVisible();
   await expect(page.locator('#configBusinessPanel')).toBeHidden();
-  await page.getByRole('button', { name: 'Negocio y agente' }).click();
+  await page.getByRole('button', { name: 'Negocio', exact: true }).click();
   await expect(page.locator('#configBusinessPanel')).toBeVisible();
 
   await expect(page.locator('#commercialStatusCard')).toBeVisible();
   await expect(page.locator('#commercialPlans')).toBeHidden();
-  await expect(page.getByText('Pro · 477 min disponibles')).toBeVisible();
-  await page.getByRole('button', { name: 'Gestionar plan' }).click();
+  await expect(page.getByText('Pro · 477 min')).toBeVisible();
+  await page.getByRole('button', { name: 'Gestionar', exact: true }).click();
   await expect(page.locator('#commercialPlans')).toBeVisible();
 
   await page.getByRole('button', { name: 'Teléfono' }).click();
+  await expect(page.locator('#phoneCompactSummary').getByText('+56911111111')).toBeVisible();
+  await page.getByRole('button', { name: 'Cambiar' }).click();
   await expect(page.getByRole('button', { name: 'Conectar mi número' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Buscar un número nuevo' })).toBeVisible();
   await expect(page.locator('#provisioningSearchForm')).toBeHidden();

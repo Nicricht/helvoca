@@ -132,7 +132,7 @@ test('operations console loads readiness, certification, commercial metrics, cal
   await expect(page.locator('#callActions')).toContainText('REQUEST_CREATED');
   await expect(page.locator('#callActions')).toContainText('Revisar equipo');
   await expect(page.locator('#callTranscript')).toContainText('Necesito una cotización');
-  await expect(page.locator('#callTranscript')).toContainText('RecepVoz');
+  await expect(page.locator('#callTranscript')).toContainText('Helvoca');
 
   await page.locator('#newRequestBtn').click();
   await page.locator('#requestForm [name=requestType]').fill('cotización');
@@ -149,6 +149,6 @@ test('operations console loads readiness, certification, commercial metrics, cal
   await page.locator('[data-question-id="q1"] [data-answer-btn]').click();
 
   await expect(page.locator('#unknownQuestions')).toHaveText('0');
-  await expect(page.getByText('RecepVoz no tiene preguntas pendientes. ✨')).toBeVisible();
+  await expect(page.getByText('Helvoca no tiene preguntas pendientes. ✨')).toBeVisible();
   await expect(page.locator('#message')).toHaveText('Respuesta aprendida y guardada en conocimiento.');
 });

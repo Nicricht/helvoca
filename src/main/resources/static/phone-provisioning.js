@@ -236,10 +236,13 @@
         let summary = panel.querySelector('#phoneCompactSummary');
 
         if (!rows.length) {
+            const hadSummary = Boolean(summary);
             summary?.remove();
             modes.classList.remove('hidden');
-            existingPanel.classList.remove('hidden');
-            newPanel.classList.add('hidden');
+            if (hadSummary) {
+                existingPanel.classList.remove('hidden');
+                newPanel.classList.add('hidden');
+            }
             return;
         }
 
@@ -282,9 +285,10 @@
         const active = Boolean(row.querySelector('.phone-state.active'));
         const numberNode = summary.querySelector('.phone-summary-number');
         const stateNode = summary.querySelector('.phone-summary-state');
-        if (numberNode) numberNode.textContent = number;
+        if (numberNode && numberNode.textContent !== number) numberNode.textContent = number;
         if (stateNode) {
-            stateNode.textContent = active ? '· Activo' : '· Inactivo';
+            const state = active ? '· Activo' : '· Inactivo';
+            if (stateNode.textContent !== state) stateNode.textContent = state;
             stateNode.classList.toggle('active', active);
         }
 
@@ -295,7 +299,15 @@
         }
     }
 
-    const observer = new MutationObserver(syncPhoneSummary);
-    observer.observe(document.body, { childList: true, subtree: true });
+    const observerOptions = { childList: true, subtree: true };
+    const observer = new MutationObserver(() => {
+        observer.disconnect();
+        try {
+            syncPhoneSummary();
+        } finally {
+            observer.observe(document.body, observerOptions);
+        }
+    });
+    observer.observe(document.body, observerOptions);
     syncPhoneSummary();
 })();
