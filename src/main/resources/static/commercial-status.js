@@ -31,6 +31,15 @@
         .commercial-plan .button { margin-top: auto; width: 100%; }
         .commercial-plan-tag { display: inline-flex; align-self: flex-start; font-size: 10px; font-weight: 800; letter-spacing: .04em; padding: 4px 7px; border-radius: 999px; border: 1px solid rgba(255,255,255,.1); }
         .commercial-plan-message { margin-top: 12px; }
+
+        /* Compact summary stays lightweight; details remain one click away. */
+        #commercialStatusCard.ux-commercial-card { margin: 8px 0 !important; border-radius: 14px !important; box-shadow: none !important; }
+        #commercialStatusCard .ux-commercial-summary { padding: 10px 12px !important; gap: 10px !important; }
+        #commercialStatusCard .ux-commercial-summary-copy .eyebrow { display: none !important; }
+        #commercialStatusCard .ux-commercial-headline { font-size: 14px !important; }
+        #commercialStatusCard .ux-commercial-meta { margin-top: 2px !important; font-size: 11px !important; }
+        #commercialStatusCard #commercialManageBtn { min-height: 30px !important; padding: 0 9px !important; font-size: 11px !important; }
+
         @media (max-width: 980px) { .commercial-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 820px) { .commercial-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 520px) { .commercial-grid, .commercial-plans { grid-template-columns: 1fr; } .commercial-heading, .commercial-foot { flex-direction: column; } }
