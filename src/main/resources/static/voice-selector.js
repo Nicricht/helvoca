@@ -4,6 +4,38 @@
     const advancedToggle = document.querySelector('#advancedToggleBtn');
     if (!setupForm || !dashboard || typeof api !== 'function') return;
 
+    const actionStyle = document.createElement('style');
+    actionStyle.id = 'helvoca-action-hierarchy-styles';
+    actionStyle.textContent = `
+        #dashboardView .ai-form .button.primary,
+        #advancedPanel .ux-config-save .button.primary,
+        #configPhonePanel form .button.primary {
+            font-weight: 900 !important;
+            box-shadow: 0 8px 22px rgba(124,92,255,.20) !important;
+        }
+
+        #dashboardView #refreshBtn,
+        #dashboardView #advancedToggleBtn,
+        #advancedPanel #addServiceBtn,
+        #advancedPanel #addKnowledgeBtn,
+        #commercialStatusCard #commercialManageBtn {
+            background: transparent !important;
+            border-color: transparent !important;
+            color: var(--muted) !important;
+            box-shadow: none !important;
+        }
+
+        #dashboardView #refreshBtn:hover,
+        #dashboardView #advancedToggleBtn:hover,
+        #advancedPanel #addServiceBtn:hover,
+        #advancedPanel #addKnowledgeBtn:hover,
+        #commercialStatusCard #commercialManageBtn:hover {
+            color: var(--text) !important;
+            background: rgba(255,255,255,.035) !important;
+        }
+    `;
+    document.head.appendChild(actionStyle);
+
     const original = setupForm.elements.agentVoice;
     if (!original) return;
 
