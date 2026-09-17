@@ -33,8 +33,23 @@
             color: var(--text) !important;
             background: rgba(255,255,255,.035) !important;
         }
+
+        #configBusinessPanel > .section-heading:first-child h2::after,
+        #configBusinessPanel > .section-heading.divider h2::after {
+            content: none !important;
+        }
     `;
     document.head.appendChild(actionStyle);
+
+    function cleanBusinessHeadings() {
+        const panel = document.querySelector('#configBusinessPanel');
+        if (!panel) return;
+        const headings = panel.querySelectorAll('.section-heading');
+        const businessTitle = headings[0]?.querySelector('h2');
+        const agentTitle = headings[1]?.querySelector('h2');
+        if (businessTitle) businessTitle.textContent = 'Negocio';
+        if (agentTitle) agentTitle.textContent = 'Agente';
+    }
 
     const original = setupForm.elements.agentVoice;
     if (!original) return;
@@ -138,8 +153,12 @@
     // attempt a second transformation pass.
     new MutationObserver(() => {
         const hub = document.querySelector('#advancedPanel.ux-config-hub');
-        if (hub) hub.dataset.uxEnhanced = 'true';
+        if (hub) {
+            hub.dataset.uxEnhanced = 'true';
+            cleanBusinessHeadings();
+        }
     }).observe(document.body, { childList: true, subtree: true });
 
+    cleanBusinessHeadings();
     if (sessionStorage.getItem('helvoca_access_token')) load();
 })();
