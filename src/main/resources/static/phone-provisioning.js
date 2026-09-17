@@ -6,34 +6,36 @@
 
     const style = document.createElement('style');
     style.textContent = `
-        .provisioning-panel { margin: 18px 0 22px; padding: 16px; border: 1px solid rgba(124,92,255,.24); border-radius: 14px; background: rgba(124,92,255,.055); }
-        .provisioning-panel h3 { margin: 0 0 6px; font-size: 15px; }
-        .provisioning-panel p { margin: 0 0 12px; font-size: 12px; line-height: 1.55; }
-        .provisioning-status { display: inline-flex; margin-bottom: 12px; }
-        .provisioning-form { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-        .provisioning-form .button { grid-column: 1 / -1; }
-        .provisioning-results { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-        .provisioning-result { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 11px; border: 1px solid rgba(255,255,255,.08); border-radius: 11px; background: rgba(0,0,0,.12); }
+        .provisioning-panel { margin: 8px 0 10px; padding: 10px; border: 1px solid rgba(124,92,255,.24); border-radius: 11px; background: rgba(124,92,255,.055); }
+        .provisioning-panel h3 { margin: 0 0 4px; font-size: 13px; }
+        .provisioning-panel p { margin: 0 0 8px; font-size: 11px; line-height: 1.4; }
+        .provisioning-status { display: inline-flex; min-height: 26px; margin-bottom: 8px; font-size: 10px; }
+        .provisioning-form { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+        .provisioning-form label { gap: 4px; font-size: 11px; }
+        .provisioning-form input { min-height: 34px; padding: 7px 9px; border-radius: 9px; font-size: 12px; }
+        .provisioning-form .button { grid-column: 1 / -1; min-height: 34px; font-size: 11px; }
+        .provisioning-results { display: flex; flex-direction: column; gap: 7px; margin-top: 8px; }
+        .provisioning-result { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 9px; background: rgba(0,0,0,.12); }
         .provisioning-result strong, .provisioning-result small { display: block; }
-        .provisioning-result small { margin-top: 3px; color: var(--muted); line-height: 1.35; }
-        .manual-phone-divider { border-top: 1px solid var(--border); padding-top: 18px; margin-top: 18px; }
+        .provisioning-result small { margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 1.3; }
+        .manual-phone-divider { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
         @media (max-width: 520px) { .provisioning-form { grid-template-columns: 1fr; } .provisioning-form .button { grid-column: auto; } }
     `;
     document.head.appendChild(style);
 
     const intro = sideCard.querySelector('p');
-    if (intro) intro.textContent = 'Busca un número disponible con Twilio o conecta uno que ya tengas. Ningún aprovisionamiento ocurre durante la búsqueda.';
+    if (intro) intro.textContent = 'Conecta un número o busca uno nuevo.';
 
     const panel = document.createElement('section');
     panel.className = 'provisioning-panel';
     panel.innerHTML = `
         <h3>Número nuevo con Twilio</h3>
-        <p>La búsqueda no genera cargos. El aprovisionamiento requiere una confirmación separada y puede generar cargos del proveedor.</p>
+        <p>Buscar no cobra. Aprovisionar requiere confirmación y puede generar cargos.</p>
         <span id="provisioningStatus" class="badge muted provisioning-status">Comprobando disponibilidad</span>
         <form id="provisioningSearchForm" class="provisioning-form">
             <label>País ISO<input name="country" required maxlength="2" value="CL" placeholder="CL"></label>
             <label>Código de área <span class="optional">opcional</span><input name="areaCode" inputmode="numeric" maxlength="8" placeholder="2"></label>
-            <button id="provisioningSearchBtn" class="button secondary" type="submit">Buscar números disponibles</button>
+            <button id="provisioningSearchBtn" class="button secondary" type="submit">Buscar números</button>
         </form>
         <div id="provisioningMessage" class="message hidden"></div>
         <div id="provisioningResults" class="provisioning-results"></div>
@@ -42,7 +44,7 @@
 
     const divider = document.createElement('div');
     divider.className = 'manual-phone-divider';
-    divider.innerHTML = '<div class="eyebrow">Número existente</div><p class="muted-text">Si ya tienes un número provisionado, conéctalo manualmente aquí.</p>';
+    divider.innerHTML = '<div class="eyebrow">Número existente</div><p class="muted-text">Conecta un número que ya tengas.</p>';
     sideCard.insertBefore(divider, manualForm);
 
     const statusBadge = panel.querySelector('#provisioningStatus');
