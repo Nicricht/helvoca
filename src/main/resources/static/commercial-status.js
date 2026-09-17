@@ -306,7 +306,9 @@
         #dashboardView #statusGrid.ux-ready-hidden { display: none !important; }
         #operationalOverview { margin: 0 0 18px; padding: 18px; }
         .home-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-        .home-metric { min-height: 76px; padding: 13px 14px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.025); }
+        .home-metric { min-height: 76px; padding: 13px 14px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.025); color: inherit; text-decoration: none; cursor: pointer; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
+        .home-metric:hover { border-color: rgba(124,92,255,.42); background: rgba(124,92,255,.07); transform: translateY(-1px); }
+        .home-metric:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         .home-metric strong, .home-metric span { display: block; }
         .home-metric strong { font-size: 24px; line-height: 1; letter-spacing: -.03em; }
         .home-metric span { margin-top: 7px; color: var(--muted); font-size: 11px; }
@@ -333,10 +335,10 @@
     overview.className = 'card hidden';
     overview.innerHTML = `
         <div class="home-metrics" aria-label="Actividad de hoy">
-            <article class="home-metric"><strong id="homeCallsToday">–</strong><span>Llamadas hoy</span></article>
-            <article class="home-metric"><strong id="homeWhatsAppToday">–</strong><span>WhatsApp hoy</span></article>
-            <article class="home-metric"><strong id="homeBookingsToday">–</strong><span>Reservas hoy</span></article>
-            <article class="home-metric"><strong id="homePending">–</strong><span>Pendientes</span></article>
+            <a id="homeCallsMetric" class="home-metric" href="/conversations.html?channel=calls" aria-label="Ver llamadas de hoy"><strong id="homeCallsToday">–</strong><span>Llamadas hoy</span></a>
+            <a id="homeWhatsAppMetric" class="home-metric" href="/conversations.html?channel=whatsapp" aria-label="Ver conversaciones de WhatsApp de hoy"><strong id="homeWhatsAppToday">–</strong><span>WhatsApp hoy</span></a>
+            <a id="homeBookingsMetric" class="home-metric" href="/operations.html?tab=bookings" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>Reservas hoy</span></a>
+            <a id="homePendingMetric" class="home-metric" href="/operations.html?tab=requests" aria-label="Ver pendientes"><strong id="homePending">–</strong><span>Pendientes</span></a>
         </div>
         <div class="home-activity-head">
             <h2>Actividad reciente</h2>

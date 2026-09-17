@@ -7,7 +7,8 @@ if (!token) location.replace("/");
 
 let calls = [];
 let whatsappConversations = [];
-let activeChannel = "all";
+const requestedChannel = new URLSearchParams(window.location.search).get("channel");
+let activeChannel = ["all", "calls", "whatsapp"].includes(requestedChannel) ? requestedChannel : "all";
 let selectedConversationKey = null;
 
 const EVENT_LABELS = {
@@ -291,4 +292,5 @@ $("#refreshBtn").addEventListener("click", async event => {
   try { await load(); } finally { event.currentTarget.disabled = false; }
 });
 
+setChannel(activeChannel);
 load();

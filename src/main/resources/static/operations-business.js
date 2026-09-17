@@ -212,6 +212,8 @@
   if (requests) new MutationObserver(syncRequestCount).observe(requests, { childList: true, subtree: true });
   $("#refreshBtn")?.addEventListener("click", loadBusinessWorkspace);
 
-  setTab("bookings");
+  const requestedTab = new URLSearchParams(window.location.search).get("tab");
+  const initialTab = ["bookings", "orders", "requests", "customers"].includes(requestedTab) ? requestedTab : "bookings";
+  setTab(initialTab);
   loadBusinessWorkspace();
 })();

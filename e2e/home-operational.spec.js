@@ -86,6 +86,10 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeWhatsAppToday')).toHaveText('1');
   await expect(page.locator('#homeBookingsToday')).toHaveText('2');
   await expect(page.locator('#homePending')).toHaveText('3');
+  await expect(page.locator('#homeCallsMetric')).toHaveAttribute('href', '/conversations.html?channel=calls');
+  await expect(page.locator('#homeWhatsAppMetric')).toHaveAttribute('href', '/conversations.html?channel=whatsapp');
+  await expect(page.locator('#homeBookingsMetric')).toHaveAttribute('href', '/operations.html?tab=bookings');
+  await expect(page.locator('#homePendingMetric')).toHaveAttribute('href', '/operations.html?tab=requests');
   await expect(page.locator('#homeRecentActivity')).toContainText('+56922222222');
   await expect(page.locator('#homeRecentActivity')).toContainText('+56911111111');
   await expect(page.locator('.nav-conversations')).toHaveAttribute('href', '/conversations.html');
