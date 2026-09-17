@@ -84,7 +84,7 @@ test('AI agent voice is selected from the backend catalog and never typed freely
   await page.route('**/api/v1/public/pricing', route => route.fulfill(json([])));
 
   await page.goto('/');
-  await page.locator('#advancedToggleBtn').click();
+  await page.locator('#advancedPanel .ux-config-nav button[aria-controls="configBusinessPanel"]').click();
 
   const selector = page.locator('#agentVoiceSelect');
   await expect(selector).toBeVisible();
