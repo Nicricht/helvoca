@@ -1,0 +1,32 @@
+/* Business workspace: customer-visible reservations, orders and people. */
+.business-workspace{margin-bottom:16px}
+.business-tabs{display:flex;align-items:center;gap:6px;margin:0 0 10px;overflow-x:auto;padding:2px 0;scrollbar-width:thin}
+#businessTabs .business-tab{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;min-height:34px;padding:5px 10px;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.018);color:var(--muted);font-size:11px;font-weight:800;box-shadow:none}
+#businessTabs .business-tab:hover{color:var(--text);background:rgba(255,255,255,.04)}
+#businessTabs .business-tab.active{color:#e5e0ff;border-color:rgba(124,92,255,.38);background:rgba(124,92,255,.15)}
+#businessTabs .business-tab strong{display:grid;place-items:center;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:rgba(255,255,255,.06);color:inherit;font-size:9px}
+.business-panel{margin-bottom:0}
+.business-panel .panel-head{margin-bottom:12px}
+.business-list{display:grid;gap:8px}
+.business-row{padding:13px 14px;border:1px solid var(--border-soft);border-radius:13px;background:rgba(255,255,255,.018)}
+.business-row-main{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.business-row-copy{min-width:0}
+.business-row-copy strong,.business-row-copy span{display:block}
+.business-row-copy strong{font-size:13px;line-height:1.35}
+.business-row-copy>span{margin-top:3px;color:var(--muted);font-size:10px;line-height:1.4}
+.business-kicker{margin-bottom:4px!important;color:#cfc7ff!important;font-size:10px!important;font-weight:800!important;text-transform:uppercase;letter-spacing:.06em}
+.business-meta{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px;color:var(--muted);font-size:10px}
+.order-lines{display:grid;gap:5px;margin-top:11px;padding-top:10px;border-top:1px solid var(--border-soft)}
+.order-line{display:flex;justify-content:space-between;gap:14px;color:#dbe1ec;font-size:11px}
+.order-line span:last-child{color:var(--muted);white-space:nowrap}
+.order-total{display:flex;justify-content:space-between;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-soft);font-size:12px;font-weight:850}
+.business-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.business-actions .button,.business-actions button{min-height:32px;padding:0 10px;font-size:10px}
+.loading-line{padding:18px;text-align:center;color:var(--muted);font-size:11px}
+.business-error{padding:12px 13px;border:1px solid rgba(255,113,135,.22);border-radius:11px;background:rgba(255,113,135,.06);color:#ff9bad;font-size:11px}
+.customer-contact{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px;color:var(--muted);font-size:10px}
+@media(max-width:620px){
+  .business-row-main{align-items:flex-start}
+  .order-line{align-items:flex-start;flex-direction:column;gap:2px}
+  .business-actions{display:grid;grid-template-columns:1fr}
+}
