@@ -26,6 +26,9 @@ public class PhoneNumber {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "whatsapp_enabled", nullable = false)
+    private boolean whatsappEnabled = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -53,6 +56,8 @@ public class PhoneNumber {
     public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public boolean isWhatsappEnabled() { return whatsappEnabled; }
+    public void setWhatsappEnabled(boolean whatsappEnabled) { this.whatsappEnabled = whatsappEnabled; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
