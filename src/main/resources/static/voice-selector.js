@@ -38,6 +38,18 @@
         #configBusinessPanel > .section-heading.divider h2::after {
             content: none !important;
         }
+
+        #businessAdvancedToggle {
+            align-self: flex-start;
+            min-height: 30px;
+            padding: 0 4px;
+            margin-top: -2px;
+            background: transparent !important;
+            border-color: transparent !important;
+            color: var(--muted) !important;
+            box-shadow: none !important;
+        }
+        #businessAdvancedToggle:hover { color: var(--text) !important; }
     `;
     document.head.appendChild(actionStyle);
 
@@ -49,6 +61,48 @@
         const agentTitle = headings[1]?.querySelector('h2');
         if (businessTitle) businessTitle.textContent = 'Negocio';
         if (agentTitle) agentTitle.textContent = 'Agente';
+    }
+
+    function setupBusinessDisclosure() {
+        const panel = document.querySelector('#configBusinessPanel');
+        if (!panel || document.querySelector('#businessAdvancedToggle')) return;
+
+        const headings = panel.querySelectorAll('.section-heading');
+        const businessFields = panel.querySelector('.two-col');
+        const businessLabels = businessFields ? [...businessFields.children] : [];
+        const agentHeading = headings[1];
+        const agentFields = agentHeading?.nextElementSibling;
+        const greeting = setupForm.elements.agentGreeting?.closest('label');
+        const instructions = setupForm.elements.agentInstructions?.closest('label');
+        const agentToggle = panel.querySelector('.agent-toggle');
+
+        const advancedFields = [
+            businessLabels[2],
+            businessLabels[3],
+            agentHeading,
+            agentFields,
+            greeting,
+            instructions
+        ].filter(Boolean);
+
+        advancedFields.forEach(node => node.classList.add('hidden'));
+
+        const toggle = document.createElement('button');
+        toggle.id = 'businessAdvancedToggle';
+        toggle.type = 'button';
+        toggle.className = 'button small ghost';
+        toggle.textContent = 'Mostrar ajustes avanzados';
+        toggle.setAttribute('aria-expanded', 'false');
+
+        toggle.addEventListener('click', () => {
+            const opening = toggle.getAttribute('aria-expanded') !== 'true';
+            advancedFields.forEach(node => node.classList.toggle('hidden', !opening));
+            toggle.setAttribute('aria-expanded', String(opening));
+            toggle.textContent = opening ? 'Ocultar ajustes avanzados' : 'Mostrar ajustes avanzados';
+        });
+
+        if (agentToggle) agentToggle.insertAdjacentElement('afterend', toggle);
+        else panel.appendChild(toggle);
     }
 
     const original = setupForm.elements.agentVoice;
@@ -156,9 +210,11 @@
         if (hub) {
             hub.dataset.uxEnhanced = 'true';
             cleanBusinessHeadings();
+            setupBusinessDisclosure();
         }
     }).observe(document.body, { childList: true, subtree: true });
 
     cleanBusinessHeadings();
+    setupBusinessDisclosure();
     if (sessionStorage.getItem('helvoca_access_token')) load();
 })();
