@@ -12,11 +12,8 @@
     .topbar .app-nav a{display:inline-flex;align-items:center;min-height:30px;padding:5px 9px;border:1px solid transparent;border-radius:999px;background:transparent;color:#6c7d77;text-decoration:none;font-size:11px;font-weight:750;white-space:nowrap}
     .topbar .app-nav a:hover{color:#173f35;background:#f1f5f3}
     .topbar .app-nav a.active{color:#173f35;border-color:#d5e5df;background:#e8f3ef}
-    body:has(#conversations:target) .app-nav .nav-operations.active{color:#6c7d77;border-color:transparent;background:transparent}
-    body:has(#conversations:target) .app-nav .nav-conversations{color:#173f35;border-color:#d5e5df;background:#e8f3ef}
     .operations-actions{display:flex;align-items:center;gap:6px}
     .topbar .operations-actions a{padding:8px 10px;font-size:11px;background:#f1f5f3;color:#45665d}
-    #conversations{scroll-margin-top:96px}
     @media(max-width:760px){.operations-nav-shell{width:100%;justify-content:flex-start}.app-nav{overflow-x:auto;flex-wrap:nowrap;max-width:100%;padding-bottom:2px}.operations-actions{margin-left:auto}}
   </style>
 </head>
@@ -26,7 +23,7 @@
   <div class="operations-nav-shell">
     <nav class="app-nav" aria-label="Navegación principal">
       <a class="nav-home" href="/">Inicio</a>
-      <a class="nav-conversations" href="/operations.html#conversations">Conversaciones</a>
+      <a class="nav-conversations" href="/conversations.html">Conversaciones</a>
       <a class="nav-operations active" href="/operations.html">Operaciones</a>
       <a class="nav-config" href="/#configuration">Configuración</a>
     </nav>
@@ -123,5 +120,11 @@
   <p id="message" class="message hidden"></p>
 </main>
 <script src="/operations.js" defer></script>
+<script>
+  if (location.hash === '#conversations') location.replace('/conversations.html');
+  addEventListener('hashchange', () => {
+    if (location.hash === '#conversations') location.replace('/conversations.html');
+  });
+</script>
 </body>
 </html>

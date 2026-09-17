@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Helvoca · Conversaciones</title>
+  <link rel="stylesheet" href="/operations.css">
+  <link rel="stylesheet" href="/conversations.css">
+</head>
+<body>
+<header class="topbar">
+  <div><strong>HELVOCA</strong><span>Conversaciones</span></div>
+  <div class="conversation-nav-shell">
+    <nav class="app-nav" aria-label="Navegación principal">
+      <a class="nav-home" href="/">Inicio</a>
+      <a class="nav-conversations active" href="/conversations.html">Conversaciones</a>
+      <a class="nav-operations" href="/operations.html">Operaciones</a>
+      <a class="nav-config" href="/#configuration">Configuración</a>
+    </nav>
+    <div class="conversation-actions">
+      <a href="/simulator.html">Probar</a>
+      <button id="refreshBtn" type="button">Actualizar</button>
+    </div>
+  </div>
+</header>
+
+<main class="conversation-main">
+  <section class="conversation-heading">
+    <div>
+      <p class="eyebrow">BANDEJA</p>
+      <h1>Conversaciones</h1>
+      <p id="conversationContext" class="muted">Cargando conversaciones reales…</p>
+    </div>
+  </section>
+
+  <div class="channel-tabs" role="tablist" aria-label="Filtrar conversaciones">
+    <button class="channel-tab active" type="button" data-channel="all" aria-selected="true">Todas</button>
+    <button class="channel-tab" type="button" data-channel="calls" aria-selected="false">Llamadas</button>
+    <button class="channel-tab" type="button" data-channel="whatsapp" aria-selected="false">WhatsApp</button>
+  </div>
+
+  <section class="conversation-layout">
+    <aside class="panel inbox-panel">
+      <div class="inbox-head">
+        <strong id="inboxTitle">Recientes</strong>
+        <span id="conversationCount" class="muted">0</span>
+      </div>
+      <div id="conversationList" class="conversation-list">
+        <div class="empty">Cargando…</div>
+      </div>
+    </aside>
+
+    <section id="conversationDetail" class="panel conversation-detail">
+      <div id="detailEmpty" class="detail-empty">
+        <strong>Selecciona una conversación</strong>
+        <span>Aquí verás el resumen, la transcripción y las acciones realizadas.</span>
+      </div>
+
+      <div id="detailContent" class="hidden">
+        <div class="detail-header">
+          <div>
+            <span id="detailChannel" class="channel-badge">Llamada</span>
+            <h2 id="detailCustomer">Cliente</h2>
+            <p id="detailMeta" class="muted"></p>
+          </div>
+          <span id="detailStatus" class="pill"></span>
+        </div>
+
+        <section class="detail-section">
+          <p class="eyebrow">RESUMEN</p>
+          <div id="detailSummary" class="detail-box"></div>
+        </section>
+
+        <section class="detail-section">
+          <p class="eyebrow">TRANSCRIPCIÓN</p>
+          <div id="detailTranscript" class="transcript"></div>
+        </section>
+
+        <section class="detail-section">
+          <p class="eyebrow">ACCIONES REALIZADAS</p>
+          <div id="detailActions" class="list"></div>
+        </section>
+      </div>
+    </section>
+  </section>
+
+  <p id="message" class="message hidden"></p>
+</main>
+
+<script src="/conversations.js" defer></script>
+</body>
+</html>
