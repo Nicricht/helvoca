@@ -231,6 +231,7 @@
 
         const shell = document.createElement('div');
         shell.className = 'ux-config-shell';
+        shell.dataset.uxEnhanced = 'true';
         const heading = document.createElement('div');
         heading.className = 'ux-config-heading';
         heading.innerHTML = '<div><div class="eyebrow">Configuración</div><h2>Ajustes de Helvoca</h2><p>Abre solo lo que quieras cambiar.</p></div>';
