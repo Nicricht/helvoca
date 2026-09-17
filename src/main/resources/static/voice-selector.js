@@ -97,7 +97,6 @@
             display: none !important;
         }
         #dashboardView .dashboard-heading { margin-bottom: 12px !important; }
-        #dashboardView .ai-onboarding-card { padding-top: 16px !important; }
 
         #dashboardView .status-grid {
             display: flex !important;
@@ -125,6 +124,34 @@
         #dashboardView .status-card strong {
             font-size: 11px !important;
             font-weight: 700 !important;
+        }
+
+        #dashboardView .ai-onboarding-card {
+            margin: 0 0 12px !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+        }
+        #dashboardView .ai-onboarding-card::before { display: none !important; }
+        #dashboardView .ai-onboarding-card .ai-form {
+            margin-top: 0 !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }
+        #dashboardView .ai-onboarding-card .ai-form label.grow {
+            gap: 0 !important;
+            font-size: 0 !important;
+        }
+        #dashboardView .ai-onboarding-card .ai-form input {
+            min-height: 38px !important;
+            font-size: 12px !important;
+        }
+        #dashboardView .ai-onboarding-card .ai-form .button {
+            min-height: 38px !important;
+            padding: 0 14px !important;
         }
     `;
     document.head.appendChild(actionStyle);
