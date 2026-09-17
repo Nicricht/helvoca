@@ -190,6 +190,41 @@
             padding: 0 4px !important;
             font-size: 11px !important;
         }
+
+        #configHoursPanel > .section-heading { display: none !important; }
+        #configHoursPanel #hoursGrid { gap: 2px !important; }
+        #configHoursPanel .hour-row {
+            grid-template-columns: minmax(105px, 1.1fr) minmax(92px, 1fr) 14px minmax(92px, 1fr) 28px !important;
+            align-items: center !important;
+            gap: 5px !important;
+            padding: 5px 0 !important;
+            border: 0 !important;
+            border-bottom: 1px solid rgba(255,255,255,.055) !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+        }
+        #configHoursPanel .hour-row label {
+            gap: 0 !important;
+            font-size: 0 !important;
+        }
+        #configHoursPanel .hour-row input,
+        #configHoursPanel .hour-row select {
+            min-height: 32px !important;
+            font-size: 12px !important;
+        }
+        #configHoursPanel .hour-row .sep {
+            padding-top: 0 !important;
+            font-size: 0 !important;
+        }
+        #configHoursPanel .hour-row .sep::after {
+            content: "→";
+            font-size: 11px;
+            color: var(--muted);
+        }
+        #configHoursPanel .hour-row .remove-row {
+            width: 28px !important;
+            height: 32px !important;
+        }
     `;
     document.head.appendChild(actionStyle);
 
