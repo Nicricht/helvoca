@@ -1,0 +1,39 @@
+name: WhatsApp ingress smoke
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/whatsapp-ingress-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST disabled WhatsApp webhook in production
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://helvoca-api-production.up.railway.app/webhooks/v1/twilio/whatsapp"
+          body_file="$(mktemp)"
+          http_code="$(curl --silent --show-error \
+            --output "$body_file" \
+            --write-out "%{http_code}" \
+            --request POST \
+            --header "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "MessageSid=SM-smoke-ingress" \
+            --data-urlencode "From=whatsapp:+56911111111" \
+            --data-urlencode "To=whatsapp:+56922222222" \
+            --data-urlencode "Body=smoke" \
+            "$url")"
+
+          body="$(cat "$body_file")"
+          echo "HTTP $http_code"
+          echo "Response: $body"
+
+          test "$http_code" = "200"
+          test "$body" = '<?xml version="1.0" encoding="UTF-8"?><Response/>'
