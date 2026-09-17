@@ -18,7 +18,7 @@
     const help = document.createElement('small');
     help.id = 'agentVoiceHelp';
     help.className = 'form-hint';
-    help.textContent = 'Automática usa la voz predeterminada del proveedor activo.';
+    help.textContent = 'Voz predeterminada del proveedor.';
     parent?.appendChild(help);
 
     let profiles = [];
@@ -41,10 +41,10 @@
 
     function renderOptions(currentVoice = '') {
         select.innerHTML = '';
-        select.appendChild(option('', 'Automática · voz predeterminada'));
+        select.appendChild(option('', 'Automática'));
 
         profiles.forEach(profile => {
-            select.appendChild(option(profile.selection, `${profile.name} · ${profile.description}`));
+            select.appendChild(option(profile.selection, profile.name));
         });
 
         const current = String(currentVoice || '').trim();
@@ -53,7 +53,7 @@
             if (profile) {
                 select.value = profile.selection;
             } else {
-                const legacy = option(current, `Configuración existente · ${current}`);
+                const legacy = option(current, `Actual · ${current}`);
                 select.appendChild(legacy);
                 select.value = current;
             }
@@ -65,13 +65,13 @@
 
     function updateHelp() {
         if (!select.value) {
-            help.textContent = 'Automática usa la voz predeterminada del proveedor activo.';
+            help.textContent = 'Voz predeterminada del proveedor.';
             return;
         }
         const profile = findProfile(select.value);
         help.textContent = profile
-            ? `${profile.name}: ${profile.description}. Helvoca adapta este perfil al proveedor de voz activo.`
-            : 'Configuración anterior. Al guardar, Helvoca validará si sigue siendo compatible.';
+            ? profile.description
+            : 'Configuración existente; se validará al guardar.';
     }
 
     async function load(force = false) {
@@ -87,7 +87,7 @@
             loaded = true;
         } catch (error) {
             if (error.status !== 401 && error.status !== 403) {
-                help.textContent = 'No pude cargar el catálogo de voces. La configuración actual se conservará.';
+                help.textContent = 'No pude cargar las voces. Se conservará la configuración actual.';
             }
         } finally {
             loading = false;
