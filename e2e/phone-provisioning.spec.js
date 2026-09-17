@@ -88,7 +88,7 @@ test('self-service phone search stays hidden until chosen and never provisions u
 
   await page.locator('#provisioningSearchForm [name=country]').fill('US');
   await page.locator('#provisioningSearchForm [name=areaCode]').fill('202');
-  await page.getByRole('button', { name: 'Buscar números disponibles' }).click();
+  await page.getByRole('button', { name: 'Buscar números' }).click();
 
   await expect(page.getByText('+12025550123')).toBeVisible();
   expect(provisionCalls).toBe(0);
