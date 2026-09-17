@@ -93,6 +93,8 @@ test('operations prioritizes business work and keeps technical diagnostics colla
 
   await page.goto('/operations.html');
 
+  await expect(page.locator('link[href^="/operations-business.css?v="]')).toHaveCount(1);
+
   await expect(page.getByRole('heading', { level: 1, name: 'Hoy en tu negocio' })).toBeVisible();
   await expect(page.locator('#businessName')).toHaveText('Negocio E2E');
   await expect(page.locator('#callsToday')).toHaveText('12');
