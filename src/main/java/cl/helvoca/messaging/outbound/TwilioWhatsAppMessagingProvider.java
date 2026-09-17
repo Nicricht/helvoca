@@ -4,6 +4,7 @@ import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.telephony.twilio.TwilioProperties;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -29,6 +30,7 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
     private final PhoneNumberRepository phones;
     private final HttpClient http;
 
+    @Autowired
     public TwilioWhatsAppMessagingProvider(TwilioProperties twilio, PhoneNumberRepository phones) {
         this(twilio, phones, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
     }
