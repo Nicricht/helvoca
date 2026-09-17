@@ -101,5 +101,13 @@
         if (!dashboard.classList.contains('hidden')) load();
     }).observe(dashboard, { attributes: true, attributeFilter: ['class'] });
 
+    // The UX layer replaces the original advanced panel with a new shell.
+    // Mark that generated shell as already enhanced before the UX observer can
+    // attempt a second transformation pass.
+    new MutationObserver(() => {
+        const hub = document.querySelector('#advancedPanel.ux-config-hub');
+        if (hub) hub.dataset.uxEnhanced = 'true';
+    }).observe(document.body, { childList: true, subtree: true });
+
     if (sessionStorage.getItem('helvoca_access_token')) load();
 })();
