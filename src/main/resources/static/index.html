@@ -14,6 +14,28 @@
         .agent-help { color: var(--muted); font-size: 12px; line-height: 1.55; margin: 0; }
         textarea[name="agentGreeting"] { min-height: 74px; resize: vertical; }
         textarea[name="agentInstructions"] { min-height: 112px; resize: vertical; }
+        #configKnowledgePanel .section-heading { align-items: center; margin-bottom: 8px; }
+        #configKnowledgePanel .section-heading .eyebrow { display: none; }
+        #configKnowledgePanel .section-heading h2 { margin: 0; font-size: 15px !important; }
+        #configKnowledgePanel #addKnowledgeBtn { min-height: 30px; padding: 0 9px; font-size: 11px; }
+        #configKnowledgePanel #knowledgeList { gap: 6px !important; }
+        #configKnowledgePanel .knowledge-row {
+            display: grid !important;
+            grid-template-columns: minmax(180px, 1fr) 130px minmax(260px, 1.8fr) 30px;
+            gap: 7px !important;
+            align-items: end !important;
+            padding: 8px !important;
+            border-radius: 10px !important;
+        }
+        #configKnowledgePanel .knowledge-row label { min-width: 0; gap: 3px !important; font-size: 10px !important; color: var(--muted); }
+        #configKnowledgePanel .knowledge-row input { min-height: 34px !important; padding: 6px 8px !important; font-size: 12px !important; }
+        #configKnowledgePanel .knowledge-row .remove-row { width: 30px !important; height: 34px !important; font-size: 18px !important; border-color: transparent !important; }
+        @media (max-width: 760px) {
+            #configKnowledgePanel .knowledge-row { grid-template-columns: 1fr 1fr; }
+            #configKnowledgePanel .knowledge-row > label:first-child,
+            #configKnowledgePanel .knowledge-row > label.grow { grid-column: 1 / -1; }
+            #configKnowledgePanel .knowledge-row .remove-row { grid-column: 2; justify-self: end; }
+        }
         @media (max-width: 720px) { .agent-capability-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -177,7 +199,7 @@
                     <div class="section-heading divider"><div><div class="eyebrow">Horarios</div><h2>Cuándo atiende el negocio</h2></div></div>
                     <div id="hoursGrid" class="hours-grid"></div>
 
-                    <div class="section-heading divider"><div><div class="eyebrow">Conocimiento</div><h2>Preguntas que la IA debe saber</h2></div><button id="addKnowledgeBtn" class="button small ghost" type="button">+ Respuesta</button></div>
+                    <div class="section-heading divider"><div><div class="eyebrow">Conocimiento</div><h2>Preguntas frecuentes</h2></div><button id="addKnowledgeBtn" class="button small ghost" type="button">+ Agregar</button></div>
                     <div id="knowledgeList" class="repeat-list"></div>
 
                     <div id="setupMessage" class="message hidden"></div>
