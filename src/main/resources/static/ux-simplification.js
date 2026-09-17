@@ -79,12 +79,12 @@
         #configServicesPanel .service-row input { min-height: 34px !important; padding: 6px 8px !important; font-size: 12px !important; }
         #configServicesPanel .service-row .remove-row { width: 30px !important; height: 34px !important; font-size: 18px !important; border-color: transparent !important; }
 
-        #configPhonePanel.side-card { width: auto !important; position: static !important; align-self: auto !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; padding: 22px 0 0 !important; }
+        #configPhonePanel.side-card { width: auto !important; position: static !important; align-self: auto !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; padding: 16px 0 0 !important; }
         #configPhonePanel > .eyebrow { display: none; }
-        #configPhonePanel > h2 { margin: 0 0 5px !important; font-size: 20px !important; }
-        #configPhonePanel > p { margin: 0 0 16px !important; color: var(--muted); font-size: 13px; }
-        .ux-phone-modes { display: inline-flex; gap: 6px; padding: 5px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.02); margin-bottom: 18px; }
-        .ux-phone-modes button { border: 0; border-radius: 9px; padding: 10px 13px; background: transparent; color: var(--muted); font: inherit; font-weight: 700; cursor: pointer; }
+        #configPhonePanel > h2 { margin: 0 0 8px !important; font-size: 16px !important; }
+        #configPhonePanel > p { display: none !important; }
+        .ux-phone-modes { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: rgba(255,255,255,.02); margin-bottom: 10px; }
+        .ux-phone-modes button { min-height: 30px; border: 0; border-radius: 8px; padding: 6px 10px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
         .ux-phone-modes button.active { color: var(--text); background: rgba(124,92,255,.16); }
         .ux-phone-path.hidden { display: none !important; }
         .provisioning-panel { margin: 0 !important; }
@@ -118,7 +118,7 @@
             .ux-config-heading { padding: 17px 16px; }
             .ux-commercial-summary { align-items: flex-start; flex-direction: column; }
             .ux-phone-modes { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
-            .ux-phone-modes button { padding: 10px 8px; }
+            .ux-phone-modes button { padding: 7px 8px; }
         }
     `;
     document.head.appendChild(style);
