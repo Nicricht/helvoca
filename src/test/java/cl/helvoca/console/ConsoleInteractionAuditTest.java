@@ -50,7 +50,8 @@ class ConsoleInteractionAuditTest {
     private static String read(String path) throws Exception {
         var resource = new ClassPathResource(path);
         try (var input = resource.getInputStream()) {
-            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8)
+                    .replace("\r\n", "\n");
         }
     }
 }
