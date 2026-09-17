@@ -208,3 +208,44 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
     .phone-item { grid-template-columns: 1fr auto; }
     .phone-item .phone-toggle { grid-column: 1 / -1; }
 }
+
+/* Compact dashboard header: less copy, stronger scanability. */
+#dashboardView .dashboard-heading {
+    align-items: center !important;
+    margin-bottom: 14px !important;
+}
+#dashboardView .dashboard-heading > div { min-width: 0; }
+#dashboardView .dashboard-heading .eyebrow { display: none !important; }
+#dashboardView .dashboard-heading h1 {
+    margin: 0 !important;
+    font-size: clamp(28px, 3.4vw, 42px) !important;
+    line-height: 1.05 !important;
+}
+#dashboardView #welcomeText { display: none !important; }
+#dashboardView .status-grid {
+    gap: 8px !important;
+    margin-bottom: 14px !important;
+}
+#dashboardView .status-card {
+    min-height: 52px !important;
+    padding: 10px 12px !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+}
+#dashboardView .status-card .dot {
+    flex-basis: 8px;
+    height: 8px;
+    box-shadow: none !important;
+}
+#dashboardView .status-card strong { font-size: 12px; }
+#dashboardView .status-card small { margin-top: 1px; font-size: 10px; }
+#dashboardView #refreshBtn {
+    min-height: 36px;
+    padding: 0 12px;
+    font-size: 12px;
+}
+#dashboardView #nextStepBanner {
+    margin-bottom: 14px !important;
+    padding: 10px 12px !important;
+    font-size: 12px !important;
+}
