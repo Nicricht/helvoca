@@ -6,6 +6,7 @@
     <title>Helvoca · Configura tu recepcionista con IA</title>
     <meta name="description" content="Pega el enlace de tu negocio y deja que Helvoca prepare tu recepcionista telefónica con IA.">
     <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/operations-business.css?v=20260917-home1">
     <style>
         .agent-toggle { flex-direction: row; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; background: rgba(255,255,255,.02); }
         .agent-toggle input, .agent-capability input { width: auto; min-height: auto; margin: 0; accent-color: var(--accent); }
@@ -188,6 +189,11 @@
             .proposal-summary-list { grid-template-columns: 1fr; }
         }
         @media (max-width: 720px) { .agent-capability-grid, #configPermissionsPanel .agent-capability-grid { grid-template-columns: 1fr; } }
+    
+        #dashboardView.ux-operational-home #advancedPanel,
+        #dashboardView.ux-operational-home .secondary-actions,
+        #dashboardView.ux-operational-home .ai-onboarding-card { display: none !important; }
+        #homeBusinessWorkspace { margin: 14px 0 18px; }
     </style>
 </head>
 <body>
@@ -199,9 +205,9 @@
         </div>
         <nav id="primaryNav" class="app-nav" aria-label="Navegación principal">
             <a class="nav-home active" href="/">Inicio</a>
-            <a class="nav-conversations" href="/operations.html#conversations">Conversaciones</a>
+            <a class="nav-conversations" href="/conversations.html">Conversaciones</a>
             <a class="nav-operations" href="/operations.html">Operaciones</a>
-            <a class="nav-config" href="/#configuration">Configuración</a>
+            <a class="nav-config" href="/settings.html">Configuración</a>
         </nav>
         <div class="top-actions">
             <span id="sessionBadge" class="badge muted">Sin sesión</span>
@@ -264,6 +270,8 @@
                 <span>La configuración obligatoria está completa.</span>
             </div>
             <div id="nextStepBanner" class="next-banner"></div>
+
+            <section id="homeBusinessWorkspace" data-helvoca-business-workspace class="home-business-workspace hidden" aria-label="Trabajo del negocio"></section>
 
             <section class="card ai-onboarding-card">
                 <div class="ai-heading">
@@ -430,6 +438,7 @@
 })();
 </script>
 <script src="/app.js" defer></script>
+<script src="/operations-business.js?v=20260917-home1" defer></script>
 <script src="/ux-simplification.js" defer></script>
 <script src="/phone-provisioning.js" defer></script>
 </body>
