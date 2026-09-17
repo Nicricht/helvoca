@@ -40,7 +40,9 @@ public class TwilioProperties {
             return "https".equalsIgnoreCase(uri.getScheme())
                     && uri.getHost() != null
                     && !uri.getHost().isBlank()
-                    && uri.getUserInfo() == null;
+                    && uri.getUserInfo() == null
+                    && uri.getQuery() == null
+                    && uri.getFragment() == null;
         } catch (IllegalArgumentException e) {
             return false;
         }
@@ -58,7 +60,25 @@ public class TwilioProperties {
         String path = mediaStreamPath == null || mediaStreamPath.isBlank()
                 ? "/ws/v1/twilio/media"
                 : (mediaStreamPath.startsWith("/") ? mediaStreamPath : "/" + mediaStreamPath);
-        return "wss://" + base.substring("https://".length()) + path;
+        try {
+            URI pathUri = URI.create(path);
+            if (path.startsWith("//")
+                    || pathUri.isAbsolute()
+                    || pathUri.getRawAuthority() != null
+                    || pathUri.getQuery() != null
+                    || pathUri.getFragment() != null) {
+                throw new IllegalStateException("TWILIO_MEDIA_STREAM_PATH must be a URL path without authority, query or fragment");
+            }
+            URI streamUri = URI.create("wss://" + base.substring("https://".length()) + path);
+            if (!"wss".equalsIgnoreCase(streamUri.getScheme())
+                    || streamUri.getHost() == null
+                    || streamUri.getHost().isBlank()) {
+                throw new IllegalStateException("TWILIO_MEDIA_STREAM_PATH produced an invalid WebSocket URL");
+            }
+            return streamUri.toString();
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("TWILIO_MEDIA_STREAM_PATH must be a valid URL path", e);
+        }
     }
 
     public String absoluteWebhook(String path) {

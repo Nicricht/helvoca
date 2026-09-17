@@ -65,7 +65,12 @@ class ChannelRuntimeReadinessServiceTest {
 
     @Test
     void rejectsMalformedSecurePublicUrls() {
-        for (String malformed : List.of("https://", "https://bad host", "https:///missing-host")) {
+        for (String malformed : List.of(
+                "https://",
+                "https://bad host",
+                "https:///missing-host",
+                "https://helvoca.example?token=secret",
+                "https://helvoca.example#fragment")) {
             TwilioProperties twilio = configuredTwilio();
             twilio.setPublicBaseUrl(malformed);
             VoiceCallRouter voiceRouter = readyVoiceRouter();
@@ -74,6 +79,20 @@ class ChannelRuntimeReadinessServiceTest {
                     twilio, enabledWhatsApp(true), voiceRouter).snapshot();
 
             assertFalse(readiness.twilio().securePublicBaseUrlConfigured(), malformed);
+            assertFalse(readiness.twilio().mediaStreamUrlConfigured(), malformed);
+            assertFalse(readiness.voice().ready(), malformed);
+        }
+    }
+
+    @Test
+    void rejectsInvalidMediaStreamPaths() {
+        for (String malformed : List.of("//other.example/media", "/media?token=secret", "/media#fragment")) {
+            TwilioProperties twilio = configuredTwilio();
+            twilio.setMediaStreamPath(malformed);
+
+            var readiness = new ChannelRuntimeReadinessService(
+                    twilio, enabledWhatsApp(true), readyVoiceRouter()).snapshot();
+
             assertFalse(readiness.twilio().mediaStreamUrlConfigured(), malformed);
             assertFalse(readiness.voice().ready(), malformed);
         }
