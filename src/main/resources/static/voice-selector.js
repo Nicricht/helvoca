@@ -50,6 +50,45 @@
             box-shadow: none !important;
         }
         #businessAdvancedToggle:hover { color: var(--text) !important; }
+
+        .secondary-actions { display: none !important; }
+        #advancedPanel.ux-config-hub {
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+        }
+        #advancedPanel .ux-config-heading { display: none !important; }
+        #advancedPanel .ux-config-nav {
+            display: flex !important;
+            flex-wrap: wrap;
+            gap: 6px !important;
+            padding: 0 0 10px !important;
+            border-bottom: 0 !important;
+            background: transparent !important;
+        }
+        #advancedPanel .ux-config-nav button {
+            flex: 0 0 auto;
+            min-height: 30px;
+            padding: 6px 10px !important;
+            border: 1px solid rgba(255,255,255,.09) !important;
+            border-radius: 999px !important;
+            text-align: center !important;
+            background: transparent !important;
+        }
+        #advancedPanel .ux-config-nav button:hover {
+            background: rgba(255,255,255,.035) !important;
+            border-color: rgba(255,255,255,.14) !important;
+        }
+        #advancedPanel .ux-config-nav button[aria-expanded="true"] {
+            background: rgba(124,92,255,.13) !important;
+            border-color: rgba(124,92,255,.34) !important;
+        }
+        #advancedPanel .ux-config-nav button strong { font-size: 11px !important; }
+        #advancedPanel .ux-config-nav button small { display: none !important; }
+        #advancedPanel .ux-config-body { padding: 0 !important; }
+        #advancedPanel .ux-config-panel { padding-top: 10px !important; }
     `;
     document.head.appendChild(actionStyle);
 
