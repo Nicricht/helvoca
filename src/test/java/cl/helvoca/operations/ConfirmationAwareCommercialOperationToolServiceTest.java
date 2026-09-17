@@ -34,6 +34,7 @@ class ConfirmationAwareCommercialOperationToolServiceTest {
     @Mock ConversationStateService conversationState;
     @Mock UniversalConfirmationService confirmations;
     @Mock OperationExecutionLockService executionLocks;
+    @Mock CrossChannelMessagingToolService crossChannelMessaging;
 
     private ConfirmationAwareCommercialOperationToolService service;
 
@@ -53,7 +54,8 @@ class ConfirmationAwareCommercialOperationToolServiceTest {
                 paymentWorkflow,
                 conversationState,
                 confirmations,
-                executionLocks);
+                executionLocks,
+                crossChannelMessaging);
     }
 
     @Test
@@ -116,6 +118,6 @@ class ConfirmationAwareCommercialOperationToolServiceTest {
                 "{}"));
 
         assertTrue(result.getBoolean("success"));
-        verifyNoInteractions(executionLocks, confirmations, paymentWorkflow);
+        verifyNoInteractions(executionLocks, confirmations, paymentWorkflow, crossChannelMessaging);
     }
 }
