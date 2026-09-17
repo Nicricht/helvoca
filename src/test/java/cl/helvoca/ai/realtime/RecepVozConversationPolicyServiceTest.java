@@ -30,6 +30,17 @@ class RecepVozConversationPolicyServiceTest {
     }
 
     @Test
+    void voicePolicyRequiresShortNonRepetitiveCommercialTurns() {
+        String policy = RecepVozConversationPolicyService.conversationGuidance();
+
+        assertTrue(policy.contains("Responde normalmente en una o dos frases"));
+        assertTrue(policy.contains("máximo aproximado de 25 palabras"));
+        assertTrue(policy.contains("No repitas ni resumas lo que el cliente acaba de decir"));
+        assertTrue(policy.contains("termina con una sola siguiente acción o pregunta breve"));
+        assertTrue(policy.contains("No esperes a que el cliente te pida que vendas"));
+    }
+
+    @Test
     void productionGuidanceDoesNotHardcodeTheHairSalonScenario() {
         String instructions = RecepVozConversationPolicyService.conversationGuidance().toLowerCase();
 
