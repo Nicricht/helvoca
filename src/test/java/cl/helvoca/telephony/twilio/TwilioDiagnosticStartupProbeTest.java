@@ -1,6 +1,7 @@
 package cl.helvoca.telephony.twilio;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
@@ -14,6 +15,17 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class TwilioDiagnosticStartupProbeTest {
+
+    @Test
+    void canBeConstructedBySpringWhenDiagnosticIsDisabled() {
+        try (var context = new AnnotationConfigApplicationContext()) {
+            context.registerBean(TwilioProperties.class);
+            context.register(TwilioDiagnosticStartupProbe.class);
+            context.refresh();
+
+            assertFalse(context.getBean(TwilioDiagnosticStartupProbe.class).probe().success());
+        }
+    }
 
     @Test
     void reportsNotConfiguredWithoutCallingTwilio() throws Exception {

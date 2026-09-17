@@ -2,6 +2,7 @@ package cl.helvoca.telephony.twilio;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -26,6 +27,7 @@ public class TwilioDiagnosticStartupProbe implements ApplicationRunner {
     private final boolean enabled;
     private final HttpClient http;
 
+    @Autowired
     public TwilioDiagnosticStartupProbe(
             TwilioProperties properties,
             @Value("${TWILIO_DIAGNOSTIC_PROBE:false}") boolean enabled) {
