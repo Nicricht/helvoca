@@ -278,3 +278,42 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
     font-size: 12px;
 }
 #dashboardView .ai-onboarding-card #aiMessage { margin-top: 10px; }
+
+/* Compact configuration hub: fewer words and faster scanning. */
+#advancedPanel.ux-config-hub {
+    margin-top: 8px !important;
+    border-radius: 14px !important;
+    box-shadow: none !important;
+}
+#advancedPanel .ux-config-heading {
+    padding: 12px 14px !important;
+}
+#advancedPanel .ux-config-heading .eyebrow,
+#advancedPanel .ux-config-heading p {
+    display: none !important;
+}
+#advancedPanel .ux-config-heading h2 {
+    margin: 0 !important;
+    font-size: 16px !important;
+}
+#advancedPanel .ux-config-nav {
+    display: flex !important;
+    grid-template-columns: none !important;
+    gap: 6px !important;
+    padding: 8px !important;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+#advancedPanel .ux-config-nav button {
+    flex: 0 0 auto;
+    padding: 9px 11px !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+}
+#advancedPanel .ux-config-nav strong {
+    font-size: 12px !important;
+    white-space: nowrap;
+}
+#advancedPanel .ux-config-nav small { display: none !important; }
+#advancedPanel .ux-config-body { padding: 0 14px 14px !important; }
+#advancedPanel .ux-config-panel { padding-top: 14px !important; }
