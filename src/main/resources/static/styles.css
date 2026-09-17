@@ -457,3 +457,69 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
     #configHoursPanel .hour-row .sep { display: none !important; }
     #configHoursPanel .hour-row .remove-row { grid-column: 2; justify-self: end; }
 }
+
+/* Compact business and agent identity: essentials first, secondary settings quieter. */
+#configBusinessPanel > .section-heading {
+    align-items: center !important;
+    margin: 0 0 8px !important;
+}
+#configBusinessPanel > .section-heading .eyebrow,
+#configBusinessPanel > .section-heading p { display: none !important; }
+#configBusinessPanel > .section-heading h2 {
+    margin: 0 !important;
+    font-size: 0 !important;
+}
+#configBusinessPanel > .section-heading:first-child h2::after {
+    content: "Negocio";
+    font-size: 15px;
+}
+#configBusinessPanel > .section-heading.divider {
+    margin-top: 12px !important;
+    padding-top: 10px !important;
+    border-top-color: rgba(255,255,255,.05) !important;
+}
+#configBusinessPanel > .section-heading.divider h2::after {
+    content: "Agente";
+    font-size: 15px;
+}
+#configBusinessPanel > .two-col {
+    gap: 7px !important;
+}
+#configBusinessPanel label:has(input[name="timezone"]),
+#configBusinessPanel label:has(input[name="language"]) {
+    opacity: .68;
+    font-size: 10px !important;
+}
+#configBusinessPanel label:has(input[name="timezone"]) input,
+#configBusinessPanel label:has(input[name="language"]) input {
+    background: rgba(255,255,255,.018) !important;
+}
+#configBusinessPanel label:has(textarea[name="agentGreeting"]),
+#configBusinessPanel label:has(textarea[name="agentInstructions"]) {
+    margin-top: 2px;
+    color: var(--muted) !important;
+    font-size: 10px !important;
+}
+#configBusinessPanel textarea[name="agentGreeting"] {
+    min-height: 54px !important;
+    resize: vertical;
+}
+#configBusinessPanel textarea[name="agentInstructions"] {
+    min-height: 62px !important;
+    resize: vertical;
+}
+#configBusinessPanel .agent-toggle {
+    min-height: 34px;
+    margin-top: 2px;
+    padding: 7px 9px !important;
+    border-radius: 9px !important;
+    font-size: 11px !important;
+    color: var(--text) !important;
+}
+#configBusinessPanel .agent-toggle input {
+    width: 15px !important;
+    height: 15px !important;
+}
+@media (max-width: 620px) {
+    #configBusinessPanel > .two-col { grid-template-columns: 1fr !important; }
+}
