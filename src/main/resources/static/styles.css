@@ -317,3 +317,31 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
 #advancedPanel .ux-config-nav small { display: none !important; }
 #advancedPanel .ux-config-body { padding: 0 14px 14px !important; }
 #advancedPanel .ux-config-panel { padding-top: 14px !important; }
+
+/* Compact global topbar: keep actions, remove redundant copy. */
+.topbar {
+    min-height: 58px !important;
+    gap: 12px !important;
+}
+.topbar .subtitle { display: none !important; }
+.topbar .brand {
+    font-size: 16px !important;
+    letter-spacing: .16em !important;
+}
+.top-actions { gap: 8px !important; }
+.top-actions .badge {
+    min-height: 28px !important;
+    padding: 0 10px !important;
+    font-size: 11px !important;
+}
+@media (max-width: 520px) {
+    .topbar {
+        min-height: 52px !important;
+        padding: 8px 0 !important;
+        align-items: center !important;
+    }
+    .top-actions {
+        flex-direction: row !important;
+        align-items: center !important;
+    }
+}
