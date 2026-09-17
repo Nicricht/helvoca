@@ -3,6 +3,8 @@ package cl.helvoca.telephony.twilio;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.net.URI;
+
 @Component
 @ConfigurationProperties(prefix = "app.twilio")
 public class TwilioProperties {
@@ -32,7 +34,16 @@ public class TwilioProperties {
     public boolean hasAuthToken() { return authToken != null && !authToken.isBlank(); }
 
     public boolean hasSecurePublicBaseUrl() {
-        return publicBaseUrl != null && publicBaseUrl.trim().startsWith("https://");
+        if (publicBaseUrl == null || publicBaseUrl.isBlank()) return false;
+        try {
+            URI uri = URI.create(publicBaseUrl.trim());
+            return "https".equalsIgnoreCase(uri.getScheme())
+                    && uri.getHost() != null
+                    && !uri.getHost().isBlank()
+                    && uri.getUserInfo() == null;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     public boolean hasCommercialProvisioningCredentials() {

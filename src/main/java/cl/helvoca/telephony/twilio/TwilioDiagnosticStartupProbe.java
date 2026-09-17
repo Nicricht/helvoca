@@ -78,8 +78,12 @@ public class TwilioDiagnosticStartupProbe implements ApplicationRunner {
         try {
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
             int status = response.statusCode();
-            if (status >= 200 && status < 300) {
+            if (status == 200) {
                 return new ProbeResult(true, "OK", "Twilio account API accepted the configured credentials");
+            }
+            if (status >= 200 && status < 300) {
+                return new ProbeResult(false, "UNEXPECTED_RESPONSE",
+                        "Twilio account API returned unexpected HTTP " + status);
             }
             if (status == 401 || status == 403) {
                 return new ProbeResult(false, "AUTH_FAILED", "Twilio rejected the configured credentials");

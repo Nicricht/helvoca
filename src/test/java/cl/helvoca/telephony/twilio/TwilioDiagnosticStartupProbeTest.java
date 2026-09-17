@@ -84,6 +84,21 @@ class TwilioDiagnosticStartupProbeTest {
     }
 
     @Test
+    void rejectsUnexpectedSuccessfulStatus() throws Exception {
+        TwilioProperties properties = configuredProperties();
+        HttpClient http = mock(HttpClient.class);
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(204);
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        var result = new TwilioDiagnosticStartupProbe(properties, true, http).probe();
+
+        assertFalse(result.success());
+        assertEquals("UNEXPECTED_RESPONSE", result.code());
+    }
+
+    @Test
     void sanitizesTransportFailuresWithoutExposingCredentials() throws Exception {
         TwilioProperties properties = configuredProperties();
         HttpClient http = mock(HttpClient.class);

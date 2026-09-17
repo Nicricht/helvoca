@@ -39,22 +39,34 @@ public class ChannelRuntimeReadinessService implements ApplicationRunner {
                 && providerReadiness.ready();
 
         boolean whatsAppEnabled = whatsApp.isEnabled();
-        boolean whatsAppReady = whatsAppEnabled && twilioWebhookReady;
+        boolean webhookValidationEnabled = whatsApp.isWebhookValidationEnabled();
+        boolean whatsAppReady = whatsAppEnabled && webhookValidationEnabled && twilioWebhookReady;
+        List<ProviderRuntimeStatus> providers = providerReadiness.providers().stream()
+                .map(provider -> new ProviderRuntimeStatus(
+                        provider.providerId(),
+                        provider.mode(),
+                        provider.configured(),
+                        provider.available(),
+                        provider.state()))
+                .toList();
 
         return new ChannelRuntimeReadiness(
                 new TwilioRuntimeReadiness(
                         credentialsConfigured,
                         securePublicBaseUrlConfigured,
                         mediaStreamUrlConfigured,
-                        twilioWebhookReady),
+                        twilioWebhookReady,
+                        twilioCode(credentialsConfigured, securePublicBaseUrlConfigured)),
                 new VoiceRuntimeReadiness(
                         voiceReady,
                         providerReadiness.selectedProvider(),
-                        providerReadiness.providers()),
+                        voiceCode(voiceReady, twilioWebhookReady, mediaStreamUrlConfigured),
+                        providers),
                 new WhatsAppRuntimeReadiness(
                         whatsAppEnabled,
-                        whatsApp.isWebhookValidationEnabled(),
-                        whatsAppReady));
+                        webhookValidationEnabled,
+                        whatsAppReady,
+                        whatsAppCode(whatsAppEnabled, webhookValidationEnabled, twilioWebhookReady)));
     }
 
     @Override
@@ -81,6 +93,27 @@ public class ChannelRuntimeReadinessService implements ApplicationRunner {
         }
     }
 
+    private static String twilioCode(boolean credentialsConfigured, boolean securePublicBaseUrlConfigured) {
+        if (!credentialsConfigured) return "MISSING_CREDENTIALS";
+        if (!securePublicBaseUrlConfigured) return "INVALID_PUBLIC_URL";
+        return "READY";
+    }
+
+    private static String voiceCode(boolean ready, boolean twilioWebhookReady, boolean mediaStreamUrlConfigured) {
+        if (!twilioWebhookReady) return "TWILIO_WEBHOOK_NOT_READY";
+        if (!mediaStreamUrlConfigured) return "INVALID_MEDIA_STREAM_URL";
+        return ready ? "READY" : "NO_AVAILABLE_PROVIDER";
+    }
+
+    private static String whatsAppCode(boolean enabled,
+                                       boolean webhookValidationEnabled,
+                                       boolean twilioWebhookReady) {
+        if (!enabled) return "DISABLED";
+        if (!webhookValidationEnabled) return "VALIDATION_DISABLED";
+        if (!twilioWebhookReady) return "TWILIO_WEBHOOK_NOT_READY";
+        return "READY";
+    }
+
     public record ChannelRuntimeReadiness(TwilioRuntimeReadiness twilio,
                                           VoiceRuntimeReadiness voice,
                                           WhatsAppRuntimeReadiness whatsApp) {
@@ -89,16 +122,26 @@ public class ChannelRuntimeReadinessService implements ApplicationRunner {
     public record TwilioRuntimeReadiness(boolean credentialsConfigured,
                                          boolean securePublicBaseUrlConfigured,
                                          boolean mediaStreamUrlConfigured,
-                                         boolean webhookReady) {
+                                         boolean webhookReady,
+                                         String code) {
     }
 
     public record VoiceRuntimeReadiness(boolean ready,
                                         String selectedProvider,
-                                        List<VoiceCallRouter.ProviderStatus> providers) {
+                                        String code,
+                                        List<ProviderRuntimeStatus> providers) {
+    }
+
+    public record ProviderRuntimeStatus(String providerId,
+                                        String mode,
+                                        boolean configured,
+                                        boolean available,
+                                        String state) {
     }
 
     public record WhatsAppRuntimeReadiness(boolean enabled,
                                            boolean webhookValidationEnabled,
-                                           boolean ready) {
+                                           boolean ready,
+                                           String code) {
     }
 }
