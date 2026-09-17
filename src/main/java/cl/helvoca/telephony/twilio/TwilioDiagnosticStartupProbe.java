@@ -87,7 +87,7 @@ public class TwilioDiagnosticStartupProbe implements ApplicationRunner {
             Thread.currentThread().interrupt();
             return new ProbeResult(false, "INTERRUPTED", "Twilio diagnostic was interrupted");
         } catch (Exception e) {
-            return new ProbeResult(false, "NETWORK_ERROR", safeMessage(e));
+            return new ProbeResult(false, "NETWORK_ERROR", "Twilio account API could not be reached");
         }
     }
 
@@ -98,8 +98,4 @@ public class TwilioDiagnosticStartupProbe implements ApplicationRunner {
         return value == null ? "" : value.trim();
     }
 
-    private static String safeMessage(Exception e) {
-        String message = e.getMessage();
-        return message == null || message.isBlank() ? e.getClass().getSimpleName() : message;
-    }
 }

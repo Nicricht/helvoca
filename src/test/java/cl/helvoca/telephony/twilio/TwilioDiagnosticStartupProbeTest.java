@@ -2,6 +2,7 @@ package cl.helvoca.telephony.twilio;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -68,6 +69,24 @@ class TwilioDiagnosticStartupProbeTest {
         assertFalse(result.success());
         assertEquals("AUTH_FAILED", result.code());
         verify(http).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    void sanitizesTransportFailuresWithoutExposingCredentials() throws Exception {
+        TwilioProperties properties = configuredProperties();
+        HttpClient http = mock(HttpClient.class);
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenThrow(new IOException(
+                        "connection failed for ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa using test-token"));
+
+        var probe = new TwilioDiagnosticStartupProbe(properties, true, http);
+        var result = probe.probe();
+
+        assertFalse(result.success());
+        assertEquals("NETWORK_ERROR", result.code());
+        assertFalse(result.detail().contains("ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+        assertFalse(result.detail().contains("test-token"));
+        assertEquals("Twilio account API could not be reached", result.detail());
     }
 
     private static TwilioProperties configuredProperties() {
