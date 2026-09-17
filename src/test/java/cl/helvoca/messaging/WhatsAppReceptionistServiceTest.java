@@ -198,4 +198,93 @@ class WhatsAppReceptionistServiceTest {
         verify(messages).saveAndFlush(inboundCaptor.capture());
         assertEquals("SM-persist-first", inboundCaptor.getValue().getExternalMessageId());
     }
+
+    @Test
+    void outboundReplyIsPersistedAndAssociatedWithInboundMessage() {
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
+        MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
+        WhatsAppToolService tools = mock(WhatsAppToolService.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        MessagingAiClient ai = mock(MessagingAiClient.class);
+        WhatsAppProperties properties = new WhatsAppProperties();
+        AiAgentService aiAgents = mock(AiAgentService.class);
+
+        UUID businessId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        phone.setPhoneNumber("+56922222222");
+        phone.setActive(true);
+        phone.setWhatsappEnabled(true);
+
+        MessagingConversation conversation = new MessagingConversation();
+        ReflectionTestUtils.setField(conversation, "id", conversationId);
+        conversation.setBusinessId(businessId);
+        conversation.setChannel(WhatsAppReceptionistService.CHANNEL);
+        conversation.setSender("+56911111111");
+        conversation.setRecipient("+56922222222");
+
+        AiAgent agent = new AiAgent();
+        agent.setBusinessId(businessId);
+        agent.setName("Helvoca");
+        agent.setLanguage("es");
+        agent.setGreeting("Hola");
+        agent.setActive(true);
+
+        BusinessSubscriptionService.SubscriptionView subscription = mock(BusinessSubscriptionService.SubscriptionView.class);
+        when(subscription.serviceAllowed()).thenReturn(true);
+        when(messages.findByExternalMessageId("SM-outbound-link")).thenReturn(Optional.empty());
+        when(phones.findByPhoneNumberAndActiveTrue("+56922222222")).thenReturn(Optional.of(phone));
+        when(subscriptions.view(businessId)).thenReturn(subscription);
+        when(aiAgents.runtime(businessId)).thenReturn(agent);
+        when(aiAgents.allowedToolNames(businessId)).thenReturn(Set.of());
+        when(conversations.findFirstByBusinessIdAndChannelAndSenderAndRecipientAndLastMessageAtAfterOrderByLastMessageAtDesc(
+                eq(businessId), eq(WhatsAppReceptionistService.CHANNEL), eq("+56911111111"), eq("+56922222222"), any()))
+                .thenReturn(Optional.of(conversation));
+        when(tools.buildInstructions(conversation)).thenReturn("Instrucciones oficiales");
+
+        AtomicReference<MessagingMessage> persistedInbound = new AtomicReference<>();
+        when(messages.saveAndFlush(any(MessagingMessage.class))).thenAnswer(invocation -> {
+            MessagingMessage saved = invocation.getArgument(0);
+            persistedInbound.set(saved);
+            return saved;
+        });
+        when(messages.findAllByConversationIdOrderByCreatedAtAsc(conversationId)).thenAnswer(invocation -> {
+            MessagingMessage inbound = persistedInbound.get();
+            return inbound == null ? List.of() : List.of(inbound);
+        });
+        when(ai.respond(anyString(), anyList(), anySet(), any(MessagingAiClient.ToolInvoker.class)))
+                .thenReturn("Reserva confirmada para mañana a las 10:00");
+
+        WhatsAppReceptionistService service = new WhatsAppReceptionistService(
+                phones, customers, conversations, messages, tools, subscriptions, ai, properties, aiAgents);
+
+        String reply = service.handle(
+                "SM-outbound-link",
+                "whatsapp:+56911111111",
+                "whatsapp:+56922222222",
+                "Reserva para mañana");
+
+        assertEquals("Reserva confirmada para mañana a las 10:00", reply);
+
+        ArgumentCaptor<MessagingMessage> savedCaptor = ArgumentCaptor.forClass(MessagingMessage.class);
+        verify(messages, times(2)).save(savedCaptor.capture());
+        List<MessagingMessage> savedMessages = savedCaptor.getAllValues();
+
+        MessagingMessage outbound = savedMessages.get(0);
+        MessagingMessage inbound = savedMessages.get(1);
+
+        assertEquals(conversationId, outbound.getConversationId());
+        assertEquals("OUTBOUND", outbound.getDirection());
+        assertEquals("ASSISTANT", outbound.getRole());
+        assertEquals(reply, outbound.getContent());
+
+        assertEquals("SM-outbound-link", inbound.getExternalMessageId());
+        assertEquals(conversationId, inbound.getConversationId());
+        assertEquals("INBOUND", inbound.getDirection());
+        assertEquals(reply, inbound.getReplyText());
+        assertEquals(outbound.getContent(), inbound.getReplyText());
+    }
 }
