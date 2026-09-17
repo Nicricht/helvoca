@@ -187,11 +187,17 @@
         }
         $('#readyBanner')?.classList.add('hidden');
 
+        const readyLabels = {
+            businessProfileConfigured: 'Configurado',
+            servicesConfigured: 'Configurados',
+            scheduleConfigured: 'Configurados',
+            phoneConfigured: 'Conectado'
+        };
         $$('.status-card').forEach(card => {
             const small = $('small', card);
             if (!small) return;
             setText(small, card.classList.contains('done')
-                ? (card.dataset.key === 'phoneConfigured' ? 'Activo' : 'Listo')
+                ? (readyLabels[card.dataset.key] || 'Listo')
                 : 'Pendiente');
         });
     }
