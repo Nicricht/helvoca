@@ -94,6 +94,6 @@ test('AI agent voice is selected from the backend catalog and never typed freely
 
   await selector.selectOption('cedar');
   await expect(selector).toHaveValue('cedar');
-  await expect(page.locator('#agentVoiceHelp')).toContainText('Profesional');
+  await expect(page.locator('#agentVoiceHelp')).toContainText('Clara y orientada a atención');
   expect(agentPuts).toBe(0);
 });
