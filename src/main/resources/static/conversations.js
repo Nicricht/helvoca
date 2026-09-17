@@ -219,20 +219,30 @@ function setChannel(channel) {
 
 async function load() {
   $("#conversationList").innerHTML = '<div class="loading-line">Cargando conversaciones…</div>';
-  try {
-    const [data, whatsapp] = await Promise.all([
-      api("/api/v1/operations/dashboard"),
-      api("/api/v1/messaging/conversations")
-    ]);
+  const [dashboardResult, whatsappResult] = await Promise.allSettled([
+    api("/api/v1/operations/dashboard"),
+    api("/api/v1/messaging/conversations")
+  ]);
+  const dashboardAvailable = dashboardResult.status === "fulfilled";
+  const whatsappAvailable = whatsappResult.status === "fulfilled";
+
+  if (dashboardAvailable || whatsappAvailable) {
+    const data = dashboardAvailable ? dashboardResult.value : {};
     calls = data.recentCalls || [];
-    whatsappConversations = whatsapp || [];
+    whatsappConversations = whatsappAvailable ? whatsappResult.value || [] : [];
     const total = calls.length + whatsappConversations.length;
     $("#conversationContext").textContent = data.businessName ? `${data.businessName} · ${total} conversaciones recientes` : `${total} conversaciones recientes`;
     renderList();
-  } catch (error) {
-    $("#conversationList").innerHTML = '<div class="empty">No pude cargar las conversaciones.</div>';
-    toast(error.message || "No pude cargar las conversaciones.");
+    const failure = dashboardAvailable ? whatsappResult.reason : dashboardResult.reason;
+    if (failure) toast(failure.message || "Una fuente de conversaciones no está disponible.");
+    return;
   }
+
+  calls = [];
+  whatsappConversations = [];
+  $("#conversationList").innerHTML = '<div class="empty">No pude cargar las conversaciones.</div>';
+  const error = dashboardResult.reason || whatsappResult.reason;
+  toast(error?.message || "No pude cargar las conversaciones.");
 }
 
 $$(".channel-tab").forEach(button => button.addEventListener("click", () => setChannel(button.dataset.channel)));
