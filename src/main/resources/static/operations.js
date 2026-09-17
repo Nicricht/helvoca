@@ -129,7 +129,7 @@ function renderCallDetail(data) {
   const transcript = data.transcript || [];
   $("#callTranscript").innerHTML = transcript.length ? transcript.map(t => `
     <div class="transcript-line ${String(t.speaker || "").toLowerCase()}">
-      <strong>${esc(t.speaker === "USER" ? "Cliente" : t.speaker === "ASSISTANT" ? "RecepVoz" : t.speaker)}</strong>
+      <strong>${esc(t.speaker === "USER" ? "Cliente" : t.speaker === "ASSISTANT" ? "Helvoca" : t.speaker)}</strong>
       <p>${esc(t.content)}</p>
       <span>${fmtDate(t.createdAt)}</span>
     </div>`).join("") : '<div class="empty">No hay transcripción disponible.</div>';
@@ -164,7 +164,7 @@ function renderRequests(items = []) {
 
 function renderQuestions(items = []) {
   const root = $("#questionsList");
-  if (!items.length) { root.innerHTML = '<div class="empty">RecepVoz no tiene preguntas pendientes. ✨</div>'; return; }
+  if (!items.length) { root.innerHTML = '<div class="empty">Helvoca no tiene preguntas pendientes. ✨</div>'; return; }
   root.innerHTML = items.map(q => `
     <div class="item" data-question-id="${esc(q.id)}">
       <div class="item-head"><strong>${esc(q.question)}</strong><span class="pill">${q.occurrences}×</span></div>
@@ -174,7 +174,7 @@ function renderQuestions(items = []) {
   root.querySelectorAll("[data-answer-btn]").forEach(button => button.addEventListener("click", async e => {
     const item = e.target.closest("[data-question-id]");
     const answer = item.querySelector("[data-answer]").value.trim();
-    if (!answer) { toast("Escribe una respuesta antes de enseñar a RecepVoz."); return; }
+    if (!answer) { toast("Escribe una respuesta antes de enseñar a Helvoca."); return; }
     e.target.disabled = true;
     try {
       await api(`/api/v1/learning/questions/${item.dataset.questionId}/answer`, {method:"POST", body:JSON.stringify({answer})});
