@@ -10,7 +10,7 @@ public class GeminiLiveProperties {
     private boolean certificationSimulation = false;
     private String certificationCaller = "";
     private String apiKey = "";
-    private String model = "gemini-3.1-flash-live-preview";
+    private String model = "gemini-3.8-live";
     private String voice = "Kore";
     private String websocketUrl = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
 
