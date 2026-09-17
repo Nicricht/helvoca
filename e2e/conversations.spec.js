@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 const json = body => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 
-test('conversation inbox combines real calls and persisted WhatsApp conversations', async ({ page }) => {
+test('conversation inbox combines channels, opens the newest item and uses human labels', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
 
   await page.route('**/api/v1/operations/dashboard', route => route.fulfill(json({
@@ -13,7 +13,7 @@ test('conversation inbox combines real calls and persisted WhatsApp conversation
       status: 'COMPLETED',
       startedAt: '2026-09-17T18:00:00Z',
       durationSeconds: 95,
-      resolution: 'Reserva creada'
+      resolution: 'BOOKING_CREATED'
     }]
   })));
 
@@ -34,7 +34,7 @@ test('conversation inbox combines real calls and persisted WhatsApp conversation
       status: 'COMPLETED',
       startedAt: '2026-09-17T18:00:00Z',
       durationSeconds: 95,
-      resolution: 'Reserva creada'
+      resolution: 'BOOKING_CREATED'
     },
     summary: 'El cliente reservó una hora.',
     transcript: [
@@ -49,10 +49,7 @@ test('conversation inbox combines real calls and persisted WhatsApp conversation
   await page.route('**/api/v1/messaging/conversations/wa-1', route => route.fulfill(json({
     conversation: {
       id: 'wa-1',
-      customerId: null,
-      channel: 'whatsapp',
       sender: '+56922222222',
-      recipient: '+56933333333',
       openedAt: '2026-09-17T18:05:00Z',
       lastMessageAt: '2026-09-17T18:06:00Z'
     },
@@ -68,17 +65,14 @@ test('conversation inbox combines real calls and persisted WhatsApp conversation
   await expect(page.getByText('+56911111111')).toBeVisible();
   await expect(page.getByText('+56922222222')).toBeVisible();
 
-  await page.getByRole('button', { name: 'WhatsApp', exact: true }).click();
-  await expect(page.getByText('+56911111111')).toHaveCount(0);
-  await expect(page.getByText('+56922222222')).toBeVisible();
-  await page.getByText('+56922222222').click();
+  await expect(page.locator('#detailCustomer')).toHaveText('+56922222222');
   await expect(page.getByText('¿Tienen hora mañana?')).toBeVisible();
-  await expect(page.getByText('Sí, tengo disponibilidad.')).toBeVisible();
 
   await page.getByRole('button', { name: 'Llamadas' }).click();
   await page.getByText('+56911111111').click();
   await expect(page.getByText('El cliente reservó una hora.')).toBeVisible();
-  await expect(page.getByText('CREATE_BOOKING')).toBeVisible();
+  await expect(page.locator('#detailActions')).toContainText('Reserva creada');
+  await expect(page.locator('#detailActions')).not.toContainText('CREATE_BOOKING');
 });
 
 test('conversation inbox keeps calls usable when WhatsApp temporarily fails', async ({ page }) => {
@@ -92,7 +86,7 @@ test('conversation inbox keeps calls usable when WhatsApp temporarily fails', as
       status: 'COMPLETED',
       startedAt: '2026-09-17T18:00:00Z',
       durationSeconds: 95,
-      resolution: 'Reserva creada'
+      resolution: 'BOOKING_CREATED'
     }]
   })));
   await page.route('**/api/v1/messaging/conversations', route => route.fulfill({
@@ -107,7 +101,7 @@ test('conversation inbox keeps calls usable when WhatsApp temporarily fails', as
       status: 'COMPLETED',
       startedAt: '2026-09-17T18:00:00Z',
       durationSeconds: 95,
-      resolution: 'Reserva creada'
+      resolution: 'BOOKING_CREATED'
     },
     summary: 'El cliente reservó una hora.',
     transcript: [],
@@ -117,7 +111,7 @@ test('conversation inbox keeps calls usable when WhatsApp temporarily fails', as
   await page.goto('/conversations.html');
 
   await expect(page.getByText('+56911111111')).toBeVisible();
-  await page.getByText('+56911111111').click();
+  await expect(page.locator('#detailCustomer')).toHaveText('+56911111111');
   await expect(page.getByText('El cliente reservó una hora.')).toBeVisible();
   await expect(page.locator('#message')).toContainText('WhatsApp no disponible');
 });

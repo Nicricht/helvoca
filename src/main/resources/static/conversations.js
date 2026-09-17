@@ -10,6 +10,29 @@ let whatsappConversations = [];
 let activeChannel = "all";
 let selectedConversationKey = null;
 
+const EVENT_LABELS = {
+  REQUEST_CREATED: "Solicitud creada",
+  BOOKING_CREATED: "Reserva creada",
+  BOOKING_RESCHEDULED: "Reserva reprogramada",
+  BOOKING_CANCELLED: "Reserva cancelada",
+  CUSTOMER_REGISTERED: "Cliente registrado",
+  CALLER_LOOKUP: "Cliente identificado",
+  FIND_CALLER: "Cliente identificado",
+  KNOWLEDGE_SEARCH: "Consultó información",
+  SEARCH_KNOWLEDGE: "Consultó información",
+  SERVICES_LISTED: "Consultó servicios",
+  LIST_SERVICES: "Consultó servicios",
+  AVAILABILITY_LISTED: "Consultó horarios disponibles",
+  LIST_AVAILABLE_SLOTS: "Consultó horarios disponibles",
+  AVAILABILITY_CHECKED: "Verificó disponibilidad",
+  CHECK_BOOKING_AVAILABILITY: "Verificó disponibilidad",
+  CREATE_BOOKING: "Reserva creada",
+  CREATE_REQUEST: "Solicitud creada",
+  HUMAN_TRANSFER: "Transferencia a una persona",
+  TRANSFER_TO_HUMAN: "Transferencia a una persona",
+  UNANSWERED_QUESTION_RECORDED: "Pregunta guardada para revisar"
+};
+
 async function api(path) {
   const response = await fetch(path, {headers: {Authorization: `Bearer ${token}`}});
   let payload = null;
@@ -33,6 +56,14 @@ function esc(value) {
   return String(value ?? "").replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 }
 
+function humanize(value) {
+  if (!value) return "";
+  if (EVENT_LABELS[value]) return EVENT_LABELS[value];
+  const text = String(value);
+  if (!/^[A-Z0-9_]+$/.test(text)) return text;
+  return text.toLowerCase().split("_").filter(Boolean).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+}
+
 function fmtDate(value) {
   if (!value) return "";
   try { return new Intl.DateTimeFormat("es-CL", {dateStyle:"short", timeStyle:"short"}).format(new Date(value)); }
@@ -51,7 +82,7 @@ function statusLabel(status) {
     IN_PROGRESS: "En curso",
     RINGING: "Entrante",
     ANSWERED: "Atendida"
-  })[status] || status || "Sin estado";
+  })[status] || humanize(status) || "Sin estado";
 }
 
 function toast(text) {
@@ -72,7 +103,7 @@ function conversationItems() {
     bad: call.status === "FAILED",
     timestamp: call.startedAt,
     durationSeconds: call.durationSeconds,
-    summary: call.resolution || ""
+    summary: humanize(call.resolution)
   }));
   const whatsappItems = whatsappConversations.map(conversation => ({
     key: `whatsapp:${conversation.id}`,
@@ -140,7 +171,7 @@ function renderCallDetail(data) {
   $("#detailContent").classList.remove("hidden");
   $("#detailChannel").textContent = "Llamada";
   $("#detailCustomer").textContent = call.callerNumber || "Número oculto";
-  $("#detailMeta").textContent = [fmtDate(call.startedAt), call.durationSeconds != null ? fmtDuration(call.durationSeconds) : "", call.resolution || ""].filter(Boolean).join(" · ");
+  $("#detailMeta").textContent = [fmtDate(call.startedAt), call.durationSeconds != null ? fmtDuration(call.durationSeconds) : "", humanize(call.resolution)].filter(Boolean).join(" · ");
   $("#detailStatus").textContent = statusLabel(call.status);
   $("#detailStatus").className = `pill ${call.status === "FAILED" ? "bad" : ""}`;
   $("#detailSummary").textContent = data.summary || "El resumen todavía no está disponible.";
@@ -148,7 +179,7 @@ function renderCallDetail(data) {
   const transcript = data.transcript || [];
   $("#detailTranscript").innerHTML = transcript.length ? transcript.map(item => `
     <div class="transcript-line ${String(item.speaker || "").toLowerCase()}">
-      <strong>${esc(item.speaker === "USER" ? "Cliente" : item.speaker === "ASSISTANT" ? "Helvoca" : item.speaker)}</strong>
+      <strong>${esc(item.speaker === "USER" ? "Cliente" : item.speaker === "ASSISTANT" ? "Helvoca" : humanize(item.speaker))}</strong>
       <p>${esc(item.content)}</p>
       <span>${fmtDate(item.createdAt)}</span>
     </div>
@@ -159,12 +190,11 @@ function renderCallDetail(data) {
   $("#detailActions").innerHTML = actions.length ? actions.map(action => `
     <div class="action-row">
       <div class="item-head">
-        <strong>${esc(action.actionType)}</strong>
+        <strong>${esc(humanize(action.actionType))}</strong>
         <span class="pill ${action.success ? "" : "bad"}">${action.success ? "Confirmada" : "Falló"}</span>
       </div>
       <div class="meta">
         ${action.detail ? `<span>${esc(action.detail)}</span>` : ""}
-        ${action.entityType ? `<span>${esc(action.entityType)}</span>` : ""}
         <span>${fmtDate(action.createdAt)}</span>
       </div>
     </div>
@@ -184,7 +214,7 @@ function renderWhatsAppDetail(data) {
   $("#detailSummary").textContent = `Conversación real por WhatsApp con ${messages.length} mensaje${messages.length === 1 ? "" : "s"}.`;
   $("#detailTranscript").innerHTML = messages.length ? messages.map(item => `
     <div class="transcript-line ${String(item.role || "").toLowerCase()}">
-      <strong>${esc(item.role === "USER" ? "Cliente" : item.role === "ASSISTANT" ? "Helvoca" : item.role || item.direction)}</strong>
+      <strong>${esc(item.role === "USER" ? "Cliente" : item.role === "ASSISTANT" ? "Helvoca" : humanize(item.role || item.direction))}</strong>
       <p>${esc(item.content)}</p>
       <span>${fmtDate(item.createdAt)}</span>
     </div>
@@ -204,6 +234,15 @@ async function loadDetail(kind, id) {
   } catch (error) {
     toast(error.message || "No pude cargar el detalle de la conversación.");
   }
+}
+
+async function openMostRecentIfNeeded() {
+  if (selectedConversationKey) return;
+  const first = conversationItems()[0];
+  if (!first) return;
+  selectedConversationKey = first.key;
+  renderList();
+  await loadDetail(first.kind, first.id);
 }
 
 function setChannel(channel) {
@@ -233,6 +272,7 @@ async function load() {
     const total = calls.length + whatsappConversations.length;
     $("#conversationContext").textContent = data.businessName ? `${data.businessName} · ${total} conversaciones recientes` : `${total} conversaciones recientes`;
     renderList();
+    await openMostRecentIfNeeded();
     const failure = dashboardAvailable ? whatsappResult.reason : dashboardResult.reason;
     if (failure) toast(failure.message || "Una fuente de conversaciones no está disponible.");
     return;

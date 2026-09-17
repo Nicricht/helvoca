@@ -5,82 +5,54 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Helvoca · Operaciones</title>
   <link rel="stylesheet" href="/operations.css">
-  <style>
-    .topbar{gap:18px;flex-wrap:wrap}
-    .operations-nav-shell{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-    .app-nav{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-    .topbar .app-nav a{display:inline-flex;align-items:center;min-height:30px;padding:5px 9px;border:1px solid transparent;border-radius:999px;background:transparent;color:#6c7d77;text-decoration:none;font-size:11px;font-weight:750;white-space:nowrap}
-    .topbar .app-nav a:hover{color:#173f35;background:#f1f5f3}
-    .topbar .app-nav a.active{color:#173f35;border-color:#d5e5df;background:#e8f3ef}
-    .operations-actions{display:flex;align-items:center;gap:6px}
-    .topbar .operations-actions a{padding:8px 10px;font-size:11px;background:#f1f5f3;color:#45665d}
-    @media(max-width:760px){.operations-nav-shell{width:100%;justify-content:flex-start}.app-nav{overflow-x:auto;flex-wrap:nowrap;max-width:100%;padding-bottom:2px}.operations-actions{margin-left:auto}}
-  </style>
 </head>
 <body>
 <header class="topbar">
-  <div><strong>HELVOCA</strong><span>Operaciones</span></div>
-  <div class="operations-nav-shell">
+  <div class="brand-block">
+    <strong>HELVOCA</strong>
+    <span>Operaciones</span>
+  </div>
+  <div class="topbar-shell">
     <nav class="app-nav" aria-label="Navegación principal">
       <a class="nav-home" href="/">Inicio</a>
       <a class="nav-conversations" href="/conversations.html">Conversaciones</a>
       <a class="nav-operations active" href="/operations.html">Operaciones</a>
       <a class="nav-config" href="/#configuration">Configuración</a>
     </nav>
-    <div class="operations-actions">
-      <a href="/simulator.html">Probar</a>
-      <button id="refreshBtn">Actualizar</button>
+    <div class="topbar-actions">
+      <a class="quiet-action" href="/simulator.html">Probar</a>
+      <button id="refreshBtn" class="quiet-action" type="button">Actualizar</button>
     </div>
   </div>
 </header>
-<main>
+
+<main class="operations-main">
   <section class="hero">
-    <div><p class="eyebrow">HOY</p><h1 id="businessName">Helvoca</h1><p id="localNow" class="muted">Cargando…</p></div>
+    <div>
+      <p class="eyebrow">OPERACIÓN</p>
+      <h1>Hoy en tu negocio</h1>
+      <p class="hero-context"><strong id="businessName">Helvoca</strong><span aria-hidden="true">·</span><span id="localNow" class="muted">Cargando…</span></p>
+    </div>
     <div id="healthBadge" class="badge">Conectando</div>
   </section>
 
-  <section class="panel">
-    <div class="panel-head">
-      <div><p class="eyebrow">LISTO PARA PRODUCCIÓN</p><h2>Estado comercial de voz</h2><p class="muted">Verifica el núcleo Realtime sin depender de un nicho específico.</p></div>
-      <div id="readinessBadge" class="badge">Verificando</div>
-    </div>
-    <div id="readinessChecks" class="list"></div>
-    <div id="capabilities" class="meta"></div>
-    <div id="readinessWarnings" class="list"></div>
-  </section>
-
-  <section id="metrics" class="metrics">
-    <article><strong id="callsToday">–</strong><span>Llamadas reales</span></article>
-    <article><strong id="minutesToday">–</strong><span>Minutos de voz</span></article>
-    <article><strong id="bookingsToday">–</strong><span>Reservas creadas</span></article>
+  <section id="metrics" class="metrics" aria-label="Resumen de hoy">
+    <article><strong id="callsToday">–</strong><span>Llamadas</span></article>
+    <article><strong id="bookingsToday">–</strong><span>Reservas</span></article>
     <article><strong id="customersToday">–</strong><span>Clientes nuevos</span></article>
     <article><strong id="openRequests">–</strong><span>Solicitudes abiertas</span></article>
     <article><strong id="unknownQuestions">–</strong><span>Preguntas pendientes</span></article>
-    <article><strong id="failuresToday">–</strong><span>Fallos de llamada</span></article>
+    <article><strong id="failuresToday">–</strong><span>Llamadas con fallo</span></article>
+    <article><strong id="minutesToday">–</strong><span>Minutos de voz</span></article>
     <article><strong id="costToday">–</strong><span>Costo estimado USD</span></article>
   </section>
 
-  <section class="panel certification-panel">
-    <div class="panel-head">
-      <div>
-        <p class="eyebrow">CERTIFICACIÓN END-TO-END</p>
-        <h2>Última prueba integral de llamada</h2>
-        <p class="muted">Comprueba audio, IA, tools, reserva, cancelación, transcripción y resumen sin mezclar la prueba con las métricas comerciales.</p>
-      </div>
-      <div id="certificationBadge" class="badge">Verificando</div>
-    </div>
-    <div id="certificationMeta" class="meta"></div>
-    <div id="certificationChecks" class="list"></div>
-  </section>
-
-  <section class="grid two">
-    <article id="conversations" class="panel">
-      <div class="panel-head"><div><p class="eyebrow">ACTIVIDAD</p><h2>Últimas llamadas</h2></div></div>
-      <div id="callsList" class="list"></div>
-    </article>
-
+  <section class="grid two work-grid">
     <article class="panel">
-      <div class="panel-head"><div><p class="eyebrow">TRABAJO</p><h2>Solicitudes</h2></div><button id="newRequestBtn">+ Nueva</button></div>
+      <div class="panel-head">
+        <div><p class="eyebrow">TRABAJO</p><h2>Solicitudes</h2><p class="muted">Lo que necesita seguimiento humano.</p></div>
+        <button id="newRequestBtn" class="button secondary" type="button">+ Nueva</button>
+      </div>
       <form id="requestForm" class="form hidden">
         <input name="requestType" placeholder="Tipo, ej. cotización" required maxlength="80">
         <input name="title" placeholder="Título" required maxlength="200">
@@ -91,18 +63,33 @@
       </form>
       <div id="requestsList" class="list"></div>
     </article>
+
+    <article class="panel learning">
+      <div class="panel-head">
+        <div><p class="eyebrow">APRENDIZAJE</p><h2>Preguntas pendientes</h2><p class="muted">Responde una vez y Helvoca aprenderá la respuesta oficial.</p></div>
+      </div>
+      <div id="questionsList" class="list"></div>
+    </article>
+  </section>
+
+  <section class="panel calls-panel">
+    <div class="panel-head">
+      <div><p class="eyebrow">ACTIVIDAD</p><h2>Últimas llamadas</h2><p class="muted">Un resumen rápido de la actividad de voz.</p></div>
+      <a class="text-link" href="/conversations.html">Ver conversaciones</a>
+    </div>
+    <div id="callsList" class="list calls-list"></div>
   </section>
 
   <section id="callDetailPanel" class="panel call-detail hidden">
     <div class="panel-head">
-      <div><p class="eyebrow">TRAZABILIDAD</p><h2>Detalle de llamada</h2><p id="callDetailMeta" class="muted"></p></div>
-      <button id="closeCallDetailBtn" class="ghost">Cerrar</button>
+      <div><p class="eyebrow">DETALLE</p><h2>Qué ocurrió en la llamada</h2><p id="callDetailMeta" class="muted"></p></div>
+      <button id="closeCallDetailBtn" class="ghost" type="button">Cerrar</button>
     </div>
     <div class="grid two call-detail-grid">
       <div>
         <h3>Resumen</h3>
         <div id="callSummary" class="detail-box"></div>
-        <h3>Acciones verificadas</h3>
+        <h3>Acciones realizadas</h3>
         <div id="callActions" class="list"></div>
       </div>
       <div>
@@ -112,19 +99,39 @@
     </div>
   </section>
 
-  <section class="panel learning">
-    <div class="panel-head"><div><p class="eyebrow">APRENDIZAJE</p><h2>Preguntas que Helvoca todavía no sabe</h2><p class="muted">Responde una vez y la respuesta entra a la base de conocimiento del negocio.</p></div></div>
-    <div id="questionsList" class="list"></div>
-  </section>
+  <details id="technicalDiagnostics" class="panel diagnostics-panel">
+    <summary>
+      <span>
+        <span class="eyebrow">AVANZADO</span>
+        <strong>Diagnóstico técnico</strong>
+      </span>
+      <span id="diagnosticsSummary" class="diagnostics-summary">Cargando…</span>
+    </summary>
+    <div class="diagnostics-body">
+      <section class="diagnostic-section">
+        <div class="panel-head">
+          <div><h2>Estado de voz</h2><p class="muted">Telefonía, proveedores y capacidades internas.</p></div>
+          <div id="readinessBadge" class="badge">Verificando</div>
+        </div>
+        <div id="readinessChecks" class="list"></div>
+        <div id="capabilities" class="meta"></div>
+        <div id="readinessWarnings" class="list"></div>
+      </section>
+
+      <section class="diagnostic-section">
+        <div class="panel-head">
+          <div><h2>Última certificación</h2><p class="muted">Prueba end-to-end de audio, IA, acciones, transcripción y resumen.</p></div>
+          <div id="certificationBadge" class="badge">Verificando</div>
+        </div>
+        <div id="certificationMeta" class="meta"></div>
+        <div id="certificationChecks" class="list"></div>
+      </section>
+    </div>
+  </details>
 
   <p id="message" class="message hidden"></p>
 </main>
+
 <script src="/operations.js" defer></script>
-<script>
-  if (location.hash === '#conversations') location.replace('/conversations.html');
-  addEventListener('hashchange', () => {
-    if (location.hash === '#conversations') location.replace('/conversations.html');
-  });
-</script>
 </body>
 </html>

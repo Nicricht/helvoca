@@ -4,6 +4,40 @@ const $ = s => document.querySelector(s);
 
 if (!token) location.replace("/");
 
+const CALL_STATUS_LABELS = {
+  COMPLETED: "Finalizada",
+  FAILED: "Falló",
+  IN_PROGRESS: "En curso",
+  RINGING: "Entrante",
+  ANSWERED: "Atendida"
+};
+
+const EVENT_LABELS = {
+  REQUEST_CREATED: "Solicitud creada",
+  BOOKING_CREATED: "Reserva creada",
+  BOOKING_RESCHEDULED: "Reserva reprogramada",
+  BOOKING_CANCELLED: "Reserva cancelada",
+  CUSTOMER_REGISTERED: "Cliente registrado",
+  CALLER_LOOKUP: "Cliente identificado",
+  FIND_CALLER: "Cliente identificado",
+  KNOWLEDGE_SEARCH: "Consultó información",
+  SEARCH_KNOWLEDGE: "Consultó información",
+  SERVICES_LISTED: "Consultó servicios",
+  LIST_SERVICES: "Consultó servicios",
+  AVAILABILITY_LISTED: "Consultó horarios disponibles",
+  LIST_AVAILABLE_SLOTS: "Consultó horarios disponibles",
+  AVAILABILITY_CHECKED: "Verificó disponibilidad",
+  CHECK_BOOKING_AVAILABILITY: "Verificó disponibilidad",
+  CREATE_BOOKING: "Reserva creada",
+  CREATE_REQUEST: "Solicitud creada",
+  HUMAN_TRANSFER: "Transferencia a una persona",
+  TRANSFER_TO_HUMAN: "Transferencia a una persona",
+  UNANSWERED_QUESTION_RECORDED: "Pregunta guardada para revisar"
+};
+
+const PRIORITY_LABELS = { LOW: "Baja", NORMAL: "Normal", HIGH: "Alta", URGENT: "Urgente" };
+const REQUEST_STATUS_LABELS = { OPEN: "Abierta", IN_PROGRESS: "En curso", RESOLVED: "Resuelta", CANCELLED: "Cancelada" };
+
 async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set("Authorization", `Bearer ${token}`);
@@ -24,15 +58,29 @@ function esc(value) {
   return String(value ?? "").replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 }
 
+function humanize(value, labels = EVENT_LABELS) {
+  if (!value) return "";
+  if (labels[value]) return labels[value];
+  const text = String(value);
+  if (!/^[A-Z0-9_]+$/.test(text)) return text;
+  return text.toLowerCase().split("_").filter(Boolean).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+}
+
+function callStatus(value) {
+  return CALL_STATUS_LABELS[value] || humanize(value, {});
+}
+
 function toast(text) {
   const el = $("#message");
-  el.textContent = text; el.classList.remove("hidden");
-  clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.add("hidden"), 3500);
+  el.textContent = text;
+  el.classList.remove("hidden");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => el.classList.add("hidden"), 3500);
 }
 
 function fmtDate(value) {
   if (!value) return "";
-  try { return new Intl.DateTimeFormat("es", {dateStyle:"short", timeStyle:"short"}).format(new Date(value)); }
+  try { return new Intl.DateTimeFormat("es-CL", {dateStyle:"short", timeStyle:"short"}).format(new Date(value)); }
   catch (_) { return value; }
 }
 
@@ -50,6 +98,7 @@ function fmtUsd(value) {
 
 function renderReadiness(data) {
   $("#readinessBadge").textContent = data.ready ? "LISTO" : `${data.requiredPassed}/${data.requiredTotal}`;
+  $("#readinessBadge").className = `badge ${data.ready ? "" : "bad"}`.trim();
   const checks = $("#readinessChecks");
   checks.innerHTML = (data.checks || []).map(c => `
     <div class="item">
@@ -61,8 +110,7 @@ function renderReadiness(data) {
   $("#capabilities").innerHTML = capabilities.map(([name, enabled]) =>
     `<span class="pill ${enabled ? "" : "bad"}">${esc(name)} ${enabled ? "✓" : "×"}</span>`).join(" ");
 
-  const warnings = $("#readinessWarnings");
-  warnings.innerHTML = (data.warnings || []).map(w => `<div class="empty">${esc(w)}</div>`).join("");
+  $("#readinessWarnings").innerHTML = (data.warnings || []).map(w => `<div class="empty">${esc(w)}</div>`).join("");
 }
 
 function renderCertification(data) {
@@ -73,19 +121,19 @@ function renderCertification(data) {
   if (!data?.available) {
     badge.textContent = "SIN EJECUTAR";
     badge.className = "badge";
-    meta.innerHTML = '<span>No existe todavía una llamada de certificación registrada para este negocio.</span>';
+    meta.innerHTML = "<span>No existe todavía una llamada de certificación registrada para este negocio.</span>";
     checks.innerHTML = '<div class="empty">La certificación real sigue siendo una operación controlada y no se inicia desde este dashboard.</div>';
     return;
   }
 
   const stateLabels = {PASSED: "APROBADA", FAILED: "FALLÓ", IN_PROGRESS: "EN CURSO", NOT_RUN: "SIN EJECUTAR"};
-  badge.textContent = stateLabels[data.state] || esc(data.state);
-  badge.className = `badge ${data.state === "FAILED" ? "bad" : ""}`;
+  badge.textContent = stateLabels[data.state] || humanize(data.state, {});
+  badge.className = `badge ${data.state === "FAILED" ? "bad" : ""}`.trim();
   meta.innerHTML = [
     data.startedAt ? `<span>${fmtDate(data.startedAt)}</span>` : "",
     data.telephonyProvider ? `<span>Telefonía: ${esc(data.telephonyProvider)}</span>` : "",
     data.aiProvider ? `<span>IA: ${esc(data.aiProvider)}</span>` : "",
-    data.callStatus ? `<span>Llamada: ${esc(data.callStatus)}</span>` : "",
+    data.callStatus ? `<span>Llamada: ${esc(callStatus(data.callStatus))}</span>` : "",
     `<span>${Number(data.passedChecks || 0)}/${Number(data.totalChecks || 0)} controles</span>`
   ].filter(Boolean).join("");
 
@@ -101,9 +149,13 @@ function renderCalls(items = []) {
   if (!items.length) { root.innerHTML = '<div class="empty">Todavía no hay llamadas reales.</div>'; return; }
   root.innerHTML = items.map(c => `
     <div class="item" data-call-id="${esc(c.id)}">
-      <div class="item-head"><strong>${esc(c.callerNumber || "Número oculto")}</strong><span class="pill ${c.status === "FAILED" ? "bad" : ""}">${esc(c.status)}</span></div>
-      <div class="meta"><span>${fmtDate(c.startedAt)}</span><span>${c.durationSeconds != null ? fmtDuration(c.durationSeconds) : "sin duración"}</span>${c.resolution ? `<span>${esc(c.resolution)}</span>` : ""}${c.estimatedTotalCostUsd != null ? `<span>USD ${fmtUsd(c.estimatedTotalCostUsd)}</span>` : ""}</div>
-      <div class="actions call-actions"><button data-call-detail class="ghost">Ver detalle</button></div>
+      <div class="item-head"><strong>${esc(c.callerNumber || "Número oculto")}</strong><span class="pill ${c.status === "FAILED" ? "bad" : ""}">${esc(callStatus(c.status))}</span></div>
+      <div class="meta">
+        <span>${fmtDate(c.startedAt)}</span>
+        <span>${c.durationSeconds != null ? fmtDuration(c.durationSeconds) : "sin duración"}</span>
+        ${c.resolution ? `<span>${esc(humanize(c.resolution))}</span>` : ""}
+      </div>
+      <div class="actions call-actions"><button data-call-detail class="ghost" type="button">Abrir detalle</button></div>
     </div>`).join("");
   root.querySelectorAll("[data-call-detail]").forEach(button => button.addEventListener("click", async e => {
     const item = e.target.closest("[data-call-id]");
@@ -116,20 +168,25 @@ function renderCalls(items = []) {
 
 function renderCallDetail(data) {
   const call = data.call || {};
-  $("#callDetailMeta").textContent = `${call.callerNumber || "Número oculto"} · ${fmtDate(call.startedAt)} · ${call.status || ""}${call.resolution ? ` · ${call.resolution}` : ""}`;
+  $("#callDetailMeta").textContent = [
+    call.callerNumber || "Número oculto",
+    fmtDate(call.startedAt),
+    callStatus(call.status),
+    call.resolution ? humanize(call.resolution) : ""
+  ].filter(Boolean).join(" · ");
   $("#callSummary").textContent = data.summary || "El resumen todavía no está disponible.";
 
   const actions = data.actions || [];
   $("#callActions").innerHTML = actions.length ? actions.map(a => `
     <div class="item">
-      <div class="item-head"><strong>${esc(a.actionType)}</strong><span class="pill ${a.success ? "" : "bad"}">${a.success ? "CONFIRMADO" : "FALLÓ"}</span></div>
-      <div class="meta">${a.detail ? `<span>${esc(a.detail)}</span>` : ""}${a.entityType ? `<span>${esc(a.entityType)}</span>` : ""}${a.entityId ? `<span>${esc(a.entityId)}</span>` : ""}${a.errorCode ? `<span>${esc(a.errorCode)}</span>` : ""}<span>${fmtDate(a.createdAt)}</span></div>
+      <div class="item-head"><strong>${esc(humanize(a.actionType))}</strong><span class="pill ${a.success ? "" : "bad"}">${a.success ? "Confirmada" : "Falló"}</span></div>
+      <div class="meta">${a.detail ? `<span>${esc(a.detail)}</span>` : ""}<span>${fmtDate(a.createdAt)}</span></div>
     </div>`).join("") : '<div class="empty">No hay acciones registradas para esta llamada.</div>';
 
   const transcript = data.transcript || [];
   $("#callTranscript").innerHTML = transcript.length ? transcript.map(t => `
     <div class="transcript-line ${String(t.speaker || "").toLowerCase()}">
-      <strong>${esc(t.speaker === "USER" ? "Cliente" : t.speaker === "ASSISTANT" ? "Helvoca" : t.speaker)}</strong>
+      <strong>${esc(t.speaker === "USER" ? "Cliente" : t.speaker === "ASSISTANT" ? "Helvoca" : humanize(t.speaker, {}))}</strong>
       <p>${esc(t.content)}</p>
       <span>${fmtDate(t.createdAt)}</span>
     </div>`).join("") : '<div class="empty">No hay transcripción disponible.</div>';
@@ -145,12 +202,12 @@ async function loadCallDetail(callId) {
 
 function renderRequests(items = []) {
   const root = $("#requestsList");
-  if (!items.length) { root.innerHTML = '<div class="empty">No hay solicitudes abiertas todavía.</div>'; return; }
+  if (!items.length) { root.innerHTML = '<div class="empty">No hay solicitudes abiertas. ✨</div>'; return; }
   root.innerHTML = items.map(r => `
     <div class="item" data-request-id="${esc(r.id)}">
-      <div class="item-head"><strong>${esc(r.title)}</strong><span class="pill ${r.priority === "URGENT" || r.priority === "HIGH" ? "high" : ""}">${esc(r.priority)}</span></div>
-      <div class="meta"><span>${esc(r.type)}</span><span>${esc(r.status)}</span><span>${fmtDate(r.createdAt)}</span></div>
-      ${r.status !== "RESOLVED" && r.status !== "CANCELLED" ? '<div class="actions" style="margin-top:10px"><button data-status="IN_PROGRESS">En curso</button><button data-status="RESOLVED" class="ghost">Resolver</button></div>' : ""}
+      <div class="item-head"><strong>${esc(r.title)}</strong><span class="pill ${r.priority === "URGENT" || r.priority === "HIGH" ? "high" : ""}">${esc(PRIORITY_LABELS[r.priority] || humanize(r.priority, {}))}</span></div>
+      <div class="meta"><span>${esc(humanize(r.type, {}))}</span><span>${esc(REQUEST_STATUS_LABELS[r.status] || humanize(r.status, {}))}</span><span>${fmtDate(r.createdAt)}</span></div>
+      ${r.status !== "RESOLVED" && r.status !== "CANCELLED" ? '<div class="actions" style="margin-top:10px"><button data-status="IN_PROGRESS" type="button">En curso</button><button data-status="RESOLVED" type="button" class="ghost">Resolver</button></div>' : ""}
     </div>`).join("");
   root.querySelectorAll("button[data-status]").forEach(button => button.addEventListener("click", async e => {
     const item = e.target.closest("[data-request-id]");
@@ -169,7 +226,7 @@ function renderQuestions(items = []) {
     <div class="item" data-question-id="${esc(q.id)}">
       <div class="item-head"><strong>${esc(q.question)}</strong><span class="pill">${q.occurrences}×</span></div>
       <div class="meta"><span>Última vez ${fmtDate(q.lastSeenAt)}</span></div>
-      <div class="question-actions"><input data-answer placeholder="Escribe la respuesta oficial"><button data-answer-btn>Enseñar</button><button data-dismiss-btn class="ghost">Descartar</button></div>
+      <div class="question-actions"><input data-answer placeholder="Escribe la respuesta oficial"><button data-answer-btn type="button">Enseñar</button><button data-dismiss-btn type="button" class="ghost">Descartar</button></div>
     </div>`).join("");
   root.querySelectorAll("[data-answer-btn]").forEach(button => button.addEventListener("click", async e => {
     const item = e.target.closest("[data-question-id]");
@@ -191,6 +248,21 @@ function renderQuestions(items = []) {
   }));
 }
 
+function updateDiagnosticsSummary(readiness, certification) {
+  const target = $("#diagnosticsSummary");
+  if (!target) return;
+  const ready = Boolean(readiness?.ready);
+  const certified = !certification?.available || certification?.state === "PASSED";
+  if (ready && certified) {
+    target.textContent = "Todo correcto";
+    return;
+  }
+  const issues = [];
+  if (!ready) issues.push("voz");
+  if (!certified) issues.push("certificación");
+  target.textContent = `Revisar ${issues.join(" y ")}`;
+}
+
 async function load() {
   try {
     const [data, readiness, certification] = await Promise.all([
@@ -198,8 +270,8 @@ async function load() {
       api("/api/v1/operations/readiness"),
       api("/api/v1/operations/certification")
     ]);
-    $("#businessName").textContent = data.businessName;
-    $("#localNow").textContent = `${data.timezone} · ${fmtDate(data.localNow)}`;
+    $("#businessName").textContent = data.businessName || "Tu negocio";
+    $("#localNow").textContent = `${data.timezone || ""}${data.timezone ? " · " : ""}${fmtDate(data.localNow)}`;
     $("#callsToday").textContent = data.callsToday;
     $("#minutesToday").textContent = fmtDuration(data.callDurationSecondsToday);
     $("#bookingsToday").textContent = data.bookingsToday;
@@ -208,13 +280,20 @@ async function load() {
     $("#unknownQuestions").textContent = data.unansweredQuestions;
     $("#failuresToday").textContent = data.callFailuresToday;
     $("#costToday").textContent = fmtUsd(data.estimatedCallCostTodayUsd);
-    $("#healthBadge").textContent = data.callFailuresToday ? `${data.callFailuresToday} llamada(s) con fallo` : "Operación saludable";
+    $("#healthBadge").textContent = data.callFailuresToday
+      ? `${data.callFailuresToday} llamada${Number(data.callFailuresToday) === 1 ? "" : "s"} necesita${Number(data.callFailuresToday) === 1 ? "" : "n"} revisión`
+      : "Todo funcionando";
+    $("#healthBadge").className = `badge ${data.callFailuresToday ? "bad" : ""}`.trim();
+
     renderReadiness(readiness);
     renderCertification(certification);
+    updateDiagnosticsSummary(readiness, certification);
     renderCalls(data.recentCalls);
     renderRequests(data.recentRequests);
     renderQuestions(data.unanswered);
-  } catch (err) { toast(err.message || "No pude cargar operaciones."); }
+  } catch (err) {
+    toast(err.message || "No pude cargar operaciones.");
+  }
 }
 
 $("#refreshBtn").addEventListener("click", load);
