@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>RecepVoz · Números telefónicos</title>
+    <title>Helvoca · Números telefónicos</title>
     <style>
         :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background:#090d16; color:#f5f7ff; }
         * { box-sizing:border-box; }
@@ -28,13 +28,13 @@
 </head>
 <body>
 <main>
-    <div class="brand">RECEPVOZ</div>
+    <div class="brand">HELVOCA</div>
     <h1>Números telefónicos</h1>
     <p>Administra únicamente los números conectados a tu negocio actual. Desvincular un número no compra, libera ni elimina el número en Twilio. Solo quita su asociación con este negocio para que puedas conectarlo a otro.</p>
     <section class="card">
         <div id="list">Cargando…</div>
         <div id="message" class="msg" hidden></div>
-        <a class="back" href="/">← Volver a RecepVoz</a>
+        <a class="back" href="/">← Volver a Helvoca</a>
     </section>
 </main>
 <script>
@@ -79,7 +79,7 @@ async function detach(phone) {
 
 async function load() {
     if (!token) {
-        list.innerHTML = "No hay una sesión activa. Ingresa primero a RecepVoz con la cuenta propietaria del número.";
+        list.innerHTML = "No hay una sesión activa. Ingresa primero a Helvoca con la cuenta propietaria del número.";
         return;
     }
     try {
