@@ -103,6 +103,52 @@
         #loginForm { gap: 13px; }
         #authView .form-hint { font-size: 11px; text-align: center; }
 
+        #proposalPanel .proposal-top { align-items: center; }
+        #proposalPanel .proposal-top .eyebrow { color: var(--success); }
+        #proposalPanel .proposal-top h3 { margin-bottom: 3px; }
+        .proposal-summary-list {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 7px;
+            margin-top: 14px;
+        }
+        .proposal-summary-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            min-height: 42px;
+            padding: 8px 11px;
+            border: 1px solid rgba(255,255,255,.07);
+            border-radius: 10px;
+            background: rgba(255,255,255,.025);
+        }
+        .proposal-summary-item strong { font-size: 12px; }
+        .proposal-summary-item span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+        .proposal-details {
+            margin-top: 10px;
+            border-top: 1px solid rgba(255,255,255,.06);
+            border-bottom: 1px solid rgba(255,255,255,.06);
+        }
+        .proposal-details > summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-height: 40px;
+            cursor: pointer;
+            list-style: none;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .proposal-details > summary::-webkit-details-marker { display: none; }
+        .proposal-details > summary strong { color: var(--text); font-size: 11px; }
+        .proposal-details[open] > summary strong { color: var(--muted); }
+        .proposal-details .proposal-grid { margin-top: 0; padding: 0 0 12px; }
+        #proposalPanel .proposal-actions { margin-top: 14px; }
+        #proposalPanel .proposal-actions .button { min-height: 36px; padding: 0 13px; font-size: 12px; }
+
         @media (max-width: 900px) { #configPermissionsPanel .agent-capability-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 760px) {
             #configKnowledgePanel .knowledge-row { grid-template-columns: 1fr 1fr; }
@@ -114,6 +160,7 @@
             #registerForm > button,
             #registerForm > .form-hint { grid-column: 1; }
             #authView .auth-card { padding: 18px; }
+            .proposal-summary-list { grid-template-columns: 1fr; }
         }
         @media (max-width: 720px) { .agent-capability-grid, #configPermissionsPanel .agent-capability-grid { grid-template-columns: 1fr; } }
     </style>
@@ -205,21 +252,32 @@
                 <div id="proposalPanel" class="proposal-panel hidden">
                     <div class="proposal-top">
                         <div>
-                            <div class="eyebrow">Propuesta encontrada</div>
+                            <div class="eyebrow">Encontramos esto ✓</div>
                             <h3 id="proposalBusinessName"></h3>
                             <p id="proposalSummary" class="muted-text"></p>
                         </div>
                         <span id="sourceBadge" class="badge online">Fuente leída</span>
                     </div>
-                    <div class="proposal-grid">
-                        <div class="proposal-box"><strong>Servicios</strong><div id="proposalServices"></div></div>
-                        <div class="proposal-box"><strong>Horarios</strong><div id="proposalHours"></div></div>
-                        <div class="proposal-box"><strong>Respuestas útiles</strong><div id="proposalKnowledge"></div></div>
+
+                    <div class="proposal-summary-list" aria-label="Resumen de datos detectados">
+                        <div class="proposal-summary-item"><strong>Servicios</strong><span id="proposalServicesCount">0 servicios</span></div>
+                        <div class="proposal-summary-item"><strong>Horarios</strong><span id="proposalHoursCount">0 horarios</span></div>
+                        <div class="proposal-summary-item"><strong>Respuestas</strong><span id="proposalKnowledgeCount">0 respuestas</span></div>
                     </div>
+
+                    <details class="proposal-details">
+                        <summary><span>Datos detectados</span><strong>Revisar detalles</strong></summary>
+                        <div class="proposal-grid">
+                            <div class="proposal-box"><strong>Servicios</strong><div id="proposalServices"></div></div>
+                            <div class="proposal-box"><strong>Horarios</strong><div id="proposalHours"></div></div>
+                            <div class="proposal-box"><strong>Respuestas útiles</strong><div id="proposalKnowledge"></div></div>
+                        </div>
+                    </details>
+
                     <div id="proposalWarnings" class="proposal-warnings hidden"></div>
                     <div class="proposal-actions">
-                        <button id="confirmProposalBtn" class="button primary" type="button">Confirmar configuración</button>
-                        <button id="editProposalBtn" class="button ghost" type="button">Revisar y editar</button>
+                        <button id="confirmProposalBtn" class="button primary" type="button">Confirmar</button>
+                        <button id="editProposalBtn" class="button ghost" type="button">Editar</button>
                     </div>
                 </div>
             </section>
@@ -316,6 +374,28 @@
     </div>
 </template>
 
+<script>
+(() => {
+    const panel = document.getElementById('proposalPanel');
+    if (!panel) return;
+    const groups = [
+        ['proposalServices', 'proposalServicesCount', 'servicio', 'servicios'],
+        ['proposalHours', 'proposalHoursCount', 'horario', 'horarios'],
+        ['proposalKnowledge', 'proposalKnowledgeCount', 'respuesta', 'respuestas']
+    ];
+    const syncCounts = () => groups.forEach(([containerId, countId, singular, plural]) => {
+        const container = document.getElementById(containerId);
+        const target = document.getElementById(countId);
+        if (!container || !target) return;
+        const first = container.querySelector('.proposal-line > strong')?.textContent?.trim();
+        const emptyState = first === 'No detectado' || first === 'Sin respuestas adicionales';
+        const count = emptyState ? 0 : container.querySelectorAll(':scope > .proposal-line').length;
+        target.textContent = `${count} ${count === 1 ? singular : plural}`;
+    });
+    new MutationObserver(syncCounts).observe(panel, { childList: true, subtree: true, characterData: true });
+    syncCounts();
+})();
+</script>
 <script src="/app.js" defer></script>
 <script src="/ux-simplification.js" defer></script>
 <script src="/phone-provisioning.js" defer></script>
