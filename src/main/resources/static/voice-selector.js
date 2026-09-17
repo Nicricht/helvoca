@@ -470,20 +470,33 @@
     }).observe(dashboard, { attributes: true, attributeFilter: ['class'] });
 
     // The UX layer replaces the original advanced panel with a new shell.
-    // Mark that generated shell as already enhanced before the UX observer can
-    // attempt a second transformation pass.
-    new MutationObserver(() => {
-        const hub = document.querySelector('#advancedPanel.ux-config-hub');
-        if (hub) {
-            hub.dataset.uxEnhanced = 'true';
-            compactConfigNav();
-            cleanBusinessHeadings();
-            compactBusinessPanel();
-            compactPermissionsPanel();
-            setupBusinessDisclosure();
+    // Pause observation while normalizing that shell so our own synchronous
+    // DOM writes cannot recursively schedule the observer again.
+    const configurationObserverOptions = {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ['aria-expanded']
+    };
+    const configurationObserver = new MutationObserver(() => {
+        configurationObserver.disconnect();
+        try {
+            const hub = document.querySelector('#advancedPanel.ux-config-hub');
+            if (hub) {
+                hub.dataset.uxEnhanced = 'true';
+                compactConfigNav();
+                cleanBusinessHeadings();
+                compactBusinessPanel();
+                compactPermissionsPanel();
+                setupBusinessDisclosure();
+            }
+            compactCommercialStatus();
+        } finally {
+            configurationObserver.observe(document.body, configurationObserverOptions);
         }
-        compactCommercialStatus();
-    }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-expanded'] });
+    });
+    configurationObserver.observe(document.body, configurationObserverOptions);
 
     compactConfigNav();
     cleanBusinessHeadings();
