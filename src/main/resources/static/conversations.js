@@ -6,8 +6,9 @@ const $$ = selector => [...document.querySelectorAll(selector)];
 if (!token) location.replace("/");
 
 let calls = [];
+let whatsappConversations = [];
 let activeChannel = "all";
-let selectedCallId = null;
+let selectedConversationKey = null;
 
 async function api(path) {
   const response = await fetch(path, {headers: {Authorization: `Bearer ${token}`}});
@@ -61,45 +62,79 @@ function toast(text) {
   toast.timer = setTimeout(() => el.classList.add("hidden"), 3500);
 }
 
+function conversationItems() {
+  const callItems = calls.map(call => ({
+    key: `call:${call.id}`,
+    kind: "call",
+    id: call.id,
+    customer: call.callerNumber || "Número oculto",
+    status: statusLabel(call.status),
+    bad: call.status === "FAILED",
+    timestamp: call.startedAt,
+    durationSeconds: call.durationSeconds,
+    summary: call.resolution || ""
+  }));
+  const whatsappItems = whatsappConversations.map(conversation => ({
+    key: `whatsapp:${conversation.id}`,
+    kind: "whatsapp",
+    id: conversation.id,
+    customer: conversation.sender || "Número desconocido",
+    status: "WhatsApp",
+    bad: false,
+    timestamp: conversation.lastMessageAt || conversation.openedAt,
+    durationSeconds: null,
+    summary: ""
+  }));
+  const items = activeChannel === "calls" ? callItems : activeChannel === "whatsapp" ? whatsappItems : [...callItems, ...whatsappItems];
+  return items.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+}
+
 function renderList() {
   const root = $("#conversationList");
   const count = $("#conversationCount");
+  const items = conversationItems();
+  count.textContent = String(items.length);
 
-  if (activeChannel === "whatsapp") {
-    count.textContent = "0";
-    root.innerHTML = `<div class="whatsapp-empty"><strong>WhatsApp todavía no tiene conversaciones reales</strong><span>Cuando Helvoca empiece a recibir mensajes, aparecerán aquí junto a las llamadas. No mostramos datos simulados.</span></div>`;
+  if (!items.length) {
+    const empty = activeChannel === "whatsapp"
+      ? "WhatsApp todavía no tiene conversaciones reales."
+      : activeChannel === "calls"
+        ? "Todavía no hay llamadas reales."
+        : "Todavía no hay conversaciones reales.";
+    root.innerHTML = `<div class="empty">${empty}</div>`;
     return;
   }
 
-  count.textContent = String(calls.length);
-  if (!calls.length) {
-    root.innerHTML = '<div class="empty">Todavía no hay llamadas reales.</div>';
-    return;
-  }
-
-  root.innerHTML = calls.map(call => `
-    <button type="button" class="conversation-row ${call.id === selectedCallId ? "active" : ""}" data-call-id="${esc(call.id)}">
+  root.innerHTML = items.map(item => `
+    <button type="button" class="conversation-row ${item.key === selectedConversationKey ? "active" : ""}" data-kind="${item.kind}" data-conversation-id="${esc(item.id)}">
       <div class="conversation-row-top">
-        <strong>${esc(call.callerNumber || "Número oculto")}</strong>
-        <span class="pill ${call.status === "FAILED" ? "bad" : ""}">${esc(statusLabel(call.status))}</span>
+        <strong>${esc(item.customer)}</strong>
+        <span class="pill ${item.bad ? "bad" : ""}">${esc(item.status)}</span>
       </div>
-      <span class="channel-badge">Llamada</span>
+      <span class="channel-badge">${item.kind === "call" ? "Llamada" : "WhatsApp"}</span>
       <div class="conversation-row-meta">
-        <span>${fmtDate(call.startedAt)}</span>
-        ${call.durationSeconds != null ? `<span>${fmtDuration(call.durationSeconds)}</span>` : ""}
+        <span>${fmtDate(item.timestamp)}</span>
+        ${item.durationSeconds != null ? `<span>${fmtDuration(item.durationSeconds)}</span>` : ""}
       </div>
-      ${call.resolution ? `<div class="conversation-row-summary">${esc(call.resolution)}</div>` : ""}
+      ${item.summary ? `<div class="conversation-row-summary">${esc(item.summary)}</div>` : ""}
     </button>
   `).join("");
 
-  root.querySelectorAll("[data-call-id]").forEach(button => button.addEventListener("click", async () => {
-    selectedCallId = button.dataset.callId;
+  root.querySelectorAll("[data-conversation-id]").forEach(button => button.addEventListener("click", async () => {
+    const kind = button.dataset.kind;
+    const id = button.dataset.conversationId;
+    selectedConversationKey = `${kind}:${id}`;
     renderList();
-    await loadDetail(selectedCallId);
+    await loadDetail(kind, id);
   }));
 }
 
-function renderDetail(data) {
+function setActionsVisible(visible) {
+  const section = $("#detailActions")?.closest(".detail-section");
+  if (section) section.classList.toggle("hidden", !visible);
+}
+
+function renderCallDetail(data) {
   const call = data.call || {};
   $("#detailEmpty").classList.add("hidden");
   $("#detailContent").classList.remove("hidden");
@@ -120,6 +155,7 @@ function renderDetail(data) {
   `).join("") : '<div class="empty">No hay transcripción disponible.</div>';
 
   const actions = data.actions || [];
+  setActionsVisible(true);
   $("#detailActions").innerHTML = actions.length ? actions.map(action => `
     <div class="action-row">
       <div class="item-head">
@@ -135,10 +171,36 @@ function renderDetail(data) {
   `).join("") : '<div class="empty">No hay acciones registradas para esta llamada.</div>';
 }
 
-async function loadDetail(callId) {
+function renderWhatsAppDetail(data) {
+  const conversation = data.conversation || {};
+  const messages = data.messages || [];
+  $("#detailEmpty").classList.add("hidden");
+  $("#detailContent").classList.remove("hidden");
+  $("#detailChannel").textContent = "WhatsApp";
+  $("#detailCustomer").textContent = conversation.sender || "Número desconocido";
+  $("#detailMeta").textContent = [fmtDate(conversation.lastMessageAt || conversation.openedAt), `${messages.length} mensaje${messages.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
+  $("#detailStatus").textContent = "WhatsApp";
+  $("#detailStatus").className = "pill";
+  $("#detailSummary").textContent = `Conversación real por WhatsApp con ${messages.length} mensaje${messages.length === 1 ? "" : "s"}.`;
+  $("#detailTranscript").innerHTML = messages.length ? messages.map(item => `
+    <div class="transcript-line ${String(item.role || "").toLowerCase()}">
+      <strong>${esc(item.role === "USER" ? "Cliente" : item.role === "ASSISTANT" ? "Helvoca" : item.role || item.direction)}</strong>
+      <p>${esc(item.content)}</p>
+      <span>${fmtDate(item.createdAt)}</span>
+    </div>
+  `).join("") : '<div class="empty">No hay mensajes guardados en esta conversación.</div>';
+  setActionsVisible(false);
+  $("#detailActions").innerHTML = "";
+}
+
+async function loadDetail(kind, id) {
   try {
-    const data = await api(`/api/v1/calls/${encodeURIComponent(callId)}`);
-    renderDetail(data);
+    const path = kind === "whatsapp"
+      ? `/api/v1/messaging/conversations/${encodeURIComponent(id)}`
+      : `/api/v1/calls/${encodeURIComponent(id)}`;
+    const data = await api(path);
+    if (kind === "whatsapp") renderWhatsAppDetail(data);
+    else renderCallDetail(data);
   } catch (error) {
     toast(error.message || "No pude cargar el detalle de la conversación.");
   }
@@ -158,9 +220,14 @@ function setChannel(channel) {
 async function load() {
   $("#conversationList").innerHTML = '<div class="loading-line">Cargando conversaciones…</div>';
   try {
-    const data = await api("/api/v1/operations/dashboard");
+    const [data, whatsapp] = await Promise.all([
+      api("/api/v1/operations/dashboard"),
+      api("/api/v1/messaging/conversations")
+    ]);
     calls = data.recentCalls || [];
-    $("#conversationContext").textContent = data.businessName ? `${data.businessName} · conversaciones reales` : "Conversaciones reales";
+    whatsappConversations = whatsapp || [];
+    const total = calls.length + whatsappConversations.length;
+    $("#conversationContext").textContent = data.businessName ? `${data.businessName} · ${total} conversaciones recientes` : `${total} conversaciones recientes`;
     renderList();
   } catch (error) {
     $("#conversationList").innerHTML = '<div class="empty">No pude cargar las conversaciones.</div>';
