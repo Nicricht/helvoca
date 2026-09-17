@@ -452,9 +452,16 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                                 .put("prebuiltVoiceConfig", new JSONObject()
                                         .put("voiceName", properties.getVoice()))));
 
+        JSONObject activityDetection = new JSONObject()
+                .put("disabled", false)
+                .put("endOfSpeechSensitivity", "END_SENSITIVITY_HIGH")
+                .put("silenceDurationMs", 250);
+
         JSONObject setup = new JSONObject()
                 .put("model", "models/" + properties.getModel().trim())
                 .put("generationConfig", generation)
+                .put("realtimeInputConfig", new JSONObject()
+                        .put("automaticActivityDetection", activityDetection))
                 .put("systemInstruction", new JSONObject()
                         .put("parts", new JSONArray().put(new JSONObject()
                                 .put("text", systemInstructions()))))
