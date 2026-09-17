@@ -163,20 +163,17 @@
 })();
 
 (() => {
-    const commercial = document.createElement('script');
-    commercial.src = '/commercial-status.js';
-    commercial.async = false;
-    document.head.appendChild(commercial);
+    function ensureScript(src) {
+        if (document.querySelector(`script[src="${src}"]`)) return;
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = false;
+        document.head.appendChild(script);
+    }
 
-    const voices = document.createElement('script');
-    voices.src = '/voice-selector.js';
-    voices.async = false;
-    document.head.appendChild(voices);
-
-    const ux = document.createElement('script');
-    ux.src = '/ux-simplification.js';
-    ux.async = false;
-    document.head.appendChild(ux);
+    ensureScript('/commercial-status.js');
+    ensureScript('/voice-selector.js');
+    ensureScript('/ux-simplification.js');
 })();
 
 (() => {
@@ -282,9 +279,10 @@
         const active = Boolean(row.querySelector('.phone-state.active'));
         const numberNode = summary.querySelector('.phone-summary-number');
         const stateNode = summary.querySelector('.phone-summary-state');
-        if (numberNode) numberNode.textContent = number;
+        if (numberNode && numberNode.textContent !== number) numberNode.textContent = number;
         if (stateNode) {
-            stateNode.textContent = active ? '· Activo' : '· Inactivo';
+            const stateText = active ? '· Activo' : '· Inactivo';
+            if (stateNode.textContent !== stateText) stateNode.textContent = stateText;
             stateNode.classList.toggle('active', active);
         }
 
