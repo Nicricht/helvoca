@@ -18,6 +18,16 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+    static final String[] PUBLIC_CONSOLE_ASSETS = {
+            "/", "/index.html", "/app.js", "/phone-provisioning.js", "/commercial-status.js",
+            "/voice-selector.js", "/ux-simplification.js", "/styles.css",
+            "/sales.html", "/sales.css",
+            "/pricing.html", "/pricing.js", "/pricing.css",
+            "/operations.html", "/operations.js", "/operations.css",
+            "/conversations.html", "/conversations.js", "/conversations.css",
+            "/simulator.html", "/simulator.js", "/simulator.css",
+            "/favicon.ico", "/error"
+    };
 
     @Bean
     PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
@@ -75,12 +85,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/index.html", "/app.js", "/phone-provisioning.js", "/commercial-status.js", "/voice-selector.js", "/ux-simplification.js", "/styles.css",
-                                "/sales.html", "/sales.css",
-                                "/pricing.html", "/pricing.js", "/pricing.css",
-                                "/operations.html", "/operations.js", "/operations.css",
-                                "/simulator.html", "/simulator.js", "/simulator.css",
-                                "/favicon.ico", "/error").permitAll()
+                        .requestMatchers(PUBLIC_CONSOLE_ASSETS).permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register",
                                 "/api/v1/public/pricing", "/actuator/health").permitAll()
                         .requestMatchers("/webhooks/v1/twilio/**", "/webhooks/v1/openai/**",
