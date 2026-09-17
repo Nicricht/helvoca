@@ -71,15 +71,15 @@
         #advancedPanel .ux-config-nav {
             display: flex !important;
             flex-wrap: wrap;
-            gap: 6px !important;
-            padding: 0 0 10px !important;
+            gap: 5px !important;
+            padding: 0 0 9px !important;
             border-bottom: 0 !important;
             background: transparent !important;
         }
         #advancedPanel .ux-config-nav button {
             flex: 0 0 auto;
-            min-height: 30px;
-            padding: 6px 10px !important;
+            min-height: 28px;
+            padding: 5px 8px !important;
             border: 1px solid rgba(255,255,255,.09) !important;
             border-radius: 999px !important;
             text-align: center !important;
@@ -251,6 +251,21 @@
 
         const save = document.querySelector('#advancedPanel .ux-config-save button[type="submit"]');
         if (save && save.textContent !== 'Guardar') save.textContent = 'Guardar';
+    }
+
+    function compactConfigNav() {
+        const labels = {
+            configBusinessPanel: 'Negocio',
+            configPermissionsPanel: 'Permisos',
+            configServicesPanel: 'Servicios',
+            configHoursPanel: 'Horarios',
+            configKnowledgePanel: 'FAQ',
+            configPhonePanel: 'Teléfono'
+        };
+        Object.entries(labels).forEach(([panelId, label]) => {
+            const node = document.querySelector(`#advancedPanel .ux-config-nav button[aria-controls="${panelId}"] strong`);
+            if (node && node.textContent !== label) node.textContent = label;
+        });
     }
 
     function compactPermissionsPanel() {
@@ -461,6 +476,7 @@
         const hub = document.querySelector('#advancedPanel.ux-config-hub');
         if (hub) {
             hub.dataset.uxEnhanced = 'true';
+            compactConfigNav();
             cleanBusinessHeadings();
             compactBusinessPanel();
             compactPermissionsPanel();
@@ -469,6 +485,7 @@
         compactCommercialStatus();
     }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-expanded'] });
 
+    compactConfigNav();
     cleanBusinessHeadings();
     compactBusinessPanel();
     compactPermissionsPanel();
