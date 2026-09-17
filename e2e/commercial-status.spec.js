@@ -34,6 +34,7 @@ async function mockBaseDashboard(page) {
     active: true,
     capabilities: ['GET_BUSINESS_INFORMATION', 'LIST_SERVICES']
   })));
+  await page.route('**/api/v1/ai-agent/voices', route => route.fulfill(json([])));
   await page.route('**/api/v1/phone-numbers', route => route.fulfill(json([
     { id: 'phone1', provider: 'TWILIO', externalId: 'PNdemo', phoneNumber: '+12025550123', active: true }
   ])));
@@ -70,7 +71,7 @@ function activeSubscription() {
   };
 }
 
-test('commercial dashboard shows confirmed and pending state without starting checkout on load', async ({ page }) => {
+test('commercial dashboard stays compact until the customer manages the plan', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
 
   let billingPosts = 0;
@@ -103,6 +104,13 @@ test('commercial dashboard shows confirmed and pending state without starting ch
 
   const card = page.locator('#commercialStatusCard');
   await expect(card).toBeVisible();
+  await expect(page.locator('#commercialDetails')).toBeHidden();
+  await expect(page.locator('#commercialPlans')).toBeHidden();
+  await expect(card.getByText('Emprende · 63 min disponibles')).toBeVisible();
+  expect(billingPosts).toBe(0);
+
+  await card.getByRole('button', { name: 'Gestionar plan' }).click();
+  await expect(page.locator('#commercialDetails')).toBeVisible();
   await expect(card.locator('#commercialPlan')).toHaveText('Emprende');
   await expect(card.locator('#commercialSubscriptionStatus')).toHaveText('TRIALING');
   await expect(card.locator('#commercialMinutes')).toHaveText('37 usados · 63 restantes');
@@ -163,7 +171,11 @@ test('plan checkout starts only after explicit confirmation and does not activat
   const card = page.locator('#commercialStatusCard');
   await expect(card).toBeVisible();
   await expect(card.locator('#commercialPlan')).toHaveText('Emprende');
+  await expect(page.locator('#commercialPlans')).toBeHidden();
   expect(checkoutPosts).toBe(0);
+
+  await card.getByRole('button', { name: 'Gestionar plan' }).click();
+  await expect(page.locator('#commercialPlans')).toBeVisible();
 
   page.once('dialog', async dialog => {
     expect(dialog.message()).toContain('Helvoca no activará el plan hasta verificar el pago');

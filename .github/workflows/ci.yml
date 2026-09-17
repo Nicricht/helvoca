@@ -35,6 +35,7 @@ jobs:
           node --check src/main/resources/static/phone-provisioning.js
           node --check src/main/resources/static/commercial-status.js
           node --check src/main/resources/static/voice-selector.js
+          node --check src/main/resources/static/ux-simplification.js
           node --check src/main/resources/static/pricing.js
           node --check src/main/resources/static/operations.js
           node --check src/main/resources/static/simulator.js

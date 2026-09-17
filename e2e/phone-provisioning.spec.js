@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-test('self-service phone search never provisions until explicit confirmation', async ({ page }) => {
+test('self-service phone search stays hidden until chosen and never provisions until explicit confirmation', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
 
   let provisionCalls = 0;
@@ -38,6 +38,7 @@ test('self-service phone search never provisions until explicit confirmation', a
     active: true,
     capabilities: ['GET_BUSINESS_INFORMATION', 'LIST_SERVICES']
   })));
+  await page.route('**/api/v1/ai-agent/voices', route => route.fulfill(json([])));
   await page.route('**/api/v1/phone-numbers/provisioning/status', route => route.fulfill(json({
     enabled: true,
     configured: true,
@@ -73,7 +74,16 @@ test('self-service phone search never provisions until explicit confirmation', a
 
   await page.goto('/');
   await expect(page.locator('#dashboardView')).toBeVisible();
-  await page.locator('#advancedToggleBtn').click();
+  await expect(page.locator('#advancedPanel')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Teléfono' }).click();
+  await expect(page.getByRole('button', { name: 'Conectar mi número' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Buscar un número nuevo' })).toBeVisible();
+  await expect(page.locator('#provisioningSearchForm')).toBeHidden();
+  expect(provisionCalls).toBe(0);
+
+  await page.getByRole('button', { name: 'Buscar un número nuevo' }).click();
+  await expect(page.locator('#provisioningSearchForm')).toBeVisible();
   await expect(page.locator('#provisioningStatus')).toHaveText('APROVISIONAMIENTO DISPONIBLE');
 
   await page.locator('#provisioningSearchForm [name=country]').fill('US');

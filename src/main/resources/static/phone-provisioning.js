@@ -170,4 +170,9 @@
     voices.src = '/voice-selector.js';
     voices.async = false;
     document.head.appendChild(voices);
+
+    const ux = document.createElement('script');
+    ux.src = '/ux-simplification.js';
+    ux.async = false;
+    document.head.appendChild(ux);
 })();
