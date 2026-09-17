@@ -218,6 +218,51 @@
         if (save && save.textContent !== 'Guardar') save.textContent = 'Guardar';
     }
 
+    function compactPermissionsPanel() {
+        const panel = document.querySelector('#configPermissionsPanel');
+        const grid = document.querySelector('#agentCapabilities');
+        if (!panel || !grid) return;
+
+        const navLabel = document.querySelector('#advancedPanel .ux-config-nav button[aria-controls="configPermissionsPanel"] strong');
+        if (navLabel && navLabel.textContent !== 'Permisos') navLabel.textContent = 'Permisos';
+
+        let summary = document.querySelector('#permissionsCompactSummary');
+        if (!summary) {
+            summary = document.createElement('div');
+            summary.id = 'permissionsCompactSummary';
+            summary.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;padding:2px 0 8px;';
+
+            const count = document.createElement('span');
+            count.id = 'permissionsCompactCount';
+            count.style.cssText = 'font-size:12px;color:var(--muted);';
+
+            const toggle = document.createElement('button');
+            toggle.id = 'permissionsCompactToggle';
+            toggle.type = 'button';
+            toggle.className = 'button small ghost';
+            toggle.textContent = 'Editar';
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.style.cssText = 'min-height:28px;padding:0 4px;background:transparent;border-color:transparent;color:var(--muted);box-shadow:none;';
+
+            toggle.addEventListener('click', () => {
+                const opening = grid.classList.contains('hidden');
+                grid.classList.toggle('hidden', !opening);
+                toggle.setAttribute('aria-expanded', String(opening));
+                toggle.textContent = opening ? 'Cerrar' : 'Editar';
+            });
+
+            grid.classList.add('hidden');
+            grid.addEventListener('change', compactPermissionsPanel);
+            summary.append(count, toggle);
+            panel.insertBefore(summary, grid);
+        }
+
+        const selected = grid.querySelectorAll('input[name="agentCapability"]:checked').length;
+        const total = grid.querySelectorAll('input[name="agentCapability"]').length;
+        const count = document.querySelector('#permissionsCompactCount');
+        if (count) count.textContent = `${selected} de ${total} habilitados`;
+    }
+
     function setupBusinessDisclosure() {
         const panel = document.querySelector('#configBusinessPanel');
         if (!panel || document.querySelector('#businessAdvancedToggle')) return;
@@ -383,6 +428,7 @@
             hub.dataset.uxEnhanced = 'true';
             cleanBusinessHeadings();
             compactBusinessPanel();
+            compactPermissionsPanel();
             setupBusinessDisclosure();
         }
         compactCommercialStatus();
@@ -390,6 +436,7 @@
 
     cleanBusinessHeadings();
     compactBusinessPanel();
+    compactPermissionsPanel();
     setupBusinessDisclosure();
     compactCommercialStatus();
     if (sessionStorage.getItem('helvoca_access_token')) load();
