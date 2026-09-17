@@ -60,12 +60,60 @@
             box-shadow: none;
         }
         .top-actions #logoutBtn:not(.hidden):hover { color: var(--text); background: rgba(255,255,255,.035); }
+
+        #authView.auth-grid {
+            grid-template-columns: minmax(0, 720px);
+            justify-content: center;
+            max-width: 760px;
+            gap: 14px;
+        }
+        #authView .hero-card {
+            min-height: auto;
+            padding: 4px 12px 16px;
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+            text-align: center;
+        }
+        #authView .hero-card .eyebrow { margin-bottom: 7px; }
+        #authView .hero-card h1 {
+            margin: 0;
+            font-size: clamp(28px, 4vw, 42px);
+            line-height: 1.04;
+            letter-spacing: -.035em;
+        }
+        #authView .hero-card p {
+            max-width: 560px;
+            margin: 10px auto 0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        #authView .feature-grid { display: none; }
+        #authView .auth-card { padding: 22px; }
+        #authView .tabs { margin-bottom: 18px; }
+        #registerForm {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 13px;
+        }
+        #registerForm > label:nth-of-type(5),
+        #registerForm > button,
+        #registerForm > .form-hint { grid-column: 1 / -1; }
+        #registerForm > button { margin-top: 1px; }
+        #loginForm { gap: 13px; }
+        #authView .form-hint { font-size: 11px; text-align: center; }
+
         @media (max-width: 900px) { #configPermissionsPanel .agent-capability-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 760px) {
             #configKnowledgePanel .knowledge-row { grid-template-columns: 1fr 1fr; }
             #configKnowledgePanel .knowledge-row > label:first-child,
             #configKnowledgePanel .knowledge-row > label.grow { grid-column: 1 / -1; }
             #configKnowledgePanel .knowledge-row .remove-row { grid-column: 2; justify-self: end; }
+            #registerForm { grid-template-columns: 1fr; }
+            #registerForm > label:nth-of-type(5),
+            #registerForm > button,
+            #registerForm > .form-hint { grid-column: 1; }
+            #authView .auth-card { padding: 18px; }
         }
         @media (max-width: 720px) { .agent-capability-grid, #configPermissionsPanel .agent-capability-grid { grid-template-columns: 1fr; } }
     </style>
@@ -86,30 +134,25 @@
     <main>
         <section id="authView" class="auth-grid">
             <article class="card hero-card">
-                <div class="eyebrow">Menos configuración, más llamadas</div>
-                <h1>Dinos qué negocio eres. Helvoca prepara el resto.</h1>
-                <p>Pega tu web, Instagram o Google Maps. La IA extrae una propuesta de servicios, horarios y respuestas frecuentes para que tú solo revises y confirmes.</p>
-                <div class="feature-grid">
-                    <div><strong>1 enlace</strong><span>para empezar</span></div>
-                    <div><strong>IA factual</strong><span>propone, no inventa</span></div>
-                    <div><strong>Tú confirmas</strong><span>antes de guardar</span></div>
-                </div>
+                <div class="eyebrow">Tu recepcionista con IA</div>
+                <h1>Configura tu negocio en minutos.</h1>
+                <p>Crea tu cuenta y, si quieres, pega tu web, Instagram o Google Maps para que Helvoca prepare la configuración.</p>
             </article>
 
             <article class="card auth-card">
                 <div class="tabs" role="tablist">
-                    <button class="tab active" id="registerTab" type="button" aria-selected="true">Crear empresa</button>
+                    <button class="tab active" id="registerTab" type="button" aria-selected="true">Crear cuenta</button>
                     <button class="tab" id="loginTab" type="button" aria-selected="false">Ingresar</button>
                 </div>
 
                 <form id="registerForm" class="stack">
                     <label>Tu nombre<input name="adminName" required maxlength="150" autocomplete="name" placeholder="Ana Pérez"></label>
+                    <label>Nombre del negocio<input name="businessName" required maxlength="150" placeholder="Restaurante Don Pepe"></label>
                     <label>Correo<input name="email" required type="email" maxlength="180" autocomplete="email" placeholder="ana@empresa.cl"></label>
                     <label>Contraseña<input name="password" required type="password" minlength="10" maxlength="72" autocomplete="new-password" placeholder="Mínimo 10 caracteres"></label>
-                    <label>Nombre del negocio<input name="businessName" required maxlength="150" placeholder="Restaurante Don Pepe"></label>
                     <label>Web, Instagram o Google Maps <span class="optional">opcional</span><input name="sourceUrl" type="text" maxlength="2048" placeholder="https://..."></label>
-                    <button class="button primary" type="submit">Crear mi recepcionista</button>
-                    <small class="form-hint">Zona horaria e idioma se detectan automáticamente. Podrás corregirlos después.</small>
+                    <button class="button primary" type="submit">Crear mi Helvoca</button>
+                    <small class="form-hint">Idioma y zona horaria se detectan automáticamente.</small>
                 </form>
 
                 <form id="loginForm" class="stack hidden">
