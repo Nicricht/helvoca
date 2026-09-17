@@ -153,6 +153,35 @@
             min-height: 38px !important;
             padding: 0 14px !important;
         }
+
+        #commercialStatusCard.ux-commercial-card {
+            margin-top: 8px !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+        }
+        #commercialStatusCard .ux-commercial-summary {
+            min-height: 32px;
+            padding: 0 !important;
+            gap: 10px !important;
+        }
+        #commercialStatusCard .ux-commercial-summary-copy .eyebrow,
+        #commercialStatusCard #uxCommercialMeta {
+            display: none !important;
+        }
+        #commercialStatusCard .ux-commercial-headline {
+            margin: 0 !important;
+            font-size: 12px !important;
+            font-weight: 700 !important;
+        }
+        #commercialStatusCard #commercialManageBtn {
+            min-height: 28px !important;
+            padding: 0 4px !important;
+            font-size: 11px !important;
+        }
     `;
     document.head.appendChild(actionStyle);
 
@@ -206,6 +235,23 @@
 
         if (agentToggle) agentToggle.insertAdjacentElement('afterend', toggle);
         else panel.appendChild(toggle);
+    }
+
+    function compactCommercialStatus() {
+        const card = document.querySelector('#commercialStatusCard');
+        if (!card) return;
+
+        const headline = card.querySelector('#uxCommercialHeadline');
+        if (headline) {
+            const compact = headline.textContent.replace(/\s+min disponibles\b/, ' min');
+            if (headline.textContent !== compact) headline.textContent = compact;
+        }
+
+        const manage = card.querySelector('#commercialManageBtn');
+        if (manage) {
+            const label = manage.getAttribute('aria-expanded') === 'true' ? 'Cerrar' : 'Gestionar';
+            if (manage.textContent !== label) manage.textContent = label;
+        }
     }
 
     const original = setupForm.elements.agentVoice;
@@ -315,9 +361,11 @@
             cleanBusinessHeadings();
             setupBusinessDisclosure();
         }
-    }).observe(document.body, { childList: true, subtree: true });
+        compactCommercialStatus();
+    }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-expanded'] });
 
     cleanBusinessHeadings();
     setupBusinessDisclosure();
+    compactCommercialStatus();
     if (sessionStorage.getItem('helvoca_access_token')) load();
 })();
