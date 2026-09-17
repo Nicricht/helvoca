@@ -422,7 +422,8 @@
         const first = container.querySelector('.proposal-line > strong')?.textContent?.trim();
         const emptyState = first === 'No detectado' || first === 'Sin respuestas adicionales';
         const count = emptyState ? 0 : container.querySelectorAll(':scope > .proposal-line').length;
-        target.textContent = `${count} ${count === 1 ? singular : plural}`;
+        const nextText = `${count} ${count === 1 ? singular : plural}`;
+        if (target.textContent !== nextText) target.textContent = nextText;
     });
     new MutationObserver(syncCounts).observe(panel, { childList: true, subtree: true, characterData: true });
     syncCounts();

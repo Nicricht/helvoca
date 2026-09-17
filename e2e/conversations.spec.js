@@ -68,7 +68,7 @@ test('conversation inbox combines real calls and persisted WhatsApp conversation
   await expect(page.getByText('+56911111111')).toBeVisible();
   await expect(page.getByText('+56922222222')).toBeVisible();
 
-  await page.getByRole('button', { name: 'WhatsApp' }).click();
+  await page.getByRole('button', { name: 'WhatsApp', exact: true }).click();
   await expect(page.getByText('+56911111111')).toHaveCount(0);
   await expect(page.getByText('+56922222222')).toBeVisible();
   await page.getByText('+56922222222').click();
