@@ -1,6 +1,9 @@
 (() => {
     const $ = (selector, root = document) => root.querySelector(selector);
     const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+    const setText = (node, value) => {
+        if (node && node.textContent !== value) node.textContent = value;
+    };
 
     const style = document.createElement('style');
     style.id = 'helvoca-ux-simplification-styles';
@@ -103,9 +106,9 @@
         const eyebrow = $('.eyebrow', hero);
         const title = $('h1', hero);
         const copy = $('p', hero);
-        if (eyebrow) eyebrow.textContent = 'Tu recepcionista con IA';
-        if (title) title.textContent = 'Tu negocio, atendido por IA.';
-        if (copy) copy.textContent = 'Pega el enlace de tu negocio y configura Helvoca en minutos.';
+        setText(eyebrow, 'Tu recepcionista con IA');
+        setText(title, 'Tu negocio, atendido por IA.');
+        setText(copy, 'Pega el enlace de tu negocio y configura Helvoca en minutos.');
     }
 
     function simplifyDashboardCopy() {
@@ -114,11 +117,11 @@
         const eyebrow = $('.eyebrow', heading);
         const title = $('h1', heading);
         const copy = $('#welcomeText', heading);
-        if (eyebrow) eyebrow.textContent = 'Tu Helvoca';
+        setText(eyebrow, 'Tu Helvoca');
         if (title && !title.id) title.id = 'dashboardTitle';
         if (copy && !copy.id.includes('dashboardSummary')) copy.dataset.uxSummary = 'true';
         const refresh = $('#refreshBtn');
-        if (refresh) refresh.textContent = 'Actualizar';
+        setText(refresh, 'Actualizar');
 
         const aiCard = $('.ai-onboarding-card');
         if (aiCard && !aiCard.dataset.uxSimplified) {
@@ -126,13 +129,15 @@
             const aiTitle = $('.ai-heading h2', aiCard);
             const aiLabel = $('label.grow', aiCard);
             const aiButton = $('.ai-form .button', aiCard);
-            if (aiTitle) aiTitle.textContent = 'Actualizar negocio con IA';
+            setText(aiTitle, 'Actualizar negocio con IA');
             if (aiLabel) {
                 const input = $('input', aiLabel);
-                aiLabel.childNodes[0].textContent = 'Web, Instagram o Google Maps';
+                if (aiLabel.childNodes[0]?.textContent !== 'Web, Instagram o Google Maps') {
+                    aiLabel.childNodes[0].textContent = 'Web, Instagram o Google Maps';
+                }
                 if (input) input.placeholder = 'https://tu-negocio.cl';
             }
-            if (aiButton) aiButton.textContent = 'Analizar';
+            setText(aiButton, 'Analizar');
         }
     }
 
@@ -148,12 +153,12 @@
         if (!title || !copy) return;
 
         if (ready) {
-            title.textContent = 'Helvoca está operativa';
-            copy.textContent = 'Tu negocio está listo para atender clientes.';
+            setText(title, 'Helvoca está operativa');
+            setText(copy, 'Tu negocio está listo para atender clientes.');
             $('#nextStepBanner')?.classList.add('hidden');
         } else {
-            title.textContent = 'Termina de preparar Helvoca';
-            copy.textContent = 'Completa lo esencial para empezar a atender.';
+            setText(title, 'Termina de preparar Helvoca');
+            setText(copy, 'Completa lo esencial para empezar a atender.');
             $('#nextStepBanner')?.classList.remove('hidden');
         }
         $('#readyBanner')?.classList.add('hidden');
@@ -161,9 +166,9 @@
         $$('.status-card').forEach(card => {
             const small = $('small', card);
             if (!small) return;
-            small.textContent = card.classList.contains('done')
+            setText(small, card.classList.contains('done')
                 ? (card.dataset.key === 'phoneConfigured' ? 'Activo' : 'Listo')
-                : 'Pendiente';
+                : 'Pendiente');
         });
     }
 
@@ -216,7 +221,7 @@
         saveArea.className = 'ux-config-save';
         if (setupMessage) saveArea.appendChild(setupMessage);
         if (submit) {
-            submit.textContent = 'Guardar cambios';
+            setText(submit, 'Guardar cambios');
             saveArea.appendChild(submit);
         }
         form.appendChild(saveArea);
@@ -274,7 +279,7 @@
 
         const legacyToggle = $('#advancedToggleBtn');
         if (legacyToggle) {
-            legacyToggle.textContent = 'Configuración';
+            setText(legacyToggle, 'Configuración');
             legacyToggle.addEventListener('click', () => {
                 setTimeout(() => {
                     shell.classList.remove('hidden');
@@ -290,10 +295,10 @@
             const hourCount = $$('.hour-row', hoursGrid || document).length;
             const knowledgeCount = $$('.knowledge-row', knowledgeList || document).length;
             const phoneCount = $$('.phone-list .phone-item, .phone-list [data-phone-id], #phoneList > div').length;
-            if (summaryNodes[2]) summaryNodes[2].textContent = serviceCount ? `${serviceCount} configurado${serviceCount === 1 ? '' : 's'}` : 'Sin servicios';
-            if (summaryNodes[3]) summaryNodes[3].textContent = hourCount ? `${hourCount} intervalo${hourCount === 1 ? '' : 's'}` : 'Sin horarios';
-            if (summaryNodes[4]) summaryNodes[4].textContent = knowledgeCount ? `${knowledgeCount} respuesta${knowledgeCount === 1 ? '' : 's'}` : 'Sin respuestas';
-            if (summaryNodes[5]) summaryNodes[5].textContent = phoneCount ? 'Número conectado' : 'Sin número';
+            setText(summaryNodes[2], serviceCount ? `${serviceCount} configurado${serviceCount === 1 ? '' : 's'}` : 'Sin servicios');
+            setText(summaryNodes[3], hourCount ? `${hourCount} intervalo${hourCount === 1 ? '' : 's'}` : 'Sin horarios');
+            setText(summaryNodes[4], knowledgeCount ? `${knowledgeCount} respuesta${knowledgeCount === 1 ? '' : 's'}` : 'Sin respuestas');
+            setText(summaryNodes[5], phoneCount ? 'Número conectado' : 'Sin número');
         }
         new MutationObserver(updateSummaries).observe(form, { childList: true, subtree: true });
         new MutationObserver(updateSummaries).observe(sideCard, { childList: true, subtree: true });
@@ -310,8 +315,8 @@
 
         const title = $('h2', sideCard);
         const intro = $('p', sideCard);
-        if (title) title.textContent = 'Teléfono';
-        if (intro) intro.textContent = 'Elige cómo quieres conectar las llamadas.';
+        setText(title, 'Teléfono');
+        setText(intro, 'Elige cómo quieres conectar las llamadas.');
 
         const modes = document.createElement('div');
         modes.className = 'ux-phone-modes';
@@ -385,7 +390,7 @@
             const opening = details.classList.contains('hidden');
             details.classList.toggle('hidden', !opening);
             manage.setAttribute('aria-expanded', String(opening));
-            manage.textContent = opening ? 'Ocultar planes' : 'Gestionar plan';
+            setText(manage, opening ? 'Ocultar planes' : 'Gestionar plan');
         });
 
         try {
@@ -400,12 +405,12 @@
                 const plan = billing?.currentPlanName || subscription?.plan || 'Plan actual';
                 const headline = $('#uxCommercialHeadline', card);
                 const meta = $('#uxCommercialMeta', card);
-                if (headline) headline.textContent = `${plan} · ${remaining} min disponibles`;
-                if (meta) meta.textContent = subscription?.serviceAllowed === false ? 'Servicio requiere atención' : 'Servicio activo';
+                setText(headline, `${plan} · ${remaining} min disponibles`);
+                setText(meta, subscription?.serviceAllowed === false ? 'Servicio requiere atención' : 'Servicio activo');
             }
         } catch (_) {
             const headline = $('#uxCommercialHeadline', card);
-            if (headline) headline.textContent = 'Plan actual';
+            setText(headline, 'Plan actual');
         }
     }
 
@@ -418,8 +423,13 @@
         renderDashboardState();
     }
 
+    let enhancementFrame = null;
     const observer = new MutationObserver(() => {
-        window.requestAnimationFrame(runEnhancements);
+        if (enhancementFrame !== null) return;
+        enhancementFrame = window.requestAnimationFrame(() => {
+            enhancementFrame = null;
+            runEnhancements();
+        });
     });
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 
