@@ -251,6 +251,62 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void certificationScenarioConfirmsTwoPhaseBookingProposalBeforeTreatingItAsCreated() {
+        GeminiLiveProperties properties = properties();
+        properties.setCertificationSimulation(true);
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        UUID operationId = UUID.randomUUID();
+        when(tools.execute(eq(context), eq("list_available_slots"), anyString())).thenReturn(
+                new JSONObject().put("success", true)
+                        .put("data", new JSONObject().put("slots", new JSONArray()))
+                        .put("error", JSONObject.NULL)
+                        .toString());
+        when(tools.execute(eq(context), eq("create_booking"), anyString())).thenReturn(
+                new JSONObject().put("success", true)
+                        .put("data", new JSONObject()
+                                .put("operationId", operationId.toString())
+                                .put("confirmationToken", "confirm-test-token")
+                                .put("requiresConfirmation", true))
+                        .put("error", JSONObject.NULL)
+                        .toString());
+
+        CallTranscriptService transcripts = mock(CallTranscriptService.class);
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                transcripts,
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        session.onOpen(socket);
+        session.onText(socket, "{\"setupComplete\":{}}", true);
+        session.onText(socket, turnComplete(), true);
+        session.onText(socket, toolCall("slot-proposal", "list_available_slots"), true);
+        session.onText(socket, turnComplete(), true);
+        session.onText(socket, toolCall("booking-proposal", "create_booking"), true);
+        session.onText(socket, turnComplete(), true);
+
+        verify(transcripts).append(eq(context.callId()), eq("USER"), argThat(text ->
+                text.contains("solo una propuesta")
+                        && text.contains("operationId")
+                        && text.contains("confirmationToken")
+                        && text.contains("Confirmo explícitamente")));
+        verify(transcripts, never()).append(eq(context.callId()), eq("USER"),
+                contains("ejecuta cancel_booking ahora"));
+    }
+
+    @Test
     void certificationSimulationDoesNotForwardCarrierMicrophoneAudio() {
         GeminiLiveProperties properties = properties();
         properties.setCertificationSimulation(true);

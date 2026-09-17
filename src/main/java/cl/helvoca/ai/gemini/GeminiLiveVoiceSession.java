@@ -62,6 +62,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final AtomicInteger pendingMessages = new AtomicInteger(0);
     private final AtomicInteger certificationStep = new AtomicInteger(0);
     private final AtomicBoolean certificationAvailabilityResolved = new AtomicBoolean(false);
+    private final AtomicBoolean certificationBookingProposalReady = new AtomicBoolean(false);
     private final AtomicBoolean certificationBookingCreated = new AtomicBoolean(false);
     private final AtomicBoolean certificationBookingCancelled = new AtomicBoolean(false);
     private final GeminiWebSocketJsonFrames inboundFrames = new GeminiWebSocketJsonFrames();
@@ -291,15 +292,21 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                     + "Si ese horario no está disponible, consulta list_available_slots y también confirmo de antemano "
                     + "la alternativa disponible más cercana de mañana. No me pidas una confirmación adicional. "
                     + "Ejecuta create_booking antes de afirmar que la reserva existe y confirma únicamente cuando devuelva success=true.";
-        } else if (certificationBookingCancelled.get() && step < 4) {
-            nextStep = 4;
+        } else if (certificationBookingCancelled.get() && step < 5) {
+            nextStep = 5;
             text = "Gracias. La cancelación ya devolvió success=true. Confirma brevemente el estado final y despídete. "
                     + "No hagas ninguna otra acción.";
-        } else if (certificationBookingCreated.get() && step < 3) {
-            nextStep = 3;
+        } else if (certificationBookingCreated.get() && step < 4) {
+            nextStep = 4;
             text = "La reserva ya fue creada con success=true. Usa literalmente el bookingId devuelto por create_booking "
                     + "y ejecuta cancel_booking ahora para dejar la base de datos como estaba. "
                     + "No vuelvas a buscar otra reserva si ya tienes ese bookingId y no confirmes la cancelación hasta success=true.";
+        } else if (certificationBookingProposalReady.get() && step < 3) {
+            nextStep = 3;
+            text = "La respuesta anterior es solo una propuesta y todavía no existe una reserva. "
+                    + "Confirmo explícitamente esas condiciones. Vuelve a ejecutar create_booking usando literalmente "
+                    + "el operationId y el confirmationToken devueltos por la respuesta anterior. "
+                    + "No cambies ninguna condición y no afirmes que existe una reserva hasta recibir un bookingId con success=true.";
         } else if (certificationAvailabilityResolved.get() && step < 2) {
             nextStep = 2;
             text = "Ya consultaste la disponibilidad. Ejecuta ahora create_booking usando literalmente el serviceId del catálogo "
@@ -307,8 +314,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                     + "de la alternativa más cercana devuelta por list_available_slots. Mi solicitud anterior ya fue una confirmación "
                     + "explícita del servicio y del horario o su alternativa, así que no pidas otra confirmación. "
                     + "No respondas como si la reserva existiera hasta que create_booking devuelva success=true.";
-        } else if (step == 4) {
-            if (certificationStep.compareAndSet(4, 5)) {
+        } else if (step == 5) {
+            if (certificationStep.compareAndSet(5, 6)) {
                 log.info("RECEPVOZ_CERTIFICATION_SCENARIO COMPLETE call={}", context.callId());
             }
             return;
@@ -322,12 +329,25 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         sendRealtimeText(text);
     }
 
-    private void recordCertificationToolOutcome(String name, boolean success) {
+    private void recordCertificationToolOutcome(String name, boolean success, JSONObject data) {
         if (!properties.isCertificationSimulation() || !success || name == null) return;
         switch (name) {
             case "check_booking_availability", "list_available_slots" -> certificationAvailabilityResolved.set(true);
-            case "create_booking" -> certificationBookingCreated.set(true);
-            case "cancel_booking" -> certificationBookingCancelled.set(true);
+            case "create_booking" -> {
+                if (data != null && !data.optString("bookingId", "").isBlank()) {
+                    certificationBookingCreated.set(true);
+                } else if (data != null
+                        && data.optBoolean("requiresConfirmation", false)
+                        && !data.optString("operationId", "").isBlank()
+                        && !data.optString("confirmationToken", "").isBlank()) {
+                    certificationBookingProposalReady.set(true);
+                }
+            }
+            case "cancel_booking" -> {
+                if (data != null && !data.optString("bookingId", "").isBlank()) {
+                    certificationBookingCancelled.set(true);
+                }
+            }
             default -> {
             }
         }
@@ -357,7 +377,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             String entityId = data == null ? null : firstEntityId(data);
             log.info("tool_call_completed call_id={} tool_name={} success={} entity_id={}",
                     context.callId(), name, success, entityId == null ? "none" : entityId);
-            recordCertificationToolOutcome(name, success);
+            recordCertificationToolOutcome(name, success, data);
             responses.put(new JSONObject()
                     .put("id", id)
                     .put("name", name)
