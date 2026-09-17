@@ -1,0 +1,431 @@
+(() => {
+    const $ = (selector, root = document) => root.querySelector(selector);
+    const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+    const style = document.createElement('style');
+    style.id = 'helvoca-ux-simplification-styles';
+    style.textContent = `
+        :root { --ux-surface: rgba(255,255,255,.028); --ux-surface-strong: rgba(255,255,255,.045); }
+        .hero-card { min-height: 0 !important; padding: clamp(28px, 5vw, 54px) !important; justify-content: center; }
+        .hero-card h1 { max-width: 660px; font-size: clamp(38px, 5vw, 66px) !important; }
+        .hero-card p { max-width: 580px; font-size: clamp(15px, 1.4vw, 18px); line-height: 1.6; }
+        .hero-card .feature-grid { display: none !important; }
+        .auth-card .form-hint { opacity: .72; }
+
+        #dashboardView { max-width: 1180px; margin: 0 auto; }
+        .dashboard-heading { align-items: flex-end !important; gap: 24px; margin-bottom: 22px !important; }
+        .dashboard-heading h1 { font-size: clamp(34px, 4.5vw, 54px) !important; letter-spacing: -.04em; margin: 6px 0 8px !important; }
+        .dashboard-heading p { margin: 0; max-width: 620px; color: var(--muted); }
+        #refreshBtn { white-space: nowrap; }
+        #readyBanner { display: none !important; }
+        #nextStepBanner.hidden { display: none !important; }
+        #nextStepBanner { margin: 0 0 18px !important; }
+
+        .status-grid { gap: 10px !important; margin-bottom: 18px !important; }
+        .status-card { min-height: 68px; padding: 14px 16px !important; background: var(--ux-surface) !important; }
+        .status-card small { margin-top: 2px; }
+
+        .ai-onboarding-card { padding: 22px !important; margin-top: 18px !important; }
+        .ai-onboarding-card .ai-heading { margin-bottom: 14px !important; }
+        .ai-onboarding-card .ai-heading h2 { font-size: clamp(20px, 2.2vw, 28px) !important; margin: 4px 0 0 !important; }
+        .ai-onboarding-card .ai-heading p { display: none !important; }
+        .ai-onboarding-card .eyebrow { display: none; }
+        .ai-onboarding-card .ai-form { align-items: end; }
+
+        .secondary-actions { margin: 18px 0 10px !important; }
+        .secondary-actions > span { display: none !important; }
+        #advancedToggleBtn { font-size: 13px; }
+
+        #advancedPanel.ux-config-hub { display: block !important; grid-template-columns: 1fr !important; margin-top: 12px; padding: 0; }
+        #advancedPanel.ux-config-hub.hidden { display: block !important; }
+        .ux-config-shell { border: 1px solid var(--border); border-radius: 18px; overflow: hidden; background: rgba(10,15,25,.42); }
+        .ux-config-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 20px 22px; border-bottom: 1px solid var(--border); }
+        .ux-config-heading h2 { margin: 2px 0 0; font-size: 21px; }
+        .ux-config-heading p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+        .ux-config-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.015); }
+        .ux-config-nav button { min-width: 0; text-align: left; border: 1px solid transparent; border-radius: 12px; padding: 13px 14px; color: var(--text); background: transparent; cursor: pointer; font: inherit; transition: .16s ease; }
+        .ux-config-nav button:hover { background: var(--ux-surface); border-color: var(--border); }
+        .ux-config-nav button[aria-expanded="true"] { background: rgba(124,92,255,.12); border-color: rgba(124,92,255,.38); }
+        .ux-config-nav strong, .ux-config-nav small { display: block; }
+        .ux-config-nav strong { font-size: 13px; }
+        .ux-config-nav small { color: var(--muted); margin-top: 3px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ux-config-body { padding: 0 22px 22px; }
+        #setupForm.ux-config-form { border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
+        .ux-config-panel { padding-top: 22px; }
+        .ux-config-panel.hidden { display: none !important; }
+        .ux-config-panel > .section-heading:first-child { margin-top: 0 !important; padding-top: 0 !important; border-top: 0 !important; }
+        .ux-config-panel .section-heading h2 { font-size: 18px !important; }
+        .ux-config-panel .section-heading p, .ux-config-panel .agent-help { display: none !important; }
+        .ux-config-save { display: flex; justify-content: flex-end; gap: 12px; padding-top: 18px; }
+        .ux-config-save .button.large { width: auto !important; min-width: 190px; }
+
+        #configPhonePanel.side-card { width: auto !important; position: static !important; align-self: auto !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; padding: 22px 0 0 !important; }
+        #configPhonePanel > .eyebrow { display: none; }
+        #configPhonePanel > h2 { margin: 0 0 5px !important; font-size: 20px !important; }
+        #configPhonePanel > p { margin: 0 0 16px !important; color: var(--muted); font-size: 13px; }
+        .ux-phone-modes { display: inline-flex; gap: 6px; padding: 5px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.02); margin-bottom: 18px; }
+        .ux-phone-modes button { border: 0; border-radius: 9px; padding: 10px 13px; background: transparent; color: var(--muted); font: inherit; font-weight: 700; cursor: pointer; }
+        .ux-phone-modes button.active { color: var(--text); background: rgba(124,92,255,.16); }
+        .ux-phone-path.hidden { display: none !important; }
+        .provisioning-panel { margin: 0 !important; }
+        .manual-phone-divider { display: none !important; }
+
+        #commercialStatusCard.ux-commercial-card { padding: 0 !important; overflow: hidden; }
+        .ux-commercial-summary { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 18px 20px; }
+        .ux-commercial-summary-copy { min-width: 0; }
+        .ux-commercial-summary-copy .eyebrow { margin-bottom: 4px; }
+        .ux-commercial-headline { display: block; font-size: 17px; letter-spacing: -.01em; }
+        .ux-commercial-meta { display: block; color: var(--muted); margin-top: 3px; font-size: 12px; }
+        #commercialDetails { border-top: 1px solid var(--border); }
+        #commercialDetails.hidden { display: none !important; }
+        #commercialDetails > * { margin-left: 0 !important; margin-right: 0 !important; }
+        #commercialDetails .commercial-plan-section { border-top: 0 !important; }
+
+        @media (max-width: 900px) {
+            .ux-config-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .dashboard-heading { align-items: flex-start !important; }
+        }
+        @media (max-width: 620px) {
+            .ux-config-nav { grid-template-columns: 1fr; }
+            .ux-config-body { padding: 0 14px 16px; }
+            .ux-config-heading { padding: 17px 16px; }
+            .ux-commercial-summary { align-items: flex-start; flex-direction: column; }
+            .ux-phone-modes { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+            .ux-phone-modes button { padding: 10px 8px; }
+        }
+    `;
+    document.head.appendChild(style);
+
+    function simplifyAuth() {
+        const hero = $('.hero-card');
+        if (!hero || hero.dataset.uxSimplified) return;
+        hero.dataset.uxSimplified = 'true';
+        const eyebrow = $('.eyebrow', hero);
+        const title = $('h1', hero);
+        const copy = $('p', hero);
+        if (eyebrow) eyebrow.textContent = 'Tu recepcionista con IA';
+        if (title) title.textContent = 'Tu negocio, atendido por IA.';
+        if (copy) copy.textContent = 'Pega el enlace de tu negocio y configura Helvoca en minutos.';
+    }
+
+    function simplifyDashboardCopy() {
+        const heading = $('.dashboard-heading');
+        if (!heading) return;
+        const eyebrow = $('.eyebrow', heading);
+        const title = $('h1', heading);
+        const copy = $('#welcomeText', heading);
+        if (eyebrow) eyebrow.textContent = 'Tu Helvoca';
+        if (title && !title.id) title.id = 'dashboardTitle';
+        if (copy && !copy.id.includes('dashboardSummary')) copy.dataset.uxSummary = 'true';
+        const refresh = $('#refreshBtn');
+        if (refresh) refresh.textContent = 'Actualizar';
+
+        const aiCard = $('.ai-onboarding-card');
+        if (aiCard && !aiCard.dataset.uxSimplified) {
+            aiCard.dataset.uxSimplified = 'true';
+            const aiTitle = $('.ai-heading h2', aiCard);
+            const aiLabel = $('label.grow', aiCard);
+            const aiButton = $('.ai-form .button', aiCard);
+            if (aiTitle) aiTitle.textContent = 'Actualizar negocio con IA';
+            if (aiLabel) {
+                const input = $('input', aiLabel);
+                aiLabel.childNodes[0].textContent = 'Web, Instagram o Google Maps';
+                if (input) input.placeholder = 'https://tu-negocio.cl';
+            }
+            if (aiButton) aiButton.textContent = 'Analizar';
+        }
+    }
+
+    function dashboardIsReady() {
+        const cards = $$('.status-card', $('#statusGrid') || document);
+        return cards.length >= 4 && cards.every(card => card.classList.contains('done'));
+    }
+
+    function renderDashboardState() {
+        const title = $('#dashboardTitle') || $('.dashboard-heading h1');
+        const copy = $('#welcomeText');
+        const ready = dashboardIsReady();
+        if (!title || !copy) return;
+
+        if (ready) {
+            title.textContent = 'Helvoca está operativa';
+            copy.textContent = 'Tu negocio está listo para atender clientes.';
+            $('#nextStepBanner')?.classList.add('hidden');
+        } else {
+            title.textContent = 'Termina de preparar Helvoca';
+            copy.textContent = 'Completa lo esencial para empezar a atender.';
+            $('#nextStepBanner')?.classList.remove('hidden');
+        }
+        $('#readyBanner')?.classList.add('hidden');
+
+        $$('.status-card').forEach(card => {
+            const small = $('small', card);
+            if (!small) return;
+            small.textContent = card.classList.contains('done')
+                ? (card.dataset.key === 'phoneConfigured' ? 'Activo' : 'Listo')
+                : 'Pendiente';
+        });
+    }
+
+    function wrapPanel(form, id, nodes) {
+        const valid = nodes.filter(Boolean).filter(node => node.parentElement === form);
+        if (!valid.length) return null;
+        const panel = document.createElement('div');
+        panel.id = id;
+        panel.className = 'ux-config-panel hidden';
+        form.insertBefore(panel, valid[0]);
+        valid.forEach(node => panel.appendChild(node));
+        return panel;
+    }
+
+    function enhanceConfiguration() {
+        const advanced = $('#advancedPanel');
+        const form = $('#setupForm');
+        const sideCard = $('.side-card', advanced || document);
+        if (!advanced || !form || !sideCard || advanced.dataset.uxEnhanced) return;
+        advanced.dataset.uxEnhanced = 'true';
+        advanced.classList.add('ux-config-hub');
+        advanced.classList.remove('hidden');
+        form.classList.add('ux-config-form');
+
+        const businessHeading = $$('.section-heading', form)[0];
+        const businessFields = $('.two-col', form);
+        const agentHeading = $$('.section-heading', form)[1];
+        const agentFields = agentHeading?.nextElementSibling;
+        const greeting = form.elements.agentGreeting?.closest('label');
+        const instructions = form.elements.agentInstructions?.closest('label');
+        const agentToggle = $('.agent-toggle', form);
+        const agentHelp = $('.agent-help', form);
+        const capabilities = $('#agentCapabilities', form);
+        const serviceHeading = $('#addServiceBtn')?.closest('.section-heading');
+        const servicesList = $('#servicesList', form);
+        const hoursGrid = $('#hoursGrid', form);
+        const hoursHeading = hoursGrid?.previousElementSibling;
+        const knowledgeHeading = $('#addKnowledgeBtn')?.closest('.section-heading');
+        const knowledgeList = $('#knowledgeList', form);
+        const setupMessage = $('#setupMessage', form);
+        const submit = $('button[type="submit"]', form);
+
+        const businessPanel = wrapPanel(form, 'configBusinessPanel', [businessHeading, businessFields, agentHeading, agentFields, greeting, instructions, agentToggle]);
+        const permissionsPanel = wrapPanel(form, 'configPermissionsPanel', [agentHelp, capabilities]);
+        const servicesPanel = wrapPanel(form, 'configServicesPanel', [serviceHeading, servicesList]);
+        const hoursPanel = wrapPanel(form, 'configHoursPanel', [hoursHeading, hoursGrid]);
+        const knowledgePanel = wrapPanel(form, 'configKnowledgePanel', [knowledgeHeading, knowledgeList]);
+
+        const saveArea = document.createElement('div');
+        saveArea.className = 'ux-config-save';
+        if (setupMessage) saveArea.appendChild(setupMessage);
+        if (submit) {
+            submit.textContent = 'Guardar cambios';
+            saveArea.appendChild(submit);
+        }
+        form.appendChild(saveArea);
+
+        sideCard.id = 'configPhonePanel';
+        sideCard.classList.add('ux-config-panel', 'hidden');
+
+        const shell = document.createElement('div');
+        shell.className = 'ux-config-shell';
+        const heading = document.createElement('div');
+        heading.className = 'ux-config-heading';
+        heading.innerHTML = '<div><div class="eyebrow">Configuración</div><h2>Ajustes de Helvoca</h2><p>Abre solo lo que quieras cambiar.</p></div>';
+        const nav = document.createElement('nav');
+        nav.className = 'ux-config-nav';
+        nav.setAttribute('aria-label', 'Configuración de Helvoca');
+        const body = document.createElement('div');
+        body.className = 'ux-config-body';
+
+        advanced.parentElement.insertBefore(shell, advanced);
+        shell.append(heading, nav, body);
+        body.append(form, sideCard);
+        advanced.remove();
+        shell.id = 'advancedPanel';
+        shell.classList.add('ux-config-hub');
+
+        const items = [
+            ['Negocio y agente', 'Identidad y voz', businessPanel],
+            ['Permisos del agente', 'Acciones permitidas', permissionsPanel],
+            ['Servicios', 'Qué puede ofrecer', servicesPanel],
+            ['Horarios', 'Cuándo atiende', hoursPanel],
+            ['Preguntas frecuentes', 'Lo que debe saber', knowledgePanel],
+            ['Teléfono', 'Número y llamadas', sideCard]
+        ];
+
+        const buttons = [];
+        function openPanel(target) {
+            items.forEach(([, , panel], index) => {
+                if (!panel) return;
+                const active = panel === target;
+                panel.classList.toggle('hidden', !active);
+                buttons[index]?.setAttribute('aria-expanded', String(active));
+            });
+        }
+
+        items.forEach(([label, summary, panel], index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.setAttribute('aria-expanded', 'false');
+            if (panel?.id) button.setAttribute('aria-controls', panel.id);
+            button.innerHTML = `<strong>${label}</strong><small data-ux-summary="${index}">${summary}</small>`;
+            button.addEventListener('click', () => openPanel(panel));
+            nav.appendChild(button);
+            buttons.push(button);
+        });
+
+        const legacyToggle = $('#advancedToggleBtn');
+        if (legacyToggle) {
+            legacyToggle.textContent = 'Configuración';
+            legacyToggle.addEventListener('click', () => {
+                setTimeout(() => {
+                    shell.classList.remove('hidden');
+                    openPanel(businessPanel);
+                    shell.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 0);
+            }, true);
+        }
+
+        function updateSummaries() {
+            const summaryNodes = $$('[data-ux-summary]', nav);
+            const serviceCount = $$('.service-row', servicesList || document).length;
+            const hourCount = $$('.hour-row', hoursGrid || document).length;
+            const knowledgeCount = $$('.knowledge-row', knowledgeList || document).length;
+            const phoneCount = $$('.phone-list .phone-item, .phone-list [data-phone-id], #phoneList > div').length;
+            if (summaryNodes[2]) summaryNodes[2].textContent = serviceCount ? `${serviceCount} configurado${serviceCount === 1 ? '' : 's'}` : 'Sin servicios';
+            if (summaryNodes[3]) summaryNodes[3].textContent = hourCount ? `${hourCount} intervalo${hourCount === 1 ? '' : 's'}` : 'Sin horarios';
+            if (summaryNodes[4]) summaryNodes[4].textContent = knowledgeCount ? `${knowledgeCount} respuesta${knowledgeCount === 1 ? '' : 's'}` : 'Sin respuestas';
+            if (summaryNodes[5]) summaryNodes[5].textContent = phoneCount ? 'Número conectado' : 'Sin número';
+        }
+        new MutationObserver(updateSummaries).observe(form, { childList: true, subtree: true });
+        new MutationObserver(updateSummaries).observe(sideCard, { childList: true, subtree: true });
+        updateSummaries();
+        enhancePhonePaths(sideCard);
+    }
+
+    function enhancePhonePaths(sideCard = $('#configPhonePanel') || $('.side-card')) {
+        if (!sideCard || sideCard.dataset.uxPhoneEnhanced) return;
+        const provisioning = $('.provisioning-panel', sideCard);
+        const manualForm = $('#phoneForm', sideCard);
+        if (!provisioning || !manualForm) return;
+        sideCard.dataset.uxPhoneEnhanced = 'true';
+
+        const title = $('h2', sideCard);
+        const intro = $('p', sideCard);
+        if (title) title.textContent = 'Teléfono';
+        if (intro) intro.textContent = 'Elige cómo quieres conectar las llamadas.';
+
+        const modes = document.createElement('div');
+        modes.className = 'ux-phone-modes';
+        const existingBtn = document.createElement('button');
+        existingBtn.type = 'button';
+        existingBtn.textContent = 'Conectar mi número';
+        existingBtn.className = 'active';
+        const newBtn = document.createElement('button');
+        newBtn.type = 'button';
+        newBtn.textContent = 'Buscar un número nuevo';
+        modes.append(existingBtn, newBtn);
+
+        const existingPanel = document.createElement('div');
+        existingPanel.id = 'phoneExistingPanel';
+        existingPanel.className = 'ux-phone-path';
+        const newPanel = document.createElement('div');
+        newPanel.id = 'phoneNewPanel';
+        newPanel.className = 'ux-phone-path hidden';
+
+        const divider = $('.manual-phone-divider', sideCard);
+        const phoneMessage = $('#phoneMessage', sideCard);
+        const phoneList = $('.phone-list-wrap', sideCard);
+        if (divider) existingPanel.appendChild(divider);
+        existingPanel.appendChild(manualForm);
+        if (phoneMessage) existingPanel.appendChild(phoneMessage);
+        if (phoneList) existingPanel.appendChild(phoneList);
+        newPanel.appendChild(provisioning);
+
+        const anchor = intro || title;
+        anchor?.insertAdjacentElement('afterend', modes);
+        modes.insertAdjacentElement('afterend', existingPanel);
+        existingPanel.insertAdjacentElement('afterend', newPanel);
+
+        function select(mode) {
+            const existing = mode === 'existing';
+            existingBtn.classList.toggle('active', existing);
+            newBtn.classList.toggle('active', !existing);
+            existingPanel.classList.toggle('hidden', !existing);
+            newPanel.classList.toggle('hidden', existing);
+        }
+        existingBtn.addEventListener('click', () => select('existing'));
+        newBtn.addEventListener('click', () => select('new'));
+        select('existing');
+    }
+
+    async function enhanceCommercial() {
+        const card = $('#commercialStatusCard');
+        if (!card || card.dataset.uxEnhanced) return;
+        card.dataset.uxEnhanced = 'true';
+        card.classList.add('ux-commercial-card');
+
+        const originalChildren = [...card.children];
+        const summary = document.createElement('div');
+        summary.className = 'ux-commercial-summary';
+        summary.innerHTML = `
+            <div class="ux-commercial-summary-copy">
+                <div class="eyebrow">Suscripción</div>
+                <strong id="uxCommercialHeadline" class="ux-commercial-headline">Cargando plan…</strong>
+                <small id="uxCommercialMeta" class="ux-commercial-meta">Uso y facturación</small>
+            </div>
+            <button id="commercialManageBtn" class="button small ghost" type="button" aria-expanded="false">Gestionar plan</button>
+        `;
+        const details = document.createElement('div');
+        details.id = 'commercialDetails';
+        details.className = 'hidden';
+        originalChildren.forEach(child => details.appendChild(child));
+        card.append(summary, details);
+
+        const manage = $('#commercialManageBtn', card);
+        manage?.addEventListener('click', () => {
+            const opening = details.classList.contains('hidden');
+            details.classList.toggle('hidden', !opening);
+            manage.setAttribute('aria-expanded', String(opening));
+            manage.textContent = opening ? 'Ocultar planes' : 'Gestionar plan';
+        });
+
+        try {
+            if (typeof api === 'function' && sessionStorage.getItem('helvoca_access_token')) {
+                const [subscription, billing] = await Promise.all([
+                    api('/api/v1/subscription'),
+                    api('/api/v1/billing/status')
+                ]);
+                const included = Number(subscription?.includedMinutes || 0);
+                const used = Number(subscription?.usedMinutes || 0);
+                const remaining = Math.max(0, included - used);
+                const plan = billing?.currentPlanName || subscription?.plan || 'Plan actual';
+                const headline = $('#uxCommercialHeadline', card);
+                const meta = $('#uxCommercialMeta', card);
+                if (headline) headline.textContent = `${plan} · ${remaining} min disponibles`;
+                if (meta) meta.textContent = subscription?.serviceAllowed === false ? 'Servicio requiere atención' : 'Servicio activo';
+            }
+        } catch (_) {
+            const headline = $('#uxCommercialHeadline', card);
+            if (headline) headline.textContent = 'Plan actual';
+        }
+    }
+
+    function runEnhancements() {
+        simplifyAuth();
+        simplifyDashboardCopy();
+        enhanceConfiguration();
+        enhancePhonePaths();
+        enhanceCommercial();
+        renderDashboardState();
+    }
+
+    const observer = new MutationObserver(() => {
+        window.requestAnimationFrame(runEnhancements);
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', runEnhancements, { once: true });
+    } else {
+        runEnhancements();
+    }
+})();
