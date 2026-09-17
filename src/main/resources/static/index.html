@@ -61,6 +61,27 @@
         }
         .top-actions #logoutBtn:not(.hidden):hover { color: var(--text); background: rgba(255,255,255,.035); }
 
+        .app-nav { display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap; }
+        .app-nav a {
+            display: inline-flex;
+            align-items: center;
+            min-height: 30px;
+            padding: 5px 9px;
+            border: 1px solid transparent;
+            border-radius: 999px;
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 750;
+            white-space: nowrap;
+        }
+        .app-nav a:hover { color: var(--text); background: rgba(255,255,255,.035); }
+        .app-nav a.active { color: #ddd6ff; border-color: rgba(124,92,255,.28); background: rgba(124,92,255,.13); }
+        body:has(#authView:not(.hidden)) #primaryNav { display: none; }
+        body:has(#configuration:target) .app-nav .nav-home.active { color: var(--muted); border-color: transparent; background: transparent; }
+        body:has(#configuration:target) .app-nav .nav-config { color: #ddd6ff; border-color: rgba(124,92,255,.28); background: rgba(124,92,255,.13); }
+        .nav-anchor { display: block; height: 0; scroll-margin-top: 96px; }
+
         #authView.auth-grid {
             grid-template-columns: minmax(0, 720px);
             justify-content: center;
@@ -150,6 +171,10 @@
         #proposalPanel .proposal-actions .button { min-height: 36px; padding: 0 13px; font-size: 12px; }
 
         @media (max-width: 900px) { #configPermissionsPanel .agent-capability-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 860px) {
+            .topbar { flex-wrap: wrap; }
+            .app-nav { order: 3; width: 100%; justify-content: flex-start; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
+        }
         @media (max-width: 760px) {
             #configKnowledgePanel .knowledge-row { grid-template-columns: 1fr 1fr; }
             #configKnowledgePanel .knowledge-row > label:first-child,
@@ -172,6 +197,12 @@
             <div class="brand">HELVOCA</div>
             <div class="subtitle">Tu recepcionista telefónica con IA</div>
         </div>
+        <nav id="primaryNav" class="app-nav" aria-label="Navegación principal">
+            <a class="nav-home active" href="/">Inicio</a>
+            <a class="nav-conversations" href="/operations.html#conversations">Conversaciones</a>
+            <a class="nav-operations" href="/operations.html">Operaciones</a>
+            <a class="nav-config" href="/#configuration">Configuración</a>
+        </nav>
         <div class="top-actions">
             <span id="sessionBadge" class="badge muted">Sin sesión</span>
             <button id="logoutBtn" class="button ghost hidden" type="button">Salir</button>
@@ -287,6 +318,7 @@
                 <span>Para ajustes finos, agente IA, horarios, transferencia humana y conocimiento.</span>
             </div>
 
+            <span id="configuration" class="nav-anchor" aria-hidden="true"></span>
             <div id="advancedPanel" class="admin-layout hidden">
                 <form id="setupForm" class="card stack wide-card">
                     <div class="section-heading"><div><div class="eyebrow">Negocio</div><h2>Configuración avanzada</h2></div></div>
