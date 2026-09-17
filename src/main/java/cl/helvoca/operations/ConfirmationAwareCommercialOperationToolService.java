@@ -20,6 +20,7 @@ public class ConfirmationAwareCommercialOperationToolService extends CommercialO
     private static final Set<String> CONFIRM_TOOLS = Set.of("create_order", "create_delivery", "create_payment");
     private final UniversalConfirmationService confirmations;
     private final OperationExecutionLockService executionLocks;
+    private final CrossChannelMessagingToolService crossChannelMessaging;
 
     public ConfirmationAwareCommercialOperationToolService(
             CatalogItemRepository catalog,
@@ -35,11 +36,18 @@ public class ConfirmationAwareCommercialOperationToolService extends CommercialO
             PaymentWorkflowService paymentWorkflow,
             ConversationStateService conversationState,
             UniversalConfirmationService confirmations,
-            OperationExecutionLockService executionLocks) {
+            OperationExecutionLockService executionLocks,
+            CrossChannelMessagingToolService crossChannelMessaging) {
         super(catalog, deliveryZones, deliveryCoverage, orders, orderLines, operations, capabilities,
                 orderWorkflow, deliveryWorkflow, universalOperations, paymentWorkflow, conversationState);
         this.confirmations = confirmations;
         this.executionLocks = executionLocks;
+        this.crossChannelMessaging = crossChannelMessaging;
+    }
+
+    @Override
+    public boolean supports(String toolName) {
+        return CrossChannelMessagingToolService.TOOL_NAME.equals(toolName) || super.supports(toolName);
     }
 
     @Override
@@ -51,6 +59,10 @@ public class ConfirmationAwareCommercialOperationToolService extends CommercialO
                           BusinessOrder.Source source,
                           String toolName,
                           String rawArguments) {
+        if (CrossChannelMessagingToolService.TOOL_NAME.equals(toolName)) {
+            return crossChannelMessaging.execute(businessId, customerId, rawArguments).toString();
+        }
+
         UUID operationId = null;
         UUID token = null;
         if (CONFIRM_TOOLS.contains(toolName)) {

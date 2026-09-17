@@ -5,6 +5,7 @@ import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.operations.BusinessOperation;
+import cl.helvoca.operations.CrossChannelMessagingToolService;
 import cl.helvoca.operations.OperationPolicyService;
 import cl.helvoca.security.TenantProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -126,9 +128,10 @@ public class AiAgentService {
 
     @Transactional(readOnly = true)
     public boolean toolAllowed(UUID businessId, String toolName) {
+        AiAgent agent = runtime(businessId);
+        if (CrossChannelMessagingToolService.TOOL_NAME.equals(toolName)) return agent.isActive();
         AiCapability capability = AiCapability.fromToolName(toolName).orElse(null);
         if (capability == null) return true;
-        AiAgent agent = runtime(businessId);
         return agent.isActive()
                 && agent.getCapabilities().contains(capability)
                 && automationAllowsTool(businessId, toolName);
@@ -138,10 +141,15 @@ public class AiAgentService {
     public Set<String> allowedToolNames(UUID businessId) {
         AiAgent agent = runtime(businessId);
         if (!agent.isActive()) return Set.of();
-        return agent.getCapabilities().stream()
+        LinkedHashSet<String> allowed = agent.getCapabilities().stream()
                 .map(AiCapability::toolName)
                 .filter(toolName -> automationAllowsTool(businessId, toolName))
-                .collect(Collectors.toUnmodifiableSet());
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        // Cross-channel delivery is a platform capability with its own strict
+        // backend gates: verified identity, tenant operation, provider and
+        // delivery switches. It does not grant any business-operation mutation.
+        allowed.add(CrossChannelMessagingToolService.TOOL_NAME);
+        return Set.copyOf(allowed);
     }
 
     /**

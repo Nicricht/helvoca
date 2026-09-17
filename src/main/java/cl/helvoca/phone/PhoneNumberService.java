@@ -41,6 +41,7 @@ public class PhoneNumberService {
             String externalId = blankToNull(request.externalId());
             if (externalId != null) existing.setExternalId(externalId);
             existing.setActive(request.active() == null || request.active());
+            if (!existing.isActive()) existing.setWhatsappEnabled(false);
             return PhoneNumberResponse.from(repository.save(existing));
         }
 
@@ -50,6 +51,7 @@ public class PhoneNumberService {
         phone.setPhoneNumber(number);
         phone.setExternalId(blankToNull(request.externalId()));
         phone.setActive(request.active() == null || request.active());
+        phone.setWhatsappEnabled(false);
         return PhoneNumberResponse.from(repository.save(phone));
     }
 
@@ -59,7 +61,31 @@ public class PhoneNumberService {
         PhoneNumber phone = repository.findByIdAndBusinessId(id, businessId)
                 .orElseThrow(() -> new NotFoundException("Phone number not found"));
         phone.setActive(active);
+        if (!active) phone.setWhatsappEnabled(false);
         return PhoneNumberResponse.from(phone);
+    }
+
+    @Transactional
+    public PhoneNumberResponse setWhatsappEnabled(UUID id, boolean enabled) {
+        UUID businessId = tenantProvider.requireBusinessId();
+        PhoneNumber phone = repository.findByIdAndBusinessId(id, businessId)
+                .orElseThrow(() -> new NotFoundException("Phone number not found"));
+
+        if (enabled) {
+            if (!phone.isActive()) {
+                throw new ConflictException("Activa el número antes de habilitarlo para WhatsApp");
+            }
+            boolean anotherSender = repository
+                    .findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId)
+                    .stream()
+                    .anyMatch(existing -> !existing.getId().equals(phone.getId()));
+            if (anotherSender) {
+                throw new ConflictException("El negocio ya tiene otro número habilitado como remitente de WhatsApp");
+            }
+        }
+
+        phone.setWhatsappEnabled(enabled);
+        return PhoneNumberResponse.from(repository.save(phone));
     }
 
     @Transactional

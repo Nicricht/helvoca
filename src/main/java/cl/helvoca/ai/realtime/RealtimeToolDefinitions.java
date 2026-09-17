@@ -58,6 +58,13 @@ public final class RealtimeToolDefinitions {
                         object().put("properties", new JSONObject()
                                         .put("question", string("Pregunta exacta o fielmente resumida del cliente")))
                                 .put("required", new JSONArray().put("question"))))
+                .put(function("send_whatsapp_operation",
+                        "Envía por WhatsApp contenido backend-autoritativo asociado a una operación ya existente del cliente actual, por ejemplo un enlace de pago. Nunca envíes texto, URL ni teléfono inventados. Usa literalmente un operationId devuelto por una herramienta del backend y un purpose compatible. Solo di que el mensaje fue enviado o quedó en cola cuando success=true. Si success=false, explica que WhatsApp no está disponible o no está listo y no afirmes que se envió.",
+                        object().put("properties", new JSONObject()
+                                        .put("operationId", string("UUID exacto de la operación backend que se quiere comunicar"))
+                                        .put("purpose", string("PAYMENT_LINK, BOOKING_CONFIRMATION, MEETING_LINK, ORDER_STATUS, QUOTE, REMINDER o DELIVERY_STATUS"))
+                                        .put("recipientIdentityId", string("UUID opcional de una identidad telefónica verificada cuando el cliente tiene más de un teléfono verificado")))
+                                .put("required", new JSONArray().put("operationId").put("purpose"))))
                 .put(function("transfer_to_human", "Solicita transferir la llamada a una persona del negocio cuando el cliente lo pida o la atención automática no pueda resolver su necesidad. El destino se obtiene de la configuración segura del negocio, nunca de argumentos del modelo.", object()))
                 .put(endCall());
     }
