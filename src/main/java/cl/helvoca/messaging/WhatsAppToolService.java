@@ -9,6 +9,7 @@ import cl.helvoca.knowledge.KnowledgeItem;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.learning.UnansweredQuestion;
 import cl.helvoca.learning.UnansweredQuestionService;
+import cl.helvoca.omnichannel.CustomerIdentityService;
 import cl.helvoca.request.BusinessRequest;
 import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.request.RequestPriority;
@@ -18,6 +19,7 @@ import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -40,6 +42,7 @@ public class WhatsAppToolService {
     private final UnansweredQuestionService unansweredQuestions;
     private final MessagingConversationRepository conversations;
     private final JdbcTemplate jdbc;
+    private CustomerIdentityService customerIdentities;
 
     public WhatsAppToolService(BusinessRepository businesses,
                                CustomerRepository customers,
@@ -61,6 +64,11 @@ public class WhatsAppToolService {
         this.unansweredQuestions = unansweredQuestions;
         this.conversations = conversations;
         this.jdbc = jdbc;
+    }
+
+    @Autowired
+    void setCustomerIdentities(CustomerIdentityService customerIdentities) {
+        this.customerIdentities = customerIdentities;
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -184,6 +192,8 @@ public class WhatsAppToolService {
         customer.setName(name);
         if (email != null) customer.setEmail(email.trim());
         customer = customers.saveAndFlush(customer);
+        customerIdentities.recordProviderAssertedPhone(
+                c.getBusinessId(), customer.getId(), c.getSender(), "TWILIO_WHATSAPP");
         c.setCustomerId(customer.getId());
         conversations.save(c);
         return success(new JSONObject()
