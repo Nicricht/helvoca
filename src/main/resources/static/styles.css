@@ -523,3 +523,51 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
 @media (max-width: 620px) {
     #configBusinessPanel > .two-col { grid-template-columns: 1fr !important; }
 }
+
+/* Compact FAQ configuration: preserve every field while removing visual weight. */
+#configKnowledgePanel > .section-heading {
+    justify-content: flex-end !important;
+    margin-bottom: 6px !important;
+}
+#configKnowledgePanel > .section-heading > div { display: none !important; }
+#configKnowledgePanel #addKnowledgeBtn {
+    min-height: 28px !important;
+    padding: 0 4px !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    color: var(--muted) !important;
+    font-size: 11px !important;
+}
+#configKnowledgePanel #knowledgeList { gap: 2px !important; }
+#configKnowledgePanel .knowledge-row {
+    display: grid !important;
+    grid-template-columns: minmax(140px, 1fr) minmax(90px, .7fr) minmax(220px, 1.8fr) 28px;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 5px 0 !important;
+    border: 0 !important;
+    border-bottom: 1px solid rgba(255,255,255,.055) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+}
+#configKnowledgePanel .knowledge-row label {
+    min-width: 0;
+    gap: 0 !important;
+    font-size: 0 !important;
+}
+#configKnowledgePanel .knowledge-row input {
+    min-height: 32px !important;
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+}
+#configKnowledgePanel .knowledge-row .remove-row {
+    width: 28px !important;
+    height: 32px !important;
+    align-self: center !important;
+    border-color: transparent !important;
+}
+@media (max-width: 620px) {
+    #configKnowledgePanel .knowledge-row { grid-template-columns: 1fr 1fr !important; }
+    #configKnowledgePanel .knowledge-row > label.grow { grid-column: 1 / -1; }
+    #configKnowledgePanel .knowledge-row .remove-row { grid-column: 2; justify-self: end; }
+}
