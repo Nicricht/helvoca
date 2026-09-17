@@ -5,11 +5,36 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Helvoca · Operaciones</title>
   <link rel="stylesheet" href="/operations.css">
+  <style>
+    .topbar{gap:18px;flex-wrap:wrap}
+    .operations-nav-shell{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+    .app-nav{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+    .topbar .app-nav a{display:inline-flex;align-items:center;min-height:30px;padding:5px 9px;border:1px solid transparent;border-radius:999px;background:transparent;color:#6c7d77;text-decoration:none;font-size:11px;font-weight:750;white-space:nowrap}
+    .topbar .app-nav a:hover{color:#173f35;background:#f1f5f3}
+    .topbar .app-nav a.active{color:#173f35;border-color:#d5e5df;background:#e8f3ef}
+    body:has(#conversations:target) .app-nav .nav-operations.active{color:#6c7d77;border-color:transparent;background:transparent}
+    body:has(#conversations:target) .app-nav .nav-conversations{color:#173f35;border-color:#d5e5df;background:#e8f3ef}
+    .operations-actions{display:flex;align-items:center;gap:6px}
+    .topbar .operations-actions a{padding:8px 10px;font-size:11px;background:#f1f5f3;color:#45665d}
+    #conversations{scroll-margin-top:96px}
+    @media(max-width:760px){.operations-nav-shell{width:100%;justify-content:flex-start}.app-nav{overflow-x:auto;flex-wrap:nowrap;max-width:100%;padding-bottom:2px}.operations-actions{margin-left:auto}}
+  </style>
 </head>
 <body>
 <header class="topbar">
   <div><strong>HELVOCA</strong><span>Operaciones</span></div>
-  <nav><a href="/simulator.html">Probar recepcionista</a><a href="/">Configuración</a><button id="refreshBtn">Actualizar</button></nav>
+  <div class="operations-nav-shell">
+    <nav class="app-nav" aria-label="Navegación principal">
+      <a class="nav-home" href="/">Inicio</a>
+      <a class="nav-conversations" href="/operations.html#conversations">Conversaciones</a>
+      <a class="nav-operations active" href="/operations.html">Operaciones</a>
+      <a class="nav-config" href="/#configuration">Configuración</a>
+    </nav>
+    <div class="operations-actions">
+      <a href="/simulator.html">Probar</a>
+      <button id="refreshBtn">Actualizar</button>
+    </div>
+  </div>
 </header>
 <main>
   <section class="hero">
@@ -52,7 +77,7 @@
   </section>
 
   <section class="grid two">
-    <article class="panel">
+    <article id="conversations" class="panel">
       <div class="panel-head"><div><p class="eyebrow">ACTIVIDAD</p><h2>Últimas llamadas</h2></div></div>
       <div id="callsList" class="list"></div>
     </article>
