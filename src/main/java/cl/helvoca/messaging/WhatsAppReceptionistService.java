@@ -68,7 +68,10 @@ public class WhatsAppReceptionistService {
     public String handle(String messageSid, String rawFrom, String rawTo, String body) {
         if (messageSid == null || messageSid.isBlank()) throw new IllegalArgumentException("MessageSid is required");
         MessagingMessage prior = messages.findByExternalMessageId(messageSid).orElse(null);
-        if (prior != null && prior.getReplyText() != null) return prior.getReplyText();
+        if (prior != null) {
+            if (prior.getReplyText() != null) return prior.getReplyText();
+            throw new IllegalStateException("WhatsApp message is already being processed");
+        }
 
         String from = normalizeAddress(rawFrom);
         String to = normalizeAddress(rawTo);
@@ -97,7 +100,7 @@ public class WhatsAppReceptionistService {
         conversation.setLastMessageAt(now);
         conversations.saveAndFlush(conversation);
 
-        MessagingMessage inbound = prior == null ? new MessagingMessage() : prior;
+        MessagingMessage inbound = new MessagingMessage();
         inbound.setConversationId(conversation.getId());
         inbound.setExternalMessageId(messageSid);
         inbound.setDirection("INBOUND");
