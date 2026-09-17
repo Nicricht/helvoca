@@ -101,16 +101,25 @@ test('operations prioritizes business work and keeps technical diagnostics colla
   await expect(page.locator('#unknownQuestions')).toHaveText('1');
 
   await expect(page.locator('#businessTabs')).toBeVisible();
-  await expect(page.locator('#bookingsList')).toContainText('Ana Reserva');
-  await expect(page.locator('#bookingsList')).toContainText('Peluquería');
-  await expect(page.locator('#bookingsList')).toContainText('Confirmada');
+  await expect(page.locator('[data-table="bookings"]')).toBeVisible();
+  await expect(page.locator('[data-table="bookings"]')).toContainText('Ana Reserva');
+  await expect(page.locator('[data-table="bookings"]')).toContainText('Peluquería');
+  await expect(page.locator('[data-table="bookings"]')).toContainText('Confirmada');
+  await page.locator('[data-booking-open][data-entity-id="b1"]').first().click();
+  await expect(page.locator('#businessDetailDrawer')).toBeVisible();
+  await expect(page.locator('#businessDetailDrawer')).toContainText('Ana Reserva');
+  await expect(page.locator('#businessDetailDrawer')).toContainText('Peluquería');
+  await page.locator('#businessDetailClose').click();
 
   await page.getByRole('button', { name: /Pedidos/ }).click();
-  await expect(page.locator('#ordersList')).toContainText('Juan Pedido');
-  await expect(page.locator('#ordersList')).toContainText('2 × Hamburguesa');
-  await expect(page.locator('#ordersList')).toContainText('18.990');
+  await expect(page.locator('[data-table="orders"]')).toBeVisible();
+  await expect(page.locator('[data-table="orders"]')).toContainText('Juan Pedido');
+  await expect(page.locator('[data-table="orders"]')).toContainText('18.990');
+  await page.locator('[data-order-open][data-entity-id="o1"]').first().click();
+  await expect(page.locator('#businessDetailDrawer')).toContainText('2 × Hamburguesa');
   await page.getByRole('button', { name: 'Empezar preparación' }).click();
-  await expect(page.locator('#ordersList')).toContainText('Preparando');
+  await expect(page.locator('#businessDetailDrawer')).toContainText('Preparando');
+  await page.locator('#businessDetailClose').click();
 
   await page.getByRole('button', { name: /Clientes/ }).click();
   await expect(page.locator('#customersList')).toContainText('Ana Reserva');
