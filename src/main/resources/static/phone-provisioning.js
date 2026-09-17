@@ -178,3 +178,124 @@
     ux.async = false;
     document.head.appendChild(ux);
 })();
+
+(() => {
+    const style = document.createElement('style');
+    style.id = 'helvoca-phone-summary-styles';
+    style.textContent = `
+        #phoneCompactSummary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-height: 38px;
+            padding: 4px 0 10px;
+        }
+        #phoneCompactSummary .phone-summary-copy {
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 12px;
+        }
+        #phoneCompactSummary .phone-summary-number {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 800;
+        }
+        #phoneCompactSummary .phone-summary-state { color: var(--muted); }
+        #phoneCompactSummary .phone-summary-state.active { color: var(--success); }
+        #phoneCompactSummary .button {
+            flex: 0 0 auto;
+            min-height: 28px;
+            padding: 0 4px;
+            border-color: transparent;
+            background: transparent;
+            color: var(--muted);
+            box-shadow: none;
+            font-size: 11px;
+        }
+        #phoneCompactSummary .button:hover { color: var(--text); }
+        @media (max-width: 520px) {
+            #phoneCompactSummary { align-items: flex-start; }
+            #phoneCompactSummary .phone-summary-copy { align-items: flex-start; flex-direction: column; gap: 2px; }
+        }
+    `;
+    document.head.appendChild(style);
+
+    function syncPhoneSummary() {
+        const panel = document.querySelector('#configPhonePanel');
+        const modes = panel?.querySelector('.ux-phone-modes');
+        const existingPanel = panel?.querySelector('#phoneExistingPanel');
+        const newPanel = panel?.querySelector('#phoneNewPanel');
+        const list = panel?.querySelector('#phoneList');
+        if (!panel || !modes || !existingPanel || !newPanel || !list) return;
+
+        const rows = [...list.querySelectorAll('.phone-item')];
+        let summary = panel.querySelector('#phoneCompactSummary');
+
+        if (!rows.length) {
+            summary?.remove();
+            modes.classList.remove('hidden');
+            existingPanel.classList.remove('hidden');
+            newPanel.classList.add('hidden');
+            return;
+        }
+
+        if (!summary) {
+            summary = document.createElement('div');
+            summary.id = 'phoneCompactSummary';
+            summary.dataset.editing = 'false';
+            summary.innerHTML = `
+                <div class="phone-summary-copy">
+                    <span class="phone-summary-number"></span>
+                    <span class="phone-summary-state"></span>
+                </div>
+                <button class="button small ghost" type="button" aria-expanded="false">Cambiar</button>
+            `;
+            panel.insertBefore(summary, modes);
+
+            const button = summary.querySelector('button');
+            button.addEventListener('click', () => {
+                const opening = summary.dataset.editing !== 'true';
+                summary.dataset.editing = String(opening);
+                button.setAttribute('aria-expanded', String(opening));
+                button.textContent = opening ? 'Cerrar' : 'Cambiar';
+
+                modes.classList.toggle('hidden', !opening);
+                if (opening) {
+                    const modeButtons = [...modes.querySelectorAll('button')];
+                    modeButtons[0]?.classList.add('active');
+                    modeButtons[1]?.classList.remove('active');
+                    existingPanel.classList.remove('hidden');
+                    newPanel.classList.add('hidden');
+                } else {
+                    existingPanel.classList.add('hidden');
+                    newPanel.classList.add('hidden');
+                }
+            });
+        }
+
+        const row = rows.find(item => item.querySelector('.phone-state.active')) || rows[0];
+        const number = row.querySelector('.phone-number')?.textContent?.trim() || 'Número conectado';
+        const active = Boolean(row.querySelector('.phone-state.active'));
+        const numberNode = summary.querySelector('.phone-summary-number');
+        const stateNode = summary.querySelector('.phone-summary-state');
+        if (numberNode) numberNode.textContent = number;
+        if (stateNode) {
+            stateNode.textContent = active ? '· Activo' : '· Inactivo';
+            stateNode.classList.toggle('active', active);
+        }
+
+        if (summary.dataset.editing !== 'true') {
+            modes.classList.add('hidden');
+            existingPanel.classList.add('hidden');
+            newPanel.classList.add('hidden');
+        }
+    }
+
+    const observer = new MutationObserver(syncPhoneSummary);
+    observer.observe(document.body, { childList: true, subtree: true });
+    syncPhoneSummary();
+})();
