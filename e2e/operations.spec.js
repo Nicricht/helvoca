@@ -5,7 +5,11 @@ test('operations prioritizes business work and keeps technical diagnostics colla
 
   const state = {
     requests: [{ id: 'r1', type: 'soporte', title: 'Revisar equipo', priority: 'HIGH', status: 'OPEN', createdAt: '2026-09-11T10:00:00Z' }],
-    questions: [{ id: 'q1', question: '¿Tienen estacionamiento?', occurrences: 2, lastSeenAt: '2026-09-11T10:30:00Z' }]
+    questions: [{ id: 'q1', question: '¿Tienen estacionamiento?', occurrences: 2, lastSeenAt: '2026-09-11T10:30:00Z' }],
+    bookings: [{ id: 'b1', customerId: 'cust1', serviceId: 'svc1', startAt: '2026-09-12T15:00:00Z', endAt: '2026-09-12T15:30:00Z', status: 'CONFIRMED', source: 'VOICE' }],
+    customers: [{ id: 'cust1', name: 'Ana Reserva', phone: '+56922222222', email: 'ana@example.cl', createdAt: '2026-09-10T09:00:00Z' }],
+    services: [{ id: 'svc1', name: 'Peluquería', durationMinutes: 30, price: 25000, active: true }],
+    orders: [{ id: 'o1', status: 'CONFIRMED', fulfillmentType: 'PICKUP', contactName: 'Juan Pedido', contactPhone: '+56933333333', total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-11T10:50:00Z', lines: [{ name: 'Hamburguesa', quantity: 2, unitPrice: 7000, lineTotal: 14000 }, { name: 'Bebida', quantity: 1, unitPrice: 4990, lineTotal: 4990 }] }]
   };
 
   const dashboard = () => ({
@@ -63,6 +67,17 @@ test('operations prioritizes business work and keeps technical diagnostics colla
   await page.route('**/api/v1/operations/readiness', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(readiness) }));
   await page.route('**/api/v1/operations/certification', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(certification) }));
   await page.route('**/api/v1/calls/c1', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(callDetail) }));
+  await page.route('**/api/v1/bookings', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(state.bookings) }));
+  await page.route('**/api/v1/customers', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(state.customers) }));
+  await page.route('**/api/v1/services', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(state.services) }));
+  await page.route('**/api/v1/commercial/orders', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(state.orders) }));
+  await page.route('**/api/v1/commercial/orders/o1/status', async route => {
+    expect(route.request().method()).toBe('PATCH');
+    const body = route.request().postDataJSON();
+    expect(body.status).toBe('PREPARING');
+    state.orders[0] = { ...state.orders[0], status: 'PREPARING' };
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(state.orders[0]) });
+  });
 
   await page.route('**/api/v1/requests', async route => {
     if (route.request().method() !== 'POST') return route.fallback();
@@ -84,6 +99,24 @@ test('operations prioritizes business work and keeps technical diagnostics colla
   await expect(page.locator('#bookingsToday')).toHaveText('4');
   await expect(page.locator('#openRequests')).toHaveText('1');
   await expect(page.locator('#unknownQuestions')).toHaveText('1');
+
+  await expect(page.locator('#businessTabs')).toBeVisible();
+  await expect(page.locator('#bookingsList')).toContainText('Ana Reserva');
+  await expect(page.locator('#bookingsList')).toContainText('Peluquería');
+  await expect(page.locator('#bookingsList')).toContainText('Confirmada');
+
+  await page.getByRole('button', { name: /Pedidos/ }).click();
+  await expect(page.locator('#ordersList')).toContainText('Juan Pedido');
+  await expect(page.locator('#ordersList')).toContainText('2 × Hamburguesa');
+  await expect(page.locator('#ordersList')).toContainText('18.990');
+  await page.getByRole('button', { name: 'Empezar preparación' }).click();
+  await expect(page.locator('#ordersList')).toContainText('Preparando');
+
+  await page.getByRole('button', { name: /Clientes/ }).click();
+  await expect(page.locator('#customersList')).toContainText('Ana Reserva');
+  await expect(page.locator('#customersList')).toContainText('+56922222222');
+
+  await page.getByRole('button', { name: /Solicitudes/ }).click();
   await expect(page.getByText('Revisar equipo')).toBeVisible();
 
   await expect(page.locator('#technicalDiagnostics')).not.toHaveAttribute('open', '');
