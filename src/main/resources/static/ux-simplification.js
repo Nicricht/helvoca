@@ -62,6 +62,23 @@
         .ux-config-save { display: flex; justify-content: flex-end; gap: 12px; padding-top: 18px; }
         .ux-config-save .button.large { width: auto !important; min-width: 190px; }
 
+        #configServicesPanel .section-heading { align-items: center !important; margin-bottom: 8px !important; }
+        #configServicesPanel .section-heading .eyebrow { display: none !important; }
+        #configServicesPanel .section-heading h2 { margin: 0 !important; font-size: 15px !important; }
+        #configServicesPanel #addServiceBtn { min-height: 30px; padding: 0 9px; font-size: 11px; }
+        #configServicesPanel #servicesList { gap: 6px !important; }
+        #configServicesPanel .service-row {
+            display: grid !important;
+            grid-template-columns: minmax(170px, 1.35fr) 86px 105px minmax(180px, 1.55fr) 30px;
+            gap: 7px !important;
+            align-items: end !important;
+            padding: 8px !important;
+            border-radius: 10px !important;
+        }
+        #configServicesPanel .service-row label { min-width: 0; gap: 3px !important; font-size: 10px !important; color: var(--muted); }
+        #configServicesPanel .service-row input { min-height: 34px !important; padding: 6px 8px !important; font-size: 12px !important; }
+        #configServicesPanel .service-row .remove-row { width: 30px !important; height: 34px !important; font-size: 18px !important; border-color: transparent !important; }
+
         #configPhonePanel.side-card { width: auto !important; position: static !important; align-self: auto !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; padding: 22px 0 0 !important; }
         #configPhonePanel > .eyebrow { display: none; }
         #configPhonePanel > h2 { margin: 0 0 5px !important; font-size: 20px !important; }
@@ -87,6 +104,13 @@
         @media (max-width: 900px) {
             .ux-config-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .dashboard-heading { align-items: flex-start !important; }
+            #configServicesPanel .service-row { grid-template-columns: minmax(150px, 1.2fr) 80px 100px minmax(160px, 1.4fr) 30px; }
+        }
+        @media (max-width: 760px) {
+            #configServicesPanel .service-row { grid-template-columns: 1fr 1fr; }
+            #configServicesPanel .service-row > label:first-child,
+            #configServicesPanel .service-row > label.grow { grid-column: 1 / -1; }
+            #configServicesPanel .service-row .remove-row { grid-column: 2; justify-self: end; }
         }
         @media (max-width: 620px) {
             .ux-config-nav { grid-template-columns: 1fr; }
@@ -216,6 +240,11 @@
         const servicesPanel = wrapPanel(form, 'configServicesPanel', [serviceHeading, servicesList]);
         const hoursPanel = wrapPanel(form, 'configHoursPanel', [hoursHeading, hoursGrid]);
         const knowledgePanel = wrapPanel(form, 'configKnowledgePanel', [knowledgeHeading, knowledgeList]);
+
+        if (serviceHeading) {
+            setText($('h2', serviceHeading), 'Servicios');
+            setText($('#addServiceBtn', serviceHeading), '+ Agregar');
+        }
 
         const saveArea = document.createElement('div');
         saveArea.className = 'ux-config-save';
