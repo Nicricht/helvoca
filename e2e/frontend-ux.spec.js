@@ -88,7 +88,7 @@ test('ready customer sees an operational dashboard with progressive disclosure',
 
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Helvoca está operativa');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Helvoca está atendiendo 🟢');
   await expect(page.getByText('Prepara tu negocio en minutos')).toHaveCount(0);
   await expect(page.locator('#readyBanner')).toBeHidden();
   await expect(page.locator('#nextStepBanner')).toBeHidden();
