@@ -41,6 +41,27 @@ class RecepVozConversationPolicyServiceTest {
     }
 
     @Test
+    void availabilityPolicyLooksAheadWithoutAskingPermissionForEveryDate() {
+        String policy = RecepVozConversationPolicyService.conversationGuidance();
+
+        assertTrue(policy.contains("no pidas permiso para revisar el día siguiente"));
+        assertTrue(policy.contains("consulta de forma proactiva los próximos días"));
+        assertTrue(policy.contains("devuelve opciones concretas de inmediato"));
+        assertTrue(policy.contains("No narres que vas a consultar una herramienta"));
+    }
+
+    @Test
+    void bookingPolicyUsesOnlyOneExplicitConfirmationAtTheMutationBoundary() {
+        String policy = RecepVozConversationPolicyService.conversationGuidance();
+
+        assertTrue(policy.contains("una sola confirmación explícita"));
+        assertTrue(policy.contains("No uses frases como \"para confirmar\" mientras todavía estás recopilando"));
+        assertTrue(policy.contains("Recopila primero los datos imprescindibles"));
+        assertTrue(policy.contains("Después de un sí claro, ejecuta la segunda fase sin volver a pedir confirmación"));
+        assertTrue(policy.contains("Al terminar, informa el éxito una sola vez"));
+    }
+
+    @Test
     void productionGuidanceDoesNotHardcodeTheHairSalonScenario() {
         String instructions = RecepVozConversationPolicyService.conversationGuidance().toLowerCase();
 
