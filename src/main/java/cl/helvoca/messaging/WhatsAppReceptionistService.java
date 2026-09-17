@@ -79,7 +79,8 @@ public class WhatsAppReceptionistService {
         if (from.isBlank() || to.isBlank() || text.isBlank()) throw new IllegalArgumentException("Invalid WhatsApp message");
 
         PhoneNumber phone = phones.findByPhoneNumberAndActiveTrue(to)
-                .orElseThrow(() -> new IllegalArgumentException("WhatsApp destination is not registered"));
+                .filter(PhoneNumber::isWhatsappEnabled)
+                .orElseThrow(() -> new IllegalArgumentException("WhatsApp destination is not registered or enabled"));
         if (!subscriptions.view(phone.getBusinessId()).serviceAllowed()) {
             throw new IllegalStateException("Subscription does not allow service");
         }
