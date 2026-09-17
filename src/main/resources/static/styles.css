@@ -399,3 +399,61 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
     min-height: 36px !important;
     font-size: 12px !important;
 }
+
+/* Compact hours configuration: scan the week at a glance. */
+#configHoursPanel > .section-heading {
+    align-items: center !important;
+    margin-bottom: 8px !important;
+}
+#configHoursPanel > .section-heading .eyebrow { display: none !important; }
+#configHoursPanel > .section-heading h2 {
+    margin: 0 !important;
+    font-size: 0 !important;
+}
+#configHoursPanel > .section-heading h2::after {
+    content: "Horarios";
+    font-size: 15px;
+}
+#configHoursPanel #addHourBtn {
+    min-height: 30px !important;
+    padding: 0 9px !important;
+    font-size: 11px !important;
+}
+#configHoursPanel #hoursGrid {
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+}
+#configHoursPanel .hour-row {
+    grid-template-columns: minmax(120px, 1.15fr) minmax(120px, 1fr) 18px minmax(120px, 1fr) 30px !important;
+    gap: 7px !important;
+    padding: 8px !important;
+    border-radius: 10px !important;
+}
+#configHoursPanel .hour-row label {
+    min-width: 0;
+    gap: 3px !important;
+    font-size: 10px !important;
+    color: var(--muted);
+}
+#configHoursPanel .hour-row input,
+#configHoursPanel .hour-row select {
+    min-height: 34px !important;
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+}
+#configHoursPanel .hour-row .sep {
+    padding-top: 14px !important;
+    font-size: 11px !important;
+}
+#configHoursPanel .hour-row .remove-row {
+    width: 30px !important;
+    height: 34px !important;
+    font-size: 18px !important;
+    border-color: transparent !important;
+}
+@media (max-width: 620px) {
+    #configHoursPanel .hour-row { grid-template-columns: 1fr 1fr !important; }
+    #configHoursPanel .hour-row .day-select { grid-column: 1 / -1; }
+    #configHoursPanel .hour-row .sep { display: none !important; }
+    #configHoursPanel .hour-row .remove-row { grid-column: 2; justify-self: end; }
+}
