@@ -50,6 +50,14 @@
             box-shadow: none !important;
         }
         #businessAdvancedToggle:hover { color: var(--text) !important; }
+        #configBusinessPanel > .section-heading { display: none !important; }
+        #configBusinessPanel .optional { display: none !important; }
+        #configBusinessPanel .agent-toggle { font-size: 0 !important; }
+        #configBusinessPanel .agent-toggle::after {
+            content: "Agente activo";
+            font-size: 12px;
+            font-weight: 700;
+        }
 
         .secondary-actions { display: none !important; }
         #advancedPanel.ux-config-hub {
@@ -195,6 +203,21 @@
         if (agentTitle) agentTitle.textContent = 'Agente';
     }
 
+    function compactBusinessPanel() {
+        const panel = document.querySelector('#configBusinessPanel');
+        if (!panel) return;
+
+        const businessFields = panel.querySelector('.two-col');
+        const businessLabels = businessFields ? [...businessFields.children] : [];
+        const phoneLabel = businessLabels[1];
+        if (phoneLabel?.childNodes[0] && phoneLabel.childNodes[0].nodeType === Node.TEXT_NODE) {
+            phoneLabel.childNodes[0].textContent = 'Teléfono';
+        }
+
+        const save = document.querySelector('#advancedPanel .ux-config-save button[type="submit"]');
+        if (save && save.textContent !== 'Guardar') save.textContent = 'Guardar';
+    }
+
     function setupBusinessDisclosure() {
         const panel = document.querySelector('#configBusinessPanel');
         if (!panel || document.querySelector('#businessAdvancedToggle')) return;
@@ -223,14 +246,14 @@
         toggle.id = 'businessAdvancedToggle';
         toggle.type = 'button';
         toggle.className = 'button small ghost';
-        toggle.textContent = 'Mostrar ajustes avanzados';
+        toggle.textContent = 'Más ajustes';
         toggle.setAttribute('aria-expanded', 'false');
 
         toggle.addEventListener('click', () => {
             const opening = toggle.getAttribute('aria-expanded') !== 'true';
             advancedFields.forEach(node => node.classList.toggle('hidden', !opening));
             toggle.setAttribute('aria-expanded', String(opening));
-            toggle.textContent = opening ? 'Ocultar ajustes avanzados' : 'Mostrar ajustes avanzados';
+            toggle.textContent = opening ? 'Menos ajustes' : 'Más ajustes';
         });
 
         if (agentToggle) agentToggle.insertAdjacentElement('afterend', toggle);
@@ -359,12 +382,14 @@
         if (hub) {
             hub.dataset.uxEnhanced = 'true';
             cleanBusinessHeadings();
+            compactBusinessPanel();
             setupBusinessDisclosure();
         }
         compactCommercialStatus();
     }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['aria-expanded'] });
 
     cleanBusinessHeadings();
+    compactBusinessPanel();
     setupBusinessDisclosure();
     compactCommercialStatus();
     if (sessionStorage.getItem('helvoca_access_token')) load();
