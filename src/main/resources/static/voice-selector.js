@@ -89,6 +89,16 @@
         #advancedPanel .ux-config-nav button small { display: none !important; }
         #advancedPanel .ux-config-body { padding: 0 !important; }
         #advancedPanel .ux-config-panel { padding-top: 10px !important; }
+
+        #dashboardView .dashboard-heading .eyebrow,
+        #dashboardView #welcomeText,
+        #dashboardView .status-card small,
+        #dashboardView .ai-onboarding-card .ai-heading {
+            display: none !important;
+        }
+        #dashboardView .dashboard-heading { margin-bottom: 12px !important; }
+        #dashboardView .status-card { min-height: 52px !important; }
+        #dashboardView .ai-onboarding-card { padding-top: 16px !important; }
     `;
     document.head.appendChild(actionStyle);
 
