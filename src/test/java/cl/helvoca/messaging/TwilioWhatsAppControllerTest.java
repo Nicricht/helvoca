@@ -4,6 +4,12 @@ import cl.helvoca.telephony.twilio.TwilioProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.LinkedMultiValueMap;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Comparator;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
@@ -42,6 +48,30 @@ class TwilioWhatsAppControllerTest {
     }
 
     @Test
+    void validTwilioSignatureAllowsWebhookToReachReceptionist() throws Exception {
+        WhatsAppReceptionistService receptionist = mock(WhatsAppReceptionistService.class);
+        WhatsAppProperties properties = new WhatsAppProperties();
+        properties.setEnabled(true);
+        properties.setWebhookValidationEnabled(true);
+        TwilioProperties twilio = new TwilioProperties();
+        twilio.setPublicBaseUrl("https://example.test");
+        twilio.setAuthToken("test-auth-token");
+        when(receptionist.handle("SM1", "+56911111111", "+56922222222", "hola"))
+                .thenReturn("ok");
+
+        var form = form();
+        String webhookUrl = "https://example.test/webhooks/v1/twilio/whatsapp";
+        String signature = twilioSignature(webhookUrl, form, "test-auth-token");
+
+        var response = new TwilioWhatsAppController(receptionist, properties, twilio)
+                .inbound(signature, form);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(response.getBody().contains("<Message>ok</Message>"));
+        verify(receptionist).handle("SM1", "+56911111111", "+56922222222", "hola");
+    }
+
+    @Test
     void acceptedWebhookEscapesReplyInTwiml() {
         WhatsAppReceptionistService receptionist = mock(WhatsAppReceptionistService.class);
         WhatsAppProperties properties = new WhatsAppProperties();
@@ -66,5 +96,21 @@ class TwilioWhatsAppControllerTest {
         form.add("To", "+56922222222");
         form.add("Body", "hola");
         return form;
+    }
+
+    private static String twilioSignature(String url,
+                                          LinkedMultiValueMap<String, String> form,
+                                          String authToken) throws Exception {
+        StringBuilder payload = new StringBuilder(url);
+        form.keySet().stream()
+                .sorted(Comparator.naturalOrder())
+                .forEach(key -> form.getOrDefault(key, java.util.List.of()).stream()
+                        .sorted()
+                        .forEach(value -> payload.append(key).append(value)));
+
+        Mac mac = Mac.getInstance("HmacSHA1");
+        mac.init(new SecretKeySpec(authToken.getBytes(StandardCharsets.UTF_8), "HmacSHA1"));
+        return Base64.getEncoder().encodeToString(
+                mac.doFinal(payload.toString().getBytes(StandardCharsets.UTF_8)));
     }
 }
