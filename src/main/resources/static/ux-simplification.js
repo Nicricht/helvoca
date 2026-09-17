@@ -179,13 +179,16 @@
         if (ready) {
             setText(title, 'Helvoca está operativa');
             setText(copy, 'Tu negocio está listo para atender clientes.');
-            $('#nextStepBanner')?.classList.add('hidden');
+            const nextStep = $('#nextStepBanner');
+            if (nextStep && !nextStep.classList.contains('hidden')) nextStep.classList.add('hidden');
         } else {
             setText(title, 'Termina de preparar Helvoca');
             setText(copy, 'Completa lo esencial para empezar a atender.');
-            $('#nextStepBanner')?.classList.remove('hidden');
+            const nextStep = $('#nextStepBanner');
+            if (nextStep?.classList.contains('hidden')) nextStep.classList.remove('hidden');
         }
-        $('#readyBanner')?.classList.add('hidden');
+        const readyBanner = $('#readyBanner');
+        if (readyBanner && !readyBanner.classList.contains('hidden')) readyBanner.classList.add('hidden');
 
         const readyLabels = {
             businessProfileConfigured: 'Configurado',
@@ -459,15 +462,21 @@
         renderDashboardState();
     }
 
+    const observerOptions = { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] };
     let enhancementFrame = null;
     const observer = new MutationObserver(() => {
         if (enhancementFrame !== null) return;
         enhancementFrame = window.requestAnimationFrame(() => {
             enhancementFrame = null;
-            runEnhancements();
+            observer.disconnect();
+            try {
+                runEnhancements();
+            } finally {
+                observer.observe(document.body, observerOptions);
+            }
         });
     });
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    observer.observe(document.body, observerOptions);
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', runEnhancements, { once: true });
