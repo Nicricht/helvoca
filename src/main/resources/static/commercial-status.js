@@ -303,7 +303,7 @@
     const style = document.createElement('style');
     style.id = 'helvoca-operational-home-styles';
     style.textContent = `
-        #statusGrid.ux-ready-hidden { display: none !important; }
+        #dashboardView #statusGrid.ux-ready-hidden { display: none !important; }
         #operationalOverview { margin: 0 0 18px; padding: 18px; }
         .home-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
         .home-metric { min-height: 76px; padding: 13px 14px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.025); }
