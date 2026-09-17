@@ -47,13 +47,17 @@ public class BusinessOperationCapabilityService {
     @Transactional(readOnly = true)
     public Set<String> allowedToolNames(UUID businessId) {
         return aiAgents.allowedToolNames(businessId).stream()
-                .filter(BusinessOperationCapability::isCommercialToolName)
+                .filter(toolName -> CrossChannelMessagingToolService.TOOL_NAME.equals(toolName)
+                        || BusinessOperationCapability.isCommercialToolName(toolName))
                 .filter(toolName -> automationAllowsTool(businessId, toolName))
                 .collect(Collectors.toUnmodifiableSet());
     }
 
     @Transactional(readOnly = true)
     public boolean isToolAllowed(UUID businessId, String toolName) {
+        if (CrossChannelMessagingToolService.TOOL_NAME.equals(toolName)) {
+            return aiAgents.toolAllowed(businessId, toolName);
+        }
         return BusinessOperationCapability.isCommercialToolName(toolName)
                 && aiAgents.toolAllowed(businessId, toolName)
                 && automationAllowsTool(businessId, toolName);
