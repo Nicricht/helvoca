@@ -52,7 +52,7 @@ async function mockReadyHome(page) {
     { id: 'cust2', name: 'Bruno Masaje', phone: '+56955555555', email: 'bruno@example.cl', createdAt: '2026-09-17T11:00:00Z' }
   ])));
   await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([
-    { id: 'o1', status: 'CONFIRMED', fulfillmentType: 'PICKUP', contactName: 'Juan Pedido', contactPhone: '+56933333333', total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z', lines: [{ name: 'Producto demo', quantity: 1, lineTotal: 18990 }] }
+    { id: 'o1', operationId: 'op1', sourceReferenceId: 'wa-order', status: 'CONFIRMED', fulfillmentType: 'PICKUP', contactName: 'Juan Pedido', contactPhone: '+56933333333', total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z', lines: [{ name: 'Producto demo', quantity: 1, lineTotal: 18990 }] }
   ])));
   await page.route('**/api/v1/bookings/b1/context', route => route.fulfill(json({
     channel: 'VOICE',
@@ -72,6 +72,13 @@ async function mockReadyHome(page) {
     whatsapp: null,
     events: [
       { id: 'e1', eventType: 'BOOKING_CREATED', channel: 'VOICE', createdAt: '2026-09-17T18:00:12Z' }
+    ]
+  })));
+  await page.route('**/api/v1/messaging/conversations/wa-order', route => route.fulfill(json({
+    conversation: { id: 'wa-order', sender: '+56933333333', openedAt: '2026-09-17T17:20:00Z', lastMessageAt: '2026-09-17T17:30:00Z' },
+    messages: [
+      { id: 'om1', direction: 'INBOUND', role: 'USER', content: 'Quiero un Producto demo.', createdAt: '2026-09-17T17:20:10Z' },
+      { id: 'om2', direction: 'OUTBOUND', role: 'ASSISTANT', content: 'Pedido confirmado.', createdAt: '2026-09-17T17:20:20Z' }
     ]
   })));
   await page.route('**/api/v1/operations/dashboard', route => route.fulfill(json({
@@ -117,11 +124,15 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeCallsToday')).toHaveText('3');
   await expect(page.locator('#homeWhatsAppToday')).toHaveText('1');
   await expect(page.locator('#homeBookingsToday')).toHaveText('2');
-  await expect(page.locator('#homePending')).toHaveText('3');
+  await expect(page.locator('#homeCustomersToday')).toHaveText('1');
+  await expect(page.locator('#homeRequestsToday')).toHaveText('1');
+  await expect(page.locator('#homeQuestionsToday')).toHaveText('2');
+  await expect(page.locator('#homeFailuresToday')).toHaveText('0');
+  await expect(page.locator('#homeMinutesToday')).toHaveText('8:00');
   await expect(page.locator('#homeCallsMetric')).toHaveAttribute('href', '/conversations.html?channel=calls');
   await expect(page.locator('#homeWhatsAppMetric')).toHaveAttribute('href', '/conversations.html?channel=whatsapp');
-  await expect(page.locator('#homeBookingsMetric')).toHaveAttribute('href', '/operations.html?tab=bookings');
-  await expect(page.locator('#homePendingMetric')).toHaveAttribute('href', '/operations.html?tab=requests');
+  await expect(page.locator('#homeBookingsMetric')).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
+  await expect(page.locator('#homeRequestsMetric')).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
   await expect(page.locator('#homeRecentActivity')).toContainText('+56922222222');
   await expect(page.locator('#homeRecentActivity')).toContainText('+56911111111');
   await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
