@@ -2,157 +2,159 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Convert Helvoca into a coherent operational product where Inicio shows the daily business workspace, Configuración is a dedicated page, reservations are filterable and traceable to their originating conversation, and Operaciones contains advanced history/diagnostics instead of duplicating the home workspace.
+**Goal:** Convert Helvoca into a customer-facing operational workspace where Inicio shows real business activity, Configuración is a dedicated screen, reservations are filterable, and every reservation can show the conversation/transcript that created it.
 
-**Architecture:** Keep the existing static HTML/JS frontend and Spring Boot APIs. Reuse current domain endpoints and add one tenant-safe read endpoint for reservation traceability so the UI never guesses by phone or timestamp. Move presentation responsibilities without duplicating operational data.
+**Architecture:** Keep the current static HTML/JS frontend and existing REST backend. Reuse existing APIs wherever possible, add one tenant-safe read endpoint for booking context, and avoid framework rewrites. Separate daily operations from advanced diagnostics while preserving current backend behavior.
 
-**Tech Stack:** Spring Boot, Java 21, static HTML/CSS/JavaScript, Playwright E2E, GitHub Actions, Railway.
+**Tech Stack:** Spring Boot 4.1, Java 21, PostgreSQL/JPA, static HTML/CSS/JavaScript, Playwright E2E.
 
 **Spec:** `docs/superpowers/specs/2026-09-17-helvoca-frontend-operational-redesign-design.md`
 
 ## Global Constraints
 
-- Universal multi-tenant UX; no industry-specific conditionals.
-- Voice and WhatsApp share domain semantics.
-- Never invent operational or payment state.
-- Technical provider details stay out of the main customer flow.
+- Inicio answers “qué está pasando ahora”.
+- Conversaciones answers “qué dijeron los clientes”.
+- Operaciones answers “qué hizo Helvoca y cuál es el historial operativo”.
+- Configuración answers “cómo quiero que trabaje Helvoca”.
+- No hardcode industries.
+- Never invent operational data.
+- Voice and WhatsApp remain tenant-scoped and read-only for this redesign.
+- Do not activate providers, certification flags, calls, WhatsApp sends, or payments.
 - Desktop uses compact tables; mobile uses cards.
-- Each independent data module fails gracefully without hiding healthy modules.
-- Preserve existing authentication and authorization behavior.
+- Each module fails independently where practical.
 
 ---
 
-### Task 1: Move operational workspace to Inicio
+### Task 1: Make Inicio the daily operational workspace
 
 **Files:**
 - Modify: `src/main/resources/static/index.html`
-- Modify: `src/main/resources/static/commercial-status.js`
-- Modify: `src/main/resources/static/operations-business.js`
-- Modify: `src/main/resources/static/operations-business.css`
-- Modify: `src/main/resources/static/operations.html`
-- Test: `e2e/home-operational.spec.js`
-- Test: `e2e/operations.spec.js`
+- Create: `src/main/resources/static/home-business.js`
+- Create: `src/main/resources/static/home-business.css`
+- Modify: `src/main/java/cl/helvoca/security/SecurityConfig.java`
+- Modify: `e2e/home-operational.spec.js`
 
 **Interfaces:**
-- Consumes: `/api/v1/operations/dashboard`, `/api/v1/bookings`, `/api/v1/customers`, `/api/v1/services`, `/api/v1/commercial/orders`
-- Produces: reusable `window.HelvocaBusinessWorkspace.mount(root, options)`
+- Consumes: `GET /api/v1/bookings`, `/api/v1/customers`, `/api/v1/services`, `/api/v1/commercial/orders`, existing global `api()`.
+- Produces: home tabs `bookings|orders|requests|customers`, tables/cards, detail drawer.
 
-- [ ] Write failing E2E assertions that Inicio contains tabs Reservas/Pedidos/Solicitudes/Clientes and Operaciones does not duplicate that workspace.
-- [ ] Verify the assertions fail on the current UI.
-- [ ] Refactor `operations-business.js` into a reusable mountable workspace and mount it on Inicio.
-- [ ] Remove the duplicate workspace markup from Operaciones.
-- [ ] Run targeted frontend tests and syntax checks.
-- [ ] Commit: `feat: move business workspace to home`
+- [ ] Write E2E assertions that Inicio renders the operational tabs and booking/order/customer data.
+- [ ] Verify the test fails because the workspace is absent.
+- [ ] Add `home-business.css/js` and static workspace containers to Inicio.
+- [ ] Load each data source independently with `Promise.allSettled`.
+- [ ] Verify syntax and targeted E2E behavior.
+- [ ] Commit.
 
-### Task 2: Create dedicated Configuración page
+### Task 2: Create dedicated Configuración screen and remove config clutter from Inicio
 
 **Files:**
 - Create: `src/main/resources/static/settings.html`
-- Create: `src/main/resources/static/settings.css`
-- Create: `src/main/resources/static/settings.js`
+- Create: `src/main/resources/static/settings-page.js`
 - Modify: `src/main/resources/static/index.html`
+- Modify: `src/main/resources/static/ux-simplification.js`
 - Modify: `src/main/java/cl/helvoca/security/SecurityConfig.java`
-- Test: `e2e/settings.spec.js`
-- Test: `e2e/frontend-ux.spec.js`
+- Modify: `e2e/frontend-ux.spec.js`
 
 **Interfaces:**
-- Consumes the same existing business/services/hours/knowledge/agent/phone/billing APIs.
-- Produces route `/settings.html` and consistent nav target.
+- Consumes: existing `app.js`, `phone-provisioning.js`, `commercial-status.js`, `voice-selector.js`, `ux-simplification.js`.
+- Produces: `/settings.html` with the existing forms and APIs; Inicio nav points there.
 
-- [ ] Write failing E2E for dedicated Configuración route and absence of embedded config on ready Inicio.
-- [ ] Verify RED.
-- [ ] Create settings shell and load the existing configuration UI inside the new page without duplicating backend APIs.
-- [ ] Update navigation targets to `/settings.html`.
-- [ ] Expose new static assets in SecurityConfig.
-- [ ] Verify login/register and ready home still work.
-- [ ] Commit: `feat: move configuration to dedicated page`
+- [ ] Add failing E2E assertions for `/settings.html` and absence of manual configuration on ready Inicio.
+- [ ] Create settings page from the existing authenticated console markup.
+- [ ] Add settings-specific script that forces the configuration shell open and hides operational home-only content.
+- [ ] Point all Configuración navigation to `/settings.html`.
+- [ ] Verify existing forms still use current IDs and backend APIs.
+- [ ] Commit.
 
 ### Task 3: Add reservation filters
 
 **Files:**
-- Modify: `src/main/resources/static/operations-business.js`
-- Modify: `src/main/resources/static/operations-business.css`
-- Test: `e2e/home-operational.spec.js`
+- Modify: `src/main/resources/static/home-business.js`
+- Modify: `src/main/resources/static/home-business.css`
+- Modify: `e2e/home-operational.spec.js`
 
 **Interfaces:**
-- Produces client-side filters for search/date/service/status/source without new backend APIs.
+- Produces filter state: `query`, `date`, `serviceId`, `status`, `source`.
+- Filters only client-side data already loaded from backend.
 
-- [ ] Write failing E2E for service, status and search filters.
-- [ ] Verify RED.
-- [ ] Add compact filter bar, dynamic service options, date/status/source filtering and result count.
+- [ ] Add failing E2E test for service/status/search filtering.
+- [ ] Render compact filter controls above reservations.
+- [ ] Populate service options from real service catalog.
+- [ ] Implement date buckets, service/status/source filters, search and “Mostrando X de Y”.
 - [ ] Add mobile filter layout.
-- [ ] Verify filtered table rows and clear filters.
-- [ ] Commit: `feat: filter reservations workspace`
+- [ ] Commit.
 
-### Task 4: Add tenant-safe reservation trace API
+### Task 4: Add tenant-safe booking context API
 
 **Files:**
 - Modify: `src/main/java/cl/helvoca/call/CallActionRepository.java`
-- Modify: `src/main/java/cl/helvoca/operations/BusinessOperationEventRepository.java`
-- Create: `src/main/java/cl/helvoca/booking/BookingTraceService.java`
-- Create: `src/main/java/cl/helvoca/booking/BookingTraceController.java`
-- Test: `src/test/java/cl/helvoca/booking/BookingTraceServiceTest.java`
+- Create: `src/main/java/cl/helvoca/booking/BookingContextService.java`
+- Create: `src/main/java/cl/helvoca/booking/BookingContextResponse.java`
+- Modify: `src/main/java/cl/helvoca/booking/BookingController.java`
+- Test: `src/test/java/cl/helvoca/booking/BookingContextServiceTest.java`
 
 **Interfaces:**
-- Produces: `GET /api/v1/bookings/{bookingId}/trace`
-- Response contains booking origin metadata plus either `callId` or `conversationId` when a real source exists.
+- New endpoint: `GET /api/v1/bookings/{id}/context`
+- Response:
+  - `channel`: `VOICE|WHATSAPP|MANUAL|null`
+  - `sourceReferenceId`: call/conversation UUID when available
+  - `call`: existing `CallDetailResponse` when voice
+  - `whatsapp`: existing `ConversationDetail` when WhatsApp
+  - `events`: operation event history for the booking operation
 
-- [ ] Write service tests proving tenant isolation and VOICE/WHATSAPP/MANUAL source resolution.
-- [ ] Verify RED.
-- [ ] Add repository queries by business/entity/operation source reference.
-- [ ] Implement trace service/controller.
-- [ ] Run targeted Java tests.
-- [ ] Commit: `feat: expose reservation conversation trace`
+- [ ] Write failing unit tests for VOICE, WHATSAPP and MANUAL booking contexts.
+- [ ] Add repository query scoped by businessId/entityType/entityId.
+- [ ] Implement context resolution without guessing by phone/time.
+- [ ] Add controller endpoint.
+- [ ] Verify tenant isolation through existing query services and booking lookup.
+- [ ] Commit.
 
-### Task 5: Show full reservation context
+### Task 5: Show full reservation dossier in Inicio
 
 **Files:**
-- Modify: `src/main/resources/static/operations-business.js`
-- Modify: `src/main/resources/static/operations-business.css`
-- Modify: `src/main/resources/static/conversations.js`
-- Test: `e2e/home-operational.spec.js`
-- Test: `e2e/conversations.spec.js`
+- Modify: `src/main/resources/static/home-business.js`
+- Modify: `src/main/resources/static/home-business.css`
+- Modify: `e2e/home-operational.spec.js`
 
 **Interfaces:**
-- Consumes `GET /api/v1/bookings/{id}/trace`, existing `GET /api/v1/calls/{id}`, and existing messaging conversation detail endpoint.
-- Produces deep links `/conversations.html?call=<id>` and `?whatsapp=<id>`.
+- Consumes: `GET /api/v1/bookings/{id}/context`.
+- Produces drawer sections: booking facts, summary, transcript/messages, actions, history, deep link to Conversations.
 
-- [ ] Write failing E2E showing reservation drawer summary/transcript/actions and deep link.
-- [ ] Verify RED.
-- [ ] Load trace when opening reservation.
-- [ ] For voice, render call summary/transcript/actions.
-- [ ] For WhatsApp, render message history.
-- [ ] For manual, render explicit “Creada manualmente”.
-- [ ] Add conversation deep-link selection.
-- [ ] Verify partial failures leave basic reservation detail visible.
-- [ ] Commit: `feat: show reservation conversation history`
+- [ ] Add failing E2E test that clicking a booking shows transcript and action history.
+- [ ] Load booking context only when drawer opens.
+- [ ] Render VOICE transcript using existing human labels.
+- [ ] Render WHATSAPP messages when channel is WhatsApp.
+- [ ] Render operation history and “Ver conversación completa”.
+- [ ] Render explicit manual-origin fallback without fabricated conversation.
+- [ ] Commit.
 
-### Task 6: Finalize Operaciones advanced view and global navigation
+### Task 6: Make Operaciones advanced-only and finish responsive consistency
 
 **Files:**
 - Modify: `src/main/resources/static/operations.html`
-- Modify: `src/main/resources/static/operations.js`
-- Modify: `src/main/resources/static/operations.css`
+- Modify: `src/main/resources/static/operations-business.js`
+- Modify: `src/main/resources/static/operations-business.css`
 - Modify: `src/main/resources/static/conversations.html`
-- Modify: `src/main/resources/static/index.html`
-- Test: `e2e/operations.spec.js`
-- Test: `e2e/conversations.spec.js`
+- Modify: `e2e/operations.spec.js`
+- Modify: `e2e/conversations.spec.js`
 
 **Interfaces:**
-- Operaciones retains advanced activity/calls/diagnostics; Inicio owns daily workspace.
+- Inicio owns daily bookings/orders/requests/customers.
+- Operaciones retains recent calls, operational history, advanced metrics and diagnostics.
 
-- [ ] Write failing assertions for non-duplicated Operaciones and consistent navigation.
-- [ ] Verify RED.
-- [ ] Remove customer-facing duplication from Operaciones and keep advanced history/diagnostics.
-- [ ] Ensure all navigation points to Inicio/Conversaciones/Operaciones/Configuración consistently.
-- [ ] Verify responsive behavior and no technical codes in primary customer surfaces.
-- [ ] Run targeted E2E + CI.
-- [ ] Commit: `refactor: finalize operational navigation`
+- [ ] Add failing E2E assertion that Operaciones no longer duplicates daily workspace.
+- [ ] Remove the duplicated daily workspace from Operaciones.
+- [ ] Keep advanced activity, call detail and diagnostics.
+- [ ] Verify mobile table/card and drawer behavior through structural E2E assertions.
+- [ ] Verify Conversaciones deep-link query parameters remain accepted.
+- [ ] Commit.
 
-## Final Verification
+### Task 7: Final verification
 
-- [ ] Run JS syntax checks for all modified static JS.
-- [ ] Run targeted Playwright specs: home, settings, operations, conversations, frontend UX.
-- [ ] Run targeted Java tests for BookingTraceService.
-- [ ] Verify GitHub Actions on final SHA.
-- [ ] Verify Railway deployment once.
+**Files:** no production changes unless a failing verification reveals a scoped regression.
+
+- [ ] Run focused Java tests for booking context.
+- [ ] Run targeted Playwright E2E for Inicio, Operaciones, Conversaciones, Configuración.
+- [ ] Check JavaScript syntax for changed static scripts.
+- [ ] Verify GitHub CI on final SHA.
+- [ ] Check Railway production status once.
