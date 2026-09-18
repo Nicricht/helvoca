@@ -276,10 +276,10 @@ async function load() {
     $("#localNow").textContent = `${data.timezone || ""}${data.timezone ? " · " : ""}${fmtDate(data.localNow)}`;
     $("#callsToday").textContent = data.callsToday;
     $("#minutesToday").textContent = fmtDuration(data.callDurationSecondsToday);
-    $("#bookingsToday").textContent = data.bookingsToday;
-    $("#customersToday").textContent = data.newCustomersToday;
-    $("#openRequests").textContent = data.openRequests;
-    $("#unknownQuestions").textContent = data.unansweredQuestions;
+    if ($("#bookingsToday")) $("#bookingsToday").textContent = data.bookingsToday;
+    if ($("#customersToday")) $("#customersToday").textContent = data.newCustomersToday;
+    if ($("#openRequests")) $("#openRequests").textContent = data.openRequests;
+    if ($("#unknownQuestions")) $("#unknownQuestions").textContent = data.unansweredQuestions;
     $("#failuresToday").textContent = data.callFailuresToday;
     $("#costToday").textContent = fmtUsd(data.estimatedCallCostTodayUsd);
     $("#healthBadge").textContent = data.callFailuresToday
