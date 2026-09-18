@@ -41,7 +41,10 @@ public class PhoneNumberService {
             String externalId = blankToNull(request.externalId());
             if (externalId != null) existing.setExternalId(externalId);
             existing.setActive(request.active() == null || request.active());
-            if (!existing.isActive()) existing.setWhatsappEnabled(false);
+            if (!existing.isActive()) {
+                existing.setWhatsappEnabled(false);
+                existing.setWhatsappCertifiedAt(null);
+            }
             return PhoneNumberResponse.from(repository.save(existing));
         }
 
@@ -61,7 +64,10 @@ public class PhoneNumberService {
         PhoneNumber phone = repository.findByIdAndBusinessId(id, businessId)
                 .orElseThrow(() -> new NotFoundException("Phone number not found"));
         phone.setActive(active);
-        if (!active) phone.setWhatsappEnabled(false);
+        if (!active) {
+            phone.setWhatsappEnabled(false);
+            phone.setWhatsappCertifiedAt(null);
+        }
         return PhoneNumberResponse.from(phone);
     }
 
@@ -85,6 +91,7 @@ public class PhoneNumberService {
         }
 
         phone.setWhatsappEnabled(enabled);
+        if (!enabled) phone.setWhatsappCertifiedAt(null);
         return PhoneNumberResponse.from(repository.save(phone));
     }
 
