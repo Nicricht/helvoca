@@ -7,4 +7,5 @@ import java.util.UUID;
 
 public interface BookingIncidentRecipientRepository extends JpaRepository<BookingIncidentRecipient, UUID> {
     List<BookingIncidentRecipient> findAllByCampaignIdAndBusinessIdOrderByCreatedAtAsc(UUID campaignId, UUID businessId);
+    long countByCampaignIdAndBusinessId(UUID campaignId, UUID businessId);
 }
