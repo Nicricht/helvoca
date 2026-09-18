@@ -77,3 +77,35 @@
 .home-detail-lines strong{white-space:nowrap}
 .home-detail-order-actions{position:sticky;bottom:-18px;display:flex;gap:8px;flex-wrap:wrap;margin:4px -18px -18px;padding:13px 18px 18px;border-top:1px solid rgba(255,255,255,.065);background:rgba(14,19,28,.96);backdrop-filter:blur(10px)}
 .home-order-primary{min-height:36px;padding:0 12px;border:1px solid rgba(124,92,255,.38);border-radius:9px;background:rgba(124,92,255,.18);color:#fff;font-size:11px;font-weight:800}
+
+
+.home-incident-trigger{min-height:36px;padding:0 12px;border:1px solid rgba(124,92,255,.34);border-radius:10px;background:rgba(124,92,255,.12);color:#e5e0ff;font-size:11px;font-weight:800;white-space:nowrap}
+.home-incident-trigger:hover{background:rgba(124,92,255,.18)}
+.home-incident-panel{margin:0 0 14px;padding:14px;border:1px solid rgba(124,92,255,.22);border-radius:13px;background:rgba(124,92,255,.055)}
+.home-incident-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.home-incident-intro strong,.home-incident-intro span{display:block}
+.home-incident-intro strong{font-size:13px}
+.home-incident-intro>div span{margin-top:3px;color:var(--muted);font-size:10px}
+.home-incident-safe{flex:0 0 auto;padding:4px 7px;border:1px solid rgba(56,217,150,.22);border-radius:999px;background:rgba(56,217,150,.07);color:#86efc3;font-size:9px;font-weight:800}
+.home-incident-form{display:grid;grid-template-columns:minmax(220px,1.6fr) repeat(4,minmax(125px,.8fr)) auto;gap:8px;align-items:end}
+.home-incident-form label{display:grid;gap:4px;color:var(--muted);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.home-incident-form textarea,.home-incident-form input,.home-incident-form select{width:100%;min-height:36px;padding:8px 9px;border:1px solid var(--border);border-radius:9px;background:rgba(8,11,16,.72);color:var(--text);font:inherit;text-transform:none;letter-spacing:normal}
+.home-incident-form textarea{resize:vertical;min-height:58px}
+.home-incident-preview-btn{min-height:36px;padding:0 12px;border:1px solid rgba(124,92,255,.38);border-radius:9px;background:rgba(124,92,255,.18);color:#fff;font-size:10px;font-weight:800}
+.home-incident-preview{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.065)}
+.home-incident-preview-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.home-incident-preview-head strong{font-size:12px}
+.home-incident-preview-head span{color:var(--muted);font-size:10px}
+.home-incident-list{display:grid;gap:7px}
+.home-incident-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:10px;border:1px solid rgba(255,255,255,.06);border-radius:10px;background:rgba(255,255,255,.018)}
+.home-incident-item strong,.home-incident-item span{display:block}
+.home-incident-item>div>span{margin-top:2px;color:var(--muted);font-size:10px}
+.home-incident-channel{align-self:start;padding:4px 7px;border-radius:999px;background:rgba(255,255,255,.05);font-size:9px;font-weight:800}
+.home-incident-message{grid-column:1/-1;margin:2px 0 0;padding:9px;border-radius:8px;background:rgba(0,0,0,.12);color:var(--text);font-size:10px;line-height:1.45}
+.home-incident-empty{padding:12px;text-align:center;color:var(--muted);font-size:10px}
+.home-incident-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.05)}
+.home-incident-footer span{color:var(--muted);font-size:9px}
+.home-incident-footer button{min-height:34px;padding:0 10px;border:1px solid var(--border);border-radius:9px;background:rgba(255,255,255,.025);color:var(--muted);font-size:10px;font-weight:800;cursor:not-allowed}
+@media(max-width:1100px){.home-incident-form{grid-template-columns:repeat(3,minmax(0,1fr))}.home-incident-reason{grid-column:1/-1}}
+@media(max-width:760px){.home-business-head{align-items:flex-start;flex-direction:column}.home-incident-trigger{width:100%}.home-incident-intro{flex-direction:column}.home-incident-form{grid-template-columns:1fr 1fr}.home-incident-reason{grid-column:1/-1}.home-incident-preview-btn{grid-column:1/-1}}
+@media(max-width:480px){.home-incident-form{grid-template-columns:1fr}.home-incident-reason,.home-incident-preview-btn{grid-column:auto}.home-incident-item{grid-template-columns:1fr}}
