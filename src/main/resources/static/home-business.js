@@ -119,6 +119,151 @@
     </div>${booking.notes ? `<div class="home-detail-note"><span>Notas</span><p>${esc(booking.notes)}</p></div>` : ""}`;
   }
 
+  function resetBookingCreateAvailability() {
+    const confirm = document.querySelector("#homeBookingCreateConfirm");
+    const message = document.querySelector("#homeBookingCreateMessage");
+    const check = document.querySelector("#homeBookingCreateCheck");
+    const customerId = document.querySelector("#homeBookingCreateCustomer")?.value || "";
+    const serviceId = document.querySelector("#homeBookingCreateService")?.value || "";
+    const date = document.querySelector("#homeBookingCreateDate")?.value || "";
+    const time = document.querySelector("#homeBookingCreateTime")?.value || "";
+
+    if (confirm) {
+      confirm.classList.add("hidden");
+      delete confirm.dataset.startAt;
+    }
+    if (message) message.textContent = "";
+    if (check) check.disabled = !(customerId && serviceId && date && time);
+  }
+
+  function populateBookingCreateControls() {
+    const customer = document.querySelector("#homeBookingCreateCustomer");
+    const service = document.querySelector("#homeBookingCreateService");
+    const date = document.querySelector("#homeBookingCreateDate");
+    const time = document.querySelector("#homeBookingCreateTime");
+    const message = document.querySelector("#homeBookingCreateMessage");
+    if (!customer || !service || !date || !time) return;
+
+    const customerOptions = [...state.customers]
+      .sort((a, b) => String(a.name || a.phone || "").localeCompare(String(b.name || b.phone || ""), "es"))
+      .map(item => `<option value="${esc(item.id)}">${esc(item.name || item.phone || "Cliente")}</option>`)
+      .join("");
+    const serviceOptions = state.services
+      .filter(item => item.active !== false)
+      .map(item => `<option value="${esc(item.id)}">${esc(item.name || "Servicio")}</option>`)
+      .join("");
+
+    customer.innerHTML = '<option value="">Elegir cliente</option>' + customerOptions;
+    service.innerHTML = '<option value="">Elegir servicio</option>' + serviceOptions;
+    date.innerHTML = '<option value="">Elegir fecha</option>' + bookingRescheduleDateOptions();
+    time.innerHTML = '<option value="">Elegir hora</option>' + bookingRescheduleTimeOptions();
+
+    if (message) {
+      if (!state.customers.length) message.textContent = "Primero registra un cliente.";
+      else if (!state.services.some(item => item.active !== false)) message.textContent = "Primero configura un servicio activo.";
+      else message.textContent = "";
+    }
+    resetBookingCreateAvailability();
+  }
+
+  async function checkManualBookingAvailability() {
+    const serviceId = document.querySelector("#homeBookingCreateService")?.value || "";
+    const date = document.querySelector("#homeBookingCreateDate")?.value || "";
+    const time = document.querySelector("#homeBookingCreateTime")?.value || "";
+    const startAt = businessLocalDateTimeToIso(date, time);
+    const message = document.querySelector("#homeBookingCreateMessage");
+    const confirm = document.querySelector("#homeBookingCreateConfirm");
+    if (!serviceId || !startAt || !message || !confirm) return;
+
+    message.textContent = "Comprobando disponibilidad…";
+    confirm.classList.add("hidden");
+    delete confirm.dataset.startAt;
+
+    try {
+      const params = new URLSearchParams({ serviceId, startAt });
+      const result = await api(`/api/v1/bookings/availability?${params.toString()}`);
+      if (result?.available === true) {
+        message.textContent = "Horario disponible ✓";
+        confirm.dataset.startAt = startAt;
+        confirm.classList.remove("hidden");
+      } else {
+        message.textContent = "Ese horario no está disponible.";
+      }
+    } catch (error) {
+      message.textContent = error.message || "No pude comprobar la disponibilidad.";
+    }
+  }
+
+  async function createManualBooking() {
+    const customerId = document.querySelector("#homeBookingCreateCustomer")?.value || "";
+    const serviceId = document.querySelector("#homeBookingCreateService")?.value || "";
+    const confirm = document.querySelector("#homeBookingCreateConfirm");
+    const message = document.querySelector("#homeBookingCreateMessage");
+    const startAt = confirm?.dataset.startAt || "";
+    if (!customerId || !serviceId || !confirm || !message || !startAt) return;
+
+    const customer = state.customers.find(item => String(item.id) === String(customerId)) || {};
+    const service = state.services.find(item => String(item.id) === String(serviceId)) || {};
+    const customerName = customer.name || customer.phone || "Cliente";
+    const serviceName = service.name || "Servicio";
+    const confirmed = window.confirm(`¿Crear reserva para ${customerName}, ${serviceName}, el ${fmtCompact(startAt)}?`);
+    if (!confirmed) return;
+
+    confirm.disabled = true;
+    confirm.textContent = "Creando…";
+    try {
+      const created = await api("/api/v1/bookings", {
+        method: "POST",
+        body: JSON.stringify({
+          customerId,
+          serviceId,
+          startAt,
+          source: "ADMIN",
+          notes: null
+        })
+      });
+      if (created?.id) {
+        state.bookings = [created, ...state.bookings.filter(item => String(item.id) !== String(created.id))];
+      }
+      renderBookings();
+      populateIncidentDateSelector();
+      syncIncidentImpact();
+      populateBookingCreateControls();
+      message.textContent = `Reserva creada para ${customerName} ✓`;
+    } catch (error) {
+      confirm.disabled = false;
+      confirm.textContent = "Crear reserva";
+      confirm.classList.add("hidden");
+      message.textContent = error.message || "No pude crear la reserva.";
+    }
+  }
+
+  function bindBookingCreate() {
+    const toggle = document.querySelector("#homeBookingCreateToggle");
+    const panel = document.querySelector("#homeBookingCreatePanel");
+    const check = document.querySelector("#homeBookingCreateCheck");
+    const confirm = document.querySelector("#homeBookingCreateConfirm");
+    if (!toggle || !panel || !check || !confirm || toggle.dataset.bound === "true") return;
+    toggle.dataset.bound = "true";
+
+    toggle.addEventListener("click", () => {
+      const opening = panel.classList.contains("hidden");
+      panel.classList.toggle("hidden", !opening);
+      toggle.setAttribute("aria-expanded", opening ? "true" : "false");
+      if (opening) populateBookingCreateControls();
+    });
+
+    [
+      "#homeBookingCreateCustomer",
+      "#homeBookingCreateService",
+      "#homeBookingCreateDate",
+      "#homeBookingCreateTime"
+    ].forEach(selector => document.querySelector(selector)?.addEventListener("change", resetBookingCreateAvailability));
+
+    check.addEventListener("click", checkManualBookingAvailability);
+    confirm.addEventListener("click", createManualBooking);
+  }
+
   function renderBookingActions(booking) {
     if (booking.status === "CANCELLED") {
       return '<section class="home-detail-section"><h3>Gestionar reserva</h3><p class="home-detail-muted">Esta reserva está cancelada. No hay acciones disponibles.</p></section>';
@@ -1219,7 +1364,7 @@
       state.requests=ops.status==="fulfilled"&&Array.isArray(ops.value?.recentRequests)?ops.value.recentRequests:[];
       state.businessName=ops.status==="fulfilled"&&ops.value?.businessName?String(ops.value.businessName):(window.helvocaBusinessName||state.businessName||"Tu negocio");
       state.businessTimezone=ops.status==="fulfilled"&&ops.value?.timezone?String(ops.value.timezone):"America/Santiago";
-      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
+      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
     } finally { loading=false; }
   }
 
