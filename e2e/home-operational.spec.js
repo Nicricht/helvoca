@@ -240,10 +240,22 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeIncidentStrategy')).toHaveValue('CHEAPEST');
 
   await expect(page.locator('#homeIncidentPreviewBtn')).toBeDisabled();
+
+  await page.locator('#homeIncidentReason').selectOption({ label: 'No abrir' });
+  await expect(page.locator('#homeIncidentTimeFrom')).toHaveValue('00:00');
+  await expect(page.locator('#homeIncidentTimeTo')).toHaveValue('24:00');
+
   await page.locator('#homeIncidentReason').selectOption({ label: 'Cerrar antes' });
   await expect(page.locator('#homeIncidentPreviewBtn')).toBeDisabled();
   await page.locator('#homeIncidentDate').selectOption('2026-09-18');
   await expect(page.locator('#homeIncidentDate')).toHaveValue('2026-09-18');
+  await expect(page.locator('#homeIncidentTimeFrom')).toHaveValue('12:00');
+  await expect(page.locator('#homeIncidentTimeTo')).toHaveValue('12:30');
+
+  await page.locator('#homeIncidentTimeFrom').selectOption('13:00');
+  await expect(page.locator('#homeIncidentTimeTo option[value="13:00"]')).toBeDisabled();
+  await expect(page.locator('#homeIncidentTimeTo option[value="12:30"]')).toBeDisabled();
+
   await page.locator('#homeIncidentTimeFrom').selectOption('09:00');
   await page.locator('#homeIncidentTimeTo').selectOption('13:00');
   await expect(page.locator('#homeIncidentImpactSummary')).toContainText('1 cliente');
