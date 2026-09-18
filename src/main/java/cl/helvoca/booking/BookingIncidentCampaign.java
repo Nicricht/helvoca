@@ -10,7 +10,7 @@ import java.util.UUID;
 public class BookingIncidentCampaign {
     public enum Goal { INFORM, RESCHEDULE }
     public enum Strategy { CHEAPEST, WHATSAPP, CALL }
-    public enum Status { PREPARED, CANCELLED, COMPLETED }
+    public enum Status { PREPARED, ACTIVATED, CANCELLED, COMPLETED }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
