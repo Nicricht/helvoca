@@ -182,6 +182,8 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').first()).toHaveText('Ana Reserva');
   await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').nth(1)).toHaveText('Negocio E2E');
   await expect(page.locator('#homeBookingDetailBody .home-detail-facts > * > span')).toHaveText(['Servicio', 'Teléfono', 'Llamada', 'Reserva', 'Origen', 'Estado']);
+  await expect(page.locator('#homeBookingDetailMeta')).toContainText('Reservada para');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-fact-link')).toHaveAttribute('href', '/conversations.html?channel=calls&conversation=call-1');
   await expect(page.locator('#homeBookingDetailBody .home-detail-facts')).not.toContainText('Inicio');
   await expect(page.locator('#homeBookingDetailBody .home-detail-facts')).not.toContainText('Fin');
   await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Qué hizo Helvoca');
@@ -196,6 +198,7 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').first()).toHaveText('Bruno Masaje');
   await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').nth(1)).toHaveText('Negocio E2E');
   await expect(page.locator('#homeBookingDetailBody .home-detail-facts > * > span')).toHaveText(['Servicio', 'Teléfono', 'WhatsApp', 'Reserva', 'Origen', 'Estado']);
+  await expect(page.locator('#homeBookingDetailMeta')).toContainText('Reservada para');
   await expect(page.locator('#homeBookingDetailBody .home-detail-fact-link')).toHaveAttribute('href', '/conversations.html?channel=whatsapp&conversation=wa-booking-2');
   await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Qué hizo Helvoca');
   await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Historial');
