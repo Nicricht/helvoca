@@ -5,6 +5,7 @@ import cl.helvoca.common.NotFoundException;
 import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -58,6 +59,30 @@ class PhoneNumberServiceTest {
         assertEquals("Este número ya está conectado a otro negocio", error.getMessage());
         verify(repository, never()).save(any());
         verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void disablingWhatsappClearsPreviousCertification() {
+        PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        UUID businessId = UUID.randomUUID();
+        UUID phoneId = UUID.randomUUID();
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        phone.setActive(true);
+        phone.setWhatsappEnabled(true);
+        phone.setWhatsappCertifiedAt(Instant.now());
+        when(repository.findByIdAndBusinessId(phoneId, businessId)).thenReturn(Optional.of(phone));
+        when(repository.save(phone)).thenReturn(phone);
+
+        PhoneNumberService service = new PhoneNumberService(repository, tenantProvider);
+        PhoneNumberResponse response = service.setWhatsappEnabled(phoneId, false);
+
+        assertFalse(response.whatsappEnabled());
+        assertNull(response.whatsappCertifiedAt());
+        verify(repository).save(phone);
     }
 
     @Test
