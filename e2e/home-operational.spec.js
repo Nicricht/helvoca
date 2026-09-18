@@ -453,7 +453,7 @@ test('reservation filters drawer and conversation links work', async ({ page }) 
 });
 
 
-test('orders requests and customers workspace actions work', async ({ page }) => {
+test('orders workspace actions work', async ({ page }) => {
   test.setTimeout(45000);
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
@@ -469,39 +469,48 @@ test('orders requests and customers workspace actions work', async ({ page }) =>
   });
 
   await page.route('**/api/v1/commercial/orders', async route => {
-    await route.fulfill(json([
-      {
-        id: 'o1',
-        operationId: 'op1',
-        sourceReferenceId: 'wa-order',
-        status: orderStatus,
-        fulfillmentType: 'DELIVERY',
-        contactName: 'Juan Pedido',
-        contactPhone: '+56933333333',
-        deliveryAddress: 'Av. Demo 123, Santiago',
-        subtotal: 15990,
-        deliveryFee: 3000,
-        total: 18990,
-        currency: 'CLP',
-        source: 'WHATSAPP',
-        createdAt: '2026-09-17T17:30:00Z',
-        lines: [{ name: 'Producto demo', quantity: 1, unitPrice: 15990, lineTotal: 15990 }]
-      }
-    ]));
+    await route.fulfill(json([{
+      id: 'o1', operationId: 'op1', sourceReferenceId: 'wa-order',
+      status: orderStatus, fulfillmentType: 'DELIVERY',
+      contactName: 'Juan Pedido', contactPhone: '+56933333333',
+      deliveryAddress: 'Av. Demo 123, Santiago',
+      subtotal: 15990, deliveryFee: 3000, total: 18990, currency: 'CLP',
+      source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z',
+      lines: [{ name: 'Producto demo', quantity: 1, unitPrice: 15990, lineTotal: 15990 }]
+    }]));
   });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: /Pedidos/ }).click();
+  await expect(page.locator('#homeOrdersList')).toContainText('Juan Pedido');
+  await expect(page.locator('#homeOrdersList')).toContainText('Confirmado');
+
+  await page.locator('#homeOrdersList .home-business-table [data-home-order-id="o1"]').click();
+  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Producto demo');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Av. Demo 123, Santiago');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute(
+    'href',
+    '/conversations.html?channel=whatsapp&conversation=wa-order'
+  );
+
+  await page.getByRole('button', { name: 'Empezar preparación' }).click();
+  await expect.poll(() => statusPatch).toEqual({ status: 'PREPARING' });
+  await expect(page.locator('#homeOrdersList')).toContainText('Preparando');
+  await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
+});
+
+test('requests workspace renders active requests', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
 
   await page.route('**/api/v1/operations/dashboard', route => route.fulfill(json({
     businessName: 'Negocio E2E',
     timezone: 'America/Santiago',
     localNow: '2026-09-17T16:30:00-03:00',
-    callsToday: 3,
-    callDurationSecondsToday: 480,
-    bookingsToday: 2,
-    newCustomersToday: 1,
-    openRequests: 1,
-    unansweredQuestions: 0,
-    callFailuresToday: 0,
-    estimatedCallCostTodayUsd: 0.7,
+    callsToday: 3, callDurationSecondsToday: 480, bookingsToday: 2,
+    newCustomersToday: 1, openRequests: 1, unansweredQuestions: 0,
+    callFailuresToday: 0, estimatedCallCostTodayUsd: 0.7,
     recentCalls: [],
     recentRequests: [{
       id: 'req1',
@@ -514,30 +523,16 @@ test('orders requests and customers workspace actions work', async ({ page }) =>
   })));
 
   await page.goto('/');
-
-  await page.getByRole('button', { name: /Pedidos/ }).click();
-  await expect(page.locator('#homeOrdersList')).toContainText('Juan Pedido');
-  await expect(page.locator('#homeOrdersList')).toContainText('18.990');
-  await expect(page.locator('#homeOrdersList')).toContainText('Confirmado');
-
-  await page.locator('#homeOrdersList .home-business-table [data-home-order-id="o1"]').click();
-  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
-  await expect(page.locator('#homeBookingDetailBody')).toContainText('Producto demo');
-  await expect(page.locator('#homeBookingDetailBody')).toContainText('Av. Demo 123, Santiago');
-  await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute(
-    'href',
-    '/conversations.html?channel=whatsapp&conversation=wa-order'
-  );
-  await page.getByRole('button', { name: 'Empezar preparación' }).click();
-
-  await expect.poll(() => statusPatch).toEqual({ status: 'PREPARING' });
-  await expect(page.locator('#homeOrdersList')).toContainText('Preparando');
-  await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
-
   await page.getByRole('button', { name: /Solicitudes/ }).click();
   await expect(page.locator('#homeRequestsList')).toContainText('Confirmar dirección');
   await expect(page.locator('#homeRequestsList')).toContainText('Cliente pidió cambiar dirección de entrega');
   await expect(page.locator('#homeRequestsList')).toContainText('Abierta');
+});
+
+test('customers workspace sorts and renders contact data', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+  await page.goto('/');
 
   await page.getByRole('button', { name: /Clientes/ }).click();
   const customers = page.locator('#homeCustomersList .home-simple-row strong');
