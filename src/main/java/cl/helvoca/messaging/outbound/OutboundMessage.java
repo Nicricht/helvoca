@@ -13,7 +13,7 @@ public class OutboundMessage {
     public enum Channel { WHATSAPP }
     public enum Purpose {
         PAYMENT_LINK, BOOKING_CONFIRMATION, MEETING_LINK, ORDER_STATUS,
-        QUOTE, REMINDER, DELIVERY_STATUS
+        QUOTE, REMINDER, DELIVERY_STATUS, INCIDENT_NOTICE
     }
     public enum Status { PREPARED, QUEUED, SENT, FAILED, CANCELLED, BLOCKED }
 
