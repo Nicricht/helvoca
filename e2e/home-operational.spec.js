@@ -932,6 +932,120 @@ test('manual customer creation adds customer and updates booking selector', asyn
   await expect(page.locator('#homeBookingCreateCustomer option[value="cust3"]')).toHaveText('Carla Nueva');
 });
 
+test('newly created customer can receive a manual booking', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+
+  let customerPayload = null;
+  let availabilityCall = null;
+  let bookingPayload = null;
+
+  await page.route('**/api/v1/customers', async route => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    customerPayload = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'cust3',
+        name: customerPayload.name,
+        phone: customerPayload.phone,
+        email: customerPayload.email,
+        notes: customerPayload.notes,
+        createdAt: '2026-09-18T22:05:00Z',
+        updatedAt: '2026-09-18T22:05:00Z'
+      })
+    });
+  });
+
+  await page.route('**/api/v1/bookings/availability?**', async route => {
+    const url = new URL(route.request().url());
+    availabilityCall = {
+      serviceId: url.searchParams.get('serviceId'),
+      startAt: url.searchParams.get('startAt'),
+      excludeBookingId: url.searchParams.get('excludeBookingId')
+    };
+    await route.fulfill(json({
+      serviceId: availabilityCall.serviceId,
+      startAt: availabilityCall.startAt,
+      endAt: new Date(new Date(availabilityCall.startAt).getTime() + 30 * 60 * 1000).toISOString(),
+      available: true
+    }));
+  });
+
+  await page.route('**/api/v1/bookings', async route => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    bookingPayload = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'b3',
+        customerId: bookingPayload.customerId,
+        serviceId: bookingPayload.serviceId,
+        startAt: bookingPayload.startAt,
+        endAt: new Date(new Date(bookingPayload.startAt).getTime() + 30 * 60 * 1000).toISOString(),
+        status: 'CONFIRMED',
+        source: 'ADMIN',
+        notes: bookingPayload.notes,
+        createdAt: '2026-09-18T22:06:00Z',
+        updatedAt: '2026-09-18T22:06:00Z'
+      })
+    });
+  });
+
+  await page.goto('/');
+  await page.getByRole('tab', { name: /Clientes/ }).click();
+  await page.getByRole('button', { name: 'Nuevo cliente' }).click();
+  await page.locator('#homeCustomerCreateName').fill('Carla Nueva');
+  await page.locator('#homeCustomerCreatePhone').fill('+56977777777');
+  await page.locator('#homeCustomerCreateEmail').fill('carla@example.cl');
+  await page.getByRole('button', { name: 'Crear cliente' }).click();
+
+  await expect(page.locator('#homeCustomersList')).toContainText('Carla Nueva');
+
+  await page.getByRole('tab', { name: /Reservas/ }).click();
+  await page.getByRole('button', { name: 'Nueva reserva' }).click();
+  await page.locator('#homeBookingCreateCustomer').selectOption('cust3');
+  await page.locator('#homeBookingCreateService').selectOption('svc1');
+  await page.locator('#homeBookingCreateDate').selectOption({ index: 1 });
+  await page.locator('#homeBookingCreateTime').selectOption('10:00');
+  await page.getByRole('button', { name: 'Comprobar disponibilidad' }).click();
+
+  await expect(page.locator('#homeBookingCreateMessage')).toHaveText('Horario disponible ✓');
+  await expect(page.getByRole('button', { name: 'Crear reserva' })).toBeVisible();
+
+  page.once('dialog', dialog => {
+    expect(dialog.message()).toContain('Carla Nueva');
+    expect(dialog.message()).toContain('Peluquería');
+    dialog.accept();
+  });
+  await page.getByRole('button', { name: 'Crear reserva' }).click();
+
+  expect(customerPayload.name).toBe('Carla Nueva');
+  expect(availabilityCall.serviceId).toBe('svc1');
+  expect(availabilityCall.excludeBookingId).toBeNull();
+  await expect.poll(() => bookingPayload).not.toBeNull();
+  expect(bookingPayload.customerId).toBe('cust3');
+  expect(bookingPayload.serviceId).toBe('svc1');
+  expect(bookingPayload.startAt).toBe(availabilityCall.startAt);
+  expect(bookingPayload.source).toBe('ADMIN');
+  expect(bookingPayload.notes).toBeNull();
+
+  await expect(page.locator('#homeBusinessBookingsCount')).toHaveText('3');
+  await expect(page.locator('#homeBookingsList')).toContainText('Carla Nueva');
+  await expect(page.locator('#homeBookingsList')).toContainText('Peluquería');
+  await expect(page.locator('#homeBookingsList')).toContainText('Manual');
+  await expect(page.locator('#homeBookingCreateMessage')).toHaveText('Reserva creada para Carla Nueva ✓');
+});
+
 test('customers workspace sorts and renders contact data', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
