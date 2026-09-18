@@ -5,6 +5,7 @@ import cl.helvoca.messaging.outbound.OutboundDispatchOutboxService;
 import cl.helvoca.messaging.outbound.OutboundMessage;
 import cl.helvoca.messaging.outbound.OutboundMessagingProperties;
 import cl.helvoca.messaging.outbound.OutboundMessagingService;
+import cl.helvoca.messaging.outbound.TwilioSmsMessagingProvider;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,10 +50,14 @@ public class CrossChannelMessagingToolService {
             OutboundMessage.Purpose purpose = purpose(required(args, "purpose"));
             UUID identityId = optionalUuid(args, "recipientIdentityId");
 
+            OutboundMessage.Channel channel = TwilioSmsMessagingProvider.ID.equalsIgnoreCase(properties.getProvider())
+                    ? OutboundMessage.Channel.SMS
+                    : OutboundMessage.Channel.WHATSAPP;
+
             OutboundMessage message = outbound.prepare(
                     businessId,
                     customerId,
-                    OutboundMessage.Channel.WHATSAPP,
+                    channel,
                     purpose,
                     operationId,
                     identityId);
@@ -75,7 +80,7 @@ public class CrossChannelMessagingToolService {
 
             // Fail before queueing when the configured provider cannot actually
             // serve WhatsApp. This avoids durable jobs that can never dispatch.
-            providers.require(properties.getProvider(), OutboundMessage.Channel.WHATSAPP);
+            providers.require(properties.getProvider(), channel);
             outbox.queue(businessId, message.getId());
             prepared.put("status", OutboundMessage.Status.QUEUED.name());
             prepared.put("queued", true);
