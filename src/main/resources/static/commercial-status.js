@@ -458,6 +458,7 @@
 
     function applyReadyState() {
         const ready = isReady();
+        document.body.classList.toggle('operational-ready', ready);
         overview.classList.toggle('hidden', !ready);
         statusGrid.classList.toggle('ux-ready-hidden', ready);
         if (!ready) return;
