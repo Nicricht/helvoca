@@ -27,6 +27,15 @@ public class BookingIncidentCampaignController {
         this.tenantProvider = tenantProvider;
     }
 
+    @GetMapping
+    public ResponseEntity<List<HistoryView>> recent() {
+        return ResponseEntity.ok(
+                service.recent(tenantProvider.requireBusinessId()).stream()
+                        .map(HistoryView::from)
+                        .toList()
+        );
+    }
+
     @PostMapping
     public ResponseEntity<View> prepare(@Valid @RequestBody PrepareRequest request) {
         var prepared = service.prepare(
@@ -58,6 +67,28 @@ public class BookingIncidentCampaignController {
             @NotNull BookingIncidentRecipient.ChannelPreference channelPreference,
             @NotBlank @Size(max = 2000) String content
     ) { }
+
+    public record HistoryView(
+            UUID id,
+            String reason,
+            String status,
+            String goal,
+            String strategy,
+            long recipientCount,
+            Instant createdAt
+    ) {
+        static HistoryView from(BookingIncidentCampaignService.CampaignSummary campaign) {
+            return new HistoryView(
+                    campaign.id(),
+                    campaign.reason(),
+                    campaign.status().name(),
+                    campaign.goal().name(),
+                    campaign.strategy().name(),
+                    campaign.recipientCount(),
+                    campaign.createdAt()
+            );
+        }
+    }
 
     public record RecipientView(
             UUID id,
