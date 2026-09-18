@@ -12,6 +12,7 @@ public class TwilioProperties {
     private String authToken = "";
     private String publicBaseUrl = "";
     private String mediaStreamPath = "/ws/v1/twilio/media";
+    private String whatsappSandboxFrom = "";
     private boolean certificationIngressEnabled = false;
     private boolean provisioningEnabled = false;
 
@@ -23,6 +24,8 @@ public class TwilioProperties {
     public void setPublicBaseUrl(String publicBaseUrl) { this.publicBaseUrl = publicBaseUrl; }
     public String getMediaStreamPath() { return mediaStreamPath; }
     public void setMediaStreamPath(String mediaStreamPath) { this.mediaStreamPath = mediaStreamPath; }
+    public String getWhatsappSandboxFrom() { return whatsappSandboxFrom; }
+    public void setWhatsappSandboxFrom(String whatsappSandboxFrom) { this.whatsappSandboxFrom = whatsappSandboxFrom; }
     public boolean isCertificationIngressEnabled() { return certificationIngressEnabled; }
     public void setCertificationIngressEnabled(boolean certificationIngressEnabled) {
         this.certificationIngressEnabled = certificationIngressEnabled;
