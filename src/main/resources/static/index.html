@@ -6,7 +6,7 @@
     <title>Helvoca · Configura tu recepcionista con IA</title>
     <meta name="description" content="Pega el enlace de tu negocio y deja que Helvoca prepare tu recepcionista telefónica con IA.">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/home-business.css?v=20260918-11">
+    <link rel="stylesheet" href="/home-business.css?v=20260918-12">
     <style>
         .agent-toggle { flex-direction: row; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; background: rgba(255,255,255,.02); }
         .agent-toggle input, .agent-capability input { width: auto; min-height: auto; margin: 0; accent-color: var(--accent); }
@@ -309,8 +309,7 @@
                     </section>
                     <section id="homeIncidentPanel" class="home-incident-panel hidden" aria-label="Resolver un imprevisto">
                         <div class="home-incident-intro">
-                            <div><strong>Avisa a los clientes afectados</strong><span>Prepara una vista previa segura antes de contactar a alguien.</span></div>
-                            <span class="home-incident-safe">Sin envíos reales</span>
+                            <div><strong>Resolver un imprevisto</strong></div>
                         </div>
                         <div class="home-incident-form home-incident-form-compact">
                             <label>¿Qué pasó?
@@ -339,7 +338,7 @@
                                     <option value="INFORM">Solo avisar</option>
                                 </select>
                             </label>
-                            <label>Estrategia
+                            <label>Canal
                                 <select id="homeIncidentStrategy">
                                     <option value="CHEAPEST">Más económico</option>
                                     <option value="WHATSAPP">WhatsApp</option>
@@ -348,17 +347,16 @@
                             </label>
                             <button id="homeIncidentPreviewBtn" class="home-incident-preview-btn" type="button" disabled>Revisar clientes afectados</button>
                         </div>
-                        <div id="homeIncidentImpactSummary" class="home-incident-impact-summary">
-                            <strong>Selecciona las opciones</strong><span>Mostraremos automáticamente a quién afecta.</span>
-                        </div>
+                        <div id="homeIncidentImpactSummary" class="home-incident-impact-summary hidden"></div>
                         <div id="homeIncidentPreview" class="home-incident-preview hidden"></div>
-                        <section class="home-incident-history" aria-label="Campañas preparadas">
-                            <div class="home-incident-history-head">
-                                <div><strong>Campañas preparadas</strong><span>Historial seguro de avisos aún no enviados.</span></div>
-                                <button id="homeIncidentHistoryRefresh" type="button">Actualizar</button>
-                            </div>
-                            <div id="homeIncidentHistoryList" class="home-incident-history-list">
-                                <div class="home-incident-empty">Cargando campañas…</div>
+                        <section class="home-incident-history" aria-label="Historial de avisos">
+                            <button id="homeIncidentHistoryToggle" class="home-incident-history-toggle" type="button" aria-expanded="false">
+                                <span>Historial</span><strong id="homeIncidentHistoryCount">0</strong>
+                            </button>
+                            <div id="homeIncidentHistoryBody" class="hidden">
+                                <div id="homeIncidentHistoryList" class="home-incident-history-list">
+                                    <div class="home-incident-empty">Cargando historial…</div>
+                                </div>
                             </div>
                         </section>
                     </section>
@@ -569,7 +567,7 @@
 </script>
 <script src="/app.js?v=20260918-4" defer></script>
 <script src="/commercial-status.js?v=20260918-4" defer></script>
-<script src="/home-business.js?v=20260918-15" defer></script>
+<script src="/home-business.js?v=20260918-16" defer></script>
 <script src="/ux-simplification.js?v=20260918-2" defer></script>
 <script src="/phone-provisioning.js?v=20260918-2" defer></script>
 </body>

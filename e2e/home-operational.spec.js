@@ -228,6 +228,17 @@ test('ready customer sees live operational home instead of setup cards', async (
   page.on('request', request => {
     if (/\/api\/v1\/outbound-messages\/.*\/(queue|dispatch)$/.test(request.url())) unsafeOutboundCalls += 1;
   });
+  await page.route('**/api/v1/booking-incident-campaigns/*/activation-readiness', async route => {
+    const parts = new URL(route.request().url()).pathname.split('/');
+    const campaignId = parts[parts.length - 2];
+    const target = campaignHistory.find(item => item.id === campaignId);
+    await route.fulfill(json({
+      ready: target?.activationReady === true,
+      channel: 'WHATSAPP',
+      blockers: target?.activationBlockers || []
+    }));
+  });
+
   await page.route('**/api/v1/booking-incident-campaigns/*/activate', async route => {
     expect(route.request().method()).toBe('POST');
     activationRequest = route.request().postDataJSON();
@@ -292,9 +303,14 @@ test('ready customer sees live operational home instead of setup cards', async (
 
   await page.locator('#homeIncidentToggle').click();
   await expect(page.locator('#homeIncidentPanel')).toBeVisible();
+  await expect(page.locator('#homeIncidentHistoryBody')).toBeHidden();
+  await expect(page.locator('#homeIncidentHistoryCount')).toHaveText('1');
+  await expect(page.locator('#homeIncidentPanel')).not.toContainText('PREPARED');
+  await page.locator('#homeIncidentHistoryToggle').click();
+  await expect(page.locator('#homeIncidentHistoryBody')).toBeVisible();
   await expect(page.locator('#homeIncidentHistoryList')).toContainText('Cierre temprano');
-  await expect(page.locator('#homeIncidentHistoryList')).toContainText('PREPARED');
-  await expect(page.getByRole('button', { name: 'Activar campaña' }).first()).toBeDisabled();
+  await expect(page.locator('#homeIncidentHistoryList')).toContainText('Pendiente');
+  await expect(page.getByRole('button', { name: 'Enviar avisos' }).first()).toBeDisabled();
 
   await expect(page.locator('#homeIncidentCalendarDays')).toHaveCount(0);
   await expect(page.locator('#homeIncidentReason')).toBeVisible();
@@ -342,29 +358,37 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeIncidentPreview')).toContainText('1 cliente afectado');
   await expect(page.locator('#homeIncidentPreview')).toContainText('Ana Reserva');
   await expect(page.locator('#homeIncidentPreview')).toContainText('WhatsApp primero');
-  await expect(page.locator('#homeIncidentPreview')).toContainText('Cierre anticipado');
   await expect(page.locator('#homeIncidentPreview')).not.toContainText('Bruno Masaje');
+  await expect(page.getByText('Ver mensaje')).toBeVisible();
+  await expect(page.locator('.home-incident-message')).toBeHidden();
+  await page.getByText('Ver mensaje').click();
+  await expect(page.locator('.home-incident-message')).toBeVisible();
+  await expect(page.locator('.home-incident-message')).toContainText('Cierre anticipado');
   await expect(page.locator('.home-incident-select')).toHaveCount(1);
   await page.locator('.home-incident-select').uncheck();
   await expect(page.locator('#homeIncidentPrepareCampaign')).toBeDisabled();
   await page.locator('.home-incident-select').check();
   await expect(page.locator('#homeIncidentPrepareCampaign')).toBeEnabled();
-
-  page.once('dialog', dialog => dialog.accept());
-  await page.locator('#homeIncidentPrepareCampaign').click();
-  await expect(page.locator('#homeIncidentPreview')).toContainText('Campaña preparada');
-  await expect(page.locator('#homeIncidentPreview')).toContainText('PREPARED');
-  await expect(page.locator('#homeIncidentHistoryList')).toContainText('Cierre anticipado');
-  await expect(page.getByRole('button', { name: 'Activar campaña' }).first()).toBeEnabled();
+  await expect(page.locator('#homeIncidentPrepareCampaign')).toHaveText('Continuar');
 
   page.once('dialog', dialog => {
-    expect(dialog.message()).toContain('contactará a 1 cliente');
+    expect(dialog.message()).toContain('Preparar avisos para 1 cliente');
     dialog.accept();
   });
-  await page.getByRole('button', { name: 'Activar campaña' }).first().click();
-  await expect(page.locator('#homeIncidentPreview')).toContainText('Campaña activada');
-  await expect(page.locator('#homeIncidentHistoryList')).toContainText('ACTIVATED');
-  await expect(page.getByRole('button', { name: 'Campaña activada' }).first()).toBeDisabled();
+  await page.locator('#homeIncidentPrepareCampaign').click();
+  await expect(page.locator('#homeIncidentPreview')).toContainText('Listo para enviar');
+  await expect(page.getByRole('button', { name: 'Enviar 1 aviso' })).toBeEnabled();
+  await expect(page.locator('#homeIncidentPanel')).not.toContainText('PREPARED');
+  await expect(page.locator('#homeIncidentHistoryList')).toContainText('Cierre anticipado');
+
+  page.once('dialog', dialog => {
+    expect(dialog.message()).toContain('Enviar avisos a 1 cliente');
+    dialog.accept();
+  });
+  await page.getByRole('button', { name: 'Enviar 1 aviso' }).click();
+  await expect(page.locator('#homeIncidentPreview')).toContainText('Envío iniciado');
+  await expect(page.locator('#homeIncidentHistoryList')).toContainText('En proceso');
+  await expect(page.getByRole('button', { name: 'En proceso' }).first()).toBeDisabled();
   expect(activationRequest).toEqual({ confirmed: true });
   expect(preparedCampaignRequest).not.toBeNull();
   expect(preparedCampaignRequest.reason).toBe('Cierre anticipado');

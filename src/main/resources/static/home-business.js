@@ -1454,16 +1454,18 @@
 
     if (!incidentFormComplete()) {
       button.disabled = true;
-      summary.innerHTML = '<strong>Selecciona las opciones</strong><span>Motivo, fecha y un rango Desde/Hasta válido.</span>';
+      summary.classList.add("hidden");
+      summary.innerHTML = "";
       return;
     }
 
     const affected = incidentBookingsInRange();
     const customers = new Set(affected.map(item => String(item.customerId || item.id)));
     button.disabled = false;
+    summary.classList.remove("hidden");
     summary.innerHTML = affected.length
-      ? `<strong>${customers.size} cliente${customers.size === 1 ? "" : "s"} · ${affected.length} reserva${affected.length === 1 ? "" : "s"}</strong><span>Detectados automáticamente dentro del horario elegido.</span>`
-      : '<strong>0 reservas afectadas</strong><span>No hay reservas confirmadas dentro de ese rango.</span>';
+      ? `<strong>${customers.size} cliente${customers.size === 1 ? "" : "s"} afectado${customers.size === 1 ? "" : "s"}</strong>`
+      : '<strong>Sin clientes afectados</strong>';
   }
 
   function handleIncidentControlChange(event) {
@@ -1507,13 +1509,12 @@
     preview.classList.remove("hidden");
     if (!incidentFormComplete()) {
       incidentDraft = null;
-      preview.innerHTML = '<div class="home-incident-empty">Elige motivo, fecha, hora de inicio y hora de fin.</div>';
+      preview.innerHTML = '<div class="home-incident-empty">Completa motivo, fecha y horario.</div>';
       syncIncidentImpact();
       return;
     }
 
     const affected = incidentBookingsInRange();
-
     const customers = new Map(state.customers.map(item => [String(item.id), item]));
     const services = new Map(state.services.map(item => [String(item.id), item]));
     const grouped = new Map();
@@ -1526,7 +1527,7 @@
 
     if (!groups.length) {
       incidentDraft = null;
-      preview.innerHTML = `<div class="home-incident-empty">No hay reservas confirmadas entre ${esc(incidentTimeLabel(targetTimeFrom))} y ${esc(incidentTimeLabel(targetTimeTo))} en esa fecha.</div>`;
+      preview.innerHTML = '<div class="home-incident-empty">No hay clientes afectados en ese horario.</div>';
       return;
     }
 
@@ -1539,9 +1540,7 @@
         return `${service.name || "Servicio"} · ${fmtCompact(booking.startAt)}`;
       }).join(" / ");
       const noun = bookings.length === 1 ? "tu reserva" : "tus reservas";
-      const actionText = goal === "RESCHEDULE"
-        ? " Podemos ayudarte a reprogramarla."
-        : "";
+      const actionText = goal === "RESCHEDULE" ? " Podemos ayudarte a reprogramarla." : "";
       const message = `Hola ${customerName}, ${state.businessName} necesita informarte de un cambio que afecta ${noun}: ${bookingText}. Motivo: ${reason}.${actionText}`;
       return {
         customerId: first.customerId,
@@ -1561,18 +1560,21 @@
         <span><strong>${esc(recipient.customerName)}</strong><small>${esc(recipient.bookingText)}</small></span>
       </label>
       <span class="home-incident-channel">${esc(recipient.channelLabel)}</span>
-      <p class="home-incident-message">${esc(recipient.content)}</p>
+      <details class="home-incident-message-details">
+        <summary>Ver mensaje</summary>
+        <p class="home-incident-message">${esc(recipient.content)}</p>
+      </details>
     </article>`).join("");
 
     preview.innerHTML = `
       <div class="home-incident-preview-head">
-        <div><strong>${groups.length} cliente${groups.length === 1 ? "" : "s"} afectado${groups.length === 1 ? "" : "s"}</strong><span>${affected.length} reserva${affected.length === 1 ? "" : "s"} · vista previa</span></div>
+        <div><strong>${groups.length} cliente${groups.length === 1 ? "" : "s"} afectado${groups.length === 1 ? "" : "s"}</strong></div>
         <label class="home-incident-select-all"><input id="homeIncidentSelectAll" type="checkbox" checked> Todos</label>
       </div>
       <div class="home-incident-list">${rows}</div>
       <div class="home-incident-footer">
-        <span id="homeIncidentSelectionSummary">Seleccionados ${draftRecipients.length} de ${draftRecipients.length} · sin envíos reales</span>
-        <button id="homeIncidentPrepareCampaign" type="button">Crear campaña preparada</button>
+        <span id="homeIncidentSelectionSummary">${draftRecipients.length} seleccionado${draftRecipients.length === 1 ? "" : "s"}</span>
+        <button id="homeIncidentPrepareCampaign" type="button">Continuar</button>
       </div>
     `;
     bindIncidentSelection();
@@ -1593,7 +1595,7 @@
     const summary = document.querySelector("#homeIncidentSelectionSummary");
     const button = document.querySelector("#homeIncidentPrepareCampaign");
     const selectAll = document.querySelector("#homeIncidentSelectAll");
-    if (summary) summary.textContent = `Seleccionados ${checked.length} de ${boxes.length} · sin envíos reales`;
+    if (summary) summary.textContent = `${checked.length} seleccionado${checked.length === 1 ? "" : "s"}`;
     if (button) button.disabled = checked.length === 0;
     if (selectAll) {
       selectAll.checked = boxes.length > 0 && checked.length === boxes.length;
@@ -1605,16 +1607,18 @@
     if (!incidentDraft) return;
     const selected = selectedIncidentRecipients();
     if (!selected.length) return;
+
     const confirmed = window.confirm(
-      `Crear una campaña PREPARED para ${selected.length} cliente${selected.length === 1 ? "" : "s"}? No se enviará ningún mensaje ni llamada.`
+      `Preparar avisos para ${selected.length} cliente${selected.length === 1 ? "" : "s"}?`
     );
     if (!confirmed) return;
 
     const button = document.querySelector("#homeIncidentPrepareCampaign");
     if (button) {
       button.disabled = true;
-      button.textContent = "Preparando…";
+      button.textContent = "Revisando…";
     }
+
     try {
       const result = await api("/api/v1/booking-incident-campaigns", {
         method: "POST",
@@ -1630,18 +1634,43 @@
           }))
         })
       });
+
+      let readiness = { ready: false, blockers: [] };
+      try {
+        readiness = await api(`/api/v1/booking-incident-campaigns/${encodeURIComponent(result.id)}/activation-readiness`);
+      } catch (_) {
+        readiness = { ready: false, blockers: [] };
+      }
+
       const footer = document.querySelector(".home-incident-footer");
       if (footer) {
-        footer.innerHTML = `<div class="home-incident-success"><strong>Campaña preparada ✓</strong><span>ID ${esc(result.id)} · ${esc(result.recipientCount)} cliente${Number(result.recipientCount) === 1 ? "" : "s"} · estado ${esc(result.status)}</span><small>No se envió ningún mensaje ni se realizó ninguna llamada.</small></div>`;
+        if (readiness?.ready === true) {
+          footer.innerHTML = `
+            <div class="home-incident-ready">
+              <div><strong>Listo para enviar</strong><span>${selected.length} aviso${selected.length === 1 ? "" : "s"} revisado${selected.length === 1 ? "" : "s"}.</span></div>
+              <button id="homeIncidentSendNow" type="button">Enviar ${selected.length} aviso${selected.length === 1 ? "" : "s"}</button>
+            </div>
+          `;
+          document.querySelector("#homeIncidentSendNow")?.addEventListener("click", event =>
+            activateIncidentCampaign(result.id, selected.length, event.currentTarget)
+          );
+        } else {
+          footer.innerHTML = `
+            <div class="home-incident-blocked">
+              <strong>Envíos desactivados</strong>
+              <span>Puedes revisar los avisos, pero todavía no enviarlos.</span>
+            </div>
+          `;
+        }
       }
       await loadIncidentHistory();
     } catch (error) {
       if (button) {
         button.disabled = false;
-        button.textContent = "Crear campaña preparada";
+        button.textContent = "Continuar";
       }
       const summary = document.querySelector("#homeIncidentSelectionSummary");
-      if (summary) summary.textContent = error.message || "No pude preparar la campaña.";
+      if (summary) summary.textContent = error.message || "No pude preparar los avisos.";
     }
   }
 
@@ -1661,33 +1690,44 @@
 
   const incidentGoalLabel = value => value === "RESCHEDULE" ? "Avisar y reprogramar" : value === "INFORM" ? "Solo avisar" : String(value || "");
   const incidentStrategyLabel = value => value === "CHEAPEST" ? "Más económico" : value === "WHATSAPP" ? "WhatsApp" : value === "CALL" ? "Llamada" : String(value || "");
+  const incidentCampaignStatusLabel = value => ({
+    PREPARED: "Pendiente",
+    ACTIVATED: "En proceso",
+    COMPLETED: "Completado",
+    CANCELLED: "Cancelado"
+  })[value] || "Pendiente";
 
   async function loadIncidentHistory() {
     const host = document.querySelector("#homeIncidentHistoryList");
+    const count = document.querySelector("#homeIncidentHistoryCount");
     if (!host) return;
-    host.innerHTML = '<div class="home-incident-empty">Cargando campañas…</div>';
+    host.innerHTML = '<div class="home-incident-empty">Cargando historial…</div>';
     try {
       const campaigns = await api("/api/v1/booking-incident-campaigns");
-      if (!Array.isArray(campaigns) || !campaigns.length) {
-        host.innerHTML = '<div class="home-incident-empty">Todavía no hay campañas preparadas.</div>';
+      const items = Array.isArray(campaigns) ? campaigns : [];
+      if (count) count.textContent = String(items.length);
+      if (!items.length) {
+        host.innerHTML = '<div class="home-incident-empty">Sin avisos anteriores.</div>';
         return;
       }
-      host.innerHTML = campaigns.map(campaign => {
+      host.innerHTML = items.map(campaign => {
         const blockers = Array.isArray(campaign.activationBlockers) ? campaign.activationBlockers : [];
-        const blockerText = blockers.map(item => item?.message).filter(Boolean).join(" · ");
         const canActivate = campaign.status === "PREPARED" && campaign.activationReady === true;
         const alreadyActivated = campaign.status === "ACTIVATED";
+        const deliveryDisabled = blockers.some(item => item?.code === "OUTBOUND_DELIVERY_DISABLED");
         const helper = alreadyActivated
-          ? "Campaña activada y entregada al outbox."
+          ? "Envío iniciado."
           : canActivate
-            ? "WhatsApp autorizado · requiere confirmación final."
-            : (blockers[0]?.message || "La campaña todavía no puede activarse.");
-        const buttonText = alreadyActivated ? "Campaña activada" : "Activar campaña";
+            ? "Listo para enviar."
+            : deliveryDisabled
+              ? "Envíos desactivados."
+              : "No disponible para enviar.";
+        const buttonText = alreadyActivated ? "En proceso" : "Enviar avisos";
         return `
           <article class="home-incident-history-item">
             <div class="home-incident-history-main">
               <div><strong>${esc(campaign.reason || "Imprevisto")}</strong><span>${esc(fmtCompact(campaign.createdAt))}</span></div>
-              <span class="home-incident-history-status">${esc(campaign.status || "PREPARED")}</span>
+              <span class="home-incident-history-status">${esc(incidentCampaignStatusLabel(campaign.status))}</span>
             </div>
             <div class="home-incident-history-meta">
               <span>${esc(incidentGoalLabel(campaign.goal))}</span>
@@ -1695,10 +1735,9 @@
               <span>${esc(campaign.recipientCount)} cliente${Number(campaign.recipientCount) === 1 ? "" : "s"}</span>
             </div>
             <div class="home-incident-history-actions">
-              <small title="${esc(blockerText)}">${esc(helper)}</small>
+              <small>${esc(helper)}</small>
               <button type="button"
-                ${canActivate ? `data-incident-activate="${esc(campaign.id)}" data-incident-count="${esc(campaign.recipientCount)}"` : "disabled"}
-                title="${esc(canActivate ? "Requiere confirmación final antes de contactar clientes" : (blockerText || helper))}">
+                ${canActivate ? `data-incident-activate="${esc(campaign.id)}" data-incident-count="${esc(campaign.recipientCount)}"` : "disabled"}>
                 ${buttonText}
               </button>
             </div>
@@ -1707,7 +1746,7 @@
       }).join("");
       bindIncidentActivation();
     } catch (error) {
-      host.innerHTML = `<div class="home-incident-empty">${esc(error.message || "No pude cargar las campañas.")}</div>`;
+      host.innerHTML = `<div class="home-incident-empty">${esc(error.message || "No pude cargar el historial.")}</div>`;
     }
   }
 
@@ -1715,13 +1754,13 @@
     if (!campaignId) return;
     const count = Number(recipientCount || 0);
     const confirmed = window.confirm(
-      `Esta acción contactará a ${count} cliente${count === 1 ? "" : "s"} por WhatsApp usando el canal real autorizado. ¿Activar la campaña ahora?`
+      `¿Enviar avisos a ${count} cliente${count === 1 ? "" : "s"} ahora?`
     );
     if (!confirmed) return;
 
     if (button) {
       button.disabled = true;
-      button.textContent = "Activando…";
+      button.textContent = "Enviando…";
     }
     try {
       const result = await api(`/api/v1/booking-incident-campaigns/${encodeURIComponent(campaignId)}/activate`, {
@@ -1732,14 +1771,14 @@
       const preview = document.querySelector("#homeIncidentPreview");
       if (preview) {
         preview.classList.remove("hidden");
-        preview.innerHTML = `<div class="home-incident-success"><strong>Campaña activada ✓</strong><span>${esc(result.queuedRecipients)} cliente${Number(result.queuedRecipients) === 1 ? "" : "s"} enviados al outbox seguro.</span><small>La entrega queda a cargo del canal WhatsApp autorizado.</small></div>`;
+        preview.innerHTML = `<div class="home-incident-success"><strong>Envío iniciado ✓</strong><span>${esc(result.queuedRecipients)} aviso${Number(result.queuedRecipients) === 1 ? "" : "s"} en proceso.</span></div>`;
       }
     } catch (error) {
       if (button) {
         button.disabled = false;
-        button.textContent = "Activar campaña";
+        button.textContent = "Enviar avisos";
       }
-      window.alert(error.message || "No pude activar la campaña.");
+      window.alert(error.message || "No pude enviar los avisos.");
       await loadIncidentHistory();
     }
   }
@@ -1756,6 +1795,8 @@
     const toggle = document.querySelector("#homeIncidentToggle");
     const panel = document.querySelector("#homeIncidentPanel");
     const previewButton = document.querySelector("#homeIncidentPreviewBtn");
+    const historyToggle = document.querySelector("#homeIncidentHistoryToggle");
+    const historyBody = document.querySelector("#homeIncidentHistoryBody");
     if (!toggle || !panel || !previewButton || toggle.dataset.bound === "true") return;
     toggle.dataset.bound = "true";
 
@@ -1782,7 +1823,15 @@
         loadIncidentHistory();
       }
     });
-    document.querySelector("#homeIncidentHistoryRefresh")?.addEventListener("click", loadIncidentHistory);
+
+    historyToggle?.addEventListener("click", () => {
+      if (!historyBody) return;
+      historyBody.classList.toggle("hidden");
+      const open = !historyBody.classList.contains("hidden");
+      historyToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) loadIncidentHistory();
+    });
+
     previewButton.addEventListener("click", renderIncidentPreview);
   }
 

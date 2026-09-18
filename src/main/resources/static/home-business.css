@@ -201,3 +201,36 @@
 @media(max-width:1100px){.home-audit-filters{grid-template-columns:repeat(3,minmax(0,1fr))}.home-audit-filter-actions{grid-column:span 3}}
 @media(max-width:760px){.home-audit-filters{grid-template-columns:1fr 1fr}.home-audit-filter-actions{grid-column:span 2}}
 @media(max-width:480px){.home-audit-filters{grid-template-columns:1fr}.home-audit-filter-actions{grid-column:auto}}
+
+
+/* Incident resolver: compact human-facing flow */
+.home-incident-panel{padding:12px}
+.home-incident-intro{margin-bottom:8px}
+.home-incident-intro strong{font-size:13px}
+.home-incident-impact-summary{display:inline-flex;width:auto;margin:8px 0 0;padding:6px 9px}
+.home-incident-impact-summary strong{font-size:9px}
+.home-incident-preview{margin-top:10px;padding-top:10px}
+.home-incident-preview-head{margin-bottom:7px}
+.home-incident-item{padding:9px}
+.home-incident-message-details{grid-column:1/-1;margin-top:0}
+.home-incident-message-details summary{width:max-content;color:#b9b1ff;font-size:9px;font-weight:800;cursor:pointer;list-style:none}
+.home-incident-message-details summary::-webkit-details-marker{display:none}
+.home-incident-message-details summary::after{content:" ▾";font-size:8px}
+.home-incident-message-details[open] summary::after{content:" ▴"}
+.home-incident-message-details .home-incident-message{margin:7px 0 0;padding:8px}
+.home-incident-footer{margin-top:8px;padding-top:8px}
+.home-incident-ready{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%}
+.home-incident-ready>div{display:grid;gap:2px}
+.home-incident-ready strong{font-size:11px}
+.home-incident-ready span{font-size:9px}
+.home-incident-blocked{display:grid;gap:2px;width:100%;padding:9px 10px;border:1px solid rgba(255,255,255,.07);border-radius:9px;background:rgba(255,255,255,.02)}
+.home-incident-blocked strong{font-size:10px}
+.home-incident-blocked span{color:var(--muted);font-size:9px}
+.home-incident-history{margin-top:10px;padding-top:8px}
+.home-incident-history-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:34px;padding:0 10px;border:1px solid rgba(255,255,255,.06);border-radius:9px;background:rgba(255,255,255,.018);color:var(--text);font-size:10px;font-weight:800;cursor:pointer}
+.home-incident-history-toggle strong{min-width:22px;padding:3px 6px;border-radius:999px;background:rgba(124,92,255,.12);color:#ddd6ff;font-size:8px;text-align:center}
+#homeIncidentHistoryBody{margin-top:8px}
+.home-incident-history-item{padding:9px}
+.home-incident-history-meta{margin:6px 0}
+.home-incident-history-actions small{font-size:8px}
+@media(max-width:760px){.home-incident-ready{align-items:stretch;flex-direction:column}.home-incident-ready button{width:100%}}
