@@ -29,6 +29,7 @@ const advancedPanel = $("#advancedPanel");
 let token = sessionStorage.getItem(TOKEN_KEY) || "";
 let currentProposal = null;
 let currentStatus = null;
+let currentBusinessName = "Tu negocio";
 
 function setToken(value) {
     token = value || "";
@@ -90,6 +91,24 @@ function showDashboardShell() {
     const badge = $("#sessionBadge");
     badge.textContent = "Sesión activa";
     badge.className = "badge online";
+}
+
+function applyBusinessIdentity(business = {}) {
+    currentBusinessName = String(business.name || "Tu negocio").trim() || "Tu negocio";
+    window.helvocaBusinessName = currentBusinessName;
+    const brand = document.querySelector(".brand");
+    if (brand) brand.textContent = currentBusinessName.toUpperCase();
+    if (document.body.classList.contains("settings-page")) document.title = `${currentBusinessName} · Configuración`;
+    else document.title = `${currentBusinessName} · Inicio`;
+
+    const readyText = document.querySelector("#readyBanner strong");
+    if (readyText) readyText.textContent = `${currentBusinessName} está listo para atender.`;
+
+    const agentHeading = setupForm?.querySelector(".section-heading.divider h2");
+    if (agentHeading) agentHeading.textContent = `Cómo debe atender ${currentBusinessName}`;
+
+    const agentName = setupForm?.elements?.agentName;
+    if (agentName) agentName.placeholder = currentBusinessName;
 }
 
 function handleExpiredSession() {
@@ -158,7 +177,7 @@ function renderKnowledge(items = []) {
 }
 
 function renderAgent(agent = {}, business = {}) {
-    setupForm.elements.agentName.value = agent.name || "Helvoca";
+    setupForm.elements.agentName.value = agent.name || business.name || "Recepcionista";
     setupForm.elements.agentVoice.value = agent.voice || "";
     setupForm.elements.agentGreeting.value = agent.greeting ||
         `Hola, gracias por llamar a ${business.name || "nuestro negocio"}. ¿En qué puedo ayudarte?`;
@@ -172,7 +191,7 @@ function renderAgent(agent = {}, business = {}) {
 
 function collectAgent() {
     return {
-        name: setupForm.elements.agentName.value.trim() || "Helvoca",
+        name: setupForm.elements.agentName.value.trim() || currentBusinessName || "Recepcionista",
         language: setupForm.elements.language.value.trim() || detectedLanguage(),
         voice: setupForm.elements.agentVoice.value.trim() || null,
         greeting: setupForm.elements.agentGreeting.value.trim(),
@@ -269,9 +288,9 @@ const nextStepText = {
     ADD_SERVICE: "Falta confirmar al menos un servicio reservable.",
     CONFIGURE_HOURS: "Falta confirmar el horario de atención.",
     CONNECT_PHONE_NUMBER: "La configuración ya casi está. Falta conectar un número telefónico activo.",
-    OPTIONAL_HUMAN_TRANSFER: "Helvoca puede atender llamadas. Opcional: agrega un teléfono para transferencia humana.",
-    OPTIONAL_KNOWLEDGE: "Helvoca puede atender llamadas. Opcional: agrega respuestas frecuentes.",
-    READY: "Configuración completa. Helvoca está lista para atender llamadas."
+    OPTIONAL_HUMAN_TRANSFER: "La recepcionista puede atender llamadas. Opcional: agrega un teléfono para transferencia humana.",
+    OPTIONAL_KNOWLEDGE: "La recepcionista puede atender llamadas. Opcional: agrega respuestas frecuentes.",
+    READY: "Configuración completa. La recepcionista está lista para atender llamadas."
 };
 
 function applyStatus(status) {
@@ -289,7 +308,8 @@ async function loadDashboard() {
             api("/api/v1/services"), api("/api/v1/business/hours"), api("/api/v1/knowledge?activeOnly=false"),
             api("/api/v1/phone-numbers"), api("/api/v1/ai-agent")
         ]);
-        $("#welcomeText").textContent = `${me.email} · Helvoca solo guardará lo que tú confirmes.`;
+        applyBusinessIdentity(business);
+        $("#welcomeText").textContent = `${me.email} · Los cambios se guardan solo cuando tú los confirmas.`;
         setupForm.elements.businessName.value = business.name || "";
         setupForm.elements.timezone.value = business.timezone || detectedTimezone();
         setupForm.elements.language.value = business.language || detectedLanguage();
@@ -352,7 +372,7 @@ function addProposalLine(container, primary, secondary = "") {
 
 function renderProposal(proposal) {
     currentProposal = proposal;
-    $("#proposalBusinessName").textContent = proposal.businessName || "Propuesta de Helvoca";
+    $("#proposalBusinessName").textContent = proposal.businessName || `Propuesta para ${currentBusinessName}`;
     $("#proposalSummary").textContent = proposal.sourceSummary || "Revisa los datos detectados antes de confirmarlos.";
     const sourceBadge = $("#sourceBadge");
     sourceBadge.textContent = proposal.sourceReadable ? "Fuente leída" : "Fuente limitada";
