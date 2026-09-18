@@ -27,7 +27,8 @@
     const title = heading?.querySelector("h1");
     const welcome = document.querySelector("#welcomeText");
     if (eyebrow) eyebrow.textContent = "Configuración";
-    if (title) title.textContent = "Cómo trabaja Helvoca";
+    const businessName = window.helvocaBusinessName || document.querySelector('#setupForm [name="businessName"]')?.value?.trim() || "Tu negocio";
+    if (title) title.textContent = `Cómo trabaja ${businessName}`;
     if (welcome) welcome.textContent = "Ajusta tu negocio, recepcionista, servicios, horarios, conocimiento, canales y plan.";
   }
 
