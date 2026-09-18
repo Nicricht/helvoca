@@ -179,8 +179,9 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Ana llamó para reservar peluquería');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Quiero reservar peluquería.');
-  await expect(page.locator('#homeBookingDetailBody')).toContainText('Verificó disponibilidad');
-  await expect(page.locator('#homeBookingDetailBody')).toContainText('Reserva creada');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').first()).toHaveText('Ana Reserva');
+  await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Qué hizo Helvoca');
+  await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Historial');
   await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute('href', '/conversations.html?channel=calls&conversation=call-1');
   await page.locator('#homeBookingDetailClose').click();
 
@@ -188,6 +189,9 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Conversación de WhatsApp');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Quiero reservar un masaje.');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Tu reserva quedó confirmada.');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').first()).toHaveText('Bruno Masaje');
+  await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Qué hizo Helvoca');
+  await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Historial');
   await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute('href', '/conversations.html?channel=whatsapp&conversation=wa-booking-2');
   await page.locator('#homeBookingDetailClose').click();
 
@@ -199,9 +203,9 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeBookingDetailBody')).toContainText('15.990');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Av. Demo 123, Santiago');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Quiero un Producto demo.');
-  await expect(page.locator('#homeBookingDetailBody')).toContainText('Pedido cotizado');
-  await expect(page.locator('#homeBookingDetailBody')).toContainText('Pedido confirmado');
-  await expect(page.locator('#homeBookingDetailBody')).toContainText('Qué hizo Helvoca');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').first()).toHaveText('Juan Pedido');
+  await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Qué hizo Helvoca');
+  await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Historial');
   await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute('href', '/conversations.html?channel=whatsapp&conversation=wa-order');
   await expect(page.getByRole('button', { name: 'Empezar preparación' })).toBeVisible();
   await page.locator('#homeBookingDetailClose').click();
