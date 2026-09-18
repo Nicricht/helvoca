@@ -63,27 +63,40 @@ public class TwilioWhatsAppTemplateInspectionStartupRunner implements Applicatio
             }
 
             JSONArray contents = new JSONObject(response.body()).optJSONArray("contents");
-            int approved = 0;
+            int whatsappCount = 0;
+            int approvedCount = 0;
+            int pendingCount = 0;
             if (contents != null) {
                 for (int i = 0; i < contents.length(); i++) {
                     JSONObject content = contents.optJSONObject(i);
                     if (content == null) continue;
-                    JSONObject whatsapp = content.optJSONObject("approvals") == null
-                            ? null
-                            : content.optJSONObject("approvals").optJSONObject("whatsapp");
-                    String status = whatsapp == null ? "" : whatsapp.optString("status", "");
-                    if (!"approved".equalsIgnoreCase(status)) continue;
-                    approved++;
+                    JSONObject approvals = content.optJSONObject("approvals");
+                    JSONObject whatsapp = approvals == null ? null : approvals.optJSONObject("whatsapp");
+                    if (whatsapp == null) continue;
+
+                    whatsappCount++;
+                    String status = whatsapp.optString("status", "").trim().toLowerCase();
+                    if ("approved".equals(status)) approvedCount++;
+                    if ("pending".equals(status) || "received".equals(status)) pendingCount++;
+
                     log.info(
-                            "WHATSAPP_TEMPLATE_APPROVED sid={} name={} language={} status={}",
+                            "WHATSAPP_TEMPLATE_STATE sid={} friendlyName={} language={} status={} name={} category={} contentType={} rejectionReason={} allowCategoryChange={}",
                             content.optString("sid", ""),
                             content.optString("friendly_name", ""),
                             content.optString("language", ""),
-                            status.toLowerCase()
+                            status,
+                            whatsapp.optString("name", ""),
+                            whatsapp.optString("category", ""),
+                            whatsapp.optString("content_type", ""),
+                            sanitize(whatsapp.optString("rejection_reason", "")),
+                            whatsapp.opt("allow_category_change")
                     );
                 }
             }
-            log.info("WHATSAPP_TEMPLATE_INSPECTION approvedCount={}", approved);
+            log.info(
+                    "WHATSAPP_TEMPLATE_INSPECTION whatsappCount={} approvedCount={} pendingCount={}",
+                    whatsappCount, approvedCount, pendingCount
+            );
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Twilio template inspection interrupted", e);
@@ -92,6 +105,12 @@ public class TwilioWhatsAppTemplateInspectionStartupRunner implements Applicatio
         } catch (Exception e) {
             throw new IllegalStateException("Twilio template inspection failed", e);
         }
+    }
+
+    private static String sanitize(String value) {
+        if (value == null) return "";
+        String sanitized = value.replace('\n', ' ').replace('\r', ' ').trim();
+        return sanitized.length() <= 300 ? sanitized : sanitized.substring(0, 300);
     }
 
     private String basicAuthorization() {
