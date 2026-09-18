@@ -163,11 +163,6 @@
 })();
 
 (() => {
-    const commercial = document.createElement('script');
-    commercial.src = '/commercial-status.js?v=20260917-4';
-    commercial.async = false;
-    document.head.appendChild(commercial);
-
     const voices = document.createElement('script');
     voices.src = '/voice-selector.js?v=20260917-4';
     voices.async = false;
