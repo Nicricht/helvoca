@@ -498,7 +498,7 @@ registerForm.addEventListener("submit", async event => {
             aiForm.elements.sourceUrl.value = sourceUrl;
             await analyzeBusiness(sourceUrl, businessName);
         } else {
-            showMessage(aiMessage, "Cuenta creada. Pega la web, Instagram o Google Maps del negocio para que Helvoca prepare la configuración.", "success");
+            showMessage(aiMessage, "Cuenta creada. Pega la web, Instagram o Google Maps del negocio para preparar la configuración.", "success");
         }
     } catch (error) {
         showMessage(authMessage, error.message || "No fue posible crear la empresa.");
