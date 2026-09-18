@@ -115,6 +115,29 @@ public class BookingIncidentCampaignService {
         return new PreparedCampaign(campaign, List.copyOf(saved));
     }
 
+    @Transactional(readOnly = true)
+    public List<CampaignSummary> recent(UUID businessId) {
+        if (businessId == null) throw new IllegalArgumentException("businessId is required");
+        return campaigns.findTop50ByBusinessIdOrderByCreatedAtDesc(businessId).stream()
+                .map(campaign -> new CampaignSummary(
+                        campaign.getId(),
+                        campaign.getReason(),
+                        campaign.getGoal(),
+                        campaign.getStrategy(),
+                        campaign.getStatus(),
+                        recipients.countByCampaignIdAndBusinessId(campaign.getId(), businessId),
+                        campaign.getCreatedAt()))
+                .toList();
+    }
+
+    public record CampaignSummary(UUID id,
+                                  String reason,
+                                  BookingIncidentCampaign.Goal goal,
+                                  BookingIncidentCampaign.Strategy strategy,
+                                  BookingIncidentCampaign.Status status,
+                                  long recipientCount,
+                                  java.time.Instant createdAt) { }
+
     public record RecipientDraft(UUID customerId,
                                  List<UUID> bookingIds,
                                  BookingIncidentRecipient.ChannelPreference channelPreference,
