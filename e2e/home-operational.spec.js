@@ -1046,6 +1046,159 @@ test('newly created customer can receive a manual booking', async ({ page }) => 
   await expect(page.locator('#homeBookingCreateMessage')).toHaveText('Reserva creada para Carla Nueva ✓');
 });
 
+test('newly created booking can be rescheduled from the agenda', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+
+  let customerPayload = null;
+  const availabilityCalls = [];
+  let bookingPayload = null;
+  let patchPayload = null;
+
+  await page.route('**/api/v1/customers', async route => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    customerPayload = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'cust3',
+        name: customerPayload.name,
+        phone: customerPayload.phone,
+        email: customerPayload.email,
+        notes: customerPayload.notes,
+        createdAt: '2026-09-18T22:20:00Z',
+        updatedAt: '2026-09-18T22:20:00Z'
+      })
+    });
+  });
+
+  await page.route('**/api/v1/bookings/availability?**', async route => {
+    const url = new URL(route.request().url());
+    const call = {
+      serviceId: url.searchParams.get('serviceId'),
+      startAt: url.searchParams.get('startAt'),
+      excludeBookingId: url.searchParams.get('excludeBookingId')
+    };
+    availabilityCalls.push(call);
+    await route.fulfill(json({
+      serviceId: call.serviceId,
+      startAt: call.startAt,
+      endAt: new Date(new Date(call.startAt).getTime() + 30 * 60 * 1000).toISOString(),
+      available: true
+    }));
+  });
+
+  await page.route('**/api/v1/bookings', async route => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    bookingPayload = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'b3',
+        customerId: bookingPayload.customerId,
+        serviceId: bookingPayload.serviceId,
+        startAt: bookingPayload.startAt,
+        endAt: new Date(new Date(bookingPayload.startAt).getTime() + 30 * 60 * 1000).toISOString(),
+        status: 'CONFIRMED',
+        source: 'ADMIN',
+        notes: bookingPayload.notes,
+        createdAt: '2026-09-18T22:21:00Z',
+        updatedAt: '2026-09-18T22:21:00Z'
+      })
+    });
+  });
+
+  await page.route('**/api/v1/bookings/b3/context', route => route.fulfill(json({
+    channel: 'MANUAL',
+    sourceReferenceId: null,
+    call: null,
+    whatsapp: null,
+    events: []
+  })));
+  await page.route('**/api/v1/bookings/b3/activity', route => route.fulfill(json([])));
+
+  await page.route('**/api/v1/bookings/b3', async route => {
+    expect(route.request().method()).toBe('PATCH');
+    patchPayload = route.request().postDataJSON();
+    await route.fulfill(json({
+      id: 'b3',
+      customerId: 'cust3',
+      serviceId: 'svc1',
+      startAt: patchPayload.startAt,
+      endAt: new Date(new Date(patchPayload.startAt).getTime() + 30 * 60 * 1000).toISOString(),
+      status: 'CONFIRMED',
+      source: 'ADMIN',
+      notes: patchPayload.notes,
+      updatedAt: '2026-09-18T22:22:00Z'
+    }));
+  });
+
+  await page.goto('/');
+  await page.getByRole('tab', { name: /Clientes/ }).click();
+  await page.getByRole('button', { name: 'Nuevo cliente' }).click();
+  await page.locator('#homeCustomerCreateName').fill('Carla Nueva');
+  await page.locator('#homeCustomerCreatePhone').fill('+56977777777');
+  await page.locator('#homeCustomerCreateEmail').fill('carla@example.cl');
+  await page.getByRole('button', { name: 'Crear cliente' }).click();
+
+  await page.getByRole('tab', { name: /Reservas/ }).click();
+  await page.getByRole('button', { name: 'Nueva reserva' }).click();
+  await page.locator('#homeBookingCreateCustomer').selectOption('cust3');
+  await page.locator('#homeBookingCreateService').selectOption('svc1');
+  await page.locator('#homeBookingCreateDate').selectOption({ index: 1 });
+  await page.locator('#homeBookingCreateTime').selectOption('10:00');
+  await page.getByRole('button', { name: 'Comprobar disponibilidad' }).click();
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Crear reserva' }).click();
+  await expect.poll(() => bookingPayload).not.toBeNull();
+
+  const row = page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b3"]');
+  await expect(row).toContainText('Carla Nueva');
+  const beforeRowText = await row.innerText();
+  await row.click();
+
+  await expect(page.locator('#homeBookingDetailTitle')).toHaveText('Carla Nueva');
+  const beforeMeta = await page.locator('#homeBookingDetailMeta').innerText();
+
+  await page.getByRole('button', { name: 'Reprogramar' }).click();
+  await page.locator('#homeBookingRescheduleDate').selectOption({ index: 2 });
+  await page.locator('#homeBookingRescheduleTime').selectOption('14:30');
+  await page.getByRole('button', { name: 'Comprobar disponibilidad' }).click();
+
+  await expect(page.locator('#homeBookingAvailabilityMessage')).toHaveText('Horario disponible ✓');
+  await expect(page.getByRole('button', { name: 'Confirmar cambio' })).toBeVisible();
+
+  const rescheduleAvailability = availabilityCalls.at(-1);
+  expect(rescheduleAvailability.serviceId).toBe('svc1');
+  expect(rescheduleAvailability.excludeBookingId).toBe('b3');
+  expect(rescheduleAvailability.startAt).not.toBe(bookingPayload.startAt);
+
+  page.once('dialog', dialog => {
+    expect(dialog.message()).toContain('Carla Nueva');
+    dialog.accept();
+  });
+  await page.getByRole('button', { name: 'Confirmar cambio' }).click();
+
+  await expect.poll(() => patchPayload).not.toBeNull();
+  expect(patchPayload.startAt).toBe(rescheduleAvailability.startAt);
+  expect(patchPayload.notes).toBeNull();
+
+  await expect(page.locator('#homeBookingDetailMeta')).not.toHaveText(beforeMeta);
+  await expect(page.locator('#homeBookingDetailMeta')).toContainText('Confirmada');
+  await expect(row).not.toHaveText(beforeRowText);
+  await expect(row).toContainText('Carla Nueva');
+});
+
 test('customers workspace sorts and renders contact data', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
