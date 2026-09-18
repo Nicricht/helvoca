@@ -629,16 +629,18 @@
     const target = event?.target;
     if (!target) return;
 
-    if (target.id === "homeIncidentDate") {
-      setIncidentDefaultRange(target.value, true);
-    }
-    if (target.id === "homeIncidentReason" && target.value === "Cierre del día") {
-      const from = document.querySelector("#homeIncidentTimeFrom");
-      const to = document.querySelector("#homeIncidentTimeTo");
+    const reason = document.querySelector("#homeIncidentReason")?.value || "";
+    const date = document.querySelector("#homeIncidentDate")?.value || "";
+    const from = document.querySelector("#homeIncidentTimeFrom");
+    const to = document.querySelector("#homeIncidentTimeTo");
+
+    if (reason === "Cierre del día" && (target.id === "homeIncidentReason" || target.id === "homeIncidentDate")) {
       if (from && to) {
         from.value = "00:00";
         to.value = "24:00";
       }
+    } else if (target.id === "homeIncidentDate" || target.id === "homeIncidentReason") {
+      setIncidentDefaultRange(date, true);
     }
 
     invalidateIncidentPreview();
