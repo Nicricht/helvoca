@@ -168,10 +168,6 @@
     voices.async = false;
     document.head.appendChild(voices);
 
-    const ux = document.createElement('script');
-    ux.src = '/ux-simplification.js?v=20260917-4';
-    ux.async = false;
-    document.head.appendChild(ux);
 })();
 
 (() => {
