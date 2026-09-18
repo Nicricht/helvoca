@@ -327,7 +327,7 @@
   }
 
   function bindBookingOpeners() {
-    $("[data-booking-open]",host).forEach(node=>{
+    $$("[data-booking-open]",host).forEach(node=>{
       const open=()=>openBookingDetail(node.dataset.entityId);
       node.addEventListener("click",open);
       node.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();open();}});
@@ -407,7 +407,7 @@
     }).join("");
     const cards = items.map(order => `<article class="business-mobile-card" tabindex="0" role="button" data-order-open data-entity-id="${esc(order.id)}"><div><small>${esc(shortId(order.id))} · ${esc(fmtDate(order.createdAt))}</small><strong>${esc(order.contactName || order.contactPhone || "Cliente")}</strong><span>${esc(money(order.total,order.currency))}</span></div><span class="pill">${esc(ORDER_STATUS_LABELS[order.status] || humanize(order.status))}</span></article>`).join("");
     root.innerHTML = `<div class="business-table-shell"><table class="business-data-table" data-table="orders"><thead><tr><th>Pedido</th><th>Cliente</th><th>Total</th><th>Entrega</th><th>Estado</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div><div class="business-mobile-list">${cards}</div>`;
-    $("[data-order-status]",root).forEach(button => button.addEventListener("click", async event => {
+    $$("[data-order-status]",root).forEach(button => button.addEventListener("click", async event => {
       event.stopPropagation();
       if (button.dataset.orderStatus === "CANCELLED" && !window.confirm("¿Cancelar este pedido?")) return;
       button.disabled=true;
@@ -416,7 +416,7 @@
         await load(); setTab("orders"); toast("Pedido actualizado.");
       } catch(e) { toast(e.message || "No pude actualizar el pedido."); button.disabled=false; }
     }));
-    $("[data-order-open]",root).forEach(node=>{
+    $$("[data-order-open]",root).forEach(node=>{
       const open=()=>openOrderDetail(node.dataset.entityId);
       node.addEventListener("click",event=>{if(event.target.closest("button"))return;open();});
       node.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();open();}});
