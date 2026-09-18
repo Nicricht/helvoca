@@ -220,25 +220,26 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeIncidentHistoryList')).toContainText('PREPARED');
   await expect(page.getByRole('button', { name: 'Activar campaña' }).first()).toBeDisabled();
 
-  await page.locator('#homeIncidentCalendarNext').click();
-  await expect(page.locator('[data-incident-date="2026-10-01"]')).toBeVisible();
-  await page.locator('#homeIncidentCalendarPrev').click();
-  await expect(page.locator('[data-incident-date="2026-09-18"]')).toBeVisible();
+  await expect(page.locator('#homeIncidentCalendarDays')).toHaveCount(0);
+  await expect(page.locator('#homeIncidentReason')).toBeVisible();
+  await expect(page.locator('#homeIncidentDate')).toBeVisible();
+  await expect(page.locator('#homeIncidentTimeFrom')).toBeVisible();
+  await expect(page.locator('#homeIncidentTimeTo')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Solo avisar' }).click();
+  await page.locator('#homeIncidentGoal').selectOption('INFORM');
   await expect(page.locator('#homeIncidentGoal')).toHaveValue('INFORM');
-  await page.getByRole('button', { name: 'Avisar y reprogramar' }).click();
+  await page.locator('#homeIncidentGoal').selectOption('RESCHEDULE');
   await expect(page.locator('#homeIncidentGoal')).toHaveValue('RESCHEDULE');
 
-  await page.getByRole('button', { name: 'WhatsApp', exact: true }).click();
+  await page.locator('#homeIncidentStrategy').selectOption('WHATSAPP');
   await expect(page.locator('#homeIncidentStrategy')).toHaveValue('WHATSAPP');
-  await page.getByRole('button', { name: 'Más económico' }).click();
+  await page.locator('#homeIncidentStrategy').selectOption('CHEAPEST');
   await expect(page.locator('#homeIncidentStrategy')).toHaveValue('CHEAPEST');
 
   await expect(page.locator('#homeIncidentPreviewBtn')).toBeDisabled();
-  await page.getByRole('button', { name: 'Cerrar antes' }).click();
+  await page.locator('#homeIncidentReason').selectOption({ label: 'Cerrar antes' });
   await expect(page.locator('#homeIncidentPreviewBtn')).toBeDisabled();
-  await page.locator('[data-incident-date="2026-09-18"]').click();
+  await page.locator('#homeIncidentDate').selectOption('2026-09-18');
   await expect(page.locator('#homeIncidentDate')).toHaveValue('2026-09-18');
   await page.locator('#homeIncidentTimeFrom').selectOption('09:00');
   await page.locator('#homeIncidentTimeTo').selectOption('13:00');
