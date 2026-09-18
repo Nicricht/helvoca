@@ -125,6 +125,7 @@
     const customer = customers.get(String(booking.customerId)) || {};
     const service = services.get(String(booking.serviceId)) || {};
     ensureBookingDrawer();
+    document.querySelector("#homeBookingDetailDrawer .eyebrow").textContent = "RESERVA";
     document.querySelector("#homeBookingDetailTitle").textContent = customer.name || customer.phone || "Cliente";
     document.querySelector("#homeBookingDetailMeta").textContent = `${fmt(booking.startAt)} · ${status(booking.status)}`;
     const body = document.querySelector("#homeBookingDetailBody");
@@ -274,13 +275,102 @@
     });
   }
 
+  function orderActions(order) {
+    switch (order.status) {
+      case "CONFIRMED": return [["PREPARING", "Empezar preparación"], ["CANCELLED", "Cancelar"]];
+      case "PREPARING": return [["READY", "Marcar listo"], ["CANCELLED", "Cancelar"]];
+      case "READY": return order.fulfillmentType === "DELIVERY" ? [["DISPATCHED", "Marcar despachado"]] : [["COMPLETED", "Completar"]];
+      case "DISPATCHED": return [["COMPLETED", "Completar"]];
+      default: return [];
+    }
+  }
+
+  async function loadOrderConversation(order) {
+    if (!order.sourceReferenceId) return null;
+    try {
+      if (order.source === "VOICE") {
+        const detail = await api(`/api/v1/calls/${encodeURIComponent(order.sourceReferenceId)}`);
+        return { channel: "VOICE", sourceReferenceId: order.sourceReferenceId, call: detail, events: [] };
+      }
+      if (order.source === "WHATSAPP") {
+        const detail = await api(`/api/v1/messaging/conversations/${encodeURIComponent(order.sourceReferenceId)}`);
+        return { channel: "WHATSAPP", sourceReferenceId: order.sourceReferenceId, whatsapp: detail, events: [] };
+      }
+    } catch (_) {
+      return null;
+    }
+    return null;
+  }
+
+  async function updateOrderStatus(order, nextStatus) {
+    if (nextStatus === "CANCELLED" && !window.confirm("¿Cancelar este pedido?")) return;
+    await api(`/api/v1/commercial/orders/${encodeURIComponent(order.id)}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: nextStatus })
+    });
+    closeBookingDrawer();
+    await load();
+    setTab("orders");
+  }
+
+  async function openOrderDetail(id) {
+    const order = state.orders.find(item => String(item.id) === String(id));
+    if (!order) return;
+    ensureBookingDrawer();
+    document.querySelector("#homeBookingDetailDrawer .eyebrow").textContent = "PEDIDO";
+    document.querySelector("#homeBookingDetailTitle").textContent = `#${String(order.id || "").slice(0,8)} · ${order.contactName || order.contactPhone || "Cliente"}`;
+    document.querySelector("#homeBookingDetailMeta").textContent = `${fmt(order.createdAt)} · ${status(order.status)}`;
+    const body = document.querySelector("#homeBookingDetailBody");
+    const lines = Array.isArray(order.lines) ? order.lines : [];
+    const facts = `<div class="home-detail-facts">
+      <div><span>Cliente</span><strong>${esc(order.contactName || "Cliente")}</strong></div>
+      <div><span>Teléfono</span><strong>${esc(order.contactPhone || "Sin teléfono")}</strong></div>
+      <div><span>Entrega</span><strong>${order.fulfillmentType === "DELIVERY" ? "Delivery" : "Retiro"}</strong></div>
+      <div><span>Origen</span><strong>${esc(source(order.source))}</strong></div>
+      <div><span>Estado</span><strong>${esc(status(order.status))}</strong></div>
+      <div><span>Total</span><strong>${esc(money(order.total, order.currency))}</strong></div>
+    </div>
+    <section class="home-detail-section"><h3>Productos</h3><div class="home-detail-lines">${lines.length ? lines.map(line =>
+      `<div><span>${esc(line.quantity || 0)} × ${esc(line.name || "Producto")}</span><strong>${esc(money(line.lineTotal ?? (Number(line.quantity || 0) * Number(line.unitPrice || 0)), order.currency))}</strong></div>`
+    ).join("") : '<p class="home-detail-muted">Sin líneas de detalle.</p>'}</div></section>
+    ${order.deliveryAddress ? `<div class="home-detail-note"><span>Dirección</span><p>${esc(order.deliveryAddress)}</p></div>` : ""}`;
+
+    body.innerHTML = facts + '<div class="home-detail-loading">Cargando conversación…</div>';
+    const backdrop = document.querySelector("#homeBookingDetailBackdrop");
+    backdrop.classList.remove("hidden");
+    backdrop.setAttribute("aria-hidden", "false");
+    document.body.classList.add("home-detail-open");
+
+    const context = await loadOrderConversation(order);
+    const actions = orderActions(order);
+    body.innerHTML = facts + renderContext(context) +
+      (actions.length ? `<div class="home-detail-order-actions">${actions.map(([next,label]) => `<button type="button" data-home-order-status="${next}" class="${next === "CANCELLED" ? "home-filter-clear" : "home-order-primary"}">${esc(label)}</button>`).join("")}</div>` : "");
+
+    body.querySelectorAll("[data-home-order-status]").forEach(button => button.addEventListener("click", async event => {
+      event.currentTarget.disabled = true;
+      try { await updateOrderStatus(order, event.currentTarget.dataset.homeOrderStatus); }
+      catch (error) { event.currentTarget.disabled = false; }
+    }));
+  }
+
+  function bindOrderOpeners() {
+    document.querySelectorAll("[data-home-order-id]").forEach(node => {
+      const open = () => openOrderDetail(node.dataset.homeOrderId);
+      node.addEventListener("click", open);
+      node.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); }
+      });
+    });
+  }
+
   function renderOrders() {
     const items=[...state.orders].sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));
     document.querySelector("#homeBusinessOrdersCount").textContent=String(items.length);
     const host=document.querySelector("#homeOrdersList");
     if(!items.length){ host.innerHTML='<div class="home-business-empty">Todavía no hay pedidos registrados.</div>'; return; }
-    host.innerHTML=`<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Pedido</th><th>Cliente</th><th>Total</th><th>Entrega</th><th>Estado</th><th>Origen</th></tr></thead><tbody>${items.map(item=>`<tr><td><strong>#${esc(String(item.id||"").slice(0,8))}</strong></td><td><strong>${esc(item.contactName||item.contactPhone||"Cliente")}</strong></td><td>${esc(money(item.total,item.currency))}</td><td>${item.fulfillmentType==="DELIVERY"?"Delivery":"Retiro"}</td><td><span class="home-pill">${esc(status(item.status))}</span></td><td>${esc(source(item.source))}</td></tr>`).join("")}</tbody></table></div>
-    <div class="home-business-mobile-list">${items.map(item=>`<article class="home-business-mobile-card"><strong>${esc(item.contactName||item.contactPhone||"Cliente")}</strong><span>${esc(money(item.total,item.currency))} · ${esc(status(item.status))}</span></article>`).join("")}</div>`;
+    host.innerHTML=`<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Pedido</th><th>Cliente</th><th>Total</th><th>Entrega</th><th>Estado</th><th>Origen</th></tr></thead><tbody>${items.map(item=>`<tr tabindex="0" data-home-order-id="${esc(item.id)}"><td><strong>#${esc(String(item.id||"").slice(0,8))}</strong></td><td><strong>${esc(item.contactName||item.contactPhone||"Cliente")}</strong></td><td>${esc(money(item.total,item.currency))}</td><td>${item.fulfillmentType==="DELIVERY"?"Delivery":"Retiro"}</td><td><span class="home-pill">${esc(status(item.status))}</span></td><td>${esc(source(item.source))}</td></tr>`).join("")}</tbody></table></div>
+    <div class="home-business-mobile-list">${items.map(item=>`<article class="home-business-mobile-card" tabindex="0" data-home-order-id="${esc(item.id)}"><strong>${esc(item.contactName||item.contactPhone||"Cliente")}</strong><span>${esc(money(item.total,item.currency))} · ${esc(status(item.status))}</span></article>`).join("")}</div>`;
+    bindOrderOpeners();
   }
 
   function renderRequests() {
