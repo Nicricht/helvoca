@@ -911,9 +911,9 @@ test('manual customer creation adds customer and updates booking selector', asyn
   await page.getByRole('tab', { name: /Clientes/ }).click();
   await page.getByRole('button', { name: 'Nuevo cliente' }).click();
 
-  await page.getByLabel('Nombre').fill('Carla Nueva');
-  await page.getByLabel('Teléfono').fill('+56977777777');
-  await page.getByLabel('Email').fill('carla@example.cl');
+  await page.locator('#homeCustomerCreateName').fill('Carla Nueva');
+  await page.locator('#homeCustomerCreatePhone').fill('+56977777777');
+  await page.locator('#homeCustomerCreateEmail').fill('carla@example.cl');
   await page.getByRole('button', { name: 'Crear cliente' }).click();
 
   expect(createPayload).toEqual({
