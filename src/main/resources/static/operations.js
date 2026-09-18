@@ -2,6 +2,8 @@ const TOKEN_KEY = "helvoca_access_token";
 const token = sessionStorage.getItem(TOKEN_KEY) || "";
 const $ = s => document.querySelector(s);
 let businessName = "Tu negocio";
+let businessTimezone = "";
+let loading = false;
 
 if (!token) location.replace("/");
 
@@ -83,7 +85,11 @@ function toast(text) {
 
 function fmtDate(value) {
   if (!value) return "";
-  try { return new Intl.DateTimeFormat("es-CL", {dateStyle:"short", timeStyle:"short"}).format(new Date(value)); }
+  try {
+    const options = {dateStyle:"short", timeStyle:"short"};
+    if (businessTimezone) options.timeZone = businessTimezone;
+    return new Intl.DateTimeFormat("es-CL", options).format(new Date(value));
+  }
   catch (_) { return value; }
 }
 
@@ -109,6 +115,14 @@ function renderReadiness(data) {
     `<span class="pill ${enabled ? "" : "bad"}">${esc(name)} ${enabled ? "✓" : "×"}</span>`).join(" ");
 
   $("#readinessWarnings").innerHTML = (data.warnings || []).map(w => `<div class="empty">${esc(w)}</div>`).join("");
+}
+
+function renderReadinessError(error) {
+  $("#readinessBadge").textContent = "ERROR";
+  $("#readinessBadge").className = "badge bad";
+  $("#readinessChecks").innerHTML = '<div class="empty">No fue posible cargar el estado de voz.</div>';
+  $("#capabilities").innerHTML = "";
+  $("#readinessWarnings").innerHTML = `<div class="empty">${esc(error?.message || "Readiness no disponible")}</div>`;
 }
 
 function renderCertification(data) {
@@ -214,13 +228,18 @@ function updateDiagnosticsSummary(readiness, certification) {
 }
 
 async function load() {
+  if (loading) return;
+  loading = true;
+  const refresh = $("#refreshBtn");
+  if (refresh) refresh.disabled = true;
   try {
-    const [data, readiness, certification] = await Promise.all([
-      api("/api/v1/operations/dashboard"),
+    const diagnosticsPromise = Promise.allSettled([
       api("/api/v1/operations/readiness"),
       api("/api/v1/operations/certification")
     ]);
+    const data = await api("/api/v1/operations/dashboard");
     businessName = data.businessName || "Tu negocio";
+    businessTimezone = data.timezone || "";
     setText("#businessName", businessName);
     document.querySelector(".brand-block strong")?.replaceChildren(document.createTextNode(businessName.toUpperCase()));
     document.title = `${businessName} · Operaciones`;
@@ -233,15 +252,33 @@ async function load() {
       healthBadge.className = `badge ${data.callFailuresToday ? "bad" : ""}`.trim();
     }
 
-    renderReadiness(readiness);
-    renderCertification(certification);
-    updateDiagnosticsSummary(readiness, certification);
     renderCalls(data.recentCalls);
+
+    const [readinessResult, certificationResult] = await diagnosticsPromise;
+    const readiness = readinessResult.status === "fulfilled" ? readinessResult.value : {ready: false};
+    const certification = certificationResult.status === "fulfilled"
+      ? certificationResult.value
+      : {available: true, state: "FAILED"};
+    if (readinessResult.status === "fulfilled") renderReadiness(readiness);
+    else renderReadinessError(readinessResult.reason);
+    if (certificationResult.status === "fulfilled") renderCertification(certification);
+    else renderCertificationError(certificationResult.reason);
+    updateDiagnosticsSummary(readiness, certification);
   } catch (err) {
     toast(err.message || "No pude cargar operaciones.");
+  } finally {
+    loading = false;
+    if (refresh) refresh.disabled = false;
   }
+}
+
+function renderCertificationError(error) {
+  $("#certificationBadge").textContent = "ERROR";
+  $("#certificationBadge").className = "badge bad";
+  $("#certificationMeta").innerHTML = `<span>${esc(error?.message || "Certificación no disponible")}</span>`;
+  $("#certificationChecks").innerHTML = '<div class="empty">No fue posible cargar el estado de certificación.</div>';
 }
 
 $("#refreshBtn")?.addEventListener("click", load);
 $("#closeCallDetailBtn")?.addEventListener("click", () => $("#callDetailPanel")?.classList.add("hidden"));
-load();
+if (token) load();
