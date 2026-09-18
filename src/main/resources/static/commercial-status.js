@@ -312,22 +312,9 @@
         .home-metric strong, .home-metric span { display: block; }
         .home-metric strong { font-size: 24px; line-height: 1; letter-spacing: -.03em; }
         .home-metric span { margin-top: 7px; color: var(--muted); font-size: 11px; }
-        .home-activity-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 8px; }
-        .home-activity-head h2 { margin: 0; font-size: 15px; }
-        .home-activity-head a { color: var(--muted); font-size: 11px; font-weight: 700; text-decoration: none; }
-        .home-activity-head a:hover { color: var(--text); }
-        .home-activity-list { display: grid; gap: 5px; }
-        .home-activity-row { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 9px; align-items: center; padding: 9px 10px; border: 1px solid rgba(255,255,255,.06); border-radius: 10px; background: rgba(255,255,255,.018); color: inherit; text-decoration: none; }
-        .home-activity-channel { min-width: 62px; color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
-        .home-activity-copy { min-width: 0; }
-        .home-activity-copy strong, .home-activity-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .home-activity-copy strong { font-size: 12px; }
-        .home-activity-copy small { margin-top: 2px; color: var(--muted); font-size: 10px; }
-        .home-activity-time { color: var(--muted); font-size: 10px; white-space: nowrap; }
-        .home-activity-empty { padding: 16px 4px; color: var(--muted); font-size: 12px; }
         @media (max-width: 900px) { .home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 520px) { .home-metrics { grid-template-columns: 1fr 1fr; } }
-        @media (max-width: 520px) { #operationalOverview { padding: 14px; } .home-activity-row { grid-template-columns: auto minmax(0,1fr); } .home-activity-time { grid-column: 2; } }
+        @media (max-width: 520px) { #operationalOverview { padding: 14px; } }
     `;
     document.head.appendChild(style);
 
@@ -346,11 +333,6 @@
             <article id="homeMinutesMetric" class="home-metric"><strong id="homeMinutesToday">–</strong><span>Minutos de voz</span></article>
             <article id="homeCostMetric" class="home-metric"><strong id="homeCostToday">–</strong><span>Costo estimado USD</span></article>
         </div>
-        <div class="home-activity-head">
-            <h2>Actividad reciente</h2>
-            <a href="/conversations.html">Ver conversaciones</a>
-        </div>
-        <div id="homeRecentActivity" class="home-activity-list"><div class="home-activity-empty">Cargando actividad…</div></div>
     `;
     heading.insertAdjacentElement('afterend', overview);
 
@@ -373,64 +355,11 @@
         return `${values.year}-${values.month}-${values.day}`;
     }
 
-    function shortTime(value, timeZone) {
-        if (!value) return '';
-        try {
-            return new Intl.DateTimeFormat('es-CL', {
-                timeZone: timeZone || 'UTC', hour: '2-digit', minute: '2-digit'
-            }).format(new Date(value));
-        } catch (_) {
-            return '';
-        }
-    }
-
-    function renderActivity(operations, whatsapp) {
-        const root = overview.querySelector('#homeRecentActivity');
-        const timeZone = operations.timezone || 'UTC';
-        const calls = (operations.recentCalls || []).map(call => ({
-            channel: 'Llamada',
-            person: call.callerNumber || 'Número oculto',
-            detail: call.resolution || (call.status === 'FAILED' ? 'Llamada con fallo' : 'Llamada atendida'),
-            at: call.startedAt
-        }));
-        const messages = (whatsapp || []).map(conversation => ({
-            channel: 'WhatsApp',
-            person: conversation.sender || 'Número desconocido',
-            detail: 'Conversación por WhatsApp',
-            at: conversation.lastMessageAt || conversation.openedAt
-        }));
-        const recent = [...calls, ...messages]
-            .filter(item => item.at)
-            .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
-            .slice(0, 5);
-
-        if (!recent.length) {
-            root.innerHTML = '<div class="home-activity-empty">Todavía no hay actividad real.</div>';
-            return;
-        }
-
-        root.innerHTML = recent.map(item => `
-            <a class="home-activity-row" href="/conversations.html">
-                <span class="home-activity-channel">${item.channel}</span>
-                <span class="home-activity-copy"><strong>${escapeHtml(item.person)}</strong><small>${escapeHtml(item.detail)}</small></span>
-                <span class="home-activity-time">${escapeHtml(shortTime(item.at, timeZone))}</span>
-            </a>
-        `).join('');
-    }
-
-    function escapeHtml(value) {
-        return String(value ?? '').replace(/[&<>'"]/g, char => ({
-            '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-        })[char]);
-    }
-
     function renderOperational(operations, whatsapp) {
         const timeZone = operations.timezone || 'UTC';
         const today = dateKey(operations.localNow || new Date().toISOString(), timeZone);
         const whatsappToday = (whatsapp || []).filter(conversation =>
             dateKey(conversation.lastMessageAt || conversation.openedAt, timeZone) === today).length;
-        const pending = Number(operations.openRequests || 0) + Number(operations.unansweredQuestions || 0);
-
         overview.querySelector('#homeCallsToday').textContent = String(Number(operations.callsToday || 0));
         overview.querySelector('#homeWhatsAppToday').textContent = String(whatsappToday);
         overview.querySelector('#homeBookingsToday').textContent = String(Number(operations.bookingsToday || 0));
@@ -441,7 +370,6 @@
         const seconds = Number(operations.callDurationSecondsToday || 0);
         overview.querySelector('#homeMinutesToday').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
         overview.querySelector('#homeCostToday').textContent = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(Number(operations.estimatedCallCostTodayUsd || 0));
-        renderActivity(operations, whatsapp);
     }
 
     async function loadOperational(force = false) {
@@ -459,10 +387,8 @@
             }
             renderOperational(operations, whatsapp);
             lastLoadedAt = Date.now();
-        } catch (error) {
-            if (error.status !== 401) {
-                overview.querySelector('#homeRecentActivity').innerHTML = '<div class="home-activity-empty">La actividad no está disponible ahora. La configuración sigue accesible debajo.</div>';
-            }
+        } catch (_) {
+            // Keep the dashboard visible with its last confirmed values.
         } finally {
             loading = false;
         }
