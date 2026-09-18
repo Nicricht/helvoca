@@ -69,6 +69,14 @@
 .home-detail-history strong{font-size:11px}
 .home-detail-link{display:inline-flex;justify-content:center;align-items:center;min-height:38px;padding:0 12px;border-radius:10px;background:rgba(124,92,255,.14);border:1px solid rgba(124,92,255,.28);color:#ddd6ff;text-decoration:none;font-size:11px;font-weight:800}
 .home-booking-action-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.home-booking-primary{min-height:36px;padding:0 12px;border:1px solid rgba(124,92,255,.38);border-radius:9px;background:rgba(124,92,255,.15);color:#e4ddff;font-size:11px;font-weight:800;cursor:pointer}
+.home-booking-primary:hover{background:rgba(124,92,255,.22)}
+.home-booking-primary:disabled{opacity:.55;cursor:not-allowed}
+.home-booking-reschedule{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;padding:10px;border:1px solid rgba(124,92,255,.18);border-radius:10px;background:rgba(124,92,255,.045)}
+.home-booking-reschedule label{display:grid;gap:4px;color:var(--muted);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.home-booking-reschedule select{min-height:36px;padding:0 9px;border:1px solid var(--border);border-radius:9px;background:rgba(8,11,16,.72);color:var(--text);font-size:11px}
+.home-booking-reschedule p{grid-column:1/-1;margin:0}
+.home-booking-reschedule button{width:100%}
 .home-booking-danger{min-height:36px;padding:0 12px;border:1px solid rgba(255,113,135,.35);border-radius:9px;background:rgba(255,113,135,.09);color:#ffb2bf;font-size:11px;font-weight:800;cursor:pointer}
 .home-booking-danger:hover{background:rgba(255,113,135,.14)}
 .home-booking-danger:disabled{opacity:.55;cursor:not-allowed}
@@ -152,3 +160,5 @@
 .home-incident-impact-summary strong{font-size:9px}
 .home-incident-impact-summary span{color:var(--muted);font-size:8px}
 @media(max-width:760px){.home-incident-impact-summary{align-items:flex-start;flex-direction:column;gap:2px}}
+
+@media(max-width:480px){.home-booking-reschedule{grid-template-columns:1fr}.home-booking-reschedule p{grid-column:auto}}
