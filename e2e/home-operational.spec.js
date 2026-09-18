@@ -51,6 +51,25 @@ async function mockReadyHome(page) {
     { id: 'cust1', name: 'Ana Reserva', phone: '+56922222222', email: 'ana@example.cl', createdAt: '2026-09-17T10:00:00Z' },
     { id: 'cust2', name: 'Bruno Masaje', phone: '+56955555555', email: 'bruno@example.cl', createdAt: '2026-09-17T11:00:00Z' }
   ])));
+  await page.route('**/api/v1/customers/cust1/profile', route => route.fulfill(json({
+    customer: {
+      id: 'cust1', name: 'Ana Reserva', phone: '+56922222222', email: 'ana@example.cl',
+      notes: 'Prefiere horario de tarde',
+      createdAt: '2026-09-17T10:00:00Z', updatedAt: '2026-09-18T10:00:00Z'
+    },
+    bookings: [
+      {
+        id: 'b1', customerId: 'cust1', serviceId: 'svc1',
+        startAt: '2026-09-18T15:00:00Z', endAt: '2026-09-18T15:30:00Z',
+        status: 'CONFIRMED', source: 'AI_CALL'
+      },
+      {
+        id: 'b-old', customerId: 'cust1', serviceId: 'svc2',
+        startAt: '2026-09-10T16:00:00Z', endAt: '2026-09-10T17:00:00Z',
+        status: 'CANCELLED', source: 'ADMIN'
+      }
+    ]
+  })));
   await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([
     { id: 'o1', operationId: 'op1', sourceReferenceId: 'wa-order', status: 'CONFIRMED', fulfillmentType: 'DELIVERY', contactName: 'Juan Pedido', contactPhone: '+56933333333', deliveryAddress: 'Av. Demo 123, Santiago', subtotal: 15990, deliveryFee: 3000, total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z', lines: [{ name: 'Producto demo', quantity: 1, unitPrice: 15990, lineTotal: 15990 }] }
   ])));
@@ -602,6 +621,18 @@ test('customers workspace sorts and renders contact data', async ({ page }) => {
   await expect(customers.nth(1)).toHaveText('Bruno Masaje');
   await expect(page.locator('#homeCustomersList')).toContainText('+56922222222');
   await expect(page.locator('#homeCustomersList')).toContainText('ana@example.cl');
+  await page.locator('#homeCustomersList [data-home-customer-id="cust1"]').click();
+  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('#homeBookingDetailDrawer .eyebrow')).toHaveText('CLIENTE');
+  await expect(page.locator('#homeBookingDetailTitle')).toHaveText('Ana Reserva');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Prefiere horario de tarde');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Historial de reservas');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Peluquería');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Masaje');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Confirmada');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Cancelada');
+  await page.locator('#homeBookingDetailClose').click();
+  await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
   await expect(page.locator('.nav-conversations')).toHaveAttribute('href', '/conversations.html');
 });
 

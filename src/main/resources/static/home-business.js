@@ -891,12 +891,81 @@
     host.innerHTML=items.map(item=>`<article class="home-simple-row"><div><strong>${esc(item.title||item.type||"Solicitud")}</strong><span>${esc(item.description||item.contactName||"")}</span></div><span class="home-pill">${esc(status(item.status))}</span></article>`).join("");
   }
 
+  function customerProfileFacts(customer) {
+    return `<div class="home-detail-facts">
+      <div><span>Teléfono</span><strong>${esc(customer.phone || "Sin teléfono")}</strong></div>
+      <div><span>Email</span><strong>${esc(customer.email || "Sin email")}</strong></div>
+      <div><span>Cliente desde</span><strong>${esc(fmtCompact(customer.createdAt) || "Sin fecha")}</strong></div>
+      <div><span>Actualizado</span><strong>${esc(fmtCompact(customer.updatedAt) || "Sin fecha")}</strong></div>
+    </div>${customer.notes ? `<div class="home-detail-note"><span>Notas</span><p>${esc(customer.notes)}</p></div>` : ""}`;
+  }
+
+  function renderCustomerBookingHistory(bookings) {
+    const items = Array.isArray(bookings) ? bookings : [];
+    if (!items.length) {
+      return '<section class="home-detail-section"><h3>Historial de reservas</h3><p class="home-detail-muted">Este cliente todavía no tiene reservas.</p></section>';
+    }
+    const services = new Map(state.services.map(item => [String(item.id), item]));
+    return `<section class="home-detail-section"><h3>Historial de reservas</h3><div class="home-detail-history">${items.map(item => {
+      const service = services.get(String(item.serviceId)) || {};
+      const label = [service.name || "Servicio", status(item.status), source(item.source)].filter(Boolean).join(" · ");
+      return `<div><span>${esc(fmtCompact(item.startAt))}</span><strong>${esc(label)}</strong></div>`;
+    }).join("")}</div></section>`;
+  }
+
+  async function openCustomerDetail(id) {
+    const fallback = state.customers.find(item => String(item.id) === String(id));
+    if (!fallback) return;
+
+    ensureBookingDrawer();
+    document.querySelector("#homeBookingDetailDrawer .eyebrow").textContent = "CLIENTE";
+    document.querySelector("#homeBookingDetailTitle").textContent = fallback.name || fallback.phone || "Cliente";
+    document.querySelector("#homeBookingDetailMeta").textContent = fallback.createdAt
+      ? `Cliente desde ${fmtCompact(fallback.createdAt)}`
+      : "Ficha de cliente";
+
+    const body = document.querySelector("#homeBookingDetailBody");
+    body.innerHTML = customerProfileFacts(fallback) + '<div class="home-detail-loading">Cargando historial…</div>';
+
+    const backdrop = document.querySelector("#homeBookingDetailBackdrop");
+    backdrop.classList.remove("hidden");
+    backdrop.setAttribute("aria-hidden", "false");
+    document.body.classList.add("home-detail-open");
+
+    try {
+      const profile = await api(`/api/v1/customers/${encodeURIComponent(id)}/profile`);
+      const customer = profile?.customer || fallback;
+      document.querySelector("#homeBookingDetailTitle").textContent = customer.name || customer.phone || "Cliente";
+      document.querySelector("#homeBookingDetailMeta").textContent = customer.createdAt
+        ? `Cliente desde ${fmtCompact(customer.createdAt)}`
+        : "Ficha de cliente";
+      body.innerHTML = customerProfileFacts(customer) + renderCustomerBookingHistory(profile?.bookings);
+    } catch (error) {
+      body.innerHTML = customerProfileFacts(fallback) +
+        '<section class="home-detail-section"><h3>Historial de reservas</h3><p class="home-detail-muted">No pude cargar el historial de este cliente.</p></section>';
+    }
+  }
+
+  function bindCustomerOpeners() {
+    document.querySelectorAll("[data-home-customer-id]").forEach(node => {
+      const open = () => openCustomerDetail(node.dataset.homeCustomerId);
+      node.addEventListener("click", open);
+      node.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      });
+    });
+  }
+
   function renderCustomers() {
     const items=[...state.customers].sort((a,b)=>String(a.name||a.phone||"").localeCompare(String(b.name||b.phone||""),"es"));
     document.querySelector("#homeBusinessCustomersCount").textContent=String(items.length);
     const host=document.querySelector("#homeCustomersList");
     if(!items.length){ host.innerHTML='<div class="home-business-empty">Todavía no hay clientes registrados.</div>'; return; }
-    host.innerHTML=items.map(item=>`<article class="home-simple-row"><div><strong>${esc(item.name||item.phone||"Cliente")}</strong><span>${esc([item.phone,item.email].filter(Boolean).join(" · "))}</span></div><span class="home-pill">Cliente</span></article>`).join("");
+    host.innerHTML=items.map(item=>`<article class="home-simple-row" tabindex="0" data-home-customer-id="${esc(item.id)}"><div><strong>${esc(item.name||item.phone||"Cliente")}</strong><span>${esc([item.phone,item.email].filter(Boolean).join(" · "))}</span></div><span class="home-pill">Ver ficha</span></article>`).join("");
+    bindCustomerOpeners();
   }
 
   function businessParts(value = new Date()) {

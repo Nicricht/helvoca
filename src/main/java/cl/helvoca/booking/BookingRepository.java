@@ -11,6 +11,7 @@ import java.util.UUID;
 
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
     List<Booking> findAllByBusinessIdOrderByStartAtDesc(UUID businessId);
+    List<Booking> findAllByBusinessIdAndCustomerIdOrderByStartAtDesc(UUID businessId, UUID customerId);
     Optional<Booking> findByIdAndBusinessId(UUID id, UUID businessId);
     Optional<Booking> findByIdAndBusinessIdAndCustomerId(UUID id, UUID businessId, UUID customerId);
     Optional<Booking> findByOperationIdAndBusinessId(UUID operationId, UUID businessId);

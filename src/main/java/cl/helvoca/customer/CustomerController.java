@@ -13,14 +13,21 @@ import java.util.UUID;
 @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
 public class CustomerController {
     private final CustomerService service;
+    private final CustomerProfileService profileService;
 
-    public CustomerController(CustomerService service) { this.service = service; }
+    public CustomerController(CustomerService service, CustomerProfileService profileService) {
+        this.service = service;
+        this.profileService = profileService;
+    }
 
     @GetMapping
     public List<CustomerResponse> list() { return service.list(); }
 
     @GetMapping("/{id}")
     public CustomerResponse get(@PathVariable UUID id) { return service.get(id); }
+
+    @GetMapping("/{id}/profile")
+    public CustomerProfileResponse profile(@PathVariable UUID id) { return profileService.get(id); }
 
     @GetMapping("/search")
     public CustomerResponse search(@RequestParam String phone) { return service.findByPhone(phone); }

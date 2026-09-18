@@ -178,3 +178,6 @@
 @media(max-width:760px){.home-incident-impact-summary{align-items:flex-start;flex-direction:column;gap:2px}}
 
 @media(max-width:480px){.home-booking-reschedule{grid-template-columns:1fr}.home-booking-reschedule p{grid-column:auto}}
+
+[data-home-customer-id]{cursor:pointer}
+[data-home-customer-id]:hover,[data-home-customer-id]:focus-visible{background:rgba(124,92,255,.075);outline:none}
