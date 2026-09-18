@@ -18,8 +18,16 @@ class ConsoleAiOnboardingTest {
         assertTrue(html.contains("id=\"confirmProposalBtn\""));
         assertTrue(html.contains("id=\"editProposalBtn\""));
         assertTrue(html.contains("id=\"advancedToggleBtn\""));
-        assertFalse(section(html, "id=\"registerForm\"", "</form>").contains("name=\"timezone\""));
-        assertFalse(section(html, "id=\"registerForm\"", "</form>").contains("name=\"humanTransferPhone\""));
+        String register = section(html, "id=\"registerForm\"", "</form>");
+        assertTrue(register.contains("name=\"businessName\""));
+        assertTrue(register.contains("name=\"email\""));
+        assertTrue(register.contains("name=\"password\""));
+        assertFalse(register.contains("name=\"adminName\""));
+        assertFalse(register.contains("name=\"sourceUrl\""));
+        assertFalse(register.contains("name=\"timezone\""));
+        assertFalse(register.contains("name=\"humanTransferPhone\""));
+        assertTrue(register.contains(">Crear cuenta<"));
+        assertTrue(script.contains("adminName: businessName"));
 
         assertTrue(script.contains("/api/v1/onboarding/analyze"));
         assertTrue(script.contains("$(\"#confirmProposalBtn\").addEventListener"));
