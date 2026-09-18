@@ -351,8 +351,8 @@ test('ready customer sees live operational home instead of setup cards', async (
 
   await page.locator('#homeIncidentTimeFrom').selectOption('09:00');
   await page.locator('#homeIncidentTimeTo').selectOption('13:00');
-  await expect(page.locator('#homeIncidentImpactSummary')).toContainText('1 cliente');
-  await expect(page.locator('#homeIncidentImpactSummary')).toContainText('1 reserva');
+  await expect(page.locator('#homeIncidentImpactSummary')).toContainText('1 cliente afectado');
+  await expect(page.locator('#homeIncidentImpactSummary')).not.toContainText('reserva');
   await expect(page.locator('#homeIncidentPreviewBtn')).toBeEnabled();
   await page.locator('#homeIncidentPreviewBtn').click();
   await expect(page.locator('#homeIncidentPreview')).toContainText('1 cliente afectado');
