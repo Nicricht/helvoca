@@ -31,7 +31,12 @@ public class OutboundMessage {
     @Column(name = "idempotency_key", nullable = false, length = 220) private String idempotencyKey;
     @Column(name = "content_text", nullable = false, columnDefinition = "text") private String contentText;
     @Column(name = "provider_message_id", length = 180) private String providerMessageId;
+    @Column(name = "provider_delivery_status", length = 20) private String providerDeliveryStatus;
     @Column(name = "failure_code", length = 80) private String failureCode;
+    @Column(name = "retry_count", nullable = false) private int retryCount;
+    @Column(name = "delivery_updated_at") private Instant deliveryUpdatedAt;
+    @Column(name = "delivered_at") private Instant deliveredAt;
+    @Column(name = "read_at") private Instant readAt;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
     @Column(name = "sent_at") private Instant sentAt;
@@ -70,8 +75,18 @@ public class OutboundMessage {
     public void setContentText(String contentText) { this.contentText = contentText; }
     public String getProviderMessageId() { return providerMessageId; }
     public void setProviderMessageId(String providerMessageId) { this.providerMessageId = providerMessageId; }
+    public String getProviderDeliveryStatus() { return providerDeliveryStatus; }
+    public void setProviderDeliveryStatus(String providerDeliveryStatus) { this.providerDeliveryStatus = providerDeliveryStatus; }
     public String getFailureCode() { return failureCode; }
     public void setFailureCode(String failureCode) { this.failureCode = failureCode; }
+    public int getRetryCount() { return retryCount; }
+    public void setRetryCount(int retryCount) { this.retryCount = retryCount; }
+    public Instant getDeliveryUpdatedAt() { return deliveryUpdatedAt; }
+    public void setDeliveryUpdatedAt(Instant deliveryUpdatedAt) { this.deliveryUpdatedAt = deliveryUpdatedAt; }
+    public Instant getDeliveredAt() { return deliveredAt; }
+    public void setDeliveredAt(Instant deliveredAt) { this.deliveredAt = deliveredAt; }
+    public Instant getReadAt() { return readAt; }
+    public void setReadAt(Instant readAt) { this.readAt = readAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public Instant getSentAt() { return sentAt; }

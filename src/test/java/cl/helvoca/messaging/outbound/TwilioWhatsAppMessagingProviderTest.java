@@ -69,7 +69,9 @@ class TwilioWhatsAppMessagingProviderTest {
         assertEquals(Map.of(
                 "To", "whatsapp:+56933333333",
                 "From", "whatsapp:+56922222222",
-                "Body", "Mensaje seguro"), parseForm(bodyOf(request)));
+                "Body", "Mensaje seguro",
+                "StatusCallback", "https://helvoca.example/webhooks/v1/twilio/whatsapp-status"),
+                parseForm(bodyOf(request)));
     }
 
     @Test
@@ -110,6 +112,7 @@ class TwilioWhatsAppMessagingProviderTest {
         TwilioProperties twilio = new TwilioProperties();
         twilio.setAccountSid("ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         twilio.setAuthToken("test-token");
+        twilio.setPublicBaseUrl("https://helvoca.example");
         return new TwilioWhatsAppMessagingProvider(twilio, phones, http);
     }
 

@@ -119,6 +119,36 @@ public class BookingIncidentCampaignActivationService {
         return new ActivationResult(campaign.getId(), campaign.getStatus().name(), queued);
     }
 
+    @Transactional
+    public RetryResult retryRecipient(UUID businessId,
+                                      UUID campaignId,
+                                      UUID recipientId,
+                                      boolean confirmed) {
+        if (!confirmed) {
+            throw new IllegalArgumentException("Explicit retry confirmation is required");
+        }
+        BookingIncidentCampaign campaign = campaigns.findForUpdateByIdAndBusinessId(campaignId, businessId)
+                .orElseThrow(() -> new IllegalArgumentException("Incident campaign not found"));
+        BookingIncidentRecipient recipient = recipients
+                .findByIdAndCampaignIdAndBusinessId(recipientId, campaignId, businessId)
+                .orElseThrow(() -> new IllegalArgumentException("Incident recipient not found"));
+        if (recipient.getOutboundMessageId() == null) {
+            throw new IllegalStateException("Recipient has no outbound message to retry");
+        }
+
+        ActivationReadiness readiness = evaluate(businessId, campaign, List.of(recipient));
+        List<Blocker> blockers = readiness.blockers().stream()
+                .filter(blocker -> !"CAMPAIGN_NOT_PREPARED".equals(blocker.code()))
+                .filter(blocker -> !"RECIPIENT_NOT_PREPARED".equals(blocker.code()))
+                .toList();
+        if (!blockers.isEmpty()) {
+            throw new IllegalStateException(blockers.getFirst().message());
+        }
+
+        outbox.retry(businessId, recipient.getOutboundMessageId());
+        return new RetryResult(campaignId, recipientId, "QUEUED");
+    }
+
     private ActivationReadiness evaluate(UUID businessId,
                                          BookingIncidentCampaign campaign,
                                          List<BookingIncidentRecipient> items) {
@@ -236,4 +266,8 @@ public class BookingIncidentCampaignActivationService {
     public record ActivationResult(UUID campaignId,
                                    String status,
                                    int queuedRecipients) { }
+
+    public record RetryResult(UUID campaignId,
+                              UUID recipientId,
+                              String status) { }
 }

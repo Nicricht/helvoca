@@ -274,7 +274,7 @@ jobs:
           cache: maven
 
       - name: Run focused booking backend tests
-        run: mvn --batch-mode --no-transfer-progress -Dtest=BookingServiceTest,BookingActivityServiceTest,CustomerProfileServiceTest,AuditQueryServiceTest,AuditExportServiceTest,CustomerExportServiceTest,RoleAuthorizationContractTest,PostgresRowLevelSecurityIntegrationTest test
+        run: mvn --batch-mode --no-transfer-progress -Dtest=BookingServiceTest,BookingActivityServiceTest,CustomerProfileServiceTest,AuditQueryServiceTest,AuditExportServiceTest,CustomerExportServiceTest,RoleAuthorizationContractTest,PostgresRowLevelSecurityIntegrationTest,BookingIncidentDeliveryStatusServiceTest,TwilioWhatsAppMessagingProviderTest,TwilioWhatsAppDeliveryStatusServiceTest,TwilioWhatsAppDeliveryStatusControllerTest,OutboundDispatchOutboxServiceTest test
 
       - name: Set up Node.js
         uses: actions/setup-node@v5

@@ -20,13 +20,16 @@ import java.util.UUID;
 public class BookingIncidentCampaignController {
     private final BookingIncidentCampaignService service;
     private final BookingIncidentCampaignActivationService activation;
+    private final BookingIncidentDeliveryStatusService deliveryStatus;
     private final TenantProvider tenantProvider;
 
     public BookingIncidentCampaignController(BookingIncidentCampaignService service,
                                              BookingIncidentCampaignActivationService activation,
+                                             BookingIncidentDeliveryStatusService deliveryStatus,
                                              TenantProvider tenantProvider) {
         this.service = service;
         this.activation = activation;
+        this.deliveryStatus = deliveryStatus;
         this.tenantProvider = tenantProvider;
     }
 
@@ -35,7 +38,10 @@ public class BookingIncidentCampaignController {
         UUID businessId = tenantProvider.requireBusinessId();
         return ResponseEntity.ok(
                 service.recent(businessId).stream()
-                        .map(campaign -> HistoryView.from(campaign, activation.readiness(businessId, campaign.id())))
+                        .map(campaign -> HistoryView.from(
+                                campaign,
+                                activation.readiness(businessId, campaign.id()),
+                                deliveryStatus.forCampaign(businessId, campaign.id())))
                         .toList()
         );
     }
@@ -52,6 +58,20 @@ public class BookingIncidentCampaignController {
         boolean confirmed = request != null && request.confirmed();
         return ResponseEntity.ok(ActivationView.from(
                 activation.activate(tenantProvider.requireBusinessId(), campaignId, confirmed)));
+    }
+
+    @PostMapping("/{campaignId}/recipients/{recipientId}/retry")
+    public ResponseEntity<RetryView> retry(
+            @PathVariable UUID campaignId,
+            @PathVariable UUID recipientId,
+            @RequestBody RetryRequest request) {
+        boolean confirmed = request != null && request.confirmed();
+        return ResponseEntity.ok(RetryView.from(
+                activation.retryRecipient(
+                        tenantProvider.requireBusinessId(),
+                        campaignId,
+                        recipientId,
+                        confirmed)));
     }
 
     @PostMapping
@@ -95,10 +115,13 @@ public class BookingIncidentCampaignController {
             long recipientCount,
             Instant createdAt,
             boolean activationReady,
-            List<BookingIncidentCampaignActivationService.Blocker> activationBlockers
+            List<BookingIncidentCampaignActivationService.Blocker> activationBlockers,
+            List<BookingIncidentDeliveryStatusService.RecipientDeliveryStatus> recipients
     ) {
-        static HistoryView from(BookingIncidentCampaignService.CampaignSummary campaign,
-                                BookingIncidentCampaignActivationService.ActivationReadiness readiness) {
+        static HistoryView from(
+                BookingIncidentCampaignService.CampaignSummary campaign,
+                BookingIncidentCampaignActivationService.ActivationReadiness readiness,
+                List<BookingIncidentDeliveryStatusService.RecipientDeliveryStatus> recipients) {
             return new HistoryView(
                     campaign.id(),
                     campaign.reason(),
@@ -108,12 +131,20 @@ public class BookingIncidentCampaignController {
                     campaign.recipientCount(),
                     campaign.createdAt(),
                     readiness.ready(),
-                    readiness.blockers()
+                    readiness.blockers(),
+                    recipients
             );
         }
     }
 
     public record ActivationRequest(boolean confirmed) { }
+    public record RetryRequest(boolean confirmed) { }
+
+    public record RetryView(UUID campaignId, UUID recipientId, String status) {
+        static RetryView from(BookingIncidentCampaignActivationService.RetryResult result) {
+            return new RetryView(result.campaignId(), result.recipientId(), result.status());
+        }
+    }
 
     public record ActivationReadinessView(
             boolean ready,

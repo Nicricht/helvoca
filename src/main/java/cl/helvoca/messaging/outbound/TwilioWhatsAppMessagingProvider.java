@@ -62,6 +62,9 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
                 || !ACCOUNT_SID.matcher(twilio.getAccountSid().trim()).matches()) {
             throw new IllegalStateException("Twilio outbound credentials are not configured");
         }
+        if (!twilio.hasSecurePublicBaseUrl()) {
+            throw new IllegalStateException("Twilio public HTTPS base URL is required for delivery status callbacks");
+        }
 
         String recipient = normalizeE164(command.recipient());
         if (command.content() == null || command.content().isBlank()) {
@@ -84,7 +87,9 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
             String basic = Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
             String body = form("To", "whatsapp:" + recipient)
                     + "&" + form("From", "whatsapp:" + sender)
-                    + "&" + form("Body", command.content());
+                    + "&" + form("Body", command.content())
+                    + "&" + form("StatusCallback",
+                            twilio.absoluteWebhook(TwilioWhatsAppDeliveryStatusController.PATH));
             URI uri = URI.create(API_BASE + "/2010-04-01/Accounts/" + accountSid + "/Messages.json");
             HttpRequest request = HttpRequest.newBuilder(uri)
                     .timeout(Duration.ofSeconds(12))

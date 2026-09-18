@@ -9,5 +9,6 @@ import java.util.UUID;
 public interface OutboundMessageRepository extends JpaRepository<OutboundMessage, UUID> {
     Optional<OutboundMessage> findByIdAndBusinessId(UUID id, UUID businessId);
     Optional<OutboundMessage> findByBusinessIdAndIdempotencyKey(UUID businessId, String idempotencyKey);
+    Optional<OutboundMessage> findTopByProviderAndProviderMessageIdOrderByUpdatedAtDesc(String provider, String providerMessageId);
     List<OutboundMessage> findTop100ByBusinessIdOrderByCreatedAtDesc(UUID businessId);
 }

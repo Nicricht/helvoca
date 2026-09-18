@@ -165,15 +165,20 @@ public class OutboundMessagingService {
             if (result == null || result.providerMessageId() == null || result.providerMessageId().isBlank()) {
                 throw new IllegalStateException("Provider did not confirm message id");
             }
+            Instant now = Instant.now();
             message.setProvider(provider.id());
             message.setProviderMessageId(result.providerMessageId().trim());
+            message.setProviderDeliveryStatus("SENT");
+            message.setDeliveryUpdatedAt(now);
             message.setFailureCode(null);
-            message.setSentAt(Instant.now());
+            message.setSentAt(now);
             message.setStatus(OutboundMessage.Status.SENT);
             return messages.saveAndFlush(message);
         } catch (RuntimeException e) {
             message.setProvider(provider.id());
             message.setProviderMessageId(null);
+            message.setProviderDeliveryStatus("FAILED");
+            message.setDeliveryUpdatedAt(Instant.now());
             message.setSentAt(null);
             message.setFailureCode(safeFailureCode(e));
             message.setStatus(OutboundMessage.Status.FAILED);
