@@ -338,7 +338,9 @@
             <a id="homeCallsMetric" class="home-metric" href="/conversations.html?channel=calls" aria-label="Ver llamadas de hoy"><strong id="homeCallsToday">–</strong><span>Llamadas hoy</span></a>
             <a id="homeWhatsAppMetric" class="home-metric" href="/conversations.html?channel=whatsapp" aria-label="Ver conversaciones de WhatsApp de hoy"><strong id="homeWhatsAppToday">–</strong><span>WhatsApp hoy</span></a>
             <a id="homeBookingsMetric" class="home-metric" href="/?tab=bookings" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>Reservas hoy</span></a>
-            <a id="homePendingMetric" class="home-metric" href="/?tab=requests" aria-label="Ver pendientes"><strong id="homePending">–</strong><span>Pendientes</span></a>
+            <a id="homeCustomersMetric" class="home-metric" href="/?tab=customers" aria-label="Ver clientes"><strong id="homeCustomersToday">–</strong><span>Clientes nuevos</span></a>
+            <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests" aria-label="Ver solicitudes abiertas"><strong id="homeOpenRequests">–</strong><span>Solicitudes abiertas</span></a>
+            <a id="homeQuestionsMetric" class="home-metric" href="/?tab=requests" aria-label="Ver preguntas pendientes"><strong id="homeQuestionsPending">–</strong><span>Preguntas pendientes</span></a>
         </div>
         <div class="home-activity-head">
             <h2>Actividad reciente</h2>
@@ -423,12 +425,12 @@
         const today = dateKey(operations.localNow || new Date().toISOString(), timeZone);
         const whatsappToday = (whatsapp || []).filter(conversation =>
             dateKey(conversation.lastMessageAt || conversation.openedAt, timeZone) === today).length;
-        const pending = Number(operations.openRequests || 0) + Number(operations.unansweredQuestions || 0);
-
         overview.querySelector('#homeCallsToday').textContent = String(Number(operations.callsToday || 0));
         overview.querySelector('#homeWhatsAppToday').textContent = String(whatsappToday);
         overview.querySelector('#homeBookingsToday').textContent = String(Number(operations.bookingsToday || 0));
-        overview.querySelector('#homePending').textContent = String(pending);
+        overview.querySelector('#homeCustomersToday').textContent = String(Number(operations.newCustomersToday || 0));
+        overview.querySelector('#homeOpenRequests').textContent = String(Number(operations.openRequests || 0));
+        overview.querySelector('#homeQuestionsPending').textContent = String(Number(operations.unansweredQuestions || 0));
         renderActivity(operations, whatsapp);
     }
 
