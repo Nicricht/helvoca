@@ -353,6 +353,9 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.getByRole('button', { name: 'Empezar preparación' })).toBeVisible();
   await page.locator('#homeBookingDetailClose').click();
 
+  await page.getByRole('button', { name: /Solicitudes/ }).click();
+  await expect(page.locator('#homeRequestsList')).toContainText('No hay solicitudes recientes.');
+
   await page.getByRole('button', { name: /Clientes/ }).click();
   await expect(page.locator('#homeCustomersList')).toContainText('Ana Reserva');
   await expect(page.locator('.nav-conversations')).toHaveAttribute('href', '/conversations.html');
