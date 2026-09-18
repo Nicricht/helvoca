@@ -115,3 +115,29 @@ test('conversation inbox keeps calls usable when WhatsApp temporarily fails', as
   await expect(page.getByText('El cliente reservó una hora.')).toBeVisible();
   await expect(page.locator('#message')).toContainText('WhatsApp no disponible');
 });
+
+
+test('deep link opens the requested call even when another channel is newer', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await page.route('**/api/v1/operations/dashboard', route => route.fulfill(json({
+    businessName: 'Negocio E2E',
+    recentCalls: [{ id: 'call-1', callerNumber: '+56911111111', status: 'COMPLETED', startedAt: '2026-09-17T18:00:00Z', durationSeconds: 95, resolution: 'BOOKING_CREATED' }]
+  })));
+  await page.route('**/api/v1/messaging/conversations', route => route.fulfill(json([{
+    id: 'wa-1', channel: 'whatsapp', sender: '+56922222222', recipient: '+56933333333',
+    openedAt: '2026-09-17T18:05:00Z', lastMessageAt: '2026-09-17T18:06:00Z'
+  }])));
+  await page.route('**/api/v1/calls/call-1', route => route.fulfill(json({
+    call: { id: 'call-1', callerNumber: '+56911111111', status: 'COMPLETED', startedAt: '2026-09-17T18:00:00Z', durationSeconds: 95, resolution: 'BOOKING_CREATED' },
+    summary: 'Reserva enlazada desde operaciones.', transcript: [], actions: []
+  })));
+  await page.route('**/api/v1/messaging/conversations/wa-1', route => route.fulfill(json({
+    conversation: { id: 'wa-1', sender: '+56922222222' }, messages: []
+  })));
+
+  await page.goto('/conversations.html?call=call-1');
+
+  await expect(page.locator('#detailCustomer')).toHaveText('+56911111111');
+  await expect(page.locator('#detailSummary')).toContainText('Reserva enlazada desde operaciones.');
+  await expect(page.getByRole('button', { name: 'Llamadas' })).toHaveClass(/active/);
+});

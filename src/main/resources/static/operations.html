@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Helvoca · Operaciones</title>
   <link rel="stylesheet" href="/operations.css">
-  <link rel="stylesheet" href="/operations-business.css?v=20260917-2">
 </head>
 <body>
 <header class="topbar">
@@ -18,7 +17,7 @@
       <a class="nav-home" href="/">Inicio</a>
       <a class="nav-conversations" href="/conversations.html">Conversaciones</a>
       <a class="nav-operations active" href="/operations.html">Operaciones</a>
-      <a class="nav-config" href="/#configuration">Configuración</a>
+      <a class="nav-config" href="/settings.html">Configuración</a>
     </nav>
     <div class="topbar-actions">
       <a class="quiet-action" href="/simulator.html">Probar</a>
@@ -30,79 +29,18 @@
 <main class="operations-main">
   <section class="hero">
     <div>
-      <p class="eyebrow">OPERACIÓN</p>
-      <h1>Hoy en tu negocio</h1>
+      <p class="eyebrow">HISTORIAL Y DIAGNÓSTICO</p>
+      <h1>Operaciones avanzadas</h1>
       <p class="hero-context"><strong id="businessName">Helvoca</strong><span aria-hidden="true">·</span><span id="localNow" class="muted">Cargando…</span></p>
     </div>
     <div id="healthBadge" class="badge">Conectando</div>
   </section>
 
-  <section id="metrics" class="metrics" aria-label="Resumen de hoy">
-    <article><strong id="callsToday">–</strong><span>Llamadas</span></article>
-    <article><strong id="bookingsToday">–</strong><span>Reservas</span></article>
-    <article><strong id="customersToday">–</strong><span>Clientes nuevos</span></article>
-    <article><strong id="openRequests">–</strong><span>Solicitudes abiertas</span></article>
-    <article><strong id="unknownQuestions">–</strong><span>Preguntas pendientes</span></article>
+  <section id="metrics" class="metrics operations-advanced-metrics" aria-label="Actividad técnica de voz">
+    <article><strong id="callsToday">–</strong><span>Llamadas procesadas</span></article>
     <article><strong id="failuresToday">–</strong><span>Llamadas con fallo</span></article>
     <article><strong id="minutesToday">–</strong><span>Minutos de voz</span></article>
     <article><strong id="costToday">–</strong><span>Costo estimado USD</span></article>
-  </section>
-
-  <section class="business-workspace" aria-label="Trabajo del negocio">
-    <div id="businessTabs" class="business-tabs" role="tablist" aria-label="Operaciones del negocio">
-      <button class="business-tab active" type="button" role="tab" aria-selected="true" data-business-tab="bookings" aria-controls="businessPanelBookings"><span>Reservas</span><strong id="businessBookingsCount">0</strong></button>
-      <button class="business-tab" type="button" role="tab" aria-selected="false" data-business-tab="orders" aria-controls="businessPanelOrders"><span>Pedidos</span><strong id="businessOrdersCount">0</strong></button>
-      <button class="business-tab" type="button" role="tab" aria-selected="false" data-business-tab="requests" aria-controls="businessPanelRequests"><span>Solicitudes</span><strong id="businessRequestsCount">0</strong></button>
-      <button class="business-tab" type="button" role="tab" aria-selected="false" data-business-tab="customers" aria-controls="businessPanelCustomers"><span>Clientes</span><strong id="businessCustomersCount">0</strong></button>
-    </div>
-
-    <section id="businessPanelBookings" class="panel business-panel" data-business-panel="bookings">
-      <div class="panel-head">
-        <div><p class="eyebrow">AGENDA</p><h2>Reservas</h2><p class="muted">Quién reservó, qué servicio y cuándo será atendido.</p></div>
-      </div>
-      <div id="bookingsList" class="business-list"><div class="loading-line">Cargando reservas…</div></div>
-    </section>
-
-    <section id="businessPanelOrders" class="panel business-panel hidden" data-business-panel="orders">
-      <div class="panel-head">
-        <div><p class="eyebrow">VENTAS</p><h2>Pedidos</h2><p class="muted">Qué compraron, quién hizo el pedido y en qué estado está.</p></div>
-      </div>
-      <div id="ordersList" class="business-list"><div class="loading-line">Cargando pedidos…</div></div>
-    </section>
-
-    <section id="businessPanelRequests" class="business-panel hidden" data-business-panel="requests">
-  <section class="grid two work-grid">
-    <article class="panel">
-      <div class="panel-head">
-        <div><p class="eyebrow">TRABAJO</p><h2>Solicitudes</h2><p class="muted">Lo que necesita seguimiento humano.</p></div>
-        <button id="newRequestBtn" class="button secondary" type="button">+ Nueva</button>
-      </div>
-      <form id="requestForm" class="form hidden">
-        <input name="requestType" placeholder="Tipo, ej. cotización" required maxlength="80">
-        <input name="title" placeholder="Título" required maxlength="200">
-        <textarea name="description" placeholder="Descripción"></textarea>
-        <div class="row"><input name="contactName" placeholder="Nombre"><input name="contactPhone" placeholder="Teléfono"></div>
-        <select name="priority"><option>NORMAL</option><option>LOW</option><option>HIGH</option><option>URGENT</option></select>
-        <div class="actions"><button type="submit">Guardar solicitud</button><button type="button" id="cancelRequestBtn" class="ghost">Cancelar</button></div>
-      </form>
-      <div id="requestsList" class="list"></div>
-    </article>
-
-    <article class="panel learning">
-      <div class="panel-head">
-        <div><p class="eyebrow">APRENDIZAJE</p><h2>Preguntas pendientes</h2><p class="muted">Responde una vez y Helvoca aprenderá la respuesta oficial.</p></div>
-      </div>
-      <div id="questionsList" class="list"></div>
-    </article>
-  </section>
-    </section>
-
-    <section id="businessPanelCustomers" class="panel business-panel hidden" data-business-panel="customers">
-      <div class="panel-head">
-        <div><p class="eyebrow">CLIENTES</p><h2>Clientes</h2><p class="muted">Personas registradas por voz, WhatsApp o gestión manual.</p></div>
-      </div>
-      <div id="customersList" class="business-list"><div class="loading-line">Cargando clientes…</div></div>
-    </section>
   </section>
 
   <section class="panel calls-panel">
@@ -166,6 +104,5 @@
 </main>
 
 <script src="/operations.js" defer></script>
-<script src="/operations-business.js?v=20260917-2" defer></script>
 </body>
 </html>

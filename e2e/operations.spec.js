@@ -95,40 +95,14 @@ test('operations prioritizes business work and keeps technical diagnostics colla
 
   await expect(page.locator('link[href^="/operations-business.css?v="]')).toHaveCount(1);
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Hoy en tu negocio' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Operaciones avanzadas' })).toBeVisible();
   await expect(page.locator('#businessName')).toHaveText('Negocio E2E');
   await expect(page.locator('#callsToday')).toHaveText('12');
-  await expect(page.locator('#bookingsToday')).toHaveText('4');
-  await expect(page.locator('#openRequests')).toHaveText('1');
-  await expect(page.locator('#unknownQuestions')).toHaveText('1');
+  await expect(page.locator('#minutesToday')).toContainText('12:34');
+  await expect(page.locator('#bookingsToday')).toHaveCount(0);
 
-  await expect(page.locator('#businessTabs')).toBeVisible();
-  await expect(page.locator('[data-table="bookings"]')).toBeVisible();
-  await expect(page.locator('[data-table="bookings"]')).toContainText('Ana Reserva');
-  await expect(page.locator('[data-table="bookings"]')).toContainText('Peluquería');
-  await expect(page.locator('[data-table="bookings"]')).toContainText('Confirmada');
-  await page.locator('[data-booking-open][data-entity-id="b1"]').first().click();
-  await expect(page.locator('#businessDetailDrawer')).toBeVisible();
-  await expect(page.locator('#businessDetailDrawer')).toContainText('Ana Reserva');
-  await expect(page.locator('#businessDetailDrawer')).toContainText('Peluquería');
-  await page.locator('#businessDetailClose').click();
-
-  await page.getByRole('button', { name: /Pedidos/ }).click();
-  await expect(page.locator('[data-table="orders"]')).toBeVisible();
-  await expect(page.locator('[data-table="orders"]')).toContainText('Juan Pedido');
-  await expect(page.locator('[data-table="orders"]')).toContainText('18.990');
-  await page.locator('[data-order-open][data-entity-id="o1"]').first().click();
-  await expect(page.locator('#businessDetailDrawer')).toContainText('2 × Hamburguesa');
-  await page.getByRole('button', { name: 'Empezar preparación' }).click();
-  await expect(page.locator('#businessDetailDrawer')).toContainText('Preparando');
-  await page.locator('#businessDetailClose').click();
-
-  await page.getByRole('button', { name: /Clientes/ }).click();
-  await expect(page.locator('#customersList')).toContainText('Ana Reserva');
-  await expect(page.locator('#customersList')).toContainText('+56922222222');
-
-  await page.getByRole('button', { name: /Solicitudes/ }).click();
-  await expect(page.getByText('Revisar equipo')).toBeVisible();
+  await expect(page.locator('#businessTabs')).toHaveCount(0);
+  await expect(page.locator('#callsList')).toBeVisible();
 
   await expect(page.locator('#technicalDiagnostics')).not.toHaveAttribute('open', '');
   await expect(page.getByText('OpenAI Realtime')).not.toBeVisible();

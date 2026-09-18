@@ -7,8 +7,12 @@ if (!token) location.replace("/");
 
 let calls = [];
 let whatsappConversations = [];
-const requestedChannel = new URLSearchParams(window.location.search).get("channel");
-let activeChannel = ["all", "calls", "whatsapp"].includes(requestedChannel) ? requestedChannel : "all";
+const conversationParams = new URLSearchParams(window.location.search);
+const requestedChannel = conversationParams.get("channel");
+const requestedCallId = conversationParams.get("call");
+const requestedWhatsAppId = conversationParams.get("whatsapp");
+const requestedConversationKey = requestedCallId ? `call:${requestedCallId}` : requestedWhatsAppId ? `whatsapp:${requestedWhatsAppId}` : null;
+let activeChannel = requestedCallId ? "calls" : requestedWhatsAppId ? "whatsapp" : ["all", "calls", "whatsapp"].includes(requestedChannel) ? requestedChannel : "all";
 let selectedConversationKey = null;
 
 const EVENT_LABELS = {
@@ -239,7 +243,9 @@ async function loadDetail(kind, id) {
 
 async function openMostRecentIfNeeded() {
   if (selectedConversationKey) return;
-  const first = conversationItems()[0];
+  const items = conversationItems();
+  const requested = requestedConversationKey ? items.find(item => item.key === requestedConversationKey) : null;
+  const first = requested || items[0];
   if (!first) return;
   selectedConversationKey = first.key;
   renderList();

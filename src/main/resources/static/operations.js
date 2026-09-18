@@ -202,6 +202,7 @@ async function loadCallDetail(callId) {
 
 function renderRequests(items = []) {
   const root = $("#requestsList");
+  if (!root) return;
   if (!items.length) { root.innerHTML = '<div class="empty">No hay solicitudes abiertas. ✨</div>'; return; }
   root.innerHTML = items.map(r => `
     <div class="item" data-request-id="${esc(r.id)}">
@@ -221,6 +222,7 @@ function renderRequests(items = []) {
 
 function renderQuestions(items = []) {
   const root = $("#questionsList");
+  if (!root) return;
   if (!items.length) { root.innerHTML = '<div class="empty">Helvoca no tiene preguntas pendientes. ✨</div>'; return; }
   root.innerHTML = items.map(q => `
     <div class="item" data-question-id="${esc(q.id)}">
@@ -274,10 +276,10 @@ async function load() {
     $("#localNow").textContent = `${data.timezone || ""}${data.timezone ? " · " : ""}${fmtDate(data.localNow)}`;
     $("#callsToday").textContent = data.callsToday;
     $("#minutesToday").textContent = fmtDuration(data.callDurationSecondsToday);
-    $("#bookingsToday").textContent = data.bookingsToday;
-    $("#customersToday").textContent = data.newCustomersToday;
-    $("#openRequests").textContent = data.openRequests;
-    $("#unknownQuestions").textContent = data.unansweredQuestions;
+    if ($("#bookingsToday")) $("#bookingsToday").textContent = data.bookingsToday;
+    if ($("#customersToday")) $("#customersToday").textContent = data.newCustomersToday;
+    if ($("#openRequests")) $("#openRequests").textContent = data.openRequests;
+    if ($("#unknownQuestions")) $("#unknownQuestions").textContent = data.unansweredQuestions;
     $("#failuresToday").textContent = data.callFailuresToday;
     $("#costToday").textContent = fmtUsd(data.estimatedCallCostTodayUsd);
     $("#healthBadge").textContent = data.callFailuresToday
@@ -298,9 +300,9 @@ async function load() {
 
 $("#refreshBtn").addEventListener("click", load);
 $("#closeCallDetailBtn").addEventListener("click", () => $("#callDetailPanel").classList.add("hidden"));
-$("#newRequestBtn").addEventListener("click", () => $("#requestForm").classList.remove("hidden"));
-$("#cancelRequestBtn").addEventListener("click", () => $("#requestForm").classList.add("hidden"));
-$("#requestForm").addEventListener("submit", async e => {
+$("#newRequestBtn")?.addEventListener("click", () => $("#requestForm")?.classList.remove("hidden"));
+$("#cancelRequestBtn")?.addEventListener("click", () => $("#requestForm")?.classList.add("hidden"));
+$("#requestForm")?.addEventListener("submit", async e => {
   e.preventDefault();
   const form = e.currentTarget;
   const data = Object.fromEntries(new FormData(form).entries());
