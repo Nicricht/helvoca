@@ -52,6 +52,8 @@ class TwilioWhatsAppMessagingProviderTest {
         MessagingProvider.SendResult result = provider().send(command(businessId));
 
         assertEquals("SM0123456789abcdef0123456789abcdef", result.providerMessageId());
+        assertNotNull(sender.getWhatsappCertifiedAt());
+        verify(phones).save(sender);
         ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
         verify(http, times(1)).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
         HttpRequest request = requestCaptor.getValue();
