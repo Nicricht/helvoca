@@ -401,7 +401,7 @@
         document.body.classList.toggle('operational-ready', ready);
         overview.classList.toggle('hidden', !ready);
         statusGrid.classList.toggle('ux-ready-hidden', ready);
-        if (!ready) return;
+        if (!ready || document.body.classList.contains('settings-page')) return;
 
         currentBusinessName = window.helvocaBusinessName || currentBusinessName || "Tu negocio";
         const operationalTitle = `${currentBusinessName} está atendiendo 🟢`;
@@ -419,7 +419,7 @@
         if (!dashboard.classList.contains('hidden')) queueMicrotask(applyReadyState);
     }).observe(dashboard, { attributes: true, attributeFilter: ['class'] });
     new MutationObserver(() => {
-        if (isReady()) {
+        if (isReady() && !document.body.classList.contains('settings-page')) {
             const operationalTitle = `${currentBusinessName} está atendiendo 🟢`;
             if (title.textContent !== operationalTitle) title.textContent = operationalTitle;
         }

@@ -33,7 +33,10 @@
   }
 
   new MutationObserver(apply).observe(dashboard, { attributes: true, attributeFilter: ["class"] });
-  new MutationObserver(() => advanced.classList.remove("hidden"))
-    .observe(advanced, { attributes: true, attributeFilter: ["class"] });
+  new MutationObserver(() => {
+    if (advanced.isConnected && advanced.classList.contains("hidden")) {
+      advanced.classList.remove("hidden");
+    }
+  }).observe(advanced, { attributes: true, attributeFilter: ["class"] });
   queueMicrotask(apply);
 })();

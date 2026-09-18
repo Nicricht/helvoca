@@ -109,7 +109,7 @@ test('commercial dashboard stays compact until the customer manages the plan', a
   await expect(card.getByText('Emprende · 63 min')).toBeVisible();
   expect(billingPosts).toBe(0);
 
-  await card.getByRole('button', { name: 'Gestionar plan', exact: true }).click();
+  await card.getByRole('button', { name: 'Gestionar', exact: true }).click();
   await expect(page.locator('#commercialDetails')).toBeVisible();
   await expect(card.locator('#commercialPlan')).toHaveText('Emprende');
   await expect(card.locator('#commercialSubscriptionStatus')).toHaveText('TRIALING');
@@ -174,7 +174,7 @@ test('plan checkout starts only after explicit confirmation and does not activat
   await expect(page.locator('#commercialPlans')).toBeHidden();
   expect(checkoutPosts).toBe(0);
 
-  await card.getByRole('button', { name: 'Gestionar plan', exact: true }).click();
+  await card.getByRole('button', { name: 'Gestionar', exact: true }).click();
   await expect(page.locator('#commercialPlans')).toBeVisible();
 
   page.once('dialog', async dialog => {

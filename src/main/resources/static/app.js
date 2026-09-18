@@ -98,8 +98,11 @@ function applyBusinessIdentity(business = {}) {
     window.helvocaBusinessName = currentBusinessName;
     const brand = document.querySelector(".brand");
     if (brand) brand.textContent = currentBusinessName.toUpperCase();
-    if (document.body.classList.contains("settings-page")) document.title = `${currentBusinessName} · Configuración`;
-    else document.title = `${currentBusinessName} · Inicio`;
+    if (document.body.classList.contains("settings-page")) {
+        document.title = `${currentBusinessName} · Configuración`;
+        const heading = document.querySelector(".dashboard-heading h1");
+        if (heading) heading.textContent = `Cómo trabaja ${currentBusinessName}`;
+    } else document.title = `${currentBusinessName} · Inicio`;
 
     const readyText = document.querySelector("#readyBanner strong");
     if (readyText) readyText.textContent = `${currentBusinessName} está listo para atender.`;
@@ -189,6 +192,14 @@ function renderAgent(agent = {}, business = {}) {
     });
 }
 
+function setFieldValue(field, value) {
+    const normalized = String(value || "");
+    if (field?.tagName === "SELECT" && normalized && ![...field.options].some(option => option.value === normalized)) {
+        field.appendChild(new Option(normalized, normalized));
+    }
+    if (field) field.value = normalized;
+}
+
 function collectAgent() {
     return {
         name: setupForm.elements.agentName.value.trim() || currentBusinessName || "Recepcionista",
@@ -258,6 +269,21 @@ async function togglePhone(phone, button) {
     }
 }
 
+async function togglePhoneWhatsApp(phone, button) {
+    clearMessage(phoneMessage);
+    button.disabled = true;
+    try {
+        await api(`/api/v1/phone-numbers/${phone.id}/whatsapp`, {
+            method: "PATCH", body: JSON.stringify({ enabled: !phone.whatsappEnabled })
+        });
+        await refreshPhoneState();
+        showMessage(phoneMessage, phone.whatsappEnabled ? "WhatsApp deshabilitado." : "WhatsApp habilitado.", "success");
+    } catch (error) {
+        if (error.status !== 401) showMessage(phoneMessage, error.message || "No fue posible cambiar el estado de WhatsApp.");
+        button.disabled = false;
+    }
+}
+
 function renderPhones(phones = []) {
     phoneList.innerHTML = "";
     if (!phones.length) {
@@ -278,7 +304,16 @@ function renderPhones(phones = []) {
         action.className = "button small ghost phone-toggle";
         action.textContent = phone.active ? "Desactivar" : "Activar";
         action.addEventListener("click", () => togglePhone(phone, action));
-        row.append(number, state, action);
+        const whatsappState = document.createElement("span");
+        whatsappState.className = `phone-state ${phone.whatsappEnabled ? "active" : "inactive"}`;
+        whatsappState.textContent = phone.whatsappEnabled ? "WhatsApp activo" : "WhatsApp inactivo";
+        const whatsappAction = document.createElement("button");
+        whatsappAction.type = "button";
+        whatsappAction.className = "button small ghost phone-whatsapp-toggle";
+        whatsappAction.textContent = phone.whatsappEnabled ? "Desactivar WhatsApp" : "Activar WhatsApp";
+        whatsappAction.disabled = !phone.active && !phone.whatsappEnabled;
+        whatsappAction.addEventListener("click", () => togglePhoneWhatsApp(phone, whatsappAction));
+        row.append(number, state, action, whatsappState, whatsappAction);
         phoneList.appendChild(row);
     });
 }
@@ -311,8 +346,8 @@ async function loadDashboard() {
         applyBusinessIdentity(business);
         $("#welcomeText").textContent = `${me.email} · Los cambios se guardan solo cuando tú los confirmas.`;
         setupForm.elements.businessName.value = business.name || "";
-        setupForm.elements.timezone.value = business.timezone || detectedTimezone();
-        setupForm.elements.language.value = business.language || detectedLanguage();
+        setFieldValue(setupForm.elements.timezone, business.timezone || detectedTimezone());
+        setFieldValue(setupForm.elements.language, business.language || detectedLanguage());
         setupForm.elements.humanTransferPhone.value = business.humanTransferPhone || "";
         renderAgent(agent, business);
         renderServices(services);
@@ -424,8 +459,8 @@ async function analyzeBusiness(sourceUrl, businessName) {
 
 function prefillProposal(proposal) {
     setupForm.elements.businessName.value = proposal.businessName || setupForm.elements.businessName.value;
-    setupForm.elements.timezone.value = proposal.timezone || setupForm.elements.timezone.value || detectedTimezone();
-    setupForm.elements.language.value = proposal.language || setupForm.elements.language.value || detectedLanguage();
+    setFieldValue(setupForm.elements.timezone, proposal.timezone || setupForm.elements.timezone.value || detectedTimezone());
+    setFieldValue(setupForm.elements.language, proposal.language || setupForm.elements.language.value || detectedLanguage());
     renderServices((proposal.services || []).map(item => ({ ...item, id: null })));
     if ((proposal.hours || []).length) renderHours(proposal.hours);
     renderKnowledge((proposal.knowledge || []).map(item => ({ ...item, id: null, active: true })));

@@ -171,6 +171,7 @@
     }
 
     function renderDashboardState() {
+        if (document.body.classList.contains('settings-page')) return;
         const title = $('#dashboardTitle') || $('.dashboard-heading h1');
         const copy = $('#welcomeText');
         const ready = dashboardIsReady();

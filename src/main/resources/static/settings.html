@@ -348,8 +348,22 @@
                     <div class="two-col">
                         <label>Nombre del negocio<input name="businessName" required maxlength="150"></label>
                         <label>Teléfono humano <span class="optional">opcional</span><input name="humanTransferPhone" placeholder="+56912345678"></label>
-                        <label>Zona horaria<input name="timezone" required value="America/Santiago"></label>
-                        <label>Idioma<input name="language" required value="es" maxlength="10"></label>
+                        <label>Zona horaria<select name="timezone" required>
+                            <option value="America/Santiago">Santiago</option>
+                            <option value="America/Caracas">Caracas</option>
+                            <option value="America/Bogota">Bogotá</option>
+                            <option value="America/Lima">Lima</option>
+                            <option value="America/Mexico_City">Ciudad de México</option>
+                            <option value="America/Argentina/Buenos_Aires">Buenos Aires</option>
+                            <option value="America/Sao_Paulo">São Paulo</option>
+                            <option value="Europe/Madrid">Madrid</option>
+                            <option value="UTC">UTC</option>
+                        </select></label>
+                        <label>Idioma<select name="language" required>
+                            <option value="es">Español</option>
+                            <option value="en">English</option>
+                            <option value="pt">Português</option>
+                        </select></label>
                     </div>
 
                     <div class="section-heading divider">
@@ -452,10 +466,10 @@
     syncCounts();
 })();
 </script>
-<script src="/app.js?v=20260918-3" defer></script>
-<script src="/commercial-status.js?v=20260918-3" defer></script>
-<script src="/ux-simplification.js" defer></script>
+<script src="/app.js?v=20260918-4" defer></script>
+<script src="/commercial-status.js?v=20260918-4" defer></script>
+<script src="/ux-simplification.js?v=20260918-2" defer></script>
 <script src="/phone-provisioning.js?v=20260918-2" defer></script>
-<script src="/settings-page.js?v=20260918-1" defer></script>
+<script src="/settings-page.js?v=20260918-2" defer></script>
 </body>
 </html>
