@@ -29,6 +29,9 @@ public class PhoneNumber {
     @Column(name = "whatsapp_enabled", nullable = false)
     private boolean whatsappEnabled = false;
 
+    @Column(name = "whatsapp_certified_at")
+    private Instant whatsappCertifiedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -58,6 +61,8 @@ public class PhoneNumber {
     public void setActive(boolean active) { this.active = active; }
     public boolean isWhatsappEnabled() { return whatsappEnabled; }
     public void setWhatsappEnabled(boolean whatsappEnabled) { this.whatsappEnabled = whatsappEnabled; }
+    public Instant getWhatsappCertifiedAt() { return whatsappCertifiedAt; }
+    public void setWhatsappCertifiedAt(Instant whatsappCertifiedAt) { this.whatsappCertifiedAt = whatsappCertifiedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
