@@ -122,7 +122,7 @@ test('registration validates fields and enters the dashboard with the expected p
   await page.locator('#registerForm [name="password"]').fill('corta');
   await page.locator('#registerForm button[type="submit"]').click();
   expect(registerCalls).toBe(0);
-  await expect(page.locator('#registerForm [name="password"]')).toHaveJSProperty('validity.valid', false);
+  expect(await page.locator('#registerForm [name="password"]').evaluate(input => input.validity.valid)).toBe(false);
 
   await page.locator('#registerForm [name="password"]').fill('clave-segura-123');
   await page.locator('#registerForm button[type="submit"]').click();
