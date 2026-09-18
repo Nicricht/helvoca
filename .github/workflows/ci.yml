@@ -280,7 +280,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run reservations frontend E2E
-        run: npx playwright test e2e/home-operational.spec.js --grep "reservation filters drawer and conversation links work"
+        run: npx playwright test e2e/home-operational.spec.js --grep "reservation filters drawer and conversation links work|booking cancellation from drawer works"
 
       - name: Report reservations QA status
         if: always()
