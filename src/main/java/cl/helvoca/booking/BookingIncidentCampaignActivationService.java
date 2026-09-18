@@ -156,15 +156,18 @@ public class BookingIncidentCampaignActivationService {
                     "El proveedor de WhatsApp outbound no está disponible."));
         }
 
-        int senderCount = phones
-                .findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId)
-                .size();
+        var activeSenders = phones
+                .findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId);
+        int senderCount = activeSenders.size();
         if (senderCount == 0) {
             blockers.add(new Blocker("WHATSAPP_SENDER_MISSING",
                     "El negocio no tiene un remitente de WhatsApp activo."));
         } else if (senderCount > 1) {
             blockers.add(new Blocker("WHATSAPP_SENDER_AMBIGUOUS",
                     "Hay más de un remitente de WhatsApp activo para el negocio."));
+        } else if (activeSenders.getFirst().getWhatsappCertifiedAt() == null) {
+            blockers.add(new Blocker("WHATSAPP_SENDER_NOT_CERTIFIED",
+                    "El remitente de WhatsApp aún no tiene un envío real exitoso certificado por Twilio."));
         }
 
         if (items.isEmpty()) {
