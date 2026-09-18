@@ -52,7 +52,7 @@ async function mockReadyHome(page) {
     { id: 'cust2', name: 'Bruno Masaje', phone: '+56955555555', email: 'bruno@example.cl', createdAt: '2026-09-17T11:00:00Z' }
   ])));
   await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([
-    { id: 'o1', operationId: 'op1', sourceReferenceId: 'wa-order', status: 'CONFIRMED', fulfillmentType: 'PICKUP', contactName: 'Juan Pedido', contactPhone: '+56933333333', total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z', lines: [{ name: 'Producto demo', quantity: 1, lineTotal: 18990 }] }
+    { id: 'o1', operationId: 'op1', sourceReferenceId: 'wa-order', status: 'CONFIRMED', fulfillmentType: 'DELIVERY', contactName: 'Juan Pedido', contactPhone: '+56933333333', deliveryAddress: 'Av. Demo 123, Santiago', subtotal: 15990, deliveryFee: 3000, total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z', lines: [{ name: 'Producto demo', quantity: 1, unitPrice: 15990, lineTotal: 15990 }] }
   ])));
   await page.route('**/api/v1/bookings/b1/context', route => route.fulfill(json({
     channel: 'VOICE',
@@ -96,6 +96,10 @@ async function mockReadyHome(page) {
       { id: 'om2', direction: 'OUTBOUND', role: 'ASSISTANT', content: 'Pedido confirmado.', createdAt: '2026-09-17T17:20:20Z' }
     ]
   })));
+  await page.route('**/api/v1/operation-events?operationId=op1', route => route.fulfill(json([
+    { id: 'oe2', eventType: 'ORDER_CONFIRMED', actorType: 'AI', channel: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z' },
+    { id: 'oe1', eventType: 'ORDER_QUOTED', actorType: 'AI', channel: 'WHATSAPP', createdAt: '2026-09-17T17:20:15Z' }
+  ])));
   await page.route('**/api/v1/operations/dashboard', route => route.fulfill(json({
     businessName: 'Negocio E2E',
     timezone: 'America/Santiago',
@@ -189,6 +193,19 @@ test('ready customer sees live operational home instead of setup cards', async (
 
   await page.getByRole('button', { name: /Pedidos/ }).click();
   await expect(page.locator('#homeOrdersList')).toContainText('Juan Pedido');
+  await page.locator('#homeOrdersList .home-business-table [data-home-order-id="o1"]').click();
+  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Producto demo');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('15.990');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Av. Demo 123, Santiago');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Quiero un Producto demo.');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Pedido cotizado');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Pedido confirmado');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Qué hizo Helvoca');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute('href', '/conversations.html?channel=whatsapp&conversation=wa-order');
+  await expect(page.getByRole('button', { name: 'Empezar preparación' })).toBeVisible();
+  await page.locator('#homeBookingDetailClose').click();
+
   await page.getByRole('button', { name: /Clientes/ }).click();
   await expect(page.locator('#homeCustomersList')).toContainText('Ana Reserva');
   await expect(page.locator('.nav-conversations')).toHaveAttribute('href', '/conversations.html');
