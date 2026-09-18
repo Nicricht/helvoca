@@ -155,8 +155,11 @@ public class TwilioWhatsAppProductionCertificationRunner implements ApplicationR
 
         String approval = normalizeStatus(template.approvalStatus());
         if (approval.isBlank() || "unsubmitted".equals(approval)) {
-            submitApproval(template.sid());
-            return new CertificationResult(template.sid(), "received", null, "awaiting_approval");
+            approval = fetchApprovalStatus(template.sid());
+            if (approval.isBlank() || "unsubmitted".equals(approval)) {
+                submitApproval(template.sid());
+                return new CertificationResult(template.sid(), "received", null, "awaiting_approval");
+            }
         }
         if ("received".equals(approval) || "pending".equals(approval)) {
             return new CertificationResult(template.sid(), approval, null, "awaiting_approval");
@@ -222,6 +225,22 @@ public class TwilioWhatsAppProductionCertificationRunner implements ApplicationR
         }
         log.info("WHATSAPP_PRODUCTION_CERTIFICATION template created sid={}", sid);
         return sid;
+    }
+
+    private String fetchApprovalStatus(String contentSid) throws Exception {
+        HttpResponse<String> response = send(HttpRequest.newBuilder(
+                        URI.create(CONTENT_API + "/" + contentSid + "/ApprovalRequests"))
+                .timeout(Duration.ofSeconds(12))
+                .header("Authorization", basicAuthorization())
+                .GET()
+                .build());
+
+        if (response.statusCode() == 404) return "unsubmitted";
+        require2xx(response, "Twilio WhatsApp approval fetch");
+
+        JSONObject json = new JSONObject(response.body());
+        JSONObject whatsapp = json.optJSONObject("whatsapp");
+        return whatsapp == null ? "unsubmitted" : normalizeStatus(whatsapp.optString("status", "unsubmitted"));
     }
 
     private void submitApproval(String contentSid) throws Exception {
