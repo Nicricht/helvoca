@@ -139,6 +139,12 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
   await expect(page.locator('#homeBookingsList')).toContainText('Peluquería');
   await expect(page.locator('#homeBookingsList')).toContainText('Bruno Masaje');
+  await expect(page.locator('#homeBookingSource option')).toHaveText(['Todos', 'Llamada', 'WhatsApp', 'Manual', 'API']);
+  await page.locator('#homeBookingSource').selectOption('CALL');
+  await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
+  await expect(page.locator('#homeBookingsList')).not.toContainText('Bruno Masaje');
+  await expect(page.locator('.home-filter-result')).toContainText('1 de 2');
+  await page.locator('#homeBookingClearFilters').click();
   await page.locator('#homeBookingService').selectOption('svc1');
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
   await expect(page.locator('#homeBookingsList')).not.toContainText('Bruno Masaje');
