@@ -15,7 +15,13 @@ test('settings is a dedicated authenticated workspace', async ({ page }) => {
   await page.route('**/api/v1/phone-numbers', route => route.fulfill(json([{ id: 'p1', phoneNumber: '+56911111111', active: true, provider: 'TWILIO' }])));
   await page.route('**/api/v1/billing/status', route => route.fulfill(json({ currentPlanName: 'Pro', currentPlanCode: 'PRO' })));
   await page.route('**/api/v1/subscription', route => route.fulfill(json({ plan: 'PRO', status: 'ACTIVE', includedMinutes: 500, usedMinutes: 28, serviceAllowed: true })));
-  await page.route('**/api/v1/onboarding/setup', route => route.fulfill(json({ ok: true })));
+  await page.route('**/api/v1/onboarding/setup', async route => {
+    expect(route.request().method()).toBe('PUT');
+    const body = route.request().postDataJSON();
+    expect(body.services).toHaveLength(1);
+    expect(body.services[0].name).toBe('Peluquería E2E');
+    await route.fulfill(json({ ok: true }));
+  });
 
   await page.goto('/settings.html');
 
@@ -26,4 +32,10 @@ test('settings is a dedicated authenticated workspace', async ({ page }) => {
   await expect(page.locator('#settingsPhones')).toContainText('+56911111111');
   await expect(page.locator('#settingsPlan')).toContainText('Pro');
   await expect(page.locator('.nav-config')).toHaveClass(/active/);
+
+  await page.getByRole('button', { name: 'Servicios' }).click();
+  await page.locator('#settingsServices [data-field="name"]').fill('Peluquería E2E');
+  await expect(page.locator('#settingsSaveBar')).toBeVisible();
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(page.locator('#settingsMessage')).toContainText('Configuración guardada');
 });
