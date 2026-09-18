@@ -4,6 +4,7 @@ import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.customer.CustomerRepository;
+import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.security.TenantProvider;
 import cl.helvoca.servicecatalog.ServiceCatalogService;
 import cl.helvoca.servicecatalog.ServiceItem;
@@ -21,6 +22,7 @@ public class BookingService {
     private final BookingRepository bookings;
     private final CustomerRepository customers;
     private final ServiceCatalogService catalog;
+    private final BusinessScheduleService schedule;
     private final TenantProvider tenantProvider;
     private final AuditService auditService;
 
@@ -28,11 +30,13 @@ public class BookingService {
             BookingRepository bookings,
             CustomerRepository customers,
             ServiceCatalogService catalog,
+            BusinessScheduleService schedule,
             TenantProvider tenantProvider,
             AuditService auditService) {
         this.bookings = bookings;
         this.customers = customers;
         this.catalog = catalog;
+        this.schedule = schedule;
         this.tenantProvider = tenantProvider;
         this.auditService = auditService;
     }
@@ -56,7 +60,8 @@ public class BookingService {
         validateFuture(startAt);
         ServiceItem service = catalog.requireActiveEntity(serviceId, businessId);
         Instant endAt = calculateEnd(startAt, service);
-        boolean available = !hasOverlap(businessId, serviceId, startAt, endAt, null);
+        boolean available = schedule.isWithinBusinessHours(businessId, startAt, endAt)
+                && !hasOverlap(businessId, serviceId, startAt, endAt, null);
         return new AvailabilityResponse(serviceId, startAt, endAt, available);
     }
 
@@ -98,6 +103,9 @@ public class BookingService {
 
         ServiceItem service = catalog.requireActiveEntity(booking.getServiceId(), businessId);
         Instant endAt = calculateEnd(request.startAt(), service);
+        if (!schedule.isWithinBusinessHours(businessId, request.startAt(), endAt)) {
+            throw new ConflictException("BUSINESS_CLOSED");
+        }
         if (hasOverlap(businessId, booking.getServiceId(), request.startAt(), endAt, id)) {
             throw new ConflictException("BOOKING_SLOT_UNAVAILABLE");
         }
