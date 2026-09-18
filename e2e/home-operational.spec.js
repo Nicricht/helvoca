@@ -64,7 +64,16 @@ async function mockReadyHome(page) {
     { id: 'cust1', name: 'Ana Reserva', phone: '+56922222222', email: 'ana@example.cl', createdAt: '2026-09-10T09:00:00Z' },
     { id: 'cust2', name: 'Bruno Corte', phone: '+56955555555', email: 'bruno@example.cl', createdAt: '2026-09-11T09:00:00Z' }
   ])));
-  await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([])));
+  await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([
+    { id: 'o1', operationId: 'op-order-1', status: 'CONFIRMED', fulfillmentType: 'PICKUP', contactName: 'Juan Pedido', contactPhone: '+56933333333', total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T19:00:00Z', lines: [{ name: 'Hamburguesa', quantity: 2, unitPrice: 7000, lineTotal: 14000 }, { name: 'Bebida', quantity: 1, unitPrice: 4990, lineTotal: 4990 }] }
+  ])));
+  await page.route('**/api/v1/operation-events?operationId=op-order-1', route => route.fulfill(json([
+    { eventType: 'ORDER_CONFIRMED', channel: 'WHATSAPP', sourceReferenceId: 'wa-order-1', status: 'CONFIRMED', createdAt: '2026-09-17T19:00:00Z' }
+  ])));
+  await page.route('**/api/v1/messaging/conversations/wa-order-1', route => route.fulfill(json({
+    conversation: { id: 'wa-order-1', sender: '+56933333333', channel: 'whatsapp', openedAt: '2026-09-17T18:55:00Z', lastMessageAt: '2026-09-17T19:00:00Z' },
+    messages: [{ id: 'm1', role: 'USER', content: 'Quiero dos hamburguesas.', createdAt: '2026-09-17T18:56:00Z' }, { id: 'm2', role: 'ASSISTANT', content: 'Pedido confirmado.', createdAt: '2026-09-17T19:00:00Z' }]
+  })));
   await page.route('**/api/v1/operations/dashboard', route => route.fulfill(json({
     businessName: 'Negocio E2E',
     timezone: 'America/Santiago',
@@ -132,5 +141,11 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#businessDetailDrawer')).toContainText('Quiero reservar peluquería.');
   await expect(page.locator('#businessDetailDrawer')).toContainText('Reserva creada');
   await expect(page.locator('#businessDetailConversationLink')).toHaveAttribute('href', '/conversations.html?call=call-1');
+  await page.locator('#businessDetailClose').click();
+  await page.getByRole('button', { name: /Pedidos/ }).click();
+  await page.locator('[data-order-open][data-entity-id="o1"]').first().click();
+  await expect(page.locator('#businessDetailDrawer')).toContainText('2 × Hamburguesa');
+  await expect(page.locator('#businessDetailDrawer')).toContainText('Quiero dos hamburguesas.');
+  await expect(page.locator('#businessDetailConversationLink')).toHaveAttribute('href', '/conversations.html?whatsapp=wa-order-1');
   await expect(page.locator('#advancedPanel')).toBeHidden();
 });
