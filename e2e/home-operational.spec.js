@@ -244,11 +244,13 @@ test('ready customer sees live operational home instead of setup cards', async (
   await page.locator('#homeIncidentReason').selectOption({ label: 'No abrir' });
   await expect(page.locator('#homeIncidentTimeFrom')).toHaveValue('00:00');
   await expect(page.locator('#homeIncidentTimeTo')).toHaveValue('24:00');
-
-  await page.locator('#homeIncidentReason').selectOption({ label: 'Cerrar antes' });
-  await expect(page.locator('#homeIncidentPreviewBtn')).toBeDisabled();
   await page.locator('#homeIncidentDate').selectOption('2026-09-18');
   await expect(page.locator('#homeIncidentDate')).toHaveValue('2026-09-18');
+  await expect(page.locator('#homeIncidentTimeFrom')).toHaveValue('00:00');
+  await expect(page.locator('#homeIncidentTimeTo')).toHaveValue('24:00');
+
+  await page.locator('#homeIncidentReason').selectOption({ label: 'Cerrar antes' });
+  await expect(page.locator('#homeIncidentPreviewBtn')).toBeEnabled();
   await expect(page.locator('#homeIncidentTimeFrom')).toHaveValue('12:00');
   await expect(page.locator('#homeIncidentTimeTo')).toHaveValue('12:30');
 
