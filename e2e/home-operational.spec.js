@@ -135,6 +135,25 @@ test('ready customer sees live operational home instead of setup cards', async (
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
 
+  let preparedCampaignRequest = null;
+  let unsafeOutboundCalls = 0;
+  page.on('request', request => {
+    if (/\/api\/v1\/outbound-messages\/.*\/(queue|dispatch)$/.test(request.url())) unsafeOutboundCalls += 1;
+  });
+  await page.route('**/api/v1/booking-incident-campaigns', async route => {
+    expect(route.request().method()).toBe('POST');
+    preparedCampaignRequest = route.request().postDataJSON();
+    await route.fulfill(json({
+      id: 'campaign-1',
+      status: 'PREPARED',
+      goal: preparedCampaignRequest.goal,
+      strategy: preparedCampaignRequest.strategy,
+      recipientCount: preparedCampaignRequest.recipients.length,
+      createdAt: '2026-09-18T12:00:00Z',
+      recipients: []
+    }));
+  });
+
   await page.goto('/');
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Negocio E2E está atendiendo 🟢');
@@ -167,7 +186,25 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeIncidentPreview')).toContainText('WhatsApp primero');
   await expect(page.locator('#homeIncidentPreview')).toContainText('Debo cerrar antes por un imprevisto');
   await expect(page.locator('#homeIncidentPreview')).not.toContainText('Bruno Masaje');
-  await expect(page.locator('#homeIncidentPreview button')).toBeDisabled();
+  await expect(page.locator('.home-incident-select')).toHaveCount(1);
+  await page.locator('.home-incident-select').uncheck();
+  await expect(page.locator('#homeIncidentPrepareCampaign')).toBeDisabled();
+  await page.locator('.home-incident-select').check();
+  await expect(page.locator('#homeIncidentPrepareCampaign')).toBeEnabled();
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#homeIncidentPrepareCampaign').click();
+  await expect(page.locator('#homeIncidentPreview')).toContainText('Campaña preparada');
+  await expect(page.locator('#homeIncidentPreview')).toContainText('PREPARED');
+  expect(preparedCampaignRequest).not.toBeNull();
+  expect(preparedCampaignRequest.reason).toBe('Debo cerrar antes por un imprevisto');
+  expect(preparedCampaignRequest.goal).toBe('RESCHEDULE');
+  expect(preparedCampaignRequest.strategy).toBe('CHEAPEST');
+  expect(preparedCampaignRequest.recipients).toHaveLength(1);
+  expect(preparedCampaignRequest.recipients[0].customerId).toBe('cust1');
+  expect(preparedCampaignRequest.recipients[0].bookingIds).toEqual(['b1']);
+  expect(preparedCampaignRequest.recipients[0].channelPreference).toBe('CHEAPEST');
+  expect(unsafeOutboundCalls).toBe(0);
 
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
   await expect(page.locator('#homeBookingsList')).toContainText('Peluquería');
