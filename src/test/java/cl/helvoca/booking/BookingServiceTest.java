@@ -45,6 +45,7 @@ class BookingServiceTest {
         when(tenantProvider.requireBusinessId()).thenReturn(businessId);
         when(customers.findByIdAndBusinessId(customerId, businessId)).thenReturn(Optional.of(customer));
         when(catalog.requireActiveEntity(serviceId, businessId)).thenReturn(item);
+        when(schedule.isWithinBusinessHours(eq(businessId), eq(startAt), any(Instant.class))).thenReturn(true);
         when(bookings.countOverlaps(
                 eq(businessId), eq(serviceId), eq(startAt), any(Instant.class),
                 eq(BookingStatus.CANCELLED), isNull()))
@@ -175,4 +176,44 @@ class BookingServiceTest {
                 eq(businessId), eq(serviceId), eq(startAt), any(Instant.class),
                 eq(BookingStatus.CANCELLED), eq(bookingId));
     }
+
+    @Test
+    void createRejectsOutsideBusinessHours() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        Instant startAt = Instant.now().plusSeconds(7200);
+
+        BookingRepository bookings = mock(BookingRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceCatalogService catalog = mock(ServiceCatalogService.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService auditService = mock(AuditService.class);
+
+        Customer customer = new Customer();
+        customer.setBusinessId(businessId);
+        ServiceItem item = new ServiceItem();
+        item.setBusinessId(businessId);
+        item.setName("Consulta");
+        item.setDurationMinutes(60);
+        item.setActive(true);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(customers.findByIdAndBusinessId(customerId, businessId)).thenReturn(Optional.of(customer));
+        when(catalog.requireActiveEntity(serviceId, businessId)).thenReturn(item);
+        when(schedule.isWithinBusinessHours(eq(businessId), eq(startAt), any(Instant.class))).thenReturn(false);
+
+        BookingService service = new BookingService(
+                bookings, customers, catalog, schedule, tenantProvider, auditService);
+
+        CreateBookingRequest request = new CreateBookingRequest(
+                customerId, serviceId, startAt, BookingSource.ADMIN, null);
+
+        assertThrows(ConflictException.class, () -> service.create(request));
+        verify(bookings, never()).countOverlaps(any(), any(), any(), any(), any(), any());
+        verify(bookings, never()).save(any());
+        verify(auditService, never()).success(any(), eq("BOOKING_CREATE"), any(), any());
+    }
+
 }
