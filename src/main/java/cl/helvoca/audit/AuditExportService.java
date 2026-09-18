@@ -29,17 +29,15 @@ public class AuditExportService {
     private final AuditQueryService queryService;
     private final TenantProvider tenantProvider;
     private final AuditService auditService;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AuditExportService(
             AuditQueryService queryService,
             TenantProvider tenantProvider,
-            AuditService auditService,
-            ObjectMapper objectMapper) {
+            AuditService auditService) {
         this.queryService = queryService;
         this.tenantProvider = tenantProvider;
         this.auditService = auditService;
-        this.objectMapper = objectMapper;
     }
 
     @Transactional

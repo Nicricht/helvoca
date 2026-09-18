@@ -1,7 +1,6 @@
 package cl.helvoca.audit;
 
 import cl.helvoca.security.TenantProvider;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -34,7 +33,7 @@ class AuditExportServiceTest {
                 .thenReturn(List.of(sample("=SUM(1,1)")));
 
         AuditExportFile file = new AuditExportService(
-                queryService, tenantProvider, auditService, new ObjectMapper())
+                queryService, tenantProvider, auditService)
                 .export("csv", "Carolina", "BOOKING_RESCHEDULE", "BOOKING", from, to);
 
         String csv = new String(file.content(), StandardCharsets.UTF_8);
@@ -65,7 +64,7 @@ class AuditExportServiceTest {
         when(queryService.recent()).thenReturn(List.of(sample("Carolina Soto")));
 
         AuditExportFile file = new AuditExportService(
-                queryService, tenantProvider, auditService, new ObjectMapper())
+                queryService, tenantProvider, auditService)
                 .export("xlsx", null, null, null, null, null);
 
         assertTrue(file.filename().endsWith(".xlsx"));
@@ -97,7 +96,7 @@ class AuditExportServiceTest {
         when(tenantProvider.requireBusinessId()).thenReturn(UUID.randomUUID());
 
         AuditExportService service = new AuditExportService(
-                queryService, tenantProvider, auditService, new ObjectMapper());
+                queryService, tenantProvider, auditService);
 
         assertThrows(IllegalArgumentException.class,
                 () -> service.export("pdf", null, null, null, null, null));
