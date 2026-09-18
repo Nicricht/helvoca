@@ -18,7 +18,13 @@
     AVAILABILITY_LISTED: "Consultó horarios disponibles",
     LIST_AVAILABLE_SLOTS: "Consultó horarios disponibles",
     AVAILABILITY_CHECKED: "Verificó disponibilidad",
-    CHECK_BOOKING_AVAILABILITY: "Verificó disponibilidad"
+    CHECK_BOOKING_AVAILABILITY: "Verificó disponibilidad",
+    ORDER_QUOTED: "Pedido cotizado",
+    ORDER_UPDATED: "Pedido actualizado",
+    ORDER_CONFIRMED: "Pedido confirmado",
+    ORDER_CREATED: "Pedido creado",
+    ORDER_STATUS_CHECKED: "Consultó estado del pedido",
+    ORDER_CANCELLED: "Pedido cancelado"
   };
   let loading = false;
 
@@ -79,11 +85,15 @@
     </div>${booking.notes ? `<div class="home-detail-note"><span>Notas</span><p>${esc(booking.notes)}</p></div>` : ""}`;
   }
 
-  function renderContext(context) {
+  function renderContext(context, entityKind = "reserva") {
     if (!context) return '<section class="home-detail-section"><h3>Conversación</h3><p class="home-detail-muted">No hay contexto conversacional disponible.</p></section>';
     const events = Array.isArray(context.events) ? context.events : [];
     const history = events.length ? `<section class="home-detail-section"><h3>Historial</h3><div class="home-detail-history">${events.map(item =>
       `<div><span>${esc(fmt(item.createdAt))}</span><strong>${esc(eventLabel(item.eventType))}</strong></div>`
+    ).join("")}</div></section>` : "";
+    const aiEvents = events.filter(item => String(item.actorType || "").toUpperCase() === "AI");
+    const eventActions = aiEvents.length ? `<section class="home-detail-section"><h3>Qué hizo Helvoca</h3><div class="home-detail-actions-list">${aiEvents.map(item =>
+      `<div><span>✓</span><strong>${esc(eventLabel(item.eventType))}</strong></div>`
     ).join("")}</div></section>` : "";
 
     if (context.channel === "VOICE" && context.call) {
@@ -110,12 +120,20 @@
           const assistant = String(message.role || "").toLowerCase() === "assistant" || String(message.direction || "").toLowerCase() === "outbound";
           return `<article class="home-detail-message ${assistant ? "assistant" : ""}"><strong>${assistant ? "Helvoca" : "Cliente"}</strong><p>${esc(message.content)}</p><span>${esc(fmt(message.createdAt))}</span></article>`;
         }).join("") : '<p class="home-detail-muted">No hay mensajes guardados.</p>'}</div></section>
+        ${eventActions}
         ${history}
         ${context.sourceReferenceId ? `<a class="home-detail-link" href="/conversations.html?channel=whatsapp&conversation=${encodeURIComponent(context.sourceReferenceId)}">Ver conversación completa</a>` : ""}
       `;
     }
 
-    return `<section class="home-detail-section"><h3>Origen</h3><p class="home-detail-muted">${context.channel === "MANUAL" ? "Esta reserva fue creada manualmente. No existe una conversación asociada." : "No se encontró una conversación enlazada a esta reserva."}</p></section>${history}`;
+    const entityText = entityKind === "pedido" ? "Este pedido" : "Esta reserva";
+    const createdSuffix = entityKind === "pedido" ? "" : "a";
+    const originText = context.channel === "MANUAL"
+      ? `${entityText} fue creado${createdSuffix} manualmente. No existe una conversación asociada.`
+      : context.channel === "API"
+        ? `${entityText} fue creado${createdSuffix} por API. No existe una conversación asociada.`
+        : `No se encontró una conversación enlazada a ${entityKind === "pedido" ? "este pedido" : "esta reserva"}.`;
+    return `${eventActions}<section class="home-detail-section"><h3>Origen</h3><p class="home-detail-muted">${originText}</p></section>${history}`;
   }
 
   async function openBookingDetail(id) {
@@ -294,20 +312,33 @@
   }
 
   async function loadOrderConversation(order) {
-    if (!order.sourceReferenceId) return null;
+    let events = [];
+    if (order.operationId) {
+      try {
+        const history = await api(`/api/v1/operation-events?operationId=${encodeURIComponent(order.operationId)}`);
+        events = Array.isArray(history) ? history : [];
+      } catch (_) {
+        events = [];
+      }
+    }
+
+    const context = {
+      channel: order.source || null,
+      sourceReferenceId: order.sourceReferenceId || null,
+      events
+    };
+    if (!order.sourceReferenceId) return context;
+
     try {
       if (order.source === "VOICE") {
-        const detail = await api(`/api/v1/calls/${encodeURIComponent(order.sourceReferenceId)}`);
-        return { channel: "VOICE", sourceReferenceId: order.sourceReferenceId, call: detail, events: [] };
-      }
-      if (order.source === "WHATSAPP") {
-        const detail = await api(`/api/v1/messaging/conversations/${encodeURIComponent(order.sourceReferenceId)}`);
-        return { channel: "WHATSAPP", sourceReferenceId: order.sourceReferenceId, whatsapp: detail, events: [] };
+        context.call = await api(`/api/v1/calls/${encodeURIComponent(order.sourceReferenceId)}`);
+      } else if (order.source === "WHATSAPP") {
+        context.whatsapp = await api(`/api/v1/messaging/conversations/${encodeURIComponent(order.sourceReferenceId)}`);
       }
     } catch (_) {
-      return null;
+      // Preserve the real order history even if the source conversation is temporarily unavailable.
     }
-    return null;
+    return context;
   }
 
   async function updateOrderStatus(order, nextStatus) {
@@ -336,10 +367,12 @@
       <div><span>Entrega</span><strong>${order.fulfillmentType === "DELIVERY" ? "Delivery" : "Retiro"}</strong></div>
       <div><span>Origen</span><strong>${esc(source(order.source))}</strong></div>
       <div><span>Estado</span><strong>${esc(status(order.status))}</strong></div>
+      <div><span>Subtotal</span><strong>${esc(money(order.subtotal, order.currency))}</strong></div>
+      <div><span>Despacho</span><strong>${esc(money(order.deliveryFee, order.currency))}</strong></div>
       <div><span>Total</span><strong>${esc(money(order.total, order.currency))}</strong></div>
     </div>
     <section class="home-detail-section"><h3>Productos</h3><div class="home-detail-lines">${lines.length ? lines.map(line =>
-      `<div><span>${esc(line.quantity || 0)} × ${esc(line.name || "Producto")}</span><strong>${esc(money(line.lineTotal ?? (Number(line.quantity || 0) * Number(line.unitPrice || 0)), order.currency))}</strong></div>`
+      `<div><span>${esc(line.quantity || 0)} × ${esc(line.name || "Producto")}${line.unitPrice != null ? ` · ${esc(money(line.unitPrice, order.currency))} c/u` : ""}</span><strong>${esc(money(line.lineTotal ?? (Number(line.quantity || 0) * Number(line.unitPrice || 0)), order.currency))}</strong></div>`
     ).join("") : '<p class="home-detail-muted">Sin líneas de detalle.</p>'}</div></section>
     ${order.deliveryAddress ? `<div class="home-detail-note"><span>Dirección</span><p>${esc(order.deliveryAddress)}</p></div>` : ""}`;
 
@@ -351,7 +384,7 @@
 
     const context = await loadOrderConversation(order);
     const actions = orderActions(order);
-    body.innerHTML = facts + renderContext(context) +
+    body.innerHTML = facts + renderContext(context, "pedido") +
       (actions.length ? `<div class="home-detail-order-actions">${actions.map(([next,label]) => `<button type="button" data-home-order-status="${next}" class="${next === "CANCELLED" ? "home-filter-clear" : "home-order-primary"}">${esc(label)}</button>`).join("")}</div>` : "");
 
     body.querySelectorAll("[data-home-order-status]").forEach(button => button.addEventListener("click", async event => {
