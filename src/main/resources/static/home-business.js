@@ -325,6 +325,7 @@
   new MutationObserver(()=>{ if(!dashboard.classList.contains("hidden")) queueMicrotask(load); }).observe(dashboard,{attributes:true,attributeFilter:["class"]});
   document.querySelector("#refreshBtn")?.addEventListener("click",load);
   ensureBookingDrawer();
-  setTab("bookings");
+  const requestedTab = new URLSearchParams(window.location.search).get("tab");
+  setTab(["bookings","orders","requests","customers"].includes(requestedTab) ? requestedTab : "bookings");
   queueMicrotask(load);
 })();
