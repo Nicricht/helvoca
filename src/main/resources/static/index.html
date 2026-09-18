@@ -278,7 +278,25 @@
                     <button class="home-business-tab" type="button" role="tab" aria-selected="false" data-home-tab="customers"><span>Clientes</span><strong id="homeBusinessCustomersCount">0</strong></button>
                 </div>
                 <section class="card home-business-panel" data-home-panel="bookings">
-                    <div class="home-business-head"><div><div class="eyebrow">Agenda</div><h2>Reservas</h2><p>Quién reservó, qué servicio y cuándo será atendido.</p></div></div>
+                    <div class="home-business-head">
+                        <div><div class="eyebrow">Agenda</div><h2>Reservas</h2><p>Quién reservó, qué servicio y cuándo será atendido.</p></div>
+                        <button id="homeIncidentToggle" class="home-incident-trigger" type="button">⚡ Resolver un imprevisto</button>
+                    </div>
+                    <section id="homeIncidentPanel" class="home-incident-panel hidden" aria-label="Resolver un imprevisto">
+                        <div class="home-incident-intro">
+                            <div><strong>Avisa a los clientes afectados</strong><span>Prepara una vista previa segura antes de contactar a alguien.</span></div>
+                            <span class="home-incident-safe">Sin envíos reales</span>
+                        </div>
+                        <div class="home-incident-form">
+                            <label class="home-incident-reason">¿Qué pasó?<textarea id="homeIncidentReason" rows="2" maxlength="500" placeholder="Ej.: hoy debo cerrar antes por un imprevisto"></textarea></label>
+                            <label>Fecha<input id="homeIncidentDate" type="date"></label>
+                            <label>Desde<input id="homeIncidentTime" type="time"></label>
+                            <label>Objetivo<select id="homeIncidentGoal"><option value="RESCHEDULE">Avisar y reprogramar</option><option value="INFORM">Solo avisar</option></select></label>
+                            <label>Estrategia<select id="homeIncidentStrategy"><option value="CHEAPEST">Más económico</option><option value="WHATSAPP">WhatsApp</option><option value="CALL">Llamada</option></select></label>
+                            <button id="homeIncidentPreviewBtn" class="home-incident-preview-btn" type="button">Preparar vista previa</button>
+                        </div>
+                        <div id="homeIncidentPreview" class="home-incident-preview hidden"></div>
+                    </section>
                     <div id="homeBookingsList" class="home-business-list"><div class="home-business-empty">Cargando reservas…</div></div>
                 </section>
                 <section class="card home-business-panel hidden" data-home-panel="orders">
