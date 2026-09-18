@@ -41,38 +41,3 @@ CREATE TABLE booking_incident_recipient (
 
 CREATE INDEX ix_booking_incident_recipient_campaign
     ON booking_incident_recipient(business_id, campaign_id);
-
-
--- V40 hardens only tables that exist at its migration time. V44 installs
--- tenant RLS explicitly for these new campaign tables.
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.booking_incident_campaign TO helvoca_runtime;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.booking_incident_recipient TO helvoca_runtime;
-
-ALTER TABLE public.booking_incident_campaign ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.booking_incident_campaign FORCE ROW LEVEL SECURITY;
-ALTER TABLE public.booking_incident_recipient ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.booking_incident_recipient FORCE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS helvoca_tenant_isolation ON public.booking_incident_campaign;
-DROP POLICY IF EXISTS helvoca_tenant_isolation ON public.booking_incident_recipient;
-
-DO $$
-DECLARE
-    migration_owner text := current_user;
-BEGIN
-    EXECUTE format(
-        'CREATE POLICY helvoca_tenant_isolation ON public.booking_incident_campaign TO PUBLIC '
-        || 'USING (current_user = %L OR current_user = ''helvoca_system'' OR business_id = public.helvoca_rls_business_id()) '
-        || 'WITH CHECK (current_user = %L OR current_user = ''helvoca_system'' OR business_id = public.helvoca_rls_business_id())',
-        migration_owner,
-        migration_owner
-    );
-    EXECUTE format(
-        'CREATE POLICY helvoca_tenant_isolation ON public.booking_incident_recipient TO PUBLIC '
-        || 'USING (current_user = %L OR current_user = ''helvoca_system'' OR business_id = public.helvoca_rls_business_id()) '
-        || 'WITH CHECK (current_user = %L OR current_user = ''helvoca_system'' OR business_id = public.helvoca_rls_business_id())',
-        migration_owner,
-        migration_owner
-    );
-END
-$$;
