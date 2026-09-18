@@ -139,6 +139,8 @@ test('ready customer sees live operational home instead of setup cards', async (
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Helvoca está atendiendo 🟢');
   await expect(page.locator('#operationalOverview')).toBeVisible();
+  await expect(page.locator('#operationalOverview')).toHaveCount(1);
+  await expect(page.locator('#homeRecentActivity')).toHaveCount(0);
   await expect(page.locator('#statusGrid')).toBeHidden();
   await expect(page.locator('#homeCallsToday')).toHaveText('3');
   await expect(page.locator('#homeWhatsAppToday')).toHaveText('1');
@@ -152,8 +154,6 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeWhatsAppMetric')).toHaveAttribute('href', '/conversations.html?channel=whatsapp');
   await expect(page.locator('#homeBookingsMetric')).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
   await expect(page.locator('#homeRequestsMetric')).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
-  await expect(page.locator('#homeRecentActivity')).toContainText('+56922222222');
-  await expect(page.locator('#homeRecentActivity')).toContainText('+56911111111');
   await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
   await expect(page.locator('#homeBookingsList')).toContainText('Peluquería');
