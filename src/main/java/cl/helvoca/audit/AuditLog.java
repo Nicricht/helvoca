@@ -1,7 +1,11 @@
 package cl.helvoca.audit;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -41,6 +45,14 @@ public class AuditLog {
     @Column(name = "actor_role", length = 50)
     private String actorRole;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "before_json", columnDefinition = "jsonb")
+    private Map<String, Object> beforeState;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "after_json", columnDefinition = "jsonb")
+    private Map<String, Object> afterState;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -68,5 +80,9 @@ public class AuditLog {
     public void setActorEmail(String actorEmail) { this.actorEmail = actorEmail; }
     public String getActorRole() { return actorRole; }
     public void setActorRole(String actorRole) { this.actorRole = actorRole; }
+    public Map<String, Object> getBeforeState() { return beforeState; }
+    public void setBeforeState(Map<String, Object> beforeState) { this.beforeState = beforeState; }
+    public Map<String, Object> getAfterState() { return afterState; }
+    public void setAfterState(Map<String, Object> afterState) { this.afterState = afterState; }
     public Instant getCreatedAt() { return createdAt; }
 }

@@ -14,7 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -99,7 +101,13 @@ public class BookingService {
         booking.setNotes(request.notes());
 
         Booking saved = bookings.save(booking);
-        auditService.humanSuccess(businessId, "BOOKING_CREATE", "BOOKING", saved.getId());
+        auditService.humanSuccess(
+                businessId,
+                "BOOKING_CREATE",
+                "BOOKING",
+                saved.getId(),
+                null,
+                auditSnapshot(saved));
         return BookingResponse.from(saved);
     }
 
@@ -121,10 +129,17 @@ public class BookingService {
             throw new ConflictException("BOOKING_SLOT_UNAVAILABLE");
         }
 
+        Map<String, Object> beforeState = auditSnapshot(booking);
         booking.setStartAt(request.startAt());
         booking.setEndAt(endAt);
         booking.setNotes(request.notes());
-        auditService.humanSuccess(businessId, "BOOKING_RESCHEDULE", "BOOKING", id);
+        auditService.humanSuccess(
+                businessId,
+                "BOOKING_RESCHEDULE",
+                "BOOKING",
+                id,
+                beforeState,
+                auditSnapshot(booking));
         return BookingResponse.from(booking);
     }
 
@@ -133,8 +148,15 @@ public class BookingService {
         UUID businessId = tenantProvider.requireBusinessId();
         Booking booking = requireBooking(id, businessId);
         if (booking.getStatus() != BookingStatus.CANCELLED) {
+            Map<String, Object> beforeState = auditSnapshot(booking);
             booking.setStatus(BookingStatus.CANCELLED);
-            auditService.humanSuccess(businessId, "BOOKING_CANCEL", "BOOKING", id);
+            auditService.humanSuccess(
+                    businessId,
+                    "BOOKING_CANCEL",
+                    "BOOKING",
+                    id,
+                    beforeState,
+                    auditSnapshot(booking));
         }
     }
 
@@ -155,6 +177,31 @@ public class BookingService {
 
     private static Instant calculateEnd(Instant startAt, ServiceItem service) {
         return startAt.plus(service.getDurationMinutes(), ChronoUnit.MINUTES);
+    }
+
+    private static Map<String, Object> auditSnapshot(Booking booking) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        put(snapshot, "id", booking.getId());
+        put(snapshot, "customerId", booking.getCustomerId());
+        put(snapshot, "serviceId", booking.getServiceId());
+        put(snapshot, "startAt", booking.getStartAt());
+        put(snapshot, "endAt", booking.getEndAt());
+        put(snapshot, "status", booking.getStatus());
+        put(snapshot, "source", booking.getSource());
+        return snapshot;
+    }
+
+    private static void put(Map<String, Object> snapshot, String key, Object value) {
+        if (value == null) return;
+        if (value instanceof UUID uuid) {
+            snapshot.put(key, uuid.toString());
+        } else if (value instanceof Instant instant) {
+            snapshot.put(key, instant.toString());
+        } else if (value instanceof Enum<?> enumValue) {
+            snapshot.put(key, enumValue.name());
+        } else {
+            snapshot.put(key, value);
+        }
     }
 
     private static void validateFuture(Instant startAt) {

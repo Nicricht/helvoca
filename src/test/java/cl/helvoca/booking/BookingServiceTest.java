@@ -21,11 +21,13 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -71,7 +73,7 @@ class BookingServiceTest {
 
         assertThrows(ConflictException.class, () -> service.create(request));
         verify(bookings, never()).save(any());
-        verify(auditService, never()).humanSuccess(any(), any(), any(), any());
+        verify(auditService, never()).humanSuccess(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -134,7 +136,8 @@ class BookingServiceTest {
         assertThrows(ConflictException.class,
                 () -> service.reschedule(bookingId, new RescheduleBookingRequest(startAt, null)));
         verify(bookings, never()).countOverlaps(any(), any(), any(), any(), any(), any());
-        verify(auditService, never()).humanSuccess(any(), eq("BOOKING_RESCHEDULE"), any(), any());
+        verify(auditService, never()).humanSuccess(
+                any(), eq("BOOKING_RESCHEDULE"), any(), any(), any(), any());
     }
 
     @Test
@@ -210,16 +213,18 @@ class BookingServiceTest {
         assertThrows(ConflictException.class, () -> service.create(request));
         verify(bookings, never()).countOverlaps(any(), any(), any(), any(), any(), any());
         verify(bookings, never()).save(any());
-        verify(auditService, never()).humanSuccess(any(), eq("BOOKING_CREATE"), any(), any());
+        verify(auditService, never()).humanSuccess(
+                any(), eq("BOOKING_CREATE"), any(), any(), any(), any());
     }
 
     @Test
-    void createUsesHumanAudit() {
+    void createAuditsAfterSnapshot() {
         UUID businessId = UUID.randomUUID();
         UUID bookingId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
         UUID serviceId = UUID.randomUUID();
         Instant startAt = Instant.now().plusSeconds(7200);
+        Instant endAt = startAt.plusSeconds(3600);
 
         BookingRepository bookings = mock(BookingRepository.class);
         CustomerRepository customers = mock(CustomerRepository.class);
@@ -236,7 +241,7 @@ class BookingServiceTest {
         when(saved.getCustomerId()).thenReturn(customerId);
         when(saved.getServiceId()).thenReturn(serviceId);
         when(saved.getStartAt()).thenReturn(startAt);
-        when(saved.getEndAt()).thenReturn(startAt.plusSeconds(3600));
+        when(saved.getEndAt()).thenReturn(endAt);
         when(saved.getStatus()).thenReturn(BookingStatus.CONFIRMED);
         when(saved.getSource()).thenReturn(BookingSource.ADMIN);
 
@@ -252,17 +257,33 @@ class BookingServiceTest {
         BookingService service = new BookingService(
                 bookings, customers, catalog, schedule, tenantProvider, auditService);
 
-        service.create(new CreateBookingRequest(customerId, serviceId, startAt, BookingSource.ADMIN, null));
+        service.create(new CreateBookingRequest(customerId, serviceId, startAt, BookingSource.ADMIN, "private note"));
 
-        verify(auditService).humanSuccess(businessId, "BOOKING_CREATE", "BOOKING", bookingId);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> afterCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(auditService).humanSuccess(
+                eq(businessId),
+                eq("BOOKING_CREATE"),
+                eq("BOOKING"),
+                eq(bookingId),
+                isNull(),
+                afterCaptor.capture());
+
+        Map<String, Object> after = afterCaptor.getValue();
+        assertEquals(startAt.toString(), after.get("startAt"));
+        assertEquals("CONFIRMED", after.get("status"));
+        assertEquals(customerId.toString(), after.get("customerId"));
+        assertFalse(after.containsKey("notes"));
     }
 
     @Test
-    void rescheduleUsesHumanAudit() {
+    void rescheduleAuditsBeforeAndAfterSnapshots() {
         UUID businessId = UUID.randomUUID();
         UUID bookingId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
         UUID serviceId = UUID.randomUUID();
-        Instant startAt = Instant.now().plusSeconds(7200);
+        Instant oldStart = Instant.now().plusSeconds(7200);
+        Instant newStart = oldStart.plusSeconds(3600);
 
         BookingRepository bookings = mock(BookingRepository.class);
         CustomerRepository customers = mock(CustomerRepository.class);
@@ -273,28 +294,48 @@ class BookingServiceTest {
 
         Booking booking = new Booking();
         booking.setBusinessId(businessId);
+        booking.setCustomerId(customerId);
         booking.setServiceId(serviceId);
+        booking.setStartAt(oldStart);
+        booking.setEndAt(oldStart.plusSeconds(3600));
         booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setSource(BookingSource.ADMIN);
         ServiceItem item = serviceItem(businessId, 60);
 
         when(tenantProvider.requireBusinessId()).thenReturn(businessId);
         when(bookings.findByIdAndBusinessId(bookingId, businessId)).thenReturn(Optional.of(booking));
         when(catalog.requireActiveEntity(serviceId, businessId)).thenReturn(item);
-        when(schedule.isWithinBusinessHours(eq(businessId), eq(startAt), any(Instant.class))).thenReturn(true);
+        when(schedule.isWithinBusinessHours(eq(businessId), eq(newStart), any(Instant.class))).thenReturn(true);
         when(bookings.countOverlaps(
-                eq(businessId), eq(serviceId), eq(startAt), any(Instant.class),
+                eq(businessId), eq(serviceId), eq(newStart), any(Instant.class),
                 eq(BookingStatus.CANCELLED), eq(bookingId))).thenReturn(0L);
 
         BookingService service = new BookingService(
                 bookings, customers, catalog, schedule, tenantProvider, auditService);
 
-        service.reschedule(bookingId, new RescheduleBookingRequest(startAt, "Cambio manual"));
+        service.reschedule(bookingId, new RescheduleBookingRequest(newStart, "private note"));
 
-        verify(auditService).humanSuccess(businessId, "BOOKING_RESCHEDULE", "BOOKING", bookingId);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> beforeCaptor = ArgumentCaptor.forClass(Map.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> afterCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(auditService).humanSuccess(
+                eq(businessId),
+                eq("BOOKING_RESCHEDULE"),
+                eq("BOOKING"),
+                eq(bookingId),
+                beforeCaptor.capture(),
+                afterCaptor.capture());
+
+        assertEquals(oldStart.toString(), beforeCaptor.getValue().get("startAt"));
+        assertEquals(newStart.toString(), afterCaptor.getValue().get("startAt"));
+        assertEquals("CONFIRMED", beforeCaptor.getValue().get("status"));
+        assertEquals("CONFIRMED", afterCaptor.getValue().get("status"));
+        assertFalse(afterCaptor.getValue().containsKey("notes"));
     }
 
     @Test
-    void cancelUsesHumanAudit() {
+    void cancelAuditsStatusBeforeAndAfter() {
         UUID businessId = UUID.randomUUID();
         UUID bookingId = UUID.randomUUID();
 
@@ -317,15 +358,30 @@ class BookingServiceTest {
 
         service.cancel(bookingId);
 
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> beforeCaptor = ArgumentCaptor.forClass(Map.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> afterCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(auditService).humanSuccess(
+                eq(businessId),
+                eq("BOOKING_CANCEL"),
+                eq("BOOKING"),
+                eq(bookingId),
+                beforeCaptor.capture(),
+                afterCaptor.capture());
+
+        assertEquals("CONFIRMED", beforeCaptor.getValue().get("status"));
+        assertEquals("CANCELLED", afterCaptor.getValue().get("status"));
         assertEquals(BookingStatus.CANCELLED, booking.getStatus());
-        verify(auditService).humanSuccess(businessId, "BOOKING_CANCEL", "BOOKING", bookingId);
     }
 
     @Test
-    void humanAuditUsesAuthenticatedJwtClaims() {
+    void humanAuditUsesAuthenticatedJwtClaimsAndSnapshots() {
         UUID businessId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         AuditLogRepository repository = mock(AuditLogRepository.class);
+        Map<String, Object> before = Map.of("status", "CONFIRMED");
+        Map<String, Object> after = Map.of("status", "CANCELLED");
 
         Jwt jwt = Jwt.withTokenValue("test-token")
                 .header("alg", "HS256")
@@ -343,7 +399,7 @@ class BookingServiceTest {
                         List.of(new SimpleGrantedAuthority("ROLE_OPERATOR"))));
 
         new AuditService(repository).humanSuccess(
-                businessId, "BOOKING_CANCEL", "BOOKING", UUID.randomUUID());
+                businessId, "BOOKING_CANCEL", "BOOKING", UUID.randomUUID(), before, after);
 
         ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
         verify(repository).save(captor.capture());
@@ -354,6 +410,8 @@ class BookingServiceTest {
         assertEquals("Carolina Soto", log.getActorName());
         assertEquals("carolina@example.com", log.getActorEmail());
         assertEquals("OPERATOR", log.getActorRole());
+        assertEquals(before, log.getBeforeState());
+        assertEquals(after, log.getAfterState());
     }
 
     @Test
@@ -381,8 +439,42 @@ class BookingServiceTest {
         assertThrows(
                 AccessDeniedException.class,
                 () -> auditService.humanSuccess(
-                        UUID.randomUUID(), "BOOKING_CANCEL", "BOOKING", UUID.randomUUID()));
+                        UUID.randomUUID(),
+                        "BOOKING_CANCEL",
+                        "BOOKING",
+                        UUID.randomUUID(),
+                        Map.of("status", "CONFIRMED"),
+                        Map.of("status", "CANCELLED")));
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void legacyHumanAuditWithoutSnapshotsStillWorks() {
+        UUID businessId = UUID.randomUUID();
+        AuditLogRepository repository = mock(AuditLogRepository.class);
+
+        Jwt jwt = Jwt.withTokenValue("test-token")
+                .header("alg", "HS256")
+                .claim("sub", UUID.randomUUID().toString())
+                .claim("business_id", businessId.toString())
+                .claim("name", "Carolina Soto")
+                .claim("email", "carolina@example.com")
+                .claim("roles", List.of("BUSINESS_ADMIN"))
+                .build();
+
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        jwt,
+                        "test-token",
+                        List.of(new SimpleGrantedAuthority("ROLE_BUSINESS_ADMIN"))));
+
+        new AuditService(repository).humanSuccess(
+                businessId, "BOOKING_CREATE", "BOOKING", UUID.randomUUID());
+
+        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(repository).save(captor.capture());
+        assertNull(captor.getValue().getBeforeState());
+        assertNull(captor.getValue().getAfterState());
     }
 
     private static ServiceItem serviceItem(UUID businessId, int durationMinutes) {

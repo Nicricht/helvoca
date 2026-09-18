@@ -6,6 +6,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -19,6 +20,16 @@ public class AuditService {
     }
 
     public void humanSuccess(UUID businessId, String action, String resourceType, UUID resourceId) {
+        humanSuccess(businessId, action, resourceType, resourceId, null, null);
+    }
+
+    public void humanSuccess(
+            UUID businessId,
+            String action,
+            String resourceType,
+            UUID resourceId,
+            Map<String, Object> beforeState,
+            Map<String, Object> afterState) {
         Jwt jwt = requireAuthenticatedJwt();
         UUID tokenBusinessId = requireUuid(jwt.getClaimAsString("business_id"), "Token has invalid business_id");
         if (!businessId.equals(tokenBusinessId)) {
@@ -31,6 +42,8 @@ public class AuditService {
         log.setActorName(requireClaim(jwt, "name"));
         log.setActorEmail(requireClaim(jwt, "email"));
         log.setActorRole(requireBusinessRole(jwt));
+        log.setBeforeState(beforeState);
+        log.setAfterState(afterState);
         repository.save(log);
     }
 
