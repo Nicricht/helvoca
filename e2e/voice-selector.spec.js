@@ -83,18 +83,17 @@ test('AI agent voice is selected from the backend catalog and never typed freely
   })));
   await page.route('**/api/v1/public/pricing', route => route.fulfill(json([])));
 
-  await page.goto('/');
-  await page.locator('#advancedPanel .ux-config-nav button[aria-controls="configBusinessPanel"]').click();
-  await page.getByRole('button', { name: 'Más ajustes' }).click();
+  await page.goto('/settings.html');
+  await page.getByRole('button', { name: 'Recepcionista', exact: true }).click();
 
-  const selector = page.locator('#agentVoiceSelect');
+  const selector = page.locator('#settingsAgentVoice');
   await expect(selector).toBeVisible();
   await expect(selector).toHaveValue('marin');
-  await expect(page.locator('#agentVoiceHelp')).toContainText('Equilibrada y conversacional');
-  await expect(page.locator('input[name="agentVoice"]')).toHaveCount(0);
+  await expect(page.locator('#settingsAgentVoiceHelp')).toContainText('Equilibrada y conversacional');
+  await expect(page.locator('input#settingsAgentVoice')).toHaveCount(0);
 
   await selector.selectOption('cedar');
   await expect(selector).toHaveValue('cedar');
-  await expect(page.locator('#agentVoiceHelp')).toContainText('Clara y orientada a atención');
+  await expect(page.locator('#settingsAgentVoiceHelp')).toContainText('Clara y orientada a atención');
   expect(agentPuts).toBe(0);
 });
