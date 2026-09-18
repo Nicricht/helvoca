@@ -82,6 +82,7 @@ app:
     auth-token: ${TWILIO_AUTH_TOKEN:}
     public-base-url: ${TWILIO_PUBLIC_BASE_URL:}
     media-stream-path: ${TWILIO_MEDIA_STREAM_PATH:/ws/v1/twilio/media}
+    whatsapp-sandbox-from: ${TWILIO_WHATSAPP_SANDBOX_FROM:}
     certification-ingress-enabled: ${TWILIO_CERTIFICATION_INGRESS_ENABLED:false}
     provisioning-enabled: ${TWILIO_PROVISIONING_ENABLED:false}
   whatsapp:
