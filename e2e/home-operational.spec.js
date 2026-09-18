@@ -137,7 +137,7 @@ test('ready customer sees live operational home instead of setup cards', async (
 
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Helvoca está atendiendo 🟢');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Negocio E2E está atendiendo 🟢');
   await expect(page.locator('#operationalOverview')).toBeVisible();
   await expect(page.locator('#operationalOverview')).toHaveCount(1);
   await expect(page.locator('#homeRecentActivity')).toHaveCount(0);
@@ -180,6 +180,7 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Ana llamó para reservar peluquería');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Quiero reservar peluquería.');
   await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').first()).toHaveText('Ana Reserva');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').nth(1)).toHaveText('Negocio E2E');
   await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Qué hizo Helvoca');
   await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Historial');
   await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute('href', '/conversations.html?channel=calls&conversation=call-1');
@@ -190,6 +191,7 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Quiero reservar un masaje.');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Tu reserva quedó confirmada.');
   await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').first()).toHaveText('Bruno Masaje');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').nth(1)).toHaveText('Negocio E2E');
   await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Qué hizo Helvoca');
   await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Historial');
   await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute('href', '/conversations.html?channel=whatsapp&conversation=wa-booking-2');
@@ -204,6 +206,7 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Av. Demo 123, Santiago');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Quiero un Producto demo.');
   await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').first()).toHaveText('Juan Pedido');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').nth(1)).toHaveText('Negocio E2E');
   await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Qué hizo Helvoca');
   await expect(page.locator('#homeBookingDetailBody')).not.toContainText('Historial');
   await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute('href', '/conversations.html?channel=whatsapp&conversation=wa-order');
