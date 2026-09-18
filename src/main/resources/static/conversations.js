@@ -7,6 +7,7 @@ if (!token) location.replace("/");
 
 let calls = [];
 let whatsappConversations = [];
+let customersById = new Map();
 const params = new URLSearchParams(window.location.search);
 const requestedChannel = params.get("channel");
 const requestedConversation = params.get("conversation");
@@ -89,6 +90,11 @@ function statusLabel(status) {
   })[status] || humanize(status) || "Sin estado";
 }
 
+function customerLabel(customerId, fallback) {
+  const customer = customerId ? customersById.get(String(customerId)) : null;
+  return customer?.name || customer?.phone || fallback;
+}
+
 function toast(text) {
   const el = $("#message");
   el.textContent = text;
@@ -102,7 +108,7 @@ function conversationItems() {
     key: `call:${call.id}`,
     kind: "call",
     id: call.id,
-    customer: call.callerNumber || "Número oculto",
+    customer: customerLabel(call.customerId, call.callerNumber || "Número oculto"),
     status: statusLabel(call.status),
     bad: call.status === "FAILED",
     timestamp: call.startedAt,
@@ -113,7 +119,7 @@ function conversationItems() {
     key: `whatsapp:${conversation.id}`,
     kind: "whatsapp",
     id: conversation.id,
-    customer: conversation.sender || "Número desconocido",
+    customer: customerLabel(conversation.customerId, conversation.sender || "Número desconocido"),
     status: "WhatsApp",
     bad: false,
     timestamp: conversation.lastMessageAt || conversation.openedAt,
@@ -174,7 +180,7 @@ function renderCallDetail(data) {
   $("#detailEmpty").classList.add("hidden");
   $("#detailContent").classList.remove("hidden");
   $("#detailChannel").textContent = "Llamada";
-  $("#detailCustomer").textContent = call.callerNumber || "Número oculto";
+  $("#detailCustomer").textContent = customerLabel(call.customerId, call.callerNumber || "Número oculto");
   $("#detailMeta").textContent = [fmtDate(call.startedAt), call.durationSeconds != null ? fmtDuration(call.durationSeconds) : "", humanize(call.resolution)].filter(Boolean).join(" · ");
   $("#detailStatus").textContent = statusLabel(call.status);
   $("#detailStatus").className = `pill ${call.status === "FAILED" ? "bad" : ""}`;
@@ -211,7 +217,7 @@ function renderWhatsAppDetail(data) {
   $("#detailEmpty").classList.add("hidden");
   $("#detailContent").classList.remove("hidden");
   $("#detailChannel").textContent = "WhatsApp";
-  $("#detailCustomer").textContent = conversation.sender || "Número desconocido";
+  $("#detailCustomer").textContent = customerLabel(conversation.customerId, conversation.sender || "Número desconocido");
   $("#detailMeta").textContent = [fmtDate(conversation.lastMessageAt || conversation.openedAt), `${messages.length} mensaje${messages.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
   $("#detailStatus").textContent = "WhatsApp";
   $("#detailStatus").className = "pill";
@@ -272,9 +278,10 @@ function setChannel(channel) {
 
 async function load() {
   $("#conversationList").innerHTML = '<div class="loading-line">Cargando conversaciones…</div>';
-  const [dashboardResult, whatsappResult] = await Promise.allSettled([
+  const [dashboardResult, whatsappResult, customersResult] = await Promise.allSettled([
     api("/api/v1/operations/dashboard"),
-    api("/api/v1/messaging/conversations")
+    api("/api/v1/messaging/conversations"),
+    api("/api/v1/customers")
   ]);
   const dashboardAvailable = dashboardResult.status === "fulfilled";
   const whatsappAvailable = whatsappResult.status === "fulfilled";
@@ -282,6 +289,9 @@ async function load() {
   if (dashboardAvailable || whatsappAvailable) {
     const data = dashboardAvailable ? dashboardResult.value : {};
     businessName = data.businessName || "Tu negocio";
+    customersById = customersResult.status === "fulfilled" && Array.isArray(customersResult.value)
+      ? new Map(customersResult.value.map(customer => [String(customer.id), customer]))
+      : new Map();
     document.querySelector(".brand-block strong")?.replaceChildren(document.createTextNode(businessName.toUpperCase()));
     document.title = `${businessName} · Conversaciones`;
     calls = data.recentCalls || [];
@@ -304,8 +314,9 @@ async function load() {
 
 $$(".channel-tab").forEach(button => button.addEventListener("click", () => setChannel(button.dataset.channel)));
 $("#refreshBtn").addEventListener("click", async event => {
-  event.currentTarget.disabled = true;
-  try { await load(); } finally { event.currentTarget.disabled = false; }
+  const button = event.currentTarget;
+  button.disabled = true;
+  try { await load(); } finally { button.disabled = false; }
 });
 
 setChannel(activeChannel);

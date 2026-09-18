@@ -405,3 +405,55 @@ jobs:
           fi
           PAYLOAD=$(printf '{"state":"%s","context":"helvoca/orders-qa","description":"%s"}' "$STATE" "$DESCRIPTION")
           curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"
+
+  conversations-qa:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[conversations-verify]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Report conversations QA pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          PAYLOAD=$(printf '{"state":"pending","context":"helvoca/conversations-qa","description":"Conversations frontend QA running"}')
+          curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Validate conversations JavaScript
+        run: node --check src/main/resources/static/conversations.js
+
+      - name: Install conversations test dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run conversations E2E
+        run: npx playwright test e2e/conversations.spec.js e2e/home-operational.spec.js --grep "conversation|reservation filters drawer and conversation links work"
+
+      - name: Report conversations QA status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          if [ "$JOB_STATUS" = "success" ]; then
+            STATE="success"
+            DESCRIPTION="Conversations frontend QA passed"
+          else
+            STATE="failure"
+            DESCRIPTION="Conversations frontend QA failed"
+          fi
+          PAYLOAD=$(printf '{"state":"%s","context":"helvoca/conversations-qa","description":"%s"}' "$STATE" "$DESCRIPTION")
+          curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"
