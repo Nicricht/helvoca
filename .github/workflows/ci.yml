@@ -282,7 +282,9 @@ jobs:
           node-version: "22"
 
       - name: Validate reservations JavaScript
-        run: node --check src/main/resources/static/home-business.js
+        run: |
+          node --check src/main/resources/static/home-business.js
+          node --check e2e/home-operational.spec.js
 
       - name: Install reservations test dependencies
         run: |
