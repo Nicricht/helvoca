@@ -881,6 +881,57 @@ test('customer exports download csv and xlsx', async ({ page }) => {
   await expect(page.locator('#homeCustomersExportMessage')).toContainText('XLSX descargado');
 });
 
+test('manual customer creation adds customer and updates booking selector', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+
+  let createPayload = null;
+  await page.route('**/api/v1/customers', async route => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    createPayload = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'cust3',
+        name: createPayload.name,
+        phone: createPayload.phone,
+        email: createPayload.email,
+        notes: createPayload.notes,
+        createdAt: '2026-09-18T21:55:00Z',
+        updatedAt: '2026-09-18T21:55:00Z'
+      })
+    });
+  });
+
+  await page.goto('/');
+  await page.getByRole('tab', { name: /Clientes/ }).click();
+  await page.getByRole('button', { name: 'Nuevo cliente' }).click();
+
+  await page.getByLabel('Nombre').fill('Carla Nueva');
+  await page.getByLabel('Teléfono').fill('+56977777777');
+  await page.getByLabel('Email').fill('carla@example.cl');
+  await page.getByRole('button', { name: 'Crear cliente' }).click();
+
+  expect(createPayload).toEqual({
+    name: 'Carla Nueva',
+    phone: '+56977777777',
+    email: 'carla@example.cl',
+    notes: null
+  });
+  await expect(page.locator('#homeCustomerCreateMessage')).toContainText('Cliente creado');
+  await expect(page.locator('#homeBusinessCustomersCount')).toHaveText('3');
+  await expect(page.locator('#homeCustomersList')).toContainText('Carla Nueva');
+  await expect(page.locator('#homeCustomersList')).toContainText('+56977777777');
+
+  await page.getByRole('tab', { name: /Reservas/ }).click();
+  await page.getByRole('button', { name: 'Nueva reserva' }).click();
+  await expect(page.locator('#homeBookingCreateCustomer option[value="cust3"]')).toHaveText('Carla Nueva');
+});
+
 test('customers workspace sorts and renders contact data', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);

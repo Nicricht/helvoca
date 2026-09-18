@@ -6,7 +6,7 @@
     <title>Helvoca · Configura tu recepcionista con IA</title>
     <meta name="description" content="Pega el enlace de tu negocio y deja que Helvoca prepare tu recepcionista telefónica con IA.">
     <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/home-business.css?v=20260918-13">
+    <link rel="stylesheet" href="/home-business.css?v=20260918-14">
     <style>
         .agent-toggle { flex-direction: row; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; background: rgba(255,255,255,.02); }
         .agent-toggle input, .agent-capability input { width: auto; min-height: auto; margin: 0; accent-color: var(--accent); }
@@ -373,11 +373,23 @@
                 <section class="card home-business-panel hidden" data-home-panel="customers">
                     <div class="home-business-head">
                         <div><div class="eyebrow">Personas</div><h2>Clientes</h2><p>Personas registradas por voz, WhatsApp o gestión manual.</p></div>
-                        <div id="homeCustomersExportActions" class="home-business-head-actions hidden">
-                            <button id="homeCustomersExportCsv" class="home-export-button" type="button">Descargar CSV</button>
-                            <button id="homeCustomersExportXlsx" class="home-export-button" type="button">Descargar Excel</button>
+                        <div class="home-business-head-actions">
+                            <button id="homeCustomerCreateToggle" class="home-booking-create-trigger" type="button" aria-expanded="false">＋ Nuevo cliente</button>
+                            <div id="homeCustomersExportActions" class="home-business-head-actions hidden">
+                                <button id="homeCustomersExportCsv" class="home-export-button" type="button">Descargar CSV</button>
+                                <button id="homeCustomersExportXlsx" class="home-export-button" type="button">Descargar Excel</button>
+                            </div>
                         </div>
                     </div>
+                    <section id="homeCustomerCreatePanel" class="home-customer-create-panel hidden" aria-label="Crear cliente manual">
+                        <div class="home-customer-create-form">
+                            <label>Nombre<input id="homeCustomerCreateName" type="text" maxlength="150" autocomplete="name"></label>
+                            <label>Teléfono<input id="homeCustomerCreatePhone" type="tel" maxlength="30" autocomplete="tel"></label>
+                            <label>Email<input id="homeCustomerCreateEmail" type="email" maxlength="180" autocomplete="email"></label>
+                            <button id="homeCustomerCreateConfirm" class="home-booking-primary" type="button">Crear cliente</button>
+                        </div>
+                        <p id="homeCustomerCreateMessage" class="home-detail-muted" aria-live="polite"></p>
+                    </section>
                     <div id="homeCustomersExportMessage" class="home-export-message" aria-live="polite"></div>
                     <div id="homeCustomersList" class="home-business-list"><div class="home-business-empty">Cargando clientes…</div></div>
                 </section>
@@ -567,7 +579,7 @@
 </script>
 <script src="/app.js?v=20260918-4" defer></script>
 <script src="/commercial-status.js?v=20260918-4" defer></script>
-<script src="/home-business.js?v=20260918-17" defer></script>
+<script src="/home-business.js?v=20260918-18" defer></script>
 <script src="/ux-simplification.js?v=20260918-2" defer></script>
 <script src="/phone-provisioning.js?v=20260918-2" defer></script>
 </body>

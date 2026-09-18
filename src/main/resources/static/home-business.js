@@ -1025,6 +1025,71 @@
     }
   }
 
+  async function createManualCustomer() {
+    const nameInput = document.querySelector("#homeCustomerCreateName");
+    const phoneInput = document.querySelector("#homeCustomerCreatePhone");
+    const emailInput = document.querySelector("#homeCustomerCreateEmail");
+    const button = document.querySelector("#homeCustomerCreateConfirm");
+    const message = document.querySelector("#homeCustomerCreateMessage");
+    if (!button || !message) return;
+
+    const name = nameInput?.value.trim() || "";
+    const phone = phoneInput?.value.trim() || "";
+    const email = emailInput?.value.trim() || "";
+    if (!name && !phone && !email) {
+      message.textContent = "Ingresa al menos un dato del cliente.";
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Creando…";
+    message.textContent = "";
+    try {
+      const created = await api("/api/v1/customers", {
+        method: "POST",
+        body: JSON.stringify({
+          name: name || null,
+          phone: phone || null,
+          email: email || null,
+          notes: null
+        })
+      });
+      if (created?.id) {
+        state.customers = [created, ...state.customers.filter(item => String(item.id) !== String(created.id))];
+      }
+      if (nameInput) nameInput.value = "";
+      if (phoneInput) phoneInput.value = "";
+      if (emailInput) emailInput.value = "";
+      renderCustomers();
+      populateBookingCreateControls();
+      message.textContent = `Cliente creado ✓`;
+    } catch (error) {
+      message.textContent = error.message || "No pude crear el cliente.";
+    } finally {
+      button.disabled = false;
+      button.textContent = "Crear cliente";
+    }
+  }
+
+  function bindCustomerCreate() {
+    const toggle = document.querySelector("#homeCustomerCreateToggle");
+    const panel = document.querySelector("#homeCustomerCreatePanel");
+    const confirm = document.querySelector("#homeCustomerCreateConfirm");
+    if (!toggle || !panel || !confirm || toggle.dataset.bound === "true") return;
+    toggle.dataset.bound = "true";
+
+    toggle.addEventListener("click", () => {
+      const opening = panel.classList.contains("hidden");
+      panel.classList.toggle("hidden", !opening);
+      toggle.setAttribute("aria-expanded", opening ? "true" : "false");
+      if (opening) {
+        document.querySelector("#homeCustomerCreateName")?.focus();
+      }
+    });
+
+    confirm.addEventListener("click", createManualCustomer);
+  }
+
   function bindCustomerExports() {
     const csv = document.querySelector("#homeCustomersExportCsv");
     const xlsx = document.querySelector("#homeCustomersExportXlsx");
@@ -1947,7 +2012,7 @@
       state.auditCatalog=[...state.audit];
       state.businessName=ops.status==="fulfilled"&&ops.value?.businessName?String(ops.value.businessName):(window.helvocaBusinessName||state.businessName||"Tu negocio");
       state.businessTimezone=ops.status==="fulfilled"&&ops.value?.timezone?String(ops.value.timezone):"America/Santiago";
-      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); renderAudit(); populateAuditFilterOptions(); if (isBusinessAdmin()) { bindCustomerExports(); bindAuditFilters(); } bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
+      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); renderAudit(); populateAuditFilterOptions(); if (isBusinessAdmin()) { bindCustomerExports(); bindAuditFilters(); } bindCustomerCreate(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
     } finally { loading=false; }
   }
 
