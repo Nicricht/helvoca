@@ -218,3 +218,83 @@ test('ready customer sees operations on home and configuration on settings', asy
   await expect(page.getByRole('button', { name: 'Buscar un número nuevo' })).toBeVisible();
   await expect(page.locator('#provisioningSearchForm')).toBeHidden();
 });
+
+test('primary and public navigation fit desktop tablet and mobile viewports', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyTenant(page);
+  const viewports = [
+    { width: 1440, height: 900 },
+    { width: 768, height: 900 },
+    { width: 390, height: 844 }
+  ];
+  const expectNoPageOverflow = async () => {
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  };
+
+  for (const viewport of viewports) {
+    await test.step(`${viewport.width}x${viewport.height}`, async () => {
+      await page.setViewportSize(viewport);
+
+      await page.goto('/');
+      await expect(page.locator('#primaryNav')).toBeVisible();
+      await expect(page.locator('.nav-conversations')).toHaveAttribute('href', '/conversations.html');
+      await expect(page.locator('.nav-operations')).toHaveAttribute('href', '/operations.html');
+      await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
+      await expectNoPageOverflow();
+
+      await page.goto('/settings.html');
+      await expect(page.locator('.nav-config')).toHaveClass(/active/);
+      await page.getByRole('button', { name: 'Negocio', exact: true }).click();
+      await expect(page.locator('#configBusinessPanel')).toBeVisible();
+      await expectNoPageOverflow();
+
+      await page.goto('/sales.html');
+      await expect(page.locator('.nav nav a[href="/pricing.html"]')).toHaveAttribute('href', '/pricing.html');
+      await expectNoPageOverflow();
+
+      await page.goto('/pricing.html');
+      await expect(page.locator('#plans .plan')).toHaveCount(2);
+      await expect(page.getByRole('link', { name: 'Ver cómo funciona' })).toHaveAttribute('href', '/sales.html');
+      await expectNoPageOverflow();
+    });
+  }
+});
+
+test('authentication and phone administration fit all target viewports', async ({ page }) => {
+  test.setTimeout(45000);
+  const viewports = [
+    { width: 1440, height: 900 },
+    { width: 768, height: 900 },
+    { width: 390, height: 844 }
+  ];
+  const expectNoPageOverflow = async () => {
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  };
+
+  for (const viewport of viewports) {
+    await test.step(`autenticación ${viewport.width}x${viewport.height}`, async () => {
+      await page.setViewportSize(viewport);
+      await page.goto('/');
+      await expect(page.locator('#registerForm')).toBeVisible();
+      await page.locator('#loginTab').click();
+      await expect(page.locator('#loginForm')).toBeVisible();
+      await expectNoPageOverflow();
+    });
+  }
+
+  await page.evaluate(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await page.route('**/api/v1/phone-numbers', route => route.fulfill(json([
+    { id: 'phone1', phoneNumber: '+56911111111', active: true }
+  ])));
+  for (const viewport of viewports) {
+    await test.step(`telefonía ${viewport.width}x${viewport.height}`, async () => {
+      await page.setViewportSize(viewport);
+      await page.goto('/phone-numbers.html');
+      await expect(page.getByText('+56911111111')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Desvincular' })).toBeVisible();
+      await expect(page.getByRole('link', { name: /Volver a Helvoca/ })).toHaveAttribute('href', '/');
+      await expectNoPageOverflow();
+    });
+  }
+});

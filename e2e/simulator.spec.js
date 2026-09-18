@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 test('receptionist simulator keeps actions isolated and shows trace', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
 
   const sessionId = '11111111-1111-1111-1111-111111111111';
@@ -278,8 +279,8 @@ test('simulator waits for business identity before starting', async ({ page }) =
   await expect(start).toBeEnabled();
 });
 
-test('simulator stays usable on a mobile viewport', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+test('simulator stays usable on tablet and mobile viewports', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 900 });
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await page.route('**/api/v1/business', route => route.fulfill({
     status: 200, contentType: 'application/json', body: JSON.stringify({ name: 'Negocio Móvil' })
@@ -288,6 +289,10 @@ test('simulator stays usable on a mobile viewport', async ({ page }) => {
   await page.goto('/simulator.html');
 
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Nueva prueba' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+
+  await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('button', { name: 'Nueva prueba' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });

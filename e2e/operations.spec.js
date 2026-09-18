@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 test('operations is advanced-only with calls and diagnostics', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
 
   const dashboard = {
@@ -175,8 +176,8 @@ test('operations keeps valid call history visible when a diagnostic endpoint fai
   await expect(page.locator('#readinessWarnings')).toContainText('Readiness no disponible');
 });
 
-test('operations remains usable on a mobile viewport', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+test('operations remains usable on tablet and mobile viewports', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 900 });
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   const json = body => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
   await page.route('**/api/v1/operations/dashboard', route => route.fulfill(json({
@@ -191,6 +192,10 @@ test('operations remains usable on a mobile viewport', async ({ page }) => {
   await page.goto('/operations.html');
 
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Abrir detalle' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+
+  await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('button', { name: 'Abrir detalle' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });

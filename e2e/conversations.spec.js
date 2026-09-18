@@ -230,16 +230,18 @@ test('conversation inbox is responsive on desktop tablet and mobile', async ({ p
     summary: 'El cliente reservó una hora.', transcript: [], actions: []
   })));
 
-  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/conversations.html');
   let inboxBox = await page.locator('.inbox-panel').boundingBox();
   let detailBox = await page.locator('.conversation-detail').boundingBox();
   expect(detailBox.x).toBeGreaterThan(inboxBox.x);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 
-  await page.setViewportSize({ width: 820, height: 900 });
+  await page.setViewportSize({ width: 768, height: 900 });
   inboxBox = await page.locator('.inbox-panel').boundingBox();
   detailBox = await page.locator('.conversation-detail').boundingBox();
   expect(detailBox.y).toBeGreaterThan(inboxBox.y);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('button', { name: 'Llamadas' })).toBeVisible();
