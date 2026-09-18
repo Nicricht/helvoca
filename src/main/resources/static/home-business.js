@@ -127,11 +127,182 @@
       <section class="home-detail-section home-booking-actions">
         <h3>Gestionar reserva</h3>
         <div class="home-booking-action-buttons">
+          <button id="homeBookingRescheduleToggle" class="home-booking-primary" type="button">Reprogramar</button>
           <button id="homeBookingCancel" class="home-booking-danger" type="button">Cancelar reserva</button>
+        </div>
+        <div id="homeBookingReschedulePanel" class="home-booking-reschedule hidden">
+          <label>Fecha
+            <select id="homeBookingRescheduleDate"></select>
+          </label>
+          <label>Hora
+            <select id="homeBookingRescheduleTime"></select>
+          </label>
+          <button id="homeBookingCheckAvailability" class="home-booking-primary" type="button">Comprobar disponibilidad</button>
+          <button id="homeBookingConfirmReschedule" class="home-booking-primary hidden" type="button">Confirmar cambio</button>
+          <p id="homeBookingAvailabilityMessage" class="home-detail-muted"></p>
         </div>
         <p id="homeBookingActionMessage" class="home-detail-muted hidden"></p>
       </section>
     `;
+  }
+
+  function bookingRescheduleDateOptions() {
+    const today = businessDateKey(new Date());
+    const values = [];
+    for (let offset = 0; offset < 31; offset += 1) {
+      const key = addDaysToDateKey(today, offset);
+      const [year, month, day] = key.split("-").map(Number);
+      const label = new Intl.DateTimeFormat("es-CL", {
+        weekday: "short", day: "numeric", month: "short",
+        timeZone: "UTC"
+      }).format(new Date(Date.UTC(year, month - 1, day)));
+      values.push(`<option value="${key}">${esc(label)}</option>`);
+    }
+    return values.join("");
+  }
+
+  function bookingRescheduleTimeOptions() {
+    const values = [];
+    for (let minutes = 0; minutes < 1440; minutes += 30) {
+      const hours = String(Math.floor(minutes / 60)).padStart(2, "0");
+      const mins = String(minutes % 60).padStart(2, "0");
+      const value = `${hours}:${mins}`;
+      values.push(`<option value="${value}">${value}</option>`);
+    }
+    return values.join("");
+  }
+
+  function businessLocalDateTimeToIso(dateKey, timeValue) {
+    const [year, month, day] = String(dateKey || "").split("-").map(Number);
+    const [hour, minute] = String(timeValue || "").split(":").map(Number);
+    if (!year || !month || !day || Number.isNaN(hour) || Number.isNaN(minute)) return null;
+
+    const desiredUtc = Date.UTC(year, month - 1, day, hour, minute);
+    let guess = desiredUtc;
+    for (let i = 0; i < 3; i += 1) {
+      const parts = businessParts(new Date(guess));
+      const observedUtc = Date.UTC(
+        Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+        Number(parts.hour), Number(parts.minute)
+      );
+      guess += desiredUtc - observedUtc;
+    }
+
+    const resolved = new Date(guess);
+    const parts = businessParts(resolved);
+    const sameLocalTime =
+      Number(parts.year) === year &&
+      Number(parts.month) === month &&
+      Number(parts.day) === day &&
+      Number(parts.hour) === hour &&
+      Number(parts.minute) === minute;
+    return sameLocalTime ? resolved.toISOString() : null;
+  }
+
+  function populateBookingRescheduleControls(booking) {
+    const date = document.querySelector("#homeBookingRescheduleDate");
+    const time = document.querySelector("#homeBookingRescheduleTime");
+    if (!date || !time) return;
+
+    date.innerHTML = bookingRescheduleDateOptions();
+    time.innerHTML = bookingRescheduleTimeOptions();
+
+    const currentParts = businessParts(booking.startAt);
+    const currentDate = `${currentParts.year}-${currentParts.month}-${currentParts.day}`;
+    const currentTime = `${currentParts.hour}:${currentParts.minute}`;
+    if ([...date.options].some(option => option.value === currentDate)) date.value = currentDate;
+    if ([...time.options].some(option => option.value === currentTime)) time.value = currentTime;
+  }
+
+  function resetBookingAvailabilityState() {
+    const confirm = document.querySelector("#homeBookingConfirmReschedule");
+    const message = document.querySelector("#homeBookingAvailabilityMessage");
+    if (confirm) confirm.classList.add("hidden");
+    if (message) message.textContent = "";
+  }
+
+  async function checkBookingAvailability(booking) {
+    const date = document.querySelector("#homeBookingRescheduleDate")?.value || "";
+    const time = document.querySelector("#homeBookingRescheduleTime")?.value || "";
+    const startAt = businessLocalDateTimeToIso(date, time);
+    const message = document.querySelector("#homeBookingAvailabilityMessage");
+    const confirm = document.querySelector("#homeBookingConfirmReschedule");
+    if (!startAt || !message || !confirm) return;
+
+    if (new Date(startAt).getTime() === new Date(booking.startAt).getTime()) {
+      message.textContent = "Selecciona una fecha u hora diferente a la actual.";
+      confirm.classList.add("hidden");
+      return;
+    }
+
+    message.textContent = "Comprobando disponibilidad…";
+    confirm.classList.add("hidden");
+    try {
+      const params = new URLSearchParams({ serviceId: booking.serviceId, startAt });
+      const result = await api(`/api/v1/bookings/availability?${params.toString()}`);
+      if (result?.available === true) {
+        message.textContent = "Horario disponible ✓";
+        confirm.dataset.startAt = startAt;
+        confirm.classList.remove("hidden");
+      } else {
+        message.textContent = "Ese horario ya no está disponible.";
+        confirm.classList.add("hidden");
+      }
+    } catch (error) {
+      message.textContent = error.message || "No pude comprobar la disponibilidad.";
+      confirm.classList.add("hidden");
+    }
+  }
+
+  async function rescheduleBookingFromDrawer(booking) {
+    const button = document.querySelector("#homeBookingConfirmReschedule");
+    const message = document.querySelector("#homeBookingAvailabilityMessage");
+    const startAt = button?.dataset.startAt || "";
+    if (!button || !message || !startAt) return;
+
+    const customer = state.customers.find(item => String(item.id) === String(booking.customerId)) || {};
+    const label = customer.name || customer.phone || "este cliente";
+    const confirmed = window.confirm(`¿Reprogramar la reserva de ${label} para ${fmtCompact(startAt)}?`);
+    if (!confirmed) return;
+
+    button.disabled = true;
+    button.textContent = "Reprogramando…";
+    try {
+      const updated = await api(`/api/v1/bookings/${encodeURIComponent(booking.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ startAt, notes: booking.notes || null })
+      });
+      booking.startAt = updated?.startAt || startAt;
+      booking.endAt = updated?.endAt || booking.endAt;
+      booking.notes = updated?.notes ?? booking.notes;
+      booking.status = updated?.status || booking.status;
+      renderBookings();
+      await openBookingDetail(booking.id);
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = "Confirmar cambio";
+      message.textContent = error.message || "No pude reprogramar la reserva.";
+      button.classList.add("hidden");
+    }
+  }
+
+  function bindBookingRescheduleActions(booking) {
+    const toggle = document.querySelector("#homeBookingRescheduleToggle");
+    const panel = document.querySelector("#homeBookingReschedulePanel");
+    if (!toggle || !panel) return;
+
+    toggle.addEventListener("click", () => {
+      const opening = panel.classList.contains("hidden");
+      panel.classList.toggle("hidden", !opening);
+      if (opening) {
+        populateBookingRescheduleControls(booking);
+        resetBookingAvailabilityState();
+      }
+    });
+    document.querySelector("#homeBookingRescheduleDate")?.addEventListener("change", resetBookingAvailabilityState);
+    document.querySelector("#homeBookingRescheduleTime")?.addEventListener("change", resetBookingAvailabilityState);
+    document.querySelector("#homeBookingCheckAvailability")?.addEventListener("click", () => checkBookingAvailability(booking));
+    document.querySelector("#homeBookingConfirmReschedule")?.addEventListener("click", () => rescheduleBookingFromDrawer(booking));
   }
 
   async function cancelBookingFromDrawer(id) {
@@ -172,6 +343,7 @@
   }
 
   function bindBookingActions(booking) {
+    bindBookingRescheduleActions(booking);
     document.querySelector("#homeBookingCancel")?.addEventListener("click", () => cancelBookingFromDrawer(booking.id));
   }
 
