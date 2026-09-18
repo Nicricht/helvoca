@@ -351,7 +351,7 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute('href', '/conversations.html?channel=whatsapp&conversation=wa-booking-2');
   await page.locator('#homeBookingDetailClose').click();
 
-  await page.getByRole('button', { name: /Pedidos/ }).click();
+  await page.getByRole('tab', { name: /Pedidos/ }).click();
   await expect(page.locator('#homeOrdersList')).toContainText('Juan Pedido');
   await page.locator('#homeOrdersList .home-business-table [data-home-order-id="o1"]').click();
   await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
@@ -368,10 +368,10 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.getByRole('button', { name: 'Empezar preparación' })).toBeVisible();
   await page.locator('#homeBookingDetailClose').click();
 
-  await page.getByRole('button', { name: /Solicitudes/ }).click();
+  await page.getByRole('tab', { name: /Solicitudes/ }).click();
   await expect(page.locator('#homeRequestsList')).toContainText('No hay solicitudes recientes.');
 
-  await page.getByRole('button', { name: /Clientes/ }).click();
+  await page.getByRole('tab', { name: /Clientes/ }).click();
   await expect(page.locator('#homeCustomersList')).toContainText('Ana Reserva');
   await expect(page.locator('.nav-conversations')).toHaveAttribute('href', '/conversations.html');
   await expect(page.locator('#advancedPanel')).toBeHidden();
@@ -460,7 +460,7 @@ test('orders list drawer and conversation work', async ({ page }) => {
   await mockReadyHome(page);
   await page.goto('/');
 
-  await page.getByRole('button', { name: /Pedidos/ }).click();
+  await page.getByRole('tab', { name: /Pedidos/ }).click();
   await expect(page.locator('#homeOrdersList')).toContainText('Juan Pedido');
   await expect(page.locator('#homeOrdersList')).toContainText('Confirmado');
 
@@ -468,12 +468,21 @@ test('orders list drawer and conversation work', async ({ page }) => {
   await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
   await expect(page.locator('#homeBookingDetailMeta')).toContainText('Confirmado');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Producto demo');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('15.990');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('3.000');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('18.990');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Av. Demo 123, Santiago');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-facts > * > span')).toHaveText([
+    'Cliente', 'Teléfono', 'Entrega', 'Origen', 'Estado', 'Subtotal', 'Despacho', 'Total'
+  ]);
+  await expect(page.locator('#homeBookingDetailBody .home-detail-facts')).toContainText('Juan Pedido');
   await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute(
     'href',
     '/conversations.html?channel=whatsapp&conversation=wa-order'
   );
   await expect(page.getByRole('button', { name: 'Empezar preparación' })).toBeVisible();
+  await page.locator('#homeBookingDetailClose').click();
+  await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
 });
 
 test('orders status transition works', async ({ page }) => {
@@ -503,7 +512,7 @@ test('orders status transition works', async ({ page }) => {
   });
 
   await page.goto('/');
-  await page.getByRole('button', { name: /Pedidos/ }).click();
+  await page.getByRole('tab', { name: /Pedidos/ }).click();
   await page.locator('#homeOrdersList .home-business-table [data-home-order-id="o1"]').click();
   await page.getByRole('button', { name: 'Empezar preparación' }).click();
 
@@ -536,10 +545,19 @@ test('requests workspace renders active requests', async ({ page }) => {
   })));
 
   await page.goto('/');
-  await page.getByRole('button', { name: /Solicitudes/ }).click();
+  await page.getByRole('tab', { name: /Solicitudes/ }).click();
   await expect(page.locator('#homeRequestsList')).toContainText('Confirmar dirección');
   await expect(page.locator('#homeRequestsList')).toContainText('Cliente pidió cambiar dirección de entrega');
   await expect(page.locator('#homeRequestsList')).toContainText('Abierta');
+});
+
+test('requests workspace renders its empty state', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+  await page.goto('/');
+
+  await page.getByRole('tab', { name: /Solicitudes/ }).click();
+  await expect(page.locator('#homeRequestsList')).toHaveText('No hay solicitudes recientes.');
 });
 
 test('customers workspace sorts and renders contact data', async ({ page }) => {
@@ -547,11 +565,35 @@ test('customers workspace sorts and renders contact data', async ({ page }) => {
   await mockReadyHome(page);
   await page.goto('/');
 
-  await page.getByRole('button', { name: /Clientes/ }).click();
+  await page.getByRole('tab', { name: /Clientes/ }).click();
   const customers = page.locator('#homeCustomersList .home-simple-row strong');
   await expect(customers).toHaveCount(2);
   await expect(customers.nth(0)).toHaveText('Ana Reserva');
   await expect(customers.nth(1)).toHaveText('Bruno Masaje');
   await expect(page.locator('#homeCustomersList')).toContainText('+56922222222');
   await expect(page.locator('#homeCustomersList')).toContainText('ana@example.cl');
+  await expect(page.locator('.nav-conversations')).toHaveAttribute('href', '/conversations.html');
+});
+
+test('orders requests customers remain operable on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+  await page.goto('/');
+
+  await page.getByRole('tab', { name: /Pedidos/ }).click();
+  await expect(page.locator('#homeOrdersList .home-business-mobile-list')).toBeVisible();
+  await page.locator('#homeOrdersList .home-business-mobile-card[data-home-order-id="o1"]').click();
+  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  const drawerBox = await page.locator('#homeBookingDetailDrawer').boundingBox();
+  expect(drawerBox).not.toBeNull();
+  expect(drawerBox.x).toBeGreaterThanOrEqual(0);
+  expect(drawerBox.x + drawerBox.width).toBeLessThanOrEqual(390);
+  await page.locator('#homeBookingDetailClose').click();
+
+  await page.getByRole('tab', { name: /Solicitudes/ }).click();
+  await expect(page.locator('#homeRequestsList')).toContainText('No hay solicitudes recientes.');
+
+  await page.getByRole('tab', { name: /Clientes/ }).click();
+  await expect(page.locator('#homeCustomersList')).toContainText('Ana Reserva');
 });

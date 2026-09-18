@@ -333,7 +333,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run orders requests customers E2E
-        run: npx playwright test e2e/home-operational.spec.js --grep "orders workspace actions work|requests workspace renders active requests|customers workspace sorts and renders contact data"
+        run: npx playwright test e2e/home-operational.spec.js --grep "orders list drawer and conversation work|orders status transition works|requests workspace renders active requests|requests workspace renders its empty state|customers workspace sorts and renders contact data|orders requests customers remain operable on mobile"
 
       - name: Report workspace QA status
         if: always()
@@ -386,7 +386,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run orders E2E
-        run: npx playwright test e2e/home-operational.spec.js --grep "orders list drawer and conversation work"
+        run: npx playwright test e2e/home-operational.spec.js --grep "orders list drawer and conversation work|orders status transition works"
 
       - name: Report orders QA status
         if: always()
