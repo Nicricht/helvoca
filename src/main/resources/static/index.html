@@ -189,9 +189,13 @@
             .proposal-summary-list { grid-template-columns: 1fr; }
         }
         @media (max-width: 720px) { .agent-capability-grid, #configPermissionsPanel .agent-capability-grid { grid-template-columns: 1fr; } }
-    </style>
+            body.home-page.operational-ready .ai-onboarding-card,
+        body.home-page.operational-ready .secondary-actions,
+        body.home-page.operational-ready #advancedPanel,
+        body.home-page.operational-ready #commercialStatusCard { display: none !important; }
+</style>
 </head>
-<body>
+<body class="home-page">
 <div class="shell">
     <header class="topbar">
         <div>
@@ -200,9 +204,9 @@
         </div>
         <nav id="primaryNav" class="app-nav" aria-label="Navegación principal">
             <a class="nav-home active" href="/">Inicio</a>
-            <a class="nav-conversations" href="/operations.html#conversations">Conversaciones</a>
+            <a class="nav-conversations" href="/conversations.html">Conversaciones</a>
             <a class="nav-operations" href="/operations.html">Operaciones</a>
-            <a class="nav-config" href="/#configuration">Configuración</a>
+            <a class="nav-config" href="/settings.html">Configuración</a>
         </nav>
         <div class="top-actions">
             <span id="sessionBadge" class="badge muted">Sin sesión</span>
