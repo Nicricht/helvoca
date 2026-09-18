@@ -62,11 +62,13 @@ test('conversation inbox combines channels, opens the newest item and uses human
   await page.goto('/conversations.html');
 
   await expect(page.getByRole('heading', { level: 1, name: 'Conversaciones' })).toBeVisible();
+  await expect(page.locator('.brand-block strong')).toHaveText('NEGOCIO E2E');
   await expect(page.getByText('+56911111111')).toBeVisible();
   await expect(page.getByText('+56922222222')).toBeVisible();
 
   await expect(page.locator('#detailCustomer')).toHaveText('+56922222222');
   await expect(page.getByText('¿Tienen hora mañana?')).toBeVisible();
+  await expect(page.locator('#detailTranscript .transcript-line strong').nth(1)).toHaveText('Negocio E2E');
 
   await page.goto('/conversations.html?channel=calls&conversation=call-1');
   await expect(page.getByRole('button', { name: 'Llamadas' })).toHaveAttribute('aria-selected', 'true');
@@ -74,6 +76,7 @@ test('conversation inbox combines channels, opens the newest item and uses human
   await expect(page.getByText('El cliente reservó una hora.')).toBeVisible();
   await expect(page.locator('#detailActions')).toContainText('Reserva creada');
   await expect(page.locator('#detailActions')).not.toContainText('CREATE_BOOKING');
+  await expect(page.locator('#detailTranscript .transcript-line strong').nth(1)).toHaveText('Negocio E2E');
 });
 
 test('conversation inbox keeps calls usable when WhatsApp temporarily fails', async ({ page }) => {
