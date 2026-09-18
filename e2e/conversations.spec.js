@@ -68,8 +68,9 @@ test('conversation inbox combines channels, opens the newest item and uses human
   await expect(page.locator('#detailCustomer')).toHaveText('+56922222222');
   await expect(page.getByText('¿Tienen hora mañana?')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Llamadas' }).click();
-  await page.getByText('+56911111111').click();
+  await page.goto('/conversations.html?channel=calls&conversation=call-1');
+  await expect(page.getByRole('button', { name: 'Llamadas' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#detailCustomer')).toHaveText('+56911111111');
   await expect(page.getByText('El cliente reservó una hora.')).toBeVisible();
   await expect(page.locator('#detailActions')).toContainText('Reserva creada');
   await expect(page.locator('#detailActions')).not.toContainText('CREATE_BOOKING');
