@@ -86,7 +86,7 @@ class BookingServiceTest {
         BookingService service = new BookingService(
                 bookings, customers, catalog, schedule, tenantProvider, auditService);
 
-        AvailabilityResponse response = service.availability(serviceId, startAt);
+        AvailabilityResponse response = service.availability(serviceId, startAt, null);
 
         assertFalse(response.available());
         verify(bookings, never()).countOverlaps(any(), any(), any(), any(), any(), any());
@@ -129,5 +129,50 @@ class BookingServiceTest {
                 () -> service.reschedule(bookingId, new RescheduleBookingRequest(startAt, null)));
         verify(bookings, never()).countOverlaps(any(), any(), any(), any(), any(), any());
         verify(auditService, never()).success(any(), eq("BOOKING_RESCHEDULE"), any(), any());
+    }
+
+    @Test
+    void availabilityCanExcludeCurrentBooking() {
+        UUID businessId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        Instant startAt = Instant.now().plusSeconds(7200);
+
+        BookingRepository bookings = mock(BookingRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceCatalogService catalog = mock(ServiceCatalogService.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService auditService = mock(AuditService.class);
+
+        Booking current = new Booking();
+        current.setBusinessId(businessId);
+        current.setServiceId(serviceId);
+        current.setStatus(BookingStatus.CONFIRMED);
+
+        ServiceItem item = new ServiceItem();
+        item.setBusinessId(businessId);
+        item.setName("Consulta");
+        item.setDurationMinutes(60);
+        item.setActive(true);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(bookings.findByIdAndBusinessId(bookingId, businessId)).thenReturn(Optional.of(current));
+        when(catalog.requireActiveEntity(serviceId, businessId)).thenReturn(item);
+        when(schedule.isWithinBusinessHours(eq(businessId), eq(startAt), any(Instant.class))).thenReturn(true);
+        when(bookings.countOverlaps(
+                eq(businessId), eq(serviceId), eq(startAt), any(Instant.class),
+                eq(BookingStatus.CANCELLED), eq(bookingId)))
+                .thenReturn(0L);
+
+        BookingService service = new BookingService(
+                bookings, customers, catalog, schedule, tenantProvider, auditService);
+
+        AvailabilityResponse response = service.availability(serviceId, startAt, bookingId);
+
+        org.junit.jupiter.api.Assertions.assertTrue(response.available());
+        verify(bookings).countOverlaps(
+                eq(businessId), eq(serviceId), eq(startAt), any(Instant.class),
+                eq(BookingStatus.CANCELLED), eq(bookingId));
     }
 }
