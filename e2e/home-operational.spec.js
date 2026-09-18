@@ -1454,14 +1454,14 @@ test('booking reschedule checks availability and updates the drawer', async ({ p
 
   await page.locator('#homeBookingRescheduleDate').selectOption({ index: 1 });
   await page.locator('#homeBookingRescheduleTime').selectOption('14:00');
-  await page.getByRole('button', { name: 'Comprobar disponibilidad' }).click();
+  await page.locator('#homeBookingReschedulePanel').getByRole('button', { name: 'Comprobar disponibilidad' }).click();
 
   await expect(page.locator('#homeBookingAvailabilityMessage')).toHaveText('Ese horario ya no está disponible.');
   await expect(page.getByRole('button', { name: 'Confirmar cambio' })).toBeHidden();
   expect(patchPayload).toBeNull();
 
   await page.locator('#homeBookingRescheduleTime').selectOption('14:30');
-  await page.getByRole('button', { name: 'Comprobar disponibilidad' }).click();
+  await page.locator('#homeBookingReschedulePanel').getByRole('button', { name: 'Comprobar disponibilidad' }).click();
 
   await expect(page.locator('#homeBookingAvailabilityMessage')).toHaveText('Horario disponible ✓');
   await expect(page.getByRole('button', { name: 'Confirmar cambio' })).toBeVisible();
