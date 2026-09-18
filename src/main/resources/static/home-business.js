@@ -238,7 +238,11 @@
     message.textContent = "Comprobando disponibilidad…";
     confirm.classList.add("hidden");
     try {
-      const params = new URLSearchParams({ serviceId: booking.serviceId, startAt });
+      const params = new URLSearchParams({
+        serviceId: booking.serviceId,
+        startAt,
+        excludeBookingId: booking.id
+      });
       const result = await api(`/api/v1/bookings/availability?${params.toString()}`);
       if (result?.available === true) {
         message.textContent = "Horario disponible ✓";
