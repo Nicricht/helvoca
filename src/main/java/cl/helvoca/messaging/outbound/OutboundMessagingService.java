@@ -97,6 +97,50 @@ public class OutboundMessagingService {
     }
 
     @Transactional
+    public OutboundMessage prepareIncidentNotice(UUID businessId,
+                                                 UUID customerId,
+                                                 UUID operationId,
+                                                 UUID campaignId,
+                                                 UUID campaignRecipientId,
+                                                 String contentText) {
+        if (businessId == null || customerId == null || operationId == null
+                || campaignId == null || campaignRecipientId == null) {
+            throw new IllegalArgumentException("Incident outbound identifiers are required");
+        }
+        String rendered = contentText == null ? "" : contentText.trim();
+        if (rendered.isBlank()) throw new IllegalArgumentException("Incident outbound content is required");
+        if (rendered.length() > 2000) throw new IllegalArgumentException("Incident outbound content is too long");
+        if (customers.findByIdAndBusinessId(customerId, businessId).isEmpty()) {
+            throw new IllegalArgumentException("Customer does not belong to tenant");
+        }
+        BusinessOperation operation = operations.findByIdAndBusinessId(operationId, businessId)
+                .orElseThrow(() -> new IllegalArgumentException("Operation not found"));
+        if (operation.getCustomerId() == null || !operation.getCustomerId().equals(customerId)) {
+            throw new IllegalArgumentException("Operation does not belong to customer");
+        }
+
+        CustomerIdentity identity = resolveRecipient(businessId, customerId, null);
+        String key = "INCIDENT_NOTICE:" + campaignId + ":" + campaignRecipientId;
+
+        jdbc.execute("SELECT pg_advisory_xact_lock(" + businessId.hashCode() + "," + key.hashCode() + ")");
+        OutboundMessage existing = messages.findByBusinessIdAndIdempotencyKey(businessId, key).orElse(null);
+        if (existing != null) return existing;
+
+        OutboundMessage message = new OutboundMessage();
+        message.setBusinessId(businessId);
+        message.setCustomerId(customerId);
+        message.setOperationId(operationId);
+        message.setRecipientIdentityId(identity.getId());
+        message.setChannel(OutboundMessage.Channel.WHATSAPP);
+        message.setPurpose(OutboundMessage.Purpose.INCIDENT_NOTICE);
+        message.setRecipientAddress(identity.getNormalizedValue());
+        message.setStatus(OutboundMessage.Status.PREPARED);
+        message.setIdempotencyKey(key);
+        message.setContentText(rendered);
+        return messages.saveAndFlush(message);
+    }
+
+    @Transactional
     public OutboundMessage dispatch(UUID businessId, UUID messageId) {
         OutboundMessage message = require(businessId, messageId);
         if (message.getStatus() == OutboundMessage.Status.SENT) return message;
