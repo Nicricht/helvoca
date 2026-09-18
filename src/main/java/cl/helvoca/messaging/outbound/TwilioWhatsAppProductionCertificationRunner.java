@@ -23,6 +23,7 @@ import java.util.Base64;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
@@ -47,6 +48,7 @@ public class TwilioWhatsAppProductionCertificationRunner implements ApplicationR
     private static final Pattern RUN_ID = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$");
 
     private static final int START_DELAY_SECONDS = 10;
+    private static final AtomicBoolean APPROVAL_DIAGNOSTIC_LOGGED = new AtomicBoolean(false);
 
     private final boolean enabled;
     private final String runId;
@@ -240,7 +242,23 @@ public class TwilioWhatsAppProductionCertificationRunner implements ApplicationR
 
         JSONObject json = new JSONObject(response.body());
         JSONObject whatsapp = json.optJSONObject("whatsapp");
-        return whatsapp == null ? "unsubmitted" : normalizeStatus(whatsapp.optString("status", "unsubmitted"));
+        if (whatsapp == null) return "unsubmitted";
+
+        if (APPROVAL_DIAGNOSTIC_LOGGED.compareAndSet(false, true)) {
+            log.info(
+                    "WHATSAPP_APPROVAL_DIAGNOSTIC sid={} status={} name={} category={} contentType={} rejectionReason={} allowCategoryChange={} type={}",
+                    contentSid,
+                    normalizeStatus(whatsapp.optString("status", "unsubmitted")),
+                    whatsapp.optString("name", ""),
+                    whatsapp.optString("category", ""),
+                    whatsapp.optString("content_type", ""),
+                    sanitize(whatsapp.optString("rejection_reason", "")),
+                    whatsapp.opt("allow_category_change"),
+                    whatsapp.optString("type", "")
+            );
+        }
+
+        return normalizeStatus(whatsapp.optString("status", "unsubmitted"));
     }
 
     private void submitApproval(String contentSid) throws Exception {
@@ -375,6 +393,12 @@ public class TwilioWhatsAppProductionCertificationRunner implements ApplicationR
 
     private static String trim(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private static String sanitize(String value) {
+        if (value == null) return "";
+        String sanitized = value.replace('\n', ' ').replace('\r', ' ').trim();
+        return sanitized.length() <= 300 ? sanitized : sanitized.substring(0, 300);
     }
 
     private static String safe(String value) {
