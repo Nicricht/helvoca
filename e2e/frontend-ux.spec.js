@@ -82,6 +82,28 @@ async function mockReadyTenant(page) {
   ])));
 }
 
+test('auth tabs and simplified registration controls are usable', async ({ page }) => {
+  await page.goto('/');
+
+  await expect(page.locator('#registerForm')).toBeVisible();
+  await expect(page.locator('#loginForm')).toBeHidden();
+  await expect(page.locator('#registerForm input')).toHaveCount(3);
+  await expect(page.locator('#registerForm [name="businessName"]')).toBeVisible();
+  await expect(page.locator('#registerForm [name="email"]')).toBeVisible();
+  await expect(page.locator('#registerForm [name="password"]')).toBeVisible();
+  await expect(page.locator('#registerForm [name="adminName"]')).toHaveCount(0);
+  await expect(page.locator('#registerForm [name="sourceUrl"]')).toHaveCount(0);
+  await expect(page.locator('#registerForm button[type="submit"]')).toHaveText('Crear cuenta');
+
+  await page.locator('#loginTab').click();
+  await expect(page.locator('#loginForm')).toBeVisible();
+  await expect(page.locator('#registerForm')).toBeHidden();
+
+  await page.locator('#registerTab').click();
+  await expect(page.locator('#registerForm')).toBeVisible();
+  await expect(page.locator('#loginForm')).toBeHidden();
+});
+
 test('ready customer sees operations on home and configuration on settings', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyTenant(page);
