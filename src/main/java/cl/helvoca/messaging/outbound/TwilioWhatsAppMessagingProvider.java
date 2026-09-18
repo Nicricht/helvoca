@@ -68,15 +68,24 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
             throw new IllegalArgumentException("Outbound content is required");
         }
 
-        List<PhoneNumber> senders = phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(
-                command.businessId());
-        if (senders.size() != 1) {
-            throw new IllegalStateException(senders.isEmpty()
-                    ? "Tenant has no WhatsApp-enabled sender"
-                    : "Tenant has multiple WhatsApp-enabled senders; configuration is ambiguous");
+        PhoneNumber senderPhone = null;
+        String sandboxSender = twilio.getWhatsappSandboxFrom() == null
+                ? ""
+                : twilio.getWhatsappSandboxFrom().trim();
+        String sender;
+        if (!sandboxSender.isBlank()) {
+            sender = normalizeE164(sandboxSender);
+        } else {
+            List<PhoneNumber> senders = phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(
+                    command.businessId());
+            if (senders.size() != 1) {
+                throw new IllegalStateException(senders.isEmpty()
+                        ? "Tenant has no WhatsApp-enabled sender"
+                        : "Tenant has multiple WhatsApp-enabled senders; configuration is ambiguous");
+            }
+            senderPhone = senders.getFirst();
+            sender = normalizeE164(senderPhone.getPhoneNumber());
         }
-        PhoneNumber senderPhone = senders.getFirst();
-        String sender = normalizeE164(senderPhone.getPhoneNumber());
 
         try {
             String accountSid = twilio.getAccountSid().trim();
@@ -98,8 +107,10 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
             }
             String sid = new JSONObject(response.body()).optString("sid", "").trim();
             if (sid.isBlank()) throw new IllegalStateException("Twilio did not return a message SID");
-            senderPhone.setWhatsappCertifiedAt(Instant.now());
-            phones.save(senderPhone);
+            if (senderPhone != null) {
+                senderPhone.setWhatsappCertifiedAt(Instant.now());
+                phones.save(senderPhone);
+            }
             return new SendResult(sid);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
