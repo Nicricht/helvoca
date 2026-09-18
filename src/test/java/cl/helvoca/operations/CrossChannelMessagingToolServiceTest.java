@@ -89,6 +89,33 @@ class CrossChannelMessagingToolServiceTest {
     }
 
     @Test
+    void usesSmsChannelWhenTwilioSmsProviderIsConfigured() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        UUID messageId = UUID.randomUUID();
+        properties.setDeliveryEnabled(true);
+        properties.setProvider("TWILIO_SMS");
+        when(message.getId()).thenReturn(messageId);
+        when(message.getChannel()).thenReturn(OutboundMessage.Channel.SMS);
+        when(message.getPurpose()).thenReturn(OutboundMessage.Purpose.BOOKING_CONFIRMATION);
+        when(message.getStatus()).thenReturn(OutboundMessage.Status.PREPARED);
+        when(outbound.prepare(eq(businessId), eq(customerId), eq(OutboundMessage.Channel.SMS),
+                eq(OutboundMessage.Purpose.BOOKING_CONFIRMATION), eq(operationId), isNull())).thenReturn(message);
+        when(providers.require("TWILIO_SMS", OutboundMessage.Channel.SMS)).thenReturn(provider);
+
+        JSONObject result = service.execute(businessId, customerId, new JSONObject()
+                .put("operationId", operationId.toString())
+                .put("purpose", "BOOKING_CONFIRMATION")
+                .toString());
+
+        assertTrue(result.getBoolean("success"));
+        assertEquals("SMS", result.getJSONObject("data").getString("channel"));
+        assertEquals("QUEUED", result.getJSONObject("data").getString("status"));
+        verify(outbox).queue(businessId, messageId);
+    }
+
+    @Test
     void rejectsMissingVerifiedCustomerContextBeforePreparingAnything() {
         JSONObject result = service.execute(UUID.randomUUID(), null, new JSONObject()
                 .put("operationId", UUID.randomUUID().toString())
