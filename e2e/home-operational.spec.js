@@ -45,7 +45,7 @@ async function mockReadyHome(page) {
   await page.route('**/api/v1/public/pricing', route => route.fulfill(json([])));
   await page.route('**/api/v1/bookings', route => route.fulfill(json([
     { id: 'b1', customerId: 'cust1', serviceId: 'svc1', startAt: '2026-09-18T15:00:00Z', endAt: '2026-09-18T15:30:00Z', status: 'CONFIRMED', source: 'AI_CALL' },
-    { id: 'b2', customerId: 'cust2', serviceId: 'svc2', startAt: '2026-09-19T16:00:00Z', endAt: '2026-09-19T17:00:00Z', status: 'CANCELLED', source: 'WHATSAPP' }
+    { id: 'b2', customerId: 'cust2', serviceId: 'svc2', startAt: '2026-09-19T16:00:00Z', endAt: '2026-09-19T17:00:00Z', status: 'CANCELLED', source: 'AI_WHATSAPP' }
   ])));
   await page.route('**/api/v1/customers', route => route.fulfill(json([
     { id: 'cust1', name: 'Ana Reserva', phone: '+56922222222', email: 'ana@example.cl', createdAt: '2026-09-17T10:00:00Z' },
@@ -72,6 +72,21 @@ async function mockReadyHome(page) {
     whatsapp: null,
     events: [
       { id: 'e1', eventType: 'BOOKING_CREATED', channel: 'VOICE', createdAt: '2026-09-17T18:00:12Z' }
+    ]
+  })));
+  await page.route('**/api/v1/bookings/b2/context', route => route.fulfill(json({
+    channel: 'WHATSAPP',
+    sourceReferenceId: 'wa-booking-2',
+    call: null,
+    whatsapp: {
+      conversation: { id: 'wa-booking-2', sender: '+56955555555', recipient: '+56911111111', openedAt: '2026-09-17T19:00:00Z', lastMessageAt: '2026-09-17T19:05:00Z' },
+      messages: [
+        { id: 'wm1', direction: 'INBOUND', role: 'USER', content: 'Quiero reservar un masaje.', createdAt: '2026-09-17T19:00:10Z' },
+        { id: 'wm2', direction: 'OUTBOUND', role: 'ASSISTANT', content: 'Tu reserva quedó confirmada.', createdAt: '2026-09-17T19:00:20Z' }
+      ]
+    },
+    events: [
+      { id: 'e2', eventType: 'BOOKING_CREATED', channel: 'WHATSAPP', createdAt: '2026-09-17T19:00:20Z' }
     ]
   })));
   await page.route('**/api/v1/messaging/conversations/wa-order', route => route.fulfill(json({
@@ -154,6 +169,24 @@ test('ready customer sees live operational home instead of setup cards', async (
   await page.locator('#homeBookingSearch').fill('Bruno');
   await expect(page.locator('#homeBookingsList')).toContainText('Bruno Masaje');
   await expect(page.locator('#homeBookingsList')).not.toContainText('Ana Reserva');
+  await page.locator('#homeBookingClearFilters').click();
+
+  await page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]').click();
+  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Ana llamó para reservar peluquería');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Quiero reservar peluquería.');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Verificó disponibilidad');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Reserva creada');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute('href', '/conversations.html?channel=calls&conversation=call-1');
+  await page.locator('#homeBookingDetailClose').click();
+
+  await page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b2"]').click();
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Conversación de WhatsApp');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Quiero reservar un masaje.');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Tu reserva quedó confirmada.');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute('href', '/conversations.html?channel=whatsapp&conversation=wa-booking-2');
+  await page.locator('#homeBookingDetailClose').click();
+
   await page.getByRole('button', { name: /Pedidos/ }).click();
   await expect(page.locator('#homeOrdersList')).toContainText('Juan Pedido');
   await page.getByRole('button', { name: /Clientes/ }).click();
