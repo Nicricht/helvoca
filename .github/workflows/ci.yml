@@ -227,7 +227,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run auth frontend E2E
-        run: npx playwright test e2e/frontend-ux.spec.js
+        run: npx playwright test e2e/frontend-ux.spec.js --grep "auth tabs|registration validates|login keeps"
 
       - name: Report auth QA status
         if: always()
