@@ -969,6 +969,85 @@ test('customer exports download csv and xlsx', async ({ page }) => {
   await expect(page.locator('#homeCustomersExportMessage')).toContainText('XLSX descargado');
 });
 
+test('newly created customer is included in csv and xlsx exports', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+
+  let customerPayload = null;
+  await page.route('**/api/v1/customers', async route => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    customerPayload = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'cust3',
+        name: customerPayload.name,
+        phone: customerPayload.phone,
+        email: customerPayload.email,
+        notes: customerPayload.notes,
+        createdAt: '2026-09-18T22:45:00Z',
+        updatedAt: '2026-09-18T22:45:00Z'
+      })
+    });
+  });
+
+  await page.route('**/api/v1/customers/export?format=csv', route => route.fulfill({
+    status: 200,
+    contentType: 'text/csv;charset=UTF-8',
+    headers: { 'Content-Disposition': 'attachment; filename="helvoca-clientes-carla.csv"' },
+    body: '\uFEFFID,Nombre,Telefono,Email\r\n"cust1","Ana Reserva","+56922222222","ana@example.cl"\r\n"cust2","Bruno Masaje","+56955555555","bruno@example.cl"\r\n"cust3","Carla Nueva","+56977777777","carla@example.cl"\r\n'
+  }));
+
+  await page.route('**/api/v1/customers/export?format=xlsx', route => route.fulfill({
+    status: 200,
+    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    headers: { 'Content-Disposition': 'attachment; filename="helvoca-clientes-carla.xlsx"' },
+    body: Buffer.from('PK Helvoca Excel Carla Nueva +56977777777 carla@example.cl', 'utf8')
+  }));
+
+  await page.goto('/');
+  await page.getByRole('tab', { name: /Clientes/ }).click();
+  await page.getByRole('button', { name: 'Nuevo cliente' }).click();
+  await page.locator('#homeCustomerCreateName').fill('Carla Nueva');
+  await page.locator('#homeCustomerCreatePhone').fill('+56977777777');
+  await page.locator('#homeCustomerCreateEmail').fill('carla@example.cl');
+  await page.getByRole('button', { name: 'Crear cliente' }).click();
+
+  await expect.poll(() => customerPayload).not.toBeNull();
+  await expect(page.locator('#homeCustomersList')).toContainText('Carla Nueva');
+  await expect(page.locator('#homeBusinessCustomersCount')).toHaveText('3');
+
+  const csvPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Descargar CSV' }).click();
+  const csv = await csvPromise;
+  expect(csv.suggestedFilename()).toBe('helvoca-clientes-carla.csv');
+  const csvStream = await csv.createReadStream();
+  let csvBody = '';
+  for await (const chunk of csvStream) csvBody += chunk.toString('utf8');
+  expect(csvBody).toContain('Carla Nueva');
+  expect(csvBody).toContain('+56977777777');
+  expect(csvBody).toContain('carla@example.cl');
+  await expect(page.locator('#homeCustomersExportMessage')).toContainText('CSV descargado · 3 clientes');
+
+  const xlsxPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Descargar Excel' }).click();
+  const xlsx = await xlsxPromise;
+  expect(xlsx.suggestedFilename()).toBe('helvoca-clientes-carla.xlsx');
+  const xlsxStream = await xlsx.createReadStream();
+  const xlsxChunks = [];
+  for await (const chunk of xlsxStream) xlsxChunks.push(chunk);
+  const xlsxBody = Buffer.concat(xlsxChunks).toString('utf8');
+  expect(xlsxBody).toContain('Carla Nueva');
+  expect(xlsxBody).toContain('+56977777777');
+  expect(xlsxBody).toContain('carla@example.cl');
+  await expect(page.locator('#homeCustomersExportMessage')).toContainText('XLSX descargado · 3 clientes');
+});
+
+
 test('manual customer creation adds customer and updates booking selector', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
