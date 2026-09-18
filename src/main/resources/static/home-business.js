@@ -27,6 +27,7 @@
     ORDER_CANCELLED: "Pedido cancelado"
   };
   let loading = false;
+  let incidentDraft = null;
 
   const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;" }[c]));
   const fmt = value => {
@@ -487,6 +488,7 @@
 
     preview.classList.remove("hidden");
     if (!reason || !targetDate || !targetTime) {
+      incidentDraft = null;
       preview.innerHTML = '<div class="home-incident-empty">Completa el motivo, la fecha y la hora desde la que cambia tu atención.</div>';
       return;
     }
@@ -510,11 +512,12 @@
     const groups = [...grouped.values()];
 
     if (!groups.length) {
+      incidentDraft = null;
       preview.innerHTML = `<div class="home-incident-empty">No hay reservas confirmadas afectadas desde las ${esc(targetTime)} en esa fecha.</div>`;
       return;
     }
 
-    const rows = groups.map(bookings => {
+    const draftRecipients = groups.map(bookings => {
       const first = bookings[0];
       const customer = customers.get(String(first.customerId)) || {};
       const customerName = customer.name || customer.phone || "Cliente";
@@ -527,25 +530,119 @@
         ? " Podemos ayudarte a reprogramarla."
         : "";
       const message = `Hola ${customerName}, ${state.businessName} necesita informarte de un cambio que afecta ${noun}: ${bookingText}. Motivo: ${reason}.${actionText}`;
-      const channel = incidentChannelLabel(strategy, bookings);
-      return `<article class="home-incident-item">
-        <div><strong>${esc(customerName)}</strong><span>${esc(bookingText)}</span></div>
-        <span class="home-incident-channel">${esc(channel)}</span>
-        <p class="home-incident-message">${esc(message)}</p>
-      </article>`;
-    }).join("");
+      return {
+        customerId: first.customerId,
+        customerName,
+        bookingIds: bookings.map(item => item.id),
+        bookingText,
+        content: message,
+        channelPreference: strategy,
+        channelLabel: incidentChannelLabel(strategy, bookings)
+      };
+    });
+
+    incidentDraft = { reason, goal, strategy, recipients: draftRecipients };
+    const rows = draftRecipients.map((recipient, index) => `<article class="home-incident-item">
+      <label class="home-incident-choice">
+        <input class="home-incident-select" type="checkbox" checked data-incident-index="${index}" aria-label="Incluir ${esc(recipient.customerName)}">
+        <span><strong>${esc(recipient.customerName)}</strong><small>${esc(recipient.bookingText)}</small></span>
+      </label>
+      <span class="home-incident-channel">${esc(recipient.channelLabel)}</span>
+      <p class="home-incident-message">${esc(recipient.content)}</p>
+    </article>`).join("");
 
     preview.innerHTML = `
       <div class="home-incident-preview-head">
-        <strong>${groups.length} cliente${groups.length === 1 ? "" : "s"} afectado${groups.length === 1 ? "" : "s"}</strong>
-        <span>${affected.length} reserva${affected.length === 1 ? "" : "s"} · vista previa</span>
+        <div><strong>${groups.length} cliente${groups.length === 1 ? "" : "s"} afectado${groups.length === 1 ? "" : "s"}</strong><span>${affected.length} reserva${affected.length === 1 ? "" : "s"} · vista previa</span></div>
+        <label class="home-incident-select-all"><input id="homeIncidentSelectAll" type="checkbox" checked> Todos</label>
       </div>
       <div class="home-incident-list">${rows}</div>
       <div class="home-incident-footer">
-        <span>No se enviará ningún mensaje ni se realizará ninguna llamada desde esta vista previa.</span>
-        <button type="button" disabled>Enviar avisos · próximo bloque</button>
+        <span id="homeIncidentSelectionSummary">Seleccionados ${draftRecipients.length} de ${draftRecipients.length} · sin envíos reales</span>
+        <button id="homeIncidentPrepareCampaign" type="button">Crear campaña preparada</button>
       </div>
     `;
+    bindIncidentSelection();
+  }
+
+  function selectedIncidentRecipients() {
+    if (!incidentDraft) return [];
+    const selected = new Set(
+      [...document.querySelectorAll(".home-incident-select:checked")]
+        .map(input => Number(input.dataset.incidentIndex))
+    );
+    return incidentDraft.recipients.filter((_, index) => selected.has(index));
+  }
+
+  function syncIncidentSelection() {
+    const boxes = [...document.querySelectorAll(".home-incident-select")];
+    const checked = boxes.filter(input => input.checked);
+    const summary = document.querySelector("#homeIncidentSelectionSummary");
+    const button = document.querySelector("#homeIncidentPrepareCampaign");
+    const selectAll = document.querySelector("#homeIncidentSelectAll");
+    if (summary) summary.textContent = `Seleccionados ${checked.length} de ${boxes.length} · sin envíos reales`;
+    if (button) button.disabled = checked.length === 0;
+    if (selectAll) {
+      selectAll.checked = boxes.length > 0 && checked.length === boxes.length;
+      selectAll.indeterminate = checked.length > 0 && checked.length < boxes.length;
+    }
+  }
+
+  async function prepareIncidentCampaign() {
+    if (!incidentDraft) return;
+    const selected = selectedIncidentRecipients();
+    if (!selected.length) return;
+    const confirmed = window.confirm(
+      `Crear una campaña PREPARED para ${selected.length} cliente${selected.length === 1 ? "" : "s"}? No se enviará ningún mensaje ni llamada.`
+    );
+    if (!confirmed) return;
+
+    const button = document.querySelector("#homeIncidentPrepareCampaign");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Preparando…";
+    }
+    try {
+      const result = await api("/api/v1/booking-incident-campaigns", {
+        method: "POST",
+        body: JSON.stringify({
+          reason: incidentDraft.reason,
+          goal: incidentDraft.goal,
+          strategy: incidentDraft.strategy,
+          recipients: selected.map(item => ({
+            customerId: item.customerId,
+            bookingIds: item.bookingIds,
+            channelPreference: item.channelPreference,
+            content: item.content
+          }))
+        })
+      });
+      const footer = document.querySelector(".home-incident-footer");
+      if (footer) {
+        footer.innerHTML = `<div class="home-incident-success"><strong>Campaña preparada ✓</strong><span>ID ${esc(result.id)} · ${esc(result.recipientCount)} cliente${Number(result.recipientCount) === 1 ? "" : "s"} · estado ${esc(result.status)}</span><small>No se envió ningún mensaje ni se realizó ninguna llamada.</small></div>`;
+      }
+    } catch (error) {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Crear campaña preparada";
+      }
+      const summary = document.querySelector("#homeIncidentSelectionSummary");
+      if (summary) summary.textContent = error.message || "No pude preparar la campaña.";
+    }
+  }
+
+  function bindIncidentSelection() {
+    document.querySelectorAll(".home-incident-select").forEach(input =>
+      input.addEventListener("change", syncIncidentSelection)
+    );
+    document.querySelector("#homeIncidentSelectAll")?.addEventListener("change", event => {
+      document.querySelectorAll(".home-incident-select").forEach(input => {
+        input.checked = event.target.checked;
+      });
+      syncIncidentSelection();
+    });
+    document.querySelector("#homeIncidentPrepareCampaign")?.addEventListener("click", prepareIncidentCampaign);
+    syncIncidentSelection();
   }
 
   function bindIncidentResolver() {
