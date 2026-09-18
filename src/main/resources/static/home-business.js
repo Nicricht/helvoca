@@ -74,13 +74,28 @@
     document.body.classList.remove("home-detail-open");
   }
 
-  function bookingFacts(booking, customer, service) {
+  function bookingFacts(booking, customer, service, context = null) {
+    const channel = context?.channel || "";
+    const contactAt = channel === "VOICE"
+      ? context?.call?.call?.startedAt
+      : channel === "WHATSAPP"
+        ? (context?.whatsapp?.conversation?.openedAt || context?.whatsapp?.messages?.[0]?.createdAt)
+        : booking.createdAt;
+    const contactLabel = channel === "VOICE" ? "Llamada" : channel === "WHATSAPP" ? "WhatsApp" : "Contacto";
+    const originValue = esc(source(booking.source));
+    const whatsappHref = channel === "WHATSAPP" && context?.sourceReferenceId
+      ? `/conversations.html?channel=whatsapp&conversation=${encodeURIComponent(context.sourceReferenceId)}`
+      : null;
+    const originCard = whatsappHref
+      ? `<a class="home-detail-fact-link" href="${whatsappHref}" aria-label="Abrir conversación de WhatsApp"><span>Origen</span><strong>${originValue}</strong></a>`
+      : `<div><span>Origen</span><strong>${originValue}</strong></div>`;
+
     return `<div class="home-detail-facts">
       <div><span>Servicio</span><strong>${esc(service.name || "Servicio")}</strong></div>
       <div><span>Teléfono</span><strong>${esc(customer.phone || "Sin teléfono")}</strong></div>
-      <div><span>Inicio</span><strong>${esc(fmt(booking.startAt))}</strong></div>
-      <div><span>Fin</span><strong>${esc(fmt(booking.endAt))}</strong></div>
-      <div><span>Origen</span><strong>${esc(source(booking.source))}</strong></div>
+      <div><span>${contactLabel}</span><strong>${esc(fmt(contactAt) || "Sin fecha")}</strong></div>
+      <div><span>Reserva</span><strong>${esc(fmt(booking.startAt))}</strong></div>
+      ${originCard}
       <div><span>Estado</span><strong>${esc(status(booking.status))}</strong></div>
     </div>${booking.notes ? `<div class="home-detail-note"><span>Notas</span><p>${esc(booking.notes)}</p></div>` : ""}`;
   }
@@ -140,7 +155,7 @@
     document.body.classList.add("home-detail-open");
     try {
       const context = await api(`/api/v1/bookings/${encodeURIComponent(id)}/context`);
-      body.innerHTML = bookingFacts(booking, customer, service) + renderContext(context, "reserva", customer.name || customer.phone || "Cliente");
+      body.innerHTML = bookingFacts(booking, customer, service, context) + renderContext(context, "reserva", customer.name || customer.phone || "Cliente");
     } catch (error) {
       body.innerHTML = bookingFacts(booking, customer, service) +
         '<section class="home-detail-section"><h3>Conversación</h3><p class="home-detail-muted">No pude cargar la conversación asociada en este momento.</p></section>';
