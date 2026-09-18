@@ -34,6 +34,14 @@
     try { return new Intl.DateTimeFormat("es-CL",{day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit"}).format(new Date(value)); }
     catch (_) { return String(value); }
   };
+  const fmtCompact = value => {
+    if (!value) return "";
+    try {
+      return new Intl.DateTimeFormat("es-CL", { day:"numeric", month:"short", hour:"numeric", minute:"2-digit" })
+        .format(new Date(value))
+        .replace(",", " ·");
+    } catch (_) { return String(value); }
+  };
   const money = (value,currency="CLP") => {
     try { return new Intl.NumberFormat("es-CL",{style:"currency",currency:currency||"CLP",maximumFractionDigits:currency==="CLP"?0:2}).format(Number(value||0)); }
     catch (_) { return String(value||0); }
@@ -83,18 +91,20 @@
         : booking.createdAt;
     const contactLabel = channel === "VOICE" ? "Llamada" : channel === "WHATSAPP" ? "WhatsApp" : "Contacto";
     const originValue = esc(source(booking.source));
-    const whatsappHref = channel === "WHATSAPP" && context?.sourceReferenceId
+    const conversationHref = context?.sourceReferenceId && channel === "WHATSAPP"
       ? `/conversations.html?channel=whatsapp&conversation=${encodeURIComponent(context.sourceReferenceId)}`
-      : null;
-    const originCard = whatsappHref
-      ? `<a class="home-detail-fact-link" href="${whatsappHref}" aria-label="Abrir conversación de WhatsApp"><span>Origen</span><strong>${originValue}</strong></a>`
+      : context?.sourceReferenceId && channel === "VOICE"
+        ? `/conversations.html?channel=calls&conversation=${encodeURIComponent(context.sourceReferenceId)}`
+        : null;
+    const originCard = conversationHref
+      ? `<a class="home-detail-fact-link" href="${conversationHref}" aria-label="Abrir conversación de ${channel === "VOICE" ? "llamada" : "WhatsApp"}"><span>Origen</span><strong>${originValue}</strong></a>`
       : `<div><span>Origen</span><strong>${originValue}</strong></div>`;
 
     return `<div class="home-detail-facts">
       <div><span>Servicio</span><strong>${esc(service.name || "Servicio")}</strong></div>
       <div><span>Teléfono</span><strong>${esc(customer.phone || "Sin teléfono")}</strong></div>
-      <div><span>${contactLabel}</span><strong>${esc(fmt(contactAt) || "Sin fecha")}</strong></div>
-      <div><span>Reserva</span><strong>${esc(fmt(booking.startAt))}</strong></div>
+      <div><span>${contactLabel}</span><strong>${esc(fmtCompact(contactAt) || "Sin fecha")}</strong></div>
+      <div><span>Reserva</span><strong>${esc(fmtCompact(booking.startAt))}</strong></div>
       ${originCard}
       <div><span>Estado</span><strong>${esc(status(booking.status))}</strong></div>
     </div>${booking.notes ? `<div class="home-detail-note"><span>Notas</span><p>${esc(booking.notes)}</p></div>` : ""}`;
@@ -146,7 +156,7 @@
     ensureBookingDrawer();
     document.querySelector("#homeBookingDetailDrawer .eyebrow").textContent = "RESERVA";
     document.querySelector("#homeBookingDetailTitle").textContent = customer.name || customer.phone || "Cliente";
-    document.querySelector("#homeBookingDetailMeta").textContent = `${fmt(booking.startAt)} · ${status(booking.status)}`;
+    document.querySelector("#homeBookingDetailMeta").textContent = `Reservada para ${fmtCompact(booking.startAt)} · ${status(booking.status)}`;
     const body = document.querySelector("#homeBookingDetailBody");
     body.innerHTML = bookingFacts(booking, customer, service) + '<div class="home-detail-loading">Cargando conversación…</div>';
     const backdrop = document.querySelector("#homeBookingDetailBackdrop");
