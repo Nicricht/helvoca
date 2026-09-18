@@ -5,6 +5,7 @@ let sessionId = null;
 let active = false;
 let recognition = null;
 let listening = false;
+let businessName = "Tu negocio";
 
 if (!token) location.replace("/");
 
@@ -62,7 +63,7 @@ function bubble(role, text) {
   root.querySelector(".empty")?.remove();
   const div = document.createElement("div");
   div.className = `bubble ${role}`;
-  div.innerHTML = `${esc(text)}<small>${role === "user" ? "Tú" : "Helvoca"}</small>`;
+  div.innerHTML = `${esc(text)}<small>${role === "user" ? "Tú" : esc(businessName)}</small>`;
   root.appendChild(div);
   root.scrollTop = root.scrollHeight;
 }
@@ -204,5 +205,17 @@ window.addEventListener("beforeunload", () => {
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
 });
 
+async function loadBusinessIdentity() {
+  try {
+    const business = await api("/api/v1/business");
+    businessName = business?.name || "Tu negocio";
+    document.querySelector(".brand-block strong")?.replaceChildren(document.createTextNode(businessName.toUpperCase()));
+    document.title = `${businessName} · Probar recepcionista`;
+  } catch (_) {
+    businessName = "Tu negocio";
+  }
+}
+
 setupRecognition();
 setActive(false);
+loadBusinessIdentity();
