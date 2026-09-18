@@ -627,3 +627,82 @@ test('booking cancellation from drawer works', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Cancelar reserva' })).toHaveCount(0);
   await expect(page.locator('#homeBookingsList [data-home-booking-id="b1"] .home-pill').first()).toHaveText('Cancelada');
 });
+
+
+test('booking reschedule checks availability and updates the drawer', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+
+  const availabilityCalls = [];
+  let patchPayload = null;
+
+  await page.route('**/api/v1/bookings/availability?**', async route => {
+    const url = new URL(route.request().url());
+    const call = {
+      serviceId: url.searchParams.get('serviceId'),
+      startAt: url.searchParams.get('startAt'),
+      excludeBookingId: url.searchParams.get('excludeBookingId')
+    };
+    availabilityCalls.push(call);
+    await route.fulfill(json({
+      serviceId: call.serviceId,
+      startAt: call.startAt,
+      endAt: new Date(new Date(call.startAt).getTime() + 30 * 60 * 1000).toISOString(),
+      available: availabilityCalls.length > 1
+    }));
+  });
+
+  await page.route('**/api/v1/bookings/b1', async route => {
+    expect(route.request().method()).toBe('PATCH');
+    patchPayload = route.request().postDataJSON();
+    await route.fulfill(json({
+      id: 'b1',
+      customerId: 'cust1',
+      serviceId: 'svc1',
+      startAt: patchPayload.startAt,
+      endAt: new Date(new Date(patchPayload.startAt).getTime() + 30 * 60 * 1000).toISOString(),
+      status: 'CONFIRMED',
+      source: 'AI_CALL',
+      notes: patchPayload.notes
+    }));
+  });
+
+  await page.goto('/');
+  await page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]').click();
+
+  await page.getByRole('button', { name: 'Reprogramar' }).click();
+  await expect(page.locator('#homeBookingReschedulePanel')).toBeVisible();
+  await expect(page.locator('#homeBookingRescheduleDate')).toBeVisible();
+  await expect(page.locator('#homeBookingRescheduleTime')).toBeVisible();
+
+  await page.locator('#homeBookingRescheduleDate').selectOption({ index: 1 });
+  await page.locator('#homeBookingRescheduleTime').selectOption('14:00');
+  await page.getByRole('button', { name: 'Comprobar disponibilidad' }).click();
+
+  await expect(page.locator('#homeBookingAvailabilityMessage')).toHaveText('Ese horario ya no está disponible.');
+  await expect(page.getByRole('button', { name: 'Confirmar cambio' })).toBeHidden();
+  expect(patchPayload).toBeNull();
+
+  await page.locator('#homeBookingRescheduleTime').selectOption('14:30');
+  await page.getByRole('button', { name: 'Comprobar disponibilidad' }).click();
+
+  await expect(page.locator('#homeBookingAvailabilityMessage')).toHaveText('Horario disponible ✓');
+  await expect(page.getByRole('button', { name: 'Confirmar cambio' })).toBeVisible();
+  expect(availabilityCalls).toHaveLength(2);
+  expect(availabilityCalls[1].serviceId).toBe('svc1');
+  expect(availabilityCalls[1].excludeBookingId).toBe('b1');
+
+  page.once('dialog', dialog => {
+    expect(dialog.message()).toContain('Ana Reserva');
+    dialog.accept();
+  });
+  await page.getByRole('button', { name: 'Confirmar cambio' }).click();
+
+  await expect.poll(() => patchPayload).not.toBeNull();
+  expect(patchPayload.startAt).toBe(availabilityCalls[1].startAt);
+  expect(patchPayload.notes).toBeNull();
+  await expect(page.locator('#homeBookingDetailMeta')).toContainText('Confirmada');
+  await expect(page.getByRole('button', { name: 'Reprogramar' })).toBeVisible();
+  await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
+});
