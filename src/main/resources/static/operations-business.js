@@ -5,6 +5,17 @@
   const REQUEST_STATUS_LABELS = { OPEN: "Abierta", IN_PROGRESS: "En curso", RESOLVED: "Resuelta", CANCELLED: "Cancelada" };
   const PRIORITY_LABELS = { LOW: "Baja", NORMAL: "Normal", HIGH: "Alta", URGENT: "Urgente" };
   const SOURCE_LABELS = { VOICE: "Llamada", AI_CALL: "Llamada", AI_WHATSAPP: "WhatsApp", WHATSAPP: "WhatsApp", ADMIN: "Manual", MANUAL: "Manual", API: "API" };
+  const EVENT_LABELS = {
+    BOOKING_CREATED: "Reserva creada",
+    BOOKING_RESCHEDULED: "Reserva reprogramada",
+    BOOKING_CANCELLED: "Reserva cancelada",
+    CUSTOMER_REGISTERED: "Cliente registrado",
+    SERVICES_LISTED: "Consultó servicios",
+    AVAILABILITY_LISTED: "Consultó horarios disponibles",
+    AVAILABILITY_CHECKED: "Verificó disponibilidad",
+    CALLER_LOOKUP: "Cliente identificado",
+    FIND_CALLER: "Cliente identificado"
+  };
 
   const host = document.querySelector("[data-helvoca-business-workspace]");
   if (!host) return;
@@ -21,6 +32,7 @@
   }
   function humanize(value) {
     if (!value) return "";
+    if (EVENT_LABELS[value]) return EVENT_LABELS[value];
     const text = String(value);
     if (!/^[A-Z0-9_]+$/.test(text)) return text;
     return text.toLowerCase().split("_").filter(Boolean).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
@@ -207,6 +219,121 @@
     $("#bookingFilterClear",host)?.addEventListener("click",()=>{state.bookingFilters={search:"",date:"all",service:"all",status:"all",source:"all"};renderBookings();});
   }
 
+  function ensureDetailDrawer() {
+    if ($("#businessDetailBackdrop")) return;
+    document.body.insertAdjacentHTML("beforeend", `
+      <div id="businessDetailBackdrop" class="business-detail-backdrop hidden" aria-hidden="true">
+        <aside id="businessDetailDrawer" class="business-detail-drawer" role="dialog" aria-modal="true" aria-labelledby="businessDetailTitle">
+          <div class="business-detail-head">
+            <div><span id="businessDetailEyebrow" class="eyebrow">DETALLE</span><h2 id="businessDetailTitle">Detalle</h2><p id="businessDetailMeta" class="muted"></p></div>
+            <button id="businessDetailClose" class="ghost business-detail-close" type="button">Cerrar</button>
+          </div>
+          <div id="businessDetailBody" class="business-detail-body"></div>
+        </aside>
+      </div>
+    `);
+    $("#businessDetailClose").addEventListener("click",closeDetailDrawer);
+    $("#businessDetailBackdrop").addEventListener("click",event=>{if(event.target===event.currentTarget)closeDetailDrawer();});
+    document.addEventListener("keydown",event=>{if(event.key==="Escape")closeDetailDrawer();});
+  }
+
+  function closeDetailDrawer() {
+    const backdrop=$("#businessDetailBackdrop");
+    if(!backdrop)return;
+    backdrop.classList.add("hidden");
+    backdrop.setAttribute("aria-hidden","true");
+    document.body.classList.remove("business-detail-open");
+  }
+
+  function showDetailDrawer(title,meta,body) {
+    ensureDetailDrawer();
+    $("#businessDetailTitle").textContent=title;
+    $("#businessDetailMeta").textContent=meta||"";
+    $("#businessDetailBody").innerHTML=body;
+    const backdrop=$("#businessDetailBackdrop");
+    backdrop.classList.remove("hidden");
+    backdrop.setAttribute("aria-hidden","false");
+    document.body.classList.add("business-detail-open");
+  }
+
+  function bookingBaseDetail(booking,customer,service,status) {
+    return `
+      <div class="business-detail-facts">
+        <div><span>Servicio</span><strong>${esc(service.name||"Servicio")}</strong></div>
+        <div><span>Teléfono</span><strong>${esc(customer.phone||"Sin teléfono")}</strong></div>
+        <div><span>Inicio</span><strong>${esc(fmtDate(booking.startAt))}</strong></div>
+        <div><span>Fin</span><strong>${esc(fmtDate(booking.endAt))}</strong></div>
+        <div><span>Origen</span><strong>${esc(sourceLabel(booking.source))}</strong></div>
+        <div><span>Estado</span><strong>${esc(status)}</strong></div>
+      </div>
+      ${booking.notes?`<section class="business-detail-section"><h3>Notas</h3><p>${esc(booking.notes)}</p></section>`:""}
+      <section id="bookingTraceSection" class="business-detail-section"><h3>Conversación de origen</h3><div class="loading-line">Cargando contexto…</div></section>
+      <section id="bookingHistorySection" class="business-detail-section"><h3>Historial</h3><div class="loading-line">Cargando historial…</div></section>
+    `;
+  }
+
+  function renderHistory(trace) {
+    const root=$("#bookingHistorySection");
+    if(!root)return;
+    const items=Array.isArray(trace.history)?trace.history:[];
+    root.innerHTML=`<h3>Historial</h3>`+(items.length?`<div class="business-history">${items.map(item=>`<div><span>${esc(humanize(item.eventType))}</span><small>${esc(fmtDate(item.createdAt))}${item.channel?` · ${esc(sourceLabel(item.channel))}`:""}</small></div>`).join("")}</div>`:'<div class="empty">No hay cambios adicionales registrados.</div>');
+  }
+
+  function renderCallContext(trace,data) {
+    const root=$("#bookingTraceSection"); if(!root)return;
+    const transcript=Array.isArray(data.transcript)?data.transcript:[];
+    const actions=Array.isArray(data.actions)?data.actions:[];
+    root.innerHTML=`
+      <h3>Conversación de origen</h3>
+      <div class="trace-summary"><span>Resumen</span><p>${esc(data.summary||"Sin resumen disponible.")}</p></div>
+      <div class="trace-transcript">${transcript.length?transcript.map(item=>`<div class="trace-message ${String(item.speaker||"").toLowerCase()}"><strong>${item.speaker==="USER"?"Cliente":item.speaker==="ASSISTANT"?"Helvoca":esc(humanize(item.speaker))}</strong><p>${esc(item.content)}</p><small>${esc(fmtDate(item.createdAt))}</small></div>`).join(""):'<div class="empty">No hay transcripción disponible.</div>'}</div>
+      <div class="trace-actions"><h4>Qué hizo Helvoca</h4>${actions.length?actions.map(action=>`<div class="trace-action"><span>${action.success?"✓":"×"}</span><strong>${esc(humanize(action.actionType))}</strong></div>`).join(""):'<span class="muted">No hay acciones registradas.</span>'}</div>
+      <a id="businessDetailConversationLink" class="button secondary trace-link" href="/conversations.html?call=${encodeURIComponent(trace.callId)}">Ver conversación completa</a>
+    `;
+  }
+
+  function renderWhatsAppContext(trace,data) {
+    const root=$("#bookingTraceSection"); if(!root)return;
+    const messages=Array.isArray(data.messages)?data.messages:[];
+    root.innerHTML=`
+      <h3>Conversación de origen</h3>
+      <div class="trace-transcript">${messages.length?messages.map(item=>`<div class="trace-message ${String(item.role||item.direction||"").toLowerCase()}"><strong>${item.role==="USER"?"Cliente":item.role==="ASSISTANT"?"Helvoca":esc(humanize(item.role||item.direction))}</strong><p>${esc(item.content)}</p><small>${esc(fmtDate(item.createdAt))}</small></div>`).join(""):'<div class="empty">No hay mensajes guardados.</div>'}</div>
+      <a id="businessDetailConversationLink" class="button secondary trace-link" href="/conversations.html?whatsapp=${encodeURIComponent(trace.conversationId)}">Ver conversación completa</a>
+    `;
+  }
+
+  async function openBookingDetail(id) {
+    const booking=state.bookings.find(item=>String(item.id)===String(id)); if(!booking)return;
+    const customers=new Map(state.customers.map(x=>[String(x.id),x])), services=new Map(state.services.map(x=>[String(x.id),x]));
+    const customer=customers.get(String(booking.customerId))||{}, service=services.get(String(booking.serviceId))||{};
+    const status=BOOKING_STATUS_LABELS[booking.status]||humanize(booking.status);
+    showDetailDrawer(customer.name||customer.phone||"Cliente",`${fmtDate(booking.startAt)} · ${status}`,bookingBaseDetail(booking,customer,service,status));
+    try{
+      const trace=await request(`/api/v1/bookings/${encodeURIComponent(id)}/trace`);
+      renderHistory(trace);
+      if(trace.callId){
+        try{renderCallContext(trace,await request(`/api/v1/calls/${encodeURIComponent(trace.callId)}`));}
+        catch(e){$("#bookingTraceSection").innerHTML=`<h3>Conversación de origen</h3><div class="business-error">La transcripción no está disponible ahora.</div><a id="businessDetailConversationLink" class="button secondary trace-link" href="/conversations.html?call=${encodeURIComponent(trace.callId)}">Ver conversación completa</a>`;}
+      }else if(trace.conversationId){
+        try{renderWhatsAppContext(trace,await request(`/api/v1/messaging/conversations/${encodeURIComponent(trace.conversationId)}`));}
+        catch(e){$("#bookingTraceSection").innerHTML=`<h3>Conversación de origen</h3><div class="business-error">Los mensajes no están disponibles ahora.</div><a id="businessDetailConversationLink" class="button secondary trace-link" href="/conversations.html?whatsapp=${encodeURIComponent(trace.conversationId)}">Ver conversación completa</a>`;}
+      }else{
+        $("#bookingTraceSection").innerHTML=`<h3>Conversación de origen</h3><div class="empty">${trace.origin==="MANUAL"?"Creada manualmente.":"No existe una conversación enlazada a esta reserva."}</div>`;
+      }
+    }catch(e){
+      $("#bookingTraceSection").innerHTML='<h3>Conversación de origen</h3><div class="business-error">No pude cargar la trazabilidad de esta reserva.</div>';
+      $("#bookingHistorySection").innerHTML='<h3>Historial</h3><div class="empty">El detalle básico de la reserva sigue disponible.</div>';
+    }
+  }
+
+  function bindBookingOpeners() {
+    $("[data-booking-open]",host).forEach(node=>{
+      const open=()=>openBookingDetail(node.dataset.entityId);
+      node.addEventListener("click",open);
+      node.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();open();}});
+    });
+  }
+
   function renderBookings(error = null) {
     const root = $("#bookingsList", host);
     const customers = new Map(state.customers.map(x => [String(x.id), x]));
@@ -255,6 +382,7 @@
     }).join("");
     root.innerHTML = filterMarkup + `<div class="business-table-shell"><table class="business-data-table" data-table="bookings"><thead><tr><th>Fecha / hora</th><th>Cliente</th><th>Servicio</th><th>Contacto</th><th>Origen</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table></div><div class="business-mobile-list">${cards}</div>`;
     bindBookingFilters();
+    bindBookingOpeners();
   }
 
   function orderActions(order) {
