@@ -155,6 +155,20 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeBookingsMetric')).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
   await expect(page.locator('#homeRequestsMetric')).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
   await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
+
+  await page.locator('#homeIncidentToggle').click();
+  await expect(page.locator('#homeIncidentPanel')).toBeVisible();
+  await page.locator('#homeIncidentReason').fill('Debo cerrar antes por un imprevisto');
+  await page.locator('#homeIncidentDate').fill('2026-09-18');
+  await page.locator('#homeIncidentTime').fill('09:00');
+  await page.locator('#homeIncidentPreviewBtn').click();
+  await expect(page.locator('#homeIncidentPreview')).toContainText('1 cliente afectado');
+  await expect(page.locator('#homeIncidentPreview')).toContainText('Ana Reserva');
+  await expect(page.locator('#homeIncidentPreview')).toContainText('WhatsApp primero');
+  await expect(page.locator('#homeIncidentPreview')).toContainText('Debo cerrar antes por un imprevisto');
+  await expect(page.locator('#homeIncidentPreview')).not.toContainText('Bruno Masaje');
+  await expect(page.locator('#homeIncidentPreview button')).toBeDisabled();
+
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
   await expect(page.locator('#homeBookingsList')).toContainText('Peluquería');
   await expect(page.locator('#homeBookingsList')).toContainText('Bruno Masaje');
