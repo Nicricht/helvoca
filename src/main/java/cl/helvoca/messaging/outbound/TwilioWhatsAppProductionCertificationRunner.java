@@ -230,7 +230,7 @@ public class TwilioWhatsAppProductionCertificationRunner implements ApplicationR
                 .put("category", "UTILITY");
 
         HttpResponse<String> response = send(HttpRequest.newBuilder(
-                        URI.create(CONTENT_API + "/" + contentSid + "/ApprovalRequests/WhatsApp"))
+                        URI.create(CONTENT_API + "/" + contentSid + "/ApprovalRequests/whatsapp"))
                 .timeout(Duration.ofSeconds(12))
                 .header("Authorization", basicAuthorization())
                 .header("Content-Type", "application/json")
