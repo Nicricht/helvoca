@@ -81,6 +81,9 @@ public class BookingService {
         ServiceItem service = catalog.requireActiveEntity(request.serviceId(), businessId);
         Instant endAt = calculateEnd(request.startAt(), service);
 
+        if (!schedule.isWithinBusinessHours(businessId, request.startAt(), endAt)) {
+            throw new ConflictException("BUSINESS_CLOSED");
+        }
         if (hasOverlap(businessId, request.serviceId(), request.startAt(), endAt, null)) {
             throw new ConflictException("BOOKING_SLOT_UNAVAILABLE");
         }
