@@ -1,6 +1,7 @@
 const TOKEN_KEY = "helvoca_access_token";
 const token = sessionStorage.getItem(TOKEN_KEY) || "";
 const $ = s => document.querySelector(s);
+let businessName = "Tu negocio";
 
 if (!token) location.replace("/");
 
@@ -183,7 +184,7 @@ function renderCallDetail(data) {
   const transcript = data.transcript || [];
   $("#callTranscript").innerHTML = transcript.length ? transcript.map(t => `
     <div class="transcript-line ${String(t.speaker || "").toLowerCase()}">
-      <strong>${esc(t.speaker === "USER" ? "Cliente" : t.speaker === "ASSISTANT" ? "Helvoca" : humanize(t.speaker, {}))}</strong>
+      <strong>${esc(t.speaker === "USER" ? "Cliente" : t.speaker === "ASSISTANT" ? businessName : humanize(t.speaker, {}))}</strong>
       <p>${esc(t.content)}</p>
       <span>${fmtDate(t.createdAt)}</span>
     </div>`).join("") : '<div class="empty">No hay transcripción disponible.</div>';
@@ -219,7 +220,10 @@ async function load() {
       api("/api/v1/operations/readiness"),
       api("/api/v1/operations/certification")
     ]);
-    setText("#businessName", data.businessName || "Tu negocio");
+    businessName = data.businessName || "Tu negocio";
+    setText("#businessName", businessName);
+    document.querySelector(".brand-block strong")?.replaceChildren(document.createTextNode(businessName.toUpperCase()));
+    document.title = `${businessName} · Operaciones`;
     setText("#localNow", `${data.timezone || ""}${data.timezone ? " · " : ""}${fmtDate(data.localNow)}`);
     const healthBadge = $("#healthBadge");
     if (healthBadge) {
