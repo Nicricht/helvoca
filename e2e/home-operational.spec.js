@@ -355,6 +355,7 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeOrdersList')).toContainText('Juan Pedido');
   await page.locator('#homeOrdersList .home-business-table [data-home-order-id="o1"]').click();
   await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('#homeBookingDetailMeta')).toContainText('Confirmado');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Producto demo');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('15.990');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Av. Demo 123, Santiago');
