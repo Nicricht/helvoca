@@ -54,7 +54,7 @@
             <div>
                 <div class="eyebrow">Suscripción</div>
                 <h2>Estado comercial</h2>
-                <p class="muted-text">Helvoca muestra el estado confirmado por backend. Elegir un plan solo inicia el checkout; el plan no se activa hasta verificar un pago aprobado.</p>
+                <p class="muted-text">El estado mostrado viene confirmado por backend. Elegir un plan solo inicia el checkout; el plan no se activa hasta verificar un pago aprobado.</p>
             </div>
             <span id="commercialStateBadge" class="badge muted">Cargando</span>
         </div>
@@ -67,7 +67,7 @@
         </div>
         <section class="commercial-plan-section">
             <h3>Elige tu plan</h3>
-            <p class="muted-text">Los precios se cargan desde el catálogo oficial de Helvoca. El pago se completa directamente en Mercado Pago.</p>
+            <p class="muted-text">Los precios se cargan desde el catálogo oficial. El pago se completa directamente en Mercado Pago.</p>
             <div id="commercialPlans" class="commercial-plans"></div>
             <div id="commercialPlanMessage" class="message commercial-plan-message hidden"></div>
         </section>
@@ -120,7 +120,7 @@
 
         const accepted = window.confirm(
             `Vas a continuar al checkout del plan ${plan.name} por ${clp(plan.monthlyPriceClp)} al mes. ` +
-            'Helvoca no activará el plan hasta verificar el pago con el proveedor. ¿Continuar?'
+            'El plan no se activará hasta verificar el pago con el proveedor. ¿Continuar?'
         );
         if (!accepted) return;
 
@@ -338,6 +338,7 @@
 
     let loading = false;
     let lastLoadedAt = 0;
+    let currentBusinessName = "Tu negocio";
 
     function isReady() {
         const cards = [...statusGrid.querySelectorAll('.status-card')];
@@ -356,6 +357,7 @@
     }
 
     function renderOperational(operations, whatsapp) {
+        currentBusinessName = operations.businessName || "Tu negocio";
         const timeZone = operations.timezone || 'UTC';
         const today = dateKey(operations.localNow || new Date().toISOString(), timeZone);
         const whatsappToday = (whatsapp || []).filter(conversation =>
@@ -401,7 +403,8 @@
         statusGrid.classList.toggle('ux-ready-hidden', ready);
         if (!ready) return;
 
-        if (title.textContent !== 'Helvoca está atendiendo 🟢') title.textContent = 'Helvoca está atendiendo 🟢';
+        const operationalTitle = `${currentBusinessName} está atendiendo 🟢`;
+        if (title.textContent !== operationalTitle) title.textContent = operationalTitle;
         if (summary && summary.textContent !== 'Tu negocio está listo. Esto es lo que está pasando hoy.') {
             summary.textContent = 'Tu negocio está listo. Esto es lo que está pasando hoy.';
         }
@@ -415,7 +418,10 @@
         if (!dashboard.classList.contains('hidden')) queueMicrotask(applyReadyState);
     }).observe(dashboard, { attributes: true, attributeFilter: ['class'] });
     new MutationObserver(() => {
-        if (isReady() && title.textContent !== 'Helvoca está atendiendo 🟢') title.textContent = 'Helvoca está atendiendo 🟢';
+        if (isReady()) {
+            const operationalTitle = `${currentBusinessName} está atendiendo 🟢`;
+            if (title.textContent !== operationalTitle) title.textContent = operationalTitle;
+        }
     }).observe(title, { childList: true, characterData: true, subtree: true });
 
     document.querySelector('#refreshBtn')?.addEventListener('click', () => loadOperational(true));
