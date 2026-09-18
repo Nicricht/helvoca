@@ -85,30 +85,18 @@
     </div>${booking.notes ? `<div class="home-detail-note"><span>Notas</span><p>${esc(booking.notes)}</p></div>` : ""}`;
   }
 
-  function renderContext(context, entityKind = "reserva") {
+  function renderContext(context, entityKind = "reserva", personName = "Cliente") {
     if (!context) return '<section class="home-detail-section"><h3>Conversación</h3><p class="home-detail-muted">No hay contexto conversacional disponible.</p></section>';
-    const events = Array.isArray(context.events) ? context.events : [];
-    const history = events.length ? `<section class="home-detail-section"><h3>Historial</h3><div class="home-detail-history">${events.map(item =>
-      `<div><span>${esc(fmt(item.createdAt))}</span><strong>${esc(eventLabel(item.eventType))}</strong></div>`
-    ).join("")}</div></section>` : "";
-    const aiEvents = events.filter(item => String(item.actorType || "").toUpperCase() === "AI");
-    const eventActions = aiEvents.length ? `<section class="home-detail-section"><h3>Qué hizo Helvoca</h3><div class="home-detail-actions-list">${aiEvents.map(item =>
-      `<div><span>✓</span><strong>${esc(eventLabel(item.eventType))}</strong></div>`
-    ).join("")}</div></section>` : "";
+    const customerLabel = personName || "Cliente";
 
     if (context.channel === "VOICE" && context.call) {
       const detail = context.call;
       const transcript = Array.isArray(detail.transcript) ? detail.transcript : [];
-      const actions = Array.isArray(detail.actions) ? detail.actions : [];
       return `
         <section class="home-detail-section"><h3>Resumen</h3><p class="home-detail-summary">${esc(detail.summary || "La llamada no tiene resumen guardado.")}</p></section>
         <section class="home-detail-section"><h3>Conversación</h3><div class="home-detail-transcript">${transcript.length ? transcript.map(line =>
-          `<article class="home-detail-message ${String(line.speaker || "").toUpperCase() === "ASSISTANT" ? "assistant" : ""}"><strong>${String(line.speaker || "").toUpperCase() === "ASSISTANT" ? "Helvoca" : "Cliente"}</strong><p>${esc(line.content)}</p><span>${esc(fmt(line.createdAt))}</span></article>`
+          `<article class="home-detail-message ${String(line.speaker || "").toUpperCase() === "ASSISTANT" ? "assistant" : ""}"><strong>${esc(String(line.speaker || "").toUpperCase() === "ASSISTANT" ? "Helvoca" : customerLabel)}</strong><p>${esc(line.content)}</p><span>${esc(fmt(line.createdAt))}</span></article>`
         ).join("") : '<p class="home-detail-muted">No hay transcripción guardada.</p>'}</div></section>
-        <section class="home-detail-section"><h3>Qué hizo Helvoca</h3><div class="home-detail-actions-list">${actions.length ? actions.filter(a => a.success !== false).map(action =>
-          `<div><span>✓</span><strong>${esc(eventLabel(action.actionType))}</strong></div>`
-        ).join("") : '<p class="home-detail-muted">No hay acciones registradas.</p>'}</div></section>
-        ${history}
         ${context.sourceReferenceId ? `<a class="home-detail-link" href="/conversations.html?channel=calls&conversation=${encodeURIComponent(context.sourceReferenceId)}">Ver conversación completa</a>` : ""}
       `;
     }
@@ -118,10 +106,8 @@
       return `
         <section class="home-detail-section"><h3>Conversación de WhatsApp</h3><div class="home-detail-transcript">${messages.length ? messages.map(message => {
           const assistant = String(message.role || "").toLowerCase() === "assistant" || String(message.direction || "").toLowerCase() === "outbound";
-          return `<article class="home-detail-message ${assistant ? "assistant" : ""}"><strong>${assistant ? "Helvoca" : "Cliente"}</strong><p>${esc(message.content)}</p><span>${esc(fmt(message.createdAt))}</span></article>`;
+          return `<article class="home-detail-message ${assistant ? "assistant" : ""}"><strong>${esc(assistant ? "Helvoca" : customerLabel)}</strong><p>${esc(message.content)}</p><span>${esc(fmt(message.createdAt))}</span></article>`;
         }).join("") : '<p class="home-detail-muted">No hay mensajes guardados.</p>'}</div></section>
-        ${eventActions}
-        ${history}
         ${context.sourceReferenceId ? `<a class="home-detail-link" href="/conversations.html?channel=whatsapp&conversation=${encodeURIComponent(context.sourceReferenceId)}">Ver conversación completa</a>` : ""}
       `;
     }
@@ -133,9 +119,8 @@
       : context.channel === "API"
         ? `${entityText} fue creado${createdSuffix} por API. No existe una conversación asociada.`
         : `No se encontró una conversación enlazada a ${entityKind === "pedido" ? "este pedido" : "esta reserva"}.`;
-    return `${eventActions}<section class="home-detail-section"><h3>Origen</h3><p class="home-detail-muted">${originText}</p></section>${history}`;
+    return `<section class="home-detail-section"><h3>Origen</h3><p class="home-detail-muted">${originText}</p></section>`;
   }
-
   async function openBookingDetail(id) {
     const booking = state.bookings.find(item => String(item.id) === String(id));
     if (!booking) return;
@@ -155,7 +140,7 @@
     document.body.classList.add("home-detail-open");
     try {
       const context = await api(`/api/v1/bookings/${encodeURIComponent(id)}/context`);
-      body.innerHTML = bookingFacts(booking, customer, service) + renderContext(context);
+      body.innerHTML = bookingFacts(booking, customer, service) + renderContext(context, "reserva", customer.name || customer.phone || "Cliente");
     } catch (error) {
       body.innerHTML = bookingFacts(booking, customer, service) +
         '<section class="home-detail-section"><h3>Conversación</h3><p class="home-detail-muted">No pude cargar la conversación asociada en este momento.</p></section>';
@@ -384,7 +369,7 @@
 
     const context = await loadOrderConversation(order);
     const actions = orderActions(order);
-    body.innerHTML = facts + renderContext(context, "pedido") +
+    body.innerHTML = facts + renderContext(context, "pedido", order.contactName || order.contactPhone || "Cliente") +
       (actions.length ? `<div class="home-detail-order-actions">${actions.map(([next,label]) => `<button type="button" data-home-order-status="${next}" class="${next === "CANCELLED" ? "home-filter-clear" : "home-order-primary"}">${esc(label)}</button>`).join("")}</div>` : "");
 
     body.querySelectorAll("[data-home-order-status]").forEach(button => button.addEventListener("click", async event => {
