@@ -10,12 +10,14 @@ public record PhoneNumberResponse(
         String phoneNumber,
         boolean active,
         boolean whatsappEnabled,
+        Instant whatsappCertifiedAt,
         Instant createdAt,
         Instant updatedAt
 ) {
     static PhoneNumberResponse from(PhoneNumber phone) {
         return new PhoneNumberResponse(
                 phone.getId(), phone.getProvider(), phone.getExternalId(), phone.getPhoneNumber(),
-                phone.isActive(), phone.isWhatsappEnabled(), phone.getCreatedAt(), phone.getUpdatedAt());
+                phone.isActive(), phone.isWhatsappEnabled(), phone.getWhatsappCertifiedAt(),
+                phone.getCreatedAt(), phone.getUpdatedAt());
     }
 }
