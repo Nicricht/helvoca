@@ -75,6 +75,58 @@ class TwilioWhatsAppProductionCertificationRunnerTest {
     }
 
     @Test
+    void createsTemplateAndSubmitsApprovalUsingLowercaseWhatsappPath() throws Exception {
+        TwilioProperties props = new TwilioProperties();
+        props.setAccountSid("ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        props.setAuthToken("test-token");
+
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        HttpClient http = mock(HttpClient.class);
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> listResponse = mock(HttpResponse.class);
+        when(listResponse.statusCode()).thenReturn(200);
+        when(listResponse.body()).thenReturn("{\"contents\":[]}");
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> createResponse = mock(HttpResponse.class);
+        when(createResponse.statusCode()).thenReturn(201);
+        when(createResponse.body()).thenReturn(
+                "{\"sid\":\"HXaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}");
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> approvalResponse = mock(HttpResponse.class);
+        when(approvalResponse.statusCode()).thenReturn(201);
+        when(approvalResponse.body()).thenReturn("{\"status\":\"received\"}");
+
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(listResponse, createResponse, approvalResponse);
+
+        TwilioWhatsAppProductionCertificationRunner runner =
+                new TwilioWhatsAppProductionCertificationRunner(
+                        true,
+                        "wa-cert-20260918",
+                        "+14355652512",
+                        "+56966939611",
+                        1,
+                        1,
+                        props,
+                        jdbc,
+                        http);
+
+        var result = runner.executeOnce();
+
+        assertEquals("received", result.approvalStatus());
+        assertEquals("awaiting_approval", result.messageStatus());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
+        verify(http, times(3)).send(captor.capture(), any(HttpResponse.BodyHandler.class));
+        assertEquals(
+                "https://content.twilio.com/v1/Content/HXaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/ApprovalRequests/whatsapp",
+                captor.getAllValues().get(2).uri().toString());
+    }
+
+    @Test
     void blocksDuplicateRealSendWhenRunIdWasAlreadyConsumed() throws Exception {
         TwilioProperties props = new TwilioProperties();
         props.setAccountSid("ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
