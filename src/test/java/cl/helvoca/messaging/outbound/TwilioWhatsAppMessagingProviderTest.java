@@ -73,6 +73,33 @@ class TwilioWhatsAppMessagingProviderTest {
     }
 
     @Test
+    void usesExplicitSandboxSenderWithoutTenantWhatsappSender() throws Exception {
+        UUID businessId = UUID.randomUUID();
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(201);
+        when(response.body()).thenReturn("{\"sid\":\"SM0123456789abcdef0123456789abcdef\"}");
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        TwilioProperties twilio = new TwilioProperties();
+        twilio.setAccountSid("ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        twilio.setAuthToken("test-token");
+        twilio.setWhatsappSandboxFrom("+14155238886");
+
+        TwilioWhatsAppMessagingProvider provider = new TwilioWhatsAppMessagingProvider(twilio, phones, http);
+        MessagingProvider.SendResult result = provider.send(command(businessId));
+
+        assertEquals("SM0123456789abcdef0123456789abcdef", result.providerMessageId());
+        verifyNoInteractions(phones);
+
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(http).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        assertEquals("whatsapp:+14155238886",
+                parseForm(bodyOf(requestCaptor.getValue())).get("From"));
+    }
+
+    @Test
     void refusesDeliveryWhenTenantHasNoExplicitWhatsappSender() {
         UUID businessId = UUID.randomUUID();
         when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
