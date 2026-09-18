@@ -99,7 +99,7 @@ public class BookingService {
         booking.setNotes(request.notes());
 
         Booking saved = bookings.save(booking);
-        auditService.success(businessId, "BOOKING_CREATE", "BOOKING", saved.getId());
+        auditService.humanSuccess(businessId, "BOOKING_CREATE", "BOOKING", saved.getId());
         return BookingResponse.from(saved);
     }
 
@@ -124,7 +124,7 @@ public class BookingService {
         booking.setStartAt(request.startAt());
         booking.setEndAt(endAt);
         booking.setNotes(request.notes());
-        auditService.success(businessId, "BOOKING_RESCHEDULE", "BOOKING", id);
+        auditService.humanSuccess(businessId, "BOOKING_RESCHEDULE", "BOOKING", id);
         return BookingResponse.from(booking);
     }
 
@@ -134,7 +134,7 @@ public class BookingService {
         Booking booking = requireBooking(id, businessId);
         if (booking.getStatus() != BookingStatus.CANCELLED) {
             booking.setStatus(BookingStatus.CANCELLED);
-            auditService.success(businessId, "BOOKING_CANCEL", "BOOKING", id);
+            auditService.humanSuccess(businessId, "BOOKING_CANCEL", "BOOKING", id);
         }
     }
 
