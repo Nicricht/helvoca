@@ -35,9 +35,6 @@ const EVENT_LABELS = {
   UNANSWERED_QUESTION_RECORDED: "Pregunta guardada para revisar"
 };
 
-const PRIORITY_LABELS = { LOW: "Baja", NORMAL: "Normal", HIGH: "Alta", URGENT: "Urgente" };
-const REQUEST_STATUS_LABELS = { OPEN: "Abierta", IN_PROGRESS: "En curso", RESOLVED: "Resuelta", CANCELLED: "Cancelada" };
-
 async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set("Authorization", `Bearer ${token}`);
@@ -94,11 +91,6 @@ function fmtDuration(seconds) {
   const minutes = Math.floor(total / 60);
   const rest = total % 60;
   return `${minutes}:${String(rest).padStart(2, "0")}`;
-}
-
-function fmtUsd(value) {
-  const number = Number(value || 0);
-  return new Intl.NumberFormat("es-CL", {minimumFractionDigits: 2, maximumFractionDigits: 4}).format(number);
 }
 
 function renderReadiness(data) {
@@ -205,56 +197,6 @@ async function loadCallDetail(callId) {
   renderCallDetail(data);
 }
 
-function renderRequests(items = []) {
-  const root = $("#requestsList");
-  if (!root) return;
-  if (!items.length) { root.innerHTML = '<div class="empty">No hay solicitudes abiertas. ✨</div>'; return; }
-  root.innerHTML = items.map(r => `
-    <div class="item" data-request-id="${esc(r.id)}">
-      <div class="item-head"><strong>${esc(r.title)}</strong><span class="pill ${r.priority === "URGENT" || r.priority === "HIGH" ? "high" : ""}">${esc(PRIORITY_LABELS[r.priority] || humanize(r.priority, {}))}</span></div>
-      <div class="meta"><span>${esc(humanize(r.type, {}))}</span><span>${esc(REQUEST_STATUS_LABELS[r.status] || humanize(r.status, {}))}</span><span>${fmtDate(r.createdAt)}</span></div>
-      ${r.status !== "RESOLVED" && r.status !== "CANCELLED" ? '<div class="actions" style="margin-top:10px"><button data-status="IN_PROGRESS" type="button">En curso</button><button data-status="RESOLVED" type="button" class="ghost">Resolver</button></div>' : ""}
-    </div>`).join("");
-  root.querySelectorAll("button[data-status]").forEach(button => button.addEventListener("click", async e => {
-    const item = e.target.closest("[data-request-id]");
-    e.target.disabled = true;
-    try {
-      await api(`/api/v1/requests/${item.dataset.requestId}/status`, {method:"PATCH", body:JSON.stringify({status:e.target.dataset.status})});
-      await load(); toast("Solicitud actualizada.");
-    } catch (err) { toast(err.message); e.target.disabled = false; }
-  }));
-}
-
-function renderQuestions(items = []) {
-  const root = $("#questionsList");
-  if (!root) return;
-  if (!items.length) { root.innerHTML = '<div class="empty">Helvoca no tiene preguntas pendientes. ✨</div>'; return; }
-  root.innerHTML = items.map(q => `
-    <div class="item" data-question-id="${esc(q.id)}">
-      <div class="item-head"><strong>${esc(q.question)}</strong><span class="pill">${q.occurrences}×</span></div>
-      <div class="meta"><span>Última vez ${fmtDate(q.lastSeenAt)}</span></div>
-      <div class="question-actions"><input data-answer placeholder="Escribe la respuesta oficial"><button data-answer-btn type="button">Enseñar</button><button data-dismiss-btn type="button" class="ghost">Descartar</button></div>
-    </div>`).join("");
-  root.querySelectorAll("[data-answer-btn]").forEach(button => button.addEventListener("click", async e => {
-    const item = e.target.closest("[data-question-id]");
-    const answer = item.querySelector("[data-answer]").value.trim();
-    if (!answer) { toast("Escribe una respuesta antes de enseñar a Helvoca."); return; }
-    e.target.disabled = true;
-    try {
-      await api(`/api/v1/learning/questions/${item.dataset.questionId}/answer`, {method:"POST", body:JSON.stringify({answer})});
-      await load(); toast("Respuesta aprendida y guardada en conocimiento.");
-    } catch (err) { toast(err.message); e.target.disabled = false; }
-  }));
-  root.querySelectorAll("[data-dismiss-btn]").forEach(button => button.addEventListener("click", async e => {
-    const item = e.target.closest("[data-question-id]");
-    e.target.disabled = true;
-    try {
-      await api(`/api/v1/learning/questions/${item.dataset.questionId}/dismiss`, {method:"POST"});
-      await load(); toast("Pregunta descartada.");
-    } catch (err) { toast(err.message); e.target.disabled = false; }
-  }));
-}
-
 function updateDiagnosticsSummary(readiness, certification) {
   const target = $("#diagnosticsSummary");
   if (!target) return;
@@ -279,14 +221,6 @@ async function load() {
     ]);
     setText("#businessName", data.businessName || "Tu negocio");
     setText("#localNow", `${data.timezone || ""}${data.timezone ? " · " : ""}${fmtDate(data.localNow)}`);
-    setText("#callsToday", data.callsToday);
-    setText("#minutesToday", fmtDuration(data.callDurationSecondsToday));
-    setText("#bookingsToday", data.bookingsToday);
-    setText("#customersToday", data.newCustomersToday);
-    setText("#openRequests", data.openRequests);
-    setText("#unknownQuestions", data.unansweredQuestions);
-    setText("#failuresToday", data.callFailuresToday);
-    setText("#costToday", fmtUsd(data.estimatedCallCostTodayUsd));
     const healthBadge = $("#healthBadge");
     if (healthBadge) {
       healthBadge.textContent = data.callFailuresToday
@@ -299,8 +233,6 @@ async function load() {
     renderCertification(certification);
     updateDiagnosticsSummary(readiness, certification);
     renderCalls(data.recentCalls);
-    renderRequests(data.recentRequests);
-    renderQuestions(data.unanswered);
   } catch (err) {
     toast(err.message || "No pude cargar operaciones.");
   }
@@ -308,19 +240,4 @@ async function load() {
 
 $("#refreshBtn")?.addEventListener("click", load);
 $("#closeCallDetailBtn")?.addEventListener("click", () => $("#callDetailPanel")?.classList.add("hidden"));
-$("#newRequestBtn")?.addEventListener("click", () => $("#requestForm")?.classList.remove("hidden"));
-$("#cancelRequestBtn")?.addEventListener("click", () => $("#requestForm")?.classList.add("hidden"));
-const requestForm = $("#requestForm");
-if (requestForm) requestForm.addEventListener("submit", async e => {
-  e.preventDefault();
-  const form = e.currentTarget;
-  const data = Object.fromEntries(new FormData(form).entries());
-  form.querySelectorAll("button").forEach(b => b.disabled = true);
-  try {
-    await api("/api/v1/requests", {method:"POST", body:JSON.stringify(data)});
-    form.reset(); form.classList.add("hidden"); await load(); toast("Solicitud creada.");
-  } catch (err) { toast(err.message); }
-  finally { form.querySelectorAll("button").forEach(b => b.disabled = false); }
-});
-
 load();
