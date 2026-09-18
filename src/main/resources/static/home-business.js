@@ -130,6 +130,8 @@
 
     if (confirm) {
       confirm.classList.add("hidden");
+      confirm.disabled = false;
+      confirm.textContent = "Crear reserva";
       delete confirm.dataset.startAt;
     }
     if (message) message.textContent = "";
