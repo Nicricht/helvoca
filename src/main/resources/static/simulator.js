@@ -209,7 +209,7 @@ async function loadBusinessIdentity() {
   try {
     const business = await api("/api/v1/business");
     businessName = business?.name || "Tu negocio";
-    document.querySelector(".brand-block strong")?.replaceChildren(document.createTextNode(businessName.toUpperCase()));
+    document.querySelector(".topbar > div strong")?.replaceChildren(document.createTextNode(businessName.toUpperCase()));
     document.title = `${businessName} · Probar recepcionista`;
   } catch (_) {
     businessName = "Tu negocio";
