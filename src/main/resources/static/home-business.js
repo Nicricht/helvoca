@@ -5,6 +5,7 @@
   if (!root || !dashboard || !statusGrid || typeof api !== "function") return;
 
   const state = { bookings: [], customers: [], services: [], orders: [], requests: [] };
+  const bookingFilters = { query: "", date: "all", serviceId: "all", status: "all", source: "all" };
   let loading = false;
 
   const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;" }[c]));
@@ -34,23 +35,111 @@
     root.querySelectorAll("[data-home-panel]").forEach(panel=>panel.classList.toggle("hidden",panel.dataset.homePanel!==name));
   }
 
+  function bookingMatchesDate(item) {
+    if (bookingFilters.date === "all") return true;
+    const when = new Date(item.startAt || 0);
+    if (Number.isNaN(when.getTime())) return false;
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startTomorrow = new Date(startToday); startTomorrow.setDate(startTomorrow.getDate() + 1);
+    const afterTomorrow = new Date(startTomorrow); afterTomorrow.setDate(afterTomorrow.getDate() + 1);
+    const weekEnd = new Date(startToday); weekEnd.setDate(weekEnd.getDate() + 7);
+    if (bookingFilters.date === "today") return when >= startToday && when < startTomorrow;
+    if (bookingFilters.date === "tomorrow") return when >= startTomorrow && when < afterTomorrow;
+    if (bookingFilters.date === "week") return when >= startToday && when < weekEnd;
+    if (bookingFilters.date === "upcoming") return when >= now;
+    if (bookingFilters.date === "past") return when < now;
+    return true;
+  }
+
   function renderBookings() {
-    const customers=new Map(state.customers.map(x=>[String(x.id),x]));
-    const services=new Map(state.services.map(x=>[String(x.id),x]));
-    const items=[...state.bookings].sort((a,b)=>new Date(b.startAt||0)-new Date(a.startAt||0));
-    document.querySelector("#homeBusinessBookingsCount").textContent=String(items.length);
-    const host=document.querySelector("#homeBookingsList");
-    if(!items.length){ host.innerHTML='<div class="home-business-empty">Todavía no hay reservas registradas.</div>'; return; }
-    host.innerHTML=`<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Fecha / hora</th><th>Cliente</th><th>Servicio</th><th>Contacto</th><th>Origen</th><th>Estado</th></tr></thead><tbody>${items.map(item=>{
-      const customer=customers.get(String(item.customerId))||{};
-      const service=services.get(String(item.serviceId))||{};
-      return `<tr tabindex="0" data-home-booking-id="${esc(item.id)}"><td><strong>${esc(fmt(item.startAt))}</strong></td><td><strong>${esc(customer.name||customer.phone||"Cliente")}</strong></td><td>${esc(service.name||"Servicio")}</td><td>${esc(customer.phone||"Sin teléfono")}</td><td>${esc(source(item.source))}</td><td><span class="home-pill ${item.status==="CANCELLED"?"bad":""}">${esc(status(item.status))}</span></td></tr>`;
+    const customers = new Map(state.customers.map(x => [String(x.id), x]));
+    const services = new Map(state.services.map(x => [String(x.id), x]));
+    const allItems = [...state.bookings].sort((a,b) => new Date(b.startAt || 0) - new Date(a.startAt || 0));
+    const query = bookingFilters.query.trim().toLocaleLowerCase("es");
+
+    const items = allItems.filter(item => {
+      const customer = customers.get(String(item.customerId)) || {};
+      const service = services.get(String(item.serviceId)) || {};
+      const searchable = [customer.name, customer.phone, customer.email, service.name]
+        .filter(Boolean).join(" ").toLocaleLowerCase("es");
+      return (!query || searchable.includes(query))
+        && bookingMatchesDate(item)
+        && (bookingFilters.serviceId === "all" || String(item.serviceId) === bookingFilters.serviceId)
+        && (bookingFilters.status === "all" || item.status === bookingFilters.status)
+        && (bookingFilters.source === "all" || item.source === bookingFilters.source);
+    });
+
+    document.querySelector("#homeBusinessBookingsCount").textContent = String(allItems.length);
+    const host = document.querySelector("#homeBookingsList");
+    const serviceOptions = state.services.map(service =>
+      `<option value="${esc(service.id)}" ${bookingFilters.serviceId === String(service.id) ? "selected" : ""}>${esc(service.name)}</option>`
+    ).join("");
+    const sourceOptions = [...new Set(allItems.map(item => item.source).filter(Boolean))].map(value =>
+      `<option value="${esc(value)}" ${bookingFilters.source === value ? "selected" : ""}>${esc(source(value))}</option>`
+    ).join("");
+
+    const controls = `
+      <div class="home-booking-filters" aria-label="Filtros de reservas">
+        <label class="home-filter-search"><span>Buscar</span><input id="homeBookingSearch" type="search" value="${esc(bookingFilters.query)}" placeholder="Cliente, teléfono o servicio"></label>
+        <label><span>Fecha</span><select id="homeBookingDate">
+          <option value="all">Todas</option><option value="today">Hoy</option><option value="tomorrow">Mañana</option>
+          <option value="week">Esta semana</option><option value="upcoming">Próximas</option><option value="past">Pasadas</option>
+        </select></label>
+        <label><span>Servicio</span><select id="homeBookingService"><option value="all">Todos</option>${serviceOptions}</select></label>
+        <label><span>Estado</span><select id="homeBookingStatus">
+          <option value="all">Todos</option><option value="CONFIRMED">Confirmadas</option><option value="CANCELLED">Canceladas</option>
+        </select></label>
+        <label><span>Origen</span><select id="homeBookingSource"><option value="all">Todos</option>${sourceOptions}</select></label>
+        <button id="homeBookingClearFilters" class="home-filter-clear" type="button">Limpiar</button>
+      </div>
+      <div class="home-filter-result">Mostrando <strong>${items.length}</strong> de <strong>${allItems.length}</strong> reservas</div>
+    `;
+
+    if (!allItems.length) {
+      host.innerHTML = controls + '<div class="home-business-empty">Todavía no hay reservas registradas.</div>';
+      bindBookingFilters();
+      return;
+    }
+    if (!items.length) {
+      host.innerHTML = controls + '<div class="home-business-empty">No hay reservas que coincidan con estos filtros.</div>';
+      bindBookingFilters();
+      return;
+    }
+
+    host.innerHTML = controls + `<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Fecha / hora</th><th>Cliente</th><th>Servicio</th><th>Contacto</th><th>Origen</th><th>Estado</th></tr></thead><tbody>${items.map(item => {
+      const customer = customers.get(String(item.customerId)) || {};
+      const service = services.get(String(item.serviceId)) || {};
+      return `<tr tabindex="0" data-home-booking-id="${esc(item.id)}"><td><strong>${esc(fmt(item.startAt))}</strong></td><td><strong>${esc(customer.name || customer.phone || "Cliente")}</strong></td><td>${esc(service.name || "Servicio")}</td><td>${esc(customer.phone || "Sin teléfono")}</td><td>${esc(source(item.source))}</td><td><span class="home-pill ${item.status === "CANCELLED" ? "bad" : ""}">${esc(status(item.status))}</span></td></tr>`;
     }).join("")}</tbody></table></div>
-    <div class="home-business-mobile-list">${items.map(item=>{
-      const customer=customers.get(String(item.customerId))||{};
-      const service=services.get(String(item.serviceId))||{};
-      return `<article class="home-business-mobile-card" data-home-booking-id="${esc(item.id)}"><strong>${esc(customer.name||customer.phone||"Cliente")}</strong><span>${esc(fmt(item.startAt))} · ${esc(service.name||"Servicio")}</span><span class="home-pill ${item.status==="CANCELLED"?"bad":""}">${esc(status(item.status))}</span></article>`;
+    <div class="home-business-mobile-list">${items.map(item => {
+      const customer = customers.get(String(item.customerId)) || {};
+      const service = services.get(String(item.serviceId)) || {};
+      return `<article class="home-business-mobile-card" tabindex="0" data-home-booking-id="${esc(item.id)}"><strong>${esc(customer.name || customer.phone || "Cliente")}</strong><span>${esc(fmt(item.startAt))} · ${esc(service.name || "Servicio")}</span><span class="home-pill ${item.status === "CANCELLED" ? "bad" : ""}">${esc(status(item.status))}</span></article>`;
     }).join("")}</div>`;
+    bindBookingFilters();
+  }
+
+  function bindBookingFilters() {
+    const search = document.querySelector("#homeBookingSearch");
+    const date = document.querySelector("#homeBookingDate");
+    const service = document.querySelector("#homeBookingService");
+    const statusFilter = document.querySelector("#homeBookingStatus");
+    const sourceFilter = document.querySelector("#homeBookingSource");
+    if (date) date.value = bookingFilters.date;
+    if (service) service.value = bookingFilters.serviceId;
+    if (statusFilter) statusFilter.value = bookingFilters.status;
+    if (sourceFilter) sourceFilter.value = bookingFilters.source;
+
+    search?.addEventListener("input", event => { bookingFilters.query = event.target.value; renderBookings(); document.querySelector("#homeBookingSearch")?.focus(); });
+    date?.addEventListener("change", event => { bookingFilters.date = event.target.value; renderBookings(); });
+    service?.addEventListener("change", event => { bookingFilters.serviceId = event.target.value; renderBookings(); });
+    statusFilter?.addEventListener("change", event => { bookingFilters.status = event.target.value; renderBookings(); });
+    sourceFilter?.addEventListener("change", event => { bookingFilters.source = event.target.value; renderBookings(); });
+    document.querySelector("#homeBookingClearFilters")?.addEventListener("click", () => {
+      Object.assign(bookingFilters, { query: "", date: "all", serviceId: "all", status: "all", source: "all" });
+      renderBookings();
+    });
   }
 
   function renderOrders() {
