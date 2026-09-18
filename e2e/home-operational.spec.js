@@ -70,6 +70,24 @@ async function mockReadyHome(page) {
       }
     ]
   })));
+  await page.route('**/api/v1/audit', route => route.fulfill(json([
+    {
+      id: 'audit-10', action: 'BOOKING_RESCHEDULE', resourceType: 'BOOKING', resourceId: 'b1',
+      result: 'SUCCESS', actorType: 'HUMAN', actorUserId: 'user-1',
+      actorName: 'Carolina Soto', actorEmail: 'carolina@example.com', actorRole: 'OPERATOR',
+      beforeState: { startAt: '2026-09-18T14:00:00Z', status: 'CONFIRMED' },
+      afterState: { startAt: '2026-09-18T15:00:00Z', status: 'CONFIRMED' },
+      createdAt: '2026-09-18T18:05:00Z'
+    },
+    {
+      id: 'audit-11', action: 'BOOKING_CANCEL', resourceType: 'BOOKING', resourceId: 'b2',
+      result: 'SUCCESS', actorType: 'HUMAN', actorUserId: 'user-2',
+      actorName: 'Diego Ruiz', actorEmail: 'diego@example.com', actorRole: 'BUSINESS_ADMIN',
+      beforeState: { status: 'CONFIRMED' }, afterState: { status: 'CANCELLED' },
+      createdAt: '2026-09-18T19:10:00Z'
+    }
+  ])));
+
   await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([
     { id: 'o1', operationId: 'op1', sourceReferenceId: 'wa-order', status: 'CONFIRMED', fulfillmentType: 'DELIVERY', contactName: 'Juan Pedido', contactPhone: '+56933333333', deliveryAddress: 'Av. Demo 123, Santiago', subtotal: 15990, deliveryFee: 3000, total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z', lines: [{ name: 'Producto demo', quantity: 1, unitPrice: 15990, lineTotal: 15990 }] }
   ])));
@@ -607,6 +625,24 @@ test('requests workspace renders its empty state', async ({ page }) => {
 
   await page.getByRole('tab', { name: /Solicitudes/ }).click();
   await expect(page.locator('#homeRequestsList')).toHaveText('No hay solicitudes recientes.');
+});
+
+test('audit workspace shows actor role resource and before after changes', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+  await page.goto('/');
+
+  await page.getByRole('tab', { name: /Auditoría/ }).click();
+  await expect(page.locator('#homeAuditList .home-audit-row')).toHaveCount(2);
+  await expect(page.locator('#homeAuditList')).toContainText('Reserva reprogramada');
+  await expect(page.locator('#homeAuditList')).toContainText('Carolina Soto');
+  await expect(page.locator('#homeAuditList')).toContainText('Operador');
+  await expect(page.locator('#homeAuditList')).toContainText('carolina@example.com');
+  await expect(page.locator('#homeAuditList')).toContainText('Reserva #b1');
+  await expect(page.locator('#homeAuditList')).toContainText('Reserva cancelada');
+  await expect(page.locator('#homeAuditList')).toContainText('Diego Ruiz');
+  await expect(page.locator('#homeAuditList')).toContainText('Administrador');
+  await expect(page.locator('#homeBusinessAuditCount')).toHaveText('2');
 });
 
 test('customers workspace sorts and renders contact data', async ({ page }) => {

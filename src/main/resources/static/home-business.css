@@ -181,3 +181,10 @@
 
 [data-home-customer-id]{cursor:pointer}
 [data-home-customer-id]:hover,[data-home-customer-id]:focus-visible{background:rgba(124,92,255,.075);outline:none}
+
+.home-audit-list{display:grid;gap:8px}
+.home-audit-row{display:grid;grid-template-columns:minmax(220px,1.4fr) minmax(180px,1fr) auto;gap:18px;align-items:center;padding:12px 13px;border:1px solid rgba(255,255,255,.065);border-radius:12px;background:rgba(255,255,255,.018)}
+.home-audit-main strong,.home-audit-main span,.home-audit-actor strong,.home-audit-actor span{display:block}
+.home-audit-main span,.home-audit-actor span,.home-audit-row time{margin-top:3px;color:var(--muted);font-size:10px}
+.home-audit-row time{text-align:right;white-space:nowrap}
+@media(max-width:760px){.home-audit-row{grid-template-columns:1fr;gap:7px}.home-audit-row time{text-align:left}}

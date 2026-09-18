@@ -4,7 +4,7 @@
   const statusGrid = document.querySelector("#statusGrid");
   if (!root || !dashboard || !statusGrid || typeof api !== "function") return;
 
-  const state = { bookings: [], customers: [], services: [], orders: [], requests: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
+  const state = { bookings: [], customers: [], services: [], orders: [], requests: [], audit: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
   const bookingFilters = { query: "", date: "all", serviceId: "all", status: "all", source: "all" };
   const EVENT_LABELS = {
     BOOKING_CREATE: "Reserva creada",
@@ -968,6 +968,72 @@
     bindCustomerOpeners();
   }
 
+  function auditActionLabel(value) {
+    const labels = {
+      BOOKING_CREATE: "Reserva creada",
+      BOOKING_RESCHEDULE: "Reserva reprogramada",
+      BOOKING_CANCEL: "Reserva cancelada",
+      CUSTOMER_CREATE: "Cliente creado",
+      CUSTOMER_UPDATE: "Cliente actualizado",
+      BUSINESS_UPDATE: "Negocio actualizado",
+      SERVICE_CREATE: "Servicio creado",
+      SERVICE_UPDATE: "Servicio actualizado",
+      SERVICE_DEACTIVATE: "Servicio desactivado"
+    };
+    return labels[value] || eventLabel(value);
+  }
+
+  function auditResourceLabel(item) {
+    const type = ({ BOOKING:"Reserva", CUSTOMER:"Cliente", BUSINESS:"Negocio", SERVICE:"Servicio" })[item?.resourceType]
+      || item?.resourceType || "Recurso";
+    const id = item?.resourceId ? String(item.resourceId).slice(0, 8) : "";
+    return id ? `${type} #${id}` : type;
+  }
+
+  function auditChangeLabel(item) {
+    const before = item?.beforeState || {};
+    const after = item?.afterState || {};
+    if (before.startAt && after.startAt && before.startAt !== after.startAt) {
+      return `${fmtCompact(before.startAt)} → ${fmtCompact(after.startAt)}`;
+    }
+    if (before.status && after.status && before.status !== after.status) {
+      return `${status(before.status)} → ${status(after.status)}`;
+    }
+    if (!item?.beforeState && after.startAt) {
+      return `Para ${fmtCompact(after.startAt)}`;
+    }
+    return "";
+  }
+
+  function renderAudit() {
+    const items = Array.isArray(state.audit) ? state.audit : [];
+    const count = document.querySelector("#homeBusinessAuditCount");
+    if (count) count.textContent = String(items.length);
+    const host = document.querySelector("#homeAuditList");
+    if (!host) return;
+    if (!items.length) {
+      host.innerHTML = '<div class="home-business-empty">Todavía no hay eventos de auditoría.</div>';
+      return;
+    }
+    host.innerHTML = `<div class="home-audit-list">${items.map(item => {
+      const actor = item.actorName || (item.actorType === "HUMAN" ? "Usuario" : "Sistema");
+      const role = bookingActorRole(item.actorRole);
+      const email = item.actorEmail || "";
+      const change = auditChangeLabel(item);
+      return `<article class="home-audit-row">
+        <div class="home-audit-main">
+          <strong>${esc(auditActionLabel(item.action))}</strong>
+          <span>${esc(auditResourceLabel(item))}${change ? ` · ${esc(change)}` : ""}</span>
+        </div>
+        <div class="home-audit-actor">
+          <strong>${esc(actor)}</strong>
+          <span>${esc([role, email].filter(Boolean).join(" · ") || "Registro del sistema")}</span>
+        </div>
+        <time datetime="${esc(item.createdAt || "")}">${esc(fmt(item.createdAt))}</time>
+      </article>`;
+    }).join("")}</div>`;
+  }
+
   function businessParts(value = new Date()) {
     try {
       const parts = new Intl.DateTimeFormat("en-CA", {
@@ -1477,21 +1543,23 @@
     loading=true;
     root.classList.remove("hidden");
     try{
-      const [bookings,customers,services,orders,ops]=await Promise.allSettled([
+      const [bookings,customers,services,orders,ops,audit]=await Promise.allSettled([
         api("/api/v1/bookings"),
         api("/api/v1/customers"),
         api("/api/v1/services"),
         api("/api/v1/commercial/orders"),
-        api("/api/v1/operations/dashboard")
+        api("/api/v1/operations/dashboard"),
+        api("/api/v1/audit")
       ]);
       state.bookings=bookings.status==="fulfilled"&&Array.isArray(bookings.value)?bookings.value:[];
       state.customers=customers.status==="fulfilled"&&Array.isArray(customers.value)?customers.value:[];
       state.services=services.status==="fulfilled"&&Array.isArray(services.value)?services.value:[];
       state.orders=orders.status==="fulfilled"&&Array.isArray(orders.value)?orders.value:[];
       state.requests=ops.status==="fulfilled"&&Array.isArray(ops.value?.recentRequests)?ops.value.recentRequests:[];
+      state.audit=audit.status==="fulfilled"&&Array.isArray(audit.value)?audit.value:[];
       state.businessName=ops.status==="fulfilled"&&ops.value?.businessName?String(ops.value.businessName):(window.helvocaBusinessName||state.businessName||"Tu negocio");
       state.businessTimezone=ops.status==="fulfilled"&&ops.value?.timezone?String(ops.value.timezone):"America/Santiago";
-      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
+      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); renderAudit(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
     } finally { loading=false; }
   }
 
@@ -1501,6 +1569,6 @@
   document.querySelector("#refreshBtn")?.addEventListener("click",load);
   ensureBookingDrawer();
   const requestedTab = new URLSearchParams(window.location.search).get("tab");
-  setTab(["bookings","orders","requests","customers"].includes(requestedTab) ? requestedTab : "bookings");
+  setTab(["bookings","orders","requests","customers","audit"].includes(requestedTab) ? requestedTab : "bookings");
   queueMicrotask(load);
 })();
