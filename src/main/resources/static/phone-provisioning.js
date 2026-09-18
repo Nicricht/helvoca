@@ -164,17 +164,17 @@
 
 (() => {
     const commercial = document.createElement('script');
-    commercial.src = '/commercial-status.js';
+    commercial.src = '/commercial-status.js?v=20260917-4';
     commercial.async = false;
     document.head.appendChild(commercial);
 
     const voices = document.createElement('script');
-    voices.src = '/voice-selector.js';
+    voices.src = '/voice-selector.js?v=20260917-4';
     voices.async = false;
     document.head.appendChild(voices);
 
     const ux = document.createElement('script');
-    ux.src = '/ux-simplification.js';
+    ux.src = '/ux-simplification.js?v=20260917-4';
     ux.async = false;
     document.head.appendChild(ux);
 })();
