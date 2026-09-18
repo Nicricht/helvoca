@@ -42,6 +42,15 @@ async function mockReadyHome(page) {
     overageMinutes: 0, billingProviderConnected: true, legacyFallback: false
   })));
   await page.route('**/api/v1/public/pricing', route => route.fulfill(json([])));
+  await page.route('**/api/v1/bookings', route => route.fulfill(json([
+    { id: 'b1', customerId: 'cust1', serviceId: 'svc1', startAt: '2026-09-18T15:00:00Z', endAt: '2026-09-18T15:30:00Z', status: 'CONFIRMED', source: 'AI_CALL' }
+  ])));
+  await page.route('**/api/v1/customers', route => route.fulfill(json([
+    { id: 'cust1', name: 'Ana Reserva', phone: '+56922222222', email: 'ana@example.cl', createdAt: '2026-09-17T10:00:00Z' }
+  ])));
+  await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([
+    { id: 'o1', status: 'CONFIRMED', fulfillmentType: 'PICKUP', contactName: 'Juan Pedido', contactPhone: '+56933333333', total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z', lines: [{ name: 'Producto demo', quantity: 1, lineTotal: 18990 }] }
+  ])));
   await page.route('**/api/v1/operations/dashboard', route => route.fulfill(json({
     businessName: 'Negocio E2E',
     timezone: 'America/Santiago',
@@ -92,6 +101,13 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homePendingMetric')).toHaveAttribute('href', '/operations.html?tab=requests');
   await expect(page.locator('#homeRecentActivity')).toContainText('+56922222222');
   await expect(page.locator('#homeRecentActivity')).toContainText('+56911111111');
+  await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
+  await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
+  await expect(page.locator('#homeBookingsList')).toContainText('Peluquería');
+  await page.getByRole('button', { name: /Pedidos/ }).click();
+  await expect(page.locator('#homeOrdersList')).toContainText('Juan Pedido');
+  await page.getByRole('button', { name: /Clientes/ }).click();
+  await expect(page.locator('#homeCustomersList')).toContainText('Ana Reserva');
   await expect(page.locator('.nav-conversations')).toHaveAttribute('href', '/conversations.html');
   await expect(page.locator('#advancedPanel')).toBeVisible();
 });

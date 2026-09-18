@@ -20,7 +20,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
     static final String[] PUBLIC_CONSOLE_ASSETS = {
             "/", "/index.html", "/app.js", "/phone-provisioning.js", "/commercial-status.js",
-            "/voice-selector.js", "/ux-simplification.js", "/styles.css",
+            "/voice-selector.js", "/ux-simplification.js", "/styles.css", "/home-business.js", "/home-business.css",
             "/sales.html", "/sales.css",
             "/pricing.html", "/pricing.js", "/pricing.css",
             "/operations.html", "/operations.js", "/operations.css",

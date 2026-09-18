@@ -6,6 +6,7 @@
     <title>Helvoca · Configura tu recepcionista con IA</title>
     <meta name="description" content="Pega el enlace de tu negocio y deja que Helvoca prepare tu recepcionista telefónica con IA.">
     <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/home-business.css?v=20260917-1">
     <style>
         .agent-toggle { flex-direction: row; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; background: rgba(255,255,255,.02); }
         .agent-toggle input, .agent-capability input { width: auto; min-height: auto; margin: 0; accent-color: var(--accent); }
@@ -265,6 +266,31 @@
             </div>
             <div id="nextStepBanner" class="next-banner"></div>
 
+            <section id="homeBusinessWorkspace" class="home-business-workspace hidden" aria-label="Operación diaria">
+                <div class="home-business-tabs" role="tablist" aria-label="Trabajo del negocio">
+                    <button class="home-business-tab active" type="button" role="tab" aria-selected="true" data-home-tab="bookings"><span>Reservas</span><strong id="homeBusinessBookingsCount">0</strong></button>
+                    <button class="home-business-tab" type="button" role="tab" aria-selected="false" data-home-tab="orders"><span>Pedidos</span><strong id="homeBusinessOrdersCount">0</strong></button>
+                    <button class="home-business-tab" type="button" role="tab" aria-selected="false" data-home-tab="requests"><span>Solicitudes</span><strong id="homeBusinessRequestsCount">0</strong></button>
+                    <button class="home-business-tab" type="button" role="tab" aria-selected="false" data-home-tab="customers"><span>Clientes</span><strong id="homeBusinessCustomersCount">0</strong></button>
+                </div>
+                <section class="card home-business-panel" data-home-panel="bookings">
+                    <div class="home-business-head"><div><div class="eyebrow">Agenda</div><h2>Reservas</h2><p>Quién reservó, qué servicio y cuándo será atendido.</p></div></div>
+                    <div id="homeBookingsList" class="home-business-list"><div class="home-business-empty">Cargando reservas…</div></div>
+                </section>
+                <section class="card home-business-panel hidden" data-home-panel="orders">
+                    <div class="home-business-head"><div><div class="eyebrow">Ventas</div><h2>Pedidos</h2><p>Qué compraron, quién hizo el pedido y en qué estado está.</p></div></div>
+                    <div id="homeOrdersList" class="home-business-list"><div class="home-business-empty">Cargando pedidos…</div></div>
+                </section>
+                <section class="card home-business-panel hidden" data-home-panel="requests">
+                    <div class="home-business-head"><div><div class="eyebrow">Seguimiento</div><h2>Solicitudes</h2><p>Casos que necesitan seguimiento humano.</p></div></div>
+                    <div id="homeRequestsList" class="home-business-list"><div class="home-business-empty">Cargando solicitudes…</div></div>
+                </section>
+                <section class="card home-business-panel hidden" data-home-panel="customers">
+                    <div class="home-business-head"><div><div class="eyebrow">Personas</div><h2>Clientes</h2><p>Personas registradas por voz, WhatsApp o gestión manual.</p></div></div>
+                    <div id="homeCustomersList" class="home-business-list"><div class="home-business-empty">Cargando clientes…</div></div>
+                </section>
+            </section>
+
             <section class="card ai-onboarding-card">
                 <div class="ai-heading">
                     <div>
@@ -430,6 +456,7 @@
 })();
 </script>
 <script src="/app.js" defer></script>
+<script src="/home-business.js?v=20260917-1" defer></script>
 <script src="/ux-simplification.js" defer></script>
 <script src="/phone-provisioning.js" defer></script>
 </body>
