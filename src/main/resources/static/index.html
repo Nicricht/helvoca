@@ -385,6 +385,18 @@
                 </section>
                 <section class="card home-business-panel hidden" data-home-panel="audit">
                     <div class="home-business-head"><div><div class="eyebrow">Control</div><h2>Auditoría</h2><p>Quién hizo cada cambio y cuándo ocurrió.</p></div></div>
+                    <form id="homeAuditFilters" class="home-audit-filters">
+                        <label>Usuario<input id="homeAuditActor" type="search" maxlength="180" placeholder="Nombre o email"></label>
+                        <label>Acción<select id="homeAuditAction"><option value="">Todas</option></select></label>
+                        <label>Recurso<select id="homeAuditResource"><option value="">Todos</option></select></label>
+                        <label>Desde<input id="homeAuditFrom" type="date"></label>
+                        <label>Hasta<input id="homeAuditTo" type="date"></label>
+                        <div class="home-audit-filter-actions">
+                            <button class="home-export-button" type="submit">Filtrar</button>
+                            <button id="homeAuditClear" class="home-export-button" type="button">Limpiar</button>
+                        </div>
+                    </form>
+                    <div id="homeAuditFilterMessage" class="home-export-message" aria-live="polite"></div>
                     <div id="homeAuditList" class="home-business-list"><div class="home-business-empty">Cargando auditoría…</div></div>
                 </section>
             </section>

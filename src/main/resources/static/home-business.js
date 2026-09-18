@@ -4,7 +4,7 @@
   const statusGrid = document.querySelector("#statusGrid");
   if (!root || !dashboard || !statusGrid || typeof api !== "function") return;
 
-  const state = { bookings: [], customers: [], services: [], orders: [], requests: [], audit: [], roles: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
+  const state = { bookings: [], customers: [], services: [], orders: [], requests: [], audit: [], auditCatalog: [], roles: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
   const bookingFilters = { query: "", date: "all", serviceId: "all", status: "all", source: "all" };
   const EVENT_LABELS = {
     BOOKING_CREATE: "Reserva creada",
@@ -1070,6 +1070,10 @@
     return id ? `${type} #${id}` : type;
   }
 
+  function auditResourceTypeLabel(value) {
+    return ({ BOOKING:"Reserva", CUSTOMER:"Cliente", BUSINESS:"Negocio", SERVICE:"Servicio", USER:"Usuario", AI_AGENT:"Agente IA", KNOWLEDGE_ITEM:"Conocimiento" })[value]
+      || value || "Recurso";
+  }
   function auditChangeLabel(item) {
     const before = item?.beforeState || {};
     const after = item?.afterState || {};
@@ -1114,6 +1118,96 @@
     }).join("")}</div>`;
   }
 
+  function populateAuditFilterOptions() {
+    if (!isBusinessAdmin()) return;
+    const catalog = Array.isArray(state.auditCatalog) ? state.auditCatalog : [];
+    const action = document.querySelector("#homeAuditAction");
+    const resource = document.querySelector("#homeAuditResource");
+    if (action) {
+      const current = action.value;
+      const values = [...new Set(catalog.map(item => item?.action).filter(Boolean))]
+        .sort((a, b) => auditActionLabel(a).localeCompare(auditActionLabel(b), "es"));
+      action.innerHTML = '<option value="">Todas</option>' + values
+        .map(value => '<option value="' + esc(value) + '">' + esc(auditActionLabel(value)) + '</option>').join("");
+      if (values.includes(current)) action.value = current;
+    }
+    if (resource) {
+      const current = resource.value;
+      const values = [...new Set(catalog.map(item => item?.resourceType).filter(Boolean))]
+        .sort((a, b) => auditResourceTypeLabel(a).localeCompare(auditResourceTypeLabel(b), "es"));
+      resource.innerHTML = '<option value="">Todos</option>' + values
+        .map(value => '<option value="' + esc(value) + '">' + esc(auditResourceTypeLabel(value)) + '</option>').join("");
+      if (values.includes(current)) resource.value = current;
+    }
+  }
+
+  function auditDateStartIso(value) {
+    if (!value) return "";
+    const date = new Date(value + "T00:00:00");
+    return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+  }
+
+  function auditDateEndExclusiveIso(value) {
+    if (!value) return "";
+    const date = new Date(value + "T00:00:00");
+    if (Number.isNaN(date.getTime())) return "";
+    date.setDate(date.getDate() + 1);
+    return date.toISOString();
+  }
+
+  async function applyAuditFilters() {
+    if (!isBusinessAdmin()) return;
+    const actor = document.querySelector("#homeAuditActor")?.value?.trim() || "";
+    const action = document.querySelector("#homeAuditAction")?.value || "";
+    const resourceType = document.querySelector("#homeAuditResource")?.value || "";
+    const from = document.querySelector("#homeAuditFrom")?.value || "";
+    const to = document.querySelector("#homeAuditTo")?.value || "";
+    const message = document.querySelector("#homeAuditFilterMessage");
+
+    if (from && to && from > to) {
+      if (message) message.textContent = "La fecha Desde no puede ser posterior a Hasta.";
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (actor) params.set("actor", actor);
+    if (action) params.set("action", action);
+    if (resourceType) params.set("resourceType", resourceType);
+    const fromIso = auditDateStartIso(from);
+    const toIso = auditDateEndExclusiveIso(to);
+    if (fromIso) params.set("from", fromIso);
+    if (toIso) params.set("to", toIso);
+
+    if (message) message.textContent = "Filtrando auditoría…";
+    try {
+      const url = "/api/v1/audit" + (params.size ? "?" + params.toString() : "");
+      const items = await api(url);
+      state.audit = Array.isArray(items) ? items : [];
+      renderAudit();
+      if (message) {
+        const plural = state.audit.length === 1 ? "" : "s";
+        message.textContent = state.audit.length + " evento" + plural + " encontrado" + plural + ".";
+      }
+    } catch (error) {
+      if (message) message.textContent = error?.message || "No pude filtrar la auditoría.";
+    }
+  }
+
+  function bindAuditFilters() {
+    const form = document.querySelector("#homeAuditFilters");
+    if (!form || form.dataset.bound === "true" || !isBusinessAdmin()) return;
+    form.dataset.bound = "true";
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      applyAuditFilters();
+    });
+    document.querySelector("#homeAuditClear")?.addEventListener("click", () => {
+      form.reset();
+      const message = document.querySelector("#homeAuditFilterMessage");
+      if (message) message.textContent = "";
+      applyAuditFilters();
+    });
+  }
   function businessParts(value = new Date()) {
     try {
       const parts = new Intl.DateTimeFormat("en-CA", {
@@ -1641,9 +1735,10 @@
       state.orders=orders.status==="fulfilled"&&Array.isArray(orders.value)?orders.value:[];
       state.requests=ops.status==="fulfilled"&&Array.isArray(ops.value?.recentRequests)?ops.value.recentRequests:[];
       state.audit=audit.status==="fulfilled"&&Array.isArray(audit.value)?audit.value:[];
+      state.auditCatalog=[...state.audit];
       state.businessName=ops.status==="fulfilled"&&ops.value?.businessName?String(ops.value.businessName):(window.helvocaBusinessName||state.businessName||"Tu negocio");
       state.businessTimezone=ops.status==="fulfilled"&&ops.value?.timezone?String(ops.value.timezone):"America/Santiago";
-      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); renderAudit(); if (isBusinessAdmin()) bindCustomerExports(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
+      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); renderAudit(); populateAuditFilterOptions(); if (isBusinessAdmin()) { bindCustomerExports(); bindAuditFilters(); } bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
     } finally { loading=false; }
   }
 

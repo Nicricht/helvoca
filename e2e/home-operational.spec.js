@@ -677,6 +677,49 @@ test('audit workspace shows actor role resource and before after changes', async
   await expect(page.locator('#homeBusinessAuditCount')).toHaveText('2');
 });
 
+test('audit filters query by actor action resource and date range', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+
+  let filteredParams = null;
+  await page.route('**/api/v1/audit?*', route => {
+    const url = new URL(route.request().url());
+    filteredParams = url.searchParams;
+    return route.fulfill(json([
+      {
+        id: 'audit-10', action: 'BOOKING_RESCHEDULE', resourceType: 'BOOKING', resourceId: 'b1',
+        result: 'SUCCESS', actorType: 'HUMAN', actorUserId: 'user-1',
+        actorName: 'Carolina Soto', actorEmail: 'carolina@example.com', actorRole: 'OPERATOR',
+        beforeState: { startAt: '2026-09-18T14:00:00Z' },
+        afterState: { startAt: '2026-09-18T15:00:00Z' },
+        createdAt: '2026-09-18T18:05:00Z'
+      }
+    ]));
+  });
+
+  await page.goto('/');
+  await page.getByRole('tab', { name: /Auditoría/ }).click();
+  await page.getByLabel('Usuario').fill('Carolina');
+  await page.getByLabel('Acción').selectOption('BOOKING_RESCHEDULE');
+  await page.getByLabel('Recurso').selectOption('BOOKING');
+  await page.getByLabel('Desde').fill('2026-09-18');
+  await page.getByLabel('Hasta').fill('2026-09-19');
+  await page.getByRole('button', { name: 'Filtrar' }).click();
+
+  await expect(page.locator('#homeAuditList .home-audit-row')).toHaveCount(1);
+  await expect(page.locator('#homeAuditList')).toContainText('Carolina Soto');
+  await expect(page.locator('#homeAuditFilterMessage')).toContainText('1 evento encontrado');
+  expect(filteredParams.get('actor')).toBe('Carolina');
+  expect(filteredParams.get('action')).toBe('BOOKING_RESCHEDULE');
+  expect(filteredParams.get('resourceType')).toBe('BOOKING');
+  expect(filteredParams.get('from')).toBeTruthy();
+  expect(filteredParams.get('to')).toBeTruthy();
+  expect(new Date(filteredParams.get('to')).getTime()).toBeGreaterThan(new Date(filteredParams.get('from')).getTime());
+
+  await page.getByRole('button', { name: 'Limpiar' }).click();
+  await expect(page.locator('#homeAuditList .home-audit-row')).toHaveCount(2);
+});
+
 test('customer exports download csv and xlsx', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
