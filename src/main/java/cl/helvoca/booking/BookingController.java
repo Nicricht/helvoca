@@ -14,14 +14,21 @@ import java.util.UUID;
 @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
 public class BookingController {
     private final BookingService service;
+    private final BookingContextService contextService;
 
-    public BookingController(BookingService service) { this.service = service; }
+    public BookingController(BookingService service, BookingContextService contextService) {
+        this.service = service;
+        this.contextService = contextService;
+    }
 
     @GetMapping
     public List<BookingResponse> list() { return service.list(); }
 
     @GetMapping("/{id}")
     public BookingResponse get(@PathVariable UUID id) { return service.get(id); }
+
+    @GetMapping("/{id}/context")
+    public BookingContextResponse context(@PathVariable UUID id) { return contextService.get(id); }
 
     @GetMapping("/availability")
     public AvailabilityResponse availability(
