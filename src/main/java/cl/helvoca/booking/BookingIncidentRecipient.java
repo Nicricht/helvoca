@@ -14,7 +14,7 @@ import java.util.UUID;
                 columnNames = {"campaign_id", "customer_id"}))
 public class BookingIncidentRecipient {
     public enum ChannelPreference { CHEAPEST, WHATSAPP, CALL }
-    public enum Status { PREPARED, CANCELLED }
+    public enum Status { PREPARED, QUEUED, CANCELLED }
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -43,6 +43,9 @@ public class BookingIncidentRecipient {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Status status = Status.PREPARED;
+
+    @Column(name = "outbound_message_id")
+    private UUID outboundMessageId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -76,6 +79,8 @@ public class BookingIncidentRecipient {
     public void setContentText(String contentText) { this.contentText = contentText; }
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
+    public UUID getOutboundMessageId() { return outboundMessageId; }
+    public void setOutboundMessageId(UUID outboundMessageId) { this.outboundMessageId = outboundMessageId; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
