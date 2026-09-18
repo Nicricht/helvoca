@@ -197,20 +197,32 @@
     root.querySelectorAll("[data-home-panel]").forEach(panel=>panel.classList.toggle("hidden",panel.dataset.homePanel!==name));
   }
 
+  function addDaysToDateKey(dateKey, days) {
+    const [year, month, day] = String(dateKey || "").split("-").map(Number);
+    if (!year || !month || !day) return "";
+    const value = new Date(Date.UTC(year, month - 1, day + days));
+    return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}-${String(value.getUTCDate()).padStart(2, "0")}`;
+  }
+
   function bookingMatchesDate(item) {
     if (bookingFilters.date === "all") return true;
     const when = new Date(item.startAt || 0);
     if (Number.isNaN(when.getTime())) return false;
+
     const now = new Date();
-    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startTomorrow = new Date(startToday); startTomorrow.setDate(startTomorrow.getDate() + 1);
-    const afterTomorrow = new Date(startTomorrow); afterTomorrow.setDate(afterTomorrow.getDate() + 1);
-    const weekStart = new Date(startToday);
-    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
-    const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 7);
-    if (bookingFilters.date === "today") return when >= startToday && when < startTomorrow;
-    if (bookingFilters.date === "tomorrow") return when >= startTomorrow && when < afterTomorrow;
-    if (bookingFilters.date === "week") return when >= weekStart && when < weekEnd;
+    const todayKey = businessDateKey(now);
+    const itemKey = businessDateKey(when);
+    const tomorrowKey = addDaysToDateKey(todayKey, 1);
+
+    const [year, month, day] = todayKey.split("-").map(Number);
+    const todayUtc = new Date(Date.UTC(year, month - 1, day));
+    const mondayOffset = (todayUtc.getUTCDay() + 6) % 7;
+    const weekStartKey = addDaysToDateKey(todayKey, -mondayOffset);
+    const weekEndKey = addDaysToDateKey(weekStartKey, 7);
+
+    if (bookingFilters.date === "today") return itemKey === todayKey;
+    if (bookingFilters.date === "tomorrow") return itemKey === tomorrowKey;
+    if (bookingFilters.date === "week") return itemKey >= weekStartKey && itemKey < weekEndKey;
     if (bookingFilters.date === "upcoming") return when >= now;
     if (bookingFilters.date === "past") return when < now;
     return true;
