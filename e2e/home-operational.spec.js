@@ -597,3 +597,33 @@ test('orders requests customers remain operable on mobile', async ({ page }) => 
   await page.getByRole('tab', { name: /Clientes/ }).click();
   await expect(page.locator('#homeCustomersList')).toContainText('Ana Reserva');
 });
+
+
+test('booking cancellation from drawer works', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+
+  let cancelCalls = 0;
+  await page.route('**/api/v1/bookings/b1', async route => {
+    expect(route.request().method()).toBe('DELETE');
+    cancelCalls += 1;
+    await route.fulfill({ status: 204, body: '' });
+  });
+
+  await page.goto('/');
+  await page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]').click();
+
+  await expect(page.getByRole('button', { name: 'Cancelar reserva' })).toBeVisible();
+  page.once('dialog', dialog => {
+    expect(dialog.message()).toContain('Ana Reserva');
+    dialog.accept();
+  });
+  await page.getByRole('button', { name: 'Cancelar reserva' }).click();
+
+  await expect.poll(() => cancelCalls).toBe(1);
+  await expect(page.locator('#homeBookingDetailMeta')).toContainText('Cancelada');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Esta reserva está cancelada');
+  await expect(page.getByRole('button', { name: 'Cancelar reserva' })).toHaveCount(0);
+  await expect(page.locator('#homeBookingsList [data-home-booking-id="b1"] .home-pill').first()).toHaveText('Cancelada');
+});
