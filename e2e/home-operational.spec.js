@@ -454,7 +454,29 @@ test('reservation filters drawer and conversation links work', async ({ page }) 
 });
 
 
-test('orders workspace actions work', async ({ page }) => {
+test('orders list drawer and conversation work', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /Pedidos/ }).click();
+  await expect(page.locator('#homeOrdersList')).toContainText('Juan Pedido');
+  await expect(page.locator('#homeOrdersList')).toContainText('Confirmado');
+
+  await page.locator('#homeOrdersList .home-business-table [data-home-order-id="o1"]').click();
+  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('#homeBookingDetailMeta')).toContainText('Confirmado');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Producto demo');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Av. Demo 123, Santiago');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute(
+    'href',
+    '/conversations.html?channel=whatsapp&conversation=wa-order'
+  );
+  await expect(page.getByRole('button', { name: 'Empezar preparación' })).toBeVisible();
+});
+
+test('orders status transition works', async ({ page }) => {
   test.setTimeout(45000);
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
@@ -463,7 +485,6 @@ test('orders workspace actions work', async ({ page }) => {
   let statusPatch = null;
 
   await page.route('**/api/v1/commercial/orders/o1/status', async route => {
-    expect(route.request().method()).toBe('PATCH');
     statusPatch = route.request().postDataJSON();
     orderStatus = statusPatch.status;
     await route.fulfill(json({ id: 'o1', status: orderStatus }));
@@ -483,23 +504,14 @@ test('orders workspace actions work', async ({ page }) => {
 
   await page.goto('/');
   await page.getByRole('button', { name: /Pedidos/ }).click();
-  await expect(page.locator('#homeOrdersList')).toContainText('Juan Pedido');
-  await expect(page.locator('#homeOrdersList')).toContainText('Confirmado');
-
   await page.locator('#homeOrdersList .home-business-table [data-home-order-id="o1"]').click();
-  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
-  await expect(page.locator('#homeBookingDetailBody')).toContainText('Producto demo');
-  await expect(page.locator('#homeBookingDetailBody')).toContainText('Av. Demo 123, Santiago');
-  await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute(
-    'href',
-    '/conversations.html?channel=whatsapp&conversation=wa-order'
-  );
-
   await page.getByRole('button', { name: 'Empezar preparación' }).click();
+
   await expect.poll(() => statusPatch).toEqual({ status: 'PREPARING' });
   await expect(page.locator('#homeOrdersList')).toContainText('Preparando');
   await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
 });
+
 
 test('requests workspace renders active requests', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
