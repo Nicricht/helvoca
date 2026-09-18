@@ -14,6 +14,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -74,7 +75,8 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
                     ? "Tenant has no WhatsApp-enabled sender"
                     : "Tenant has multiple WhatsApp-enabled senders; configuration is ambiguous");
         }
-        String sender = normalizeE164(senders.getFirst().getPhoneNumber());
+        PhoneNumber senderPhone = senders.getFirst();
+        String sender = normalizeE164(senderPhone.getPhoneNumber());
 
         try {
             String accountSid = twilio.getAccountSid().trim();
@@ -96,6 +98,8 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
             }
             String sid = new JSONObject(response.body()).optString("sid", "").trim();
             if (sid.isBlank()) throw new IllegalStateException("Twilio did not return a message SID");
+            senderPhone.setWhatsappCertifiedAt(Instant.now());
+            phones.save(senderPhone);
             return new SendResult(sid);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
