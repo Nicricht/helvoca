@@ -1055,6 +1055,7 @@
       CUSTOMER_CREATE: "Cliente creado",
       CUSTOMER_UPDATE: "Cliente actualizado",
       CUSTOMER_EXPORT: "Clientes exportados",
+      AUDIT_EXPORT: "Auditoría exportada",
       BUSINESS_UPDATE: "Negocio actualizado",
       SERVICE_CREATE: "Servicio creado",
       SERVICE_UPDATE: "Servicio actualizado",
@@ -1155,18 +1156,15 @@
     return date.toISOString();
   }
 
-  async function applyAuditFilters() {
-    if (!isBusinessAdmin()) return;
+  function currentAuditParams() {
     const actor = document.querySelector("#homeAuditActor")?.value?.trim() || "";
     const action = document.querySelector("#homeAuditAction")?.value || "";
     const resourceType = document.querySelector("#homeAuditResource")?.value || "";
     const from = document.querySelector("#homeAuditFrom")?.value || "";
     const to = document.querySelector("#homeAuditTo")?.value || "";
-    const message = document.querySelector("#homeAuditFilterMessage");
 
     if (from && to && from > to) {
-      if (message) message.textContent = "La fecha Desde no puede ser posterior a Hasta.";
-      return;
+      throw new Error("La fecha Desde no puede ser posterior a Hasta.");
     }
 
     const params = new URLSearchParams();
@@ -1177,6 +1175,19 @@
     const toIso = auditDateEndExclusiveIso(to);
     if (fromIso) params.set("from", fromIso);
     if (toIso) params.set("to", toIso);
+    return params;
+  }
+
+  async function applyAuditFilters() {
+    if (!isBusinessAdmin()) return;
+    const message = document.querySelector("#homeAuditFilterMessage");
+    let params;
+    try {
+      params = currentAuditParams();
+    } catch (error) {
+      if (message) message.textContent = error.message;
+      return;
+    }
 
     if (message) message.textContent = "Filtrando auditoría…";
     try {
@@ -1190,6 +1201,67 @@
       }
     } catch (error) {
       if (message) message.textContent = error?.message || "No pude filtrar la auditoría.";
+    }
+  }
+
+  async function downloadAuditExport(format) {
+    if (!isBusinessAdmin()) return;
+    const normalized = format === "xlsx" ? "xlsx" : "csv";
+    const button = document.querySelector(normalized === "xlsx" ? "#homeAuditExportXlsx" : "#homeAuditExportCsv");
+    const message = document.querySelector("#homeAuditFilterMessage");
+    const accessToken = sessionStorage.getItem("helvoca_access_token");
+    if (!accessToken) {
+      if (message) message.textContent = "Tu sesión expiró. Ingresa nuevamente.";
+      return;
+    }
+
+    let params;
+    try {
+      params = currentAuditParams();
+    } catch (error) {
+      if (message) message.textContent = error.message;
+      return;
+    }
+    params.set("format", normalized);
+
+    if (button) button.disabled = true;
+    if (message) message.textContent = normalized === "xlsx" ? "Preparando Excel de auditoría…" : "Preparando CSV de auditoría…";
+    try {
+      const response = await fetch("/api/v1/audit/export?" + params.toString(), {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (!response.ok) {
+        let detail = `Error HTTP ${response.status}`;
+        try {
+          const type = response.headers.get("content-type") || "";
+          if (type.includes("application/json")) {
+            const payload = await response.json();
+            detail = payload?.message || payload?.detail || payload?.error || detail;
+          } else {
+            const text = await response.text();
+            if (text) detail = text;
+          }
+        } catch (_) {}
+        throw new Error(detail);
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition") || "";
+      const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+      const filename = filenameMatch?.[1] || `helvoca-auditoria.${normalized}`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (message) message.textContent = `${normalized.toUpperCase()} de auditoría descargado · ${state.audit.length} eventos visibles`;
+    } catch (error) {
+      if (message) message.textContent = error.message || "No pude exportar la auditoría.";
+    } finally {
+      if (button) button.disabled = false;
     }
   }
 
@@ -1207,6 +1279,8 @@
       if (message) message.textContent = "";
       applyAuditFilters();
     });
+    document.querySelector("#homeAuditExportCsv")?.addEventListener("click", () => downloadAuditExport("csv"));
+    document.querySelector("#homeAuditExportXlsx")?.addEventListener("click", () => downloadAuditExport("xlsx"));
   }
   function businessParts(value = new Date()) {
     try {

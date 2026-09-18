@@ -197,7 +197,7 @@
 .home-audit-filters{display:grid;grid-template-columns:minmax(180px,1.4fr) repeat(2,minmax(145px,1fr)) repeat(2,minmax(135px,.8fr)) auto;gap:10px;align-items:end;margin:4px 0 10px}
 .home-audit-filters label{display:grid;gap:5px;color:var(--muted);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
 .home-audit-filters input,.home-audit-filters select{width:100%;min-height:36px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:rgba(255,255,255,.025);color:inherit;padding:8px 10px;font:inherit;font-size:11px}
-.home-audit-filter-actions{display:flex;gap:7px;align-items:center}
+.home-audit-filter-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
 @media(max-width:1100px){.home-audit-filters{grid-template-columns:repeat(3,minmax(0,1fr))}.home-audit-filter-actions{grid-column:span 3}}
 @media(max-width:760px){.home-audit-filters{grid-template-columns:1fr 1fr}.home-audit-filter-actions{grid-column:span 2}}
 @media(max-width:480px){.home-audit-filters{grid-template-columns:1fr}.home-audit-filter-actions{grid-column:auto}}

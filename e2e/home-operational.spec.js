@@ -720,6 +720,62 @@ test('audit filters query by actor action resource and date range', async ({ pag
   await expect(page.locator('#homeAuditList .home-audit-row')).toHaveCount(2);
 });
 
+test('audit exports preserve active filters in csv and xlsx', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+
+  const exportRequests = [];
+  await page.route('**/api/v1/audit/export?*', route => {
+    const url = new URL(route.request().url());
+    exportRequests.push(url.searchParams);
+    const format = url.searchParams.get('format');
+    if (format === 'xlsx') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers: { 'Content-Disposition': 'attachment; filename="helvoca-auditoria-e2e.xlsx"' },
+        body: Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x41, 0x55, 0x44])
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'text/csv;charset=UTF-8',
+      headers: { 'Content-Disposition': 'attachment; filename="helvoca-auditoria-e2e.csv"' },
+      body: '\uFEFFFecha,Accion,Actor\r\n"2026-09-18","BOOKING_RESCHEDULE","Carolina Soto"\r\n'
+    });
+  });
+
+  await page.goto('/');
+  await page.getByRole('tab', { name: /Auditoría/ }).click();
+  await page.getByLabel('Usuario').fill('Carolina');
+  await page.getByLabel('Acción').selectOption('BOOKING_RESCHEDULE');
+  await page.getByLabel('Recurso').selectOption('BOOKING');
+  await page.locator('#homeAuditFrom').fill('2026-09-18');
+  await page.locator('#homeAuditTo').fill('2026-09-19');
+
+  const csvPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportar CSV' }).click();
+  const csv = await csvPromise;
+  expect(csv.suggestedFilename()).toBe('helvoca-auditoria-e2e.csv');
+
+  const xlsxPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportar Excel' }).click();
+  const xlsx = await xlsxPromise;
+  expect(xlsx.suggestedFilename()).toBe('helvoca-auditoria-e2e.xlsx');
+
+  expect(exportRequests).toHaveLength(2);
+  for (const params of exportRequests) {
+    expect(params.get('actor')).toBe('Carolina');
+    expect(params.get('action')).toBe('BOOKING_RESCHEDULE');
+    expect(params.get('resourceType')).toBe('BOOKING');
+    expect(params.get('from')).toBeTruthy();
+    expect(params.get('to')).toBeTruthy();
+  }
+  expect(exportRequests[0].get('format')).toBe('csv');
+  expect(exportRequests[1].get('format')).toBe('xlsx');
+  await expect(page.locator('#homeAuditFilterMessage')).toContainText('XLSX de auditoría descargado');
+});
+
 test('customer exports download csv and xlsx', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
