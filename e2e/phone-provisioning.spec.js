@@ -72,7 +72,7 @@ test('self-service phone search stays hidden until chosen and never provisions u
   });
   await page.route('**/api/v1/phone-numbers', route => route.fulfill(json(phones)));
 
-  await page.goto('/');
+  await page.goto('/settings.html');
   await expect(page.locator('#dashboardView')).toBeVisible();
   await expect(page.locator('#advancedPanel')).toBeVisible();
 
