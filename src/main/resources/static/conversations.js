@@ -7,7 +7,9 @@ if (!token) location.replace("/");
 
 let calls = [];
 let whatsappConversations = [];
-const requestedChannel = new URLSearchParams(window.location.search).get("channel");
+const params = new URLSearchParams(window.location.search);
+const requestedChannel = params.get("channel");
+const requestedConversation = params.get("conversation");
 let activeChannel = ["all", "calls", "whatsapp"].includes(requestedChannel) ? requestedChannel : "all";
 let selectedConversationKey = null;
 
@@ -239,11 +241,21 @@ async function loadDetail(kind, id) {
 
 async function openMostRecentIfNeeded() {
   if (selectedConversationKey) return;
-  const first = conversationItems()[0];
-  if (!first) return;
-  selectedConversationKey = first.key;
+  const items = conversationItems();
+  const target = requestedConversation
+    ? items.find(item => String(item.id) === String(requestedConversation))
+    : items[0];
+  if (!target) {
+    const first = items[0];
+    if (!first) return;
+    selectedConversationKey = first.key;
+    renderList();
+    await loadDetail(first.kind, first.id);
+    return;
+  }
+  selectedConversationKey = target.key;
   renderList();
-  await loadDetail(first.kind, first.id);
+  await loadDetail(target.kind, target.id);
 }
 
 function setChannel(channel) {
