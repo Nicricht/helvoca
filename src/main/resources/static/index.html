@@ -278,8 +278,34 @@
                 <section class="card home-business-panel" data-home-panel="bookings">
                     <div class="home-business-head">
                         <div><div class="eyebrow">Agenda</div><h2>Reservas</h2><p>Quién reservó, qué servicio y cuándo será atendido.</p></div>
-                        <button id="homeIncidentToggle" class="home-incident-trigger" type="button">⚡ Resolver un imprevisto</button>
+                        <div class="home-business-head-actions">
+                            <button id="homeBookingCreateToggle" class="home-booking-create-trigger" type="button" aria-expanded="false">＋ Nueva reserva</button>
+                            <button id="homeIncidentToggle" class="home-incident-trigger" type="button">⚡ Resolver un imprevisto</button>
+                        </div>
                     </div>
+                    <section id="homeBookingCreatePanel" class="home-booking-create-panel hidden" aria-label="Crear reserva manual">
+                        <div class="home-booking-create-intro">
+                            <div><strong>Nueva reserva</strong><span>Selecciona cliente, servicio, fecha y hora.</span></div>
+                            <span class="home-booking-create-badge">Manual</span>
+                        </div>
+                        <div class="home-booking-create-form">
+                            <label>Cliente
+                                <select id="homeBookingCreateCustomer"><option value="">Elegir cliente</option></select>
+                            </label>
+                            <label>Servicio
+                                <select id="homeBookingCreateService"><option value="">Elegir servicio</option></select>
+                            </label>
+                            <label>Fecha
+                                <select id="homeBookingCreateDate"><option value="">Elegir fecha</option></select>
+                            </label>
+                            <label>Hora
+                                <select id="homeBookingCreateTime"><option value="">Elegir hora</option></select>
+                            </label>
+                            <button id="homeBookingCreateCheck" class="home-booking-primary" type="button" disabled>Comprobar disponibilidad</button>
+                            <button id="homeBookingCreateConfirm" class="home-booking-primary hidden" type="button">Crear reserva</button>
+                        </div>
+                        <p id="homeBookingCreateMessage" class="home-detail-muted"></p>
+                    </section>
                     <section id="homeIncidentPanel" class="home-incident-panel hidden" aria-label="Resolver un imprevisto">
                         <div class="home-incident-intro">
                             <div><strong>Avisa a los clientes afectados</strong><span>Prepara una vista previa segura antes de contactar a alguien.</span></div>
