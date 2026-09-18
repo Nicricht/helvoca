@@ -55,13 +55,21 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
-    public AvailabilityResponse availability(UUID serviceId, Instant startAt) {
+    public AvailabilityResponse availability(UUID serviceId, Instant startAt, UUID excludeBookingId) {
         UUID businessId = tenantProvider.requireBusinessId();
         validateFuture(startAt);
         ServiceItem service = catalog.requireActiveEntity(serviceId, businessId);
+        UUID excludeId = null;
+        if (excludeBookingId != null) {
+            Booking excluded = requireBooking(excludeBookingId, businessId);
+            if (!excluded.getServiceId().equals(serviceId)) {
+                throw new IllegalArgumentException("excludeBookingId does not belong to the selected service");
+            }
+            excludeId = excludeBookingId;
+        }
         Instant endAt = calculateEnd(startAt, service);
         boolean available = schedule.isWithinBusinessHours(businessId, startAt, endAt)
-                && !hasOverlap(businessId, serviceId, startAt, endAt, null);
+                && !hasOverlap(businessId, serviceId, startAt, endAt, excludeId);
         return new AvailabilityResponse(serviceId, startAt, endAt, available);
     }
 
