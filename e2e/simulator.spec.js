@@ -6,6 +6,12 @@ test('receptionist simulator keeps actions isolated and shows trace', async ({ p
   const sessionId = '11111111-1111-1111-1111-111111111111';
   let actionCreated = false;
 
+  await page.route('**/api/v1/business', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ name: 'Negocio E2E', timezone: 'America/Santiago', language: 'es' })
+  }));
+
   await page.route('**/api/v1/simulator/sessions', async route => {
     if (route.request().method() !== 'POST') return route.fallback();
     expect(route.request().headers().authorization).toBe('Bearer e2e-token');
@@ -67,10 +73,12 @@ test('receptionist simulator keeps actions isolated and shows trace', async ({ p
 
   await page.goto('/simulator.html');
   await expect(page.getByText('Modo seguro')).toBeVisible();
+  await expect(page.locator('.topbar > div strong')).toHaveText('NEGOCIO E2E');
   await expect(page.getByText('No crea datos comerciales reales ni realiza llamadas telefónicas.')).toBeVisible();
 
   await page.getByRole('button', { name: 'Nueva prueba' }).click();
   await expect(page.getByText('Hola, soy la recepcionista virtual de Negocio E2E. ¿En qué puedo ayudarte?')).toBeVisible();
+  await expect(page.locator('#chat .bubble.assistant small').first()).toHaveText('Negocio E2E');
   await expect(page.locator('#sessionBadge')).toHaveText('Prueba activa');
 
   await page.locator('#messageInput').fill('Quiero reservar mañana');
