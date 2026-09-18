@@ -702,8 +702,8 @@ test('audit filters query by actor action resource and date range', async ({ pag
   await page.getByLabel('Usuario').fill('Carolina');
   await page.getByLabel('Acción').selectOption('BOOKING_RESCHEDULE');
   await page.getByLabel('Recurso').selectOption('BOOKING');
-  await page.getByLabel('Desde').fill('2026-09-18');
-  await page.getByLabel('Hasta').fill('2026-09-19');
+  await page.locator('#homeAuditFrom').fill('2026-09-18');
+  await page.locator('#homeAuditTo').fill('2026-09-19');
   await page.getByRole('button', { name: 'Filtrar' }).click();
 
   await expect(page.locator('#homeAuditList .home-audit-row')).toHaveCount(1);
