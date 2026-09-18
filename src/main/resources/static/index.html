@@ -287,13 +287,67 @@
                             <div><strong>Avisa a los clientes afectados</strong><span>Prepara una vista previa segura antes de contactar a alguien.</span></div>
                             <span class="home-incident-safe">Sin envíos reales</span>
                         </div>
-                        <div class="home-incident-form">
-                            <label class="home-incident-reason">¿Qué pasó?<textarea id="homeIncidentReason" rows="2" maxlength="500" placeholder="Ej.: hoy debo cerrar antes por un imprevisto"></textarea></label>
-                            <label>Fecha<input id="homeIncidentDate" type="date"></label>
-                            <label>Desde<input id="homeIncidentTime" type="time"></label>
-                            <label>Objetivo<select id="homeIncidentGoal"><option value="RESCHEDULE">Avisar y reprogramar</option><option value="INFORM">Solo avisar</option></select></label>
-                            <label>Estrategia<select id="homeIncidentStrategy"><option value="CHEAPEST">Más económico</option><option value="WHATSAPP">WhatsApp</option><option value="CALL">Llamada</option></select></label>
-                            <button id="homeIncidentPreviewBtn" class="home-incident-preview-btn" type="button">Preparar vista previa</button>
+                        <div class="home-incident-guided">
+                            <section class="home-incident-step" aria-labelledby="homeIncidentReasonTitle">
+                                <div class="home-incident-step-head"><span>1</span><div><strong id="homeIncidentReasonTitle">¿Qué pasó?</strong><small>Elige una opción.</small></div></div>
+                                <div id="homeIncidentReasonChoices" class="home-incident-choice-grid" role="group" aria-label="Motivo del imprevisto">
+                                    <button type="button" data-incident-reason="CLOSE_EARLY" data-label="Cierre anticipado">Cerrar antes</button>
+                                    <button type="button" data-incident-reason="CLOSED_DAY" data-label="Cierre del día">No abrir</button>
+                                    <button type="button" data-incident-reason="DELAY" data-label="Retraso en la atención">Retraso</button>
+                                    <button type="button" data-incident-reason="ABSENCE" data-label="Ausencia del personal">Ausencia</button>
+                                    <button type="button" data-incident-reason="EMERGENCY" data-label="Emergencia del negocio">Emergencia</button>
+                                    <button type="button" data-incident-reason="RESCHEDULE_DAY" data-label="Reorganización de agenda">Reagendar agenda</button>
+                                </div>
+                                <input id="homeIncidentReason" type="hidden" value="">
+                            </section>
+
+                            <section class="home-incident-step" aria-labelledby="homeIncidentDateTitle">
+                                <div class="home-incident-step-head"><span>2</span><div><strong id="homeIncidentDateTitle">¿Qué día?</strong><small>Selecciona una fecha en el calendario.</small></div></div>
+                                <div class="home-incident-calendar">
+                                    <div class="home-incident-calendar-head">
+                                        <button id="homeIncidentCalendarPrev" type="button" aria-label="Mes anterior">‹</button>
+                                        <strong id="homeIncidentCalendarMonth"></strong>
+                                        <button id="homeIncidentCalendarNext" type="button" aria-label="Mes siguiente">›</button>
+                                    </div>
+                                    <div class="home-incident-weekdays" aria-hidden="true"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+                                    <div id="homeIncidentCalendarDays" class="home-incident-calendar-days"></div>
+                                </div>
+                                <input id="homeIncidentDate" type="hidden" value="">
+                            </section>
+
+                            <section class="home-incident-step home-incident-time-step" aria-labelledby="homeIncidentTimeTitle">
+                                <div class="home-incident-step-head"><span>3</span><div><strong id="homeIncidentTimeTitle">¿Entre qué horas?</strong><small>Define el comienzo y el final del imprevisto.</small></div></div>
+                                <div class="home-incident-time-range">
+                                    <label>Desde<select id="homeIncidentTimeFrom"><option value="">Elegir hora</option></select></label>
+                                    <span aria-hidden="true">→</span>
+                                    <label>Hasta<select id="homeIncidentTimeTo"><option value="">Elegir hora</option></select></label>
+                                </div>
+                            </section>
+
+                            <section class="home-incident-step" aria-labelledby="homeIncidentActionTitle">
+                                <div class="home-incident-step-head"><span>4</span><div><strong id="homeIncidentActionTitle">¿Qué hacemos?</strong><small>Elige objetivo y canal.</small></div></div>
+                                <div class="home-incident-option-block">
+                                    <span>Objetivo</span>
+                                    <div id="homeIncidentGoalChoices" class="home-incident-segmented" role="group" aria-label="Objetivo">
+                                        <button type="button" class="active" data-incident-goal="RESCHEDULE">Avisar y reprogramar</button>
+                                        <button type="button" data-incident-goal="INFORM">Solo avisar</button>
+                                    </div>
+                                    <input id="homeIncidentGoal" type="hidden" value="RESCHEDULE">
+                                </div>
+                                <div class="home-incident-option-block">
+                                    <span>Estrategia</span>
+                                    <div id="homeIncidentStrategyChoices" class="home-incident-segmented" role="group" aria-label="Estrategia">
+                                        <button type="button" class="active" data-incident-strategy="CHEAPEST">Más económico</button>
+                                        <button type="button" data-incident-strategy="WHATSAPP">WhatsApp</button>
+                                        <button type="button" data-incident-strategy="CALL">Llamada</button>
+                                    </div>
+                                    <input id="homeIncidentStrategy" type="hidden" value="CHEAPEST">
+                                </div>
+                            </section>
+                        </div>
+                        <div class="home-incident-impact-bar">
+                            <div id="homeIncidentImpactSummary"><strong>Elige motivo, día y horario</strong><span>Calcularemos automáticamente las reservas afectadas.</span></div>
+                            <button id="homeIncidentPreviewBtn" class="home-incident-preview-btn" type="button" disabled>Revisar clientes afectados</button>
                         </div>
                         <div id="homeIncidentPreview" class="home-incident-preview hidden"></div>
                         <section class="home-incident-history" aria-label="Campañas preparadas">
