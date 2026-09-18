@@ -32,13 +32,20 @@
   const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;" }[c]));
   const fmt = value => {
     if (!value) return "";
-    try { return new Intl.DateTimeFormat("es-CL",{day:"2-digit",month:"2-digit",year:"2-digit",hour:"2-digit",minute:"2-digit"}).format(new Date(value)); }
-    catch (_) { return String(value); }
+    try {
+      return new Intl.DateTimeFormat("es-CL", {
+        day:"2-digit", month:"2-digit", year:"2-digit", hour:"2-digit", minute:"2-digit",
+        timeZone: state.businessTimezone || "America/Santiago"
+      }).format(new Date(value));
+    } catch (_) { return String(value); }
   };
   const fmtCompact = value => {
     if (!value) return "";
     try {
-      return new Intl.DateTimeFormat("es-CL", { day:"numeric", month:"short", hour:"numeric", minute:"2-digit" })
+      return new Intl.DateTimeFormat("es-CL", {
+        day:"numeric", month:"short", hour:"numeric", minute:"2-digit",
+        timeZone: state.businessTimezone || "America/Santiago"
+      })
         .format(new Date(value))
         .replace(",", " ·");
     } catch (_) { return String(value); }
