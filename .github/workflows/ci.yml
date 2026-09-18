@@ -274,7 +274,7 @@ jobs:
           cache: maven
 
       - name: Run focused booking backend tests
-        run: mvn --batch-mode --no-transfer-progress -Dtest=BookingServiceTest,BookingActivityServiceTest,CustomerProfileServiceTest,AuditQueryServiceTest test
+        run: mvn --batch-mode --no-transfer-progress -Dtest=BookingServiceTest,BookingActivityServiceTest,CustomerProfileServiceTest,AuditQueryServiceTest,CustomerExportServiceTest test
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -290,7 +290,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run reservations frontend E2E
-        run: npx playwright test e2e/home-operational.spec.js --grep "reservation filters drawer and conversation links work|booking cancellation from drawer works|booking reschedule checks availability and updates the drawer|manual booking creation checks availability and adds the reservation|customers workspace sorts and renders contact data|audit workspace shows actor role resource and before after changes"
+        run: npx playwright test e2e/home-operational.spec.js --grep "reservation filters drawer and conversation links work|booking cancellation from drawer works|booking reschedule checks availability and updates the drawer|manual booking creation checks availability and adds the reservation|customers workspace sorts and renders contact data|customer exports download csv and xlsx|audit workspace shows actor role resource and before after changes"
 
       - name: Report reservations QA status
         if: always()

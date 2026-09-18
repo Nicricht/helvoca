@@ -959,6 +959,70 @@
     });
   }
 
+  async function downloadCustomerExport(format) {
+    const normalized = format === "xlsx" ? "xlsx" : "csv";
+    const button = document.querySelector(normalized === "xlsx" ? "#homeCustomersExportXlsx" : "#homeCustomersExportCsv");
+    const message = document.querySelector("#homeCustomersExportMessage");
+    const accessToken = sessionStorage.getItem("helvoca_access_token");
+    if (!accessToken) {
+      if (message) message.textContent = "Tu sesión expiró. Ingresa nuevamente.";
+      return;
+    }
+
+    if (button) button.disabled = true;
+    if (message) message.textContent = normalized === "xlsx" ? "Preparando Excel…" : "Preparando CSV…";
+    try {
+      const response = await fetch(`/api/v1/customers/export?format=${normalized}`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      if (!response.ok) {
+        let detail = `Error HTTP ${response.status}`;
+        try {
+          const type = response.headers.get("content-type") || "";
+          if (type.includes("application/json")) {
+            const payload = await response.json();
+            detail = payload?.message || payload?.detail || payload?.error || detail;
+          } else {
+            const text = await response.text();
+            if (text) detail = text;
+          }
+        } catch (_) {}
+        throw new Error(detail);
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition") || "";
+      const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+      const filename = filenameMatch?.[1] || `helvoca-clientes.${normalized}`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (message) message.textContent = `${normalized.toUpperCase()} descargado · ${state.customers.length} clientes`;
+    } catch (error) {
+      if (message) message.textContent = error.message || "No pude exportar los clientes.";
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  function bindCustomerExports() {
+    const csv = document.querySelector("#homeCustomersExportCsv");
+    const xlsx = document.querySelector("#homeCustomersExportXlsx");
+    if (csv && csv.dataset.bound !== "true") {
+      csv.dataset.bound = "true";
+      csv.addEventListener("click", () => downloadCustomerExport("csv"));
+    }
+    if (xlsx && xlsx.dataset.bound !== "true") {
+      xlsx.dataset.bound = "true";
+      xlsx.addEventListener("click", () => downloadCustomerExport("xlsx"));
+    }
+  }
+
   function renderCustomers() {
     const items=[...state.customers].sort((a,b)=>String(a.name||a.phone||"").localeCompare(String(b.name||b.phone||""),"es"));
     document.querySelector("#homeBusinessCustomersCount").textContent=String(items.length);
@@ -975,6 +1039,7 @@
       BOOKING_CANCEL: "Reserva cancelada",
       CUSTOMER_CREATE: "Cliente creado",
       CUSTOMER_UPDATE: "Cliente actualizado",
+      CUSTOMER_EXPORT: "Clientes exportados",
       BUSINESS_UPDATE: "Negocio actualizado",
       SERVICE_CREATE: "Servicio creado",
       SERVICE_UPDATE: "Servicio actualizado",
@@ -1559,7 +1624,7 @@
       state.audit=audit.status==="fulfilled"&&Array.isArray(audit.value)?audit.value:[];
       state.businessName=ops.status==="fulfilled"&&ops.value?.businessName?String(ops.value.businessName):(window.helvocaBusinessName||state.businessName||"Tu negocio");
       state.businessTimezone=ops.status==="fulfilled"&&ops.value?.timezone?String(ops.value.timezone):"America/Santiago";
-      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); renderAudit(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
+      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); renderAudit(); bindCustomerExports(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
     } finally { loading=false; }
   }
 

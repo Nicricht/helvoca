@@ -88,6 +88,19 @@ async function mockReadyHome(page) {
     }
   ])));
 
+  await page.route('**/api/v1/customers/export?format=csv', route => route.fulfill({
+    status: 200,
+    contentType: 'text/csv;charset=UTF-8',
+    headers: { 'Content-Disposition': 'attachment; filename="helvoca-clientes-e2e.csv"' },
+    body: '\uFEFFID,Nombre\r\n"1","Ana Reserva"\r\n'
+  })));
+  await page.route('**/api/v1/customers/export?format=xlsx', route => route.fulfill({
+    status: 200,
+    contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    headers: { 'Content-Disposition': 'attachment; filename="helvoca-clientes-e2e.xlsx"' },
+    body: Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x45, 0x32, 0x45])
+  })));
+
   await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([
     { id: 'o1', operationId: 'op1', sourceReferenceId: 'wa-order', status: 'CONFIRMED', fulfillmentType: 'DELIVERY', contactName: 'Juan Pedido', contactPhone: '+56933333333', deliveryAddress: 'Av. Demo 123, Santiago', subtotal: 15990, deliveryFee: 3000, total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z', lines: [{ name: 'Producto demo', quantity: 1, unitPrice: 15990, lineTotal: 15990 }] }
   ])));
@@ -643,6 +656,25 @@ test('audit workspace shows actor role resource and before after changes', async
   await expect(page.locator('#homeAuditList')).toContainText('Diego Ruiz');
   await expect(page.locator('#homeAuditList')).toContainText('Administrador');
   await expect(page.locator('#homeBusinessAuditCount')).toHaveText('2');
+});
+
+test('customer exports download csv and xlsx', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+  await page.goto('/');
+  await page.getByRole('tab', { name: /Clientes/ }).click();
+
+  const csvPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Descargar CSV' }).click();
+  const csv = await csvPromise;
+  expect(csv.suggestedFilename()).toBe('helvoca-clientes-e2e.csv');
+  await expect(page.locator('#homeCustomersExportMessage')).toContainText('CSV descargado');
+
+  const xlsxPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Descargar Excel' }).click();
+  const xlsx = await xlsxPromise;
+  expect(xlsx.suggestedFilename()).toBe('helvoca-clientes-e2e.xlsx');
+  await expect(page.locator('#homeCustomersExportMessage')).toContainText('XLSX descargado');
 });
 
 test('customers workspace sorts and renders contact data', async ({ page }) => {

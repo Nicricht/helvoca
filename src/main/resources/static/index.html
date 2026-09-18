@@ -373,7 +373,14 @@
                     <div id="homeRequestsList" class="home-business-list"><div class="home-business-empty">Cargando solicitudes…</div></div>
                 </section>
                 <section class="card home-business-panel hidden" data-home-panel="customers">
-                    <div class="home-business-head"><div><div class="eyebrow">Personas</div><h2>Clientes</h2><p>Personas registradas por voz, WhatsApp o gestión manual.</p></div></div>
+                    <div class="home-business-head">
+                        <div><div class="eyebrow">Personas</div><h2>Clientes</h2><p>Personas registradas por voz, WhatsApp o gestión manual.</p></div>
+                        <div class="home-business-head-actions">
+                            <button id="homeCustomersExportCsv" class="home-export-button" type="button">Descargar CSV</button>
+                            <button id="homeCustomersExportXlsx" class="home-export-button" type="button">Descargar Excel</button>
+                        </div>
+                    </div>
+                    <div id="homeCustomersExportMessage" class="home-export-message" aria-live="polite"></div>
                     <div id="homeCustomersList" class="home-business-list"><div class="home-business-empty">Cargando clientes…</div></div>
                 </section>
                 <section class="card home-business-panel hidden" data-home-panel="audit">
