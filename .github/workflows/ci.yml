@@ -386,7 +386,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run orders E2E
-        run: npx playwright test e2e/home-operational.spec.js --grep "orders workspace actions work"
+        run: npx playwright test e2e/home-operational.spec.js --grep "orders list drawer and conversation work"
 
       - name: Report orders QA status
         if: always()
