@@ -136,6 +136,7 @@ test('ready customer sees live operational home instead of setup cards', async (
   await mockReadyHome(page);
 
   let preparedCampaignRequest = null;
+  let activationRequest = null;
   let unsafeOutboundCalls = 0;
   const campaignHistory = [{
     id: 'campaign-old',
@@ -144,11 +145,29 @@ test('ready customer sees live operational home instead of setup cards', async (
     goal: 'INFORM',
     strategy: 'CHEAPEST',
     recipientCount: 2,
-    createdAt: '2026-09-17T12:00:00Z'
+    createdAt: '2026-09-17T12:00:00Z',
+    activationReady: false,
+    activationBlockers: [{ code: 'OUTBOUND_DELIVERY_DISABLED', message: 'La entrega real de mensajes está desactivada.' }]
   }];
   page.on('request', request => {
     if (/\/api\/v1\/outbound-messages\/.*\/(queue|dispatch)$/.test(request.url())) unsafeOutboundCalls += 1;
   });
+  await page.route('**/api/v1/booking-incident-campaigns/*/activate', async route => {
+    expect(route.request().method()).toBe('POST');
+    activationRequest = route.request().postDataJSON();
+    const target = campaignHistory.find(item => item.id === 'campaign-1');
+    if (target) {
+      target.status = 'ACTIVATED';
+      target.activationReady = false;
+      target.activationBlockers = [{ code: 'CAMPAIGN_NOT_PREPARED', message: 'La campaña ya no está en estado preparado.' }];
+    }
+    await route.fulfill(json({
+      campaignId: 'campaign-1',
+      status: 'ACTIVATED',
+      queuedRecipients: 1
+    }));
+  });
+
   await page.route('**/api/v1/booking-incident-campaigns', async route => {
     if (route.request().method() === 'GET') {
       await route.fulfill(json(campaignHistory));
@@ -167,7 +186,9 @@ test('ready customer sees live operational home instead of setup cards', async (
     };
     campaignHistory.unshift({
       ...created,
-      reason: preparedCampaignRequest.reason
+      reason: preparedCampaignRequest.reason,
+      activationReady: true,
+      activationBlockers: []
     });
     await route.fulfill(json(created));
   });
@@ -218,7 +239,17 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeIncidentPreview')).toContainText('Campaña preparada');
   await expect(page.locator('#homeIncidentPreview')).toContainText('PREPARED');
   await expect(page.locator('#homeIncidentHistoryList')).toContainText('Debo cerrar antes por un imprevisto');
-  await expect(page.getByRole('button', { name: 'Activar campaña' }).first()).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Activar campaña' }).first()).toBeEnabled();
+
+  page.once('dialog', dialog => {
+    expect(dialog.message()).toContain('contactará a 1 cliente');
+    dialog.accept();
+  });
+  await page.getByRole('button', { name: 'Activar campaña' }).first().click();
+  await expect(page.locator('#homeIncidentPreview')).toContainText('Campaña activada');
+  await expect(page.locator('#homeIncidentHistoryList')).toContainText('ACTIVATED');
+  await expect(page.getByRole('button', { name: 'Campaña activada' }).first()).toBeDisabled();
+  expect(activationRequest).toEqual({ confirmed: true });
   expect(preparedCampaignRequest).not.toBeNull();
   expect(preparedCampaignRequest.reason).toBe('Debo cerrar antes por un imprevisto');
   expect(preparedCampaignRequest.goal).toBe('RESCHEDULE');
