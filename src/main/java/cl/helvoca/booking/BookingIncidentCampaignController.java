@@ -49,7 +49,7 @@ public class BookingIncidentCampaignController {
             @NotBlank @Size(max = 500) String reason,
             @NotNull BookingIncidentCampaign.Goal goal,
             @NotNull BookingIncidentCampaign.Strategy strategy,
-            @NotEmpty @Size(max = 200) @Valid List<RecipientRequest> recipients
+            @NotEmpty @Size(max = 200) List<@Valid RecipientRequest> recipients
     ) { }
 
     public record RecipientRequest(
