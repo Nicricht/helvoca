@@ -33,8 +33,9 @@ public class BookingController {
     @GetMapping("/availability")
     public AvailabilityResponse availability(
             @RequestParam UUID serviceId,
-            @RequestParam Instant startAt) {
-        return service.availability(serviceId, startAt);
+            @RequestParam Instant startAt,
+            @RequestParam(required = false) UUID excludeBookingId) {
+        return service.availability(serviceId, startAt, excludeBookingId);
     }
 
     @PostMapping
