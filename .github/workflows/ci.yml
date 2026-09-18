@@ -193,3 +193,56 @@ jobs:
           fi
           PAYLOAD=$(printf '{"state":"%s","context":"helvoca/frontend-qa","description":"%s"}' "$STATE" "$DESCRIPTION")
           curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"
+
+
+  auth-qa:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[auth-verify]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Report auth QA pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          PAYLOAD=$(printf '{"state":"pending","context":"helvoca/auth-qa","description":"Auth frontend QA running"}')
+          curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Validate auth frontend JavaScript
+        run: node --check src/main/resources/static/app.js
+
+      - name: Install auth test dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run auth frontend E2E
+        run: npx playwright test e2e/frontend-ux.spec.js
+
+      - name: Report auth QA status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          if [ "$JOB_STATUS" = "success" ]; then
+            STATE="success"
+            DESCRIPTION="Auth frontend QA passed"
+          else
+            STATE="failure"
+            DESCRIPTION="Auth frontend QA failed"
+          fi
+          PAYLOAD=$(printf '{"state":"%s","context":"helvoca/auth-qa","description":"%s"}' "$STATE" "$DESCRIPTION")
+          curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"
