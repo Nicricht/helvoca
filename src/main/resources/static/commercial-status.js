@@ -337,8 +337,8 @@
         <div class="home-metrics" aria-label="Actividad de hoy">
             <a id="homeCallsMetric" class="home-metric" href="/conversations.html?channel=calls" aria-label="Ver llamadas de hoy"><strong id="homeCallsToday">–</strong><span>Llamadas hoy</span></a>
             <a id="homeWhatsAppMetric" class="home-metric" href="/conversations.html?channel=whatsapp" aria-label="Ver conversaciones de WhatsApp de hoy"><strong id="homeWhatsAppToday">–</strong><span>WhatsApp hoy</span></a>
-            <a id="homeBookingsMetric" class="home-metric" href="/operations.html?tab=bookings" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>Reservas hoy</span></a>
-            <a id="homePendingMetric" class="home-metric" href="/operations.html?tab=requests" aria-label="Ver pendientes"><strong id="homePending">–</strong><span>Pendientes</span></a>
+            <a id="homeBookingsMetric" class="home-metric" href="/?tab=bookings#homeBusinessWorkspace" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>Reservas hoy</span></a>
+            <a id="homePendingMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver pendientes"><strong id="homePending">–</strong><span>Pendientes</span></a>
         </div>
         <div class="home-activity-head">
             <h2>Actividad reciente</h2>
