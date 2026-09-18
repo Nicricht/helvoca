@@ -763,6 +763,94 @@ test('audit workspace shows actor role resource and before after changes', async
   await expect(page.locator('#homeBusinessAuditCount')).toHaveText('2');
 });
 
+test('new customer booking lifecycle appears in audit workspace', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+
+  await page.route('**/api/v1/audit', route => route.fulfill(json([
+    {
+      id: 'audit-carla-4',
+      action: 'BOOKING_CANCEL',
+      resourceType: 'BOOKING',
+      resourceId: 'b3',
+      result: 'SUCCESS',
+      actorType: 'HUMAN',
+      actorUserId: 'secretary-1',
+      actorName: 'Secretaria Demo',
+      actorEmail: 'secretaria@demo.cl',
+      actorRole: 'BUSINESS_ADMIN',
+      beforeState: { status: 'CONFIRMED' },
+      afterState: { status: 'CANCELLED' },
+      createdAt: '2026-09-18T22:43:00Z'
+    },
+    {
+      id: 'audit-carla-3',
+      action: 'BOOKING_RESCHEDULE',
+      resourceType: 'BOOKING',
+      resourceId: 'b3',
+      result: 'SUCCESS',
+      actorType: 'HUMAN',
+      actorUserId: 'secretary-1',
+      actorName: 'Secretaria Demo',
+      actorEmail: 'secretaria@demo.cl',
+      actorRole: 'BUSINESS_ADMIN',
+      beforeState: { startAt: '2026-09-19T13:00:00Z', status: 'CONFIRMED' },
+      afterState: { startAt: '2026-09-20T17:30:00Z', status: 'CONFIRMED' },
+      createdAt: '2026-09-18T22:42:00Z'
+    },
+    {
+      id: 'audit-carla-2',
+      action: 'BOOKING_CREATE',
+      resourceType: 'BOOKING',
+      resourceId: 'b3',
+      result: 'SUCCESS',
+      actorType: 'HUMAN',
+      actorUserId: 'secretary-1',
+      actorName: 'Secretaria Demo',
+      actorEmail: 'secretaria@demo.cl',
+      actorRole: 'BUSINESS_ADMIN',
+      beforeState: null,
+      afterState: { startAt: '2026-09-19T13:00:00Z', status: 'CONFIRMED' },
+      createdAt: '2026-09-18T22:41:00Z'
+    },
+    {
+      id: 'audit-carla-1',
+      action: 'CUSTOMER_CREATE',
+      resourceType: 'CUSTOMER',
+      resourceId: 'cust3',
+      result: 'SUCCESS',
+      actorType: 'HUMAN',
+      actorUserId: 'secretary-1',
+      actorName: 'Secretaria Demo',
+      actorEmail: 'secretaria@demo.cl',
+      actorRole: 'BUSINESS_ADMIN',
+      beforeState: null,
+      afterState: { name: 'Carla Nueva', phone: '+56977777777', email: 'carla@example.cl' },
+      createdAt: '2026-09-18T22:40:00Z'
+    }
+  ])));
+
+  await page.goto('/');
+  await page.getByRole('tab', { name: /Auditoría/ }).click();
+
+  const audit = page.locator('#homeAuditList');
+  await expect(audit.locator('.home-audit-row')).toHaveCount(4);
+  await expect(page.locator('#homeBusinessAuditCount')).toHaveText('4');
+
+  await expect(audit).toContainText('Cliente creado');
+  await expect(audit).toContainText('Reserva creada');
+  await expect(audit).toContainText('Reserva reprogramada');
+  await expect(audit).toContainText('Reserva cancelada');
+
+  await expect(audit).toContainText('Secretaria Demo');
+  await expect(audit).toContainText('secretaria@demo.cl');
+  await expect(audit).toContainText('Administrador');
+  await expect(audit).toContainText('Cliente #cust3');
+  await expect(audit).toContainText('Reserva #b3');
+  await expect(audit).toContainText('Confirmada → Cancelada');
+});
+
+
 test('audit filters query by actor action resource and date range', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
