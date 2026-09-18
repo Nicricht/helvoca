@@ -9,9 +9,32 @@ async function mockSettings(page, state = {}) {
   };
   state.whatsappPatches = [];
   state.setupPayloads = [];
+  state.profilePayloads = [];
+  state.profile = state.profile || {
+    businessId: 'business-1',
+    presetKey: 'store',
+    publicDescription: 'Tecnología y accesorios',
+    publicPhone: '+56922223333',
+    publicEmail: 'ventas@negocio.cl',
+    websiteUrl: 'https://negocio.cl',
+    addressLine: 'Av. Principal 123',
+    commune: 'Conchalí',
+    city: 'Santiago',
+    region: 'Metropolitana',
+    countryCode: 'CL',
+    defaultCurrency: 'CLP'
+  };
 
   await page.route('**/api/v1/auth/me', route => route.fulfill(json({ email: 'admin@demo.cl' })));
-  await page.route('**/api/v1/business', route => route.fulfill(json({
+  await page.route('**/api/v1/business/profile', async route => {
+    if (route.request().method() === 'PUT') {
+      const payload = route.request().postDataJSON();
+      state.profilePayloads.push(payload);
+      state.profile = { ...state.profile, ...payload };
+    }
+    await route.fulfill(json(state.profile));
+  });
+  await page.route(/\/api\/v1\/business$/, route => route.fulfill(json({
     name: 'Negocio E2E', timezone: 'America/Santiago', language: 'es', humanTransferPhone: '+56999999999'
   })));
   await page.route('**/api/v1/onboarding/status', route => route.fulfill(json({
@@ -153,6 +176,44 @@ test('settings shows WhatsApp API errors and leaves the explicit action usable',
   await expect(page.locator('#phoneMessage')).toContainText('WhatsApp todavía no está certificado');
   await expect(action).toBeEnabled();
   await expect(page.getByText('WhatsApp inactivo')).toBeVisible();
+});
+
+test('settings loads and saves the public business profile', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const state = {};
+  await mockSettings(page, state);
+  await page.goto('/settings.html');
+
+  await page.getByRole('button', { name: 'Negocio', exact: true }).click();
+  await page.getByRole('button', { name: 'Más ajustes' }).click();
+
+  await expect(page.locator('#setupForm [name="presetKey"]')).toHaveValue('store');
+  await expect(page.locator('#setupForm [name="publicDescription"]')).toHaveValue('Tecnología y accesorios');
+  await expect(page.locator('#setupForm [name="publicPhone"]')).toHaveValue('+56922223333');
+  await expect(page.locator('#setupForm [name="publicEmail"]')).toHaveValue('ventas@negocio.cl');
+  await expect(page.locator('#setupForm [name="countryCode"]')).toHaveValue('CL');
+  await expect(page.locator('#setupForm [name="city"]')).toHaveValue('Santiago');
+  await expect(page.locator('#setupForm [name="defaultCurrency"]')).toHaveValue('CLP');
+
+  await page.locator('#setupForm [name="publicDescription"]').fill('Venta y soporte tecnológico');
+  await page.locator('#setupForm [name="city"]').fill('Santiago Centro');
+  await page.locator('#setupForm [name="defaultCurrency"]').selectOption('USD');
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+
+  await expect.poll(() => state.profilePayloads.length).toBe(1);
+  expect(state.profilePayloads[0]).toMatchObject({
+    presetKey: 'store',
+    publicDescription: 'Venta y soporte tecnológico',
+    publicPhone: '+56922223333',
+    publicEmail: 'ventas@negocio.cl',
+    websiteUrl: 'https://negocio.cl',
+    addressLine: 'Av. Principal 123',
+    commune: 'Conchalí',
+    city: 'Santiago Centro',
+    region: 'Metropolitana',
+    countryCode: 'CL',
+    defaultCurrency: 'USD'
+  });
 });
 
 test('settings validates required data and saves the complete business configuration', async ({ page }) => {

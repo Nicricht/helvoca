@@ -33,6 +33,11 @@
         #configPermissionsPanel .agent-capability input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         textarea[name="agentGreeting"] { min-height: 74px; resize: vertical; }
         textarea[name="agentInstructions"] { min-height: 112px; resize: vertical; }
+        .business-profile-grid .profile-wide { grid-column: 1 / -1; }
+        .business-profile-grid textarea { min-height: 72px; resize: vertical; }
+        .business-profile-grid input,
+        .business-profile-grid select,
+        .business-profile-grid textarea { width: 100%; }
         #configKnowledgePanel .section-heading { align-items: center; margin-bottom: 8px; }
         #configKnowledgePanel .section-heading .eyebrow { display: none; }
         #configKnowledgePanel .section-heading h2 { margin: 0; font-size: 15px !important; }
@@ -364,6 +369,42 @@
                             <option value="en">English</option>
                             <option value="pt">Português</option>
                         </select></label>
+                    </div>
+
+                    <div class="section-heading divider">
+                        <div><div class="eyebrow">Mi negocio</div><h2>Información pública</h2></div>
+                    </div>
+                    <div class="two-col business-profile-grid">
+                        <label>Rubro<select name="presetKey">
+                            <option value="">General</option>
+                            <option value="store">Tienda / comercio</option>
+                            <option value="services">Servicios</option>
+                            <option value="restaurant">Restaurant / alimentos</option>
+                            <option value="clinic">Salud / clínica</option>
+                            <option value="salon">Belleza / peluquería</option>
+                            <option value="workshop">Taller / reparación</option>
+                            <option value="hospitality">Hotel / hospedaje</option>
+                            <option value="professional">Profesional / oficina</option>
+                        </select></label>
+                        <label>Moneda<select name="defaultCurrency">
+                            <option value="CLP">CLP</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="MXN">MXN</option>
+                            <option value="COP">COP</option>
+                            <option value="PEN">PEN</option>
+                            <option value="ARS">ARS</option>
+                            <option value="BRL">BRL</option>
+                        </select></label>
+                        <label class="profile-wide">Descripción<textarea name="publicDescription" maxlength="4000" placeholder="Qué hace tu negocio y qué debe saber un cliente"></textarea></label>
+                        <label>Teléfono público<input name="publicPhone" type="tel" maxlength="32" placeholder="+56912345678"></label>
+                        <label>Correo público<input name="publicEmail" type="email" maxlength="180" placeholder="ventas@empresa.cl"></label>
+                        <label class="profile-wide">Web o perfil público<input name="websiteUrl" type="url" maxlength="500" placeholder="https://tu-negocio.cl"></label>
+                        <label class="profile-wide">Dirección<input name="addressLine" maxlength="250" placeholder="Av. Principal 123"></label>
+                        <label>Comuna<input name="commune" maxlength="120"></label>
+                        <label>Ciudad<input name="city" maxlength="120"></label>
+                        <label>Región<input name="region" maxlength="120"></label>
+                        <label>País<input name="countryCode" maxlength="2" pattern="[A-Za-z]{2}" placeholder="CL"></label>
                     </div>
 
                     <div class="section-heading divider">

@@ -335,13 +335,27 @@ function applyStatus(status) {
     $("#nextStepBanner").textContent = nextStepText[status.nextStep] || `Siguiente paso: ${status.nextStep}`;
 }
 
+function hasBusinessProfileEditor() {
+    return Boolean(setupForm?.elements?.presetKey && setupForm?.elements?.publicDescription);
+}
+
+async function loadBusinessProfile() {
+    if (!hasBusinessProfileEditor()) return {};
+    try {
+        return await api("/api/v1/business/profile");
+    } catch (error) {
+        if (error.status === 404) return {};
+        throw error;
+    }
+}
+
 async function loadDashboard() {
     showDashboardShell();
     try {
-        const [me, business, status, services, hours, knowledge, phones, agent] = await Promise.all([
-            api("/api/v1/auth/me"), api("/api/v1/business"), api("/api/v1/onboarding/status"),
-            api("/api/v1/services"), api("/api/v1/business/hours"), api("/api/v1/knowledge?activeOnly=false"),
-            api("/api/v1/phone-numbers"), api("/api/v1/ai-agent")
+        const [me, business, profile, status, services, hours, knowledge, phones, agent] = await Promise.all([
+            api("/api/v1/auth/me"), api("/api/v1/business"), loadBusinessProfile(),
+            api("/api/v1/onboarding/status"), api("/api/v1/services"), api("/api/v1/business/hours"),
+            api("/api/v1/knowledge?activeOnly=false"), api("/api/v1/phone-numbers"), api("/api/v1/ai-agent")
         ]);
         applyBusinessIdentity(business);
         $("#welcomeText").textContent = `${me.email} · Los cambios se guardan solo cuando tú los confirmas.`;
@@ -349,6 +363,7 @@ async function loadDashboard() {
         setFieldValue(setupForm.elements.timezone, business.timezone || detectedTimezone());
         setFieldValue(setupForm.elements.language, business.language || detectedLanguage());
         setupForm.elements.humanTransferPhone.value = business.humanTransferPhone || "";
+        renderBusinessProfile(profile);
         renderAgent(agent, business);
         renderServices(services);
         renderHours(hours);
@@ -359,6 +374,44 @@ async function loadDashboard() {
     } catch (error) {
         if (error.status !== 401) showMessage(aiMessage, error.message || "No pude cargar la configuración.");
     }
+}
+
+function renderBusinessProfile(profile = {}) {
+    if (!hasBusinessProfileEditor()) return;
+    setFieldValue(setupForm.elements.presetKey, profile.presetKey || "");
+    setupForm.elements.publicDescription.value = profile.publicDescription || "";
+    setupForm.elements.publicPhone.value = profile.publicPhone || "";
+    setupForm.elements.publicEmail.value = profile.publicEmail || "";
+    setupForm.elements.websiteUrl.value = profile.websiteUrl || "";
+    setupForm.elements.addressLine.value = profile.addressLine || "";
+    setupForm.elements.commune.value = profile.commune || "";
+    setupForm.elements.city.value = profile.city || "";
+    setupForm.elements.region.value = profile.region || "";
+    setupForm.elements.countryCode.value = profile.countryCode || "";
+    setFieldValue(setupForm.elements.defaultCurrency, profile.defaultCurrency || "CLP");
+}
+
+function collectBusinessProfile() {
+    if (!hasBusinessProfileEditor()) return null;
+    return {
+        presetKey: setupForm.elements.presetKey.value.trim() || null,
+        publicDescription: setupForm.elements.publicDescription.value.trim() || null,
+        publicPhone: setupForm.elements.publicPhone.value.trim() || null,
+        publicEmail: setupForm.elements.publicEmail.value.trim() || null,
+        websiteUrl: setupForm.elements.websiteUrl.value.trim() || null,
+        addressLine: setupForm.elements.addressLine.value.trim() || null,
+        commune: setupForm.elements.commune.value.trim() || null,
+        city: setupForm.elements.city.value.trim() || null,
+        region: setupForm.elements.region.value.trim() || null,
+        countryCode: setupForm.elements.countryCode.value.trim().toUpperCase() || null,
+        defaultCurrency: setupForm.elements.defaultCurrency.value.trim().toUpperCase() || "CLP"
+    };
+}
+
+async function saveBusinessProfile() {
+    const payload = collectBusinessProfile();
+    if (!payload) return null;
+    return api("/api/v1/business/profile", { method: "PUT", body: JSON.stringify(payload) });
 }
 
 function collectServices() {
@@ -498,6 +551,7 @@ async function confirmProposal() {
             knowledge: (currentProposal.knowledge || []).map(item => ({ id: null, ...item }))
         };
         await api("/api/v1/onboarding/setup", { method: "PUT", body: JSON.stringify(payload) });
+        await saveBusinessProfile();
         proposalPanel.classList.add("hidden");
         currentProposal = null;
         await loadDashboard();
@@ -559,6 +613,9 @@ aiForm.addEventListener("submit", async event => {
     event.preventDefault();
     const sourceUrl = String(new FormData(aiForm).get("sourceUrl") || "").trim();
     const businessName = setupForm.elements.businessName.value.trim();
+    if (!setupForm.elements.websiteUrl.value.trim() && /^https?:\/\//i.test(sourceUrl)) {
+        setupForm.elements.websiteUrl.value = sourceUrl;
+    }
     await analyzeBusiness(sourceUrl, businessName);
 });
 
@@ -580,6 +637,7 @@ setupForm.addEventListener("submit", async event => {
             services, hours, knowledge: collectKnowledge()
         };
         await api("/api/v1/onboarding/setup", { method: "PUT", body: JSON.stringify(payload) });
+        await saveBusinessProfile();
         await api("/api/v1/ai-agent", { method: "PUT", body: JSON.stringify(collectAgent()) });
         await loadDashboard();
         showMessage(setupMessage, "Negocio y agente guardados correctamente.", "success");
