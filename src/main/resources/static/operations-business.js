@@ -9,7 +9,10 @@
   const host = document.querySelector("[data-helvoca-business-workspace]");
   if (!host) return;
 
-  const state = { bookings: [], customers: [], services: [], orders: [], requests: [], questions: [] };
+  const state = {
+    bookings: [], customers: [], services: [], orders: [], requests: [], questions: [], dashboard: {},
+    bookingFilters: { search: "", date: "all", service: "all", status: "all", source: "all" }
+  };
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -114,20 +117,119 @@
     $$("[data-business-panel]", host).forEach(panel => panel.classList.toggle("hidden", panel.dataset.businessPanel !== tab));
   }
 
+  function businessDateKey(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const timeZone = state.dashboard?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {timeZone, year:"numeric", month:"2-digit", day:"2-digit"}).formatToParts(date);
+      const map = Object.fromEntries(parts.map(part => [part.type, part.value]));
+      return `${map.year}-${map.month}-${map.day}`;
+    } catch (_) {
+      return date.toISOString().slice(0,10);
+    }
+  }
+
+  function bookingDateMatch(booking, filter) {
+    if (filter === "all") return true;
+    const target = new Date(booking.startAt || 0);
+    if (Number.isNaN(target.getTime())) return false;
+    const nowValue = state.dashboard?.localNow || new Date().toISOString();
+    const todayKey = businessDateKey(nowValue);
+    const todayDate = new Date(`${todayKey}T12:00:00`);
+    const targetKey = businessDateKey(booking.startAt);
+    if (filter === "today") return targetKey === todayKey;
+    const tomorrow = new Date(todayDate); tomorrow.setDate(tomorrow.getDate()+1);
+    const tomorrowKey = tomorrow.toISOString().slice(0,10);
+    if (filter === "tomorrow") return targetKey === tomorrowKey;
+    const nowMs = new Date(nowValue).getTime();
+    if (filter === "upcoming") return target.getTime() >= nowMs;
+    if (filter === "past") return target.getTime() < nowMs;
+    if (filter === "week") {
+      const end = new Date(todayDate); end.setDate(end.getDate()+7);
+      return target.getTime() >= todayDate.getTime() && target.getTime() < end.getTime();
+    }
+    return true;
+  }
+
+  function filteredBookings(customers, services) {
+    const filters = state.bookingFilters;
+    const query = filters.search.trim().toLowerCase();
+    return state.bookings.filter(booking => {
+      const customer = customers.get(String(booking.customerId)) || {};
+      const service = services.get(String(booking.serviceId)) || {};
+      const searchText = [customer.name, customer.phone, service.name].filter(Boolean).join(" ").toLowerCase();
+      return (!query || searchText.includes(query))
+        && (filters.service === "all" || String(booking.serviceId) === filters.service)
+        && (filters.status === "all" || booking.status === filters.status)
+        && (filters.source === "all" || sourceLabel(booking.source) === filters.source)
+        && bookingDateMatch(booking, filters.date);
+    });
+  }
+
+  function renderBookingFilters(total, visible) {
+    const filters = state.bookingFilters;
+    const services = [...state.services].filter(item => item.active !== false);
+    const sourceOptions = [...new Set(state.bookings.map(item => sourceLabel(item.source)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"));
+    return `
+      <div class="booking-filter-bar">
+        <label class="booking-search"><span>Buscar</span><input id="bookingFilterSearch" value="${esc(filters.search)}" placeholder="Cliente, teléfono o servicio"></label>
+        <label><span>Fecha</span><select id="bookingFilterDate">
+          <option value="all" ${filters.date==="all"?"selected":""}>Todas</option>
+          <option value="today" ${filters.date==="today"?"selected":""}>Hoy</option>
+          <option value="tomorrow" ${filters.date==="tomorrow"?"selected":""}>Mañana</option>
+          <option value="week" ${filters.date==="week"?"selected":""}>Próximos 7 días</option>
+          <option value="upcoming" ${filters.date==="upcoming"?"selected":""}>Próximas</option>
+          <option value="past" ${filters.date==="past"?"selected":""}>Pasadas</option>
+        </select></label>
+        <label><span>Servicio</span><select id="bookingFilterService"><option value="all">Todos</option>${services.map(service=>`<option value="${esc(service.id)}" ${String(service.id)===filters.service?"selected":""}>${esc(service.name)}</option>`).join("")}</select></label>
+        <label><span>Estado</span><select id="bookingFilterStatus"><option value="all">Todos</option><option value="CONFIRMED" ${filters.status==="CONFIRMED"?"selected":""}>Confirmadas</option><option value="CANCELLED" ${filters.status==="CANCELLED"?"selected":""}>Canceladas</option></select></label>
+        <label><span>Origen</span><select id="bookingFilterSource"><option value="all">Todos</option>${sourceOptions.map(source=>`<option value="${esc(source)}" ${source===filters.source?"selected":""}>${esc(source)}</option>`).join("")}</select></label>
+        <button id="bookingFilterClear" class="booking-filter-clear ghost" type="button">Limpiar</button>
+      </div>
+      <div class="booking-filter-summary"><span id="bookingFilterCount">Mostrando ${visible} de ${total}</span></div>
+    `;
+  }
+
+  function bindBookingFilters() {
+    const mapping = [
+      ["#bookingFilterSearch","search","input"],
+      ["#bookingFilterDate","date","change"],
+      ["#bookingFilterService","service","change"],
+      ["#bookingFilterStatus","status","change"],
+      ["#bookingFilterSource","source","change"]
+    ];
+    mapping.forEach(([selector,key,event]) => {
+      const control = $(selector,host);
+      control?.addEventListener(event, () => { state.bookingFilters[key]=control.value; renderBookings(); });
+    });
+    $("#bookingFilterClear",host)?.addEventListener("click",()=>{state.bookingFilters={search:"",date:"all",service:"all",status:"all",source:"all"};renderBookings();});
+  }
+
   function renderBookings(error = null) {
     const root = $("#bookingsList", host);
     const customers = new Map(state.customers.map(x => [String(x.id), x]));
     const services = new Map(state.services.map(x => [String(x.id), x]));
     const now = Date.now();
-    const items = [...state.bookings].sort((a,b) => {
+    const allItems = [...state.bookings].sort((a,b) => {
       const at = new Date(a.startAt || 0).getTime(), bt = new Date(b.startAt || 0).getTime();
       const af = at >= now, bf = bt >= now;
       if (af !== bf) return af ? -1 : 1;
       return af ? at - bt : bt - at;
     });
-    $("#businessBookingsCount", host).textContent = String(items.length);
-    if (error && !items.length) { root.innerHTML = `<div class="business-error">${esc(error)}</div>`; return; }
-    if (!items.length) { root.innerHTML = '<div class="empty">Todavía no hay reservas registradas.</div>'; return; }
+    const visibleSet = new Set(filteredBookings(customers,services).map(item=>String(item.id)));
+    const items = allItems.filter(item=>visibleSet.has(String(item.id)));
+    $("#businessBookingsCount", host).textContent = String(state.bookings.length);
+    if (error && !state.bookings.length) { root.innerHTML = `<div class="business-error">${esc(error)}</div>`; return; }
+    if (!state.bookings.length) { root.innerHTML = '<div class="empty">Todavía no hay reservas registradas.</div>'; return; }
+
+    const filterMarkup = renderBookingFilters(state.bookings.length, items.length);
+    if (!items.length) {
+      root.innerHTML = filterMarkup + '<div class="empty">No hay reservas que coincidan con estos filtros.</div>';
+      bindBookingFilters();
+      return;
+    }
 
     const rows = items.map(booking => {
       const customer = customers.get(String(booking.customerId)) || {};
@@ -151,7 +253,8 @@
         <span class="pill ${booking.status === "CANCELLED" ? "bad" : ""}">${esc(status)}</span>
       </article>`;
     }).join("");
-    root.innerHTML = `<div class="business-table-shell"><table class="business-data-table" data-table="bookings"><thead><tr><th>Fecha / hora</th><th>Cliente</th><th>Servicio</th><th>Contacto</th><th>Origen</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table></div><div class="business-mobile-list">${cards}</div>`;
+    root.innerHTML = filterMarkup + `<div class="business-table-shell"><table class="business-data-table" data-table="bookings"><thead><tr><th>Fecha / hora</th><th>Cliente</th><th>Servicio</th><th>Contacto</th><th>Origen</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table></div><div class="business-mobile-list">${cards}</div>`;
+    bindBookingFilters();
   }
 
   function orderActions(order) {
@@ -237,6 +340,7 @@
     state.customers=customers.status==="fulfilled"&&Array.isArray(customers.value)?customers.value:[];
     state.services=services.status==="fulfilled"&&Array.isArray(services.value)?services.value:[];
     state.orders=orders.status==="fulfilled"&&Array.isArray(orders.value)?orders.value:[];
+    state.dashboard=dashboard.status==="fulfilled"?dashboard.value||{}:{};
     state.requests=dashboard.status==="fulfilled"?dashboard.value?.recentRequests||[]:[];
     state.questions=dashboard.status==="fulfilled"?dashboard.value?.unanswered||[]:[];
     renderBookings(bookings.status==="rejected"?bookings.reason?.message:null);
