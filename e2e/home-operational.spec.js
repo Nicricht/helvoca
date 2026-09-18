@@ -47,6 +47,19 @@ async function mockReadyHome(page) {
     { id: 'b1', customerId: 'cust1', serviceId: 'svc1', startAt: '2026-09-18T15:00:00Z', endAt: '2026-09-18T15:30:00Z', status: 'CONFIRMED', source: 'VOICE' },
     { id: 'b2', customerId: 'cust2', serviceId: 'svc2', startAt: '2026-09-19T16:00:00Z', endAt: '2026-09-19T16:45:00Z', status: 'CANCELLED', source: 'AI_WHATSAPP' }
   ])));
+  await page.route('**/api/v1/bookings/b1/trace', route => route.fulfill(json({
+    bookingId: 'b1', operationId: 'op1', origin: 'VOICE', callId: 'call-1', conversationId: null,
+    history: [{ eventType: 'BOOKING_CREATED', status: 'CONFIRMED', channel: 'VOICE', createdAt: '2026-09-17T18:01:00Z' }]
+  })));
+  await page.route('**/api/v1/calls/call-1', route => route.fulfill(json({
+    call: { id: 'call-1', callerNumber: '+56922222222', status: 'COMPLETED', resolution: 'BOOKING_CREATED', startedAt: '2026-09-17T18:00:00Z', durationSeconds: 95 },
+    summary: 'Ana llamó para reservar Peluquería.',
+    transcript: [
+      { id: 't1', speaker: 'USER', content: 'Quiero reservar peluquería.', createdAt: '2026-09-17T18:00:05Z' },
+      { id: 't2', speaker: 'ASSISTANT', content: 'Perfecto, quedó reservada.', createdAt: '2026-09-17T18:01:00Z' }
+    ],
+    actions: [{ id: 'a1', actionType: 'BOOKING_CREATED', success: true, detail: 'Peluquería', createdAt: '2026-09-17T18:01:00Z' }]
+  })));
   await page.route('**/api/v1/customers', route => route.fulfill(json([
     { id: 'cust1', name: 'Ana Reserva', phone: '+56922222222', email: 'ana@example.cl', createdAt: '2026-09-10T09:00:00Z' },
     { id: 'cust2', name: 'Bruno Corte', phone: '+56955555555', email: 'bruno@example.cl', createdAt: '2026-09-11T09:00:00Z' }
@@ -113,5 +126,11 @@ test('ready customer sees live operational home instead of setup cards', async (
   await page.locator('#bookingFilterClear').click();
   await expect(page.locator('[data-table="bookings"] tbody')).toContainText('Ana Reserva');
   await expect(page.locator('#bookingFilterCount')).toContainText('2 de 2');
+  await page.locator('[data-booking-open][data-entity-id="b1"]').first().click();
+  await expect(page.locator('#businessDetailDrawer')).toBeVisible();
+  await expect(page.locator('#businessDetailDrawer')).toContainText('Ana llamó para reservar Peluquería.');
+  await expect(page.locator('#businessDetailDrawer')).toContainText('Quiero reservar peluquería.');
+  await expect(page.locator('#businessDetailDrawer')).toContainText('Reserva creada');
+  await expect(page.locator('#businessDetailConversationLink')).toHaveAttribute('href', '/conversations.html?call=call-1');
   await expect(page.locator('#advancedPanel')).toBeHidden();
 });
