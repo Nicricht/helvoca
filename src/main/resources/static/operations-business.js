@@ -537,6 +537,13 @@
 
   const requestedTab=new URLSearchParams(window.location.search).get("tab");
   setTab(["bookings","orders","requests","customers"].includes(requestedTab)?requestedTab:"bookings");
-  load();
+  const maybeLoad = () => {
+    if (!sessionStorage.getItem(TOKEN_KEY)) return;
+    load();
+  };
+  new MutationObserver(() => {
+    if (!host.classList.contains("hidden")) maybeLoad();
+  }).observe(host, {attributes:true, attributeFilter:["class"]});
+  maybeLoad();
   window.HelvocaBusinessWorkspace={reload:load,setTab};
 })();
