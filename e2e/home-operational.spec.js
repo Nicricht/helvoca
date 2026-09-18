@@ -1173,7 +1173,7 @@ test('newly created booking can be rescheduled from the agenda', async ({ page }
   await page.getByRole('button', { name: 'Reprogramar' }).click();
   await page.locator('#homeBookingRescheduleDate').selectOption({ index: 2 });
   await page.locator('#homeBookingRescheduleTime').selectOption('14:30');
-  await page.getByRole('button', { name: 'Comprobar disponibilidad' }).click();
+  await page.locator('#homeBookingCheckAvailability').click();
 
   await expect(page.locator('#homeBookingAvailabilityMessage')).toHaveText('Horario disponible ✓');
   await expect(page.getByRole('button', { name: 'Confirmar cambio' })).toBeVisible();
