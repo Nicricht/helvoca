@@ -50,6 +50,7 @@
   const source = value => ({VOICE:"Voz",AI_CALL:"Llamada",WHATSAPP:"WhatsApp",AI_WHATSAPP:"WhatsApp",MANUAL:"Manual",API:"API",ADMIN:"Manual"})[value] || value || "Sin origen";
   const sourceGroup = value => ({VOICE:"CALL",AI_CALL:"CALL",WHATSAPP:"WHATSAPP",AI_WHATSAPP:"WHATSAPP",MANUAL:"MANUAL",ADMIN:"MANUAL",API:"API"})[value] || value || "";
   const status = value => ({CONFIRMED:"Confirmada",CANCELLED:"Cancelada",PREPARING:"Preparando",READY:"Listo",DISPATCHED:"Despachado",COMPLETED:"Completado",OPEN:"Abierta",IN_PROGRESS:"En curso"})[value] || value || "";
+  const orderStatus = value => ({CONFIRMED:"Confirmado",CANCELLED:"Cancelado",PREPARING:"Preparando",READY:"Listo",DISPATCHED:"Despachado",COMPLETED:"Completado"})[value] || status(value);
 
   function eventLabel(value) {
     return EVENT_LABELS[value] || String(value || "").toLowerCase().replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
@@ -381,7 +382,7 @@
     ensureBookingDrawer();
     document.querySelector("#homeBookingDetailDrawer .eyebrow").textContent = "PEDIDO";
     document.querySelector("#homeBookingDetailTitle").textContent = `#${String(order.id || "").slice(0,8)} · ${order.contactName || order.contactPhone || "Cliente"}`;
-    document.querySelector("#homeBookingDetailMeta").textContent = `${fmt(order.createdAt)} · ${status(order.status)}`;
+    document.querySelector("#homeBookingDetailMeta").textContent = `${fmt(order.createdAt)} · ${orderStatus(order.status)}`;
     const body = document.querySelector("#homeBookingDetailBody");
     const lines = Array.isArray(order.lines) ? order.lines : [];
     const facts = `<div class="home-detail-facts">
@@ -389,7 +390,7 @@
       <div><span>Teléfono</span><strong>${esc(order.contactPhone || "Sin teléfono")}</strong></div>
       <div><span>Entrega</span><strong>${order.fulfillmentType === "DELIVERY" ? "Delivery" : "Retiro"}</strong></div>
       <div><span>Origen</span><strong>${esc(source(order.source))}</strong></div>
-      <div><span>Estado</span><strong>${esc(status(order.status))}</strong></div>
+      <div><span>Estado</span><strong>${esc(orderStatus(order.status))}</strong></div>
       <div><span>Subtotal</span><strong>${esc(money(order.subtotal, order.currency))}</strong></div>
       <div><span>Despacho</span><strong>${esc(money(order.deliveryFee, order.currency))}</strong></div>
       <div><span>Total</span><strong>${esc(money(order.total, order.currency))}</strong></div>
@@ -432,8 +433,8 @@
     document.querySelector("#homeBusinessOrdersCount").textContent=String(items.length);
     const host=document.querySelector("#homeOrdersList");
     if(!items.length){ host.innerHTML='<div class="home-business-empty">Todavía no hay pedidos registrados.</div>'; return; }
-    host.innerHTML=`<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Pedido</th><th>Cliente</th><th>Total</th><th>Entrega</th><th>Estado</th><th>Origen</th></tr></thead><tbody>${items.map(item=>`<tr tabindex="0" data-home-order-id="${esc(item.id)}"><td><strong>#${esc(String(item.id||"").slice(0,8))}</strong></td><td><strong>${esc(item.contactName||item.contactPhone||"Cliente")}</strong></td><td>${esc(money(item.total,item.currency))}</td><td>${item.fulfillmentType==="DELIVERY"?"Delivery":"Retiro"}</td><td><span class="home-pill">${esc(status(item.status))}</span></td><td>${esc(source(item.source))}</td></tr>`).join("")}</tbody></table></div>
-    <div class="home-business-mobile-list">${items.map(item=>`<article class="home-business-mobile-card" tabindex="0" data-home-order-id="${esc(item.id)}"><strong>${esc(item.contactName||item.contactPhone||"Cliente")}</strong><span>${esc(money(item.total,item.currency))} · ${esc(status(item.status))}</span></article>`).join("")}</div>`;
+    host.innerHTML=`<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Pedido</th><th>Cliente</th><th>Total</th><th>Entrega</th><th>Estado</th><th>Origen</th></tr></thead><tbody>${items.map(item=>`<tr tabindex="0" data-home-order-id="${esc(item.id)}"><td><strong>#${esc(String(item.id||"").slice(0,8))}</strong></td><td><strong>${esc(item.contactName||item.contactPhone||"Cliente")}</strong></td><td>${esc(money(item.total,item.currency))}</td><td>${item.fulfillmentType==="DELIVERY"?"Delivery":"Retiro"}</td><td><span class="home-pill">${esc(orderStatus(item.status))}</span></td><td>${esc(source(item.source))}</td></tr>`).join("")}</tbody></table></div>
+    <div class="home-business-mobile-list">${items.map(item=>`<article class="home-business-mobile-card" tabindex="0" data-home-order-id="${esc(item.id)}"><strong>${esc(item.contactName||item.contactPhone||"Cliente")}</strong><span>${esc(money(item.total,item.currency))} · ${esc(orderStatus(item.status))}</span></article>`).join("")}</div>`;
     bindOrderOpeners();
   }
 
