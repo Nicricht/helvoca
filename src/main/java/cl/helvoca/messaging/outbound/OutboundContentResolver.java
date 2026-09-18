@@ -36,6 +36,7 @@ public class OutboundContentResolver {
             case QUOTE -> quote(operation);
             case REMINDER -> reminder(operation);
             case DELIVERY_STATUS -> delivery(operation);
+            case INCIDENT_NOTICE -> throw new IllegalArgumentException("Incident notices require prepared campaign content");
         };
     }
 
