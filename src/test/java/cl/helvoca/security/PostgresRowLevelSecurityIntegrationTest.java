@@ -56,6 +56,7 @@ class PostgresRowLevelSecurityIntegrationTest {
     void seed() {
         ownerJdbc = new JdbcTemplate(migrationDataSource);
 
+        ownerJdbc.update("DELETE FROM audit_log");
         ownerJdbc.update("DELETE FROM user_role");
         ownerJdbc.update("DELETE FROM app_user");
         ownerJdbc.update("DELETE FROM customer");
@@ -82,6 +83,56 @@ class PostgresRowLevelSecurityIntegrationTest {
         assertNotNull(roleId, "baseline migrations must seed at least one role");
         ownerJdbc.update("INSERT INTO user_role(user_id, role_id) VALUES (?, ?)", userA, roleId);
         ownerJdbc.update("INSERT INTO user_role(user_id, role_id) VALUES (?, ?)", userB, roleId);
+    }
+
+    @Test
+    void auditLogIsTenantIsolatedAndApplicationAppendOnly() {
+        UUID auditA = UUID.randomUUID();
+        UUID auditB = UUID.randomUUID();
+
+        ownerJdbc.update(
+                "INSERT INTO audit_log(id, business_id, action, result) VALUES (?, ?, ?, ?)",
+                auditA, businessA, "AUDIT_A", "SUCCESS");
+        ownerJdbc.update(
+                "INSERT INTO audit_log(id, business_id, action, result) VALUES (?, ?, ?, ?)",
+                auditB, businessB, "AUDIT_B", "SUCCESS");
+
+        long visibleA = databaseContext.callAsTenant(businessA,
+                () -> runtimeJdbc.queryForObject("SELECT COUNT(*) FROM audit_log", Long.class));
+        long visibleB = databaseContext.callAsTenant(businessB,
+                () -> runtimeJdbc.queryForObject("SELECT COUNT(*) FROM audit_log", Long.class));
+
+        assertEquals(1L, visibleA);
+        assertEquals(1L, visibleB);
+
+        databaseContext.runAsTenant(businessA, () ->
+                runtimeJdbc.update(
+                        "INSERT INTO audit_log(id, business_id, action, result) VALUES (?, ?, ?, ?)",
+                        UUID.randomUUID(), businessA, "TENANT_INSERT", "SUCCESS"));
+
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(businessA, () ->
+                runtimeJdbc.update("UPDATE audit_log SET action = ? WHERE id = ?", "MUTATED", auditA)));
+
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(businessA, () ->
+                runtimeJdbc.update("DELETE FROM audit_log WHERE id = ?", auditA)));
+
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(businessA, () ->
+                runtimeJdbc.update(
+                        "INSERT INTO audit_log(id, business_id, action, result) VALUES (?, ?, ?, ?)",
+                        UUID.randomUUID(), businessB, "CROSS_TENANT", "SUCCESS")));
+
+        assertFalse(ownerJdbc.queryForObject(
+                "SELECT has_table_privilege('helvoca_runtime', 'public.audit_log', 'UPDATE')",
+                Boolean.class));
+        assertFalse(ownerJdbc.queryForObject(
+                "SELECT has_table_privilege('helvoca_runtime', 'public.audit_log', 'DELETE')",
+                Boolean.class));
+        assertFalse(ownerJdbc.queryForObject(
+                "SELECT has_table_privilege('helvoca_system', 'public.audit_log', 'UPDATE')",
+                Boolean.class));
+        assertFalse(ownerJdbc.queryForObject(
+                "SELECT has_table_privilege('helvoca_system', 'public.audit_log', 'DELETE')",
+                Boolean.class));
     }
 
     @Test
