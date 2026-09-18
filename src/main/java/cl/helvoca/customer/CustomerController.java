@@ -32,6 +32,7 @@ public class CustomerController {
     public List<CustomerResponse> list() { return service.list(); }
 
     @GetMapping("/export")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public ResponseEntity<byte[]> export(@RequestParam(defaultValue = "csv") String format) {
         CustomerExportFile file = exportService.export(format);
         return ResponseEntity.ok()

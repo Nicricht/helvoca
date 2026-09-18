@@ -274,7 +274,7 @@
                     <button class="home-business-tab" type="button" role="tab" aria-selected="false" data-home-tab="orders"><span>Pedidos</span><strong id="homeBusinessOrdersCount">0</strong></button>
                     <button class="home-business-tab" type="button" role="tab" aria-selected="false" data-home-tab="requests"><span>Solicitudes</span><strong id="homeBusinessRequestsCount">0</strong></button>
                     <button class="home-business-tab" type="button" role="tab" aria-selected="false" data-home-tab="customers"><span>Clientes</span><strong id="homeBusinessCustomersCount">0</strong></button>
-                    <button class="home-business-tab" type="button" role="tab" aria-selected="false" data-home-tab="audit"><span>Auditoría</span><strong id="homeBusinessAuditCount">0</strong></button>
+                    <button class="home-business-tab hidden" type="button" role="tab" aria-selected="false" data-home-tab="audit"><span>Auditoría</span><strong id="homeBusinessAuditCount">0</strong></button>
                 </div>
                 <section class="card home-business-panel" data-home-panel="bookings">
                     <div class="home-business-head">
@@ -375,7 +375,7 @@
                 <section class="card home-business-panel hidden" data-home-panel="customers">
                     <div class="home-business-head">
                         <div><div class="eyebrow">Personas</div><h2>Clientes</h2><p>Personas registradas por voz, WhatsApp o gestión manual.</p></div>
-                        <div class="home-business-head-actions">
+                        <div id="homeCustomersExportActions" class="home-business-head-actions hidden">
                             <button id="homeCustomersExportCsv" class="home-export-button" type="button">Descargar CSV</button>
                             <button id="homeCustomersExportXlsx" class="home-export-button" type="button">Descargar Excel</button>
                         </div>

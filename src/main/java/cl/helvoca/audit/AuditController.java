@@ -9,7 +9,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/audit")
-@PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+@PreAuthorize("hasRole('BUSINESS_ADMIN')")
 public class AuditController {
     private final AuditQueryService service;
 

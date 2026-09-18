@@ -4,7 +4,7 @@
   const statusGrid = document.querySelector("#statusGrid");
   if (!root || !dashboard || !statusGrid || typeof api !== "function") return;
 
-  const state = { bookings: [], customers: [], services: [], orders: [], requests: [], audit: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
+  const state = { bookings: [], customers: [], services: [], orders: [], requests: [], audit: [], roles: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
   const bookingFilters = { query: "", date: "all", serviceId: "all", status: "all", source: "all" };
   const EVENT_LABELS = {
     BOOKING_CREATE: "Reserva creada",
@@ -634,13 +634,28 @@
     return cards.length>=4 && cards.every(card=>card.classList.contains("done"));
   }
 
+  function isBusinessAdmin() {
+    return state.roles.includes("BUSINESS_ADMIN");
+  }
+
+  function applyRoleVisibility() {
+    const admin = isBusinessAdmin();
+    document.querySelector('[data-home-tab="audit"]')?.classList.toggle("hidden", !admin);
+    document.querySelector("#homeCustomersExportActions")?.classList.toggle("hidden", !admin);
+    if (!admin && !document.querySelector('[data-home-panel="audit"]')?.classList.contains("hidden")) {
+      setTab("bookings");
+    }
+  }
+
   function setTab(name) {
+    const allowed = name !== "audit" || isBusinessAdmin();
+    const next = allowed ? name : "bookings";
     root.querySelectorAll("[data-home-tab]").forEach(btn=>{
-      const active=btn.dataset.homeTab===name;
+      const active=btn.dataset.homeTab===next;
       btn.classList.toggle("active",active);
       btn.setAttribute("aria-selected",active?"true":"false");
     });
-    root.querySelectorAll("[data-home-panel]").forEach(panel=>panel.classList.toggle("hidden",panel.dataset.homePanel!==name));
+    root.querySelectorAll("[data-home-panel]").forEach(panel=>panel.classList.toggle("hidden",panel.dataset.homePanel!==next));
   }
 
   function addDaysToDateKey(dateKey, days) {
@@ -1608,13 +1623,17 @@
     loading=true;
     root.classList.remove("hidden");
     try{
+      const me = await api("/api/v1/auth/me");
+      state.roles = Array.isArray(me?.roles) ? me.roles.map(String) : [];
+      applyRoleVisibility();
+      const auditRequest = isBusinessAdmin() ? api("/api/v1/audit") : Promise.resolve([]);
       const [bookings,customers,services,orders,ops,audit]=await Promise.allSettled([
         api("/api/v1/bookings"),
         api("/api/v1/customers"),
         api("/api/v1/services"),
         api("/api/v1/commercial/orders"),
         api("/api/v1/operations/dashboard"),
-        api("/api/v1/audit")
+        auditRequest
       ]);
       state.bookings=bookings.status==="fulfilled"&&Array.isArray(bookings.value)?bookings.value:[];
       state.customers=customers.status==="fulfilled"&&Array.isArray(customers.value)?customers.value:[];
@@ -1624,7 +1643,7 @@
       state.audit=audit.status==="fulfilled"&&Array.isArray(audit.value)?audit.value:[];
       state.businessName=ops.status==="fulfilled"&&ops.value?.businessName?String(ops.value.businessName):(window.helvocaBusinessName||state.businessName||"Tu negocio");
       state.businessTimezone=ops.status==="fulfilled"&&ops.value?.timezone?String(ops.value.timezone):"America/Santiago";
-      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); renderAudit(); bindCustomerExports(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
+      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); renderAudit(); if (isBusinessAdmin()) bindCustomerExports(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
     } finally { loading=false; }
   }
 
@@ -1634,6 +1653,6 @@
   document.querySelector("#refreshBtn")?.addEventListener("click",load);
   ensureBookingDrawer();
   const requestedTab = new URLSearchParams(window.location.search).get("tab");
-  setTab(["bookings","orders","requests","customers","audit"].includes(requestedTab) ? requestedTab : "bookings");
+  setTab(["bookings","orders","requests","customers"].includes(requestedTab) ? requestedTab : "bookings");
   queueMicrotask(load);
 })();

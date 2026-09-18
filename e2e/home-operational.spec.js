@@ -2,8 +2,8 @@ const { test, expect } = require('@playwright/test');
 
 const json = body => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 
-async function mockReadyHome(page) {
-  await page.route('**/api/v1/auth/me', route => route.fulfill(json({ email: 'admin@demo.cl' })));
+async function mockReadyHome(page, roles = ['BUSINESS_ADMIN']) {
+  await page.route('**/api/v1/auth/me', route => route.fulfill(json({ email: 'admin@demo.cl', roles })));
   await page.route('**/api/v1/business', route => route.fulfill(json({
     name: 'Negocio E2E', timezone: 'America/Santiago', language: 'es', humanTransferPhone: null
   })));
@@ -638,6 +638,25 @@ test('requests workspace renders its empty state', async ({ page }) => {
 
   await page.getByRole('tab', { name: /Solicitudes/ }).click();
   await expect(page.locator('#homeRequestsList')).toHaveText('No hay solicitudes recientes.');
+});
+
+test('operator cannot see audit or export controls but keeps reservations and customers', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  let auditRequests = 0;
+  page.on('request', request => {
+    if (request.url().includes('/api/v1/audit')) auditRequests += 1;
+  });
+  await mockReadyHome(page, ['OPERATOR']);
+  await page.goto('/');
+
+  await expect(page.getByRole('tab', { name: /Auditoría/ })).toBeHidden();
+  await page.getByRole('tab', { name: /Clientes/ }).click();
+  await expect(page.locator('#homeCustomersList')).toContainText('Ana Reserva');
+  await expect(page.getByRole('button', { name: 'Descargar CSV' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Descargar Excel' })).toBeHidden();
+  await page.getByRole('tab', { name: /Reservas/ }).click();
+  await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
+  expect(auditRequests).toBe(0);
 });
 
 test('audit workspace shows actor role resource and before after changes', async ({ page }) => {
