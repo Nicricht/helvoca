@@ -117,7 +117,7 @@
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 13px;
         }
-        #registerForm > label:nth-of-type(5),
+        #registerForm > label:first-of-type,
         #registerForm > button,
         #registerForm > .form-hint { grid-column: 1 / -1; }
         #registerForm > button { margin-top: 1px; }
@@ -224,12 +224,10 @@
                 </div>
 
                 <form id="registerForm" class="stack">
-                    <label>Tu nombre<input name="adminName" required maxlength="150" autocomplete="name" placeholder="Ana Pérez"></label>
-                    <label>Nombre del negocio<input name="businessName" required maxlength="150" placeholder="Restaurante Don Pepe"></label>
+                    <label>Nombre del negocio<input name="businessName" required maxlength="150" autocomplete="organization" placeholder="Restaurante Don Pepe"></label>
                     <label>Correo<input name="email" required type="email" maxlength="180" autocomplete="email" placeholder="ana@empresa.cl"></label>
                     <label>Contraseña<input name="password" required type="password" minlength="10" maxlength="72" autocomplete="new-password" placeholder="Mínimo 10 caracteres"></label>
-                    <label>Web, Instagram o Google Maps <span class="optional">opcional</span><input name="sourceUrl" type="text" maxlength="2048" placeholder="https://..."></label>
-                    <button class="button primary" type="submit">Crear mi Helvoca</button>
+                    <button class="button primary" type="submit">Crear cuenta</button>
                     <small class="form-hint">Idioma y zona horaria se detectan automáticamente.</small>
                 </form>
 
