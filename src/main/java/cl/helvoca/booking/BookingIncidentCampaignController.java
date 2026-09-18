@@ -19,21 +19,39 @@ import java.util.UUID;
 @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
 public class BookingIncidentCampaignController {
     private final BookingIncidentCampaignService service;
+    private final BookingIncidentCampaignActivationService activation;
     private final TenantProvider tenantProvider;
 
     public BookingIncidentCampaignController(BookingIncidentCampaignService service,
+                                             BookingIncidentCampaignActivationService activation,
                                              TenantProvider tenantProvider) {
         this.service = service;
+        this.activation = activation;
         this.tenantProvider = tenantProvider;
     }
 
     @GetMapping
     public ResponseEntity<List<HistoryView>> recent() {
+        UUID businessId = tenantProvider.requireBusinessId();
         return ResponseEntity.ok(
-                service.recent(tenantProvider.requireBusinessId()).stream()
-                        .map(HistoryView::from)
+                service.recent(businessId).stream()
+                        .map(campaign -> HistoryView.from(campaign, activation.readiness(businessId, campaign.id())))
                         .toList()
         );
+    }
+
+    @GetMapping("/{campaignId}/activation-readiness")
+    public ResponseEntity<ActivationReadinessView> activationReadiness(@PathVariable UUID campaignId) {
+        return ResponseEntity.ok(ActivationReadinessView.from(
+                activation.readiness(tenantProvider.requireBusinessId(), campaignId)));
+    }
+
+    @PostMapping("/{campaignId}/activate")
+    public ResponseEntity<ActivationView> activate(@PathVariable UUID campaignId,
+                                                   @RequestBody ActivationRequest request) {
+        boolean confirmed = request != null && request.confirmed();
+        return ResponseEntity.ok(ActivationView.from(
+                activation.activate(tenantProvider.requireBusinessId(), campaignId, confirmed)));
     }
 
     @PostMapping
@@ -75,9 +93,12 @@ public class BookingIncidentCampaignController {
             String goal,
             String strategy,
             long recipientCount,
-            Instant createdAt
+            Instant createdAt,
+            boolean activationReady,
+            List<BookingIncidentCampaignActivationService.Blocker> activationBlockers
     ) {
-        static HistoryView from(BookingIncidentCampaignService.CampaignSummary campaign) {
+        static HistoryView from(BookingIncidentCampaignService.CampaignSummary campaign,
+                                BookingIncidentCampaignActivationService.ActivationReadiness readiness) {
             return new HistoryView(
                     campaign.id(),
                     campaign.reason(),
@@ -85,8 +106,30 @@ public class BookingIncidentCampaignController {
                     campaign.goal().name(),
                     campaign.strategy().name(),
                     campaign.recipientCount(),
-                    campaign.createdAt()
+                    campaign.createdAt(),
+                    readiness.ready(),
+                    readiness.blockers()
             );
+        }
+    }
+
+    public record ActivationRequest(boolean confirmed) { }
+
+    public record ActivationReadinessView(
+            boolean ready,
+            String channel,
+            List<BookingIncidentCampaignActivationService.Blocker> blockers
+    ) {
+        static ActivationReadinessView from(BookingIncidentCampaignActivationService.ActivationReadiness readiness) {
+            return new ActivationReadinessView(readiness.ready(), readiness.channel(), readiness.blockers());
+        }
+    }
+
+    public record ActivationView(UUID campaignId,
+                                 String status,
+                                 int queuedRecipients) {
+        static ActivationView from(BookingIncidentCampaignActivationService.ActivationResult result) {
+            return new ActivationView(result.campaignId(), result.status(), result.queuedRecipients());
         }
     }
 
