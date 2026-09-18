@@ -659,26 +659,84 @@
         host.innerHTML = '<div class="home-incident-empty">Todavía no hay campañas preparadas.</div>';
         return;
       }
-      host.innerHTML = campaigns.map(campaign => `
-        <article class="home-incident-history-item">
-          <div class="home-incident-history-main">
-            <div><strong>${esc(campaign.reason || "Imprevisto")}</strong><span>${esc(fmtCompact(campaign.createdAt))}</span></div>
-            <span class="home-incident-history-status">${esc(campaign.status || "PREPARED")}</span>
-          </div>
-          <div class="home-incident-history-meta">
-            <span>${esc(incidentGoalLabel(campaign.goal))}</span>
-            <span>${esc(incidentStrategyLabel(campaign.strategy))}</span>
-            <span>${esc(campaign.recipientCount)} cliente${Number(campaign.recipientCount) === 1 ? "" : "s"}</span>
-          </div>
-          <div class="home-incident-history-actions">
-            <small>Preparada, todavía sin envíos.</small>
-            <button type="button" disabled title="Disponible cuando exista un canal real autorizado">Activar campaña</button>
-          </div>
-        </article>
-      `).join("");
+      host.innerHTML = campaigns.map(campaign => {
+        const blockers = Array.isArray(campaign.activationBlockers) ? campaign.activationBlockers : [];
+        const blockerText = blockers.map(item => item?.message).filter(Boolean).join(" · ");
+        const canActivate = campaign.status === "PREPARED" && campaign.activationReady === true;
+        const alreadyActivated = campaign.status === "ACTIVATED";
+        const helper = alreadyActivated
+          ? "Campaña activada y entregada al outbox."
+          : canActivate
+            ? "WhatsApp autorizado · requiere confirmación final."
+            : (blockers[0]?.message || "La campaña todavía no puede activarse.");
+        const buttonText = alreadyActivated ? "Campaña activada" : "Activar campaña";
+        return `
+          <article class="home-incident-history-item">
+            <div class="home-incident-history-main">
+              <div><strong>${esc(campaign.reason || "Imprevisto")}</strong><span>${esc(fmtCompact(campaign.createdAt))}</span></div>
+              <span class="home-incident-history-status">${esc(campaign.status || "PREPARED")}</span>
+            </div>
+            <div class="home-incident-history-meta">
+              <span>${esc(incidentGoalLabel(campaign.goal))}</span>
+              <span>${esc(incidentStrategyLabel(campaign.strategy))}</span>
+              <span>${esc(campaign.recipientCount)} cliente${Number(campaign.recipientCount) === 1 ? "" : "s"}</span>
+            </div>
+            <div class="home-incident-history-actions">
+              <small title="${esc(blockerText)}">${esc(helper)}</small>
+              <button type="button"
+                ${canActivate ? `data-incident-activate="${esc(campaign.id)}" data-incident-count="${esc(campaign.recipientCount)}"` : "disabled"}
+                title="${esc(canActivate ? "Requiere confirmación final antes de contactar clientes" : (blockerText || helper))}">
+                ${buttonText}
+              </button>
+            </div>
+          </article>
+        `;
+      }).join("");
+      bindIncidentActivation();
     } catch (error) {
       host.innerHTML = `<div class="home-incident-empty">${esc(error.message || "No pude cargar las campañas.")}</div>`;
     }
+  }
+
+  async function activateIncidentCampaign(campaignId, recipientCount, button) {
+    if (!campaignId) return;
+    const count = Number(recipientCount || 0);
+    const confirmed = window.confirm(
+      `Esta acción contactará a ${count} cliente${count === 1 ? "" : "s"} por WhatsApp usando el canal real autorizado. ¿Activar la campaña ahora?`
+    );
+    if (!confirmed) return;
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Activando…";
+    }
+    try {
+      const result = await api(`/api/v1/booking-incident-campaigns/${encodeURIComponent(campaignId)}/activate`, {
+        method: "POST",
+        body: JSON.stringify({ confirmed: true })
+      });
+      await loadIncidentHistory();
+      const preview = document.querySelector("#homeIncidentPreview");
+      if (preview) {
+        preview.classList.remove("hidden");
+        preview.innerHTML = `<div class="home-incident-success"><strong>Campaña activada ✓</strong><span>${esc(result.queuedRecipients)} cliente${Number(result.queuedRecipients) === 1 ? "" : "s"} enviados al outbox seguro.</span><small>La entrega queda a cargo del canal WhatsApp autorizado.</small></div>`;
+      }
+    } catch (error) {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Activar campaña";
+      }
+      window.alert(error.message || "No pude activar la campaña.");
+      await loadIncidentHistory();
+    }
+  }
+
+  function bindIncidentActivation() {
+    document.querySelectorAll("[data-incident-activate]").forEach(button => {
+      button.addEventListener("click", () =>
+        activateIncidentCampaign(button.dataset.incidentActivate, button.dataset.incidentCount, button)
+      );
+    });
   }
 
   function bindIncidentResolver() {
