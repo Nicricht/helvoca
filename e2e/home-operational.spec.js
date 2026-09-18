@@ -375,3 +375,79 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('.nav-conversations')).toHaveAttribute('href', '/conversations.html');
   await expect(page.locator('#advancedPanel')).toBeHidden();
 });
+
+
+test('reservation filters drawer and conversation links work', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+  await page.goto('/');
+
+  await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
+  await expect(page.locator('#homeBookingsList')).toContainText('Bruno Masaje');
+
+  await page.locator('#homeBookingDate').selectOption('today');
+  await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
+  await expect(page.locator('#homeBookingsList')).not.toContainText('Bruno Masaje');
+
+  await page.locator('#homeBookingDate').selectOption('tomorrow');
+  await expect(page.locator('#homeBookingsList')).toContainText('Bruno Masaje');
+  await expect(page.locator('#homeBookingsList')).not.toContainText('Ana Reserva');
+
+  await page.locator('#homeBookingClearFilters').click();
+  await page.locator('#homeBookingService').selectOption('svc1');
+  await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
+  await expect(page.locator('#homeBookingsList')).not.toContainText('Bruno Masaje');
+
+  await page.locator('#homeBookingStatus').selectOption('CANCELLED');
+  await expect(page.locator('#homeBookingsList')).toContainText('No hay reservas que coincidan con estos filtros.');
+
+  await page.locator('#homeBookingClearFilters').click();
+  await page.locator('#homeBookingStatus').selectOption('CANCELLED');
+  await expect(page.locator('#homeBookingsList')).toContainText('Bruno Masaje');
+
+  await page.locator('#homeBookingClearFilters').click();
+  await page.locator('#homeBookingSource').selectOption('WHATSAPP');
+  await expect(page.locator('#homeBookingsList')).toContainText('Bruno Masaje');
+  await expect(page.locator('#homeBookingsList')).not.toContainText('Ana Reserva');
+
+  await page.locator('#homeBookingClearFilters').click();
+  await page.locator('#homeBookingSearch').fill('Ana');
+  await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
+  await expect(page.locator('#homeBookingsList')).not.toContainText('Bruno Masaje');
+
+  await page.locator('#homeBookingClearFilters').click();
+  await expect(page.locator('#homeBookingSearch')).toHaveValue('');
+  await expect(page.locator('#homeBookingDate')).toHaveValue('all');
+  await expect(page.locator('#homeBookingService')).toHaveValue('all');
+  await expect(page.locator('#homeBookingStatus')).toHaveValue('all');
+  await expect(page.locator('#homeBookingSource')).toHaveValue('all');
+  await expect(page.locator('.home-filter-result')).toContainText('2 de 2');
+
+  await page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]').click();
+  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('#homeBookingDetailMeta')).toContainText('Reservada para');
+  await expect(page.locator('#homeBookingDetailBody .home-detail-fact-link')).toHaveAttribute(
+    'href',
+    '/conversations.html?channel=calls&conversation=call-1'
+  );
+  await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute(
+    'href',
+    '/conversations.html?channel=calls&conversation=call-1'
+  );
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
+
+  await page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b2"]').click();
+  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('#homeBookingDetailBody .home-detail-fact-link')).toHaveAttribute(
+    'href',
+    '/conversations.html?channel=whatsapp&conversation=wa-booking-2'
+  );
+  await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute(
+    'href',
+    '/conversations.html?channel=whatsapp&conversation=wa-booking-2'
+  );
+  await page.locator('#homeBookingDetailClose').click();
+  await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
+});
