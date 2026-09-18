@@ -621,6 +621,7 @@
       if (footer) {
         footer.innerHTML = `<div class="home-incident-success"><strong>Campaña preparada ✓</strong><span>ID ${esc(result.id)} · ${esc(result.recipientCount)} cliente${Number(result.recipientCount) === 1 ? "" : "s"} · estado ${esc(result.status)}</span><small>No se envió ningún mensaje ni se realizó ninguna llamada.</small></div>`;
       }
+      await loadIncidentHistory();
     } catch (error) {
       if (button) {
         button.disabled = false;
@@ -645,6 +646,41 @@
     syncIncidentSelection();
   }
 
+  const incidentGoalLabel = value => value === "RESCHEDULE" ? "Avisar y reprogramar" : value === "INFORM" ? "Solo avisar" : String(value || "");
+  const incidentStrategyLabel = value => value === "CHEAPEST" ? "Más económico" : value === "WHATSAPP" ? "WhatsApp" : value === "CALL" ? "Llamada" : String(value || "");
+
+  async function loadIncidentHistory() {
+    const host = document.querySelector("#homeIncidentHistoryList");
+    if (!host) return;
+    host.innerHTML = '<div class="home-incident-empty">Cargando campañas…</div>';
+    try {
+      const campaigns = await api("/api/v1/booking-incident-campaigns");
+      if (!Array.isArray(campaigns) || !campaigns.length) {
+        host.innerHTML = '<div class="home-incident-empty">Todavía no hay campañas preparadas.</div>';
+        return;
+      }
+      host.innerHTML = campaigns.map(campaign => `
+        <article class="home-incident-history-item">
+          <div class="home-incident-history-main">
+            <div><strong>${esc(campaign.reason || "Imprevisto")}</strong><span>${esc(fmtCompact(campaign.createdAt))}</span></div>
+            <span class="home-incident-history-status">${esc(campaign.status || "PREPARED")}</span>
+          </div>
+          <div class="home-incident-history-meta">
+            <span>${esc(incidentGoalLabel(campaign.goal))}</span>
+            <span>${esc(incidentStrategyLabel(campaign.strategy))}</span>
+            <span>${esc(campaign.recipientCount)} cliente${Number(campaign.recipientCount) === 1 ? "" : "s"}</span>
+          </div>
+          <div class="home-incident-history-actions">
+            <small>Preparada, todavía sin envíos.</small>
+            <button type="button" disabled title="Disponible cuando exista un canal real autorizado">Activar campaña</button>
+          </div>
+        </article>
+      `).join("");
+    } catch (error) {
+      host.innerHTML = `<div class="home-incident-empty">${esc(error.message || "No pude cargar las campañas.")}</div>`;
+    }
+  }
+
   function bindIncidentResolver() {
     const toggle = document.querySelector("#homeIncidentToggle");
     const panel = document.querySelector("#homeIncidentPanel");
@@ -653,10 +689,13 @@
     toggle.dataset.bound = "true";
     toggle.addEventListener("click", () => {
       panel.classList.toggle("hidden");
-      toggle.setAttribute("aria-expanded", panel.classList.contains("hidden") ? "false" : "true");
+      const open = !panel.classList.contains("hidden");
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
       const date = document.querySelector("#homeIncidentDate");
       if (date && !date.value) date.value = businessDateKey(new Date());
+      if (open) loadIncidentHistory();
     });
+    document.querySelector("#homeIncidentHistoryRefresh")?.addEventListener("click", loadIncidentHistory);
     previewButton.addEventListener("click", renderIncidentPreview);
   }
 
