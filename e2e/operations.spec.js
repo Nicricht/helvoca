@@ -63,6 +63,7 @@ test('operations is advanced-only with calls and diagnostics', async ({ page }) 
   await page.goto('/operations.html');
 
   await expect(page.getByRole('heading', { level: 1, name: 'Historial y diagnóstico' })).toBeVisible();
+  await expect(page.locator('.brand-block strong')).toHaveText('NEGOCIO E2E');
   await expect(page.locator('#businessTabs')).toHaveCount(0);
   await expect(page.locator('#metrics')).toHaveCount(0);
   await expect(page.locator('#bookingsList')).toHaveCount(0);
@@ -81,4 +82,5 @@ test('operations is advanced-only with calls and diagnostics', async ({ page }) 
   await expect(page.locator('#callDetailPanel')).toBeVisible();
   await expect(page.locator('#callActions')).toContainText('Reserva creada');
   await expect(page.locator('#callTranscript')).toContainText('Necesito una hora');
+  await expect(page.locator('#callTranscript .transcript-line strong').nth(1)).toHaveText('Negocio E2E');
 });
