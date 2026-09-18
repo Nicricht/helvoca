@@ -54,6 +54,26 @@ async function mockReadyHome(page) {
   await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([
     { id: 'o1', status: 'CONFIRMED', fulfillmentType: 'PICKUP', contactName: 'Juan Pedido', contactPhone: '+56933333333', total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z', lines: [{ name: 'Producto demo', quantity: 1, lineTotal: 18990 }] }
   ])));
+  await page.route('**/api/v1/bookings/b1/context', route => route.fulfill(json({
+    channel: 'VOICE',
+    sourceReferenceId: 'call-1',
+    call: {
+      call: { id: 'call-1', callerNumber: '+56922222222', status: 'COMPLETED', resolution: 'BOOKING_CREATED', startedAt: '2026-09-17T18:00:00Z' },
+      summary: 'Ana llamó para reservar peluquería y confirmó la hora.',
+      transcript: [
+        { id: 't1', speaker: 'USER', content: 'Quiero reservar peluquería.', createdAt: '2026-09-17T18:00:05Z' },
+        { id: 't2', speaker: 'ASSISTANT', content: 'Tengo una hora disponible mañana.', createdAt: '2026-09-17T18:00:08Z' }
+      ],
+      actions: [
+        { id: 'a1', actionType: 'AVAILABILITY_CHECKED', success: true, createdAt: '2026-09-17T18:00:09Z' },
+        { id: 'a2', actionType: 'BOOKING_CREATED', success: true, createdAt: '2026-09-17T18:00:12Z' }
+      ]
+    },
+    whatsapp: null,
+    events: [
+      { id: 'e1', eventType: 'BOOKING_CREATED', channel: 'VOICE', createdAt: '2026-09-17T18:00:12Z' }
+    ]
+  })));
   await page.route('**/api/v1/operations/dashboard', route => route.fulfill(json({
     businessName: 'Negocio E2E',
     timezone: 'America/Santiago',
