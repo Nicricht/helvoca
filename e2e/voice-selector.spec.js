@@ -83,7 +83,7 @@ test('AI agent voice is selected from the backend catalog and never typed freely
   })));
   await page.route('**/api/v1/public/pricing', route => route.fulfill(json([])));
 
-  await page.goto('/');
+  await page.goto('/settings.html');
   await page.locator('#advancedPanel .ux-config-nav button[aria-controls="configBusinessPanel"]').click();
   await page.getByRole('button', { name: 'Más ajustes' }).click();
 
