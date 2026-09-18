@@ -82,19 +82,27 @@ async function mockReadyTenant(page) {
   ])));
 }
 
-test('ready customer sees an operational dashboard with progressive disclosure', async ({ page }) => {
+test('ready customer sees operations on home and configuration on settings', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyTenant(page);
 
   await page.goto('/');
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Helvoca está atendiendo 🟢');
-  await expect(page.getByText('Prepara tu negocio en minutos')).toHaveCount(0);
   await expect(page.locator('#readyBanner')).toBeHidden();
   await expect(page.locator('#nextStepBanner')).toBeHidden();
+  await expect(page.locator('#advancedPanel')).toBeHidden();
+  await expect(page.locator('#commercialStatusCard')).toBeHidden();
+  await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
 
+  await page.goto('/settings.html');
+
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Cómo trabaja Helvoca');
   await expect(page.locator('#advancedPanel')).toBeVisible();
+  await expect(page.locator('#statusGrid')).toBeHidden();
+  await expect(page.locator('.nav-config')).toHaveClass(/active/);
   await expect(page.locator('#configBusinessPanel')).toBeHidden();
+
   await page.getByRole('button', { name: 'Negocio', exact: true }).click();
   await expect(page.locator('#configBusinessPanel')).toBeVisible();
 
