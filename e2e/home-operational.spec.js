@@ -226,6 +226,8 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeIncidentDate')).toBeVisible();
   await expect(page.locator('#homeIncidentTimeFrom')).toBeVisible();
   await expect(page.locator('#homeIncidentTimeTo')).toBeVisible();
+  await expect(page.locator('#homeIncidentPanel select')).toHaveCount(6);
+  await expect(page.locator('#homeIncidentPanel textarea')).toHaveCount(0);
 
   await page.locator('#homeIncidentGoal').selectOption('INFORM');
   await expect(page.locator('#homeIncidentGoal')).toHaveValue('INFORM');
