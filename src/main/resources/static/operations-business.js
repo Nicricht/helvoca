@@ -405,9 +405,10 @@
       const status = ORDER_STATUS_LABELS[order.status] || humanize(order.status);
       return `<tr class="business-table-row"><td><strong>${esc(shortId(order.id))}</strong><small>${esc(fmtDate(order.createdAt))}</small></td><td><strong>${esc(order.contactName || order.contactPhone || "Cliente")}</strong><small>${esc(order.contactPhone || "")}</small></td><td><strong>${esc(money(order.total,order.currency))}</strong></td><td>${order.fulfillmentType === "DELIVERY" ? "Delivery" : "Retiro"}</td><td><span class="pill ${order.status === "CANCELLED" ? "bad" : order.status === "COMPLETED" ? "" : "high"}">${esc(status)}</span></td><td><div class="workspace-actions">${orderActions(order).map(([next,label]) => `<button type="button" class="${next === "CANCELLED" ? "ghost" : "button secondary"}" data-order-id="${esc(order.id)}" data-order-status="${next}">${esc(label)}</button>`).join("")}</div></td></tr>`;
     }).join("");
-    const cards = items.map(order => `<article class="business-mobile-card"><div><small>${esc(shortId(order.id))} · ${esc(fmtDate(order.createdAt))}</small><strong>${esc(order.contactName || order.contactPhone || "Cliente")}</strong><span>${esc(money(order.total,order.currency))}</span></div><span class="pill">${esc(ORDER_STATUS_LABELS[order.status] || humanize(order.status))}</span></article>`).join("");
+    const cards = items.map(order => `<article class="business-mobile-card" tabindex="0" role="button" data-order-open data-entity-id="${esc(order.id)}"><div><small>${esc(shortId(order.id))} · ${esc(fmtDate(order.createdAt))}</small><strong>${esc(order.contactName || order.contactPhone || "Cliente")}</strong><span>${esc(money(order.total,order.currency))}</span></div><span class="pill">${esc(ORDER_STATUS_LABELS[order.status] || humanize(order.status))}</span></article>`).join("");
     root.innerHTML = `<div class="business-table-shell"><table class="business-data-table" data-table="orders"><thead><tr><th>Pedido</th><th>Cliente</th><th>Total</th><th>Entrega</th><th>Estado</th><th>Acción</th></tr></thead><tbody>${rows}</tbody></table></div><div class="business-mobile-list">${cards}</div>`;
-    $$("[data-order-status]",root).forEach(button => button.addEventListener("click", async () => {
+    $("[data-order-status]",root).forEach(button => button.addEventListener("click", async event => {
+      event.stopPropagation();
       if (button.dataset.orderStatus === "CANCELLED" && !window.confirm("¿Cancelar este pedido?")) return;
       button.disabled=true;
       try {
@@ -415,6 +416,50 @@
         await load(); setTab("orders"); toast("Pedido actualizado.");
       } catch(e) { toast(e.message || "No pude actualizar el pedido."); button.disabled=false; }
     }));
+    $("[data-order-open]",root).forEach(node=>{
+      const open=()=>openOrderDetail(node.dataset.entityId);
+      node.addEventListener("click",event=>{if(event.target.closest("button"))return;open();});
+      node.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();open();}});
+    });
+  }
+
+  async function renderOperationConversation(operationId) {
+    if(!operationId)return {events:[],link:null,content:'<div class="empty">No hay una operación enlazada.</div>'};
+    const events=await request(`/api/v1/operation-events?operationId=${encodeURIComponent(operationId)}`);
+    const source=(events||[]).find(item=>item.sourceReferenceId&&(item.channel==="VOICE"||item.channel==="WHATSAPP"));
+    if(!source)return {events,link:null,content:'<div class="empty">No hay una conversación enlazada a esta operación.</div>'};
+    if(source.channel==="VOICE"){
+      const call=await request(`/api/v1/calls/${encodeURIComponent(source.sourceReferenceId)}`);
+      const transcript=Array.isArray(call.transcript)?call.transcript:[];
+      return {events,link:`/conversations.html?call=${source.sourceReferenceId}`,content:`<div class="trace-summary"><span>Resumen</span><p>${esc(call.summary||"Sin resumen disponible.")}</p></div><div class="trace-transcript">${transcript.map(item=>`<div class="trace-message ${String(item.speaker||"").toLowerCase()}"><strong>${item.speaker==="USER"?"Cliente":item.speaker==="ASSISTANT"?"Helvoca":esc(humanize(item.speaker))}</strong><p>${esc(item.content)}</p><small>${esc(fmtDate(item.createdAt))}</small></div>`).join("")||'<div class="empty">No hay transcripción disponible.</div>'}</div>`};
+    }
+    const convo=await request(`/api/v1/messaging/conversations/${encodeURIComponent(source.sourceReferenceId)}`);
+    const messages=Array.isArray(convo.messages)?convo.messages:[];
+    return {events,link:`/conversations.html?whatsapp=${source.sourceReferenceId}`,content:`<div class="trace-transcript">${messages.map(item=>`<div class="trace-message ${String(item.role||item.direction||"").toLowerCase()}"><strong>${item.role==="USER"?"Cliente":item.role==="ASSISTANT"?"Helvoca":esc(humanize(item.role||item.direction))}</strong><p>${esc(item.content)}</p><small>${esc(fmtDate(item.createdAt))}</small></div>`).join("")||'<div class="empty">No hay mensajes guardados.</div>'}</div>`};
+  }
+
+  async function openOrderDetail(id) {
+    const order=state.orders.find(item=>String(item.id)===String(id));if(!order)return;
+    const status=ORDER_STATUS_LABELS[order.status]||humanize(order.status);
+    const lines=Array.isArray(order.lines)?order.lines:[];
+    showDetailDrawer(`${shortId(order.id)} · ${order.contactName||order.contactPhone||"Cliente"}`,`${fmtDate(order.createdAt)} · ${status}`,`
+      <div class="business-detail-facts">
+        <div><span>Cliente</span><strong>${esc(order.contactName||"Cliente")}</strong></div>
+        <div><span>Teléfono</span><strong>${esc(order.contactPhone||"Sin teléfono")}</strong></div>
+        <div><span>Entrega</span><strong>${order.fulfillmentType==="DELIVERY"?"Delivery":"Retiro"}</strong></div>
+        <div><span>Estado</span><strong>${esc(status)}</strong></div>
+      </div>
+      <section class="business-detail-section"><h3>Productos</h3><div class="business-detail-lines">${lines.map(line=>`<div><span>${esc(line.quantity||0)} × ${esc(line.name||"Producto")}</span><strong>${esc(money(line.lineTotal??(Number(line.quantity||0)*Number(line.unitPrice||0)),order.currency))}</strong></div>`).join("")||'<div class="empty">Sin líneas de detalle.</div>'}</div><div class="business-detail-total"><span>Total</span><strong>${esc(money(order.total,order.currency))}</strong></div></section>
+      ${order.deliveryAddress?`<section class="business-detail-section"><h3>Dirección</h3><p>${esc(order.deliveryAddress)}</p></section>`:""}
+      <section id="orderConversationSection" class="business-detail-section"><h3>Conversación de origen</h3><div class="loading-line">Cargando contexto…</div></section>
+    `);
+    try{
+      const ctx=await renderOperationConversation(order.operationId);
+      const section=$("#orderConversationSection");
+      section.innerHTML=`<h3>Conversación de origen</h3>${ctx.content}${ctx.link?`<a id="businessDetailConversationLink" class="button secondary trace-link" href="${esc(ctx.link)}">Ver conversación completa</a>`:""}`;
+    }catch(e){
+      $("#orderConversationSection").innerHTML='<h3>Conversación de origen</h3><div class="business-error">No pude cargar la conversación de este pedido.</div>';
+    }
   }
 
   function renderCustomers(error = null) {

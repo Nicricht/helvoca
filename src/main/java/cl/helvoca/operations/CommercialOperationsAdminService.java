@@ -165,7 +165,7 @@ public class CommercialOperationsAdminService {
         List<OrderLineView> lines = orderLines.findAllByOrderIdOrderByCreatedAtAsc(order.getId()).stream()
                 .map(OrderLineView::from)
                 .toList();
-        return new OrderView(order.getId(), order.getStatus(), order.getFulfillmentType(),
+        return new OrderView(order.getId(), order.getOperationId(), order.getStatus(), order.getFulfillmentType(),
                 order.getContactName(), order.getContactPhone(), order.getDeliveryAddress(),
                 order.getSubtotal(), order.getDeliveryFee(), order.getTotal(), order.getCurrency(),
                 order.getSource(), lines, order.getCreatedAt(), order.getUpdatedAt());
@@ -179,7 +179,7 @@ public class CommercialOperationsAdminService {
         }
     }
 
-    public record OrderView(UUID id, BusinessOrder.Status status, BusinessOrder.FulfillmentType fulfillmentType,
+    public record OrderView(UUID id, UUID operationId, BusinessOrder.Status status, BusinessOrder.FulfillmentType fulfillmentType,
                             String contactName, String contactPhone, String deliveryAddress,
                             BigDecimal subtotal, BigDecimal deliveryFee, BigDecimal total, String currency,
                             BusinessOrder.Source source, List<OrderLineView> lines,
