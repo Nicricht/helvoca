@@ -54,6 +54,11 @@ async function api(path, options = {}) {
   return payload;
 }
 
+function setText(selector, value) {
+  const node = $(selector);
+  if (node) node.textContent = value;
+}
+
 function esc(value) {
   return String(value ?? "").replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 }
@@ -202,6 +207,7 @@ async function loadCallDetail(callId) {
 
 function renderRequests(items = []) {
   const root = $("#requestsList");
+  if (!root) return;
   if (!items.length) { root.innerHTML = '<div class="empty">No hay solicitudes abiertas. ✨</div>'; return; }
   root.innerHTML = items.map(r => `
     <div class="item" data-request-id="${esc(r.id)}">
@@ -221,6 +227,7 @@ function renderRequests(items = []) {
 
 function renderQuestions(items = []) {
   const root = $("#questionsList");
+  if (!root) return;
   if (!items.length) { root.innerHTML = '<div class="empty">Helvoca no tiene preguntas pendientes. ✨</div>'; return; }
   root.innerHTML = items.map(q => `
     <div class="item" data-question-id="${esc(q.id)}">
@@ -270,20 +277,23 @@ async function load() {
       api("/api/v1/operations/readiness"),
       api("/api/v1/operations/certification")
     ]);
-    $("#businessName").textContent = data.businessName || "Tu negocio";
-    $("#localNow").textContent = `${data.timezone || ""}${data.timezone ? " · " : ""}${fmtDate(data.localNow)}`;
-    $("#callsToday").textContent = data.callsToday;
-    $("#minutesToday").textContent = fmtDuration(data.callDurationSecondsToday);
-    $("#bookingsToday").textContent = data.bookingsToday;
-    $("#customersToday").textContent = data.newCustomersToday;
-    $("#openRequests").textContent = data.openRequests;
-    $("#unknownQuestions").textContent = data.unansweredQuestions;
-    $("#failuresToday").textContent = data.callFailuresToday;
-    $("#costToday").textContent = fmtUsd(data.estimatedCallCostTodayUsd);
-    $("#healthBadge").textContent = data.callFailuresToday
-      ? `${data.callFailuresToday} llamada${Number(data.callFailuresToday) === 1 ? "" : "s"} necesita${Number(data.callFailuresToday) === 1 ? "" : "n"} revisión`
-      : "Todo funcionando";
-    $("#healthBadge").className = `badge ${data.callFailuresToday ? "bad" : ""}`.trim();
+    setText("#businessName", data.businessName || "Tu negocio");
+    setText("#localNow", `${data.timezone || ""}${data.timezone ? " · " : ""}${fmtDate(data.localNow)}`);
+    setText("#callsToday", data.callsToday);
+    setText("#minutesToday", fmtDuration(data.callDurationSecondsToday));
+    setText("#bookingsToday", data.bookingsToday);
+    setText("#customersToday", data.newCustomersToday);
+    setText("#openRequests", data.openRequests);
+    setText("#unknownQuestions", data.unansweredQuestions);
+    setText("#failuresToday", data.callFailuresToday);
+    setText("#costToday", fmtUsd(data.estimatedCallCostTodayUsd));
+    const healthBadge = $("#healthBadge");
+    if (healthBadge) {
+      healthBadge.textContent = data.callFailuresToday
+        ? `${data.callFailuresToday} llamada${Number(data.callFailuresToday) === 1 ? "" : "s"} necesita${Number(data.callFailuresToday) === 1 ? "" : "n"} revisión`
+        : "Todo funcionando";
+      healthBadge.className = `badge ${data.callFailuresToday ? "bad" : ""}`.trim();
+    }
 
     renderReadiness(readiness);
     renderCertification(certification);
@@ -296,11 +306,12 @@ async function load() {
   }
 }
 
-$("#refreshBtn").addEventListener("click", load);
-$("#closeCallDetailBtn").addEventListener("click", () => $("#callDetailPanel").classList.add("hidden"));
-$("#newRequestBtn").addEventListener("click", () => $("#requestForm").classList.remove("hidden"));
-$("#cancelRequestBtn").addEventListener("click", () => $("#requestForm").classList.add("hidden"));
-$("#requestForm").addEventListener("submit", async e => {
+$("#refreshBtn")?.addEventListener("click", load);
+$("#closeCallDetailBtn")?.addEventListener("click", () => $("#callDetailPanel")?.classList.add("hidden"));
+$("#newRequestBtn")?.addEventListener("click", () => $("#requestForm")?.classList.remove("hidden"));
+$("#cancelRequestBtn")?.addEventListener("click", () => $("#requestForm")?.classList.add("hidden"));
+const requestForm = $("#requestForm");
+if (requestForm) requestForm.addEventListener("submit", async e => {
   e.preventDefault();
   const form = e.currentTarget;
   const data = Object.fromEntries(new FormData(form).entries());
