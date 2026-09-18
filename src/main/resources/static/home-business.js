@@ -28,7 +28,6 @@
   };
   let loading = false;
   let incidentDraft = null;
-  let incidentCalendarCursor = null;
 
   const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;" }[c]));
   const fmt = value => {
@@ -514,6 +513,30 @@
       .sort((a, b) => new Date(a.startAt || 0) - new Date(b.startAt || 0));
   }
 
+  function populateIncidentDateSelector() {
+    const select = document.querySelector("#homeIncidentDate");
+    if (!select) return;
+    const current = select.value;
+    const counts = new Map();
+    state.bookings
+      .filter(item => item.status === "CONFIRMED")
+      .forEach(item => {
+        const key = businessDateKey(item.startAt);
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+
+    const keys = [...counts.keys()].sort();
+    select.innerHTML = '<option value="">Elegir fecha</option>' + keys.map(key => {
+      const [year, month, day] = key.split("-").map(Number);
+      const label = new Intl.DateTimeFormat("es-CL", {
+        weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC"
+      }).format(new Date(Date.UTC(year, month - 1, day)));
+      const count = counts.get(key);
+      return `<option value="${key}">${esc(label)} · ${count} reserva${count === 1 ? "" : "s"}</option>`;
+    }).join("");
+    if (current && counts.has(current)) select.value = current;
+  }
+
   function incidentBookingsInRange() {
     const dateKey = document.querySelector("#homeIncidentDate")?.value || "";
     const from = incidentTimeMinutes(document.querySelector("#homeIncidentTimeFrom")?.value || "");
@@ -567,8 +590,8 @@
 
     const bookings = incidentBookingsForDate(dateKey);
     if (!bookings.length) {
-      from.value = "08:00";
-      to.value = "18:00";
+      from.value = "";
+      to.value = "";
       syncIncidentTimeBounds();
       return;
     }
@@ -590,7 +613,7 @@
 
     if (!incidentFormComplete()) {
       button.disabled = true;
-      summary.innerHTML = '<strong>Completa las opciones</strong><span>Elige motivo, día y un rango Desde/Hasta válido.</span>';
+      summary.innerHTML = '<strong>Selecciona las opciones</strong><span>Motivo, fecha y un rango Desde/Hasta válido.</span>';
       return;
     }
 
@@ -599,85 +622,17 @@
     button.disabled = false;
     summary.innerHTML = affected.length
       ? `<strong>${customers.size} cliente${customers.size === 1 ? "" : "s"} · ${affected.length} reserva${affected.length === 1 ? "" : "s"}</strong><span>Detectados automáticamente dentro del horario elegido.</span>`
-      : '<strong>0 reservas afectadas</strong><span>Puedes revisar igualmente la selección antes de preparar una campaña.</span>';
+      : '<strong>0 reservas afectadas</strong><span>No hay reservas confirmadas dentro de ese rango.</span>';
   }
 
-  function selectIncidentDate(dateKey) {
-    const input = document.querySelector("#homeIncidentDate");
-    if (!input || !dateKey) return;
-    input.value = dateKey;
-    const [year, month] = dateKey.split("-").map(Number);
-    incidentCalendarCursor = { year, month: month - 1 };
-    setIncidentDefaultRange(dateKey, true);
-    invalidateIncidentPreview();
-    renderIncidentCalendar();
-    syncIncidentImpact();
-  }
+  function handleIncidentControlChange(event) {
+    const target = event?.target;
+    if (!target) return;
 
-  function renderIncidentCalendar() {
-    const host = document.querySelector("#homeIncidentCalendarDays");
-    const title = document.querySelector("#homeIncidentCalendarMonth");
-    const selected = document.querySelector("#homeIncidentDate")?.value || "";
-    if (!host || !title) return;
-
-    if (!incidentCalendarCursor) {
-      const base = selected || businessDateKey(new Date());
-      const [year, month] = base.split("-").map(Number);
-      incidentCalendarCursor = { year, month: month - 1 };
+    if (target.id === "homeIncidentDate") {
+      setIncidentDefaultRange(target.value, true);
     }
-
-    const { year, month } = incidentCalendarCursor;
-    const monthDate = new Date(Date.UTC(year, month, 1));
-    title.textContent = new Intl.DateTimeFormat("es-CL", { month: "long", year: "numeric", timeZone: "UTC" })
-      .format(monthDate).replace(/^./, char => char.toUpperCase());
-
-    const firstWeekday = (monthDate.getUTCDay() + 6) % 7;
-    const days = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-    const today = businessDateKey(new Date());
-    const counts = new Map();
-    state.bookings.filter(item => item.status === "CONFIRMED").forEach(item => {
-      const key = businessDateKey(item.startAt);
-      counts.set(key, (counts.get(key) || 0) + 1);
-    });
-
-    const cells = Array.from({ length: firstWeekday }, () => '<span class="home-incident-calendar-empty"></span>');
-    for (let day = 1; day <= days; day++) {
-      const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-      const count = counts.get(key) || 0;
-      const classes = [
-        "home-incident-calendar-day",
-        key === selected ? "selected" : "",
-        key === today ? "today" : "",
-        count ? "has-bookings" : ""
-      ].filter(Boolean).join(" ");
-      cells.push(`<button type="button" class="${classes}" data-incident-date="${key}" aria-label="${key}${count ? `, ${count} reservas` : ""}"><strong>${day}</strong>${count ? `<small>${count}</small>` : ""}</button>`);
-    }
-    host.innerHTML = cells.join("");
-    host.querySelectorAll("[data-incident-date]").forEach(button => {
-      button.addEventListener("click", () => selectIncidentDate(button.dataset.incidentDate));
-    });
-  }
-
-  function shiftIncidentCalendar(monthDelta) {
-    if (!incidentCalendarCursor) renderIncidentCalendar();
-    const next = new Date(Date.UTC(
-      incidentCalendarCursor.year,
-      incidentCalendarCursor.month + monthDelta,
-      1
-    ));
-    incidentCalendarCursor = { year: next.getUTCFullYear(), month: next.getUTCMonth() };
-    renderIncidentCalendar();
-  }
-
-  function chooseIncidentOption(selector, hiddenSelector, dataKey, button) {
-    const hidden = document.querySelector(hiddenSelector);
-    if (!hidden || !button) return;
-    hidden.value = button.dataset[dataKey] || "";
-    document.querySelectorAll(selector).forEach(item => item.classList.toggle("active", item === button));
-
-    if (dataKey === "incidentReason" && button.dataset.incidentReason === "CLOSED_DAY") {
-      const dateKey = document.querySelector("#homeIncidentDate")?.value || businessDateKey(new Date());
-      if (!document.querySelector("#homeIncidentDate")?.value) selectIncidentDate(dateKey);
+    if (target.id === "homeIncidentReason" && target.value === "Cierre del día") {
       const from = document.querySelector("#homeIncidentTimeFrom");
       const to = document.querySelector("#homeIncidentTimeTo");
       if (from && to) {
@@ -962,43 +917,25 @@
     toggle.dataset.bound = "true";
 
     populateIncidentTimeSelectors();
-    renderIncidentCalendar();
+    populateIncidentDateSelector();
     syncIncidentImpact();
 
-    document.querySelectorAll("[data-incident-reason]").forEach(button =>
-      button.addEventListener("click", () => chooseIncidentOption(
-        "[data-incident-reason]", "#homeIncidentReason", "incidentReason", button
-      ))
-    );
-    document.querySelectorAll("[data-incident-goal]").forEach(button =>
-      button.addEventListener("click", () => chooseIncidentOption(
-        "[data-incident-goal]", "#homeIncidentGoal", "incidentGoal", button
-      ))
-    );
-    document.querySelectorAll("[data-incident-strategy]").forEach(button =>
-      button.addEventListener("click", () => chooseIncidentOption(
-        "[data-incident-strategy]", "#homeIncidentStrategy", "incidentStrategy", button
-      ))
-    );
-
-    document.querySelector("#homeIncidentCalendarPrev")?.addEventListener("click", () => shiftIncidentCalendar(-1));
-    document.querySelector("#homeIncidentCalendarNext")?.addEventListener("click", () => shiftIncidentCalendar(1));
-
-    document.querySelector("#homeIncidentTimeFrom")?.addEventListener("change", () => {
-      invalidateIncidentPreview();
-      syncIncidentImpact();
-    });
-    document.querySelector("#homeIncidentTimeTo")?.addEventListener("change", () => {
-      invalidateIncidentPreview();
-      syncIncidentImpact();
-    });
+    [
+      "#homeIncidentReason",
+      "#homeIncidentDate",
+      "#homeIncidentTimeFrom",
+      "#homeIncidentTimeTo",
+      "#homeIncidentGoal",
+      "#homeIncidentStrategy"
+    ].forEach(selector => document.querySelector(selector)?.addEventListener("change", handleIncidentControlChange));
 
     toggle.addEventListener("click", () => {
       panel.classList.toggle("hidden");
       const open = !panel.classList.contains("hidden");
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
       if (open) {
-        renderIncidentCalendar();
+        populateIncidentDateSelector();
+        syncIncidentImpact();
         loadIncidentHistory();
       }
     });
@@ -1025,7 +962,7 @@
       state.requests=ops.status==="fulfilled"&&Array.isArray(ops.value?.recentRequests)?ops.value.recentRequests:[];
       state.businessName=ops.status==="fulfilled"&&ops.value?.businessName?String(ops.value.businessName):"Tu negocio";
       state.businessTimezone=ops.status==="fulfilled"&&ops.value?.timezone?String(ops.value.timezone):"America/Santiago";
-      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); bindIncidentResolver(); renderIncidentCalendar(); syncIncidentImpact();
+      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
     } finally { loading=false; }
   }
 
