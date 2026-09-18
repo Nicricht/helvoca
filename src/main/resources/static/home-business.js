@@ -32,8 +32,8 @@
     try { return new Intl.NumberFormat("es-CL",{style:"currency",currency:currency||"CLP",maximumFractionDigits:currency==="CLP"?0:2}).format(Number(value||0)); }
     catch (_) { return String(value||0); }
   };
-  const source = value => ({VOICE:"Voz",AI_CALL:"Llamada",WHATSAPP:"WhatsApp",MANUAL:"Manual",API:"API",ADMIN:"Manual"})[value] || value || "Sin origen";
-  const sourceGroup = value => ({VOICE:"CALL",AI_CALL:"CALL",WHATSAPP:"WHATSAPP",MANUAL:"MANUAL",ADMIN:"MANUAL",API:"API"})[value] || value || "";
+  const source = value => ({VOICE:"Voz",AI_CALL:"Llamada",WHATSAPP:"WhatsApp",AI_WHATSAPP:"WhatsApp",MANUAL:"Manual",API:"API",ADMIN:"Manual"})[value] || value || "Sin origen";
+  const sourceGroup = value => ({VOICE:"CALL",AI_CALL:"CALL",WHATSAPP:"WHATSAPP",AI_WHATSAPP:"WHATSAPP",MANUAL:"MANUAL",ADMIN:"MANUAL",API:"API"})[value] || value || "";
   const status = value => ({CONFIRMED:"Confirmada",CANCELLED:"Cancelada",PREPARING:"Preparando",READY:"Listo",DISPATCHED:"Despachado",COMPLETED:"Completado",OPEN:"Abierta",IN_PROGRESS:"En curso"})[value] || value || "";
 
   function eventLabel(value) {
