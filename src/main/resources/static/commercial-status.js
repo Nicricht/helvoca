@@ -305,7 +305,7 @@
     style.textContent = `
         #dashboardView #statusGrid.ux-ready-hidden { display: none !important; }
         #operationalOverview { margin: 0 0 18px; padding: 18px; }
-        .home-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+        .home-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
         .home-metric { min-height: 76px; padding: 13px 14px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.025); color: inherit; text-decoration: none; cursor: pointer; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
         .home-metric:hover { border-color: rgba(124,92,255,.42); background: rgba(124,92,255,.07); transform: translateY(-1px); }
         .home-metric:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -325,7 +325,8 @@
         .home-activity-copy small { margin-top: 2px; color: var(--muted); font-size: 10px; }
         .home-activity-time { color: var(--muted); font-size: 10px; white-space: nowrap; }
         .home-activity-empty { padding: 16px 4px; color: var(--muted); font-size: 12px; }
-        @media (max-width: 760px) { .home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 900px) { .home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 520px) { .home-metrics { grid-template-columns: 1fr 1fr; } }
         @media (max-width: 520px) { #operationalOverview { padding: 14px; } .home-activity-row { grid-template-columns: auto minmax(0,1fr); } .home-activity-time { grid-column: 2; } }
     `;
     document.head.appendChild(style);
@@ -338,7 +339,12 @@
             <a id="homeCallsMetric" class="home-metric" href="/conversations.html?channel=calls" aria-label="Ver llamadas de hoy"><strong id="homeCallsToday">–</strong><span>Llamadas hoy</span></a>
             <a id="homeWhatsAppMetric" class="home-metric" href="/conversations.html?channel=whatsapp" aria-label="Ver conversaciones de WhatsApp de hoy"><strong id="homeWhatsAppToday">–</strong><span>WhatsApp hoy</span></a>
             <a id="homeBookingsMetric" class="home-metric" href="/?tab=bookings#homeBusinessWorkspace" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>Reservas hoy</span></a>
-            <a id="homePendingMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver pendientes"><strong id="homePending">–</strong><span>Pendientes</span></a>
+            <a id="homeCustomersMetric" class="home-metric" href="/?tab=customers#homeBusinessWorkspace" aria-label="Ver clientes"><strong id="homeCustomersToday">–</strong><span>Clientes nuevos</span></a>
+            <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver solicitudes"><strong id="homeRequestsToday">–</strong><span>Solicitudes abiertas</span></a>
+            <a id="homeQuestionsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver preguntas pendientes"><strong id="homeQuestionsToday">–</strong><span>Preguntas pendientes</span></a>
+            <a id="homeFailuresMetric" class="home-metric" href="/conversations.html?channel=calls" aria-label="Ver llamadas con fallo"><strong id="homeFailuresToday">–</strong><span>Llamadas con fallo</span></a>
+            <article id="homeMinutesMetric" class="home-metric"><strong id="homeMinutesToday">–</strong><span>Minutos de voz</span></article>
+            <article id="homeCostMetric" class="home-metric"><strong id="homeCostToday">–</strong><span>Costo estimado USD</span></article>
         </div>
         <div class="home-activity-head">
             <h2>Actividad reciente</h2>
@@ -428,7 +434,13 @@
         overview.querySelector('#homeCallsToday').textContent = String(Number(operations.callsToday || 0));
         overview.querySelector('#homeWhatsAppToday').textContent = String(whatsappToday);
         overview.querySelector('#homeBookingsToday').textContent = String(Number(operations.bookingsToday || 0));
-        overview.querySelector('#homePending').textContent = String(pending);
+        overview.querySelector('#homeCustomersToday').textContent = String(Number(operations.newCustomersToday || 0));
+        overview.querySelector('#homeRequestsToday').textContent = String(Number(operations.openRequests || 0));
+        overview.querySelector('#homeQuestionsToday').textContent = String(Number(operations.unansweredQuestions || 0));
+        overview.querySelector('#homeFailuresToday').textContent = String(Number(operations.callFailuresToday || 0));
+        const seconds = Number(operations.callDurationSecondsToday || 0);
+        overview.querySelector('#homeMinutesToday').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+        overview.querySelector('#homeCostToday').textContent = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(Number(operations.estimatedCallCostTodayUsd || 0));
         renderActivity(operations, whatsapp);
     }
 
