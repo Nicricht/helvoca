@@ -478,12 +478,11 @@ registerForm.addEventListener("submit", async event => {
     event.preventDefault();
     clearMessage(authMessage);
     const f = new FormData(registerForm);
-    const sourceUrl = String(f.get("sourceUrl") || "").trim();
     const businessName = String(f.get("businessName") || "").trim();
     setBusy(registerForm, true);
     try {
         const payload = {
-            adminName: String(f.get("adminName") || "").trim(),
+            adminName: businessName,
             email: String(f.get("email") || "").trim(),
             password: String(f.get("password") || ""),
             businessName,
@@ -494,12 +493,7 @@ registerForm.addEventListener("submit", async event => {
         const result = await api("/api/v1/auth/register", { method: "POST", body: JSON.stringify(payload) }, false);
         setToken(result.accessToken);
         await loadDashboard();
-        if (sourceUrl) {
-            aiForm.elements.sourceUrl.value = sourceUrl;
-            await analyzeBusiness(sourceUrl, businessName);
-        } else {
-            showMessage(aiMessage, "Cuenta creada. Pega la web, Instagram o Google Maps del negocio para preparar la configuración.", "success");
-        }
+        showMessage(aiMessage, "Cuenta creada. Ahora pega la web, Instagram o Google Maps del negocio para preparar la configuración.", "success");
     } catch (error) {
         showMessage(authMessage, error.message || "No fue posible crear la empresa.");
     } finally {
