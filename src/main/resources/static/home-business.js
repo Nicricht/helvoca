@@ -112,6 +112,62 @@
     </div>${booking.notes ? `<div class="home-detail-note"><span>Notas</span><p>${esc(booking.notes)}</p></div>` : ""}`;
   }
 
+  function renderBookingActions(booking) {
+    if (booking.status === "CANCELLED") {
+      return '<section class="home-detail-section"><h3>Gestionar reserva</h3><p class="home-detail-muted">Esta reserva está cancelada. No hay acciones disponibles.</p></section>';
+    }
+    return `
+      <section class="home-detail-section home-booking-actions">
+        <h3>Gestionar reserva</h3>
+        <div class="home-booking-action-buttons">
+          <button id="homeBookingCancel" class="home-booking-danger" type="button">Cancelar reserva</button>
+        </div>
+        <p id="homeBookingActionMessage" class="home-detail-muted hidden"></p>
+      </section>
+    `;
+  }
+
+  async function cancelBookingFromDrawer(id) {
+    const booking = state.bookings.find(item => String(item.id) === String(id));
+    if (!booking || booking.status === "CANCELLED") return;
+
+    const customer = state.customers.find(item => String(item.id) === String(booking.customerId)) || {};
+    const label = customer.name || customer.phone || "este cliente";
+    const confirmed = window.confirm(`¿Cancelar la reserva de ${label}? Esta acción cambiará su estado a Cancelada.`);
+    if (!confirmed) return;
+
+    const button = document.querySelector("#homeBookingCancel");
+    const message = document.querySelector("#homeBookingActionMessage");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Cancelando…";
+    }
+    if (message) {
+      message.classList.add("hidden");
+      message.textContent = "";
+    }
+
+    try {
+      await api(`/api/v1/bookings/${encodeURIComponent(id)}`, { method: "DELETE" });
+      booking.status = "CANCELLED";
+      renderBookings();
+      await openBookingDetail(id);
+    } catch (error) {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Cancelar reserva";
+      }
+      if (message) {
+        message.textContent = error.message || "No pude cancelar la reserva.";
+        message.classList.remove("hidden");
+      }
+    }
+  }
+
+  function bindBookingActions(booking) {
+    document.querySelector("#homeBookingCancel")?.addEventListener("click", () => cancelBookingFromDrawer(booking.id));
+  }
+
   function renderContext(context, entityKind = "reserva", personName = "Cliente") {
     if (!context) return '<section class="home-detail-section"><h3>Conversación</h3><p class="home-detail-muted">No hay contexto conversacional disponible.</p></section>';
     const customerLabel = personName || "Cliente";
@@ -160,17 +216,20 @@
     document.querySelector("#homeBookingDetailTitle").textContent = customer.name || customer.phone || "Cliente";
     document.querySelector("#homeBookingDetailMeta").textContent = `Reservada para ${fmtCompact(booking.startAt)} · ${status(booking.status)}`;
     const body = document.querySelector("#homeBookingDetailBody");
-    body.innerHTML = bookingFacts(booking, customer, service) + '<div class="home-detail-loading">Cargando conversación…</div>';
+    body.innerHTML = bookingFacts(booking, customer, service) + renderBookingActions(booking) + '<div class="home-detail-loading">Cargando conversación…</div>';
+    bindBookingActions(booking);
     const backdrop = document.querySelector("#homeBookingDetailBackdrop");
     backdrop.classList.remove("hidden");
     backdrop.setAttribute("aria-hidden", "false");
     document.body.classList.add("home-detail-open");
     try {
       const context = await api(`/api/v1/bookings/${encodeURIComponent(id)}/context`);
-      body.innerHTML = bookingFacts(booking, customer, service, context) + renderContext(context, "reserva", customer.name || customer.phone || "Cliente");
+      body.innerHTML = bookingFacts(booking, customer, service, context) + renderBookingActions(booking) + renderContext(context, "reserva", customer.name || customer.phone || "Cliente");
+      bindBookingActions(booking);
     } catch (error) {
-      body.innerHTML = bookingFacts(booking, customer, service) +
+      body.innerHTML = bookingFacts(booking, customer, service) + renderBookingActions(booking) +
         '<section class="home-detail-section"><h3>Conversación</h3><p class="home-detail-muted">No pude cargar la conversación asociada en este momento.</p></section>';
+      bindBookingActions(booking);
     }
   }
 
