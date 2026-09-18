@@ -33,6 +33,7 @@
     catch (_) { return String(value||0); }
   };
   const source = value => ({VOICE:"Voz",AI_CALL:"Llamada",WHATSAPP:"WhatsApp",MANUAL:"Manual",API:"API",ADMIN:"Manual"})[value] || value || "Sin origen";
+  const sourceGroup = value => ({VOICE:"CALL",AI_CALL:"CALL",WHATSAPP:"WHATSAPP",MANUAL:"MANUAL",ADMIN:"MANUAL",API:"API"})[value] || value || "";
   const status = value => ({CONFIRMED:"Confirmada",CANCELLED:"Cancelada",PREPARING:"Preparando",READY:"Listo",DISPATCHED:"Despachado",COMPLETED:"Completado",OPEN:"Abierta",IN_PROGRESS:"En curso"})[value] || value || "";
 
   function eventLabel(value) {
@@ -175,10 +176,12 @@
     const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startTomorrow = new Date(startToday); startTomorrow.setDate(startTomorrow.getDate() + 1);
     const afterTomorrow = new Date(startTomorrow); afterTomorrow.setDate(afterTomorrow.getDate() + 1);
-    const weekEnd = new Date(startToday); weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekStart = new Date(startToday);
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 7);
     if (bookingFilters.date === "today") return when >= startToday && when < startTomorrow;
     if (bookingFilters.date === "tomorrow") return when >= startTomorrow && when < afterTomorrow;
-    if (bookingFilters.date === "week") return when >= startToday && when < weekEnd;
+    if (bookingFilters.date === "week") return when >= weekStart && when < weekEnd;
     if (bookingFilters.date === "upcoming") return when >= now;
     if (bookingFilters.date === "past") return when < now;
     return true;
@@ -199,7 +202,7 @@
         && bookingMatchesDate(item)
         && (bookingFilters.serviceId === "all" || String(item.serviceId) === bookingFilters.serviceId)
         && (bookingFilters.status === "all" || item.status === bookingFilters.status)
-        && (bookingFilters.source === "all" || item.source === bookingFilters.source);
+        && (bookingFilters.source === "all" || sourceGroup(item.source) === bookingFilters.source);
     });
 
     document.querySelector("#homeBusinessBookingsCount").textContent = String(allItems.length);
@@ -207,8 +210,13 @@
     const serviceOptions = state.services.map(service =>
       `<option value="${esc(service.id)}" ${bookingFilters.serviceId === String(service.id) ? "selected" : ""}>${esc(service.name)}</option>`
     ).join("");
-    const sourceOptions = [...new Set(allItems.map(item => item.source).filter(Boolean))].map(value =>
-      `<option value="${esc(value)}" ${bookingFilters.source === value ? "selected" : ""}>${esc(source(value))}</option>`
+    const sourceOptions = [
+      ["CALL", "Llamada"],
+      ["WHATSAPP", "WhatsApp"],
+      ["MANUAL", "Manual"],
+      ["API", "API"]
+    ].map(([value, label]) =>
+      `<option value="${value}" ${bookingFilters.source === value ? "selected" : ""}>${label}</option>`
     ).join("");
 
     const controls = `
