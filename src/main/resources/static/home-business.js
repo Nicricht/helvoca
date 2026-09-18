@@ -960,7 +960,7 @@
       state.services=services.status==="fulfilled"&&Array.isArray(services.value)?services.value:[];
       state.orders=orders.status==="fulfilled"&&Array.isArray(orders.value)?orders.value:[];
       state.requests=ops.status==="fulfilled"&&Array.isArray(ops.value?.recentRequests)?ops.value.recentRequests:[];
-      state.businessName=ops.status==="fulfilled"&&ops.value?.businessName?String(ops.value.businessName):"Tu negocio";
+      state.businessName=ops.status==="fulfilled"&&ops.value?.businessName?String(ops.value.businessName):(window.helvocaBusinessName||state.businessName||"Tu negocio");
       state.businessTimezone=ops.status==="fulfilled"&&ops.value?.timezone?String(ops.value.timezone):"America/Santiago";
       renderBookings(); renderOrders(); renderRequests(); renderCustomers(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
     } finally { loading=false; }
