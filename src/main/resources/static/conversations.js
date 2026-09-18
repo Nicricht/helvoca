@@ -12,6 +12,7 @@ const requestedChannel = params.get("channel");
 const requestedConversation = params.get("conversation");
 let activeChannel = ["all", "calls", "whatsapp"].includes(requestedChannel) ? requestedChannel : "all";
 let selectedConversationKey = null;
+let businessName = "Tu negocio";
 
 const EVENT_LABELS = {
   REQUEST_CREATED: "Solicitud creada",
@@ -182,7 +183,7 @@ function renderCallDetail(data) {
   const transcript = data.transcript || [];
   $("#detailTranscript").innerHTML = transcript.length ? transcript.map(item => `
     <div class="transcript-line ${String(item.speaker || "").toLowerCase()}">
-      <strong>${esc(item.speaker === "USER" ? "Cliente" : item.speaker === "ASSISTANT" ? "Helvoca" : humanize(item.speaker))}</strong>
+      <strong>${esc(item.speaker === "USER" ? "Cliente" : item.speaker === "ASSISTANT" ? businessName : humanize(item.speaker))}</strong>
       <p>${esc(item.content)}</p>
       <span>${fmtDate(item.createdAt)}</span>
     </div>
@@ -217,7 +218,7 @@ function renderWhatsAppDetail(data) {
   $("#detailSummary").textContent = `Conversación real por WhatsApp con ${messages.length} mensaje${messages.length === 1 ? "" : "s"}.`;
   $("#detailTranscript").innerHTML = messages.length ? messages.map(item => `
     <div class="transcript-line ${String(item.role || "").toLowerCase()}">
-      <strong>${esc(item.role === "USER" ? "Cliente" : item.role === "ASSISTANT" ? "Helvoca" : humanize(item.role || item.direction))}</strong>
+      <strong>${esc(item.role === "USER" ? "Cliente" : item.role === "ASSISTANT" ? businessName : humanize(item.role || item.direction))}</strong>
       <p>${esc(item.content)}</p>
       <span>${fmtDate(item.createdAt)}</span>
     </div>
@@ -280,6 +281,9 @@ async function load() {
 
   if (dashboardAvailable || whatsappAvailable) {
     const data = dashboardAvailable ? dashboardResult.value : {};
+    businessName = data.businessName || "Tu negocio";
+    document.querySelector(".brand-block strong")?.replaceChildren(document.createTextNode(businessName.toUpperCase()));
+    document.title = `${businessName} · Conversaciones`;
     calls = data.recentCalls || [];
     whatsappConversations = whatsappAvailable ? whatsappResult.value || [] : [];
     const total = calls.length + whatsappConversations.length;
