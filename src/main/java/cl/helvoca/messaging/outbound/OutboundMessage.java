@@ -10,7 +10,7 @@ import java.util.UUID;
         uniqueConstraints = @UniqueConstraint(name = "uq_outbound_message_idempotency",
                 columnNames = {"business_id", "idempotency_key"}))
 public class OutboundMessage {
-    public enum Channel { WHATSAPP }
+    public enum Channel { WHATSAPP, SMS }
     public enum Purpose {
         PAYMENT_LINK, BOOKING_CONFIRMATION, MEETING_LINK, ORDER_STATUS,
         QUOTE, REMINDER, DELIVERY_STATUS, INCIDENT_NOTICE
