@@ -89,6 +89,31 @@ async function mockReadyHome(page) {
       { id: 'e2', eventType: 'BOOKING_CREATED', channel: 'WHATSAPP', createdAt: '2026-09-17T19:00:20Z' }
     ]
   })));
+  await page.route('**/api/v1/bookings/b1/activity', route => route.fulfill(json([
+    {
+      id: 'audit-1', action: 'BOOKING_CREATE', actorType: 'HUMAN',
+      actorUserId: 'user-1', actorName: 'Carolina Soto', actorRole: 'OPERATOR',
+      beforeState: null,
+      afterState: { startAt: '2026-09-18T15:00:00Z', status: 'CONFIRMED' },
+      createdAt: '2026-09-17T18:00:12Z'
+    },
+    {
+      id: 'audit-2', action: 'BOOKING_RESCHEDULE', actorType: 'HUMAN',
+      actorUserId: 'user-1', actorName: 'Carolina Soto', actorRole: 'OPERATOR',
+      beforeState: { startAt: '2026-09-18T14:00:00Z', status: 'CONFIRMED' },
+      afterState: { startAt: '2026-09-18T15:00:00Z', status: 'CONFIRMED' },
+      createdAt: '2026-09-17T18:05:00Z'
+    }
+  ])));
+  await page.route('**/api/v1/bookings/b2/activity', route => route.fulfill(json([
+    {
+      id: 'audit-3', action: 'BOOKING_CANCEL', actorType: 'HUMAN',
+      actorUserId: 'user-2', actorName: 'Diego Ruiz', actorRole: 'BUSINESS_ADMIN',
+      beforeState: { status: 'CONFIRMED' },
+      afterState: { status: 'CANCELLED' },
+      createdAt: '2026-09-17T19:10:00Z'
+    }
+  ])));
   await page.route('**/api/v1/messaging/conversations/wa-order', route => route.fulfill(json({
     conversation: { id: 'wa-order', sender: '+56933333333', openedAt: '2026-09-17T17:20:00Z', lastMessageAt: '2026-09-17T17:30:00Z' },
     messages: [
@@ -436,6 +461,11 @@ test('reservation filters drawer and conversation links work', async ({ page }) 
     'href',
     '/conversations.html?channel=calls&conversation=call-1'
   );
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Actividad');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Reserva creada');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Reserva reprogramada');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Carolina Soto');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Operador');
   await page.keyboard.press('Escape');
   await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
 

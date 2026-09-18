@@ -15,10 +15,15 @@ import java.util.UUID;
 public class BookingController {
     private final BookingService service;
     private final BookingContextService contextService;
+    private final BookingActivityService activityService;
 
-    public BookingController(BookingService service, BookingContextService contextService) {
+    public BookingController(
+            BookingService service,
+            BookingContextService contextService,
+            BookingActivityService activityService) {
         this.service = service;
         this.contextService = contextService;
+        this.activityService = activityService;
     }
 
     @GetMapping
@@ -29,6 +34,9 @@ public class BookingController {
 
     @GetMapping("/{id}/context")
     public BookingContextResponse context(@PathVariable UUID id) { return contextService.get(id); }
+
+    @GetMapping("/{id}/activity")
+    public List<BookingActivityResponse> activity(@PathVariable UUID id) { return activityService.list(id); }
 
     @GetMapping("/availability")
     public AvailabilityResponse availability(

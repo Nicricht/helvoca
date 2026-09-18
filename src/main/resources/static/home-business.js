@@ -7,6 +7,9 @@
   const state = { bookings: [], customers: [], services: [], orders: [], requests: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
   const bookingFilters = { query: "", date: "all", serviceId: "all", status: "all", source: "all" };
   const EVENT_LABELS = {
+    BOOKING_CREATE: "Reserva creada",
+    BOOKING_RESCHEDULE: "Reserva reprogramada",
+    BOOKING_CANCEL: "Reserva cancelada",
     BOOKING_CREATED: "Reserva creada",
     BOOKING_RESCHEDULED: "Reserva reprogramada",
     BOOKING_CANCELLED: "Reserva cancelada",
@@ -61,6 +64,46 @@
 
   function eventLabel(value) {
     return EVENT_LABELS[value] || String(value || "").toLowerCase().replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function bookingActorRole(value) {
+    return ({ BUSINESS_ADMIN:"Administrador", OPERATOR:"Operador" })[value] || value || "";
+  }
+
+  function bookingActivityChange(item) {
+    const before = item?.beforeState || {};
+    const after = item?.afterState || {};
+    if (item?.action === "BOOKING_RESCHEDULE" && before.startAt && after.startAt) {
+      return `${fmtCompact(before.startAt)} → ${fmtCompact(after.startAt)}`;
+    }
+    if (item?.action === "BOOKING_CANCEL" && before.status && after.status) {
+      return `${status(before.status)} → ${status(after.status)}`;
+    }
+    if (item?.action === "BOOKING_CREATE" && after.startAt) {
+      return `Reserva para ${fmtCompact(after.startAt)}`;
+    }
+    return "";
+  }
+
+  function renderBookingActivity(items, unavailable = false) {
+    if (unavailable) {
+      return '<section class="home-detail-section"><h3>Actividad</h3><p class="home-detail-muted">No pude cargar la actividad de esta reserva.</p></section>';
+    }
+    const activity = Array.isArray(items) ? items : [];
+    if (!activity.length) {
+      return '<section class="home-detail-section"><h3>Actividad</h3><p class="home-detail-muted">Todavía no hay actividad auditada para esta reserva.</p></section>';
+    }
+    return `<section class="home-detail-section"><h3>Actividad</h3><div class="home-detail-history">${activity.map(item => {
+      const actor = item.actorName || (item.actorType === "HUMAN" ? "Usuario" : "Sistema");
+      const role = bookingActorRole(item.actorRole);
+      const change = bookingActivityChange(item);
+      const detail = [actor, role, change].filter(Boolean).join(" · ");
+      return `<div><span>${esc(fmtCompact(item.createdAt))}</span><strong>${esc(eventLabel(item.action))}${detail ? ` · ${esc(detail)}` : ""}</strong></div>`;
+    }).join("")}</div></section>`;
+  }
+
+  function bookingActivityLoading() {
+    return '<div id="homeBookingActivitySlot" class="home-detail-loading">Cargando actividad…</div>';
   }
 
   function ensureBookingDrawer() {
@@ -546,20 +589,33 @@
     document.querySelector("#homeBookingDetailTitle").textContent = customer.name || customer.phone || "Cliente";
     document.querySelector("#homeBookingDetailMeta").textContent = `Reservada para ${fmtCompact(booking.startAt)} · ${status(booking.status)}`;
     const body = document.querySelector("#homeBookingDetailBody");
-    body.innerHTML = bookingFacts(booking, customer, service) + renderBookingActions(booking) + '<div class="home-detail-loading">Cargando conversación…</div>';
+    body.innerHTML = bookingFacts(booking, customer, service) + renderBookingActions(booking) +
+      '<div class="home-detail-loading">Cargando conversación…</div>' + bookingActivityLoading();
     bindBookingActions(booking);
     const backdrop = document.querySelector("#homeBookingDetailBackdrop");
     backdrop.classList.remove("hidden");
     backdrop.setAttribute("aria-hidden", "false");
     document.body.classList.add("home-detail-open");
+
     try {
       const context = await api(`/api/v1/bookings/${encodeURIComponent(id)}/context`);
-      body.innerHTML = bookingFacts(booking, customer, service, context) + renderBookingActions(booking) + renderContext(context, "reserva", customer.name || customer.phone || "Cliente");
+      body.innerHTML = bookingFacts(booking, customer, service, context) + renderBookingActions(booking) +
+        renderContext(context, "reserva", customer.name || customer.phone || "Cliente") + bookingActivityLoading();
       bindBookingActions(booking);
     } catch (error) {
       body.innerHTML = bookingFacts(booking, customer, service) + renderBookingActions(booking) +
-        '<section class="home-detail-section"><h3>Conversación</h3><p class="home-detail-muted">No pude cargar la conversación asociada en este momento.</p></section>';
+        '<section class="home-detail-section"><h3>Conversación</h3><p class="home-detail-muted">No pude cargar la conversación asociada en este momento.</p></section>' +
+        bookingActivityLoading();
       bindBookingActions(booking);
+    }
+
+    try {
+      const activity = await api(`/api/v1/bookings/${encodeURIComponent(id)}/activity`);
+      const slot = document.querySelector("#homeBookingActivitySlot");
+      if (slot) slot.outerHTML = renderBookingActivity(activity);
+    } catch (error) {
+      const slot = document.querySelector("#homeBookingActivitySlot");
+      if (slot) slot.outerHTML = renderBookingActivity([], true);
     }
   }
 
