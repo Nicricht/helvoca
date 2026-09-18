@@ -63,8 +63,8 @@ test('conversation inbox combines channels, opens the newest item and uses human
 
   await expect(page.getByRole('heading', { level: 1, name: 'Conversaciones' })).toBeVisible();
   await expect(page.locator('.brand-block strong')).toHaveText('NEGOCIO E2E');
-  await expect(page.getByText('+56911111111')).toBeVisible();
-  await expect(page.getByText('+56922222222')).toBeVisible();
+  await expect(page.locator('#conversationList').getByText('+56911111111').first()).toBeVisible();
+  await expect(page.locator('#conversationList').getByText('+56922222222').first()).toBeVisible();
 
   await expect(page.locator('#detailCustomer')).toHaveText('+56922222222');
   await expect(page.getByText('¿Tienen hora mañana?')).toBeVisible();
