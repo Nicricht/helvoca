@@ -136,5 +136,6 @@
 .home-incident-history-meta span{padding:4px 6px;border-radius:7px;background:rgba(255,255,255,.035);color:var(--muted);font-size:8px}
 .home-incident-history-actions{align-items:center}
 .home-incident-history-actions small{color:var(--muted);font-size:8px}
-.home-incident-history-actions button{min-height:31px;padding:0 9px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,.025);color:var(--muted);font-size:9px;font-weight:800;cursor:not-allowed}
+.home-incident-history-actions button{min-height:31px;padding:0 9px;border:1px solid rgba(56,217,150,.28);border-radius:8px;background:rgba(56,217,150,.09);color:#a8f3d4;font-size:9px;font-weight:800;cursor:pointer}
+.home-incident-history-actions button:disabled{border-color:var(--border);background:rgba(255,255,255,.025);color:var(--muted);cursor:not-allowed}
 @media(max-width:600px){.home-incident-history-head,.home-incident-history-main,.home-incident-history-actions{align-items:flex-start;flex-direction:column}.home-incident-history-actions button{width:100%}}
