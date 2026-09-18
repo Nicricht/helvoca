@@ -219,6 +219,22 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeIncidentHistoryList')).toContainText('Cierre temprano');
   await expect(page.locator('#homeIncidentHistoryList')).toContainText('PREPARED');
   await expect(page.getByRole('button', { name: 'Activar campaña' }).first()).toBeDisabled();
+
+  await page.locator('#homeIncidentCalendarNext').click();
+  await expect(page.locator('[data-incident-date="2026-10-01"]')).toBeVisible();
+  await page.locator('#homeIncidentCalendarPrev').click();
+  await expect(page.locator('[data-incident-date="2026-09-18"]')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Solo avisar' }).click();
+  await expect(page.locator('#homeIncidentGoal')).toHaveValue('INFORM');
+  await page.getByRole('button', { name: 'Avisar y reprogramar' }).click();
+  await expect(page.locator('#homeIncidentGoal')).toHaveValue('RESCHEDULE');
+
+  await page.getByRole('button', { name: 'WhatsApp', exact: true }).click();
+  await expect(page.locator('#homeIncidentStrategy')).toHaveValue('WHATSAPP');
+  await page.getByRole('button', { name: 'Más económico' }).click();
+  await expect(page.locator('#homeIncidentStrategy')).toHaveValue('CHEAPEST');
+
   await expect(page.locator('#homeIncidentPreviewBtn')).toBeDisabled();
   await page.getByRole('button', { name: 'Cerrar antes' }).click();
   await expect(page.locator('#homeIncidentPreviewBtn')).toBeDisabled();
