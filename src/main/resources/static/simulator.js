@@ -5,7 +5,9 @@ let sessionId = null;
 let active = false;
 let recognition = null;
 let listening = false;
+let recognitionSessionId = null;
 let businessName = "Tu negocio";
+let operation = null;
 
 if (!token) location.replace("/");
 
@@ -37,14 +39,21 @@ function toast(text) {
   toast.timer = setTimeout(() => el.classList.add("hidden"), 3500);
 }
 
+function updateControls() {
+  const operationBusy = Boolean(operation);
+  const sessionBusy = operationBusy || listening;
+  $("#startBtn").disabled = sessionBusy;
+  $("#messageInput").disabled = !active || sessionBusy;
+  $("#sendBtn").disabled = !active || sessionBusy;
+  $("#finishBtn").disabled = !active || sessionBusy;
+  $("#micBtn").disabled = !active || operationBusy || !recognition;
+}
+
 function setActive(value) {
   active = value;
-  $("#messageInput").disabled = !value;
-  $("#sendBtn").disabled = !value;
-  $("#finishBtn").disabled = !value;
-  $("#micBtn").disabled = !value || !recognition;
+  updateControls();
   $("#sessionBadge").textContent = value ? "Prueba activa" : (sessionId ? "Prueba finalizada" : "Sin prueba activa");
-  if (value) $("#messageInput").focus();
+  if (value && !operation) $("#messageInput").focus();
 }
 
 function resetTrace() {
@@ -66,6 +75,7 @@ function bubble(role, text) {
   div.innerHTML = `${esc(text)}<small>${role === "user" ? "Tú" : esc(businessName)}</small>`;
   root.appendChild(div);
   root.scrollTop = root.scrollHeight;
+  return div;
 }
 
 function speak(text) {
@@ -77,10 +87,11 @@ function speak(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-async function loadTrace() {
-  if (!sessionId) return;
+async function loadTrace(targetSessionId = sessionId) {
+  if (!targetSessionId) return;
   try {
-    const detail = await api(`/api/v1/calls/${sessionId}`);
+    const detail = await api(`/api/v1/calls/${targetSessionId}`);
+    if (targetSessionId !== sessionId) return;
     $("#resolution").textContent = detail.call?.resolution || "SIN ACCIÓN";
     const actions = detail.actions || [];
     $("#actionCount").textContent = String(actions.length);
@@ -100,22 +111,40 @@ async function loadTrace() {
   }
 }
 
-async function finishCurrent(silent = false) {
-  if (!sessionId || !active) return;
+async function finishCurrent(silent = false, nested = false) {
+  if (!sessionId || !active) return true;
+  if ((operation || listening) && !nested) return false;
+  if (!nested) {
+    operation = "finish";
+    updateControls();
+  }
+  const finishingSessionId = sessionId;
   try {
-    await api(`/api/v1/simulator/sessions/${sessionId}/finish`, {method:"POST"});
+    await api(`/api/v1/simulator/sessions/${finishingSessionId}/finish`, {method:"POST"});
     setActive(false);
-    await loadTrace();
+    await loadTrace(finishingSessionId);
     if (!silent) toast("Prueba finalizada. Ningún dato comercial real fue modificado.");
+    return true;
   } catch (err) {
     if (!silent) toast(err.message);
+    return false;
+  } finally {
+    if (!nested) {
+      operation = null;
+      updateControls();
+    }
   }
 }
 
 async function startSession() {
-  $("#startBtn").disabled = true;
+  if (operation || listening) return;
+  operation = "start";
+  updateControls();
   try {
-    if (active) await finishCurrent(true);
+    if (active && !(await finishCurrent(true, true))) {
+      toast("No pude finalizar la prueba actual. Intenta nuevamente.");
+      return;
+    }
     const result = await api("/api/v1/simulator/sessions", {method:"POST"});
     sessionId = result.sessionId;
     resetChat();
@@ -126,35 +155,39 @@ async function startSession() {
   } catch (err) {
     toast(err.message);
   } finally {
-    $("#startBtn").disabled = false;
+    operation = null;
+    updateControls();
+    if (active) $("#messageInput").focus();
   }
 }
 
 async function sendMessage(text) {
-  if (!active || !sessionId) return;
+  if (!active || !sessionId || operation) return;
   const clean = String(text || "").trim();
   if (!clean) return;
-  bubble("user", clean);
+  const messageSessionId = sessionId;
+  operation = "send";
+  updateControls();
+  const pendingBubble = bubble("user", clean);
   $("#messageInput").value = "";
-  $("#sendBtn").disabled = true;
-  $("#messageInput").disabled = true;
-  $("#micBtn").disabled = true;
   try {
-    const result = await api(`/api/v1/simulator/sessions/${sessionId}/messages`, {
+    const result = await api(`/api/v1/simulator/sessions/${messageSessionId}/messages`, {
       method:"POST",
       body:JSON.stringify({message:clean})
     });
+    if (messageSessionId !== sessionId) return;
     bubble("assistant", result.reply);
     speak(result.reply);
-    await loadTrace();
+    await loadTrace(messageSessionId);
     if (result.ended) setActive(false);
   } catch (err) {
+    pendingBubble.remove();
+    $("#messageInput").value = clean;
     toast(err.message);
   } finally {
+    operation = null;
+    updateControls();
     if (active) {
-      $("#sendBtn").disabled = false;
-      $("#messageInput").disabled = false;
-      $("#micBtn").disabled = !recognition;
       $("#messageInput").focus();
     }
   }
@@ -172,17 +205,33 @@ function setupRecognition() {
   recognition.continuous = false;
   recognition.onstart = () => {
     listening = true;
+    recognitionSessionId = sessionId;
     $("#micBtn").classList.add("listening");
     $("#voiceHint").textContent = "Escuchando… habla como si estuvieras llamando al negocio.";
+    updateControls();
   };
   recognition.onend = () => {
     listening = false;
+    recognitionSessionId = null;
     $("#micBtn").classList.remove("listening");
     $("#voiceHint").textContent = "Puedes escribir o hablar. Las respuestas se leen en voz alta desde el navegador.";
+    updateControls();
   };
-  recognition.onerror = event => toast(`Micrófono: ${event.error || "no disponible"}`);
+  recognition.onerror = event => {
+    listening = false;
+    recognitionSessionId = null;
+    $("#micBtn").classList.remove("listening");
+    updateControls();
+    toast(`Micrófono: ${event.error || "no disponible"}`);
+  };
   recognition.onresult = event => {
+    const resultSessionId = recognitionSessionId;
     const text = event.results?.[0]?.[0]?.transcript || "";
+    listening = false;
+    recognitionSessionId = null;
+    $("#micBtn").classList.remove("listening");
+    updateControls();
+    if (!active || resultSessionId !== sessionId) return;
     $("#messageInput").value = text;
     sendMessage(text);
   };
@@ -198,8 +247,18 @@ $("#micBtn").addEventListener("click", () => {
   if (!recognition || !active) return;
   try {
     if (listening) recognition.stop();
-    else recognition.start();
-  } catch (err) { toast(err.message); }
+    else {
+      listening = true;
+      recognitionSessionId = sessionId;
+      updateControls();
+      recognition.start();
+    }
+  } catch (err) {
+    listening = false;
+    recognitionSessionId = null;
+    updateControls();
+    toast(err.message);
+  }
 });
 window.addEventListener("beforeunload", () => {
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
@@ -216,6 +275,15 @@ async function loadBusinessIdentity() {
   }
 }
 
-setupRecognition();
-setActive(false);
-loadBusinessIdentity();
+async function initialize() {
+  setupRecognition();
+  setActive(false);
+  if (!token) return;
+  operation = "identity";
+  updateControls();
+  await loadBusinessIdentity();
+  operation = null;
+  updateControls();
+}
+
+initialize();
