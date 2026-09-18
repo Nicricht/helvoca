@@ -255,8 +255,8 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeIncidentTimeTo')).toHaveValue('12:30');
 
   await page.locator('#homeIncidentTimeFrom').selectOption('13:00');
-  await expect(page.locator('#homeIncidentTimeTo option[value="13:00"]')).toBeDisabled();
-  await expect(page.locator('#homeIncidentTimeTo option[value="12:30"]')).toBeDisabled();
+  await expect.poll(() => page.locator('#homeIncidentTimeTo option[value="13:00"]').evaluate(option => option.disabled)).toBe(true);
+  await expect.poll(() => page.locator('#homeIncidentTimeTo option[value="12:30"]').evaluate(option => option.disabled)).toBe(true);
 
   await page.locator('#homeIncidentTimeFrom').selectOption('09:00');
   await page.locator('#homeIncidentTimeTo').selectOption('13:00');
