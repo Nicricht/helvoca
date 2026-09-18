@@ -71,7 +71,7 @@ function activeSubscription() {
   };
 }
 
-test('commercial dashboard stays compact until the customer manages the plan', async ({ page }) => {
+test('settings shows current, pending and available plans without mutating billing', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
 
   let billingPosts = 0;
@@ -100,30 +100,18 @@ test('commercial dashboard stays compact until the customer manages the plan', a
   });
   await page.route('**/api/v1/subscription', route => route.fulfill(json(activeSubscription())));
 
-  await page.goto('/');
+  await page.goto('/settings.html');
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
 
-  const card = page.locator('#commercialStatusCard');
-  await expect(card).toBeVisible();
-  await expect(page.locator('#commercialDetails')).toBeHidden();
-  await expect(page.locator('#commercialPlans')).toBeHidden();
-  await expect(card.getByText('Emprende · 63 min')).toBeVisible();
-  expect(billingPosts).toBe(0);
-
-  await card.getByRole('button', { name: 'Gestionar', exact: true }).click();
-  await expect(page.locator('#commercialDetails')).toBeVisible();
-  await expect(card.locator('#commercialPlan')).toHaveText('Emprende');
-  await expect(card.locator('#commercialSubscriptionStatus')).toHaveText('TRIALING');
-  await expect(card.locator('#commercialMinutes')).toHaveText('37 usados · 63 restantes');
-  await expect(card.locator('#commercialOverage')).toHaveText('0 min');
-  await expect(card.locator('#commercialStateBadge')).toHaveText('SERVICIO HABILITADO');
-  await expect(card).toContainText('Plan pendiente: Negocio');
-  await expect(card).toContainText('hasta que el backend reciba y verifique un cobro aprobado');
-  await expect(card.getByRole('button', { name: 'Continuar checkout' })).toBeVisible();
-  await expect(card.getByRole('button', { name: 'Cotización personalizada' })).toBeDisabled();
+  await expect(page.locator('#settingsPlan')).toContainText('Emprende');
+  await expect(page.locator('#settingsPlan')).toContainText('37 / 100');
+  await expect(page.locator('#settingsPlanPending')).toContainText('Plan pendiente: Negocio');
+  await expect(page.getByRole('button', { name: 'Continuar checkout' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Cotización personalizada' })).toBeDisabled();
   expect(billingPosts).toBe(0);
 });
 
-test('plan checkout starts only after explicit confirmation and does not activate the plan locally', async ({ page }) => {
+test('settings plan checkout starts only after explicit confirmation and keeps current plan until verification', async ({ page }) => {
   await page.addInitScript(() => {
     sessionStorage.setItem('helvoca_access_token', 'e2e-token');
     window.__openedCheckoutUrls = [];
@@ -166,28 +154,23 @@ test('plan checkout starts only after explicit confirmation and does not activat
     }));
   });
 
-  await page.goto('/');
+  await page.goto('/settings.html');
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
 
-  const card = page.locator('#commercialStatusCard');
-  await expect(card).toBeVisible();
-  await expect(card.locator('#commercialPlan')).toHaveText('Emprende');
-  await expect(page.locator('#commercialPlans')).toBeHidden();
+  await expect(page.locator('#settingsPlan')).toContainText('Emprende');
   expect(checkoutPosts).toBe(0);
-
-  await card.getByRole('button', { name: 'Gestionar', exact: true }).click();
-  await expect(page.locator('#commercialPlans')).toBeVisible();
 
   page.once('dialog', async dialog => {
     expect(dialog.message()).toContain('Helvoca no activará el plan hasta verificar el pago');
     await dialog.accept();
   });
-  await card.getByRole('button', { name: 'Elegir Negocio' }).click();
+  await page.getByRole('button', { name: 'Elegir Negocio' }).click();
 
   await expect.poll(() => checkoutPosts).toBe(1);
   expect(checkoutPayload).toEqual({ plan: 'NEGOCIO' });
-  await expect(card.locator('#commercialPlan')).toHaveText('Emprende');
-  await expect(card).toContainText('Plan pendiente: Negocio');
-  await expect(card.locator('#commercialPlanMessage')).toContainText('Checkout creado para Negocio');
+  await expect(page.locator('#settingsPlan')).toContainText('Emprende');
+  await expect(page.locator('#settingsPlanPending')).toContainText('Plan pendiente: Negocio');
+  await expect(page.locator('#settingsPlanMessage')).toContainText('Checkout creado para Negocio');
   await expect.poll(() => page.evaluate(() => window.__openedCheckoutUrls)).toEqual([
     'https://checkout.example.test/pre-e2e-1'
   ]);
