@@ -100,7 +100,7 @@ test('commercial dashboard stays compact until the customer manages the plan', a
   });
   await page.route('**/api/v1/subscription', route => route.fulfill(json(activeSubscription())));
 
-  await page.goto('/');
+  await page.goto('/settings.html');
 
   const card = page.locator('#commercialStatusCard');
   await expect(card).toBeVisible();
@@ -109,7 +109,7 @@ test('commercial dashboard stays compact until the customer manages the plan', a
   await expect(card.getByText('Emprende · 63 min')).toBeVisible();
   expect(billingPosts).toBe(0);
 
-  await card.getByRole('button', { name: 'Gestionar', exact: true }).click();
+  await card.getByRole('button', { name: 'Gestionar plan', exact: true }).click();
   await expect(page.locator('#commercialDetails')).toBeVisible();
   await expect(card.locator('#commercialPlan')).toHaveText('Emprende');
   await expect(card.locator('#commercialSubscriptionStatus')).toHaveText('TRIALING');
@@ -166,7 +166,7 @@ test('plan checkout starts only after explicit confirmation and does not activat
     }));
   });
 
-  await page.goto('/');
+  await page.goto('/settings.html');
 
   const card = page.locator('#commercialStatusCard');
   await expect(card).toBeVisible();
@@ -174,11 +174,11 @@ test('plan checkout starts only after explicit confirmation and does not activat
   await expect(page.locator('#commercialPlans')).toBeHidden();
   expect(checkoutPosts).toBe(0);
 
-  await card.getByRole('button', { name: 'Gestionar', exact: true }).click();
+  await card.getByRole('button', { name: 'Gestionar plan', exact: true }).click();
   await expect(page.locator('#commercialPlans')).toBeVisible();
 
   page.once('dialog', async dialog => {
-    expect(dialog.message()).toContain('Helvoca no activará el plan hasta verificar el pago');
+    expect(dialog.message()).toContain('El plan no se activará hasta verificar el pago');
     await dialog.accept();
   });
   await card.getByRole('button', { name: 'Elegir Negocio' }).click();
