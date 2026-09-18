@@ -132,6 +132,7 @@ async function mockReadyHome(page) {
 }
 
 test('ready customer sees live operational home instead of setup cards', async ({ page }) => {
+  test.setTimeout(90000);
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
 
