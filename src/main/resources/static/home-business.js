@@ -6,6 +6,20 @@
 
   const state = { bookings: [], customers: [], services: [], orders: [], requests: [] };
   const bookingFilters = { query: "", date: "all", serviceId: "all", status: "all", source: "all" };
+  const EVENT_LABELS = {
+    BOOKING_CREATED: "Reserva creada",
+    BOOKING_RESCHEDULED: "Reserva reprogramada",
+    BOOKING_CANCELLED: "Reserva cancelada",
+    CUSTOMER_REGISTERED: "Cliente registrado",
+    CALLER_LOOKUP: "Cliente identificado",
+    FIND_CALLER: "Cliente identificado",
+    SERVICES_LISTED: "Consultó servicios",
+    LIST_SERVICES: "Consultó servicios",
+    AVAILABILITY_LISTED: "Consultó horarios disponibles",
+    LIST_AVAILABLE_SLOTS: "Consultó horarios disponibles",
+    AVAILABILITY_CHECKED: "Verificó disponibilidad",
+    CHECK_BOOKING_AVAILABILITY: "Verificó disponibilidad"
+  };
   let loading = false;
 
   const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;" }[c]));
@@ -20,6 +34,123 @@
   };
   const source = value => ({VOICE:"Voz",AI_CALL:"Llamada",WHATSAPP:"WhatsApp",MANUAL:"Manual",API:"API",ADMIN:"Manual"})[value] || value || "Sin origen";
   const status = value => ({CONFIRMED:"Confirmada",CANCELLED:"Cancelada",PREPARING:"Preparando",READY:"Listo",DISPATCHED:"Despachado",COMPLETED:"Completado",OPEN:"Abierta",IN_PROGRESS:"En curso"})[value] || value || "";
+
+  function eventLabel(value) {
+    return EVENT_LABELS[value] || String(value || "").toLowerCase().replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function ensureBookingDrawer() {
+    if (document.querySelector("#homeBookingDetailBackdrop")) return;
+    document.body.insertAdjacentHTML("beforeend", `
+      <div id="homeBookingDetailBackdrop" class="home-detail-backdrop hidden" aria-hidden="true">
+        <aside id="homeBookingDetailDrawer" class="home-detail-drawer" role="dialog" aria-modal="true" aria-labelledby="homeBookingDetailTitle">
+          <div class="home-detail-head">
+            <div><span class="eyebrow">RESERVA</span><h2 id="homeBookingDetailTitle">Detalle</h2><p id="homeBookingDetailMeta"></p></div>
+            <button id="homeBookingDetailClose" class="home-detail-close" type="button">Cerrar</button>
+          </div>
+          <div id="homeBookingDetailBody" class="home-detail-body"></div>
+        </aside>
+      </div>
+    `);
+    document.querySelector("#homeBookingDetailClose").addEventListener("click", closeBookingDrawer);
+    document.querySelector("#homeBookingDetailBackdrop").addEventListener("click", event => {
+      if (event.target === event.currentTarget) closeBookingDrawer();
+    });
+    document.addEventListener("keydown", event => { if (event.key === "Escape") closeBookingDrawer(); });
+  }
+
+  function closeBookingDrawer() {
+    const backdrop = document.querySelector("#homeBookingDetailBackdrop");
+    if (!backdrop) return;
+    backdrop.classList.add("hidden");
+    backdrop.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("home-detail-open");
+  }
+
+  function bookingFacts(booking, customer, service) {
+    return `<div class="home-detail-facts">
+      <div><span>Servicio</span><strong>${esc(service.name || "Servicio")}</strong></div>
+      <div><span>Teléfono</span><strong>${esc(customer.phone || "Sin teléfono")}</strong></div>
+      <div><span>Inicio</span><strong>${esc(fmt(booking.startAt))}</strong></div>
+      <div><span>Fin</span><strong>${esc(fmt(booking.endAt))}</strong></div>
+      <div><span>Origen</span><strong>${esc(source(booking.source))}</strong></div>
+      <div><span>Estado</span><strong>${esc(status(booking.status))}</strong></div>
+    </div>${booking.notes ? `<div class="home-detail-note"><span>Notas</span><p>${esc(booking.notes)}</p></div>` : ""}`;
+  }
+
+  function renderContext(context) {
+    if (!context) return '<section class="home-detail-section"><h3>Conversación</h3><p class="home-detail-muted">No hay contexto conversacional disponible.</p></section>';
+    const events = Array.isArray(context.events) ? context.events : [];
+    const history = events.length ? `<section class="home-detail-section"><h3>Historial</h3><div class="home-detail-history">${events.map(item =>
+      `<div><span>${esc(fmt(item.createdAt))}</span><strong>${esc(eventLabel(item.eventType))}</strong></div>`
+    ).join("")}</div></section>` : "";
+
+    if (context.channel === "VOICE" && context.call) {
+      const detail = context.call;
+      const transcript = Array.isArray(detail.transcript) ? detail.transcript : [];
+      const actions = Array.isArray(detail.actions) ? detail.actions : [];
+      return `
+        <section class="home-detail-section"><h3>Resumen</h3><p class="home-detail-summary">${esc(detail.summary || "La llamada no tiene resumen guardado.")}</p></section>
+        <section class="home-detail-section"><h3>Conversación</h3><div class="home-detail-transcript">${transcript.length ? transcript.map(line =>
+          `<article class="home-detail-message ${String(line.speaker || "").toUpperCase() === "ASSISTANT" ? "assistant" : ""}"><strong>${String(line.speaker || "").toUpperCase() === "ASSISTANT" ? "Helvoca" : "Cliente"}</strong><p>${esc(line.content)}</p><span>${esc(fmt(line.createdAt))}</span></article>`
+        ).join("") : '<p class="home-detail-muted">No hay transcripción guardada.</p>'}</div></section>
+        <section class="home-detail-section"><h3>Qué hizo Helvoca</h3><div class="home-detail-actions-list">${actions.length ? actions.filter(a => a.success !== false).map(action =>
+          `<div><span>✓</span><strong>${esc(eventLabel(action.actionType))}</strong></div>`
+        ).join("") : '<p class="home-detail-muted">No hay acciones registradas.</p>'}</div></section>
+        ${history}
+        ${context.sourceReferenceId ? `<a class="home-detail-link" href="/conversations.html?channel=calls&conversation=${encodeURIComponent(context.sourceReferenceId)}">Ver conversación completa</a>` : ""}
+      `;
+    }
+
+    if (context.channel === "WHATSAPP" && context.whatsapp) {
+      const messages = Array.isArray(context.whatsapp.messages) ? context.whatsapp.messages : [];
+      return `
+        <section class="home-detail-section"><h3>Conversación de WhatsApp</h3><div class="home-detail-transcript">${messages.length ? messages.map(message => {
+          const assistant = String(message.role || "").toLowerCase() === "assistant" || String(message.direction || "").toLowerCase() === "outbound";
+          return `<article class="home-detail-message ${assistant ? "assistant" : ""}"><strong>${assistant ? "Helvoca" : "Cliente"}</strong><p>${esc(message.content)}</p><span>${esc(fmt(message.createdAt))}</span></article>`;
+        }).join("") : '<p class="home-detail-muted">No hay mensajes guardados.</p>'}</div></section>
+        ${history}
+        ${context.sourceReferenceId ? `<a class="home-detail-link" href="/conversations.html?channel=whatsapp&conversation=${encodeURIComponent(context.sourceReferenceId)}">Ver conversación completa</a>` : ""}
+      `;
+    }
+
+    return `<section class="home-detail-section"><h3>Origen</h3><p class="home-detail-muted">${context.channel === "MANUAL" ? "Esta reserva fue creada manualmente. No existe una conversación asociada." : "No se encontró una conversación enlazada a esta reserva."}</p></section>${history}`;
+  }
+
+  async function openBookingDetail(id) {
+    const booking = state.bookings.find(item => String(item.id) === String(id));
+    if (!booking) return;
+    const customers = new Map(state.customers.map(x => [String(x.id), x]));
+    const services = new Map(state.services.map(x => [String(x.id), x]));
+    const customer = customers.get(String(booking.customerId)) || {};
+    const service = services.get(String(booking.serviceId)) || {};
+    ensureBookingDrawer();
+    document.querySelector("#homeBookingDetailTitle").textContent = customer.name || customer.phone || "Cliente";
+    document.querySelector("#homeBookingDetailMeta").textContent = `${fmt(booking.startAt)} · ${status(booking.status)}`;
+    const body = document.querySelector("#homeBookingDetailBody");
+    body.innerHTML = bookingFacts(booking, customer, service) + '<div class="home-detail-loading">Cargando conversación…</div>';
+    const backdrop = document.querySelector("#homeBookingDetailBackdrop");
+    backdrop.classList.remove("hidden");
+    backdrop.setAttribute("aria-hidden", "false");
+    document.body.classList.add("home-detail-open");
+    try {
+      const context = await api(`/api/v1/bookings/${encodeURIComponent(id)}/context`);
+      body.innerHTML = bookingFacts(booking, customer, service) + renderContext(context);
+    } catch (error) {
+      body.innerHTML = bookingFacts(booking, customer, service) +
+        '<section class="home-detail-section"><h3>Conversación</h3><p class="home-detail-muted">No pude cargar la conversación asociada en este momento.</p></section>';
+    }
+  }
+
+  function bindBookingOpeners() {
+    document.querySelectorAll("[data-home-booking-id]").forEach(node => {
+      const open = () => openBookingDetail(node.dataset.homeBookingId);
+      node.addEventListener("click", open);
+      node.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); }
+      });
+    });
+  }
 
   function ready() {
     const cards=[...statusGrid.querySelectorAll(".status-card")];
@@ -118,6 +249,7 @@
       return `<article class="home-business-mobile-card" tabindex="0" data-home-booking-id="${esc(item.id)}"><strong>${esc(customer.name || customer.phone || "Cliente")}</strong><span>${esc(fmt(item.startAt))} · ${esc(service.name || "Servicio")}</span><span class="home-pill ${item.status === "CANCELLED" ? "bad" : ""}">${esc(status(item.status))}</span></article>`;
     }).join("")}</div>`;
     bindBookingFilters();
+    bindBookingOpeners();
   }
 
   function bindBookingFilters() {
@@ -192,6 +324,7 @@
   new MutationObserver(()=>queueMicrotask(load)).observe(statusGrid,{subtree:true,attributes:true,attributeFilter:["class"]});
   new MutationObserver(()=>{ if(!dashboard.classList.contains("hidden")) queueMicrotask(load); }).observe(dashboard,{attributes:true,attributeFilter:["class"]});
   document.querySelector("#refreshBtn")?.addEventListener("click",load);
+  ensureBookingDrawer();
   setTab("bookings");
   queueMicrotask(load);
 })();
