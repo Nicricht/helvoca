@@ -104,6 +104,83 @@ test('auth tabs and simplified registration controls are usable', async ({ page 
   await expect(page.locator('#loginForm')).toBeHidden();
 });
 
+test('registration validates fields and enters the dashboard with the expected payload', async ({ page }) => {
+  await mockReadyTenant(page);
+
+  let registerCalls = 0;
+  let registerPayload = null;
+  await page.route('**/api/v1/auth/register', async route => {
+    registerCalls += 1;
+    registerPayload = route.request().postDataJSON();
+    await route.fulfill(json({ accessToken: 'register-token' }));
+  });
+
+  await page.goto('/');
+
+  await page.locator('#registerForm [name="businessName"]').fill('Negocio QA');
+  await page.locator('#registerForm [name="email"]').fill('qa@example.cl');
+  await page.locator('#registerForm [name="password"]').fill('corta');
+  await page.locator('#registerForm button[type="submit"]').click();
+  expect(registerCalls).toBe(0);
+  await expect(page.locator('#registerForm [name="password"]')).toHaveJSProperty('validity.valid', false);
+
+  await page.locator('#registerForm [name="password"]').fill('clave-segura-123');
+  await page.locator('#registerForm button[type="submit"]').click();
+
+  await expect.poll(() => registerCalls).toBe(1);
+  expect(registerPayload.businessName).toBe('Negocio QA');
+  expect(registerPayload.adminName).toBe('Negocio QA');
+  expect(registerPayload.email).toBe('qa@example.cl');
+  expect(registerPayload.password).toBe('clave-segura-123');
+  expect(registerPayload.humanTransferPhone).toBeNull();
+  expect(registerPayload.timezone).toBeTruthy();
+  expect(registerPayload.language).toBeTruthy();
+
+  await expect(page.locator('#dashboardView')).toBeVisible();
+  await expect(page.locator('#authView')).toBeHidden();
+  await expect(page.locator('#sessionBadge')).toHaveText('Sesión activa');
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBe('register-token');
+});
+
+test('login keeps errors visible and enters the dashboard after valid credentials', async ({ page }) => {
+  await mockReadyTenant(page);
+
+  let loginCalls = 0;
+  await page.route('**/api/v1/auth/login', async route => {
+    loginCalls += 1;
+    if (loginCalls === 1) {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Credenciales inválidas.' })
+      });
+      return;
+    }
+    await route.fulfill(json({ accessToken: 'login-token' }));
+  });
+
+  await page.goto('/');
+  await page.locator('#loginTab').click();
+  await page.locator('#loginForm [name="email"]').fill('qa@example.cl');
+  await page.locator('#loginForm [name="password"]').fill('incorrecta');
+  await page.locator('#loginForm button[type="submit"]').click();
+
+  await expect(page.locator('#authMessage')).toBeVisible();
+  await expect(page.locator('#authMessage')).toContainText('Credenciales inválidas');
+  await expect(page.locator('#loginForm')).toBeVisible();
+  await expect(page.locator('#dashboardView')).toBeHidden();
+  expect(loginCalls).toBe(1);
+
+  await page.locator('#loginForm [name="password"]').fill('clave-segura-123');
+  await page.locator('#loginForm button[type="submit"]').click();
+
+  await expect.poll(() => loginCalls).toBe(2);
+  await expect(page.locator('#dashboardView')).toBeVisible();
+  await expect(page.locator('#authView')).toBeHidden();
+  await expect(page.locator('#sessionBadge')).toHaveText('Sesión activa');
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBe('login-token');
+});
+
 test('ready customer sees operations on home and configuration on settings', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyTenant(page);
