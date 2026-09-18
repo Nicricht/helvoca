@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Helvoca · Configuración</title>
+  <link rel="stylesheet" href="/operations.css">
+  <link rel="stylesheet" href="/settings.css?v=20260917-1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand-block"><strong>HELVOCA</strong><span>Configuración</span></div>
+  <div class="topbar-shell">
+    <nav class="app-nav" aria-label="Navegación principal">
+      <a class="nav-home" href="/">Inicio</a>
+      <a class="nav-conversations" href="/conversations.html">Conversaciones</a>
+      <a class="nav-operations" href="/operations.html">Operaciones</a>
+      <a class="nav-config active" href="/settings.html">Configuración</a>
+    </nav>
+    <div class="topbar-actions"><a class="quiet-action" href="/simulator.html">Probar</a><button id="refreshSettingsBtn" class="quiet-action" type="button">Actualizar</button></div>
+  </div>
+</header>
+
+<main class="settings-main">
+  <section class="settings-heading">
+    <div><p class="eyebrow">TU HELVOCA</p><h1>Configuración</h1><p class="muted">Define cómo trabaja Helvoca. Los cambios operacionales se mantienen separados de esta pantalla.</p></div>
+    <div id="settingsLoadState" class="badge">Cargando</div>
+  </section>
+
+  <div class="settings-layout">
+    <aside class="settings-nav" aria-label="Secciones de configuración">
+      <button class="settings-tab active" type="button" data-settings-tab="general">General</button>
+      <button class="settings-tab" type="button" data-settings-tab="agent">Recepcionista</button>
+      <button class="settings-tab" type="button" data-settings-tab="services">Servicios</button>
+      <button class="settings-tab" type="button" data-settings-tab="hours">Horarios</button>
+      <button class="settings-tab" type="button" data-settings-tab="knowledge">Conocimiento</button>
+      <button class="settings-tab" type="button" data-settings-tab="channels">Canales</button>
+      <button class="settings-tab" type="button" data-settings-tab="plan">Plan</button>
+      <button class="settings-tab" type="button" data-settings-tab="advanced">Avanzado</button>
+    </aside>
+
+    <section class="settings-content">
+      <section class="settings-panel" data-settings-panel="general">
+        <div class="settings-panel-head"><div><p class="eyebrow">GENERAL</p><h2>Negocio</h2><p>Datos que Helvoca utiliza para atender correctamente.</p></div></div>
+        <div class="settings-grid two">
+          <label>Nombre del negocio<input id="settingsBusinessName" maxlength="150"></label>
+          <label>Teléfono humano<input id="settingsHumanTransferPhone" placeholder="+56912345678"></label>
+          <label>Zona horaria<input id="settingsTimezone" value="America/Santiago"></label>
+          <label>Idioma<input id="settingsLanguage" maxlength="10" value="es"></label>
+        </div>
+      </section>
+
+      <section class="settings-panel hidden" data-settings-panel="agent">
+        <div class="settings-panel-head"><div><p class="eyebrow">RECEPCIONISTA</p><h2>Cómo debe atender</h2><p>Identidad, voz y permisos de Helvoca.</p></div></div>
+        <div class="settings-grid two">
+          <label>Nombre<input id="settingsAgentName" maxlength="100"></label>
+          <label>Voz<input id="settingsAgentVoice" maxlength="100" placeholder="Predeterminada"></label>
+        </div>
+        <label>Saludo<textarea id="settingsAgentGreeting" maxlength="2000"></textarea></label>
+        <label>Instrucciones adicionales<textarea id="settingsAgentInstructions" maxlength="4000"></textarea></label>
+        <label class="settings-toggle"><input id="settingsAgentActive" type="checkbox"> Recepcionista activa</label>
+        <div class="settings-capabilities" id="settingsCapabilities">
+          <label><input type="checkbox" value="GET_BUSINESS_INFORMATION">Información</label>
+          <label><input type="checkbox" value="LIST_SERVICES">Servicios</label>
+          <label><input type="checkbox" value="SEARCH_KNOWLEDGE">Conocimiento</label>
+          <label><input type="checkbox" value="FIND_CALLER">Identificar cliente</label>
+          <label><input type="checkbox" value="REGISTER_CALLER">Registrar cliente</label>
+          <label><input type="checkbox" value="LIST_AVAILABLE_SLOTS">Ver horarios</label>
+          <label><input type="checkbox" value="CHECK_BOOKING_AVAILABILITY">Comprobar horario</label>
+          <label><input type="checkbox" value="CREATE_BOOKING">Crear reserva</label>
+          <label><input type="checkbox" value="LIST_CUSTOMER_BOOKINGS">Ver reservas</label>
+          <label><input type="checkbox" value="RESCHEDULE_BOOKING">Reprogramar</label>
+          <label><input type="checkbox" value="CANCEL_BOOKING">Cancelar reserva</label>
+          <label><input type="checkbox" value="CREATE_REQUEST">Crear solicitud</label>
+          <label><input type="checkbox" value="RECORD_UNANSWERED_QUESTION">Guardar pregunta</label>
+          <label><input type="checkbox" value="TRANSFER_TO_HUMAN">Transferir a persona</label>
+        </div>
+      </section>
+
+      <section class="settings-panel hidden" data-settings-panel="services">
+        <div class="settings-panel-head"><div><p class="eyebrow">SERVICIOS</p><h2>Qué puede reservar un cliente</h2></div><button id="settingsAddService" class="button secondary" type="button">+ Servicio</button></div>
+        <div id="settingsServices" class="settings-repeat"></div>
+      </section>
+
+      <section class="settings-panel hidden" data-settings-panel="hours">
+        <div class="settings-panel-head"><div><p class="eyebrow">HORARIOS</p><h2>Cuándo atiende el negocio</h2></div><button id="settingsAddHour" class="button secondary" type="button">+ Intervalo</button></div>
+        <div id="settingsHours" class="settings-repeat"></div>
+      </section>
+
+      <section class="settings-panel hidden" data-settings-panel="knowledge">
+        <div class="settings-panel-head"><div><p class="eyebrow">CONOCIMIENTO</p><h2>Respuestas oficiales</h2></div><button id="settingsAddKnowledge" class="button secondary" type="button">+ Respuesta</button></div>
+        <div id="settingsKnowledge" class="settings-repeat"></div>
+      </section>
+
+      <section class="settings-panel hidden" data-settings-panel="channels">
+        <div class="settings-panel-head"><div><p class="eyebrow">CANALES</p><h2>Teléfono</h2><p>Administra los números conectados a este negocio.</p></div></div>
+        <form id="settingsPhoneForm" class="settings-inline-form">
+          <input name="phoneNumber" required placeholder="+56912345678">
+          <input name="externalId" placeholder="ID externo opcional">
+          <button type="submit">Conectar</button>
+        </form>
+        <div id="settingsPhones" class="settings-repeat"></div>
+      </section>
+
+      <section class="settings-panel hidden" data-settings-panel="plan">
+        <div class="settings-panel-head"><div><p class="eyebrow">PLAN</p><h2>Suscripción</h2><p>Estado confirmado por backend.</p></div><a href="/pricing.html" class="button secondary">Ver planes</a></div>
+        <div id="settingsPlan" class="settings-plan">Cargando plan…</div>
+      </section>
+
+      <section class="settings-panel hidden" data-settings-panel="advanced">
+        <div class="settings-panel-head"><div><p class="eyebrow">AVANZADO</p><h2>Diagnóstico técnico</h2><p>Telefonía, proveedores, readiness y certificación viven fuera del flujo diario.</p></div></div>
+        <a href="/operations.html#technicalDiagnostics" class="button secondary">Abrir diagnóstico técnico</a>
+      </section>
+    </section>
+  </div>
+
+  <div id="settingsSaveBar" class="settings-save-bar hidden">
+    <span>Tienes cambios sin guardar</span>
+    <button id="settingsSaveBtn" type="button">Guardar cambios</button>
+  </div>
+  <p id="settingsMessage" class="message hidden"></p>
+</main>
+
+<script src="/settings.js?v=20260917-1" defer></script>
+</body>
+</html>
