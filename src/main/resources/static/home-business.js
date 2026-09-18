@@ -4,7 +4,7 @@
   const statusGrid = document.querySelector("#statusGrid");
   if (!root || !dashboard || !statusGrid || typeof api !== "function") return;
 
-  const state = { bookings: [], customers: [], services: [], orders: [], requests: [], businessName: "Tu negocio" };
+  const state = { bookings: [], customers: [], services: [], orders: [], requests: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
   const bookingFilters = { query: "", date: "all", serviceId: "all", status: "all", source: "all" };
   const EVENT_LABELS = {
     BOOKING_CREATED: "Reserva creada",
@@ -440,6 +440,129 @@
     host.innerHTML=items.map(item=>`<article class="home-simple-row"><div><strong>${esc(item.name||item.phone||"Cliente")}</strong><span>${esc([item.phone,item.email].filter(Boolean).join(" · "))}</span></div><span class="home-pill">Cliente</span></article>`).join("");
   }
 
+  function businessParts(value = new Date()) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: state.businessTimezone || "America/Santiago",
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+      }).formatToParts(new Date(value));
+      return Object.fromEntries(parts.filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+    } catch (_) {
+      const date = new Date(value);
+      return {
+        year: String(date.getFullYear()),
+        month: String(date.getMonth() + 1).padStart(2, "0"),
+        day: String(date.getDate()).padStart(2, "0"),
+        hour: String(date.getHours()).padStart(2, "0"),
+        minute: String(date.getMinutes()).padStart(2, "0")
+      };
+    }
+  }
+
+  function businessDateKey(value) {
+    const parts = businessParts(value);
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  }
+
+  function businessMinuteOfDay(value) {
+    const parts = businessParts(value);
+    return Number(parts.hour || 0) * 60 + Number(parts.minute || 0);
+  }
+
+  function incidentChannelLabel(strategy, bookings) {
+    if (strategy === "CALL") return "Llamada";
+    if (strategy === "WHATSAPP") return "WhatsApp";
+    return bookings.some(item => sourceGroup(item.source) === "WHATSAPP") ? "WhatsApp" : "WhatsApp primero";
+  }
+
+  function renderIncidentPreview() {
+    const preview = document.querySelector("#homeIncidentPreview");
+    const reason = document.querySelector("#homeIncidentReason")?.value.trim() || "";
+    const targetDate = document.querySelector("#homeIncidentDate")?.value || "";
+    const targetTime = document.querySelector("#homeIncidentTime")?.value || "";
+    const goal = document.querySelector("#homeIncidentGoal")?.value || "RESCHEDULE";
+    const strategy = document.querySelector("#homeIncidentStrategy")?.value || "CHEAPEST";
+    if (!preview) return;
+
+    preview.classList.remove("hidden");
+    if (!reason || !targetDate || !targetTime) {
+      preview.innerHTML = '<div class="home-incident-empty">Completa el motivo, la fecha y la hora desde la que cambia tu atención.</div>';
+      return;
+    }
+
+    const [hour, minute] = targetTime.split(":").map(Number);
+    const cutoff = Number(hour || 0) * 60 + Number(minute || 0);
+    const affected = state.bookings
+      .filter(item => item.status === "CONFIRMED")
+      .filter(item => businessDateKey(item.startAt) === targetDate)
+      .filter(item => businessMinuteOfDay(item.startAt) >= cutoff)
+      .sort((a, b) => new Date(a.startAt || 0) - new Date(b.startAt || 0));
+
+    const customers = new Map(state.customers.map(item => [String(item.id), item]));
+    const services = new Map(state.services.map(item => [String(item.id), item]));
+    const grouped = new Map();
+    affected.forEach(booking => {
+      const key = String(booking.customerId || booking.id);
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(booking);
+    });
+    const groups = [...grouped.values()];
+
+    if (!groups.length) {
+      preview.innerHTML = `<div class="home-incident-empty">No hay reservas confirmadas afectadas desde las ${esc(targetTime)} en esa fecha.</div>`;
+      return;
+    }
+
+    const rows = groups.map(bookings => {
+      const first = bookings[0];
+      const customer = customers.get(String(first.customerId)) || {};
+      const customerName = customer.name || customer.phone || "Cliente";
+      const bookingText = bookings.map(booking => {
+        const service = services.get(String(booking.serviceId)) || {};
+        return `${service.name || "Servicio"} · ${fmtCompact(booking.startAt)}`;
+      }).join(" / ");
+      const noun = bookings.length === 1 ? "tu reserva" : "tus reservas";
+      const actionText = goal === "RESCHEDULE"
+        ? " Podemos ayudarte a reprogramarla."
+        : "";
+      const message = `Hola ${customerName}, ${state.businessName} necesita informarte de un cambio que afecta ${noun}: ${bookingText}. Motivo: ${reason}.${actionText}`;
+      const channel = incidentChannelLabel(strategy, bookings);
+      return `<article class="home-incident-item">
+        <div><strong>${esc(customerName)}</strong><span>${esc(bookingText)}</span></div>
+        <span class="home-incident-channel">${esc(channel)}</span>
+        <p class="home-incident-message">${esc(message)}</p>
+      </article>`;
+    }).join("");
+
+    preview.innerHTML = `
+      <div class="home-incident-preview-head">
+        <strong>${groups.length} cliente${groups.length === 1 ? "" : "s"} afectado${groups.length === 1 ? "" : "s"}</strong>
+        <span>${affected.length} reserva${affected.length === 1 ? "" : "s"} · vista previa</span>
+      </div>
+      <div class="home-incident-list">${rows}</div>
+      <div class="home-incident-footer">
+        <span>No se enviará ningún mensaje ni se realizará ninguna llamada desde esta vista previa.</span>
+        <button type="button" disabled>Enviar avisos · próximo bloque</button>
+      </div>
+    `;
+  }
+
+  function bindIncidentResolver() {
+    const toggle = document.querySelector("#homeIncidentToggle");
+    const panel = document.querySelector("#homeIncidentPanel");
+    const previewButton = document.querySelector("#homeIncidentPreviewBtn");
+    if (!toggle || !panel || !previewButton || toggle.dataset.bound === "true") return;
+    toggle.dataset.bound = "true";
+    toggle.addEventListener("click", () => {
+      panel.classList.toggle("hidden");
+      toggle.setAttribute("aria-expanded", panel.classList.contains("hidden") ? "false" : "true");
+      const date = document.querySelector("#homeIncidentDate");
+      if (date && !date.value) date.value = businessDateKey(new Date());
+    });
+    previewButton.addEventListener("click", renderIncidentPreview);
+  }
+
   async function load() {
     if(loading || dashboard.classList.contains("hidden") || !ready()) return;
     loading=true;
@@ -458,7 +581,8 @@
       state.orders=orders.status==="fulfilled"&&Array.isArray(orders.value)?orders.value:[];
       state.requests=ops.status==="fulfilled"&&Array.isArray(ops.value?.recentRequests)?ops.value.recentRequests:[];
       state.businessName=ops.status==="fulfilled"&&ops.value?.businessName?String(ops.value.businessName):"Tu negocio";
-      renderBookings(); renderOrders(); renderRequests(); renderCustomers();
+      state.businessTimezone=ops.status==="fulfilled"&&ops.value?.timezone?String(ops.value.timezone):"America/Santiago";
+      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); bindIncidentResolver();
     } finally { loading=false; }
   }
 
