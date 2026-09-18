@@ -338,7 +338,7 @@
 
     let loading = false;
     let lastLoadedAt = 0;
-    let currentBusinessName = "Tu negocio";
+    let currentBusinessName = window.helvocaBusinessName || "Tu negocio";
 
     function isReady() {
         const cards = [...statusGrid.querySelectorAll('.status-card')];
@@ -357,7 +357,7 @@
     }
 
     function renderOperational(operations, whatsapp) {
-        currentBusinessName = operations.businessName || "Tu negocio";
+        currentBusinessName = operations.businessName || window.helvocaBusinessName || currentBusinessName || "Tu negocio";
         const timeZone = operations.timezone || 'UTC';
         const today = dateKey(operations.localNow || new Date().toISOString(), timeZone);
         const whatsappToday = (whatsapp || []).filter(conversation =>
@@ -403,6 +403,7 @@
         statusGrid.classList.toggle('ux-ready-hidden', ready);
         if (!ready) return;
 
+        currentBusinessName = window.helvocaBusinessName || currentBusinessName || "Tu negocio";
         const operationalTitle = `${currentBusinessName} está atendiendo 🟢`;
         if (title.textContent !== operationalTitle) title.textContent = operationalTitle;
         if (summary && summary.textContent !== 'Tu negocio está listo. Esto es lo que está pasando hoy.') {
