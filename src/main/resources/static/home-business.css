@@ -234,3 +234,19 @@
 .home-incident-history-meta{margin:6px 0}
 .home-incident-history-actions small{font-size:8px}
 @media(max-width:760px){.home-incident-ready{align-items:stretch;flex-direction:column}.home-incident-ready button{width:100%}}
+
+.home-incident-delivery-list{display:grid;gap:6px;margin:8px 0 2px;padding-top:7px;border-top:1px solid rgba(255,255,255,.05)}
+.home-incident-delivery-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 9px;border:1px solid rgba(255,255,255,.055);border-radius:9px;background:rgba(255,255,255,.018)}
+.home-incident-delivery-who{display:grid;gap:2px;min-width:0}
+.home-incident-delivery-who strong{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.home-incident-delivery-who span{color:var(--muted);font-size:8px}
+.home-incident-delivery-result{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex:0 0 auto}
+.home-incident-delivery-status{display:inline-flex;align-items:center;min-height:24px;padding:0 8px;border-radius:999px;border:1px solid rgba(255,255,255,.07);font-size:8px;font-weight:800}
+.home-incident-delivery-status.is-pending,.home-incident-delivery-status.is-sending{color:#d8d5e6;background:rgba(255,255,255,.035)}
+.home-incident-delivery-status.is-sent{color:#c9d9ff;background:rgba(91,131,255,.09)}
+.home-incident-delivery-status.is-delivered{color:#bff3cf;background:rgba(58,187,112,.09)}
+.home-incident-delivery-status.is-error{color:#ffd1d1;background:rgba(219,72,72,.09)}
+.home-incident-delivery-status.is-cancelled{color:#d4d0dc;background:rgba(255,255,255,.035)}
+.home-incident-delivery-result button{min-height:26px;padding:0 9px;border:1px solid rgba(255,255,255,.09);border-radius:8px;background:rgba(255,255,255,.035);color:var(--text);font-size:8px;font-weight:800;cursor:pointer}
+.home-incident-delivery-result button:disabled{opacity:.55;cursor:default}
+@media(max-width:560px){.home-incident-delivery-row{align-items:flex-start;flex-direction:column}.home-incident-delivery-result{width:100%;justify-content:space-between}}

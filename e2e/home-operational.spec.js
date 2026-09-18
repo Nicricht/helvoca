@@ -213,17 +213,28 @@ test('ready customer sees live operational home instead of setup cards', async (
 
   let preparedCampaignRequest = null;
   let activationRequest = null;
+  let retryRequest = null;
   let unsafeOutboundCalls = 0;
   const campaignHistory = [{
     id: 'campaign-old',
     reason: 'Cierre temprano',
-    status: 'PREPARED',
+    status: 'ACTIVATED',
     goal: 'INFORM',
     strategy: 'CHEAPEST',
-    recipientCount: 2,
+    recipientCount: 1,
     createdAt: '2026-09-17T12:00:00Z',
     activationReady: false,
-    activationBlockers: [{ code: 'OUTBOUND_DELIVERY_DISABLED', message: 'La entrega real de mensajes está desactivada.' }]
+    activationBlockers: [{ code: 'CAMPAIGN_NOT_PREPARED', message: 'La campaña ya fue activada.' }],
+    recipients: [{
+      recipientId: 'recipient-old',
+      customerId: 'cust-old',
+      customerName: 'Nicolás Vega',
+      channel: 'WHATSAPP',
+      status: 'FAILED',
+      statusAt: '2026-09-17T12:05:00Z',
+      retryable: true,
+      retryCount: 0
+    }]
   }];
   page.on('request', request => {
     if (/\/api\/v1\/outbound-messages\/.*\/(queue|dispatch)$/.test(request.url())) unsafeOutboundCalls += 1;
@@ -239,6 +250,24 @@ test('ready customer sees live operational home instead of setup cards', async (
     }));
   });
 
+  await page.route('**/api/v1/booking-incident-campaigns/*/recipients/*/retry', async route => {
+    expect(route.request().method()).toBe('POST');
+    retryRequest = route.request().postDataJSON();
+    const target = campaignHistory.find(item => item.id === 'campaign-old');
+    const recipient = target?.recipients?.find(item => item.recipientId === 'recipient-old');
+    if (recipient) {
+      recipient.status = 'QUEUED';
+      recipient.statusAt = '2026-09-18T12:10:00Z';
+      recipient.retryable = false;
+      recipient.retryCount = 1;
+    }
+    await route.fulfill(json({
+      campaignId: 'campaign-old',
+      recipientId: 'recipient-old',
+      status: 'QUEUED'
+    }));
+  });
+
   await page.route('**/api/v1/booking-incident-campaigns/*/activate', async route => {
     expect(route.request().method()).toBe('POST');
     activationRequest = route.request().postDataJSON();
@@ -247,6 +276,11 @@ test('ready customer sees live operational home instead of setup cards', async (
       target.status = 'ACTIVATED';
       target.activationReady = false;
       target.activationBlockers = [{ code: 'CAMPAIGN_NOT_PREPARED', message: 'La campaña ya no está en estado preparado.' }];
+      (target.recipients || []).forEach(recipient => {
+        recipient.status = 'QUEUED';
+        recipient.statusAt = '2026-09-18T12:01:00Z';
+        recipient.retryable = false;
+      });
     }
     await route.fulfill(json({
       campaignId: 'campaign-1',
@@ -275,7 +309,17 @@ test('ready customer sees live operational home instead of setup cards', async (
       ...created,
       reason: preparedCampaignRequest.reason,
       activationReady: true,
-      activationBlockers: []
+      activationBlockers: [],
+      recipients: preparedCampaignRequest.recipients.map((item, index) => ({
+        recipientId: 'recipient-' + (index + 1),
+        customerId: item.customerId,
+        customerName: index === 0 ? 'Ana Reserva' : 'Cliente',
+        channel: 'WHATSAPP',
+        status: 'PENDING',
+        statusAt: '2026-09-18T12:00:00Z',
+        retryable: false,
+        retryCount: 0
+      }))
     });
     await route.fulfill(json(created));
   });
@@ -309,8 +353,18 @@ test('ready customer sees live operational home instead of setup cards', async (
   await page.locator('#homeIncidentHistoryToggle').click();
   await expect(page.locator('#homeIncidentHistoryBody')).toBeVisible();
   await expect(page.locator('#homeIncidentHistoryList')).toContainText('Cierre temprano');
-  await expect(page.locator('#homeIncidentHistoryList')).toContainText('Pendiente');
-  await expect(page.getByRole('button', { name: 'Enviar avisos' }).first()).toBeDisabled();
+  await expect(page.locator('#homeIncidentHistoryList')).toContainText('Con errores');
+  await expect(page.locator('#homeIncidentHistoryList')).toContainText('Nicolás Vega');
+  await expect(page.locator('#homeIncidentHistoryList')).toContainText('Error');
+  await expect(page.getByRole('button', { name: 'Reintentar' })).toBeEnabled();
+
+  page.once('dialog', dialog => {
+    expect(dialog.message()).toContain('Reintentar este aviso');
+    dialog.accept();
+  });
+  await page.getByRole('button', { name: 'Reintentar' }).click();
+  await expect(page.locator('[data-incident-recipient="recipient-old"]')).toContainText('Enviando');
+  expect(retryRequest).toEqual({ confirmed: true });
 
   await expect(page.locator('#homeIncidentCalendarDays')).toHaveCount(0);
   await expect(page.locator('#homeIncidentReason')).toBeVisible();
@@ -388,7 +442,15 @@ test('ready customer sees live operational home instead of setup cards', async (
   await page.getByRole('button', { name: 'Enviar 1 aviso' }).click();
   await expect(page.locator('#homeIncidentPreview')).toContainText('Envío iniciado');
   await expect(page.locator('#homeIncidentHistoryList')).toContainText('En proceso');
-  await expect(page.getByRole('button', { name: 'En proceso' }).first()).toBeDisabled();
+  await expect(page.locator('[data-incident-recipient="recipient-1"]')).toContainText('Enviando');
+
+  const activatedCampaign = campaignHistory.find(item => item.id === 'campaign-1');
+  activatedCampaign.recipients[0].status = 'DELIVERED';
+  activatedCampaign.recipients[0].statusAt = '2026-09-18T12:04:00Z';
+  await page.locator('#homeIncidentHistoryToggle').click();
+  await page.locator('#homeIncidentHistoryToggle').click();
+  await expect(page.locator('[data-incident-recipient="recipient-1"]')).toContainText('Entregado');
+  await expect(page.locator('#homeIncidentHistoryList')).toContainText('Completado');
   expect(activationRequest).toEqual({ confirmed: true });
   expect(preparedCampaignRequest).not.toBeNull();
   expect(preparedCampaignRequest.reason).toBe('Cierre anticipado');

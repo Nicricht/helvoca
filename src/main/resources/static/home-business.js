@@ -1697,6 +1697,56 @@
     CANCELLED: "Cancelado"
   })[value] || "Pendiente";
 
+  const incidentDeliveryLabel = value => ({
+    PENDING: "Pendiente",
+    QUEUED: "Enviando…",
+    SENT: "Enviado",
+    DELIVERED: "Entregado",
+    READ: "Leído",
+    FAILED: "Error",
+    CANCELLED: "Cancelado"
+  })[value] || "Pendiente";
+
+  const incidentDeliveryClass = value => ({
+    PENDING: "is-pending",
+    QUEUED: "is-sending",
+    SENT: "is-sent",
+    DELIVERED: "is-delivered",
+    READ: "is-delivered",
+    FAILED: "is-error",
+    CANCELLED: "is-cancelled"
+  })[value] || "is-pending";
+
+  function incidentCampaignDisplayStatus(campaign) {
+    const recipients = Array.isArray(campaign?.recipients) ? campaign.recipients : [];
+    if (recipients.length && recipients.every(item => ["DELIVERED", "READ"].includes(item?.status))) return "Completado";
+    if (recipients.some(item => item?.status === "FAILED")) return "Con errores";
+    return incidentCampaignStatusLabel(campaign?.status);
+  }
+
+  function incidentDeliveryRows(campaign) {
+    const recipients = Array.isArray(campaign?.recipients) ? campaign.recipients : [];
+    if (!recipients.length) return "";
+    return `<div class="home-incident-delivery-list">${recipients.map(item => {
+      const status = incidentDeliveryLabel(item?.status);
+      const statusClass = incidentDeliveryClass(item?.status);
+      const time = item?.statusAt ? fmtCompact(item.statusAt) : "";
+      const channel = item?.channel === "WHATSAPP" ? "WhatsApp" : incidentStrategyLabel(item?.channel);
+      return `<div class="home-incident-delivery-row" data-incident-recipient="${esc(item?.recipientId || "")}">
+        <div class="home-incident-delivery-who">
+          <strong>${esc(item?.customerName || "Cliente")}</strong>
+          <span>${esc(channel)}${time ? ` · ${esc(time)}` : ""}</span>
+        </div>
+        <div class="home-incident-delivery-result">
+          <span class="home-incident-delivery-status ${statusClass}">${esc(status)}</span>
+          ${item?.retryable ? `<button type="button"
+            data-incident-retry="${esc(item.recipientId)}"
+            data-incident-campaign="${esc(campaign.id)}">Reintentar</button>` : ""}
+        </div>
+      </div>`;
+    }).join("")}</div>`;
+  }
+
   async function loadIncidentHistory() {
     const host = document.querySelector("#homeIncidentHistoryList");
     const count = document.querySelector("#homeIncidentHistoryCount");
@@ -1712,39 +1762,43 @@
       }
       host.innerHTML = items.map(campaign => {
         const blockers = Array.isArray(campaign.activationBlockers) ? campaign.activationBlockers : [];
+        const deliveries = Array.isArray(campaign.recipients) ? campaign.recipients : [];
         const canActivate = campaign.status === "PREPARED" && campaign.activationReady === true;
         const alreadyActivated = campaign.status === "ACTIVATED";
         const deliveryDisabled = blockers.some(item => item?.code === "OUTBOUND_DELIVERY_DISABLED");
-        const helper = alreadyActivated
-          ? "Envío iniciado."
-          : canActivate
-            ? "Listo para enviar."
-            : deliveryDisabled
-              ? "Envíos desactivados."
-              : "No disponible para enviar.";
-        const buttonText = alreadyActivated ? "En proceso" : "Enviar avisos";
+        const displayStatus = incidentCampaignDisplayStatus(campaign);
+        const helper = deliveries.length
+          ? ""
+          : alreadyActivated
+            ? "Envío iniciado."
+            : canActivate
+              ? "Listo para enviar."
+              : deliveryDisabled
+                ? "Envíos desactivados."
+                : "No disponible para enviar.";
         return `
           <article class="home-incident-history-item">
             <div class="home-incident-history-main">
               <div><strong>${esc(campaign.reason || "Imprevisto")}</strong><span>${esc(fmtCompact(campaign.createdAt))}</span></div>
-              <span class="home-incident-history-status">${esc(incidentCampaignStatusLabel(campaign.status))}</span>
+              <span class="home-incident-history-status">${esc(displayStatus)}</span>
             </div>
             <div class="home-incident-history-meta">
               <span>${esc(incidentGoalLabel(campaign.goal))}</span>
               <span>${esc(incidentStrategyLabel(campaign.strategy))}</span>
               <span>${esc(campaign.recipientCount)} cliente${Number(campaign.recipientCount) === 1 ? "" : "s"}</span>
             </div>
-            <div class="home-incident-history-actions">
+            ${incidentDeliveryRows(campaign)}
+            ${helper || canActivate ? `<div class="home-incident-history-actions">
               <small>${esc(helper)}</small>
-              <button type="button"
-                ${canActivate ? `data-incident-activate="${esc(campaign.id)}" data-incident-count="${esc(campaign.recipientCount)}"` : "disabled"}>
-                ${buttonText}
-              </button>
-            </div>
+              ${canActivate ? `<button type="button"
+                data-incident-activate="${esc(campaign.id)}"
+                data-incident-count="${esc(campaign.recipientCount)}">Enviar avisos</button>` : ""}
+            </div>` : ""}
           </article>
         `;
       }).join("");
       bindIncidentActivation();
+      bindIncidentRetries();
     } catch (error) {
       host.innerHTML = `<div class="home-incident-empty">${esc(error.message || "No pude cargar el historial.")}</div>`;
     }
@@ -1787,6 +1841,38 @@
     document.querySelectorAll("[data-incident-activate]").forEach(button => {
       button.addEventListener("click", () =>
         activateIncidentCampaign(button.dataset.incidentActivate, button.dataset.incidentCount, button)
+      );
+    });
+  }
+
+  async function retryIncidentRecipient(campaignId, recipientId, button) {
+    if (!campaignId || !recipientId) return;
+    const confirmed = window.confirm("¿Reintentar este aviso ahora?");
+    if (!confirmed) return;
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Reintentando…";
+    }
+    try {
+      await api(`/api/v1/booking-incident-campaigns/${encodeURIComponent(campaignId)}/recipients/${encodeURIComponent(recipientId)}/retry`, {
+        method: "POST",
+        body: JSON.stringify({ confirmed: true })
+      });
+      await loadIncidentHistory();
+    } catch (error) {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Reintentar";
+      }
+      window.alert(error.message || "No pude reintentar el aviso.");
+    }
+  }
+
+  function bindIncidentRetries() {
+    document.querySelectorAll("[data-incident-retry]").forEach(button => {
+      button.addEventListener("click", () =>
+        retryIncidentRecipient(button.dataset.incidentCampaign, button.dataset.incidentRetry, button)
       );
     });
   }
