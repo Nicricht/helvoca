@@ -88,7 +88,7 @@ test('ready customer sees operations on home and configuration on settings', asy
 
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Helvoca está atendiendo 🟢');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Negocio E2E está atendiendo 🟢');
   await expect(page.locator('#readyBanner')).toBeHidden();
   await expect(page.locator('#nextStepBanner')).toBeHidden();
   await expect(page.locator('#advancedPanel')).toBeHidden();
@@ -97,7 +97,7 @@ test('ready customer sees operations on home and configuration on settings', asy
 
   await page.goto('/settings.html');
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Cómo trabaja Helvoca');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Cómo trabaja Negocio E2E');
   await expect(page.locator('#advancedPanel')).toBeVisible();
   await expect(page.locator('#statusGrid')).toBeHidden();
   await expect(page.locator('.nav-config')).toHaveClass(/active/);
