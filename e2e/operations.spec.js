@@ -65,6 +65,10 @@ test('operations is advanced-only with calls and diagnostics', async ({ page }) 
   await expect(page.getByRole('heading', { level: 1, name: 'Historial y diagnóstico' })).toBeVisible();
   await expect(page.locator('#businessTabs')).toHaveCount(0);
   await expect(page.locator('#metrics')).toHaveCount(0);
+  await expect(page.locator('#bookingsList')).toHaveCount(0);
+  await expect(page.locator('#ordersList')).toHaveCount(0);
+  await expect(page.locator('#requestsList')).toHaveCount(0);
+  await expect(page.locator('#customersList')).toHaveCount(0);
   await expect(page.locator('#callsList')).toContainText('+56911111111');
   await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
 
