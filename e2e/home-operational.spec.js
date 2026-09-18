@@ -706,3 +706,92 @@ test('booking reschedule checks availability and updates the drawer', async ({ p
   await expect(page.getByRole('button', { name: 'Reprogramar' })).toBeVisible();
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
 });
+
+
+test('manual booking creation checks availability and adds the reservation', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+
+  let availabilityCall = null;
+  let createPayload = null;
+
+  await page.route('**/api/v1/bookings/availability?**', async route => {
+    const url = new URL(route.request().url());
+    availabilityCall = {
+      serviceId: url.searchParams.get('serviceId'),
+      startAt: url.searchParams.get('startAt'),
+      excludeBookingId: url.searchParams.get('excludeBookingId')
+    };
+    await route.fulfill(json({
+      serviceId: availabilityCall.serviceId,
+      startAt: availabilityCall.startAt,
+      endAt: new Date(new Date(availabilityCall.startAt).getTime() + 30 * 60 * 1000).toISOString(),
+      available: true
+    }));
+  });
+
+  await page.route('**/api/v1/bookings', async route => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    createPayload = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'b3',
+        customerId: createPayload.customerId,
+        serviceId: createPayload.serviceId,
+        startAt: createPayload.startAt,
+        endAt: new Date(new Date(createPayload.startAt).getTime() + 30 * 60 * 1000).toISOString(),
+        status: 'CONFIRMED',
+        source: 'ADMIN',
+        notes: createPayload.notes,
+        createdAt: '2026-09-18T18:00:00Z',
+        updatedAt: '2026-09-18T18:00:00Z'
+      })
+    });
+  });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: '＋ Nueva reserva' }).click();
+
+  await expect(page.locator('#homeBookingCreatePanel')).toBeVisible();
+  await expect(page.locator('#homeBookingCreateCustomer')).toContainText('Ana Reserva');
+  await expect(page.locator('#homeBookingCreateService')).toContainText('Peluquería');
+
+  await page.locator('#homeBookingCreateCustomer').selectOption('cust1');
+  await page.locator('#homeBookingCreateService').selectOption('svc1');
+  await page.locator('#homeBookingCreateDate').selectOption({ index: 1 });
+  await page.locator('#homeBookingCreateTime').selectOption('10:00');
+
+  await expect(page.getByRole('button', { name: 'Comprobar disponibilidad' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Crear reserva' })).toBeHidden();
+
+  await page.getByRole('button', { name: 'Comprobar disponibilidad' }).click();
+
+  await expect(page.locator('#homeBookingCreateMessage')).toHaveText('Horario disponible ✓');
+  await expect(page.getByRole('button', { name: 'Crear reserva' })).toBeVisible();
+  expect(availabilityCall.serviceId).toBe('svc1');
+  expect(availabilityCall.excludeBookingId).toBeNull();
+
+  page.once('dialog', dialog => {
+    expect(dialog.message()).toContain('Ana Reserva');
+    expect(dialog.message()).toContain('Peluquería');
+    dialog.accept();
+  });
+  await page.getByRole('button', { name: 'Crear reserva' }).click();
+
+  await expect.poll(() => createPayload).not.toBeNull();
+  expect(createPayload.customerId).toBe('cust1');
+  expect(createPayload.serviceId).toBe('svc1');
+  expect(createPayload.startAt).toBe(availabilityCall.startAt);
+  expect(createPayload.source).toBe('ADMIN');
+  expect(createPayload.notes).toBeNull();
+
+  await expect(page.locator('#homeBusinessBookingsCount')).toHaveText('3');
+  await expect(page.locator('#homeBookingsList')).toContainText('Manual');
+  await expect(page.locator('#homeBookingCreateMessage')).toHaveText('Reserva creada para Ana Reserva ✓');
+});
