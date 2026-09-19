@@ -164,7 +164,7 @@
 
 (() => {
     const voices = document.createElement('script');
-    voices.src = '/voice-selector.js?v=20260919-2';
+    voices.src = '/voice-selector.js?v=20260919-3';
     voices.async = false;
     document.head.appendChild(voices);
 
