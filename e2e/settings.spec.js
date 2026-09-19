@@ -123,12 +123,15 @@ test('settings exposes the Mi negocio sections with simple navigation', async ({
   await expect(page.locator('.dashboard-heading h1')).toHaveText('Mi negocio');
   const nav = page.locator('#advancedPanel .ux-config-nav');
   await expect(nav.getByRole('button')).toHaveText([
-    'Información', 'Servicios', 'Horarios', 'FAQ', 'Recepcionista', 'Canales'
+    '🏪 Negocio', '✂️ Servicios', '📅 Horarios', '💬 Respuestas', '🤖 Recepcionista', '📞 Canales'
   ]);
   await expect(page.locator('#configBusinessPanel')).toBeVisible();
   await expect(page.locator('#configAgentPanel')).toBeHidden();
+  await expect(page.locator('#setupForm [name="defaultCurrency"]').locator('xpath=ancestor::label')).toContainText('💰 Moneda');
+  await expect(page.locator('#setupForm [name="humanTransferPhone"]').locator('xpath=ancestor::label')).toBeHidden();
+  await expect(page.getByRole('button', { name: '⚙️ Más opciones' })).toBeVisible();
 
-  await nav.getByRole('button', { name: 'Recepcionista', exact: true }).click();
+  await nav.getByRole('button', { name: '🤖 Recepcionista', exact: true }).click();
   await expect(page.locator('#configAgentPanel')).toBeVisible();
   await expect(page.locator('#configBusinessPanel')).toBeHidden();
   await expect(page.locator('#agentCapabilities')).toBeHidden();
@@ -139,13 +142,13 @@ test('settings uses selectors for timezone language and voice', async ({ page })
   await mockSettings(page);
   await page.goto('/settings.html');
 
-  await page.getByRole('button', { name: 'Información', exact: true }).click();
-  await page.getByRole('button', { name: 'Más ajustes' }).click();
+  await page.getByRole('button', { name: '🏪 Negocio', exact: true }).click();
+  await page.getByRole('button', { name: '⚙️ Más opciones' }).click();
 
   await expect(page.locator('#setupForm select[name="timezone"]')).toHaveValue('America/Santiago');
   await expect(page.locator('#setupForm select[name="language"]')).toHaveValue('es');
 
-  await page.getByRole('button', { name: 'Recepcionista', exact: true }).click();
+  await page.getByRole('button', { name: '🤖 Recepcionista', exact: true }).click();
   await expect(page.locator('#agentVoiceSelect')).toHaveValue('marin');
 });
 
@@ -186,7 +189,7 @@ test('settings exposes WhatsApp state and changes it only after an explicit clic
   await mockSettings(page, state);
   await page.goto('/settings.html');
 
-  await page.getByRole('button', { name: 'Canales', exact: true }).click();
+  await page.getByRole('button', { name: '📞 Canales', exact: true }).click();
   await page.getByRole('button', { name: 'Cambiar' }).click();
   expect(state.whatsappPatches).toEqual([]);
 
@@ -223,7 +226,7 @@ test('settings shows WhatsApp API errors and leaves the explicit action usable',
   await mockSettings(page, state);
   await page.goto('/settings.html');
 
-  await page.getByRole('button', { name: 'Canales', exact: true }).click();
+  await page.getByRole('button', { name: '📞 Canales', exact: true }).click();
   await page.getByRole('button', { name: 'Cambiar' }).click();
   const action = page.getByRole('button', { name: 'Activar WhatsApp' });
   await action.click();
@@ -239,8 +242,8 @@ test('settings loads and saves the public business profile', async ({ page }) =>
   await mockSettings(page, state);
   await page.goto('/settings.html');
 
-  await page.getByRole('button', { name: 'Información', exact: true }).click();
-  await page.getByRole('button', { name: 'Más ajustes' }).click();
+  await page.getByRole('button', { name: '🏪 Negocio', exact: true }).click();
+  await page.getByRole('button', { name: '⚙️ Más opciones' }).click();
 
   await expect(page.locator('#setupForm [name="presetKey"]')).toHaveValue('store');
   await expect(page.locator('#setupForm [name="publicDescription"]')).toHaveValue('Tecnología y accesorios');
@@ -258,7 +261,7 @@ test('settings loads and saves the public business profile', async ({ page }) =>
   await page.locator('#setupForm [name="defaultCurrency"]').selectOption('USD');
   await page.locator('#setupForm [name="sellsProducts"]').selectOption('false');
   await page.locator('#setupForm [name="usesReservations"]').selectOption('true');
-  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
 
   await expect.poll(() => state.profilePayloads.length).toBe(1);
   expect(state.profilePayloads[0]).toMatchObject({
@@ -285,18 +288,18 @@ test('settings validates required data and saves the complete business configura
   await mockSettings(page, state);
   await page.goto('/settings.html');
 
-  await page.getByRole('button', { name: 'Información', exact: true }).click();
-  await page.getByRole('button', { name: 'Más ajustes' }).click();
+  await page.getByRole('button', { name: '🏪 Negocio', exact: true }).click();
+  await page.getByRole('button', { name: '⚙️ Más opciones' }).click();
   await expect(page.locator('#setupForm [name="businessName"]')).toHaveValue('Negocio E2E');
   await expect(page.locator('#setupForm [name="humanTransferPhone"]')).toHaveValue('+56999999999');
 
-  await page.getByRole('button', { name: 'Recepcionista', exact: true }).click();
+  await page.getByRole('button', { name: '🤖 Recepcionista', exact: true }).click();
   await expect(page.locator('#setupForm [name="agentGreeting"]')).toHaveValue('Hola, gracias por llamar.');
   await expect(page.locator('#setupForm [name="agentInstructions"]')).toHaveValue('Responde brevemente.');
 
   const greeting = page.locator('#setupForm [name="agentGreeting"]');
   await greeting.fill('');
-  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
   await expect(page.locator('#setupMessage')).toContainText('Define el saludo inicial del agente.');
   expect(state.setupPayloads).toEqual([]);
 
@@ -309,14 +312,14 @@ test('settings validates required data and saves the complete business configura
   await expect(page.locator('input[name="agentCapability"][value="GET_BUSINESS_INFORMATION"]')).toBeChecked();
   await page.locator('input[name="agentCapability"][value="TRANSFER_TO_HUMAN"]').check();
 
-  await page.getByRole('button', { name: 'Servicios', exact: true }).click();
+  await page.getByRole('button', { name: '✂️ Servicios', exact: true }).click();
   await expect(page.locator('#servicesList [data-field="name"]')).toHaveValue('Consulta');
-  await page.getByRole('button', { name: 'Horarios', exact: true }).click();
+  await page.getByRole('button', { name: '📅 Horarios', exact: true }).click();
   await expect(page.locator('#hoursGrid [data-field="openTime"]')).toHaveValue('09:00');
-  await page.getByRole('button', { name: 'FAQ', exact: true }).click();
+  await page.getByRole('button', { name: '💬 Respuestas', exact: true }).click();
   await expect(page.locator('#knowledgeList [data-field="title"]')).toHaveValue('Ubicación');
 
-  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
   await expect.poll(() => state.setupPayloads.length).toBe(1);
   expect(state.setupPayloads[0]).toMatchObject({
     businessName: 'Negocio E2E', timezone: 'America/Caracas', language: 'es',
@@ -340,8 +343,8 @@ test('settings keeps the save action usable and shows backend errors', async ({ 
   await mockSettings(page, state);
   await page.goto('/settings.html');
 
-  await page.getByRole('button', { name: 'Información', exact: true }).click();
-  const save = page.getByRole('button', { name: 'Guardar', exact: true });
+  await page.getByRole('button', { name: '🏪 Negocio', exact: true }).click();
+  const save = page.getByRole('button', { name: '💾 Guardar cambios', exact: true });
   await save.click();
 
   await expect(page.locator('#setupMessage')).toContainText('No se pudo guardar la configuración');
@@ -355,8 +358,8 @@ test('settings reports agent save errors after the business payload succeeds', a
   await mockSettings(page, state);
   await page.goto('/settings.html');
 
-  await page.getByRole('button', { name: 'Información', exact: true }).click();
-  const save = page.getByRole('button', { name: 'Guardar', exact: true });
+  await page.getByRole('button', { name: '🏪 Negocio', exact: true }).click();
+  const save = page.getByRole('button', { name: '💾 Guardar cambios', exact: true });
   await save.click();
 
   await expect(page.locator('#setupMessage')).toContainText('No se pudo guardar el agente');

@@ -290,12 +290,12 @@
         shell.classList.add('ux-config-hub');
 
         const items = [
-            ['Información', businessPanel],
-            ['Servicios', servicesPanel],
-            ['Horarios', hoursPanel],
-            ['FAQ', knowledgePanel],
-            ['Recepcionista', agentPanel],
-            ['Canales', sideCard]
+            ['🏪 Negocio', businessPanel],
+            ['✂️ Servicios', servicesPanel],
+            ['📅 Horarios', hoursPanel],
+            ['💬 Respuestas', knowledgePanel],
+            ['🤖 Recepcionista', agentPanel],
+            ['📞 Canales', sideCard]
         ];
 
         const buttons = [];
