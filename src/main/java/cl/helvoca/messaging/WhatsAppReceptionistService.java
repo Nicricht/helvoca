@@ -66,22 +66,43 @@ public class WhatsAppReceptionistService {
 
     @Transactional
     public String handle(String messageSid, String rawFrom, String rawTo, String body) {
-        if (messageSid == null || messageSid.isBlank()) throw new IllegalArgumentException("MessageSid is required");
-        MessagingMessage prior = messages.findByExternalMessageId(messageSid).orElse(null);
+        String to = normalizeAddress(rawTo);
+        String tenantDestination = properties.resolveTenantDestination(to);
+        PhoneNumber phone = phones.findByPhoneNumberAndActiveTrue(tenantDestination)
+                .filter(PhoneNumber::isWhatsappEnabled)
+                .orElseThrow(() -> new IllegalArgumentException("WhatsApp destination is not registered or enabled"));
+        return process(messageSid, rawFrom, phone, body);
+    }
+
+    @Transactional
+    public String handleResolved(String messageId,
+                                 UUID businessId,
+                                 UUID phoneNumberId,
+                                 String rawFrom,
+                                 String body) {
+        if (businessId == null || phoneNumberId == null) {
+            throw new IllegalArgumentException("Resolved WhatsApp tenant route is required");
+        }
+        PhoneNumber phone = phones.findByIdAndBusinessId(phoneNumberId, businessId)
+                .filter(PhoneNumber::isActive)
+                .filter(PhoneNumber::isWhatsappEnabled)
+                .orElseThrow(() -> new IllegalArgumentException("Resolved WhatsApp destination is not registered or enabled"));
+        return process(messageId, rawFrom, phone, body);
+    }
+
+    private String process(String messageId, String rawFrom, PhoneNumber phone, String body) {
+        if (messageId == null || messageId.isBlank()) throw new IllegalArgumentException("Message id is required");
+        MessagingMessage prior = messages.findByExternalMessageId(messageId).orElse(null);
         if (prior != null) {
             if (prior.getReplyText() != null) return prior.getReplyText();
             throw new IllegalStateException("WhatsApp message is already being processed");
         }
 
         String from = normalizeAddress(rawFrom);
-        String to = normalizeAddress(rawTo);
+        String to = normalizeAddress(phone.getPhoneNumber());
         String text = body == null ? "" : body.trim();
         if (from.isBlank() || to.isBlank() || text.isBlank()) throw new IllegalArgumentException("Invalid WhatsApp message");
 
-        String tenantDestination = properties.resolveTenantDestination(to);
-        PhoneNumber phone = phones.findByPhoneNumberAndActiveTrue(tenantDestination)
-                .filter(PhoneNumber::isWhatsappEnabled)
-                .orElseThrow(() -> new IllegalArgumentException("WhatsApp destination is not registered or enabled"));
         if (!subscriptions.view(phone.getBusinessId()).serviceAllowed()) {
             throw new IllegalStateException("Subscription does not allow service");
         }
@@ -104,7 +125,7 @@ public class WhatsAppReceptionistService {
 
         MessagingMessage inbound = new MessagingMessage();
         inbound.setConversationId(conversation.getId());
-        inbound.setExternalMessageId(messageSid);
+        inbound.setExternalMessageId(messageId);
         inbound.setDirection("INBOUND");
         inbound.setRole("USER");
         inbound.setContent(text);
@@ -123,7 +144,7 @@ public class WhatsAppReceptionistService {
                             : disabledToolResult());
         } catch (Exception e) {
             log.warn("WhatsApp assistant failed message={} business={} type={}",
-                    messageSid, phone.getBusinessId(), e.getClass().getSimpleName());
+                    messageId, phone.getBusinessId(), e.getClass().getSimpleName());
             reply = "No pude completar tu solicitud en este momento. Por favor intenta nuevamente en unos minutos.";
         }
 
