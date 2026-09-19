@@ -18,6 +18,7 @@ public class TwilioWhatsAppController {
     private static final Logger log = LoggerFactory.getLogger(TwilioWhatsAppController.class);
     private static final String EMPTY_TWIML = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response/>";
     private static final String PATH = "/webhooks/v1/twilio/whatsapp";
+    private static final String STATUS_PATH = "/webhooks/v1/twilio/whatsapp/status";
 
     private final WhatsAppReceptionistService receptionist;
     private final WhatsAppProperties properties;
@@ -37,7 +38,7 @@ public class TwilioWhatsAppController {
             @RequestHeader(value = "X-Twilio-Signature", required = false) String signature,
             @RequestParam MultiValueMap<String, String> form) {
         if (!properties.isEnabled()) return ResponseEntity.ok(EMPTY_TWIML);
-        if (!validSignature(signature, form)) {
+        if (!validSignature(PATH, signature, form)) {
             log.warn("Rejected WhatsApp webhook with invalid Twilio signature");
             return ResponseEntity.status(403).body(EMPTY_TWIML);
         }
@@ -45,6 +46,7 @@ public class TwilioWhatsAppController {
         String sid = form.getFirst("MessageSid");
         try {
             String reply = receptionist.handle(sid, form.getFirst("From"), form.getFirst("To"), form.getFirst("Body"));
+            log.info("WhatsApp inbound processed message={} replyChars={}", sid, reply == null ? 0 : reply.length());
             return ResponseEntity.ok(twimlMessage(reply));
         } catch (Exception e) {
             log.warn("WhatsApp webhook failed message={} type={}", sid, e.getClass().getSimpleName());
@@ -52,7 +54,25 @@ public class TwilioWhatsAppController {
         }
     }
 
-    private boolean validSignature(String signature, MultiValueMap<String, String> form) {
+    @PostMapping(value = "/whatsapp/status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+            produces = MediaType.APPLICATION_XML_VALUE)
+    public ResponseEntity<String> status(
+            @RequestHeader(value = "X-Twilio-Signature", required = false) String signature,
+            @RequestParam MultiValueMap<String, String> form) {
+        if (!validSignature(STATUS_PATH, signature, form)) {
+            log.warn("Rejected WhatsApp status callback with invalid Twilio signature");
+            return ResponseEntity.status(403).body(EMPTY_TWIML);
+        }
+
+        log.info("WhatsApp delivery status message={} status={} errorCode={} channelStatus={}",
+                form.getFirst("MessageSid"),
+                form.getFirst("MessageStatus"),
+                form.getFirst("ErrorCode"),
+                form.getFirst("ChannelStatusMessage"));
+        return ResponseEntity.ok(EMPTY_TWIML);
+    }
+
+    private boolean validSignature(String path, String signature, MultiValueMap<String, String> form) {
         if (!properties.isWebhookValidationEnabled()) return true;
         if (signature == null || signature.isBlank() || !twilio.hasAuthToken() || !twilio.hasSecurePublicBaseUrl()) {
             return false;
@@ -62,11 +82,12 @@ public class TwilioWhatsAppController {
             if (values != null && !values.isEmpty()) params.put(key, values.get(0));
         });
         RequestValidator validator = new RequestValidator(twilio.getAuthToken());
-        return validator.validate(twilio.absoluteWebhook(PATH), params, signature);
+        return validator.validate(twilio.absoluteWebhook(path), params, signature);
     }
 
     static String twimlMessage(String reply) {
-        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Message>"
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Message statusCallback=\""
+                + STATUS_PATH + "\" action=\"" + STATUS_PATH + "\">"
                 + escapeXml(reply) + "</Message></Response>";
     }
 
