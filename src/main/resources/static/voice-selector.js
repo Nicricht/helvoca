@@ -233,9 +233,9 @@
         if (!panel) return;
         const headings = panel.querySelectorAll('.section-heading');
         const businessTitle = headings[0]?.querySelector('h2');
-        const agentTitle = headings[1]?.querySelector('h2');
-        if (businessTitle) businessTitle.textContent = 'Negocio';
-        if (agentTitle) agentTitle.textContent = 'Agente';
+        const profileTitle = headings[1]?.querySelector('h2');
+        if (businessTitle) businessTitle.textContent = 'Información';
+        if (profileTitle) profileTitle.textContent = 'Información pública';
     }
 
     function compactBusinessPanel() {
@@ -255,12 +255,12 @@
 
     function compactConfigNav() {
         const labels = {
-            configBusinessPanel: 'Negocio',
-            configPermissionsPanel: 'Permisos',
+            configBusinessPanel: 'Información',
             configServicesPanel: 'Servicios',
             configHoursPanel: 'Horarios',
             configKnowledgePanel: 'FAQ',
-            configPhonePanel: 'Teléfono'
+            configAgentPanel: 'Recepcionista',
+            configPhonePanel: 'Canales'
         };
         Object.entries(labels).forEach(([panelId, label]) => {
             const node = document.querySelector(`#advancedPanel .ux-config-nav button[aria-controls="${panelId}"] strong`);
@@ -269,12 +269,9 @@
     }
 
     function compactPermissionsPanel() {
-        const panel = document.querySelector('#configPermissionsPanel');
+        const panel = document.querySelector('#configAgentPanel');
         const grid = document.querySelector('#agentCapabilities');
         if (!panel || !grid) return;
-
-        const navLabel = document.querySelector('#advancedPanel .ux-config-nav button[aria-controls="configPermissionsPanel"] strong');
-        if (navLabel && navLabel.textContent !== 'Permisos') navLabel.textContent = 'Permisos';
 
         let summary = document.querySelector('#permissionsCompactSummary');
         if (!summary) {
@@ -317,23 +314,9 @@
         const panel = document.querySelector('#configBusinessPanel');
         if (!panel || document.querySelector('#businessAdvancedToggle')) return;
 
-        const headings = panel.querySelectorAll('.section-heading');
-        const businessFields = panel.querySelector('.two-col');
+        const businessFields = panel.querySelector('.two-col:not(.business-profile-grid)');
         const businessLabels = businessFields ? [...businessFields.children] : [];
-        const agentHeading = headings[1];
-        const agentFields = agentHeading?.nextElementSibling;
-        const greeting = setupForm.elements.agentGreeting?.closest('label');
-        const instructions = setupForm.elements.agentInstructions?.closest('label');
-        const agentToggle = panel.querySelector('.agent-toggle');
-
-        const advancedFields = [
-            businessLabels[2],
-            businessLabels[3],
-            agentHeading,
-            agentFields,
-            greeting,
-            instructions
-        ].filter(Boolean);
+        const advancedFields = [businessLabels[2], businessLabels[3]].filter(Boolean);
 
         advancedFields.forEach(node => node.classList.add('hidden'));
 
@@ -351,7 +334,7 @@
             toggle.textContent = opening ? 'Menos ajustes' : 'Más ajustes';
         });
 
-        if (agentToggle) agentToggle.insertAdjacentElement('afterend', toggle);
+        if (businessFields) businessFields.insertAdjacentElement('afterend', toggle);
         else panel.appendChild(toggle);
     }
 

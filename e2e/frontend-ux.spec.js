@@ -196,13 +196,11 @@ test('ready customer sees operations on home and configuration on settings', asy
 
   await page.goto('/settings.html');
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Cómo trabaja Negocio E2E');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mi negocio');
   await expect(page.locator('#advancedPanel')).toBeVisible();
   await expect(page.locator('#statusGrid')).toBeHidden();
   await expect(page.locator('.nav-config')).toHaveClass(/active/);
-  await expect(page.locator('#configBusinessPanel')).toBeHidden();
-
-  await page.getByRole('button', { name: 'Negocio', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Información', exact: true })).toBeVisible();
   await expect(page.locator('#configBusinessPanel')).toBeVisible();
 
   await expect(page.locator('#commercialStatusCard')).toBeVisible();
@@ -211,7 +209,7 @@ test('ready customer sees operations on home and configuration on settings', asy
   await page.getByRole('button', { name: 'Gestionar', exact: true }).click();
   await expect(page.locator('#commercialPlans')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Teléfono' }).click();
+  await page.getByRole('button', { name: 'Canales', exact: true }).click();
   await expect(page.locator('#phoneCompactSummary').getByText('+56911111111')).toBeVisible();
   await page.getByRole('button', { name: 'Cambiar' }).click();
   await expect(page.getByRole('button', { name: 'Conectar mi número' })).toBeVisible();
@@ -245,7 +243,7 @@ test('primary and public navigation fit desktop tablet and mobile viewports', as
 
       await page.goto('/settings.html');
       await expect(page.locator('.nav-config')).toHaveClass(/active/);
-      await page.getByRole('button', { name: 'Negocio', exact: true }).click();
+      await page.getByRole('button', { name: 'Información', exact: true }).click();
       await expect(page.locator('#configBusinessPanel')).toBeVisible();
       await expectNoPageOverflow();
 

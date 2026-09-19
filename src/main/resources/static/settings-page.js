@@ -28,8 +28,8 @@
     const welcome = document.querySelector("#welcomeText");
     if (eyebrow) eyebrow.textContent = "Configuración";
     const businessName = window.helvocaBusinessName || document.querySelector('#setupForm [name="businessName"]')?.value?.trim() || "Tu negocio";
-    if (title) title.textContent = `Cómo trabaja ${businessName}`;
-    if (welcome) welcome.textContent = "Ajusta tu negocio, recepcionista, servicios, horarios, conocimiento, canales y plan.";
+    if (title) title.textContent = "Mi negocio";
+    if (welcome) welcome.textContent = businessName;
   }
 
   new MutationObserver(apply).observe(dashboard, { attributes: true, attributeFilter: ["class"] });
