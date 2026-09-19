@@ -1,5 +1,8 @@
 package cl.helvoca.bootstrap;
 
+import cl.helvoca.agent.AiAgent;
+import cl.helvoca.agent.AiAgentRepository;
+import cl.helvoca.agent.AiCapability;
 import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
@@ -42,6 +45,7 @@ class DevDataInitializerTest {
         CatalogItemRepository catalog = mock(CatalogItemRepository.class);
         BusinessHourRepository hours = mock(BusinessHourRepository.class);
         KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        AiAgentRepository agents = mock(AiAgentRepository.class);
 
         UUID businessId = UUID.randomUUID();
         when(users.findByEmailIgnoreCase("demo@helvoca.local")).thenReturn(Optional.empty());
@@ -61,6 +65,7 @@ class DevDataInitializerTest {
         initializer.setDemoCatalogRepositories(services, catalog);
         initializer.setDemoScheduleRepository(hours);
         initializer.setDemoKnowledgeRepository(knowledge);
+        initializer.setDemoAgentRepository(agents);
         ReflectionTestUtils.setField(initializer, "enabled", true);
         ReflectionTestUtils.setField(initializer, "adminEmail", "demo@helvoca.local");
         ReflectionTestUtils.setField(initializer, "adminPassword", "safe-demo-password");
@@ -116,6 +121,22 @@ class DevDataInitializerTest {
         assertEquals(List.of("Reservas y confirmación", "Cambios y cancelaciones", "Información no disponible", "Pagos en la demostración"),
                 seededKnowledge.stream().map(KnowledgeItem::getTitle).toList());
         assertTrue(seededKnowledge.stream().allMatch(KnowledgeItem::isActive));
+
+        var agentCaptor = org.mockito.ArgumentCaptor.forClass(AiAgent.class);
+        verify(agents).saveAndFlush(agentCaptor.capture());
+        AiAgent seededAgent = agentCaptor.getValue();
+        assertEquals("Helvoca Demo", seededAgent.getName());
+        assertEquals("es", seededAgent.getLanguage());
+        assertTrue(seededAgent.isActive());
+        assertNull(seededAgent.getVoice());
+        assertTrue(seededAgent.getCapabilities().contains(AiCapability.GET_BUSINESS_INFORMATION));
+        assertTrue(seededAgent.getCapabilities().contains(AiCapability.LIST_CATALOG));
+        assertTrue(seededAgent.getCapabilities().contains(AiCapability.CREATE_BOOKING));
+        assertTrue(seededAgent.getCapabilities().contains(AiCapability.RESCHEDULE_BOOKING));
+        assertTrue(seededAgent.getCapabilities().contains(AiCapability.CANCEL_BOOKING));
+        assertFalse(seededAgent.getCapabilities().contains(AiCapability.TRANSFER_TO_HUMAN));
+        assertFalse(seededAgent.getCapabilities().contains(AiCapability.CREATE_PAYMENT));
+        assertFalse(seededAgent.getCapabilities().contains(AiCapability.CREATE_ORDER));
     }
 
     @Test
@@ -129,6 +150,7 @@ class DevDataInitializerTest {
         CatalogItemRepository catalog = mock(CatalogItemRepository.class);
         BusinessHourRepository hours = mock(BusinessHourRepository.class);
         KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        AiAgentRepository agents = mock(AiAgentRepository.class);
 
         UUID businessId = UUID.randomUUID();
         Business business = new Business();
@@ -148,6 +170,7 @@ class DevDataInitializerTest {
         initializer.setDemoCatalogRepositories(services, catalog);
         initializer.setDemoScheduleRepository(hours);
         initializer.setDemoKnowledgeRepository(knowledge);
+        initializer.setDemoAgentRepository(agents);
         ReflectionTestUtils.setField(initializer, "enabled", true);
         ReflectionTestUtils.setField(initializer, "adminEmail", "demo@helvoca.local");
         ReflectionTestUtils.setField(initializer, "adminPassword", "safe-demo-password");
@@ -161,6 +184,7 @@ class DevDataInitializerTest {
         verify(catalog, times(1)).saveAndFlush(any(CatalogItem.class));
         verify(hours, times(6)).saveAndFlush(any(BusinessHour.class));
         verify(knowledge, times(3)).saveAndFlush(any(KnowledgeItem.class));
+        verify(agents).saveAndFlush(any(AiAgent.class));
     }
 
     @Test
@@ -241,6 +265,47 @@ class DevDataInitializerTest {
         initializer.run();
 
         verify(knowledge, never()).saveAndFlush(any(KnowledgeItem.class));
+    }
+
+    @Test
+    void keepsExistingDemoAgentUntouched() throws Exception {
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        CatalogItemRepository catalog = mock(CatalogItemRepository.class);
+        BusinessHourRepository hours = mock(BusinessHourRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        AiAgentRepository agents = mock(AiAgentRepository.class);
+
+        UUID businessId = UUID.randomUUID();
+        Business business = new Business();
+        ReflectionTestUtils.setField(business, "id", businessId);
+        business.setName("Helvoca Demo Business");
+        AppUser admin = new AppUser();
+        admin.setBusiness(business);
+        admin.setEmail("demo@helvoca.local");
+
+        when(users.findByEmailIgnoreCase("demo@helvoca.local")).thenReturn(Optional.of(admin));
+        when(hours.countByBusinessId(businessId)).thenReturn(6L);
+        when(agents.existsByBusinessId(businessId)).thenReturn(true);
+
+        DevDataInitializer initializer = new DevDataInitializer(businesses, users, roles, encoder);
+        initializer.setSubscriptions(subscriptions);
+        initializer.setDemoCatalogRepositories(services, catalog);
+        initializer.setDemoScheduleRepository(hours);
+        initializer.setDemoKnowledgeRepository(knowledge);
+        initializer.setDemoAgentRepository(agents);
+        ReflectionTestUtils.setField(initializer, "enabled", true);
+        ReflectionTestUtils.setField(initializer, "adminEmail", "demo@helvoca.local");
+        ReflectionTestUtils.setField(initializer, "adminPassword", "safe-demo-password");
+
+        initializer.run();
+
+        verify(agents).existsByBusinessId(businessId);
+        verify(agents, never()).saveAndFlush(any(AiAgent.class));
     }
 
     @Test

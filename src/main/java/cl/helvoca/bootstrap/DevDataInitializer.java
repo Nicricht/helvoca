@@ -1,5 +1,8 @@
 package cl.helvoca.bootstrap;
 
+import cl.helvoca.agent.AiAgent;
+import cl.helvoca.agent.AiAgentRepository;
+import cl.helvoca.agent.AiCapability;
 import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
@@ -23,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalTime;
+import java.util.EnumSet;
 import java.util.Optional;
 
 @Component
@@ -38,6 +42,7 @@ public class DevDataInitializer implements CommandLineRunner {
     private CatalogItemRepository catalog;
     private BusinessHourRepository hours;
     private KnowledgeItemRepository knowledge;
+    private AiAgentRepository agents;
 
     @Value("${app.seed.enabled:false}") private boolean enabled;
     @Value("${app.seed.admin-email:admin@helvoca.local}") private String adminEmail;
@@ -68,6 +73,11 @@ public class DevDataInitializer implements CommandLineRunner {
         this.knowledge = knowledge;
     }
 
+    @Autowired(required = false)
+    void setDemoAgentRepository(AiAgentRepository agents) {
+        this.agents = agents;
+    }
+
     @Override @Transactional
     public void run(String... args) {
         if (!enabled) return;
@@ -80,8 +90,9 @@ public class DevDataInitializer implements CommandLineRunner {
                 ensureDemoCatalog(existingBusiness.getId());
                 ensureDemoSchedule(existingBusiness.getId());
                 ensureDemoKnowledge(existingBusiness.getId());
+                ensureDemoAgent(existingBusiness.getId());
             }
-            log.info("Sales demo tenant seed is ready with catalog, schedule and knowledge");
+            log.info("Sales demo tenant seed is ready with catalog, schedule, knowledge and agent");
             return;
         }
 
@@ -98,7 +109,8 @@ public class DevDataInitializer implements CommandLineRunner {
         ensureDemoCatalog(business.getId());
         ensureDemoSchedule(business.getId());
         ensureDemoKnowledge(business.getId());
-        log.info("Sales demo tenant seed was created successfully with catalog, schedule and knowledge");
+        ensureDemoAgent(business.getId());
+        log.info("Sales demo tenant seed was created successfully with catalog, schedule, knowledge and agent");
     }
 
     private void ensureDemoCatalog(java.util.UUID businessId) {
@@ -115,6 +127,35 @@ public class DevDataInitializer implements CommandLineRunner {
                 "Producto demo para mostrar consultas de catálogo y precio.", "15990");
         ensureProduct(businessId, "Kit premium",
                 "Producto demo de mayor valor para cotización o pedido.", "29990");
+    }
+
+    private void ensureDemoAgent(java.util.UUID businessId) {
+        if (businessId == null || agents == null || agents.existsByBusinessId(businessId)) return;
+
+        AiAgent agent = new AiAgent();
+        agent.setBusinessId(businessId);
+        agent.setName("Helvoca Demo");
+        agent.setLanguage("es");
+        agent.setVoice(null);
+        agent.setGreeting("Hola, soy Helvoca. Puedo ayudarte con información, productos, servicios y reservas.");
+        agent.setInstructions("Usa solo datos configurados del negocio. No inventes información. Antes de crear o cambiar una reserva, valida disponibilidad y confirma la intención del cliente. Este tenant demo no procesa pagos reales ni transfiere conversaciones a personas.");
+        agent.setActive(true);
+        agent.setCapabilities(EnumSet.of(
+                AiCapability.GET_BUSINESS_INFORMATION,
+                AiCapability.LIST_SERVICES,
+                AiCapability.SEARCH_KNOWLEDGE,
+                AiCapability.FIND_CALLER,
+                AiCapability.REGISTER_CALLER,
+                AiCapability.LIST_AVAILABLE_SLOTS,
+                AiCapability.CHECK_BOOKING_AVAILABILITY,
+                AiCapability.CREATE_BOOKING,
+                AiCapability.LIST_CUSTOMER_BOOKINGS,
+                AiCapability.RESCHEDULE_BOOKING,
+                AiCapability.CANCEL_BOOKING,
+                AiCapability.RECORD_UNANSWERED_QUESTION,
+                AiCapability.LIST_CATALOG
+        ));
+        agents.saveAndFlush(agent);
     }
 
     private void ensureDemoKnowledge(java.util.UUID businessId) {
