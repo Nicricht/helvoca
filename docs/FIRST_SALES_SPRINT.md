@@ -55,7 +55,9 @@ Ejemplos: odontología, veterinarias, estética, peluquerías, talleres, restaur
 6. CUSTOMER — cliente pagador.
 7. CLOSED — no continúa por ahora.
 
-Nunca dejar un prospecto abierto sin `next_action` y `follow_up_date`.
+Nunca dejar un prospecto abierto sin `next_action` y `follow_up_date`. `follow_up_date` es la fecha acordada para ejecutar la siguiente acción.
+
+Después de cada reunión, completar también `highest_interest_capability`, `main_objection`, `plan_or_pilot_discussed` y `requested_changes`. No esconder objeciones o cambios dentro de `notes`; deben quedar como campos separados para que el aprendizaje comercial pueda medirse.
 
 ## Mensaje inicial por WhatsApp o DM
 
