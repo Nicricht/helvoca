@@ -202,6 +202,13 @@
         first.focus();
       }
     });
+    const drawer = document.querySelector("#homeBookingDetailDrawer");
+    const body = document.querySelector("#homeBookingDetailBody");
+    new MutationObserver(() => {
+      const backdrop = document.querySelector("#homeBookingDetailBackdrop");
+      if (!backdrop || backdrop.classList.contains("hidden") || drawer?.contains(document.activeElement)) return;
+      document.querySelector("#homeBookingDetailClose")?.focus({ preventScroll: true });
+    }).observe(body, { childList: true, subtree: true });
   }
 
   function closeBookingDrawer() {

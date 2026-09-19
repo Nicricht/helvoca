@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 const json = body => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 
-async function mockReadyHome(page, roles = ['BUSINESS_ADMIN']) {
+async function mockReadyHome(page, roles = ['BUSINESS_ADMIN'], options = {}) {
   await page.route('**/api/v1/auth/me', route => route.fulfill(json({ email: 'admin@demo.cl', roles })));
   await page.route('**/api/v1/business', route => route.fulfill(json({
     name: 'Negocio E2E', timezone: 'America/Santiago', language: 'es', humanTransferPhone: null
@@ -104,7 +104,9 @@ async function mockReadyHome(page, roles = ['BUSINESS_ADMIN']) {
   await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([
     { id: 'o1', operationId: 'op1', sourceReferenceId: 'wa-order', status: 'CONFIRMED', fulfillmentType: 'DELIVERY', contactName: 'Juan Pedido', contactPhone: '+56933333333', deliveryAddress: 'Av. Demo 123, Santiago', subtotal: 15990, deliveryFee: 3000, total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z', lines: [{ name: 'Producto demo', quantity: 1, unitPrice: 15990, lineTotal: 15990 }] }
   ])));
-  await page.route('**/api/v1/bookings/b1/context', route => route.fulfill(json({
+  await page.route('**/api/v1/bookings/b1/context', async route => {
+    if (options.bookingContextGate) await options.bookingContextGate;
+    return route.fulfill(json({
     channel: 'VOICE',
     sourceReferenceId: 'call-1',
     call: {
@@ -123,7 +125,8 @@ async function mockReadyHome(page, roles = ['BUSINESS_ADMIN']) {
     events: [
       { id: 'e1', eventType: 'BOOKING_CREATED', channel: 'VOICE', createdAt: '2026-09-17T18:00:12Z' }
     ]
-  })));
+    }));
+  });
   await page.route('**/api/v1/bookings/b2/context', route => route.fulfill(json({
     channel: 'WHATSAPP',
     sourceReferenceId: 'wa-booking-2',
@@ -553,7 +556,9 @@ test('ready customer sees live operational home instead of setup cards', async (
 test('reservation filters drawer and conversation links work', async ({ page }) => {
   test.setTimeout(45000);
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
-  await mockReadyHome(page);
+  let releaseBookingContext;
+  const bookingContextGate = new Promise(resolve => { releaseBookingContext = resolve; });
+  await mockReadyHome(page, ['BUSINESS_ADMIN'], { bookingContextGate });
   await page.goto('/');
 
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
@@ -603,6 +608,11 @@ test('reservation filters drawer and conversation links work', async ({ page }) 
   await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
   await expect(page.locator('#homeBookingDetailClose')).toBeFocused();
   await page.keyboard.press('Shift+Tab');
+  releaseBookingContext();
+  await expect(page.locator('#homeBookingDetailBody .home-detail-link')).toHaveAttribute(
+    'href',
+    '/conversations.html?channel=calls&conversation=call-1'
+  );
   await expect.poll(() => page.locator('#homeBookingDetailDrawer').evaluate(
     drawer => drawer.contains(document.activeElement)
   )).toBe(true);
@@ -1867,6 +1877,8 @@ test('manual booking creation checks availability and adds the reservation', asy
   let availabilityCall = null;
   let availabilityCalls = 0;
   let createPayload = null;
+  let releaseAvailability;
+  const availabilityGate = new Promise(resolve => { releaseAvailability = resolve; });
 
   await page.route('**/api/v1/bookings/availability?**', async route => {
     availabilityCalls += 1;
@@ -1876,7 +1888,7 @@ test('manual booking creation checks availability and adds the reservation', asy
       startAt: url.searchParams.get('startAt'),
       excludeBookingId: url.searchParams.get('excludeBookingId')
     };
-    await new Promise(resolve => setTimeout(resolve, 150));
+    await availabilityGate;
     await route.fulfill(json({
       serviceId: availabilityCall.serviceId,
       startAt: availabilityCall.startAt,
@@ -1938,6 +1950,7 @@ test('manual booking creation checks availability and adds the reservation', asy
   await expect(page.locator('#homeBookingCreateTime')).toBeDisabled();
   await expect(page.getByRole('button', { name: '＋ Nueva reserva' })).toBeDisabled();
 
+  releaseAvailability();
   await expect(page.locator('#homeBookingCreateMessage')).toHaveText('Horario disponible ✓');
   await expect(page.getByRole('button', { name: 'Comprobar disponibilidad' })).toBeEnabled();
   await expect(page.locator('#homeBookingCreateCustomer')).toBeEnabled();
