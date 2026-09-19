@@ -376,6 +376,17 @@ async function loadDashboard() {
     }
 }
 
+function optionalBooleanValue(value) {
+    if (value === true) return "true";
+    if (value === false) return "false";
+    return "";
+}
+
+function readOptionalBoolean(field) {
+    if (!field || field.value === "") return null;
+    return field.value === "true";
+}
+
 function renderBusinessProfile(profile = {}) {
     if (!hasBusinessProfileEditor()) return;
     setFieldValue(setupForm.elements.presetKey, profile.presetKey || "");
@@ -389,6 +400,9 @@ function renderBusinessProfile(profile = {}) {
     setupForm.elements.region.value = profile.region || "";
     setupForm.elements.countryCode.value = profile.countryCode || "";
     setFieldValue(setupForm.elements.defaultCurrency, profile.defaultCurrency || "CLP");
+    setFieldValue(setupForm.elements.sellsProducts, optionalBooleanValue(profile.sellsProducts));
+    setFieldValue(setupForm.elements.sellsServices, optionalBooleanValue(profile.sellsServices));
+    setFieldValue(setupForm.elements.usesReservations, optionalBooleanValue(profile.usesReservations));
 }
 
 function collectBusinessProfile() {
@@ -404,7 +418,10 @@ function collectBusinessProfile() {
         city: setupForm.elements.city.value.trim() || null,
         region: setupForm.elements.region.value.trim() || null,
         countryCode: setupForm.elements.countryCode.value.trim().toUpperCase() || null,
-        defaultCurrency: setupForm.elements.defaultCurrency.value.trim().toUpperCase() || "CLP"
+        defaultCurrency: setupForm.elements.defaultCurrency.value.trim().toUpperCase() || "CLP",
+        sellsProducts: readOptionalBoolean(setupForm.elements.sellsProducts),
+        sellsServices: readOptionalBoolean(setupForm.elements.sellsServices),
+        usesReservations: readOptionalBoolean(setupForm.elements.usesReservations)
     };
 }
 
