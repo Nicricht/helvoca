@@ -298,8 +298,6 @@
     const summary = document.querySelector('#welcomeText');
     if (!dashboard || !statusGrid || !heading || !title || typeof api !== 'function') return;
 
-    document.querySelector('.nav-conversations')?.setAttribute('href', '/conversations.html');
-
     const style = document.createElement('style');
     style.id = 'helvoca-operational-home-styles';
     style.textContent = `
@@ -323,7 +321,7 @@
     overview.className = 'card hidden';
     overview.innerHTML = `
         <div class="home-metrics" aria-label="Actividad principal de hoy">
-            <a id="homeCallsMetric" class="home-metric" href="/conversations.html?channel=calls" aria-label="Ver llamadas de hoy"><strong id="homeCallsToday">–</strong><span>📞 Llamadas</span></a>
+            <a id="homeCallsMetric" class="home-metric" href="/operations.html" aria-label="Ver llamadas de hoy"><strong id="homeCallsToday">–</strong><span>📞 Llamadas</span></a>
             <a id="homeBookingsMetric" class="home-metric" href="/?tab=bookings#homeBusinessWorkspace" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>📅 Reservas</span></a>
             <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver solicitudes"><strong id="homeRequestsToday">–</strong><span>📋 Solicitudes</span></a>
             <a id="homeCustomersMetric" class="home-metric" href="/?tab=customers#homeBusinessWorkspace" aria-label="Ver clientes"><strong id="homeCustomersToday">–</strong><span>👥 Clientes</span></a>
