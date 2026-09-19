@@ -22,9 +22,12 @@ public class MetaWhatsAppWebhookController {
     private static final String SIGNATURE_PREFIX = "sha256=";
 
     private final MetaWhatsAppProperties properties;
+    private final MetaWhatsAppTenantResolver tenantResolver;
 
-    public MetaWhatsAppWebhookController(MetaWhatsAppProperties properties) {
+    public MetaWhatsAppWebhookController(MetaWhatsAppProperties properties,
+                                         MetaWhatsAppTenantResolver tenantResolver) {
         this.properties = properties;
+        this.tenantResolver = tenantResolver;
     }
 
     @GetMapping(value = "/whatsapp", produces = MediaType.TEXT_PLAIN_VALUE)
@@ -64,7 +67,20 @@ public class MetaWhatsAppWebhookController {
 
         try {
             var messages = MetaWhatsAppPayloadParser.parseTextMessages(payload);
-            log.info("Meta WhatsApp webhook parsed textMessages={} processingEnabled=false", messages.size());
+            int resolved = 0;
+            int unresolved = 0;
+            for (MetaWhatsAppInboundMessage message : messages) {
+                if (tenantResolver.resolveBusinessId(message.phoneNumberId()).isPresent()) {
+                    resolved++;
+                } else {
+                    unresolved++;
+                }
+            }
+            log.info(
+                    "Meta WhatsApp webhook parsed textMessages={} resolvedTenants={} unresolvedTenants={} processingEnabled=false",
+                    messages.size(),
+                    resolved,
+                    unresolved);
         } catch (Exception e) {
             log.warn("Meta WhatsApp webhook payload could not be parsed type={}", e.getClass().getSimpleName());
         }
