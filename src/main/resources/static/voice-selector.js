@@ -39,21 +39,6 @@
             content: none !important;
         }
 
-        #businessAdvancedToggle {
-            align-self: flex-start;
-            min-height: 32px;
-            padding: 5px 10px;
-            margin-top: 8px;
-            border: 1px solid rgba(255,255,255,.10) !important;
-            border-radius: 999px;
-            background: rgba(255,255,255,.025) !important;
-            color: var(--muted) !important;
-            box-shadow: none !important;
-        }
-        #businessAdvancedToggle:hover {
-            color: var(--text) !important;
-            background: rgba(255,255,255,.045) !important;
-        }
         #configBusinessPanel > .section-heading { display: none !important; }
         #configBusinessPanel .optional { display: none !important; }
         #configBusinessPanel .agent-toggle { font-size: 0 !important; }
@@ -338,50 +323,28 @@
 
     function setupBusinessDisclosure() {
         const panel = document.querySelector('#configBusinessPanel');
-        if (!panel || document.querySelector('#businessAdvancedToggle')) return;
+        if (!panel) return;
 
-        const advancedNames = [
+        const internalNames = [
             'humanTransferPhone',
             'timezone',
             'language',
             'defaultCurrency',
-            'publicPhone',
-            'publicEmail',
-            'websiteUrl',
             'commune',
             'city',
             'region',
-            'countryCode'
+            'countryCode',
+            'sellsProducts',
+            'sellsServices',
+            'usesReservations'
         ];
-        const advancedFields = advancedNames
+
+        internalNames
             .map(name => setupForm.elements[name]?.closest('label'))
-            .filter(Boolean);
+            .filter(Boolean)
+            .forEach(node => node.classList.add('hidden'));
 
-        const redundantNames = ['sellsProducts', 'sellsServices', 'usesReservations'];
-        const redundantFields = redundantNames
-            .map(name => setupForm.elements[name]?.closest('label'))
-            .filter(Boolean);
-
-        advancedFields.forEach(node => node.classList.add('hidden'));
-        redundantFields.forEach(node => node.classList.add('hidden'));
-
-        const toggle = document.createElement('button');
-        toggle.id = 'businessAdvancedToggle';
-        toggle.type = 'button';
-        toggle.className = 'button small ghost';
-        toggle.textContent = '⚙️ Más opciones';
-        toggle.setAttribute('aria-expanded', 'false');
-
-        toggle.addEventListener('click', () => {
-            const opening = toggle.getAttribute('aria-expanded') !== 'true';
-            advancedFields.forEach(node => node.classList.toggle('hidden', !opening));
-            toggle.setAttribute('aria-expanded', String(opening));
-            toggle.textContent = opening ? '⚙️ Menos opciones' : '⚙️ Más opciones';
-        });
-
-        const profileFields = panel.querySelector('.business-profile-grid');
-        if (profileFields) profileFields.insertAdjacentElement('afterend', toggle);
-        else panel.appendChild(toggle);
+        document.querySelector('#businessAdvancedToggle')?.remove();
     }
 
     function compactCommercialStatus() {
