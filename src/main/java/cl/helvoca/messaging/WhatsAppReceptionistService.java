@@ -66,7 +66,11 @@ public class WhatsAppReceptionistService {
 
     @Transactional
     public String handle(String messageSid, String rawFrom, String rawTo, String body) {
+        String priorReply = priorReply(messageSid);
+        if (priorReply != null) return priorReply;
+
         String to = normalizeAddress(rawTo);
+        if (to.isBlank()) throw new IllegalArgumentException("Invalid WhatsApp destination");
         String tenantDestination = properties.resolveTenantDestination(to);
         PhoneNumber phone = phones.findByPhoneNumberAndActiveTrue(tenantDestination)
                 .filter(PhoneNumber::isWhatsappEnabled)
@@ -80,6 +84,9 @@ public class WhatsAppReceptionistService {
                                  UUID phoneNumberId,
                                  String rawFrom,
                                  String body) {
+        String priorReply = priorReply(messageId);
+        if (priorReply != null) return priorReply;
+
         if (businessId == null || phoneNumberId == null) {
             throw new IllegalArgumentException("Resolved WhatsApp tenant route is required");
         }
@@ -91,13 +98,6 @@ public class WhatsAppReceptionistService {
     }
 
     private String process(String messageId, String rawFrom, PhoneNumber phone, String body) {
-        if (messageId == null || messageId.isBlank()) throw new IllegalArgumentException("Message id is required");
-        MessagingMessage prior = messages.findByExternalMessageId(messageId).orElse(null);
-        if (prior != null) {
-            if (prior.getReplyText() != null) return prior.getReplyText();
-            throw new IllegalStateException("WhatsApp message is already being processed");
-        }
-
         String from = normalizeAddress(rawFrom);
         String to = normalizeAddress(phone.getPhoneNumber());
         String text = body == null ? "" : body.trim();
@@ -160,6 +160,16 @@ public class WhatsAppReceptionistService {
         conversation.setLastMessageAt(Instant.now());
         conversations.save(conversation);
         return reply;
+    }
+
+    private String priorReply(String messageId) {
+        if (messageId == null || messageId.isBlank()) {
+            throw new IllegalArgumentException("Message id is required");
+        }
+        MessagingMessage prior = messages.findByExternalMessageId(messageId).orElse(null);
+        if (prior == null) return null;
+        if (prior.getReplyText() != null) return prior.getReplyText();
+        throw new IllegalStateException("WhatsApp message is already being processed");
     }
 
     private Set<String> allowedTools(UUID businessId) {
