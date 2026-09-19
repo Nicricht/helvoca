@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -36,6 +37,10 @@ public class UniversalCatalogService {
         if (repository.existsByBusinessIdAndKindAndNameIgnoreCase(businessId, input.kind(), input.name().trim())) {
             throw new ConflictException("A catalog item with that name and kind already exists");
         }
+        String sku = normalizeSku(input.sku());
+        if (sku != null && repository.existsByBusinessIdAndSkuIgnoreCase(businessId, sku)) {
+            throw new ConflictException("A catalog item with that SKU already exists");
+        }
         CatalogItem item = new CatalogItem();
         item.setBusinessId(businessId);
         apply(item, input);
@@ -54,6 +59,12 @@ public class UniversalCatalogService {
         if (identityChanged && repository.existsByBusinessIdAndKindAndNameIgnoreCase(
                 businessId, input.kind(), input.name().trim())) {
             throw new ConflictException("A catalog item with that name and kind already exists");
+        }
+        String sku = normalizeSku(input.sku());
+        if (!Objects.equals(item.getSku(), sku)
+                && sku != null
+                && repository.existsByBusinessIdAndSkuIgnoreCase(businessId, sku)) {
+            throw new ConflictException("A catalog item with that SKU already exists");
         }
         apply(item, input);
         return ItemView.from(repository.saveAndFlush(item));
@@ -89,6 +100,7 @@ public class UniversalCatalogService {
         if (input == null) throw new IllegalArgumentException("Catalog item is required");
         if (input.kind() == null) throw new IllegalArgumentException("Catalog item kind is required");
         if (input.name() == null || input.name().isBlank()) throw new IllegalArgumentException("Catalog item name is required");
+        normalizeSku(input.sku());
         if (input.price() != null && input.price().signum() < 0) throw new IllegalArgumentException("Price cannot be negative");
         if (input.durationMinutes() != null && input.durationMinutes() <= 0) {
             throw new IllegalArgumentException("Duration must be positive when provided");
@@ -99,12 +111,24 @@ public class UniversalCatalogService {
     private static void apply(CatalogItem item, ItemInput input) {
         item.setKind(input.kind());
         item.setName(input.name().trim());
+        item.setSku(normalizeSku(input.sku()));
+        item.setInventoryTracked(Boolean.TRUE.equals(input.inventoryTracked()));
         item.setDescription(blankToNull(input.description()));
         item.setPrice(input.price());
         item.setCurrency(normalizeCurrency(input.currency()));
         item.setDurationMinutes(input.durationMinutes());
         item.setMetadataJson(blankToNull(input.metadataJson()));
         if (input.active() != null) item.setActive(input.active());
+    }
+
+    private static String normalizeSku(String sku) {
+        String value = blankToNull(sku);
+        if (value == null) return null;
+        value = value.toUpperCase(Locale.ROOT);
+        if (!value.matches("^[A-Z0-9][A-Z0-9._-]{0,79}$")) {
+            throw new IllegalArgumentException("SKU may contain only letters, numbers, dot, dash and underscore");
+        }
+        return value;
     }
 
     private static String normalizeCurrency(String currency) {
@@ -119,6 +143,8 @@ public class UniversalCatalogService {
 
     public record ItemInput(CatalogItem.Kind kind,
                             String name,
+                            String sku,
+                            Boolean inventoryTracked,
                             String description,
                             BigDecimal price,
                             String currency,
@@ -129,6 +155,8 @@ public class UniversalCatalogService {
     public record ItemView(UUID id,
                            CatalogItem.Kind kind,
                            String name,
+                           String sku,
+                           boolean inventoryTracked,
                            String description,
                            BigDecimal price,
                            String currency,
@@ -137,8 +165,8 @@ public class UniversalCatalogService {
                            boolean active,
                            UUID legacyServiceId) {
         static ItemView from(CatalogItem item) {
-            return new ItemView(item.getId(), item.getKind(), item.getName(), item.getDescription(),
-                    item.getPrice(), item.getCurrency(), item.getDurationMinutes(), item.getMetadataJson(),
+            return new ItemView(item.getId(), item.getKind(), item.getName(), item.getSku(), item.isInventoryTracked(),
+                    item.getDescription(), item.getPrice(), item.getCurrency(), item.getDurationMinutes(), item.getMetadataJson(),
                     item.isActive(), item.getLegacyServiceId());
         }
     }
