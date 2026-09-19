@@ -42,11 +42,32 @@ function toast(text) {
 function updateControls() {
   const operationBusy = Boolean(operation);
   const sessionBusy = operationBusy || listening;
-  $("#startBtn").disabled = sessionBusy;
-  $("#messageInput").disabled = !active || sessionBusy;
-  $("#sendBtn").disabled = !active || sessionBusy;
-  $("#finishBtn").disabled = !active || sessionBusy;
-  $("#micBtn").disabled = !active || operationBusy || !recognition;
+  const start = $("#startBtn");
+  const input = $("#messageInput");
+  const send = $("#sendBtn");
+  const finish = $("#finishBtn");
+  const mic = $("#micBtn");
+  start.disabled = sessionBusy;
+  input.disabled = !active || sessionBusy;
+  send.disabled = !active || sessionBusy;
+  finish.disabled = !active || sessionBusy;
+  mic.disabled = !active || operationBusy || !recognition;
+
+  start.title = sessionBusy ? "Espera a que termine la operación actual." : "Iniciar una prueba segura nueva.";
+  input.title = !active
+    ? "Inicia una prueba para poder escribir."
+    : (sessionBusy ? "Espera a que termine la operación actual." : "Escribe tu mensaje de prueba.");
+  send.title = !active
+    ? "Inicia una prueba para poder enviar mensajes."
+    : (sessionBusy ? "Espera a que termine la operación actual." : "Enviar mensaje de prueba.");
+  finish.title = !active
+    ? "Inicia una prueba para poder finalizarla."
+    : (sessionBusy ? "Espera a que termine la operación actual." : "Finalizar esta prueba segura.");
+  mic.title = !recognition
+    ? "El reconocimiento de voz no está disponible en este navegador."
+    : (!active
+      ? "Inicia una prueba para poder usar el micrófono."
+      : (operationBusy ? "Espera a que termine la operación actual." : (listening ? "Detener escucha." : "Hablar.")));
 }
 
 function setActive(value) {

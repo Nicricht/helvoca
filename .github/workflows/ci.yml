@@ -1089,3 +1089,58 @@ jobs:
           fi
           PAYLOAD=$(printf '{"state":"%s","context":"helvoca/navigation-qa","description":"%s"}' "$STATE" "$DESCRIPTION")
           curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"
+
+  interaction-qa:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[interaction-verify]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Report interaction QA pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          PAYLOAD=$(printf '{"state":"pending","context":"helvoca/interaction-qa","description":"Interaction and accessibility QA running"}')
+          curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Validate interaction JavaScript
+        run: |
+          node --check src/main/resources/static/home-business.js
+          node --check src/main/resources/static/simulator.js
+          node --check e2e/interaction-audit.spec.js
+
+      - name: Install interaction test dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run complete interaction E2E
+        run: npm run test:e2e
+
+      - name: Report interaction QA status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          if [ "$JOB_STATUS" = "success" ]; then
+            STATE="success"
+            DESCRIPTION="Interaction and accessibility QA passed"
+          else
+            STATE="failure"
+            DESCRIPTION="Interaction and accessibility QA failed"
+          fi
+          PAYLOAD=$(printf '{"state":"%s","context":"helvoca/interaction-qa","description":"%s"}' "$STATE" "$DESCRIPTION")
+          curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"

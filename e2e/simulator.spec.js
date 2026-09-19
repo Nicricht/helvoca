@@ -83,6 +83,8 @@ test('receptionist simulator keeps actions isolated and shows trace', async ({ p
   await expect(page.locator('.topbar > div strong')).toHaveText('NEGOCIO E2E');
   await expect(page.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/settings.html');
   await expect(page.getByText('No crea datos comerciales reales ni realiza llamadas telefónicas.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Finalizar' })).toHaveAttribute('title', 'Inicia una prueba para poder finalizarla.');
+  await expect(page.getByRole('button', { name: 'Enviar' })).toHaveAttribute('title', 'Inicia una prueba para poder enviar mensajes.');
 
   await page.getByRole('button', { name: 'Nueva prueba' }).click();
   await expect(page.getByText('Hola, soy la recepcionista virtual de Negocio E2E. ¿En qué puedo ayudarte?')).toBeVisible();
@@ -127,6 +129,7 @@ test('simulator exposes a clear voice fallback and start errors', async ({ page 
 
   await expect(page.locator('#voiceHint')).toHaveText('Tu navegador no ofrece reconocimiento de voz. Puedes usar el chat igualmente.');
   await expect(page.locator('#micBtn')).toBeDisabled();
+  await expect(page.locator('#micBtn')).toHaveAttribute('title', 'El reconocimiento de voz no está disponible en este navegador.');
   const start = page.getByRole('button', { name: 'Nueva prueba' });
   await start.click();
   await expect(start).toBeDisabled();

@@ -106,6 +106,60 @@
     return '<div id="homeBookingActivitySlot" class="home-detail-loading">Cargando actividad…</div>';
   }
 
+  let bookingDrawerReturnFocus = null;
+
+  function rememberDrawerOpener(element) {
+    if (!(element instanceof HTMLElement)) return null;
+    for (const kind of ["booking", "order", "customer"]) {
+      const id = element.dataset[`home${kind[0].toUpperCase()}${kind.slice(1)}Id`];
+      if (id) return { element, kind, id };
+    }
+    return { element, kind: null, id: null };
+  }
+
+  function restoreDrawerOpener() {
+    const saved = bookingDrawerReturnFocus;
+    bookingDrawerReturnFocus = null;
+    if (!saved) return;
+    if (saved.element?.isConnected) {
+      saved.element.focus({ preventScroll: true });
+      return;
+    }
+    if (!saved.kind || !saved.id) return;
+    const key = `home${saved.kind[0].toUpperCase()}${saved.kind.slice(1)}Id`;
+    const replacement = [...document.querySelectorAll(`[data-home-${saved.kind}-id]`)]
+      .find(node => node.dataset[key] === saved.id && node.getClientRects().length > 0);
+    if (replacement) {
+      replacement.focus({ preventScroll: true });
+      return;
+    }
+    const fallbackTab = saved.kind === "order"
+      ? document.querySelector('[data-home-tab="orders"]')
+      : saved.kind === "customer"
+        ? document.querySelector('[data-home-tab="customers"]')
+        : document.querySelector('[data-home-tab="bookings"]');
+    fallbackTab?.focus({ preventScroll: true });
+  }
+
+  function drawerFocusableElements() {
+    const drawer = document.querySelector("#homeBookingDetailDrawer");
+    if (!drawer) return [];
+    return [...drawer.querySelectorAll('a[href], button:not([disabled]), select:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+      .filter(node => !node.classList.contains("hidden") && node.getClientRects().length > 0);
+  }
+
+  function showBookingDrawer() {
+    const backdrop = document.querySelector("#homeBookingDetailBackdrop");
+    if (!backdrop) return;
+    if (backdrop.classList.contains("hidden")) {
+      bookingDrawerReturnFocus = rememberDrawerOpener(document.activeElement);
+    }
+    backdrop.classList.remove("hidden");
+    backdrop.setAttribute("aria-hidden", "false");
+    document.body.classList.add("home-detail-open");
+    document.querySelector("#homeBookingDetailClose")?.focus({ preventScroll: true });
+  }
+
   function ensureBookingDrawer() {
     if (document.querySelector("#homeBookingDetailBackdrop")) return;
     document.body.insertAdjacentHTML("beforeend", `
@@ -123,15 +177,40 @@
     document.querySelector("#homeBookingDetailBackdrop").addEventListener("click", event => {
       if (event.target === event.currentTarget) closeBookingDrawer();
     });
-    document.addEventListener("keydown", event => { if (event.key === "Escape") closeBookingDrawer(); });
+    document.addEventListener("keydown", event => {
+      const backdrop = document.querySelector("#homeBookingDetailBackdrop");
+      if (!backdrop || backdrop.classList.contains("hidden")) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeBookingDrawer();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = drawerFocusableElements();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const drawer = document.querySelector("#homeBookingDetailDrawer");
+      if (!drawer?.contains(document.activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
   }
 
   function closeBookingDrawer() {
     const backdrop = document.querySelector("#homeBookingDetailBackdrop");
-    if (!backdrop) return;
+    if (!backdrop || backdrop.classList.contains("hidden")) return;
     backdrop.classList.add("hidden");
     backdrop.setAttribute("aria-hidden", "true");
     document.body.classList.remove("home-detail-open");
+    restoreDrawerOpener();
   }
 
   function bookingFacts(booking, customer, service, context = null) {
@@ -178,7 +257,13 @@
       delete confirm.dataset.startAt;
     }
     if (message) message.textContent = "";
-    if (check) check.disabled = !(customerId && serviceId && date && time);
+    if (check) {
+      const complete = Boolean(customerId && serviceId && date && time);
+      check.disabled = !complete;
+      check.title = complete
+        ? "Comprobar si el horario está disponible."
+        : "Completa cliente, servicio, fecha y hora.";
+    }
   }
 
   function populateBookingCreateControls() {
@@ -212,14 +297,25 @@
   }
 
   async function checkManualBookingAvailability() {
+    const toggle = document.querySelector("#homeBookingCreateToggle");
+    const customer = document.querySelector("#homeBookingCreateCustomer");
+    const service = document.querySelector("#homeBookingCreateService");
+    const dateControl = document.querySelector("#homeBookingCreateDate");
+    const timeControl = document.querySelector("#homeBookingCreateTime");
     const serviceId = document.querySelector("#homeBookingCreateService")?.value || "";
     const date = document.querySelector("#homeBookingCreateDate")?.value || "";
     const time = document.querySelector("#homeBookingCreateTime")?.value || "";
     const startAt = businessLocalDateTimeToIso(date, time);
     const message = document.querySelector("#homeBookingCreateMessage");
     const confirm = document.querySelector("#homeBookingCreateConfirm");
-    if (!serviceId || !startAt || !message || !confirm) return;
+    const check = document.querySelector("#homeBookingCreateCheck");
+    const controls = [customer, service, dateControl, timeControl].filter(Boolean);
+    if (!serviceId || !startAt || !message || !confirm || !check || check.disabled || controls.length !== 4) return;
 
+    controls.forEach(control => { control.disabled = true; });
+    if (toggle) toggle.disabled = true;
+    check.disabled = true;
+    check.title = "Comprobando disponibilidad…";
     message.textContent = "Comprobando disponibilidad…";
     confirm.classList.add("hidden");
     delete confirm.dataset.startAt;
@@ -236,6 +332,18 @@
       }
     } catch (error) {
       message.textContent = error.message || "No pude comprobar la disponibilidad.";
+    } finally {
+      controls.forEach(control => { control.disabled = false; });
+      if (toggle) toggle.disabled = false;
+      const customerId = document.querySelector("#homeBookingCreateCustomer")?.value || "";
+      const currentServiceId = document.querySelector("#homeBookingCreateService")?.value || "";
+      const currentDate = document.querySelector("#homeBookingCreateDate")?.value || "";
+      const currentTime = document.querySelector("#homeBookingCreateTime")?.value || "";
+      const complete = Boolean(customerId && currentServiceId && currentDate && currentTime);
+      check.disabled = !complete;
+      check.title = complete
+        ? "Comprobar si el horario está disponible."
+        : "Completa cliente, servicio, fecha y hora.";
     }
   }
 
@@ -412,12 +520,16 @@
   }
 
   async function checkBookingAvailability(booking) {
-    const date = document.querySelector("#homeBookingRescheduleDate")?.value || "";
-    const time = document.querySelector("#homeBookingRescheduleTime")?.value || "";
+    const toggle = document.querySelector("#homeBookingRescheduleToggle");
+    const dateControl = document.querySelector("#homeBookingRescheduleDate");
+    const timeControl = document.querySelector("#homeBookingRescheduleTime");
+    const check = document.querySelector("#homeBookingCheckAvailability");
+    const date = dateControl?.value || "";
+    const time = timeControl?.value || "";
     const startAt = businessLocalDateTimeToIso(date, time);
     const message = document.querySelector("#homeBookingAvailabilityMessage");
     const confirm = document.querySelector("#homeBookingConfirmReschedule");
-    if (!startAt || !message || !confirm) return;
+    if (!startAt || !message || !confirm || !dateControl || !timeControl || !check || check.disabled) return;
 
     if (new Date(startAt).getTime() === new Date(booking.startAt).getTime()) {
       message.textContent = "Selecciona una fecha u hora diferente a la actual.";
@@ -425,6 +537,11 @@
       return;
     }
 
+    dateControl.disabled = true;
+    timeControl.disabled = true;
+    if (toggle) toggle.disabled = true;
+    check.disabled = true;
+    check.title = "Comprobando disponibilidad…";
     message.textContent = "Comprobando disponibilidad…";
     confirm.classList.add("hidden");
     try {
@@ -445,6 +562,12 @@
     } catch (error) {
       message.textContent = error.message || "No pude comprobar la disponibilidad.";
       confirm.classList.add("hidden");
+    } finally {
+      dateControl.disabled = false;
+      timeControl.disabled = false;
+      if (toggle) toggle.disabled = false;
+      check.disabled = false;
+      check.title = "Comprobar si el nuevo horario está disponible.";
     }
   }
 
@@ -592,10 +715,7 @@
     body.innerHTML = bookingFacts(booking, customer, service) + renderBookingActions(booking) +
       '<div class="home-detail-loading">Cargando conversación…</div>' + bookingActivityLoading();
     bindBookingActions(booking);
-    const backdrop = document.querySelector("#homeBookingDetailBackdrop");
-    backdrop.classList.remove("hidden");
-    backdrop.setAttribute("aria-hidden", "false");
-    document.body.classList.add("home-detail-open");
+    showBookingDrawer();
 
     try {
       const context = await api(`/api/v1/bookings/${encodeURIComponent(id)}/context`);
@@ -831,9 +951,9 @@
       method: "PATCH",
       body: JSON.stringify({ status: nextStatus })
     });
-    closeBookingDrawer();
     await load();
     setTab("orders");
+    closeBookingDrawer();
   }
 
   async function openOrderDetail(id) {
@@ -861,10 +981,7 @@
     ${order.deliveryAddress ? `<div class="home-detail-note"><span>Dirección</span><p>${esc(order.deliveryAddress)}</p></div>` : ""}`;
 
     body.innerHTML = facts + '<div class="home-detail-loading">Cargando conversación…</div>';
-    const backdrop = document.querySelector("#homeBookingDetailBackdrop");
-    backdrop.classList.remove("hidden");
-    backdrop.setAttribute("aria-hidden", "false");
-    document.body.classList.add("home-detail-open");
+    showBookingDrawer();
 
     const context = await loadOrderConversation(order);
     const actions = orderActions(order);
@@ -942,10 +1059,7 @@
     const body = document.querySelector("#homeBookingDetailBody");
     body.innerHTML = customerProfileFacts(fallback) + '<div class="home-detail-loading">Cargando historial…</div>';
 
-    const backdrop = document.querySelector("#homeBookingDetailBackdrop");
-    backdrop.classList.remove("hidden");
-    backdrop.setAttribute("aria-hidden", "false");
-    document.body.classList.add("home-detail-open");
+    showBookingDrawer();
 
     try {
       const profile = await api(`/api/v1/customers/${encodeURIComponent(id)}/profile`);
@@ -1521,6 +1635,7 @@
       button.disabled = true;
       summary.classList.add("hidden");
       summary.innerHTML = "";
+      button.title = "Completa motivo, fecha y un rango Desde/Hasta válido.";
       return;
     }
 
@@ -1528,6 +1643,7 @@
     const customers = new Set(affected.map(item => String(item.customerId || item.id)));
     button.disabled = false;
     summary.classList.remove("hidden");
+    button.title = "Revisar los clientes afectados antes de preparar la campaña.";
     summary.innerHTML = affected.length
       ? `<strong>${customers.size} cliente${customers.size === 1 ? "" : "s"} afectado${customers.size === 1 ? "" : "s"}</strong>`
       : '<strong>Sin clientes afectados</strong>';
@@ -1661,7 +1777,12 @@
     const button = document.querySelector("#homeIncidentPrepareCampaign");
     const selectAll = document.querySelector("#homeIncidentSelectAll");
     if (summary) summary.textContent = `${checked.length} seleccionado${checked.length === 1 ? "" : "s"}`;
-    if (button) button.disabled = checked.length === 0;
+    if (button) {
+      button.disabled = checked.length === 0;
+      button.title = checked.length === 0
+        ? "Selecciona al menos un cliente para preparar la campaña."
+        : "Preparar la campaña sin enviar mensajes todavía.";
+    }
     if (selectAll) {
       selectAll.checked = boxes.length > 0 && checked.length === boxes.length;
       selectAll.indeterminate = checked.length > 0 && checked.length < boxes.length;

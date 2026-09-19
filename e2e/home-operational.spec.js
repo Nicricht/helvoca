@@ -385,6 +385,10 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeIncidentStrategy')).toHaveValue('CHEAPEST');
 
   await expect(page.locator('#homeIncidentPreviewBtn')).toBeDisabled();
+  await expect(page.locator('#homeIncidentPreviewBtn')).toHaveAttribute(
+    'title',
+    'Completa motivo, fecha y un rango Desde/Hasta válido.'
+  );
 
   await page.locator('#homeIncidentReason').selectOption({ label: 'No abrir' });
   await expect(page.locator('#homeIncidentTimeFrom')).toHaveValue('00:00');
@@ -421,6 +425,10 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('.home-incident-select')).toHaveCount(1);
   await page.locator('.home-incident-select').uncheck();
   await expect(page.locator('#homeIncidentPrepareCampaign')).toBeDisabled();
+  await expect(page.locator('#homeIncidentPrepareCampaign')).toHaveAttribute(
+    'title',
+    'Selecciona al menos un cliente para preparar la campaña.'
+  );
   await page.locator('.home-incident-select').check();
   await expect(page.locator('#homeIncidentPrepareCampaign')).toBeEnabled();
   await expect(page.locator('#homeIncidentPrepareCampaign')).toHaveText('Continuar');
@@ -482,8 +490,11 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeBookingsList')).not.toContainText('Ana Reserva');
   await page.locator('#homeBookingClearFilters').click();
 
-  await page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]').click();
+  const firstBooking = page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]');
+  await firstBooking.focus();
+  await firstBooking.click();
   await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('#homeBookingDetailClose')).toBeFocused();
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Ana llamó para reservar peluquería');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Quiero reservar peluquería.');
   await expect(page.locator('#homeBookingDetailBody .home-detail-message strong').first()).toHaveText('Ana Reserva');
@@ -586,8 +597,16 @@ test('reservation filters drawer and conversation links work', async ({ page }) 
   await expect(page.locator('#homeBookingSource')).toHaveValue('all');
   await expect(page.locator('.home-filter-result')).toContainText('2 de 2');
 
-  await page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]').click();
+  const firstBooking = page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]');
+  await firstBooking.focus();
+  await firstBooking.click();
   await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('#homeBookingDetailClose')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect.poll(() => page.locator('#homeBookingDetailDrawer').evaluate(
+    drawer => drawer.contains(document.activeElement)
+  )).toBe(true);
+  await page.locator('#homeBookingDetailClose').focus();
   await expect(page.locator('#homeBookingDetailMeta')).toContainText('Reservada para');
   await expect(page.locator('#homeBookingDetailBody .home-detail-fact-link')).toHaveAttribute(
     'href',
@@ -602,11 +621,24 @@ test('reservation filters drawer and conversation links work', async ({ page }) 
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Reserva reprogramada');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Carolina Soto');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Operador');
+  await page.getByRole('button', { name: 'Reprogramar' }).focus();
+  await page.locator('#homeBookingDetailBody').evaluate(body => {
+    body.innerHTML = '<button id="replacementDrawerAction" type="button">Acción reemplazada</button>';
+  });
+  await page.keyboard.press('Tab');
+  await expect.poll(() => page.locator('#homeBookingDetailDrawer').evaluate(
+    drawer => drawer.contains(document.activeElement)
+  )).toBe(true);
+  await page.locator('#homeBookingDetailClose').focus();
   await page.keyboard.press('Escape');
   await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
+  await expect(firstBooking).toBeFocused();
 
-  await page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b2"]').click();
+  const secondBooking = page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b2"]');
+  await secondBooking.focus();
+  await secondBooking.click();
   await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('#homeBookingDetailClose')).toBeFocused();
   await expect(page.locator('#homeBookingDetailBody .home-detail-fact-link')).toHaveAttribute(
     'href',
     '/conversations.html?channel=whatsapp&conversation=wa-booking-2'
@@ -615,8 +647,9 @@ test('reservation filters drawer and conversation links work', async ({ page }) 
     'href',
     '/conversations.html?channel=whatsapp&conversation=wa-booking-2'
   );
-  await page.locator('#homeBookingDetailClose').click();
+  await page.locator('#homeBookingDetailBackdrop').click({ position: { x: 8, y: 8 } });
   await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
+  await expect(secondBooking).toBeFocused();
 });
 
 
@@ -679,12 +712,15 @@ test('orders status transition works', async ({ page }) => {
 
   await page.goto('/');
   await page.getByRole('tab', { name: /Pedidos/ }).click();
-  await page.locator('#homeOrdersList .home-business-table [data-home-order-id="o1"]').click();
+  const orderOpener = page.locator('#homeOrdersList .home-business-table [data-home-order-id="o1"]');
+  await orderOpener.focus();
+  await orderOpener.click();
   await page.getByRole('button', { name: 'Empezar preparación' }).click();
 
   await expect.poll(() => statusPatch).toEqual({ status: 'PREPARING' });
   await expect(page.locator('#homeOrdersList')).toContainText('Preparando');
   await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
+  await expect(page.locator('#homeOrdersList .home-business-table [data-home-order-id="o1"]')).toBeFocused();
 });
 
 
@@ -1709,6 +1745,7 @@ test('booking cancellation from drawer works', async ({ page }) => {
   });
 
   await page.goto('/');
+  await page.locator('#homeBookingStatus').selectOption('CONFIRMED');
   await page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]').click();
 
   await expect(page.getByRole('button', { name: 'Cancelar reserva' })).toBeVisible();
@@ -1722,7 +1759,10 @@ test('booking cancellation from drawer works', async ({ page }) => {
   await expect(page.locator('#homeBookingDetailMeta')).toContainText('Cancelada');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Esta reserva está cancelada');
   await expect(page.getByRole('button', { name: 'Cancelar reserva' })).toHaveCount(0);
-  await expect(page.locator('#homeBookingsList [data-home-booking-id="b1"] .home-pill').first()).toHaveText('Cancelada');
+  await expect(page.locator('#homeBookingsList')).toContainText('No hay reservas que coincidan con estos filtros.');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
+  await expect(page.getByRole('tab', { name: /Reservas/ })).toBeFocused();
 });
 
 
@@ -1742,6 +1782,7 @@ test('booking reschedule checks availability and updates the drawer', async ({ p
       excludeBookingId: url.searchParams.get('excludeBookingId')
     };
     availabilityCalls.push(call);
+    await new Promise(resolve => setTimeout(resolve, 150));
     await route.fulfill(json({
       serviceId: call.serviceId,
       startAt: call.startAt,
@@ -1766,7 +1807,9 @@ test('booking reschedule checks availability and updates the drawer', async ({ p
   });
 
   await page.goto('/');
-  await page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]').click();
+  const bookingOpener = page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]');
+  await bookingOpener.focus();
+  await bookingOpener.click();
 
   await page.getByRole('button', { name: 'Reprogramar' }).click();
   await expect(page.locator('#homeBookingReschedulePanel')).toBeVisible();
@@ -1776,8 +1819,16 @@ test('booking reschedule checks availability and updates the drawer', async ({ p
   await page.locator('#homeBookingRescheduleDate').selectOption({ index: 1 });
   await page.locator('#homeBookingRescheduleTime').selectOption('14:00');
   await page.locator('#homeBookingReschedulePanel').getByRole('button', { name: 'Comprobar disponibilidad' }).click();
+  await expect(page.locator('#homeBookingRescheduleDate')).toBeDisabled();
+  await expect(page.locator('#homeBookingRescheduleTime')).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Reprogramar' })).toBeDisabled();
+  await expect(page.locator('#homeBookingReschedulePanel').getByRole('button', { name: 'Comprobar disponibilidad' })).toBeDisabled();
+  await expect(page.locator('#homeBookingReschedulePanel').getByRole('button', { name: 'Comprobar disponibilidad' })).toHaveAttribute('title', 'Comprobando disponibilidad…');
 
   await expect(page.locator('#homeBookingAvailabilityMessage')).toHaveText('Ese horario ya no está disponible.');
+  await expect(page.locator('#homeBookingRescheduleDate')).toBeEnabled();
+  await expect(page.locator('#homeBookingRescheduleTime')).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Reprogramar' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Confirmar cambio' })).toBeHidden();
   expect(patchPayload).toBeNull();
 
@@ -1802,6 +1853,9 @@ test('booking reschedule checks availability and updates the drawer', async ({ p
   await expect(page.locator('#homeBookingDetailMeta')).toContainText('Confirmada');
   await expect(page.getByRole('button', { name: 'Reprogramar' })).toBeVisible();
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
+  await expect(page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]')).toBeFocused();
 });
 
 
@@ -1811,15 +1865,18 @@ test('manual booking creation checks availability and adds the reservation', asy
   await mockReadyHome(page);
 
   let availabilityCall = null;
+  let availabilityCalls = 0;
   let createPayload = null;
 
   await page.route('**/api/v1/bookings/availability?**', async route => {
+    availabilityCalls += 1;
     const url = new URL(route.request().url());
     availabilityCall = {
       serviceId: url.searchParams.get('serviceId'),
       startAt: url.searchParams.get('startAt'),
       excludeBookingId: url.searchParams.get('excludeBookingId')
     };
+    await new Promise(resolve => setTimeout(resolve, 150));
     await route.fulfill(json({
       serviceId: availabilityCall.serviceId,
       startAt: availabilityCall.startAt,
@@ -1858,6 +1915,11 @@ test('manual booking creation checks availability and adds the reservation', asy
   await expect(page.locator('#homeBookingCreatePanel')).toBeVisible();
   await expect(page.locator('#homeBookingCreateCustomer')).toContainText('Ana Reserva');
   await expect(page.locator('#homeBookingCreateService')).toContainText('Peluquería');
+  await expect(page.getByRole('button', { name: 'Comprobar disponibilidad' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Comprobar disponibilidad' })).toHaveAttribute(
+    'title',
+    'Completa cliente, servicio, fecha y hora.'
+  );
 
   await page.locator('#homeBookingCreateCustomer').selectOption('cust1');
   await page.locator('#homeBookingCreateService').selectOption('svc1');
@@ -1868,8 +1930,20 @@ test('manual booking creation checks availability and adds the reservation', asy
   await expect(page.getByRole('button', { name: 'Crear reserva' })).toBeHidden();
 
   await page.getByRole('button', { name: 'Comprobar disponibilidad' }).click();
+  await expect(page.getByRole('button', { name: 'Comprobar disponibilidad' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Comprobar disponibilidad' })).toHaveAttribute('title', 'Comprobando disponibilidad…');
+  await expect(page.locator('#homeBookingCreateCustomer')).toBeDisabled();
+  await expect(page.locator('#homeBookingCreateService')).toBeDisabled();
+  await expect(page.locator('#homeBookingCreateDate')).toBeDisabled();
+  await expect(page.locator('#homeBookingCreateTime')).toBeDisabled();
+  await expect(page.getByRole('button', { name: '＋ Nueva reserva' })).toBeDisabled();
 
   await expect(page.locator('#homeBookingCreateMessage')).toHaveText('Horario disponible ✓');
+  await expect(page.getByRole('button', { name: 'Comprobar disponibilidad' })).toBeEnabled();
+  await expect(page.locator('#homeBookingCreateCustomer')).toBeEnabled();
+  await expect(page.locator('#homeBookingCreateService')).toBeEnabled();
+  await expect(page.getByRole('button', { name: '＋ Nueva reserva' })).toBeEnabled();
+  expect(availabilityCalls).toBe(1);
   await expect(page.getByRole('button', { name: 'Crear reserva' })).toBeVisible();
   expect(availabilityCall.serviceId).toBe('svc1');
   expect(availabilityCall.excludeBookingId).toBeNull();
