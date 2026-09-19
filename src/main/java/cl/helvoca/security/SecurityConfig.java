@@ -23,7 +23,6 @@ public class SecurityConfig {
             "/voice-selector.js", "/ux-simplification.js", "/styles.css", "/home-business.js", "/home-business.css",
             "/sales.html", "/sales.css",
             "/pricing.html", "/pricing.js", "/pricing.css",
-            "/operations.html", "/operations.js", "/operations.css",
             "/settings.html", "/settings-page.js",
             "/simulator.html", "/simulator.js", "/simulator.css",
             "/favicon.ico", "/error"
