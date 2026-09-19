@@ -305,7 +305,7 @@
     style.textContent = `
         #dashboardView #statusGrid.ux-ready-hidden { display: none !important; }
         #operationalOverview { margin: 0 0 18px; padding: 18px; }
-        .home-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+        .home-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
         .home-metric { min-height: 76px; padding: 13px 14px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.025); color: inherit; text-decoration: none; cursor: pointer; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
         .home-metric:hover { border-color: rgba(124,92,255,.42); background: rgba(124,92,255,.07); transform: translateY(-1px); }
         .home-metric:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -322,16 +322,18 @@
     overview.id = 'operationalOverview';
     overview.className = 'card hidden';
     overview.innerHTML = `
-        <div class="home-metrics" aria-label="Actividad de hoy">
+        <div class="home-metrics" aria-label="Actividad principal de hoy">
             <a id="homeCallsMetric" class="home-metric" href="/conversations.html?channel=calls" aria-label="Ver llamadas de hoy"><strong id="homeCallsToday">–</strong><span>Llamadas hoy</span></a>
-            <a id="homeWhatsAppMetric" class="home-metric" href="/conversations.html?channel=whatsapp" aria-label="Ver conversaciones de WhatsApp de hoy"><strong id="homeWhatsAppToday">–</strong><span>WhatsApp hoy</span></a>
             <a id="homeBookingsMetric" class="home-metric" href="/?tab=bookings#homeBusinessWorkspace" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>Reservas hoy</span></a>
-            <a id="homeCustomersMetric" class="home-metric" href="/?tab=customers#homeBusinessWorkspace" aria-label="Ver clientes"><strong id="homeCustomersToday">–</strong><span>Clientes nuevos</span></a>
             <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver solicitudes"><strong id="homeRequestsToday">–</strong><span>Solicitudes abiertas</span></a>
-            <a id="homeQuestionsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver preguntas pendientes"><strong id="homeQuestionsToday">–</strong><span>Preguntas pendientes</span></a>
-            <a id="homeFailuresMetric" class="home-metric" href="/conversations.html?channel=calls" aria-label="Ver llamadas con fallo"><strong id="homeFailuresToday">–</strong><span>Llamadas con fallo</span></a>
-            <article id="homeMinutesMetric" class="home-metric"><strong id="homeMinutesToday">–</strong><span>Minutos de voz</span></article>
-            <article id="homeCostMetric" class="home-metric"><strong id="homeCostToday">–</strong><span>Costo estimado USD</span></article>
+            <a id="homeCustomersMetric" class="home-metric" href="/?tab=customers#homeBusinessWorkspace" aria-label="Ver clientes"><strong id="homeCustomersToday">–</strong><span>Clientes nuevos</span></a>
+        </div>
+        <div hidden aria-hidden="true">
+            <span id="homeWhatsAppToday">–</span>
+            <span id="homeQuestionsToday">–</span>
+            <span id="homeFailuresToday">–</span>
+            <span id="homeMinutesToday">–</span>
+            <span id="homeCostToday">–</span>
         </div>
     `;
     heading.insertAdjacentElement('afterend', overview);
