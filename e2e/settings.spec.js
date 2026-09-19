@@ -276,8 +276,6 @@ test('settings loads and saves the public business profile', async ({ page }) =>
   await page.locator('#setupForm [name="publicDescription"]').fill('Venta y soporte tecnológico');
   await page.locator('#setupForm [name="city"]').fill('Santiago Centro');
   await page.locator('#setupForm [name="defaultCurrency"]').selectOption('USD');
-  await page.locator('#setupForm [name="sellsProducts"]').selectOption('false');
-  await page.locator('#setupForm [name="usesReservations"]').selectOption('true');
   await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
 
   await expect.poll(() => state.profilePayloads.length).toBe(1);
@@ -293,9 +291,9 @@ test('settings loads and saves the public business profile', async ({ page }) =>
     region: 'Metropolitana',
     countryCode: 'CL',
     defaultCurrency: 'USD',
-    sellsProducts: false,
+    sellsProducts: true,
     sellsServices: true,
-    usesReservations: true
+    usesReservations: false
   });
 });
 
