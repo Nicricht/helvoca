@@ -45,6 +45,15 @@ public class BusinessProfile {
     @Column(name = "default_currency", nullable = false, length = 3)
     private String defaultCurrency = "CLP";
 
+    @Column(name = "sells_products")
+    private Boolean sellsProducts;
+
+    @Column(name = "sells_services")
+    private Boolean sellsServices;
+
+    @Column(name = "uses_reservations")
+    private Boolean usesReservations;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -87,6 +96,12 @@ public class BusinessProfile {
     public void setCountryCode(String countryCode) { this.countryCode = countryCode; }
     public String getDefaultCurrency() { return defaultCurrency; }
     public void setDefaultCurrency(String defaultCurrency) { this.defaultCurrency = defaultCurrency; }
+    public Boolean getSellsProducts() { return sellsProducts; }
+    public void setSellsProducts(Boolean sellsProducts) { this.sellsProducts = sellsProducts; }
+    public Boolean getSellsServices() { return sellsServices; }
+    public void setSellsServices(Boolean sellsServices) { this.sellsServices = sellsServices; }
+    public Boolean getUsesReservations() { return usesReservations; }
+    public void setUsesReservations(Boolean usesReservations) { this.usesReservations = usesReservations; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

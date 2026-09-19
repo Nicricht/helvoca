@@ -55,7 +55,10 @@ class BusinessProfileServiceTest {
                 " Santiago ",
                 " Metropolitana ",
                 " cl ",
-                " usd "
+                " usd ",
+                true,
+                true,
+                false
         ));
 
         assertEquals(businessId, response.businessId());
@@ -64,6 +67,9 @@ class BusinessProfileServiceTest {
         assertEquals("+56912345678", response.publicPhone());
         assertEquals("CL", response.countryCode());
         assertEquals("USD", response.defaultCurrency());
+        assertTrue(response.sellsProducts());
+        assertTrue(response.sellsServices());
+        assertFalse(response.usesReservations());
 
         verify(audit).humanSuccess(
                 eq(businessId),
