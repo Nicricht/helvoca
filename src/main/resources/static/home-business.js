@@ -130,9 +130,10 @@
 
     if (saved.kind && saved.id) {
       const key = `home${saved.kind[0].toUpperCase()}${saved.kind.slice(1)}Id`;
-      const replacement = [...document.querySelectorAll(`[data-home-${saved.kind}-id]`)]
-        .find(node => node.dataset[key] === saved.id && node.getClientRects().length > 0);
-      if (focusVisibleTarget(replacement)) return;
+      const candidates = [...document.querySelectorAll(`[data-home-${saved.kind}-id]`)]
+        .filter(node => node.dataset[key] === saved.id && node.getClientRects().length > 0);
+      const samePresentation = candidates.find(node => node.tagName === saved.element?.tagName);
+      if (focusVisibleTarget(samePresentation || candidates[0])) return;
     }
 
     if (focusVisibleTarget(saved.element)) return;
