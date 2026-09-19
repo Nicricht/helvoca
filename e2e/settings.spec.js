@@ -127,9 +127,26 @@ test('settings exposes the Mi negocio sections with simple navigation', async ({
   ]);
   await expect(page.locator('#configBusinessPanel')).toBeVisible();
   await expect(page.locator('#configAgentPanel')).toBeHidden();
+
+  for (const name of ['businessName', 'presetKey', 'publicDescription', 'addressLine']) {
+    await expect(page.locator(`#setupForm [name="${name}"]`).locator('xpath=ancestor::label')).toBeVisible();
+  }
+  for (const name of ['defaultCurrency', 'publicPhone', 'humanTransferPhone']) {
+    await expect(page.locator(`#setupForm [name="${name}"]`).locator('xpath=ancestor::label')).toBeHidden();
+  }
+  for (const name of ['sellsProducts', 'sellsServices', 'usesReservations']) {
+    await expect(page.locator(`#setupForm [name="${name}"]`).locator('xpath=ancestor::label')).toBeHidden();
+  }
+
+  const moreOptions = page.getByRole('button', { name: '⚙️ Más opciones' });
+  await expect(moreOptions).toBeVisible();
+  await moreOptions.click();
+  await expect(page.locator('#setupForm [name="defaultCurrency"]').locator('xpath=ancestor::label')).toBeVisible();
   await expect(page.locator('#setupForm [name="defaultCurrency"]').locator('xpath=ancestor::label')).toContainText('💰 Moneda');
-  await expect(page.locator('#setupForm [name="humanTransferPhone"]').locator('xpath=ancestor::label')).toBeHidden();
-  await expect(page.getByRole('button', { name: '⚙️ Más opciones' })).toBeVisible();
+  await expect(page.locator('#setupForm [name="publicPhone"]').locator('xpath=ancestor::label')).toBeVisible();
+  for (const name of ['sellsProducts', 'sellsServices', 'usesReservations']) {
+    await expect(page.locator(`#setupForm [name="${name}"]`).locator('xpath=ancestor::label')).toBeHidden();
+  }
 
   await nav.getByRole('button', { name: '🤖 Recepcionista', exact: true }).click();
   await expect(page.locator('#configAgentPanel')).toBeVisible();
@@ -259,8 +276,6 @@ test('settings loads and saves the public business profile', async ({ page }) =>
   await page.locator('#setupForm [name="publicDescription"]').fill('Venta y soporte tecnológico');
   await page.locator('#setupForm [name="city"]').fill('Santiago Centro');
   await page.locator('#setupForm [name="defaultCurrency"]').selectOption('USD');
-  await page.locator('#setupForm [name="sellsProducts"]').selectOption('false');
-  await page.locator('#setupForm [name="usesReservations"]').selectOption('true');
   await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
 
   await expect.poll(() => state.profilePayloads.length).toBe(1);
@@ -276,9 +291,9 @@ test('settings loads and saves the public business profile', async ({ page }) =>
     region: 'Metropolitana',
     countryCode: 'CL',
     defaultCurrency: 'USD',
-    sellsProducts: false,
+    sellsProducts: true,
     sellsServices: true,
-    usesReservations: true
+    usesReservations: false
   });
 });
 

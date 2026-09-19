@@ -344,6 +344,8 @@
             'humanTransferPhone',
             'timezone',
             'language',
+            'defaultCurrency',
+            'publicPhone',
             'publicEmail',
             'websiteUrl',
             'commune',
@@ -355,7 +357,13 @@
             .map(name => setupForm.elements[name]?.closest('label'))
             .filter(Boolean);
 
+        const redundantNames = ['sellsProducts', 'sellsServices', 'usesReservations'];
+        const redundantFields = redundantNames
+            .map(name => setupForm.elements[name]?.closest('label'))
+            .filter(Boolean);
+
         advancedFields.forEach(node => node.classList.add('hidden'));
+        redundantFields.forEach(node => node.classList.add('hidden'));
 
         const toggle = document.createElement('button');
         toggle.id = 'businessAdvancedToggle';
