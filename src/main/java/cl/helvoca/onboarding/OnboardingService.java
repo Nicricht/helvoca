@@ -3,6 +3,8 @@ package cl.helvoca.onboarding;
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
+import cl.helvoca.business.BusinessProfileResponse;
+import cl.helvoca.business.BusinessProfileService;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.knowledge.KnowledgeItem;
@@ -33,6 +35,7 @@ public class OnboardingService {
     private final KnowledgeItemRepository knowledge;
     private final PhoneNumberRepository phoneNumbers;
     private final BusinessHoursAdminService businessHours;
+    private final BusinessProfileService businessProfiles;
     private final TenantProvider tenantProvider;
     private final AuditService auditService;
 
@@ -41,6 +44,7 @@ public class OnboardingService {
                              KnowledgeItemRepository knowledge,
                              PhoneNumberRepository phoneNumbers,
                              BusinessHoursAdminService businessHours,
+                             BusinessProfileService businessProfiles,
                              TenantProvider tenantProvider,
                              AuditService auditService) {
         this.businesses = businesses;
@@ -48,6 +52,7 @@ public class OnboardingService {
         this.knowledge = knowledge;
         this.phoneNumbers = phoneNumbers;
         this.businessHours = businessHours;
+        this.businessProfiles = businessProfiles;
         this.tenantProvider = tenantProvider;
         this.auditService = auditService;
     }
@@ -206,12 +211,21 @@ public class OnboardingService {
         boolean kb = knowledge.findAllByBusinessIdAndActiveTrueOrderByTitleAsc(businessId).size() > 0;
         boolean transfer = business.getHumanTransferPhone() != null && !business.getHumanTransferPhone().isBlank();
         boolean phone = phoneNumbers.findAllByBusinessIdOrderByCreatedAtDesc(businessId).stream().anyMatch(p -> p.isActive());
-        boolean ready = profile && service && schedule && phone;
+        BusinessProfileResponse profileConfig = businessProfiles.current();
+        boolean requiresReservations = profileConfig == null || profileConfig.usesReservations() == null || profileConfig.usesReservations();
+        boolean requiresServices = requiresReservations
+                || profileConfig == null
+                || profileConfig.sellsServices() == null
+                || profileConfig.sellsServices();
+        boolean ready = profile
+                && (!requiresServices || service)
+                && (!requiresReservations || schedule)
+                && phone;
 
         String nextStep;
         if (!profile) nextStep = "CONFIGURE_BUSINESS";
-        else if (!service) nextStep = "ADD_SERVICE";
-        else if (!schedule) nextStep = "CONFIGURE_HOURS";
+        else if (requiresServices && !service) nextStep = "ADD_SERVICE";
+        else if (requiresReservations && !schedule) nextStep = "CONFIGURE_HOURS";
         else if (!phone) nextStep = "CONNECT_PHONE_NUMBER";
         else if (!transfer) nextStep = "OPTIONAL_HUMAN_TRANSFER";
         else if (!kb) nextStep = "OPTIONAL_KNOWLEDGE";

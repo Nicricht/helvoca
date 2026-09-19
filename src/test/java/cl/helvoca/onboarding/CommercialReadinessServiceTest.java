@@ -4,6 +4,8 @@ import cl.helvoca.agent.AiAgent;
 import cl.helvoca.agent.AiAgentService;
 import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.billing.MercadoPagoProperties;
+import cl.helvoca.business.BusinessProfileResponse;
+import cl.helvoca.business.BusinessProfileService;
 import cl.helvoca.messaging.WhatsAppProperties;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +31,7 @@ class CommercialReadinessServiceTest {
         when(subscriptions.currentForTenant()).thenReturn(subscription("BASIC", "TRIALING", true, false));
 
         CommercialReadinessResponse result = new SelfServiceReadinessService(
-                onboarding, subscriptions, mercadoPago, whatsapp, aiAgents).current();
+                onboarding, subscriptions, mercadoPago, whatsapp, aiAgents, legacyProfileService()).current();
 
         assertEquals(100, result.progressPercent());
         assertTrue(result.readyForProduction());
@@ -58,7 +60,7 @@ class CommercialReadinessServiceTest {
         when(subscriptions.currentForTenant()).thenReturn(subscription("PRO", "SUSPENDED", false, true));
 
         CommercialReadinessResponse result = new SelfServiceReadinessService(
-                onboarding, subscriptions, mercadoPago, whatsapp, aiAgents).current();
+                onboarding, subscriptions, mercadoPago, whatsapp, aiAgents, legacyProfileService()).current();
 
         assertEquals(20, result.progressPercent());
         assertFalse(result.readyForProduction());
@@ -68,6 +70,31 @@ class CommercialReadinessServiceTest {
         assertTrue(result.blockers().contains("SCHEDULE_MISSING"));
         assertTrue(result.blockers().contains("PHONE_MISSING"));
         assertTrue(result.blockers().contains("SUBSCRIPTION_BLOCKED"));
+    }
+
+    @Test
+    void explicitlyDisabledServiceModulesDoNotCreateCommercialBlockers() {
+        OnboardingService onboarding = mock(OnboardingService.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        MercadoPagoProperties mercadoPago = new MercadoPagoProperties();
+        WhatsAppProperties whatsapp = new WhatsAppProperties();
+        AiAgentService aiAgents = activeAgentService(true);
+        BusinessProfileService profiles = mock(BusinessProfileService.class);
+
+        UUID businessId = UUID.randomUUID();
+        when(profiles.current()).thenReturn(profile(businessId, true, false, false));
+        when(onboarding.status()).thenReturn(new OnboardingStatusResponse(
+                true, false, false, false, false, true, true, "OPTIONAL_HUMAN_TRANSFER"));
+        when(subscriptions.currentForTenant()).thenReturn(subscription("BASIC", "ACTIVE", true, true));
+
+        CommercialReadinessResponse result = new SelfServiceReadinessService(
+                onboarding, subscriptions, mercadoPago, whatsapp, aiAgents, profiles).current();
+
+        assertEquals(100, result.progressPercent());
+        assertTrue(result.readyForProduction());
+        assertTrue(result.readyForCalls());
+        assertFalse(result.blockers().contains("SERVICES_MISSING"));
+        assertFalse(result.blockers().contains("SCHEDULE_MISSING"));
     }
 
     @Test
@@ -83,13 +110,29 @@ class CommercialReadinessServiceTest {
         when(subscriptions.currentForTenant()).thenReturn(subscription("BASIC", "ACTIVE", true, true));
 
         CommercialReadinessResponse result = new SelfServiceReadinessService(
-                onboarding, subscriptions, mercadoPago, whatsapp, aiAgents).current();
+                onboarding, subscriptions, mercadoPago, whatsapp, aiAgents, legacyProfileService()).current();
 
         assertEquals(100, result.progressPercent());
         assertFalse(result.readyForProduction());
         assertFalse(result.readyForCalls());
         assertFalse(result.readyForWhatsApp());
         assertTrue(result.blockers().contains("AI_AGENT_DISABLED"));
+    }
+
+    private static BusinessProfileService legacyProfileService() {
+        BusinessProfileService profiles = mock(BusinessProfileService.class);
+        when(profiles.current()).thenReturn(profile(UUID.randomUUID(), null, null, null));
+        return profiles;
+    }
+
+    private static BusinessProfileResponse profile(UUID businessId,
+                                                   Boolean sellsProducts,
+                                                   Boolean sellsServices,
+                                                   Boolean usesReservations) {
+        return new BusinessProfileResponse(
+                businessId, null, null, null, null, null,
+                null, null, null, null, null, "CLP",
+                sellsProducts, sellsServices, usesReservations);
     }
 
     private static AiAgentService activeAgentService(boolean active) {
