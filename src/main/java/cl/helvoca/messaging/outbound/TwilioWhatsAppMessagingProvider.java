@@ -1,5 +1,6 @@
 package cl.helvoca.messaging.outbound;
 
+import cl.helvoca.messaging.WhatsAppProperties;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.telephony.twilio.TwilioProperties;
@@ -29,18 +30,23 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
 
     private final TwilioProperties twilio;
     private final PhoneNumberRepository phones;
+    private final WhatsAppProperties whatsApp;
     private final HttpClient http;
 
     @Autowired
-    public TwilioWhatsAppMessagingProvider(TwilioProperties twilio, PhoneNumberRepository phones) {
-        this(twilio, phones, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
+    public TwilioWhatsAppMessagingProvider(TwilioProperties twilio,
+                                           PhoneNumberRepository phones,
+                                           WhatsAppProperties whatsApp) {
+        this(twilio, phones, whatsApp, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
     }
 
     TwilioWhatsAppMessagingProvider(TwilioProperties twilio,
                                     PhoneNumberRepository phones,
+                                    WhatsAppProperties whatsApp,
                                     HttpClient http) {
         this.twilio = twilio;
         this.phones = phones;
+        this.whatsApp = whatsApp;
         this.http = http;
     }
 
@@ -79,7 +85,10 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
                     : "Tenant has multiple WhatsApp-enabled senders; configuration is ambiguous");
         }
         PhoneNumber senderPhone = senders.getFirst();
-        String sender = normalizeE164(senderPhone.getPhoneNumber());
+        boolean sandbox = whatsApp.isSandboxEnabled();
+        String sender = sandbox
+                ? normalizeE164(whatsApp.getSandboxNumber())
+                : normalizeE164(senderPhone.getPhoneNumber());
 
         try {
             String accountSid = twilio.getAccountSid().trim();
@@ -103,8 +112,10 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
             }
             String sid = new JSONObject(response.body()).optString("sid", "").trim();
             if (sid.isBlank()) throw new IllegalStateException("Twilio did not return a message SID");
-            senderPhone.setWhatsappCertifiedAt(Instant.now());
-            phones.save(senderPhone);
+            if (!sandbox) {
+                senderPhone.setWhatsappCertifiedAt(Instant.now());
+                phones.save(senderPhone);
+            }
             return new SendResult(sid);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

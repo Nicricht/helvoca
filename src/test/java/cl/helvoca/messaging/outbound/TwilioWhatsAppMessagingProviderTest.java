@@ -1,5 +1,6 @@
 package cl.helvoca.messaging.outbound;
 
+import cl.helvoca.messaging.WhatsAppProperties;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.telephony.twilio.TwilioProperties;
@@ -75,6 +76,37 @@ class TwilioWhatsAppMessagingProviderTest {
     }
 
     @Test
+    void sendsThroughSandboxWithoutCertifyingTenantSender() throws Exception {
+        UUID businessId = UUID.randomUUID();
+        PhoneNumber sender = new PhoneNumber();
+        sender.setPhoneNumber("+56922222222");
+        sender.setBusinessId(businessId);
+        sender.setWhatsappEnabled(true);
+        when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(sender));
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(201);
+        when(response.body()).thenReturn("{\"sid\":\"SMfedcba9876543210fedcba9876543210\"}");
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        WhatsAppProperties whatsApp = new WhatsAppProperties();
+        whatsApp.setSandboxEnabled(true);
+        whatsApp.setSandboxNumber("+14155238886");
+
+        MessagingProvider.SendResult result = provider(whatsApp).send(command(businessId));
+
+        assertEquals("SMfedcba9876543210fedcba9876543210", result.providerMessageId());
+        assertNull(sender.getWhatsappCertifiedAt());
+        verify(phones, never()).save(sender);
+
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(http).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        assertEquals("whatsapp:+14155238886", parseForm(bodyOf(requestCaptor.getValue())).get("From"));
+    }
+
+    @Test
     void refusesDeliveryWhenTenantHasNoExplicitWhatsappSender() {
         UUID businessId = UUID.randomUUID();
         when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
@@ -109,11 +141,15 @@ class TwilioWhatsAppMessagingProviderTest {
     }
 
     private TwilioWhatsAppMessagingProvider provider() {
+        return provider(new WhatsAppProperties());
+    }
+
+    private TwilioWhatsAppMessagingProvider provider(WhatsAppProperties whatsApp) {
         TwilioProperties twilio = new TwilioProperties();
         twilio.setAccountSid("ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         twilio.setAuthToken("test-token");
         twilio.setPublicBaseUrl("https://helvoca.example");
-        return new TwilioWhatsAppMessagingProvider(twilio, phones, http);
+        return new TwilioWhatsAppMessagingProvider(twilio, phones, whatsApp, http);
     }
 
     private MessagingProvider.SendCommand command(UUID businessId) {
