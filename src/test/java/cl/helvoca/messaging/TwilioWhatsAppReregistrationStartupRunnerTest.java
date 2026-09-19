@@ -74,6 +74,55 @@ class TwilioWhatsAppReregistrationStartupRunnerTest {
     }
 
     @Test
+    void forcesReregistrationEvenWhenSenderLooksOnline() throws Exception {
+        TwilioProperties props = new TwilioProperties();
+        props.setAccountSid("ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        props.setAuthToken("test-token");
+        props.setPublicBaseUrl("https://helvoca.example");
+
+        HttpClient http = mock(HttpClient.class);
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> listResponse = mock(HttpResponse.class);
+        when(listResponse.statusCode()).thenReturn(200);
+        when(listResponse.body()).thenReturn("""
+                {
+                  "senders": [{
+                    "sid": "XEaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "status": "ONLINE",
+                    "sender_id": "whatsapp:+14355652512",
+                    "configuration": {"waba_id": "123456789", "verification_method": "sms"},
+                    "profile": {"name": "Helvoca"},
+                    "webhook": {
+                      "callback_url": "https://helvoca.example/webhooks/v1/twilio/whatsapp",
+                      "callback_method": "POST"
+                    }
+                  }]
+                }
+                """);
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> createResponse = mock(HttpResponse.class);
+        when(createResponse.statusCode()).thenReturn(409);
+        when(createResponse.body()).thenReturn("""
+                {"code":63110,"message":"Sender already registered"}
+                """);
+
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(listResponse, createResponse);
+
+        var runner = new TwilioWhatsAppReregistrationStartupRunner(
+                true, "+14355652512", props, http);
+
+        var result = runner.reregisterOnce();
+
+        assertFalse(result.accepted());
+        assertEquals(409, result.httpStatus());
+        assertEquals("63110", result.errorCode());
+        verify(http, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
     void reportsTwilioReregistrationFailureWithoutDeletingOrSendingMessages() throws Exception {
         TwilioProperties props = new TwilioProperties();
         props.setAccountSid("ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
