@@ -149,6 +149,37 @@ test('settings uses selectors for timezone language and voice', async ({ page })
   await expect(page.locator('#agentVoiceSelect')).toHaveValue('marin');
 });
 
+
+
+test('settings preset changes guidance only and never rewrites capability choices', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockSettings(page);
+  await page.goto('/settings.html');
+
+  const preset = page.locator('#setupForm [name="presetKey"]');
+  const products = page.locator('#setupForm [name="sellsProducts"]');
+  const services = page.locator('#setupForm [name="sellsServices"]');
+  const reservations = page.locator('#setupForm [name="usesReservations"]');
+  const suggestion = page.locator('#presetSuggestion');
+
+  await expect(suggestion).toHaveText('Prioriza productos.');
+  await expect(products).toHaveValue('true');
+  await expect(services).toHaveValue('true');
+  await expect(reservations).toHaveValue('false');
+
+  await preset.selectOption('salon');
+  await expect(suggestion).toHaveText('Prioriza servicios y reservas.');
+  await expect(products).toHaveValue('true');
+  await expect(services).toHaveValue('true');
+  await expect(reservations).toHaveValue('false');
+
+  await preset.selectOption('restaurant');
+  await expect(suggestion).toHaveText('Prioriza productos y pedidos.');
+
+  await preset.selectOption('clinic');
+  await expect(suggestion).toHaveText('Prioriza servicios y reservas.');
+});
+
 test('settings exposes WhatsApp state and changes it only after an explicit click', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   const state = {};
