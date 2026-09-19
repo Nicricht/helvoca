@@ -7,6 +7,8 @@ public record OnboardingStatusResponse(
         boolean knowledgeConfigured,
         boolean humanTransferConfigured,
         boolean phoneConfigured,
+        boolean servicesRequired,
+        boolean scheduleRequired,
         boolean readyForCalls,
         String nextStep
 ) {}

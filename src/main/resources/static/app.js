@@ -330,7 +330,15 @@ const nextStepText = {
 
 function applyStatus(status) {
     currentStatus = status;
-    $$(".status-card", $("#statusGrid")).forEach(card => card.classList.toggle("done", Boolean(status[card.dataset.key])));
+    $(".status-card", $("#statusGrid")).forEach(card => {
+        const key = card.dataset.key;
+        const optional = (key === "servicesConfigured" && status.servicesRequired === false)
+            || (key === "scheduleConfigured" && status.scheduleRequired === false);
+        card.classList.toggle("done", optional || Boolean(status[key]));
+        const small = $("small", card);
+        const defaultLabel = { servicesConfigured: "Reservables", scheduleConfigured: "Atención" }[key];
+        if (small && defaultLabel) small.textContent = optional ? "Opcional" : defaultLabel;
+    });
     $("#readyBanner").classList.toggle("hidden", !status.readyForCalls);
     $("#nextStepBanner").textContent = nextStepText[status.nextStep] || `Siguiente paso: ${status.nextStep}`;
 }
@@ -385,6 +393,15 @@ function optionalBooleanValue(value) {
 function readOptionalBoolean(field) {
     if (!field || field.value === "") return null;
     return field.value === "true";
+}
+
+function currentModuleRequirements() {
+    const sellsServices = readOptionalBoolean(setupForm.elements.sellsServices);
+    const usesReservations = readOptionalBoolean(setupForm.elements.usesReservations);
+    return {
+        servicesRequired: sellsServices !== false || usesReservations !== false,
+        scheduleRequired: usesReservations !== false
+    };
 }
 
 const PRESET_PRESENTATION_SUGGESTIONS = Object.freeze({
@@ -559,10 +576,13 @@ function showAdvanced() {
 
 async function confirmProposal() {
     if (!currentProposal) return;
-    if (!(currentProposal.services || []).length || !(currentProposal.hours || []).length) {
+    const requirements = currentModuleRequirements();
+    const missingServices = requirements.servicesRequired && !(currentProposal.services || []).length;
+    const missingHours = requirements.scheduleRequired && !(currentProposal.hours || []).length;
+    if (missingServices || missingHours) {
         prefillProposal(currentProposal);
         showAdvanced();
-        showMessage(setupMessage, "La IA no encontró todos los datos obligatorios. Completa servicios y horarios y luego guarda.");
+        showMessage(setupMessage, "La IA no encontró todos los datos requeridos. Completa los módulos que uses y luego guarda.");
         advancedPanel.scrollIntoView({ behavior: "smooth", block: "start" });
         return;
     }
@@ -657,8 +677,9 @@ setupForm.addEventListener("submit", async event => {
     clearMessage(setupMessage);
     const services = collectServices();
     const hours = collectHours();
-    if (!services.length) { showMessage(setupMessage, "Añade al menos un servicio antes de guardar."); return; }
-    if (!hours.length) { showMessage(setupMessage, "Configura al menos un intervalo de atención."); return; }
+    const requirements = currentModuleRequirements();
+    if (requirements.servicesRequired && !services.length) { showMessage(setupMessage, "Añade al menos un servicio antes de guardar."); return; }
+    if (requirements.scheduleRequired && !hours.length) { showMessage(setupMessage, "Configura al menos un intervalo de atención."); return; }
     if (!setupForm.elements.agentGreeting.value.trim()) { showMessage(setupMessage, "Define el saludo inicial del agente."); return; }
     setBusy(setupForm, true);
     try {

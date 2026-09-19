@@ -35,14 +35,35 @@ public class SelfServiceReadinessService {
         boolean agentActive = aiAgents.current().isActive();
 
         List<String> blockers = new ArrayList<>();
-        if (!operational.businessProfileConfigured()) blockers.add("BUSINESS_PROFILE_MISSING");
-        if (!operational.servicesConfigured()) blockers.add("SERVICES_MISSING");
-        if (!operational.scheduleConfigured()) blockers.add("SCHEDULE_MISSING");
-        if (!operational.phoneConfigured()) blockers.add("PHONE_MISSING");
-        if (!subscription.serviceAllowed()) blockers.add("SUBSCRIPTION_BLOCKED");
+        int requiredChecks = 0;
+        int completedChecks = 0;
 
-        int completed = 5 - blockers.size();
-        int progress = Math.max(0, Math.min(100, completed * 20));
+        requiredChecks++;
+        if (operational.businessProfileConfigured()) completedChecks++;
+        else blockers.add("BUSINESS_PROFILE_MISSING");
+
+        if (operational.servicesRequired()) {
+            requiredChecks++;
+            if (operational.servicesConfigured()) completedChecks++;
+            else blockers.add("SERVICES_MISSING");
+        }
+
+        if (operational.scheduleRequired()) {
+            requiredChecks++;
+            if (operational.scheduleConfigured()) completedChecks++;
+            else blockers.add("SCHEDULE_MISSING");
+        }
+
+        requiredChecks++;
+        if (operational.phoneConfigured()) completedChecks++;
+        else blockers.add("PHONE_MISSING");
+
+        requiredChecks++;
+        if (subscription.serviceAllowed()) completedChecks++;
+        else blockers.add("SUBSCRIPTION_BLOCKED");
+
+        int progress = Math.max(0, Math.min(100,
+                Math.round((completedChecks * 100.0f) / requiredChecks)));
         if (!agentActive) blockers.add("AI_AGENT_DISABLED");
 
         boolean readyForCalls = operational.readyForCalls() && subscription.serviceAllowed() && agentActive;

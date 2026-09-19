@@ -10,6 +10,18 @@ async function mockSettings(page, state = {}) {
   state.whatsappPatches = [];
   state.setupPayloads = [];
   state.profilePayloads = [];
+  state.services = state.services || [
+    { id: 'service-1', name: 'Consulta', durationMinutes: 30, price: 25000, description: 'Consulta general', active: true }
+  ];
+  state.hours = state.hours || [
+    { dayOfWeek: 1, openTime: '09:00:00', closeTime: '18:00:00' }
+  ];
+  state.status = state.status || {
+    businessProfileConfigured: true, servicesConfigured: true, scheduleConfigured: true,
+    knowledgeConfigured: true, humanTransferConfigured: true, phoneConfigured: true,
+    servicesRequired: true, scheduleRequired: false,
+    readyForCalls: true, nextStep: 'READY'
+  };
   state.profile = state.profile || {
     businessId: 'business-1',
     presetKey: 'store',
@@ -40,11 +52,7 @@ async function mockSettings(page, state = {}) {
   await page.route(/\/api\/v1\/business$/, route => route.fulfill(json({
     name: 'Negocio E2E', timezone: 'America/Santiago', language: 'es', humanTransferPhone: '+56999999999'
   })));
-  await page.route('**/api/v1/onboarding/status', route => route.fulfill(json({
-    businessProfileConfigured: true, servicesConfigured: true, scheduleConfigured: true,
-    knowledgeConfigured: true, humanTransferConfigured: true, phoneConfigured: true,
-    readyForCalls: true, nextStep: 'READY'
-  })));
+  await page.route('**/api/v1/onboarding/status', route => route.fulfill(json(state.status)));
   await page.route('**/api/v1/onboarding/setup', async route => {
     if (route.request().method() === 'PUT') {
       state.setupPayloads.push(route.request().postDataJSON());
@@ -55,12 +63,8 @@ async function mockSettings(page, state = {}) {
     }
     await route.fulfill(json({ readyForCalls: true }));
   });
-  await page.route('**/api/v1/services', route => route.fulfill(json([
-    { id: 'service-1', name: 'Consulta', durationMinutes: 30, price: 25000, description: 'Consulta general', active: true }
-  ])));
-  await page.route('**/api/v1/business/hours', route => route.fulfill(json([
-    { dayOfWeek: 1, openTime: '09:00:00', closeTime: '18:00:00' }
-  ])));
+  await page.route('**/api/v1/services', route => route.fulfill(json(state.services)));
+  await page.route('**/api/v1/business/hours', route => route.fulfill(json(state.hours)));
   await page.route('**/api/v1/knowledge?activeOnly=false', route => route.fulfill(json([
     { id: 'knowledge-1', title: 'Ubicación', category: 'Información', content: 'Centro', active: true }
   ])));
@@ -178,6 +182,37 @@ test('settings preset changes guidance only and never rewrites capability choice
 
   await preset.selectOption('clinic');
   await expect(suggestion).toHaveText('Prioriza servicios y reservas.');
+});
+
+test('settings saves a business without services or reservations when those modules are explicitly unused', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const state = {};
+  await mockSettings(page, state);
+  state.profile.sellsServices = false;
+  state.profile.usesReservations = false;
+  state.services = [];
+  state.hours = [];
+  state.status = {
+    businessProfileConfigured: true, servicesConfigured: false, scheduleConfigured: false,
+    knowledgeConfigured: true, humanTransferConfigured: true, phoneConfigured: true,
+    servicesRequired: false, scheduleRequired: false,
+    readyForCalls: true, nextStep: 'READY'
+  };
+
+  await page.goto('/');
+  await page.goto('/settings.html');
+
+  await expect(page.locator('#setupForm [name="sellsServices"]')).toHaveValue('false');
+  await expect(page.locator('#setupForm [name="usesReservations"]')).toHaveValue('false');
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+
+  await expect.poll(() => state.setupPayloads.length).toBe(1);
+  expect(state.setupPayloads[0].services).toEqual([]);
+  expect(state.setupPayloads[0].hours).toEqual([]);
+  await expect.poll(() => state.profilePayloads.length).toBe(1);
+  expect(state.profilePayloads[0]).toMatchObject({ sellsServices: false, usesReservations: false });
+  await expect(page.locator('#statusGrid [data-key="servicesConfigured"] small')).toHaveText('Opcional');
+  await expect(page.locator('#statusGrid [data-key="scheduleConfigured"] small')).toHaveText('Opcional');
 });
 
 test('settings exposes WhatsApp state and changes it only after an explicit click', async ({ page }) => {

@@ -2,6 +2,7 @@ package cl.helvoca.onboarding;
 
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.business.Business;
+import cl.helvoca.business.BusinessProfileRepository;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.knowledge.KnowledgeItem;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
@@ -27,6 +28,7 @@ class OnboardingSynchronizationTest {
     @Test
     void setupRenamesExistingItemsByIdAndDeactivatesRemovedItems() {
         BusinessRepository businesses = mock(BusinessRepository.class);
+        BusinessProfileRepository profiles = mock(BusinessProfileRepository.class);
         ServiceItemRepository services = mock(ServiceItemRepository.class);
         KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
         PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
@@ -71,7 +73,7 @@ class OnboardingSynchronizationTest {
         when(phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of());
 
         OnboardingService service = new OnboardingService(
-                businesses, services, knowledge, phones, hours, tenant, audit);
+                businesses, profiles, services, knowledge, phones, hours, tenant, audit);
 
         OnboardingSetupRequest request = new OnboardingSetupRequest(
                 "Restaurante", "America/Santiago", "es", null,
@@ -94,6 +96,7 @@ class OnboardingSynchronizationTest {
     @Test
     void setupRejectsItemIdsOutsideAuthenticatedTenant() {
         BusinessRepository businesses = mock(BusinessRepository.class);
+        BusinessProfileRepository profiles = mock(BusinessProfileRepository.class);
         ServiceItemRepository services = mock(ServiceItemRepository.class);
         KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
         PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
@@ -111,7 +114,7 @@ class OnboardingSynchronizationTest {
         when(services.findAllByBusinessIdOrderByNameAsc(businessId)).thenReturn(List.of());
 
         OnboardingService service = new OnboardingService(
-                businesses, services, knowledge, phones, hours, tenant, mock(AuditService.class));
+                businesses, profiles, services, knowledge, phones, hours, tenant, mock(AuditService.class));
 
         OnboardingSetupRequest request = new OnboardingSetupRequest(
                 "Restaurante", "America/Santiago", "es", null,
