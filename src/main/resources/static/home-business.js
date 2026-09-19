@@ -121,24 +121,28 @@
     const saved = bookingDrawerReturnFocus;
     bookingDrawerReturnFocus = null;
     if (!saved) return;
-    if (saved.element?.isConnected) {
-      saved.element.focus({ preventScroll: true });
-      return;
+
+    const focusVisibleTarget = node => {
+      if (!(node instanceof HTMLElement) || !node.isConnected || node.getClientRects().length === 0) return false;
+      node.focus({ preventScroll: true });
+      return document.activeElement === node;
+    };
+
+    if (saved.kind && saved.id) {
+      const key = `home${saved.kind[0].toUpperCase()}${saved.kind.slice(1)}Id`;
+      const replacement = [...document.querySelectorAll(`[data-home-${saved.kind}-id]`)]
+        .find(node => node.dataset[key] === saved.id && node.getClientRects().length > 0);
+      if (focusVisibleTarget(replacement)) return;
     }
-    if (!saved.kind || !saved.id) return;
-    const key = `home${saved.kind[0].toUpperCase()}${saved.kind.slice(1)}Id`;
-    const replacement = [...document.querySelectorAll(`[data-home-${saved.kind}-id]`)]
-      .find(node => node.dataset[key] === saved.id && node.getClientRects().length > 0);
-    if (replacement) {
-      replacement.focus({ preventScroll: true });
-      return;
-    }
+
+    if (focusVisibleTarget(saved.element)) return;
+
     const fallbackTab = saved.kind === "order"
       ? document.querySelector('[data-home-tab="orders"]')
       : saved.kind === "customer"
         ? document.querySelector('[data-home-tab="customers"]')
         : document.querySelector('[data-home-tab="bookings"]');
-    fallbackTab?.focus({ preventScroll: true });
+    focusVisibleTarget(fallbackTab);
   }
 
   function drawerFocusableElements() {
