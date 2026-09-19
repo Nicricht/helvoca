@@ -130,7 +130,8 @@ public class TwilioWhatsAppReregistrationStartupRunner implements ApplicationRun
                 lastFour(senderE164), redactSid(existingSid), currentStatus, offlineCode);
 
         if ("ONLINE".equalsIgnoreCase(currentStatus)) {
-            return new ReregistrationAttempt(true, existingSid, currentStatus, 200, "", "");
+            log.warn("WHATSAPP_REREGISTER forcing provider registration despite ONLINE senderEnding={} because delivery may still be locked",
+                    lastFour(senderE164));
         }
 
         String profileName = sender.optJSONObject("profile") == null
