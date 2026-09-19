@@ -67,8 +67,35 @@ class TwilioWhatsAppControllerTest {
                 .inbound(signature, form);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().contains("<Message>ok</Message>"));
+        assertTrue(response.getBody().contains("statusCallback=\"/webhooks/v1/twilio/whatsapp/status\""));
+        assertTrue(response.getBody().contains("action=\"/webhooks/v1/twilio/whatsapp/status\""));
+        assertTrue(response.getBody().contains(">ok</Message>"));
         verify(receptionist).handle("SM1", "+56911111111", "+56922222222", "hola");
+    }
+
+    @Test
+    void validStatusCallbackIsAcceptedAndDoesNotInvokeReceptionist() throws Exception {
+        WhatsAppReceptionistService receptionist = mock(WhatsAppReceptionistService.class);
+        WhatsAppProperties properties = new WhatsAppProperties();
+        properties.setEnabled(true);
+        properties.setWebhookValidationEnabled(true);
+        TwilioProperties twilio = new TwilioProperties();
+        twilio.setPublicBaseUrl("https://example.test");
+        twilio.setAuthToken("test-auth-token");
+
+        LinkedMultiValueMap<String, String> payload = new LinkedMultiValueMap<>();
+        payload.add("MessageSid", "SM-out-1");
+        payload.add("MessageStatus", "delivered");
+        payload.add("ErrorCode", "");
+        String callbackUrl = "https://example.test/webhooks/v1/twilio/whatsapp/status";
+        String signature = twilioSignature(callbackUrl, payload, "test-auth-token");
+
+        var response = new TwilioWhatsAppController(receptionist, properties, twilio)
+                .status(signature, payload);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response/>", response.getBody());
+        verifyNoInteractions(receptionist);
     }
 
     @Test
