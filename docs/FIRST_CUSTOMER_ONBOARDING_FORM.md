@@ -163,7 +163,7 @@ Registrar necesidades futuras aunque todavía no formen parte del piloto. No pro
 - Responsable por parte de Helvoca:
 - Responsable por parte del cliente:
 
-Mientras V42 Plans / Entitlements / Billing no esté certificado en producción, el alta de los primeros clientes es asistida y los límites/condiciones deben quedar documentados expresamente.
+V42 Plans / Entitlements / Billing ya está certificado en producción. Los primeros clientes continúan con alta asistida para controlar el alcance del piloto, validar datos reales y aprender con uso real. Los límites, condiciones, capacidades e integraciones incluidas deben quedar documentados expresamente para cada tenant.
 
 ## 12. Criterios para activar
 
