@@ -7,12 +7,16 @@ import cl.helvoca.user.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class DevDataInitializer implements CommandLineRunner {
+    private static final Logger log = LoggerFactory.getLogger(DevDataInitializer.class);
+
     private final BusinessRepository businesses;
     private final AppUserRepository users;
     private final RoleRepository roles;
@@ -34,7 +38,11 @@ public class DevDataInitializer implements CommandLineRunner {
 
     @Override @Transactional
     public void run(String... args) {
-        if (!enabled || users.existsByEmailIgnoreCase(adminEmail)) return;
+        if (!enabled) return;
+        if (users.existsByEmailIgnoreCase(adminEmail)) {
+            log.info("Sales demo tenant seed is ready");
+            return;
+        }
         Business business = new Business();
         business.setName("Helvoca Demo Business");
         business.setTimezone("America/Santiago");
