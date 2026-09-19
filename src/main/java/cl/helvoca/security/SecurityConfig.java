@@ -87,7 +87,7 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_CONSOLE_ASSETS).permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register",
                                 "/api/v1/public/pricing", "/actuator/health").permitAll()
-                        .requestMatchers("/webhooks/v1/twilio/**", "/webhooks/v1/openai/**",
+                        .requestMatchers("/webhooks/v1/twilio/**", "/webhooks/v1/meta/**", "/webhooks/v1/openai/**",
                                 "/webhooks/v1/mercadopago", "/webhooks/v1/payments/**").permitAll()
                         .requestMatchers("/ws/v1/twilio/**").permitAll()
                         .requestMatchers("/api/v1/platform/**").hasRole("PLATFORM_ADMIN")
