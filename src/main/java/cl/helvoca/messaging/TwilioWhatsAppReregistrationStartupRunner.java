@@ -174,19 +174,49 @@ public class TwilioWhatsAppReregistrationStartupRunner implements ApplicationRun
         }
         if (!webhook.isEmpty()) payload.put("webhook", webhook);
 
-        HttpResponse<String> createResponse = send(HttpRequest.newBuilder(URI.create(SENDERS_API))
-                .timeout(Duration.ofSeconds(15))
-                .header("Authorization", authorization)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
-                .build());
+        HttpResponse<String> createResponse = createSender(authorization, payload);
 
         if (!is2xx(createResponse.statusCode())) {
             TwilioError error = parseError(createResponse.body());
-            log.error("WHATSAPP_REREGISTER request failed http={} code={} reason={}",
-                    createResponse.statusCode(), error.code(), sanitize(error.message()));
-            return new ReregistrationAttempt(false, existingSid, currentStatus,
-                    createResponse.statusCode(), error.code(), error.message());
+
+            if (createResponse.statusCode() == 409 && "63100".equals(error.code())) {
+                if (!SENDER_SID.matcher(existingSid).matches()) {
+                    throw new IllegalStateException("Existing Twilio sender SID is invalid");
+                }
+
+                HttpResponse<String> deleteResponse = send(HttpRequest.newBuilder(
+                                URI.create(SENDERS_API + "/" + existingSid))
+                        .timeout(Duration.ofSeconds(15))
+                        .header("Authorization", authorization)
+                        .DELETE()
+                        .build());
+
+                if (!is2xx(deleteResponse.statusCode())) {
+                    TwilioError deleteError = parseError(deleteResponse.body());
+                    log.error("WHATSAPP_REREGISTER delete failed http={} code={} reason={}",
+                            deleteResponse.statusCode(), deleteError.code(), sanitize(deleteError.message()));
+                    return new ReregistrationAttempt(false, existingSid, currentStatus,
+                            deleteResponse.statusCode(), deleteError.code(), deleteError.message());
+                }
+
+                log.warn("WHATSAPP_REREGISTER deleted existing sender ending={} sid={}",
+                        lastFour(senderE164), redactSid(existingSid));
+
+                Thread.sleep(2_000L);
+                createResponse = createSender(authorization, payload);
+                if (!is2xx(createResponse.statusCode())) {
+                    TwilioError retryError = parseError(createResponse.body());
+                    log.error("WHATSAPP_REREGISTER recreate failed http={} code={} reason={}",
+                            createResponse.statusCode(), retryError.code(), sanitize(retryError.message()));
+                    return new ReregistrationAttempt(false, existingSid, currentStatus,
+                            createResponse.statusCode(), retryError.code(), retryError.message());
+                }
+            } else {
+                log.error("WHATSAPP_REREGISTER request failed http={} code={} reason={}",
+                        createResponse.statusCode(), error.code(), sanitize(error.message()));
+                return new ReregistrationAttempt(false, existingSid, currentStatus,
+                        createResponse.statusCode(), error.code(), error.message());
+            }
         }
 
         JSONObject created = new JSONObject(createResponse.body());
@@ -199,6 +229,15 @@ public class TwilioWhatsAppReregistrationStartupRunner implements ApplicationRun
         log.info("WHATSAPP_REREGISTER accepted http={} senderEnding={} sid={} status={}",
                 createResponse.statusCode(), lastFour(senderE164), redactSid(sid), status);
         return new ReregistrationAttempt(true, sid, status, createResponse.statusCode(), "", "");
+    }
+
+    private HttpResponse<String> createSender(String authorization, JSONObject payload) throws Exception {
+        return send(HttpRequest.newBuilder(URI.create(SENDERS_API))
+                .timeout(Duration.ofSeconds(15))
+                .header("Authorization", authorization)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
+                .build());
     }
 
     private SenderState fetchSenderState(String sid) throws Exception {
