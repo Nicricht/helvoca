@@ -25,7 +25,7 @@ class CommercialReadinessServiceTest {
         AiAgentService aiAgents = activeAgentService(true);
 
         when(onboarding.status()).thenReturn(new OnboardingStatusResponse(
-                true, true, true, false, false, true, true, "OPTIONAL_HUMAN_TRANSFER"));
+                true, true, true, false, false, true, true, true, true, "OPTIONAL_HUMAN_TRANSFER"));
         when(subscriptions.currentForTenant()).thenReturn(subscription("BASIC", "TRIALING", true, false));
 
         CommercialReadinessResponse result = new SelfServiceReadinessService(
@@ -54,7 +54,7 @@ class CommercialReadinessServiceTest {
         AiAgentService aiAgents = activeAgentService(true);
 
         when(onboarding.status()).thenReturn(new OnboardingStatusResponse(
-                true, false, false, true, true, false, false, "ADD_SERVICE"));
+                true, false, false, true, true, false, true, true, false, "ADD_SERVICE"));
         when(subscriptions.currentForTenant()).thenReturn(subscription("PRO", "SUSPENDED", false, true));
 
         CommercialReadinessResponse result = new SelfServiceReadinessService(
@@ -79,7 +79,7 @@ class CommercialReadinessServiceTest {
         AiAgentService aiAgents = activeAgentService(false);
 
         when(onboarding.status()).thenReturn(new OnboardingStatusResponse(
-                true, true, true, true, true, true, true, "READY"));
+                true, true, true, true, true, true, true, true, true, "READY"));
         when(subscriptions.currentForTenant()).thenReturn(subscription("BASIC", "ACTIVE", true, true));
 
         CommercialReadinessResponse result = new SelfServiceReadinessService(
@@ -110,4 +110,27 @@ class CommercialReadinessServiceTest {
                 now.minusSeconds(3600), now.plusSeconds(86400), null,
                 billingConnected, List.of(), false);
     }
+
+    @Test
+    void optionalServiceAndScheduleModulesDoNotCreateCommercialBlockers() {
+        OnboardingService onboarding = mock(OnboardingService.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        MercadoPagoProperties mercadoPago = new MercadoPagoProperties();
+        WhatsAppProperties whatsapp = new WhatsAppProperties();
+        AiAgentService aiAgents = activeAgentService(true);
+
+        when(onboarding.status()).thenReturn(new OnboardingStatusResponse(
+                true, false, false, false, false, true, false, false, true, "OPTIONAL_HUMAN_TRANSFER"));
+        when(subscriptions.currentForTenant()).thenReturn(subscription("BASIC", "ACTIVE", true, true));
+
+        CommercialReadinessResponse result = new SelfServiceReadinessService(
+                onboarding, subscriptions, mercadoPago, whatsapp, aiAgents).current();
+
+        assertEquals(100, result.progressPercent());
+        assertTrue(result.readyForProduction());
+        assertTrue(result.readyForCalls());
+        assertFalse(result.blockers().contains("SERVICES_MISSING"));
+        assertFalse(result.blockers().contains("SCHEDULE_MISSING"));
+    }
+
 }

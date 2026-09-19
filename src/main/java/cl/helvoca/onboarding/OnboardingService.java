@@ -2,6 +2,8 @@ package cl.helvoca.onboarding;
 
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.business.Business;
+import cl.helvoca.business.BusinessProfile;
+import cl.helvoca.business.BusinessProfileRepository;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
@@ -29,6 +31,7 @@ import java.util.UUID;
 @Service
 public class OnboardingService {
     private final BusinessRepository businesses;
+    private final BusinessProfileRepository businessProfiles;
     private final ServiceItemRepository services;
     private final KnowledgeItemRepository knowledge;
     private final PhoneNumberRepository phoneNumbers;
@@ -37,6 +40,7 @@ public class OnboardingService {
     private final AuditService auditService;
 
     public OnboardingService(BusinessRepository businesses,
+                             BusinessProfileRepository businessProfiles,
                              ServiceItemRepository services,
                              KnowledgeItemRepository knowledge,
                              PhoneNumberRepository phoneNumbers,
@@ -44,6 +48,7 @@ public class OnboardingService {
                              TenantProvider tenantProvider,
                              AuditService auditService) {
         this.businesses = businesses;
+        this.businessProfiles = businessProfiles;
         this.services = services;
         this.knowledge = knowledge;
         this.phoneNumbers = phoneNumbers;
@@ -198,26 +203,37 @@ public class OnboardingService {
     }
 
     private OnboardingStatusResponse buildStatus(UUID businessId, Business business) {
-        boolean profile = business.getName() != null && !business.getName().isBlank()
+        boolean profileConfigured = business.getName() != null && !business.getName().isBlank()
                 && business.getTimezone() != null && !business.getTimezone().isBlank()
                 && business.getLanguage() != null && !business.getLanguage().isBlank();
+        BusinessProfile profile = businessProfiles.findById(businessId).orElse(null);
+        boolean servicesRequired = profile == null
+                || !Boolean.FALSE.equals(profile.getSellsServices())
+                || !Boolean.FALSE.equals(profile.getUsesReservations());
+        boolean scheduleRequired = profile == null || !Boolean.FALSE.equals(profile.getUsesReservations());
+
         boolean service = services.findAllByBusinessIdOrderByNameAsc(businessId).stream().anyMatch(ServiceItem::isActive);
         boolean schedule = businessHours.list().size() > 0;
         boolean kb = knowledge.findAllByBusinessIdAndActiveTrueOrderByTitleAsc(businessId).size() > 0;
         boolean transfer = business.getHumanTransferPhone() != null && !business.getHumanTransferPhone().isBlank();
         boolean phone = phoneNumbers.findAllByBusinessIdOrderByCreatedAtDesc(businessId).stream().anyMatch(p -> p.isActive());
-        boolean ready = profile && service && schedule && phone;
+        boolean ready = profileConfigured
+                && (!servicesRequired || service)
+                && (!scheduleRequired || schedule)
+                && phone;
 
         String nextStep;
-        if (!profile) nextStep = "CONFIGURE_BUSINESS";
-        else if (!service) nextStep = "ADD_SERVICE";
-        else if (!schedule) nextStep = "CONFIGURE_HOURS";
+        if (!profileConfigured) nextStep = "CONFIGURE_BUSINESS";
+        else if (servicesRequired && !service) nextStep = "ADD_SERVICE";
+        else if (scheduleRequired && !schedule) nextStep = "CONFIGURE_HOURS";
         else if (!phone) nextStep = "CONNECT_PHONE_NUMBER";
         else if (!transfer) nextStep = "OPTIONAL_HUMAN_TRANSFER";
         else if (!kb) nextStep = "OPTIONAL_KNOWLEDGE";
         else nextStep = "READY";
 
-        return new OnboardingStatusResponse(profile, service, schedule, kb, transfer, phone, ready, nextStep);
+        return new OnboardingStatusResponse(
+                profileConfigured, service, schedule, kb, transfer, phone,
+                servicesRequired, scheduleRequired, ready, nextStep);
     }
 
     private Business requireBusiness(UUID businessId) {
