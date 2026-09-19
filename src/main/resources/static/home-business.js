@@ -145,7 +145,29 @@
     const drawer = document.querySelector("#homeBookingDetailDrawer");
     if (!drawer) return [];
     return [...drawer.querySelectorAll('a[href], button:not([disabled]), select:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])')]
-      .filter(node => !node.classList.contains("hidden") && node.getClientRects().length > 0);
+      .filter(node => !node.hidden && !node.closest(".hidden") && window.getComputedStyle(node).visibility !== "hidden");
+  }
+
+  function trapDrawerFocus(event) {
+    if (event.key !== "Tab") return;
+    const backdrop = document.querySelector("#homeBookingDetailBackdrop");
+    const drawer = document.querySelector("#homeBookingDetailDrawer");
+    if (!backdrop || !drawer || backdrop.classList.contains("hidden")) return;
+
+    const focusable = drawerFocusableElements();
+    if (!focusable.length) {
+      event.preventDefault();
+      document.querySelector("#homeBookingDetailClose")?.focus({ preventScroll: true });
+      return;
+    }
+
+    const currentIndex = focusable.indexOf(document.activeElement);
+    const nextIndex = event.shiftKey
+      ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1)
+      : (currentIndex < 0 || currentIndex === focusable.length - 1 ? 0 : currentIndex + 1);
+
+    event.preventDefault();
+    focusable[nextIndex].focus({ preventScroll: true });
   }
 
   function showBookingDrawer() {
@@ -185,22 +207,7 @@
         closeBookingDrawer();
         return;
       }
-      if (event.key !== "Tab") return;
-      const focusable = drawerFocusableElements();
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const drawer = document.querySelector("#homeBookingDetailDrawer");
-      if (!drawer?.contains(document.activeElement)) {
-        event.preventDefault();
-        (event.shiftKey ? last : first).focus();
-      } else if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
+      trapDrawerFocus(event);
     });
   }
 
