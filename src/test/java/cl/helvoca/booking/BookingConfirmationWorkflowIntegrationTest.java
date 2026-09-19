@@ -25,6 +25,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -58,7 +60,7 @@ class BookingConfirmationWorkflowIntegrationTest {
     @Test
     void proposalDoesNotCreateBookingAndSameCustomerCanConfirmOnAnotherChannel() {
         Fixture fixture = fixture();
-        Instant startAt = Instant.now().plus(3, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MINUTES);
+        Instant startAt = futureBusinessTime(3);
         UUID voiceSource = UUID.randomUUID();
 
         JSONObject proposal = workflow.execute(
@@ -144,7 +146,7 @@ class BookingConfirmationWorkflowIntegrationTest {
     @Test
     void slotOccupiedAfterProposalExpiresConfirmationWithoutCreatingSecondBooking() {
         Fixture fixture = fixture();
-        Instant startAt = Instant.now().plus(4, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MINUTES);
+        Instant startAt = futureBusinessTime(4);
 
         JSONObject proposal = workflow.execute(
                 fixture.business().getId(),
@@ -195,6 +197,16 @@ class BookingConfirmationWorkflowIntegrationTest {
                 .orElseThrow();
         entityManager.refresh(expiredConfirmation);
         assertEquals(OperationConfirmation.State.EXPIRED, expiredConfirmation.getState());
+    }
+
+    private static Instant futureBusinessTime(int daysAhead) {
+        return ZonedDateTime.now(ZoneId.of("America/Santiago"))
+                .plusDays(daysAhead)
+                .withHour(12)
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0)
+                .toInstant();
     }
 
     private Fixture fixture() {
