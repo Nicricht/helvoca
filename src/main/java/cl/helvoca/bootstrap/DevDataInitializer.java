@@ -5,6 +5,8 @@ import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
+import cl.helvoca.schedule.BusinessHour;
+import cl.helvoca.schedule.BusinessHourRepository;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import cl.helvoca.user.*;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalTime;
 import java.util.Optional;
 
 @Component
@@ -31,6 +34,7 @@ public class DevDataInitializer implements CommandLineRunner {
     private BusinessSubscriptionService subscriptions;
     private ServiceItemRepository services;
     private CatalogItemRepository catalog;
+    private BusinessHourRepository hours;
 
     @Value("${app.seed.enabled:false}") private boolean enabled;
     @Value("${app.seed.admin-email:admin@helvoca.local}") private String adminEmail;
@@ -51,6 +55,11 @@ public class DevDataInitializer implements CommandLineRunner {
         this.catalog = catalog;
     }
 
+    @Autowired(required = false)
+    void setDemoScheduleRepository(BusinessHourRepository hours) {
+        this.hours = hours;
+    }
+
     @Override @Transactional
     public void run(String... args) {
         if (!enabled) return;
@@ -61,8 +70,9 @@ public class DevDataInitializer implements CommandLineRunner {
             if (existingBusiness != null) {
                 if (subscriptions != null) subscriptions.startBasicTrial(existingBusiness.getId());
                 ensureDemoCatalog(existingBusiness.getId());
+                ensureDemoSchedule(existingBusiness.getId());
             }
-            log.info("Sales demo tenant seed is ready");
+            log.info("Sales demo tenant seed is ready with catalog and schedule");
             return;
         }
 
@@ -77,7 +87,8 @@ public class DevDataInitializer implements CommandLineRunner {
         AppUser admin = new AppUser(); admin.setBusiness(business); admin.setName("Demo Administrator"); admin.setEmail(adminEmail.toLowerCase());
         admin.setPasswordHash(encoder.encode(adminPassword)); admin.getRoles().add(roles.findByCode(RoleCode.BUSINESS_ADMIN).orElseThrow()); users.saveAndFlush(admin);
         ensureDemoCatalog(business.getId());
-        log.info("Sales demo tenant seed was created successfully");
+        ensureDemoSchedule(business.getId());
+        log.info("Sales demo tenant seed was created successfully with catalog and schedule");
     }
 
     private void ensureDemoCatalog(java.util.UUID businessId) {
@@ -94,6 +105,24 @@ public class DevDataInitializer implements CommandLineRunner {
                 "Producto demo para mostrar consultas de catálogo y precio.", "15990");
         ensureProduct(businessId, "Kit premium",
                 "Producto demo de mayor valor para cotización o pedido.", "29990");
+    }
+
+    private void ensureDemoSchedule(java.util.UUID businessId) {
+        if (businessId == null || hours == null || hours.countByBusinessId(businessId) > 0) return;
+
+        for (int day = 1; day <= 5; day++) {
+            ensureHour(businessId, day, LocalTime.of(9, 0), LocalTime.of(18, 0));
+        }
+        ensureHour(businessId, 6, LocalTime.of(10, 0), LocalTime.of(14, 0));
+    }
+
+    private void ensureHour(java.util.UUID businessId, int dayOfWeek, LocalTime openTime, LocalTime closeTime) {
+        BusinessHour hour = new BusinessHour();
+        hour.setBusinessId(businessId);
+        hour.setDayOfWeek(dayOfWeek);
+        hour.setOpenTime(openTime);
+        hour.setCloseTime(closeTime);
+        hours.saveAndFlush(hour);
     }
 
     private void ensureService(java.util.UUID businessId, String name, String description, int durationMinutes, String price) {
