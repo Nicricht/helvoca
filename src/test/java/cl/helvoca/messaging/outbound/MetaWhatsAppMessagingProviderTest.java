@@ -15,7 +15,7 @@ class MetaWhatsAppMessagingProviderTest {
 
         assertEquals("META_WHATSAPP_CLOUD", provider.id());
         assertTrue(provider.supports(OutboundMessage.Channel.WHATSAPP));
-        assertFalse(provider.supports(OutboundMessage.Channel.SMS));
+        assertFalse(provider.supports(null));
     }
 
     @Test
@@ -52,7 +52,7 @@ class MetaWhatsAppMessagingProviderTest {
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> provider.send(command(OutboundMessage.Channel.SMS)));
+                () -> provider.send(command(null)));
     }
 
     private static MessagingProvider.SendCommand command(OutboundMessage.Channel channel) {
