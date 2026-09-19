@@ -114,6 +114,50 @@ class WhatsAppReceptionistServiceTest {
     }
 
     @Test
+    void sandboxDestinationRoutesToConfiguredTenantPhone() {
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
+        MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
+        WhatsAppToolService tools = mock(WhatsAppToolService.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        MessagingAiClient ai = mock(MessagingAiClient.class);
+        WhatsAppProperties properties = new WhatsAppProperties();
+        properties.setSandboxEnabled(true);
+        properties.setSandboxNumber("+14155238886");
+        properties.setSandboxTenantPhone("+56922222222");
+        AiAgentService aiAgents = mock(AiAgentService.class);
+
+        UUID businessId = UUID.randomUUID();
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        phone.setPhoneNumber("+56922222222");
+        phone.setActive(true);
+        phone.setWhatsappEnabled(true);
+
+        BusinessSubscriptionService.SubscriptionView subscription = mock(BusinessSubscriptionService.SubscriptionView.class);
+
+        when(messages.findByExternalMessageId("SM-sandbox")).thenReturn(Optional.empty());
+        when(phones.findByPhoneNumberAndActiveTrue("+56922222222")).thenReturn(Optional.of(phone));
+        when(subscriptions.view(businessId)).thenReturn(subscription);
+        when(subscription.serviceAllowed()).thenReturn(false);
+
+        WhatsAppReceptionistService service = new WhatsAppReceptionistService(
+                phones, customers, conversations, messages, tools, subscriptions, ai, properties, aiAgents);
+
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> service.handle(
+                        "SM-sandbox",
+                        "whatsapp:+56911111111",
+                        "whatsapp:+14155238886",
+                        "hola"));
+
+        assertEquals("Subscription does not allow service", error.getMessage());
+        verify(phones).findByPhoneNumberAndActiveTrue("+56922222222");
+        verify(phones, never()).findByPhoneNumberAndActiveTrue("+14155238886");
+    }
+
+    @Test
     void inboundMessageIsPersistedBeforeAiResponds() {
         PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
         CustomerRepository customers = mock(CustomerRepository.class);
