@@ -156,22 +156,24 @@ El objetivo es descubrir la objeción real y acordar una siguiente acción, no p
 
 ## Checklist técnico antes de salir
 
-- [ ] producción Railway en SUCCESS;
-- [ ] `main` corresponde al SHA desplegado;
-- [ ] landing `/sales.html` disponible;
-- [ ] `/pricing.html` disponible y precios revisados;
-- [ ] tenant demo activo;
-- [ ] servicios/productos demo revisados;
-- [ ] precios demo confirmados;
-- [ ] horarios demo revisados;
-- [ ] Knowledge/FAQ demo revisado;
-- [ ] agente activo y saludo revisado;
-- [ ] capacidades demo habilitadas;
-- [ ] cinco conversaciones ensayadas;
-- [ ] corrección de datos ensayada;
-- [ ] caso desconocido ensayado sin inventar;
+- [x] producción Railway en SUCCESS;
+- [x] `main` corresponde al SHA desplegado;
+- [x] landing `/sales.html` disponible;
+- [x] `/pricing.html` disponible y precios revisados;
+- [x] tenant demo activo;
+- [x] servicios/productos demo revisados;
+- [x] precios demo confirmados;
+- [x] horarios demo revisados;
+- [x] Knowledge/FAQ demo revisado;
+- [x] agente activo y saludo revisado;
+- [x] capacidades demo habilitadas;
+- [x] cinco conversaciones ensayadas;
+- [x] corrección de datos ensayada;
+- [x] caso desconocido ensayado sin inventar;
 - [ ] si se muestra voz real, readiness y llamada real comprobados;
 - [ ] si se muestra WhatsApp real, flujo del alcance acordado comprobado.
+
+> Estado comercial verificado: la demo web segura está lista. Los dos checks restantes son condicionales y solo se completan si se decide mostrar esos canales reales con proveedor e identidad del tenant configurados y probados.
 
 ## Cinco conversaciones obligatorias para la demo
 
