@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Helvoca · Configura tu recepcionista con IA</title>
-    <meta name="description" content="Pega el enlace de tu negocio y deja que Helvoca prepare tu recepcionista telefónica con IA.">
+    <title>RecepVoz · Recepcionista virtual con IA para negocios</title>
+    <meta name="description" content="RecepVoz automatiza la atención de negocios con IA: llamadas, integración con WhatsApp Business, reservas, pedidos y seguimiento de clientes.">
     <link rel="stylesheet" href="/styles.css">
     <link rel="stylesheet" href="/home-business.css?v=20260918-14">
     <style>
@@ -189,7 +189,19 @@
             .proposal-summary-list { grid-template-columns: 1fr; }
         }
         @media (max-width: 720px) { .agent-capability-grid, #configPermissionsPanel .agent-capability-grid { grid-template-columns: 1fr; } }
-            body.home-page.operational-ready .ai-onboarding-card,
+        .public-company-card { margin-top: 2px; padding: 20px 22px; }
+        .public-company-card h2 { margin: 3px 0 6px; font-size: 20px; }
+        .public-company-card p { margin: 0; color: var(--muted); line-height: 1.55; }
+        .public-capabilities { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:16px; }
+        .public-capabilities span { padding:10px 12px; border:1px solid rgba(255,255,255,.07); border-radius:10px; background:rgba(255,255,255,.02); font-size:12px; font-weight:700; }
+        .public-company-bottom { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,.07); }
+        .public-contact { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12px; }
+        .public-contact a, .public-legal a { color:var(--text); text-decoration:none; font-weight:750; }
+        .public-legal { display:flex; gap:12px; font-size:12px; }
+        .technical-name { display:block; margin-top:2px; color:var(--muted); font-size:9px; font-weight:700; letter-spacing:.12em; }
+        @media (max-width:620px) { .public-capabilities { grid-template-columns:1fr; } }
+
+        body.home-page.operational-ready .ai-onboarding-card,
         body.home-page.operational-ready .secondary-actions,
         body.home-page.operational-ready #advancedPanel,
         body.home-page.operational-ready #commercialStatusCard { display: none !important; }
@@ -199,8 +211,8 @@
 <div class="shell">
     <header class="topbar">
         <div>
-            <div class="brand">HELVOCA</div>
-            <div class="subtitle">Tu recepcionista telefónica con IA</div>
+            <div class="brand">RECEPVOZ<span class="technical-name">HELVOCA</span></div>
+            <div class="subtitle">Recepcionista virtual con IA para negocios</div>
         </div>
         <nav id="primaryNav" class="app-nav" aria-label="Navegación principal">
             <a class="nav-home active" href="/">Inicio</a>
@@ -215,9 +227,9 @@
     <main>
         <section id="authView" class="auth-grid">
             <article class="card hero-card">
-                <div class="eyebrow">Tu recepcionista con IA</div>
-                <h1>Configura tu negocio en minutos.</h1>
-                <p>Crea tu cuenta y, si quieres, pega tu web, Instagram o Google Maps para que Helvoca prepare la configuración.</p>
+                <div class="eyebrow">Atención inteligente para negocios</div>
+                <h1>RecepVoz atiende mientras tú trabajas.</h1>
+                <p>Automatiza llamadas, reservas y atención de clientes, con integración para WhatsApp Business y una operación centralizada.</p>
             </article>
 
             <article class="card auth-card">
@@ -237,9 +249,28 @@
                 <form id="loginForm" class="stack hidden">
                     <label>Correo<input name="email" required type="email" autocomplete="email" placeholder="ana@empresa.cl"></label>
                     <label>Contraseña<input name="password" required type="password" autocomplete="current-password"></label>
-                    <button class="button primary" type="submit">Ingresar a Helvoca</button>
+                    <button class="button primary" type="submit">Ingresar a RecepVoz</button>
                 </form>
                 <div id="authMessage" class="message hidden"></div>
+            </article>
+
+            <article class="card public-company-card" aria-label="Información comercial de RecepVoz">
+                <div class="eyebrow">RecepVoz</div>
+                <h2>Una sola plataforma para atender y operar.</h2>
+                <p>Recepcionista virtual con IA para negocios que necesitan responder clientes sin depender siempre del teléfono.</p>
+                <div class="public-capabilities">
+                    <span>☎ Atención de llamadas</span>
+                    <span>◉ Integración con WhatsApp Business</span>
+                    <span>▣ Reservas y agenda</span>
+                    <span>✓ Pedidos, solicitudes y seguimiento</span>
+                </div>
+                <div class="public-company-bottom">
+                    <div class="public-contact"><strong>Contacto</strong><a href="tel:+14355652512">+1 435 565 2512</a></div>
+                    <nav class="public-legal" aria-label="Información legal">
+                        <a href="/privacy.html">Privacidad</a>
+                        <a href="/terms.html">Términos</a>
+                    </nav>
+                </div>
             </article>
         </section>
 
