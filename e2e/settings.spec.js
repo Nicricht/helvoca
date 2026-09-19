@@ -128,25 +128,17 @@ test('settings exposes the Mi negocio sections with simple navigation', async ({
   await expect(page.locator('#configBusinessPanel')).toBeVisible();
   await expect(page.locator('#configAgentPanel')).toBeHidden();
 
-  for (const name of ['businessName', 'presetKey', 'publicDescription', 'addressLine']) {
+  for (const name of ['businessName', 'presetKey', 'publicDescription', 'addressLine', 'publicPhone', 'publicEmail', 'websiteUrl']) {
     await expect(page.locator(`#setupForm [name="${name}"]`).locator('xpath=ancestor::label')).toBeVisible();
   }
-  for (const name of ['defaultCurrency', 'publicPhone', 'humanTransferPhone']) {
+  for (const name of [
+    'humanTransferPhone', 'timezone', 'language', 'defaultCurrency',
+    'commune', 'city', 'region', 'countryCode',
+    'sellsProducts', 'sellsServices', 'usesReservations'
+  ]) {
     await expect(page.locator(`#setupForm [name="${name}"]`).locator('xpath=ancestor::label')).toBeHidden();
   }
-  for (const name of ['sellsProducts', 'sellsServices', 'usesReservations']) {
-    await expect(page.locator(`#setupForm [name="${name}"]`).locator('xpath=ancestor::label')).toBeHidden();
-  }
-
-  const moreOptions = page.getByRole('button', { name: '⚙️ Más opciones' });
-  await expect(moreOptions).toBeVisible();
-  await moreOptions.click();
-  await expect(page.locator('#setupForm [name="defaultCurrency"]').locator('xpath=ancestor::label')).toBeVisible();
-  await expect(page.locator('#setupForm [name="defaultCurrency"]').locator('xpath=ancestor::label')).toContainText('💰 Moneda');
-  await expect(page.locator('#setupForm [name="publicPhone"]').locator('xpath=ancestor::label')).toBeVisible();
-  for (const name of ['sellsProducts', 'sellsServices', 'usesReservations']) {
-    await expect(page.locator(`#setupForm [name="${name}"]`).locator('xpath=ancestor::label')).toBeHidden();
-  }
+  await expect(page.getByRole('button', { name: '⚙️ Más opciones' })).toHaveCount(0);
 
   await nav.getByRole('button', { name: '🤖 Recepcionista', exact: true }).click();
   await expect(page.locator('#configAgentPanel')).toBeVisible();
@@ -160,8 +152,9 @@ test('settings uses selectors for timezone language and voice', async ({ page })
   await page.goto('/settings.html');
 
   await page.getByRole('button', { name: '🏪 Negocio', exact: true }).click();
-  await page.getByRole('button', { name: '⚙️ Más opciones' }).click();
 
+  await expect(page.locator('#setupForm select[name="timezone"]').locator('xpath=ancestor::label')).toBeHidden();
+  await expect(page.locator('#setupForm select[name="language"]').locator('xpath=ancestor::label')).toBeHidden();
   await expect(page.locator('#setupForm select[name="timezone"]')).toHaveValue('America/Santiago');
   await expect(page.locator('#setupForm select[name="language"]')).toHaveValue('es');
 
@@ -260,7 +253,6 @@ test('settings loads and saves the public business profile', async ({ page }) =>
   await page.goto('/settings.html');
 
   await page.getByRole('button', { name: '🏪 Negocio', exact: true }).click();
-  await page.getByRole('button', { name: '⚙️ Más opciones' }).click();
 
   await expect(page.locator('#setupForm [name="presetKey"]')).toHaveValue('store');
   await expect(page.locator('#setupForm [name="publicDescription"]')).toHaveValue('Tecnología y accesorios');
@@ -274,23 +266,22 @@ test('settings loads and saves the public business profile', async ({ page }) =>
   await expect(page.locator('#setupForm [name="usesReservations"]')).toHaveValue('false');
 
   await page.locator('#setupForm [name="publicDescription"]').fill('Venta y soporte tecnológico');
-  await page.locator('#setupForm [name="city"]').fill('Santiago Centro');
-  await page.locator('#setupForm [name="defaultCurrency"]').selectOption('USD');
+  await page.locator('#setupForm [name="publicPhone"]').fill('+56933334444');
   await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
 
   await expect.poll(() => state.profilePayloads.length).toBe(1);
   expect(state.profilePayloads[0]).toMatchObject({
     presetKey: 'store',
     publicDescription: 'Venta y soporte tecnológico',
-    publicPhone: '+56922223333',
+    publicPhone: '+56933334444',
     publicEmail: 'ventas@negocio.cl',
     websiteUrl: 'https://negocio.cl',
     addressLine: 'Av. Principal 123',
     commune: 'Conchalí',
-    city: 'Santiago Centro',
+    city: 'Santiago',
     region: 'Metropolitana',
     countryCode: 'CL',
-    defaultCurrency: 'USD',
+    defaultCurrency: 'CLP',
     sellsProducts: true,
     sellsServices: true,
     usesReservations: false
@@ -304,9 +295,9 @@ test('settings validates required data and saves the complete business configura
   await page.goto('/settings.html');
 
   await page.getByRole('button', { name: '🏪 Negocio', exact: true }).click();
-  await page.getByRole('button', { name: '⚙️ Más opciones' }).click();
   await expect(page.locator('#setupForm [name="businessName"]')).toHaveValue('Negocio E2E');
   await expect(page.locator('#setupForm [name="humanTransferPhone"]')).toHaveValue('+56999999999');
+  await expect(page.locator('#setupForm [name="humanTransferPhone"]').locator('xpath=ancestor::label')).toBeHidden();
 
   await page.getByRole('button', { name: '🤖 Recepcionista', exact: true }).click();
   await expect(page.locator('#setupForm [name="agentGreeting"]')).toHaveValue('Hola, gracias por llamar.');
@@ -319,8 +310,6 @@ test('settings validates required data and saves the complete business configura
   expect(state.setupPayloads).toEqual([]);
 
   await greeting.fill('Hola, te atiende Helvoca.');
-  await page.locator('#setupForm [name="timezone"]').selectOption('America/Caracas');
-  await page.locator('#setupForm [name="language"]').selectOption('es');
   await page.locator('#setupForm [name="agentActive"]').uncheck();
 
   await page.getByRole('button', { name: 'Editar', exact: true }).click();
@@ -337,7 +326,7 @@ test('settings validates required data and saves the complete business configura
   await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
   await expect.poll(() => state.setupPayloads.length).toBe(1);
   expect(state.setupPayloads[0]).toMatchObject({
-    businessName: 'Negocio E2E', timezone: 'America/Caracas', language: 'es',
+    businessName: 'Negocio E2E', timezone: 'America/Santiago', language: 'es',
     humanTransferPhone: '+56999999999',
     services: [{ id: 'service-1', name: 'Consulta', durationMinutes: 30, price: 25000, description: 'Consulta general' }],
     hours: [{ dayOfWeek: 1, openTime: '09:00', closeTime: '18:00' }],
