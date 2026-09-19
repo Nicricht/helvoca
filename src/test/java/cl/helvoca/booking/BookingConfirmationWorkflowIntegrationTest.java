@@ -9,6 +9,8 @@ import cl.helvoca.operations.BusinessOperationRepository;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.operations.OperationConfirmation;
 import cl.helvoca.operations.OperationConfirmationRepository;
+import cl.helvoca.schedule.BusinessHour;
+import cl.helvoca.schedule.BusinessHourRepository;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import jakarta.persistence.EntityManager;
@@ -25,6 +27,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -52,13 +57,14 @@ class BookingConfirmationWorkflowIntegrationTest {
     @Autowired BookingRepository bookings;
     @Autowired BusinessOperationRepository operations;
     @Autowired OperationConfirmationRepository confirmations;
+    @Autowired BusinessHourRepository businessHours;
     @Autowired BookingConfirmationWorkflowService workflow;
     @Autowired EntityManager entityManager;
 
     @Test
     void proposalDoesNotCreateBookingAndSameCustomerCanConfirmOnAnotherChannel() {
         Fixture fixture = fixture();
-        Instant startAt = Instant.now().plus(3, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MINUTES);
+        Instant startAt = futureLocalStart(3);
         UUID voiceSource = UUID.randomUUID();
 
         JSONObject proposal = workflow.execute(
@@ -144,7 +150,7 @@ class BookingConfirmationWorkflowIntegrationTest {
     @Test
     void slotOccupiedAfterProposalExpiresConfirmationWithoutCreatingSecondBooking() {
         Fixture fixture = fixture();
-        Instant startAt = Instant.now().plus(4, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MINUTES);
+        Instant startAt = futureLocalStart(4);
 
         JSONObject proposal = workflow.execute(
                 fixture.business().getId(),
@@ -218,7 +224,26 @@ class BookingConfirmationWorkflowIntegrationTest {
         service.setActive(true);
         service = services.saveAndFlush(service);
 
+        for (int day = 1; day <= 7; day++) {
+            BusinessHour hour = new BusinessHour();
+            hour.setBusinessId(business.getId());
+            hour.setDayOfWeek(day);
+            hour.setOpenTime(LocalTime.of(9, 0));
+            hour.setCloseTime(LocalTime.of(18, 0));
+            businessHours.save(hour);
+        }
+        businessHours.flush();
+
         return new Fixture(business, customer, service);
+    }
+
+    private static Instant futureLocalStart(int days) {
+        ZoneId zone = ZoneId.of("America/Santiago");
+        return LocalDate.now(zone)
+                .plusDays(days)
+                .atTime(12, 0)
+                .atZone(zone)
+                .toInstant();
     }
 
     private record Fixture(Business business, Customer customer, ServiceItem service) {}
