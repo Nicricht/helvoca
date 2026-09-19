@@ -1,8 +1,12 @@
 package cl.helvoca.bootstrap;
 
 import cl.helvoca.billing.BusinessSubscriptionService;
+import cl.helvoca.catalog.CatalogItem;
+import cl.helvoca.catalog.CatalogItemRepository;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
+import cl.helvoca.servicecatalog.ServiceItem;
+import cl.helvoca.servicecatalog.ServiceItemRepository;
 import cl.helvoca.user.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +17,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.Optional;
+
 @Component
 public class DevDataInitializer implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(DevDataInitializer.class);
@@ -22,6 +29,8 @@ public class DevDataInitializer implements CommandLineRunner {
     private final RoleRepository roles;
     private final PasswordEncoder encoder;
     private BusinessSubscriptionService subscriptions;
+    private ServiceItemRepository services;
+    private CatalogItemRepository catalog;
 
     @Value("${app.seed.enabled:false}") private boolean enabled;
     @Value("${app.seed.admin-email:admin@helvoca.local}") private String adminEmail;
@@ -36,13 +45,27 @@ public class DevDataInitializer implements CommandLineRunner {
         this.subscriptions = subscriptions;
     }
 
+    @Autowired(required = false)
+    void setDemoCatalogRepositories(ServiceItemRepository services, CatalogItemRepository catalog) {
+        this.services = services;
+        this.catalog = catalog;
+    }
+
     @Override @Transactional
     public void run(String... args) {
         if (!enabled) return;
-        if (users.existsByEmailIgnoreCase(adminEmail)) {
+
+        Optional<AppUser> existingAdmin = users.findByEmailIgnoreCase(adminEmail);
+        if (existingAdmin.isPresent()) {
+            Business existingBusiness = existingAdmin.get().getBusiness();
+            if (existingBusiness != null) {
+                if (subscriptions != null) subscriptions.startBasicTrial(existingBusiness.getId());
+                ensureDemoCatalog(existingBusiness.getId());
+            }
             log.info("Sales demo tenant seed is ready");
             return;
         }
+
         Business business = new Business();
         business.setName("Helvoca Demo Business");
         business.setTimezone("America/Santiago");
