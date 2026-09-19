@@ -236,14 +236,7 @@
         : booking.createdAt;
     const contactLabel = channel === "VOICE" ? "Llamada" : channel === "WHATSAPP" ? "WhatsApp" : "Contacto";
     const originValue = esc(source(booking.source));
-    const conversationHref = context?.sourceReferenceId && channel === "WHATSAPP"
-      ? `/conversations.html?channel=whatsapp&conversation=${encodeURIComponent(context.sourceReferenceId)}`
-      : context?.sourceReferenceId && channel === "VOICE"
-        ? `/conversations.html?channel=calls&conversation=${encodeURIComponent(context.sourceReferenceId)}`
-        : null;
-    const originCard = conversationHref
-      ? `<a class="home-detail-fact-link" href="${conversationHref}" aria-label="Abrir conversación de ${channel === "VOICE" ? "llamada" : "WhatsApp"}"><span>Origen</span><strong>${originValue}</strong></a>`
-      : `<div><span>Origen</span><strong>${originValue}</strong></div>`;
+    const originCard = `<div><span>Origen</span><strong>${originValue}</strong></div>`;
 
     return `<div class="home-detail-facts">
       <div><span>Servicio</span><strong>${esc(service.name || "Servicio")}</strong></div>
@@ -690,7 +683,6 @@
         <section class="home-detail-section"><h3>Conversación</h3><div class="home-detail-transcript">${transcript.length ? transcript.map(line =>
           `<article class="home-detail-message ${String(line.speaker || "").toUpperCase() === "ASSISTANT" ? "assistant" : ""}"><strong>${esc(String(line.speaker || "").toUpperCase() === "ASSISTANT" ? state.businessName : customerLabel)}</strong><p>${esc(line.content)}</p><span>${esc(fmt(line.createdAt))}</span></article>`
         ).join("") : '<p class="home-detail-muted">No hay transcripción guardada.</p>'}</div></section>
-        ${context.sourceReferenceId ? `<a class="home-detail-link" href="/conversations.html?channel=calls&conversation=${encodeURIComponent(context.sourceReferenceId)}">Ver conversación completa</a>` : ""}
       `;
     }
 
@@ -701,7 +693,6 @@
           const assistant = String(message.role || "").toLowerCase() === "assistant" || String(message.direction || "").toLowerCase() === "outbound";
           return `<article class="home-detail-message ${assistant ? "assistant" : ""}"><strong>${esc(assistant ? state.businessName : customerLabel)}</strong><p>${esc(message.content)}</p><span>${esc(fmt(message.createdAt))}</span></article>`;
         }).join("") : '<p class="home-detail-muted">No hay mensajes guardados.</p>'}</div></section>
-        ${context.sourceReferenceId ? `<a class="home-detail-link" href="/conversations.html?channel=whatsapp&conversation=${encodeURIComponent(context.sourceReferenceId)}">Ver conversación completa</a>` : ""}
       `;
     }
 
