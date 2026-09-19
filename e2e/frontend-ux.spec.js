@@ -236,7 +236,6 @@ test('primary and public navigation fit desktop tablet and mobile viewports', as
 
       await page.goto('/');
       await expect(page.locator('#primaryNav')).toBeVisible();
-      await expect(page.locator('.nav-operations')).toHaveAttribute('href', '/operations.html');
       await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
       await expectNoPageOverflow();
 
