@@ -575,6 +575,74 @@ jobs:
           curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"
 
 
+  pricing-production-smoke:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[pricing-smoke-verify]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Report pricing production smoke pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          PAYLOAD=$(printf '{"state":"pending","context":"helvoca/pricing-production-smoke","description":"Pricing production smoke running"}')
+          curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"
+
+      - name: Verify pricing page and public catalog in production
+        run: |
+          BASE_URL="https://helvoca-api-production.up.railway.app"
+          PAGE_CODE=$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 30 -sS -L -o pricing-production.html -w "%{http_code}" "$BASE_URL/pricing.html")
+          test "$PAGE_CODE" = "200"
+          grep -F "Planes para empezar" pricing-production.html
+          grep -F '<script src="/pricing.js" defer></script>' pricing-production.html
+
+          API_CODE=$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 30 -sS -L -o pricing-production.json -w "%{http_code}" "$BASE_URL/api/v1/public/pricing")
+          test "$API_CODE" = "200"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          plans = json.loads(Path("pricing-production.json").read_text())
+          expected = {
+              "EMPRENDE": {"name": "Emprende", "monthlyPriceClp": 24990, "includedMinutes": 100, "overagePerMinuteClp": 149},
+              "NEGOCIO": {"name": "Negocio", "monthlyPriceClp": 39990, "includedMinutes": 250, "overagePerMinuteClp": 129},
+              "PRO": {"name": "Pro", "monthlyPriceClp": 69990, "includedMinutes": 500, "overagePerMinuteClp": 109},
+              "ENTERPRISE": {"name": "Enterprise", "monthlyPriceClp": 119990},
+          }
+          by_code = {plan["code"]: plan for plan in plans}
+          assert set(expected) <= set(by_code), (expected.keys(), by_code.keys())
+          for code, fields in expected.items():
+              for key, value in fields.items():
+                  assert by_code[code].get(key) == value, (code, key, by_code[code].get(key), value)
+          assert by_code["NEGOCIO"].get("recommended") is True
+          assert by_code["ENTERPRISE"].get("customPricing") is True
+          print("pricing catalog verified:", ", ".join(f"{code}={by_code[code]['monthlyPriceClp']}" for code in expected))
+          PY
+
+      - name: Report pricing production smoke status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          if [ "$JOB_STATUS" = "success" ]; then
+            STATE="success"
+            DESCRIPTION="Pricing production smoke passed"
+          else
+            STATE="failure"
+            DESCRIPTION="Pricing production smoke failed"
+          fi
+          PAYLOAD=$(printf '{"state":"%s","context":"helvoca/pricing-production-smoke","description":"%s"}' "$STATE" "$DESCRIPTION")
+          curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"
+
+
   sales-production-smoke:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[sales-smoke-verify]')
     runs-on: ubuntu-latest
