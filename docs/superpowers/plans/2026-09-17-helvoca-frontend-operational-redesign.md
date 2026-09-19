@@ -153,8 +153,8 @@
 
 **Files:** no production changes unless a failing verification reveals a scoped regression.
 
-- [ ] Run focused Java tests for booking context.
-- [ ] Run targeted Playwright E2E for Inicio, Operaciones, Conversaciones, Configuración.
-- [ ] Check JavaScript syntax for changed static scripts.
+- [x] Run focused Java tests for booking context.
+- [x] Run targeted Playwright E2E for Inicio, Operaciones, Conversaciones, Configuración.
+- [x] Check JavaScript syntax for changed static scripts.
 - [ ] Verify GitHub CI on final SHA.
 - [ ] Check Railway production status once.
