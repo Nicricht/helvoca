@@ -4,13 +4,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.HexFormat;
 
 @RestController
 @RequestMapping("/webhooks/v1/meta")
@@ -19,6 +19,7 @@ public class MetaWhatsAppWebhookController {
 
     private static final Logger log = LoggerFactory.getLogger(MetaWhatsAppWebhookController.class);
     private static final String SUBSCRIBE_MODE = "subscribe";
+    private static final String SIGNATURE_PREFIX = "sha256=";
 
     private final MetaWhatsAppProperties properties;
 
@@ -43,6 +44,55 @@ public class MetaWhatsAppWebhookController {
 
         log.info("Meta WhatsApp webhook verification accepted");
         return ResponseEntity.ok(challenge);
+    }
+
+    @PostMapping(value = "/whatsapp", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> inbound(
+            @RequestHeader(value = "X-Hub-Signature-256", required = false) String signature,
+            @RequestBody byte[] body) {
+
+        byte[] payload = body == null ? new byte[0] : body;
+        if (!validMetaSignature(signature, payload)) {
+            log.warn("Rejected Meta WhatsApp webhook with invalid signature");
+            return ResponseEntity.status(403).build();
+        }
+
+        if (!properties.isEnabled()) {
+            log.info("Meta WhatsApp webhook authenticated but integration is disabled; payload ignored");
+            return ResponseEntity.ok().build();
+        }
+
+        log.info("Meta WhatsApp webhook authenticated; message processing is not enabled yet");
+        return ResponseEntity.ok().build();
+    }
+
+    private boolean validMetaSignature(String signature, byte[] body) {
+        if (!properties.isWebhookValidationEnabled()) {
+            return true;
+        }
+        if (!properties.hasAppSecret()
+                || signature == null
+                || !signature.startsWith(SIGNATURE_PREFIX)) {
+            return false;
+        }
+
+        String providedHex = signature.substring(SIGNATURE_PREFIX.length()).trim();
+        if (providedHex.length() != 64 || !providedHex.matches("[0-9a-fA-F]{64}")) {
+            return false;
+        }
+
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(
+                    properties.getAppSecret().getBytes(StandardCharsets.UTF_8),
+                    "HmacSHA256"));
+            byte[] expected = mac.doFinal(body);
+            byte[] provided = HexFormat.of().parseHex(providedHex);
+            return MessageDigest.isEqual(expected, provided);
+        } catch (Exception e) {
+            log.warn("Meta WhatsApp signature validation failed type={}", e.getClass().getSimpleName());
+            return false;
+        }
     }
 
     private static boolean constantTimeEquals(String expected, String actual) {
