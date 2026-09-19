@@ -41,15 +41,19 @@
 
         #businessAdvancedToggle {
             align-self: flex-start;
-            min-height: 30px;
-            padding: 0 4px;
-            margin-top: -2px;
-            background: transparent !important;
-            border-color: transparent !important;
+            min-height: 32px;
+            padding: 5px 10px;
+            margin-top: 8px;
+            border: 1px solid rgba(255,255,255,.10) !important;
+            border-radius: 999px;
+            background: rgba(255,255,255,.025) !important;
             color: var(--muted) !important;
             box-shadow: none !important;
         }
-        #businessAdvancedToggle:hover { color: var(--text) !important; }
+        #businessAdvancedToggle:hover {
+            color: var(--text) !important;
+            background: rgba(255,255,255,.045) !important;
+        }
         #configBusinessPanel > .section-heading { display: none !important; }
         #configBusinessPanel .optional { display: none !important; }
         #configBusinessPanel .agent-toggle { font-size: 0 !important; }
@@ -242,25 +246,47 @@
         const panel = document.querySelector('#configBusinessPanel');
         if (!panel) return;
 
-        const businessFields = panel.querySelector('.two-col');
-        const businessLabels = businessFields ? [...businessFields.children] : [];
-        const phoneLabel = businessLabels[1];
-        if (phoneLabel?.childNodes[0] && phoneLabel.childNodes[0].nodeType === Node.TEXT_NODE) {
-            phoneLabel.childNodes[0].textContent = 'Teléfono';
-        }
+        const labels = {
+            businessName: '🏪 Nombre del negocio',
+            humanTransferPhone: '📞 Teléfono humano',
+            timezone: '🕒 Zona horaria',
+            language: '🌐 Idioma',
+            presetKey: '🏷️ Rubro',
+            defaultCurrency: '💰 Moneda',
+            sellsProducts: '🛍️ Productos',
+            sellsServices: '✂️ Servicios',
+            usesReservations: '📅 Reservas',
+            publicDescription: '📝 Descripción',
+            publicPhone: '📞 Teléfono público',
+            publicEmail: '✉️ Correo público',
+            websiteUrl: '🌐 Web o perfil público',
+            addressLine: '📍 Dirección',
+            commune: 'Comuna',
+            city: 'Ciudad',
+            region: 'Región',
+            countryCode: 'País'
+        };
+
+        Object.entries(labels).forEach(([name, text]) => {
+            const control = setupForm.elements[name];
+            const label = control?.closest('label');
+            if (!label) return;
+            const firstText = [...label.childNodes].find(node => node.nodeType === Node.TEXT_NODE);
+            if (firstText) firstText.textContent = text;
+        });
 
         const save = document.querySelector('#advancedPanel .ux-config-save button[type="submit"]');
-        if (save && save.textContent !== 'Guardar') save.textContent = 'Guardar';
+        if (save && save.textContent !== '💾 Guardar cambios') save.textContent = '💾 Guardar cambios';
     }
 
     function compactConfigNav() {
         const labels = {
-            configBusinessPanel: 'Información',
-            configServicesPanel: 'Servicios',
-            configHoursPanel: 'Horarios',
-            configKnowledgePanel: 'FAQ',
-            configAgentPanel: 'Recepcionista',
-            configPhonePanel: 'Canales'
+            configBusinessPanel: '🏪 Negocio',
+            configServicesPanel: '✂️ Servicios',
+            configHoursPanel: '📅 Horarios',
+            configKnowledgePanel: '💬 Respuestas',
+            configAgentPanel: '🤖 Recepcionista',
+            configPhonePanel: '📞 Canales'
         };
         Object.entries(labels).forEach(([panelId, label]) => {
             const node = document.querySelector(`#advancedPanel .ux-config-nav button[aria-controls="${panelId}"] strong`);
@@ -314,9 +340,20 @@
         const panel = document.querySelector('#configBusinessPanel');
         if (!panel || document.querySelector('#businessAdvancedToggle')) return;
 
-        const businessFields = panel.querySelector('.two-col:not(.business-profile-grid)');
-        const businessLabels = businessFields ? [...businessFields.children] : [];
-        const advancedFields = [businessLabels[2], businessLabels[3]].filter(Boolean);
+        const advancedNames = [
+            'humanTransferPhone',
+            'timezone',
+            'language',
+            'publicEmail',
+            'websiteUrl',
+            'commune',
+            'city',
+            'region',
+            'countryCode'
+        ];
+        const advancedFields = advancedNames
+            .map(name => setupForm.elements[name]?.closest('label'))
+            .filter(Boolean);
 
         advancedFields.forEach(node => node.classList.add('hidden'));
 
@@ -324,17 +361,18 @@
         toggle.id = 'businessAdvancedToggle';
         toggle.type = 'button';
         toggle.className = 'button small ghost';
-        toggle.textContent = 'Más ajustes';
+        toggle.textContent = '⚙️ Más opciones';
         toggle.setAttribute('aria-expanded', 'false');
 
         toggle.addEventListener('click', () => {
             const opening = toggle.getAttribute('aria-expanded') !== 'true';
             advancedFields.forEach(node => node.classList.toggle('hidden', !opening));
             toggle.setAttribute('aria-expanded', String(opening));
-            toggle.textContent = opening ? 'Menos ajustes' : 'Más ajustes';
+            toggle.textContent = opening ? '⚙️ Menos opciones' : '⚙️ Más opciones';
         });
 
-        if (businessFields) businessFields.insertAdjacentElement('afterend', toggle);
+        const profileFields = panel.querySelector('.business-profile-grid');
+        if (profileFields) profileFields.insertAdjacentElement('afterend', toggle);
         else panel.appendChild(toggle);
     }
 
