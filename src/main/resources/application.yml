@@ -88,6 +88,14 @@ app:
     enabled: ${TWILIO_WHATSAPP_ENABLED:false}
     webhook-validation-enabled: ${TWILIO_WHATSAPP_WEBHOOK_VALIDATION_ENABLED:true}
     session-hours: ${TWILIO_WHATSAPP_SESSION_HOURS:24}
+  meta:
+    whatsapp:
+      enabled: ${META_WHATSAPP_ENABLED:false}
+      webhook-validation-enabled: ${META_WHATSAPP_WEBHOOK_VALIDATION_ENABLED:true}
+      graph-api-version: ${META_WHATSAPP_GRAPH_API_VERSION:v26.0}
+      graph-base-url: ${META_WHATSAPP_GRAPH_BASE_URL:https://graph.facebook.com}
+      verify-token: ${META_WHATSAPP_VERIFY_TOKEN:}
+      app-secret: ${META_WHATSAPP_APP_SECRET:}
   outbound:
     delivery-enabled: ${HELVOCA_OUTBOUND_DELIVERY_ENABLED:false}
     provider: ${HELVOCA_OUTBOUND_PROVIDER:NONE}
