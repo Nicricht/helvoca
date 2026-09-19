@@ -21,7 +21,7 @@ public class MetaWhatsAppTenantResolver {
         this.databaseContext = databaseContext;
     }
 
-    public Optional<UUID> resolveBusinessId(String phoneNumberId) {
+    public Optional<MetaWhatsAppTenantRoute> resolveRoute(String phoneNumberId) {
         String externalId = normalize(phoneNumberId);
         if (externalId == null) {
             return Optional.empty();
@@ -32,7 +32,14 @@ public class MetaWhatsAppTenantResolver {
                         .findByWhatsappProviderAndWhatsappExternalIdAndActiveTrueAndWhatsappEnabledTrue(
                                 PROVIDER,
                                 externalId)
-                        .map(PhoneNumber::getBusinessId));
+                        .map(phone -> new MetaWhatsAppTenantRoute(
+                                phone.getBusinessId(),
+                                phone.getId(),
+                                phone.getPhoneNumber())));
+    }
+
+    public Optional<UUID> resolveBusinessId(String phoneNumberId) {
+        return resolveRoute(phoneNumberId).map(MetaWhatsAppTenantRoute::businessId);
     }
 
     private static String normalize(String value) {
