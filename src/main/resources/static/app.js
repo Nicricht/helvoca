@@ -387,6 +387,21 @@ function readOptionalBoolean(field) {
     return field.value === "true";
 }
 
+const PRESET_PRESENTATION_SUGGESTIONS = Object.freeze({
+    store: "Prioriza productos.",
+    salon: "Prioriza servicios y reservas.",
+    restaurant: "Prioriza productos y pedidos.",
+    clinic: "Prioriza servicios y reservas."
+});
+
+function renderPresetSuggestion(presetKey) {
+    const target = document.querySelector("#presetSuggestion");
+    if (!target) return;
+    const message = PRESET_PRESENTATION_SUGGESTIONS[String(presetKey || "").trim().toLowerCase()] || "";
+    target.textContent = message;
+    target.classList.toggle("hidden", !message);
+}
+
 function renderBusinessProfile(profile = {}) {
     if (!hasBusinessProfileEditor()) return;
     setFieldValue(setupForm.elements.presetKey, profile.presetKey || "");
@@ -403,6 +418,7 @@ function renderBusinessProfile(profile = {}) {
     setFieldValue(setupForm.elements.sellsProducts, optionalBooleanValue(profile.sellsProducts));
     setFieldValue(setupForm.elements.sellsServices, optionalBooleanValue(profile.sellsServices));
     setFieldValue(setupForm.elements.usesReservations, optionalBooleanValue(profile.usesReservations));
+    renderPresetSuggestion(profile.presetKey);
 }
 
 function collectBusinessProfile() {
@@ -693,6 +709,7 @@ $("#registerTab").addEventListener("click", () => switchAuth("register"));
 $("#loginTab").addEventListener("click", () => switchAuth("login"));
 $("#addServiceBtn").addEventListener("click", () => addServiceRow());
 $("#addKnowledgeBtn").addEventListener("click", () => addKnowledgeRow());
+setupForm.elements.presetKey?.addEventListener("change", event => renderPresetSuggestion(event.currentTarget.value));
 $("#confirmProposalBtn").addEventListener("click", confirmProposal);
 $("#editProposalBtn").addEventListener("click", () => {
     if (!currentProposal) return;
