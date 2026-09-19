@@ -22,7 +22,10 @@ async function mockSettings(page, state = {}) {
     city: 'Santiago',
     region: 'Metropolitana',
     countryCode: 'CL',
-    defaultCurrency: 'CLP'
+    defaultCurrency: 'CLP',
+    sellsProducts: true,
+    sellsServices: true,
+    usesReservations: false
   };
 
   await page.route('**/api/v1/auth/me', route => route.fulfill(json({ email: 'admin@demo.cl' })));
@@ -215,10 +218,15 @@ test('settings loads and saves the public business profile', async ({ page }) =>
   await expect(page.locator('#setupForm [name="countryCode"]')).toHaveValue('CL');
   await expect(page.locator('#setupForm [name="city"]')).toHaveValue('Santiago');
   await expect(page.locator('#setupForm [name="defaultCurrency"]')).toHaveValue('CLP');
+  await expect(page.locator('#setupForm [name="sellsProducts"]')).toHaveValue('true');
+  await expect(page.locator('#setupForm [name="sellsServices"]')).toHaveValue('true');
+  await expect(page.locator('#setupForm [name="usesReservations"]')).toHaveValue('false');
 
   await page.locator('#setupForm [name="publicDescription"]').fill('Venta y soporte tecnológico');
   await page.locator('#setupForm [name="city"]').fill('Santiago Centro');
   await page.locator('#setupForm [name="defaultCurrency"]').selectOption('USD');
+  await page.locator('#setupForm [name="sellsProducts"]').selectOption('false');
+  await page.locator('#setupForm [name="usesReservations"]').selectOption('true');
   await page.getByRole('button', { name: 'Guardar', exact: true }).click();
 
   await expect.poll(() => state.profilePayloads.length).toBe(1);
@@ -233,7 +241,10 @@ test('settings loads and saves the public business profile', async ({ page }) =>
     city: 'Santiago Centro',
     region: 'Metropolitana',
     countryCode: 'CL',
-    defaultCurrency: 'USD'
+    defaultCurrency: 'USD',
+    sellsProducts: false,
+    sellsServices: true,
+    usesReservations: true
   });
 });
 
