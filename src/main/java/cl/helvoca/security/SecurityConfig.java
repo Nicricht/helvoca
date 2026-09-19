@@ -25,7 +25,6 @@ public class SecurityConfig {
             "/pricing.html", "/pricing.js", "/pricing.css",
             "/operations.html", "/operations.js", "/operations.css",
             "/settings.html", "/settings-page.js",
-            "/conversations.html", "/conversations.js", "/conversations.css",
             "/simulator.html", "/simulator.js", "/simulator.css",
             "/favicon.ico", "/error"
     };
