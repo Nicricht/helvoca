@@ -599,7 +599,7 @@ jobs:
           HTTP_CODE=$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 30 -sS -L -o sales-production.html -w "%{http_code}" "$URL")
           test "$HTTP_CODE" = "200"
           grep -F "Que una llamada o un WhatsApp sin responder no se convierta en un cliente perdido." sales-production.html
-          grep -F "Planes desde $24.990" sales-production.html
+          grep -F 'Planes desde $24.990' sales-production.html
 
       - name: Report sales production smoke status
         if: always()
