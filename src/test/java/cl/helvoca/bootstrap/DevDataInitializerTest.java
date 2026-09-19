@@ -5,6 +5,8 @@ import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
+import cl.helvoca.knowledge.KnowledgeItem;
+import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.schedule.BusinessHour;
 import cl.helvoca.schedule.BusinessHourRepository;
 import cl.helvoca.servicecatalog.ServiceItem;
@@ -39,6 +41,7 @@ class DevDataInitializerTest {
         ServiceItemRepository services = mock(ServiceItemRepository.class);
         CatalogItemRepository catalog = mock(CatalogItemRepository.class);
         BusinessHourRepository hours = mock(BusinessHourRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
 
         UUID businessId = UUID.randomUUID();
         when(users.findByEmailIgnoreCase("demo@helvoca.local")).thenReturn(Optional.empty());
@@ -57,6 +60,7 @@ class DevDataInitializerTest {
         initializer.setSubscriptions(subscriptions);
         initializer.setDemoCatalogRepositories(services, catalog);
         initializer.setDemoScheduleRepository(hours);
+        initializer.setDemoKnowledgeRepository(knowledge);
         ReflectionTestUtils.setField(initializer, "enabled", true);
         ReflectionTestUtils.setField(initializer, "adminEmail", "demo@helvoca.local");
         ReflectionTestUtils.setField(initializer, "adminPassword", "safe-demo-password");
@@ -105,6 +109,13 @@ class DevDataInitializerTest {
                 hour.getOpenTime().equals(LocalTime.of(9, 0)) && hour.getCloseTime().equals(LocalTime.of(18, 0))));
         assertEquals(LocalTime.of(10, 0), seededHours.get(5).getOpenTime());
         assertEquals(LocalTime.of(14, 0), seededHours.get(5).getCloseTime());
+
+        var knowledgeCaptor = org.mockito.ArgumentCaptor.forClass(KnowledgeItem.class);
+        verify(knowledge, times(4)).saveAndFlush(knowledgeCaptor.capture());
+        List<KnowledgeItem> seededKnowledge = knowledgeCaptor.getAllValues();
+        assertEquals(List.of("Reservas y confirmación", "Cambios y cancelaciones", "Información no disponible", "Pagos en la demostración"),
+                seededKnowledge.stream().map(KnowledgeItem::getTitle).toList());
+        assertTrue(seededKnowledge.stream().allMatch(KnowledgeItem::isActive));
     }
 
     @Test
@@ -117,6 +128,7 @@ class DevDataInitializerTest {
         ServiceItemRepository services = mock(ServiceItemRepository.class);
         CatalogItemRepository catalog = mock(CatalogItemRepository.class);
         BusinessHourRepository hours = mock(BusinessHourRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
 
         UUID businessId = UUID.randomUUID();
         Business business = new Business();
@@ -129,11 +141,13 @@ class DevDataInitializerTest {
         when(users.findByEmailIgnoreCase("demo@helvoca.local")).thenReturn(Optional.of(admin));
         when(services.existsByBusinessIdAndNameIgnoreCase(businessId, "Consulta inicial")).thenReturn(true);
         when(catalog.existsByBusinessIdAndKindAndNameIgnoreCase(businessId, CatalogItem.Kind.PRODUCT, "Kit esencial")).thenReturn(true);
+        when(knowledge.existsByBusinessIdAndTitleIgnoreCase(businessId, "Reservas y confirmación")).thenReturn(true);
 
         DevDataInitializer initializer = new DevDataInitializer(businesses, users, roles, encoder);
         initializer.setSubscriptions(subscriptions);
         initializer.setDemoCatalogRepositories(services, catalog);
         initializer.setDemoScheduleRepository(hours);
+        initializer.setDemoKnowledgeRepository(knowledge);
         ReflectionTestUtils.setField(initializer, "enabled", true);
         ReflectionTestUtils.setField(initializer, "adminEmail", "demo@helvoca.local");
         ReflectionTestUtils.setField(initializer, "adminPassword", "safe-demo-password");
@@ -146,6 +160,7 @@ class DevDataInitializerTest {
         verify(services, times(2)).saveAndFlush(any(ServiceItem.class));
         verify(catalog, times(1)).saveAndFlush(any(CatalogItem.class));
         verify(hours, times(6)).saveAndFlush(any(BusinessHour.class));
+        verify(knowledge, times(3)).saveAndFlush(any(KnowledgeItem.class));
     }
 
     @Test
@@ -158,6 +173,7 @@ class DevDataInitializerTest {
         ServiceItemRepository services = mock(ServiceItemRepository.class);
         CatalogItemRepository catalog = mock(CatalogItemRepository.class);
         BusinessHourRepository hours = mock(BusinessHourRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
 
         UUID businessId = UUID.randomUUID();
         Business business = new Business();
@@ -174,6 +190,7 @@ class DevDataInitializerTest {
         initializer.setSubscriptions(subscriptions);
         initializer.setDemoCatalogRepositories(services, catalog);
         initializer.setDemoScheduleRepository(hours);
+        initializer.setDemoKnowledgeRepository(knowledge);
         ReflectionTestUtils.setField(initializer, "enabled", true);
         ReflectionTestUtils.setField(initializer, "adminEmail", "demo@helvoca.local");
         ReflectionTestUtils.setField(initializer, "adminPassword", "safe-demo-password");
@@ -182,6 +199,48 @@ class DevDataInitializerTest {
 
         verify(hours).countByBusinessId(businessId);
         verify(hours, never()).saveAndFlush(any(BusinessHour.class));
+        verify(knowledge, times(4)).saveAndFlush(any(KnowledgeItem.class));
+    }
+
+    @Test
+    void keepsExistingDemoKnowledgeUntouchedByTitle() throws Exception {
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        CatalogItemRepository catalog = mock(CatalogItemRepository.class);
+        BusinessHourRepository hours = mock(BusinessHourRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+
+        UUID businessId = UUID.randomUUID();
+        Business business = new Business();
+        ReflectionTestUtils.setField(business, "id", businessId);
+        business.setName("Helvoca Demo Business");
+        AppUser admin = new AppUser();
+        admin.setBusiness(business);
+        admin.setEmail("demo@helvoca.local");
+
+        when(users.findByEmailIgnoreCase("demo@helvoca.local")).thenReturn(Optional.of(admin));
+        when(hours.countByBusinessId(businessId)).thenReturn(6L);
+        when(knowledge.existsByBusinessIdAndTitleIgnoreCase(businessId, "Reservas y confirmación")).thenReturn(true);
+        when(knowledge.existsByBusinessIdAndTitleIgnoreCase(businessId, "Cambios y cancelaciones")).thenReturn(true);
+        when(knowledge.existsByBusinessIdAndTitleIgnoreCase(businessId, "Información no disponible")).thenReturn(true);
+        when(knowledge.existsByBusinessIdAndTitleIgnoreCase(businessId, "Pagos en la demostración")).thenReturn(true);
+
+        DevDataInitializer initializer = new DevDataInitializer(businesses, users, roles, encoder);
+        initializer.setSubscriptions(subscriptions);
+        initializer.setDemoCatalogRepositories(services, catalog);
+        initializer.setDemoScheduleRepository(hours);
+        initializer.setDemoKnowledgeRepository(knowledge);
+        ReflectionTestUtils.setField(initializer, "enabled", true);
+        ReflectionTestUtils.setField(initializer, "adminEmail", "demo@helvoca.local");
+        ReflectionTestUtils.setField(initializer, "adminPassword", "safe-demo-password");
+
+        initializer.run();
+
+        verify(knowledge, never()).saveAndFlush(any(KnowledgeItem.class));
     }
 
     @Test

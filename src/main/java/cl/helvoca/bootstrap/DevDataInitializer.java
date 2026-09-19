@@ -5,6 +5,8 @@ import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
+import cl.helvoca.knowledge.KnowledgeItem;
+import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.schedule.BusinessHour;
 import cl.helvoca.schedule.BusinessHourRepository;
 import cl.helvoca.servicecatalog.ServiceItem;
@@ -35,6 +37,7 @@ public class DevDataInitializer implements CommandLineRunner {
     private ServiceItemRepository services;
     private CatalogItemRepository catalog;
     private BusinessHourRepository hours;
+    private KnowledgeItemRepository knowledge;
 
     @Value("${app.seed.enabled:false}") private boolean enabled;
     @Value("${app.seed.admin-email:admin@helvoca.local}") private String adminEmail;
@@ -60,6 +63,11 @@ public class DevDataInitializer implements CommandLineRunner {
         this.hours = hours;
     }
 
+    @Autowired(required = false)
+    void setDemoKnowledgeRepository(KnowledgeItemRepository knowledge) {
+        this.knowledge = knowledge;
+    }
+
     @Override @Transactional
     public void run(String... args) {
         if (!enabled) return;
@@ -71,8 +79,9 @@ public class DevDataInitializer implements CommandLineRunner {
                 if (subscriptions != null) subscriptions.startBasicTrial(existingBusiness.getId());
                 ensureDemoCatalog(existingBusiness.getId());
                 ensureDemoSchedule(existingBusiness.getId());
+                ensureDemoKnowledge(existingBusiness.getId());
             }
-            log.info("Sales demo tenant seed is ready with catalog and schedule");
+            log.info("Sales demo tenant seed is ready with catalog, schedule and knowledge");
             return;
         }
 
@@ -88,7 +97,8 @@ public class DevDataInitializer implements CommandLineRunner {
         admin.setPasswordHash(encoder.encode(adminPassword)); admin.getRoles().add(roles.findByCode(RoleCode.BUSINESS_ADMIN).orElseThrow()); users.saveAndFlush(admin);
         ensureDemoCatalog(business.getId());
         ensureDemoSchedule(business.getId());
-        log.info("Sales demo tenant seed was created successfully with catalog and schedule");
+        ensureDemoKnowledge(business.getId());
+        log.info("Sales demo tenant seed was created successfully with catalog, schedule and knowledge");
     }
 
     private void ensureDemoCatalog(java.util.UUID businessId) {
@@ -105,6 +115,30 @@ public class DevDataInitializer implements CommandLineRunner {
                 "Producto demo para mostrar consultas de catálogo y precio.", "15990");
         ensureProduct(businessId, "Kit premium",
                 "Producto demo de mayor valor para cotización o pedido.", "29990");
+    }
+
+    private void ensureDemoKnowledge(java.util.UUID businessId) {
+        if (businessId == null || knowledge == null) return;
+
+        ensureKnowledge(businessId, "Reservas y confirmación", "Reservas",
+                "Antes de confirmar una reserva, Helvoca debe validar el servicio solicitado y consultar disponibilidad. La reserva se crea solo cuando el cliente confirma el horario.");
+        ensureKnowledge(businessId, "Cambios y cancelaciones", "Reservas",
+                "Una reserva existente puede reprogramarse o cancelarse a solicitud del cliente. Helvoca debe confirmar el cambio realizado y no asumir un nuevo horario sin validarlo.");
+        ensureKnowledge(businessId, "Información no disponible", "Atención",
+                "Si una respuesta no está respaldada por la configuración o la base de conocimiento, Helvoca no debe inventarla. Debe indicar que la información requiere revisión.");
+        ensureKnowledge(businessId, "Pagos en la demostración", "Pagos",
+                "Este tenant de demostración no procesa cobros reales. Puede informar precios del catálogo, pero no debe afirmar que un pago fue realizado.");
+    }
+
+    private void ensureKnowledge(java.util.UUID businessId, String title, String category, String content) {
+        if (knowledge.existsByBusinessIdAndTitleIgnoreCase(businessId, title)) return;
+        KnowledgeItem item = new KnowledgeItem();
+        item.setBusinessId(businessId);
+        item.setTitle(title);
+        item.setCategory(category);
+        item.setContent(content);
+        item.setActive(true);
+        knowledge.saveAndFlush(item);
     }
 
     private void ensureDemoSchedule(java.util.UUID businessId) {
