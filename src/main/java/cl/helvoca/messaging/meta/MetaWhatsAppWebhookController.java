@@ -1,5 +1,7 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.messaging.WhatsAppReceptionistService;
+import cl.helvoca.security.TenantDatabaseContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -23,11 +25,17 @@ public class MetaWhatsAppWebhookController {
 
     private final MetaWhatsAppProperties properties;
     private final MetaWhatsAppTenantResolver tenantResolver;
+    private final TenantDatabaseContext databaseContext;
+    private final WhatsAppReceptionistService receptionist;
 
     public MetaWhatsAppWebhookController(MetaWhatsAppProperties properties,
-                                         MetaWhatsAppTenantResolver tenantResolver) {
+                                         MetaWhatsAppTenantResolver tenantResolver,
+                                         TenantDatabaseContext databaseContext,
+                                         WhatsAppReceptionistService receptionist) {
         this.properties = properties;
         this.tenantResolver = tenantResolver;
+        this.databaseContext = databaseContext;
+        this.receptionist = receptionist;
     }
 
     @GetMapping(value = "/whatsapp", produces = MediaType.TEXT_PLAIN_VALUE)
@@ -67,24 +75,46 @@ public class MetaWhatsAppWebhookController {
 
         try {
             var messages = MetaWhatsAppPayloadParser.parseTextMessages(payload);
-            int resolved = 0;
+            int processed = 0;
             int unresolved = 0;
+            int failed = 0;
             for (MetaWhatsAppInboundMessage message : messages) {
-                if (tenantResolver.resolveBusinessId(message.phoneNumberId()).isPresent()) {
-                    resolved++;
-                } else {
+                var route = tenantResolver.resolveRoute(message.phoneNumberId()).orElse(null);
+                if (route == null) {
                     unresolved++;
+                    continue;
+                }
+
+                try {
+                    databaseContext.callAsTenant(route.businessId(), () ->
+                            receptionist.handleResolved(
+                                    message.messageId(),
+                                    route.businessId(),
+                                    route.phoneNumberId(),
+                                    message.from(),
+                                    message.text()));
+                    processed++;
+                } catch (Exception e) {
+                    failed++;
+                    log.warn("Meta WhatsApp message processing failed message={} business={} type={}",
+                            message.messageId(),
+                            route.businessId(),
+                            e.getClass().getSimpleName());
                 }
             }
             log.info(
-                    "Meta WhatsApp webhook parsed textMessages={} resolvedTenants={} unresolvedTenants={} processingEnabled=false",
+                    "Meta WhatsApp webhook parsed textMessages={} processed={} unresolvedTenants={} failed={} outboundDelivery=false",
                     messages.size(),
-                    resolved,
-                    unresolved);
+                    processed,
+                    unresolved,
+                    failed);
+            return failed == 0
+                    ? ResponseEntity.ok().build()
+                    : ResponseEntity.status(500).build();
         } catch (Exception e) {
             log.warn("Meta WhatsApp webhook payload could not be parsed type={}", e.getClass().getSimpleName());
+            return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok().build();
     }
 
     private boolean validMetaSignature(String signature, byte[] body) {

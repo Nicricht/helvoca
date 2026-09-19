@@ -15,13 +15,16 @@ import static org.mockito.Mockito.*;
 class MetaWhatsAppTenantResolverTest {
 
     @Test
-    void resolvesBusinessFromActiveEnabledMetaPhoneIdentity() {
+    void resolvesFullRouteFromActiveEnabledMetaPhoneIdentity() {
         PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
         TenantDatabaseContext context = new TenantDatabaseContext();
         UUID businessId = UUID.randomUUID();
+        UUID phoneId = UUID.randomUUID();
 
-        PhoneNumber phone = new PhoneNumber();
-        phone.setBusinessId(businessId);
+        PhoneNumber phone = mock(PhoneNumber.class);
+        when(phone.getBusinessId()).thenReturn(businessId);
+        when(phone.getId()).thenReturn(phoneId);
+        when(phone.getPhoneNumber()).thenReturn("+56955555555");
 
         when(repository.findByWhatsappProviderAndWhatsappExternalIdAndActiveTrueAndWhatsappEnabledTrue(
                 "META_WHATSAPP_CLOUD",
@@ -29,12 +32,31 @@ class MetaWhatsAppTenantResolverTest {
                 .thenReturn(Optional.of(phone));
 
         var result = new MetaWhatsAppTenantResolver(repository, context)
-                .resolveBusinessId("  PHONE-123  ");
+                .resolveRoute("  PHONE-123  ");
 
-        assertEquals(Optional.of(businessId), result);
-        verify(repository).findByWhatsappProviderAndWhatsappExternalIdAndActiveTrueAndWhatsappEnabledTrue(
+        assertTrue(result.isPresent());
+        assertEquals(businessId, result.orElseThrow().businessId());
+        assertEquals(phoneId, result.orElseThrow().phoneNumberId());
+        assertEquals("+56955555555", result.orElseThrow().recipientPhone());
+    }
+
+    @Test
+    void businessIdCompatibilityLookupUsesResolvedRoute() {
+        PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
+        TenantDatabaseContext context = new TenantDatabaseContext();
+        UUID businessId = UUID.randomUUID();
+
+        PhoneNumber phone = mock(PhoneNumber.class);
+        when(phone.getBusinessId()).thenReturn(businessId);
+
+        when(repository.findByWhatsappProviderAndWhatsappExternalIdAndActiveTrueAndWhatsappEnabledTrue(
                 "META_WHATSAPP_CLOUD",
-                "PHONE-123");
+                "PHONE-123"))
+                .thenReturn(Optional.of(phone));
+
+        assertEquals(
+                Optional.of(businessId),
+                new MetaWhatsAppTenantResolver(repository, context).resolveBusinessId("PHONE-123"));
     }
 
     @Test
@@ -48,7 +70,7 @@ class MetaWhatsAppTenantResolverTest {
                 .thenReturn(Optional.empty());
 
         assertTrue(new MetaWhatsAppTenantResolver(repository, context)
-                .resolveBusinessId("UNKNOWN")
+                .resolveRoute("UNKNOWN")
                 .isEmpty());
     }
 
@@ -58,7 +80,7 @@ class MetaWhatsAppTenantResolverTest {
         TenantDatabaseContext context = new TenantDatabaseContext();
 
         assertTrue(new MetaWhatsAppTenantResolver(repository, context)
-                .resolveBusinessId(" ")
+                .resolveRoute(" ")
                 .isEmpty());
 
         verifyNoInteractions(repository);

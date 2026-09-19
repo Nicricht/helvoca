@@ -1,5 +1,7 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.messaging.WhatsAppReceptionistService;
+import cl.helvoca.security.TenantDatabaseContext;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -15,7 +17,7 @@ class MetaWhatsAppWebhookPostTest {
         properties.setAppSecret("unit-test-key");
         byte[] body = "{\"entry\":[]}".getBytes(StandardCharsets.UTF_8);
 
-        var response = new MetaWhatsAppWebhookController(properties, mock(MetaWhatsAppTenantResolver.class))
+        var response = new MetaWhatsAppWebhookController(properties, mock(MetaWhatsAppTenantResolver.class), new TenantDatabaseContext(), mock(WhatsAppReceptionistService.class))
                 .inbound("sha256=af0607e7ca1f292e213d64327ce97a36c7d316af967ebe890972c787cd234ac4", body);
 
         assertEquals(200, response.getStatusCode().value());
@@ -26,7 +28,7 @@ class MetaWhatsAppWebhookPostTest {
         MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
         properties.setAppSecret("unit-test-key");
 
-        var response = new MetaWhatsAppWebhookController(properties, mock(MetaWhatsAppTenantResolver.class))
+        var response = new MetaWhatsAppWebhookController(properties, mock(MetaWhatsAppTenantResolver.class), new TenantDatabaseContext(), mock(WhatsAppReceptionistService.class))
                 .inbound("sha256=" + "0".repeat(64), "{}".getBytes(StandardCharsets.UTF_8));
 
         assertEquals(403, response.getStatusCode().value());
@@ -36,7 +38,7 @@ class MetaWhatsAppWebhookPostTest {
     void missingAppSecretFailsClosed() {
         MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
 
-        var response = new MetaWhatsAppWebhookController(properties, mock(MetaWhatsAppTenantResolver.class))
+        var response = new MetaWhatsAppWebhookController(properties, mock(MetaWhatsAppTenantResolver.class), new TenantDatabaseContext(), mock(WhatsAppReceptionistService.class))
                 .inbound("sha256=" + "0".repeat(64), "{}".getBytes(StandardCharsets.UTF_8));
 
         assertEquals(403, response.getStatusCode().value());
@@ -47,7 +49,7 @@ class MetaWhatsAppWebhookPostTest {
         MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
         properties.setAppSecret("unit-test-key");
 
-        var response = new MetaWhatsAppWebhookController(properties, mock(MetaWhatsAppTenantResolver.class))
+        var response = new MetaWhatsAppWebhookController(properties, mock(MetaWhatsAppTenantResolver.class), new TenantDatabaseContext(), mock(WhatsAppReceptionistService.class))
                 .inbound("sha1=deadbeef", "{}".getBytes(StandardCharsets.UTF_8));
 
         assertEquals(403, response.getStatusCode().value());
