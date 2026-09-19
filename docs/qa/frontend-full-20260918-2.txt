@@ -1,0 +1,1 @@
+Second full frontend QA run after fixing tenant identity fallback, duplicate settings UX loading, and stale E2E expectations.
