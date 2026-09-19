@@ -1,0 +1,54 @@
+package cl.helvoca.messaging.meta;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+
+@RestController
+@RequestMapping("/webhooks/v1/meta")
+public class MetaWhatsAppWebhookController {
+    public static final String PATH = "/webhooks/v1/meta/whatsapp";
+
+    private static final Logger log = LoggerFactory.getLogger(MetaWhatsAppWebhookController.class);
+    private static final String SUBSCRIBE_MODE = "subscribe";
+
+    private final MetaWhatsAppProperties properties;
+
+    public MetaWhatsAppWebhookController(MetaWhatsAppProperties properties) {
+        this.properties = properties;
+    }
+
+    @GetMapping(value = "/whatsapp", produces = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<String> verify(
+            @RequestParam(name = "hub.mode", required = false) String mode,
+            @RequestParam(name = "hub.verify_token", required = false) String verifyToken,
+            @RequestParam(name = "hub.challenge", required = false) String challenge) {
+
+        if (!SUBSCRIBE_MODE.equals(mode)
+                || challenge == null
+                || challenge.isBlank()
+                || !properties.hasVerifyToken()
+                || !constantTimeEquals(properties.getVerifyToken(), verifyToken)) {
+            log.warn("Rejected Meta WhatsApp webhook verification");
+            return ResponseEntity.status(403).body("");
+        }
+
+        log.info("Meta WhatsApp webhook verification accepted");
+        return ResponseEntity.ok(challenge);
+    }
+
+    private static boolean constantTimeEquals(String expected, String actual) {
+        if (actual == null) return false;
+        return MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8),
+                actual.getBytes(StandardCharsets.UTF_8));
+    }
+}
