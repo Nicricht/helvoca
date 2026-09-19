@@ -14,7 +14,10 @@ public record BusinessProfileResponse(
         String city,
         String region,
         String countryCode,
-        String defaultCurrency
+        String defaultCurrency,
+        Boolean sellsProducts,
+        Boolean sellsServices,
+        Boolean usesReservations
 ) {
     static BusinessProfileResponse from(BusinessProfile profile) {
         return new BusinessProfileResponse(
@@ -29,14 +32,18 @@ public record BusinessProfileResponse(
                 profile.getCity(),
                 profile.getRegion(),
                 profile.getCountryCode(),
-                profile.getDefaultCurrency()
+                profile.getDefaultCurrency(),
+                profile.getSellsProducts(),
+                profile.getSellsServices(),
+                profile.getUsesReservations()
         );
     }
 
     static BusinessProfileResponse empty(UUID businessId) {
         return new BusinessProfileResponse(
                 businessId, null, null, null, null, null,
-                null, null, null, null, null, "CLP"
+                null, null, null, null, null, "CLP",
+                null, null, null
         );
     }
 }

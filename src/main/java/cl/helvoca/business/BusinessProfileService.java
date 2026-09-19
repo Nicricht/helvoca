@@ -55,6 +55,9 @@ public class BusinessProfileService {
         profile.setRegion(blankToNull(request.region()));
         profile.setCountryCode(normalizeCountry(request.countryCode()));
         profile.setDefaultCurrency(normalizeCurrency(request.defaultCurrency()));
+        profile.setSellsProducts(request.sellsProducts());
+        profile.setSellsServices(request.sellsServices());
+        profile.setUsesReservations(request.usesReservations());
 
         BusinessProfile saved = profiles.saveAndFlush(profile);
         auditService.humanSuccess(
@@ -125,6 +128,9 @@ public class BusinessProfileService {
         put(out, "region", profile.getRegion());
         put(out, "countryCode", profile.getCountryCode());
         put(out, "defaultCurrency", profile.getDefaultCurrency());
+        put(out, "sellsProducts", profile.getSellsProducts());
+        put(out, "sellsServices", profile.getSellsServices());
+        put(out, "usesReservations", profile.getUsesReservations());
         return out;
     }
 

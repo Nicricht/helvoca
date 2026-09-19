@@ -40,6 +40,10 @@ public record BusinessProfileRequest(
         String countryCode,
 
         @Pattern(regexp = "^$|^[A-Za-z]{3}$", message = "defaultCurrency must contain three letters")
-        String defaultCurrency
+        String defaultCurrency,
+
+        Boolean sellsProducts,
+        Boolean sellsServices,
+        Boolean usesReservations
 ) {
 }
