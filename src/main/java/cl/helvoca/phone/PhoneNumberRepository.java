@@ -11,5 +11,8 @@ public interface PhoneNumberRepository extends JpaRepository<PhoneNumber, UUID> 
     Optional<PhoneNumber> findByIdAndBusinessId(UUID id, UUID businessId);
     Optional<PhoneNumber> findByPhoneNumber(String phoneNumber);
     Optional<PhoneNumber> findByPhoneNumberAndActiveTrue(String phoneNumber);
+    Optional<PhoneNumber> findByWhatsappProviderAndWhatsappExternalIdAndActiveTrueAndWhatsappEnabledTrue(
+            String whatsappProvider,
+            String whatsappExternalId);
     boolean existsByPhoneNumber(String phoneNumber);
 }

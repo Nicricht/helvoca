@@ -29,6 +29,12 @@ public class PhoneNumber {
     @Column(name = "whatsapp_enabled", nullable = false)
     private boolean whatsappEnabled = false;
 
+    @Column(name = "whatsapp_provider", nullable = false, length = 30)
+    private String whatsappProvider = "TWILIO_WHATSAPP";
+
+    @Column(name = "whatsapp_external_id", length = 100)
+    private String whatsappExternalId;
+
     @Column(name = "whatsapp_certified_at")
     private Instant whatsappCertifiedAt;
 
@@ -61,6 +67,10 @@ public class PhoneNumber {
     public void setActive(boolean active) { this.active = active; }
     public boolean isWhatsappEnabled() { return whatsappEnabled; }
     public void setWhatsappEnabled(boolean whatsappEnabled) { this.whatsappEnabled = whatsappEnabled; }
+    public String getWhatsappProvider() { return whatsappProvider; }
+    public void setWhatsappProvider(String whatsappProvider) { this.whatsappProvider = whatsappProvider; }
+    public String getWhatsappExternalId() { return whatsappExternalId; }
+    public void setWhatsappExternalId(String whatsappExternalId) { this.whatsappExternalId = whatsappExternalId; }
     public Instant getWhatsappCertifiedAt() { return whatsappCertifiedAt; }
     public void setWhatsappCertifiedAt(Instant whatsappCertifiedAt) { this.whatsappCertifiedAt = whatsappCertifiedAt; }
     public Instant getCreatedAt() { return createdAt; }
