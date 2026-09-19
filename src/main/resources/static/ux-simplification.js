@@ -227,10 +227,12 @@
         advanced.classList.remove('hidden');
         form.classList.add('ux-config-form');
 
-        const businessHeading = $$('.section-heading', form)[0];
-        const businessFields = $('.two-col', form);
-        const agentHeading = $$('.section-heading', form)[1];
-        const agentFields = agentHeading?.nextElementSibling;
+        const businessHeading = $('.section-heading', form)[0];
+        const businessFields = businessHeading?.nextElementSibling;
+        const profileFields = $('.business-profile-grid', form);
+        const profileHeading = profileFields?.previousElementSibling;
+        const agentFields = form.elements.agentName?.closest('.two-col');
+        const agentHeading = agentFields?.previousElementSibling;
         const greeting = form.elements.agentGreeting?.closest('label');
         const instructions = form.elements.agentInstructions?.closest('label');
         const agentToggle = $('.agent-toggle', form);
@@ -245,8 +247,8 @@
         const setupMessage = $('#setupMessage', form);
         const submit = $('button[type="submit"]', form);
 
-        const businessPanel = wrapPanel(form, 'configBusinessPanel', [businessHeading, businessFields, agentHeading, agentFields, greeting, instructions, agentToggle]);
-        const permissionsPanel = wrapPanel(form, 'configPermissionsPanel', [agentHelp, capabilities]);
+        const businessPanel = wrapPanel(form, 'configBusinessPanel', [businessHeading, businessFields, profileHeading, profileFields]);
+        const agentPanel = wrapPanel(form, 'configAgentPanel', [agentHeading, agentFields, greeting, instructions, agentToggle, agentHelp, capabilities]);
         const servicesPanel = wrapPanel(form, 'configServicesPanel', [serviceHeading, servicesList]);
         const hoursPanel = wrapPanel(form, 'configHoursPanel', [hoursHeading, hoursGrid]);
         const knowledgePanel = wrapPanel(form, 'configKnowledgePanel', [knowledgeHeading, knowledgeList]);
@@ -273,10 +275,10 @@
         shell.dataset.uxEnhanced = 'true';
         const heading = document.createElement('div');
         heading.className = 'ux-config-heading';
-        heading.innerHTML = '<div><div class="eyebrow">Configuración</div><h2>Ajustes de Helvoca</h2><p>Abre solo lo que quieras cambiar.</p></div>';
+        heading.innerHTML = '<div><div class="eyebrow">Configuración</div><h2>Mi negocio</h2></div>';
         const nav = document.createElement('nav');
         nav.className = 'ux-config-nav';
-        nav.setAttribute('aria-label', 'Configuración de Helvoca');
+        nav.setAttribute('aria-label', 'Secciones de Mi negocio');
         const body = document.createElement('div');
         body.className = 'ux-config-body';
 
@@ -288,17 +290,17 @@
         shell.classList.add('ux-config-hub');
 
         const items = [
-            ['Negocio y agente', 'Identidad y voz', businessPanel],
-            ['Permisos del agente', 'Acciones permitidas', permissionsPanel],
-            ['Servicios', 'Qué puede ofrecer', servicesPanel],
-            ['Horarios', 'Cuándo atiende', hoursPanel],
-            ['Preguntas frecuentes', 'Lo que debe saber', knowledgePanel],
-            ['Teléfono', 'Número y llamadas', sideCard]
+            ['Información', businessPanel],
+            ['Servicios', servicesPanel],
+            ['Horarios', hoursPanel],
+            ['FAQ', knowledgePanel],
+            ['Recepcionista', agentPanel],
+            ['Canales', sideCard]
         ];
 
         const buttons = [];
         function openPanel(target) {
-            items.forEach(([, , panel], index) => {
+            items.forEach(([, panel], index) => {
                 if (!panel) return;
                 const active = panel === target;
                 panel.classList.toggle('hidden', !active);
@@ -306,20 +308,21 @@
             });
         }
 
-        items.forEach(([label, summary, panel], index) => {
+        items.forEach(([label, panel]) => {
             const button = document.createElement('button');
             button.type = 'button';
             button.setAttribute('aria-expanded', 'false');
             if (panel?.id) button.setAttribute('aria-controls', panel.id);
-            button.innerHTML = `<strong>${label}</strong><small data-ux-summary="${index}">${summary}</small>`;
+            button.innerHTML = `<strong>${label}</strong>`;
             button.addEventListener('click', () => openPanel(panel));
             nav.appendChild(button);
             buttons.push(button);
         });
+        openPanel(businessPanel);
 
         const legacyToggle = $('#advancedToggleBtn');
         if (legacyToggle) {
-            setText(legacyToggle, 'Configuración');
+            setText(legacyToggle, 'Mi negocio');
             legacyToggle.addEventListener('click', () => {
                 setTimeout(() => {
                     shell.classList.remove('hidden');
@@ -329,20 +332,6 @@
             }, true);
         }
 
-        function updateSummaries() {
-            const summaryNodes = $$('[data-ux-summary]', nav);
-            const serviceCount = $$('.service-row', servicesList || document).length;
-            const hourCount = $$('.hour-row', hoursGrid || document).length;
-            const knowledgeCount = $$('.knowledge-row', knowledgeList || document).length;
-            const phoneCount = $$('.phone-list .phone-item, .phone-list [data-phone-id], #phoneList > div').length;
-            setText(summaryNodes[2], serviceCount ? `${serviceCount} configurado${serviceCount === 1 ? '' : 's'}` : 'Sin servicios');
-            setText(summaryNodes[3], hourCount ? `${hourCount} intervalo${hourCount === 1 ? '' : 's'}` : 'Sin horarios');
-            setText(summaryNodes[4], knowledgeCount ? `${knowledgeCount} respuesta${knowledgeCount === 1 ? '' : 's'}` : 'Sin respuestas');
-            setText(summaryNodes[5], phoneCount ? 'Número conectado' : 'Sin número');
-        }
-        new MutationObserver(updateSummaries).observe(form, { childList: true, subtree: true });
-        new MutationObserver(updateSummaries).observe(sideCard, { childList: true, subtree: true });
-        updateSummaries();
         enhancePhonePaths(sideCard);
     }
 

@@ -101,7 +101,7 @@ function applyBusinessIdentity(business = {}) {
     if (document.body.classList.contains("settings-page")) {
         document.title = `${currentBusinessName} · Configuración`;
         const heading = document.querySelector(".dashboard-heading h1");
-        if (heading) heading.textContent = `Cómo trabaja ${currentBusinessName}`;
+        if (heading) heading.textContent = "Mi negocio";
     } else document.title = `${currentBusinessName} · Inicio`;
 
     const readyText = document.querySelector("#readyBanner strong");

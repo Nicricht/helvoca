@@ -76,7 +76,7 @@ test('self-service phone search stays hidden until chosen and never provisions u
   await expect(page.locator('#dashboardView')).toBeVisible();
   await expect(page.locator('#advancedPanel')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Teléfono' }).click();
+  await page.getByRole('button', { name: 'Canales', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Conectar mi número' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Buscar un número nuevo' })).toBeVisible();
   await expect(page.locator('#provisioningSearchForm')).toBeHidden();
