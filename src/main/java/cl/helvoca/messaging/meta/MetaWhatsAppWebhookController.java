@@ -62,7 +62,12 @@ public class MetaWhatsAppWebhookController {
             return ResponseEntity.ok().build();
         }
 
-        log.info("Meta WhatsApp webhook authenticated; message processing is not enabled yet");
+        try {
+            var messages = MetaWhatsAppPayloadParser.parseTextMessages(payload);
+            log.info("Meta WhatsApp webhook parsed textMessages={} processingEnabled=false", messages.size());
+        } catch (Exception e) {
+            log.warn("Meta WhatsApp webhook payload could not be parsed type={}", e.getClass().getSimpleName());
+        }
         return ResponseEntity.ok().build();
     }
 
