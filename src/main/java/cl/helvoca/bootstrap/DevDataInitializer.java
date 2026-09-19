@@ -76,5 +76,48 @@ public class DevDataInitializer implements CommandLineRunner {
         }
         AppUser admin = new AppUser(); admin.setBusiness(business); admin.setName("Demo Administrator"); admin.setEmail(adminEmail.toLowerCase());
         admin.setPasswordHash(encoder.encode(adminPassword)); admin.getRoles().add(roles.findByCode(RoleCode.BUSINESS_ADMIN).orElseThrow()); users.saveAndFlush(admin);
+        ensureDemoCatalog(business.getId());
+        log.info("Sales demo tenant seed was created successfully");
+    }
+
+    private void ensureDemoCatalog(java.util.UUID businessId) {
+        if (businessId == null || services == null || catalog == null) return;
+
+        ensureService(businessId, "Consulta inicial",
+                "Evaluación de necesidades y recomendación del siguiente paso.", 30, "19990");
+        ensureService(businessId, "Servicio completo",
+                "Atención principal de demostración con duración de una hora.", 60, "39990");
+        ensureService(businessId, "Control de seguimiento",
+                "Revisión breve posterior al servicio principal.", 30, "14990");
+
+        ensureProduct(businessId, "Kit esencial",
+                "Producto demo para mostrar consultas de catálogo y precio.", "15990");
+        ensureProduct(businessId, "Kit premium",
+                "Producto demo de mayor valor para cotización o pedido.", "29990");
+    }
+
+    private void ensureService(java.util.UUID businessId, String name, String description, int durationMinutes, String price) {
+        if (services.existsByBusinessIdAndNameIgnoreCase(businessId, name)) return;
+        ServiceItem item = new ServiceItem();
+        item.setBusinessId(businessId);
+        item.setName(name);
+        item.setDescription(description);
+        item.setDurationMinutes(durationMinutes);
+        item.setPrice(new BigDecimal(price));
+        item.setActive(true);
+        services.saveAndFlush(item);
+    }
+
+    private void ensureProduct(java.util.UUID businessId, String name, String description, String price) {
+        if (catalog.existsByBusinessIdAndKindAndNameIgnoreCase(businessId, CatalogItem.Kind.PRODUCT, name)) return;
+        CatalogItem item = new CatalogItem();
+        item.setBusinessId(businessId);
+        item.setKind(CatalogItem.Kind.PRODUCT);
+        item.setName(name);
+        item.setDescription(description);
+        item.setPrice(new BigDecimal(price));
+        item.setCurrency("CLP");
+        item.setActive(true);
+        catalog.saveAndFlush(item);
     }
 }
