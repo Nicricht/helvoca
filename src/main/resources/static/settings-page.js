@@ -84,6 +84,63 @@
   document.head.appendChild(style);
 
   let requested = false;
+  let facebookSdkPromise = null;
+
+  function initFacebookSdk(bootstrap) {
+    if (!window.FB?.init) throw new Error("Facebook SDK unavailable");
+    window.FB.init({
+      appId: bootstrap.appId,
+      xfbml: false,
+      version: bootstrap.graphApiVersion
+    });
+  }
+
+  function loadFacebookSdk(bootstrap) {
+    if (window.FB?.init) {
+      initFacebookSdk(bootstrap);
+      return Promise.resolve();
+    }
+    if (facebookSdkPromise) return facebookSdkPromise;
+
+    facebookSdkPromise = new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        facebookSdkPromise = null;
+        reject(new Error("Facebook SDK load timed out"));
+      }, 10000);
+
+      const previousAsyncInit = window.fbAsyncInit;
+      window.fbAsyncInit = () => {
+        try {
+          if (typeof previousAsyncInit === "function") previousAsyncInit();
+          initFacebookSdk(bootstrap);
+          window.clearTimeout(timeout);
+          resolve();
+        } catch (error) {
+          window.clearTimeout(timeout);
+          facebookSdkPromise = null;
+          reject(error);
+        }
+      };
+
+      let script = document.querySelector("#facebook-jssdk");
+      if (!script) {
+        script = document.createElement("script");
+        script.id = "facebook-jssdk";
+        script.async = true;
+        script.defer = true;
+        script.crossOrigin = "anonymous";
+        script.src = "https://connect.facebook.net/en_US/sdk.js";
+        script.onerror = () => {
+          window.clearTimeout(timeout);
+          facebookSdkPromise = null;
+          reject(new Error("Facebook SDK failed to load"));
+        };
+        document.head.appendChild(script);
+      }
+    });
+
+    return facebookSdkPromise;
+  }
 
   function renderConnectButton(bootstrap) {
     if (!bootstrap?.available) return;
@@ -106,9 +163,22 @@
 
     const button = section.querySelector("#metaWhatsAppConnectBtn");
     const message = section.querySelector("#metaWhatsAppConnectMessage");
-    button?.addEventListener("click", () => {
-      message.textContent = "Meta está preparado. El inicio de sesión seguro se habilitará en el siguiente paso.";
+    button?.addEventListener("click", async () => {
+      button.disabled = true;
+      message.textContent = "Preparando conexión segura con Meta…";
       message.classList.remove("hidden");
+      try {
+        await loadFacebookSdk(bootstrap);
+        button.textContent = "Continuar con Meta";
+        button.dataset.sdkReady = "true";
+        message.textContent = "SDK de Meta preparado. La autorización todavía está desactivada.";
+      } catch (error) {
+        button.textContent = "Conectar WhatsApp";
+        button.dataset.sdkReady = "false";
+        message.textContent = "No fue posible preparar Meta. Intenta nuevamente.";
+      } finally {
+        button.disabled = false;
+      }
     });
   }
 

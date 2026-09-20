@@ -191,6 +191,11 @@ test('login keeps errors visible and enters the dashboard after valid credential
 test('ready customer sees operations on home and configuration on settings', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyTenant(page);
+  await page.route('https://connect.facebook.net/**/sdk.js', route => route.fulfill({
+    status: 200,
+    contentType: 'application/javascript',
+    body: 'window.FB={init:(options)=>{window.__fbInitOptions=options;}}; if(window.fbAsyncInit) window.fbAsyncInit();'
+  }));
 
   await page.goto('/');
 
@@ -224,7 +229,13 @@ test('ready customer sees operations on home and configuration on settings', asy
   await expect(page.locator('#provisioningSearchForm')).toBeHidden();
   await expect(page.getByRole('button', { name: 'Conectar WhatsApp', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Conectar WhatsApp', exact: true }).click();
-  await expect(page.locator('#metaWhatsAppConnectMessage')).toContainText('inicio de sesión seguro');
+  await expect(page.getByRole('button', { name: 'Continuar con Meta', exact: true })).toBeVisible();
+  await expect(page.locator('#metaWhatsAppConnectMessage')).toContainText('SDK de Meta preparado');
+  expect(await page.evaluate(() => window.__fbInitOptions)).toEqual({
+    appId: '123456789',
+    xfbml: false,
+    version: 'v26.0'
+  });
 });
 
 test('primary and public navigation fit desktop tablet and mobile viewports', async ({ page }) => {
