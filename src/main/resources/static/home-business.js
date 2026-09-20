@@ -122,28 +122,45 @@
     bookingDrawerReturnFocus = null;
     if (!saved) return;
 
-    const focusVisibleTarget = node => {
-      if (!(node instanceof HTMLElement) || !node.isConnected || node.getClientRects().length === 0) return false;
+    const focusTarget = node => {
+      if (!(node instanceof HTMLElement) || !node.isConnected) return false;
       node.focus({ preventScroll: true });
       return document.activeElement === node;
     };
 
-    if (saved.kind && saved.id) {
+    const findReplacementTarget = () => {
+      if (!saved.kind || !saved.id) return null;
       const key = `home${saved.kind[0].toUpperCase()}${saved.kind.slice(1)}Id`;
       const candidates = [...document.querySelectorAll(`[data-home-${saved.kind}-id]`)]
-        .filter(node => node.dataset[key] === saved.id && node.getClientRects().length > 0);
-      const samePresentation = candidates.find(node => node.tagName === saved.element?.tagName);
-      if (focusVisibleTarget(samePresentation || candidates[0])) return;
-    }
+        .filter(node => node.dataset[key] === saved.id);
+      return candidates.find(node => node.tagName === saved.element?.tagName)
+        || candidates.find(node => node.getClientRects().length > 0)
+        || null;
+    };
 
-    if (focusVisibleTarget(saved.element)) return;
+    const restore = () => {
+      if (focusTarget(findReplacementTarget())) return true;
+      return focusTarget(saved.element);
+    };
 
-    const fallbackTab = saved.kind === "order"
-      ? document.querySelector('[data-home-tab="orders"]')
-      : saved.kind === "customer"
-        ? document.querySelector('[data-home-tab="customers"]')
-        : document.querySelector('[data-home-tab="bookings"]');
-    focusVisibleTarget(fallbackTab);
+    if (restore()) return;
+
+    // A booking reschedule re-renders the table while the drawer is still open.
+    // Chromium can close the drawer before the replacement row has completed
+    // layout, so retry after layout instead of prematurely focusing the tab.
+    requestAnimationFrame(() => {
+      if (restore()) return;
+      requestAnimationFrame(() => {
+        if (restore()) return;
+
+        const fallbackTab = saved.kind === "order"
+          ? document.querySelector('[data-home-tab="orders"]')
+          : saved.kind === "customer"
+            ? document.querySelector('[data-home-tab="customers"]')
+            : document.querySelector('[data-home-tab="bookings"]');
+        focusTarget(fallbackTab);
+      });
+    });
   }
 
   function drawerFocusableElements() {
