@@ -26,6 +26,8 @@ class MetaWhatsAppEmbeddedSignupReadinessServiceTest {
                 .anyMatch(item -> "APP_ID_MISSING".equals(item.code())));
         assertTrue(response.blockers().stream()
                 .anyMatch(item -> "CONFIG_ID_MISSING".equals(item.code())));
+        assertTrue(response.blockers().stream()
+                .anyMatch(item -> "SYSTEM_USER_ACCESS_TOKEN_MISSING".equals(item.code())));
     }
 
     @Test
@@ -34,6 +36,7 @@ class MetaWhatsAppEmbeddedSignupReadinessServiceTest {
         meta.setEmbeddedSignupEnabled(true);
         meta.setEmbeddedSignupAppId("123456789");
         meta.setEmbeddedSignupConfigId("987654321");
+        meta.setEmbeddedSignupSystemUserAccessToken("system-user-secret");
         meta.setAppSecret("super-secret");
         meta.setVerifyToken("verify-secret");
         meta.setWebhookValidationEnabled(true);
@@ -52,6 +55,7 @@ class MetaWhatsAppEmbeddedSignupReadinessServiceTest {
         assertFalse(response.toString().contains("123456789"));
         assertFalse(response.toString().contains("987654321"));
         assertFalse(response.toString().contains("super-secret"));
+        assertFalse(response.toString().contains("system-user-secret"));
         assertFalse(response.toString().contains("verify-secret"));
     }
 
@@ -61,6 +65,7 @@ class MetaWhatsAppEmbeddedSignupReadinessServiceTest {
         meta.setEmbeddedSignupEnabled(true);
         meta.setEmbeddedSignupAppId("123");
         meta.setEmbeddedSignupConfigId("456");
+        meta.setEmbeddedSignupSystemUserAccessToken("system-user-secret");
         meta.setAppSecret("secret");
         meta.setVerifyToken("verify");
         meta.setWebhookValidationEnabled(false);
