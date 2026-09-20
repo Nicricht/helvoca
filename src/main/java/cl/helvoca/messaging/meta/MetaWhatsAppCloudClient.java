@@ -59,7 +59,7 @@ public class MetaWhatsAppCloudClient {
         try {
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalStateException("Meta WhatsApp rejected message with HTTP " + response.statusCode());
+                throw apiError(response.statusCode(), response.body());
             }
 
             JSONObject body = new JSONObject(response.body());
@@ -82,6 +82,35 @@ public class MetaWhatsAppCloudClient {
         } catch (Exception e) {
             throw new IllegalStateException("Meta WhatsApp send failed", e);
         }
+    }
+
+    private static MetaWhatsAppApiException apiError(int httpStatus, String rawBody) {
+        String code = null;
+        String subcode = null;
+        String type = null;
+        String trace = null;
+        boolean transientFailure = false;
+        try {
+            JSONObject error = new JSONObject(rawBody == null ? "{}" : rawBody)
+                    .optJSONObject("error");
+            if (error != null) {
+                code = scalar(error, "code");
+                subcode = scalar(error, "error_subcode");
+                type = scalar(error, "type");
+                trace = scalar(error, "fbtrace_id");
+                transientFailure = error.optBoolean("is_transient", false);
+            }
+        } catch (RuntimeException ignored) {
+            // Diagnostics remain fail-closed: never surface the raw provider body.
+        }
+        return new MetaWhatsAppApiException(
+                httpStatus, code, subcode, transientFailure, type, trace);
+    }
+
+    private static String scalar(JSONObject source, String key) {
+        if (source == null || !source.has(key) || source.isNull(key)) return null;
+        String value = String.valueOf(source.get(key)).trim();
+        return value.isBlank() ? null : value;
     }
 
     private static String normalizePhoneNumberId(String value) {

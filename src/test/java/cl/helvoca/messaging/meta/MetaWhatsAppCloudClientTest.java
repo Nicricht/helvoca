@@ -83,16 +83,34 @@ class MetaWhatsAppCloudClientTest {
         @SuppressWarnings("unchecked")
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(400);
+        when(response.body()).thenReturn("""
+                {"error":{
+                  "message":"sensitive recipient data must never escape",
+                  "type":"OAuthException",
+                  "code":131047,
+                  "error_subcode":2494010,
+                  "is_transient":false,
+                  "fbtrace_id":"TRACE_ABC123"
+                }}
+                """);
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
 
         MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
-        var error = assertThrows(
-                IllegalStateException.class,
+        MetaWhatsAppApiException error = assertThrows(
+                MetaWhatsAppApiException.class,
                 () -> new MetaWhatsAppCloudClient(properties, http)
                         .sendText("1234567890", "test-token", "+56933333333", "Hola"));
 
-        assertEquals("Meta WhatsApp rejected message with HTTP 400", error.getMessage());
+        assertEquals(400, error.httpStatus());
+        assertEquals("131047", error.errorCode());
+        assertEquals("2494010", error.errorSubcode());
+        assertEquals("OAuthException", error.errorType());
+        assertEquals("TRACE_ABC123", error.traceId());
+        assertFalse(error.transientFailure());
+        assertFalse(error.retryable());
+        assertEquals("META_131047_SUB_2494010", error.failureCode());
         assertFalse(error.getMessage().contains("sensitive"));
+        assertFalse(error.getMessage().contains("recipient data"));
     }
 
     @Test
