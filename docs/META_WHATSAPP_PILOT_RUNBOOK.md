@@ -245,6 +245,36 @@ Do not continue to real certification if any of these are true:
 - the Meta number is not registered for Cloud API,
 - tenant ownership of the chosen phone record is not confirmed.
 
+## Embedded Signup follow-up
+
+Embedded Signup is a separate phase after the manual pilot is certified.
+
+Current Meta requirements verified against the official WhatsApp Business Platform collection:
+
+- the Meta app must pass App Review with Advanced Access to `business_management` and `whatsapp_business_management`;
+- the onboarding UI is embedded with the Facebook JavaScript SDK and Facebook Login;
+- after signup, the integration must be able to discover the WABA shared with RecepVoz;
+- the shared WABA can be obtained from:
+  `GET /<business_id>/client_whatsapp_business_accounts`;
+- once the WABA is known, its business phone numbers are obtained from:
+  `GET /<waba_id>/phone_numbers`;
+- the resulting `phone_number_id` is then registered and used for Cloud API messaging;
+- all callback and completion endpoints used by the onboarding flow must be HTTPS.
+
+### Helvoca persistence gap
+
+The current Helvoca Meta tenant model stores the tenant business ID, credential reference and Meta `phone_number_id`, but it does not persist the Meta `waba_id`.
+
+This does not block the manual pilot.
+
+Before implementing production Embedded Signup, add an explicit tenant-scoped `waba_id` persistence field so Helvoca can:
+- identify the WABA authorized by the customer,
+- subscribe the correct WABA to webhooks,
+- query its phone numbers deterministically,
+- and audit the relationship between a Helvoca tenant, WABA and `phone_number_id`.
+
+Do not store temporary OAuth user access tokens in the tenant database.
+
 ## Real-pilot boundary
 
 The next stage, which is intentionally not performed by this runbook, is the controlled real pilot:
