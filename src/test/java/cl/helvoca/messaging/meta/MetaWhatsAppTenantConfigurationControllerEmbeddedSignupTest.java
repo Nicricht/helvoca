@@ -21,6 +21,7 @@ class MetaWhatsAppTenantConfigurationControllerEmbeddedSignupTest {
         var bootstrap = mock(MetaWhatsAppEmbeddedSignupBootstrapService.class);
         var authorization = mock(MetaWhatsAppEmbeddedSignupAuthorizationCodeService.class);
         var assignment = mock(MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService.class);
+        var subscription = mock(MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService.class);
 
         var expected = new MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentResult(
                 "SYSTEM_USER_ASSIGNED",
@@ -35,7 +36,8 @@ class MetaWhatsAppTenantConfigurationControllerEmbeddedSignupTest {
                 readiness,
                 bootstrap,
                 authorization,
-                assignment);
+                assignment,
+                subscription);
 
         var actual = controller.assignSystemUserToSelectedWaba(
                 new MetaWhatsAppEmbeddedSignupSelectedWabaRequest(" 1906385232743451 "));
@@ -53,4 +55,51 @@ class MetaWhatsAppTenantConfigurationControllerEmbeddedSignupTest {
         PostMapping mapping = endpoint.getAnnotation(PostMapping.class);
         assertEquals("/embedded-signup/waba/assign-system-user", mapping.value()[0]);
     }
+
+    @Test
+    void selectedWabaSubscriptionEndpointIsAdminOnlyAndDelegatesSelectedId() throws Exception {
+        var configuration = mock(MetaWhatsAppTenantConfigurationService.class);
+        var health = mock(MetaWhatsAppTenantHealthService.class);
+        var deployment = mock(MetaWhatsAppDeploymentReadinessService.class);
+        var readiness = mock(MetaWhatsAppEmbeddedSignupReadinessService.class);
+        var bootstrap = mock(MetaWhatsAppEmbeddedSignupBootstrapService.class);
+        var authorization = mock(MetaWhatsAppEmbeddedSignupAuthorizationCodeService.class);
+        var assignment = mock(MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService.class);
+        var subscription = mock(MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService.class);
+
+        var expected = new MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionResult(
+                "APP_SUBSCRIBED",
+                true,
+                false,
+                true);
+        when(subscription.ensureSubscribed("1906385232743451")).thenReturn(expected);
+
+        var controller = new MetaWhatsAppTenantConfigurationController(
+                configuration,
+                health,
+                deployment,
+                readiness,
+                bootstrap,
+                authorization,
+                assignment,
+                subscription);
+
+        var actual = controller.subscribeAppToSelectedWaba(
+                new MetaWhatsAppEmbeddedSignupSelectedWabaRequest(" 1906385232743451 "));
+
+        assertSame(expected, actual);
+        verify(subscription).ensureSubscribed("1906385232743451");
+        verifyNoInteractions(assignment);
+
+        Method endpoint = MetaWhatsAppTenantConfigurationController.class.getMethod(
+                "subscribeAppToSelectedWaba",
+                MetaWhatsAppEmbeddedSignupSelectedWabaRequest.class);
+
+        PreAuthorize rule = endpoint.getAnnotation(PreAuthorize.class);
+        assertEquals("hasRole('BUSINESS_ADMIN')", rule.value());
+
+        PostMapping mapping = endpoint.getAnnotation(PostMapping.class);
+        assertEquals("/embedded-signup/waba/subscribe-app", mapping.value()[0]);
+    }
+
 }

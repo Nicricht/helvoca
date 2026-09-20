@@ -19,6 +19,7 @@ public class MetaWhatsAppTenantConfigurationController {
     private final MetaWhatsAppEmbeddedSignupBootstrapService embeddedSignupBootstrapService;
     private final MetaWhatsAppEmbeddedSignupAuthorizationCodeService embeddedSignupAuthorizationCodeService;
     private final MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService embeddedSignupSelectedWabaAssignmentService;
+    private final MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService embeddedSignupSelectedWabaSubscriptionService;
 
     public MetaWhatsAppTenantConfigurationController(
             MetaWhatsAppTenantConfigurationService service,
@@ -27,7 +28,8 @@ public class MetaWhatsAppTenantConfigurationController {
             MetaWhatsAppEmbeddedSignupReadinessService embeddedSignupReadinessService,
             MetaWhatsAppEmbeddedSignupBootstrapService embeddedSignupBootstrapService,
             MetaWhatsAppEmbeddedSignupAuthorizationCodeService embeddedSignupAuthorizationCodeService,
-            MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService embeddedSignupSelectedWabaAssignmentService) {
+            MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService embeddedSignupSelectedWabaAssignmentService,
+            MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService embeddedSignupSelectedWabaSubscriptionService) {
         this.service = service;
         this.healthService = healthService;
         this.deploymentReadinessService = deploymentReadinessService;
@@ -35,6 +37,7 @@ public class MetaWhatsAppTenantConfigurationController {
         this.embeddedSignupBootstrapService = embeddedSignupBootstrapService;
         this.embeddedSignupAuthorizationCodeService = embeddedSignupAuthorizationCodeService;
         this.embeddedSignupSelectedWabaAssignmentService = embeddedSignupSelectedWabaAssignmentService;
+        this.embeddedSignupSelectedWabaSubscriptionService = embeddedSignupSelectedWabaSubscriptionService;
     }
 
     @GetMapping("/config")
@@ -79,6 +82,13 @@ public class MetaWhatsAppTenantConfigurationController {
     public MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentResult assignSystemUserToSelectedWaba(
             @Valid @RequestBody MetaWhatsAppEmbeddedSignupSelectedWabaRequest request) {
         return embeddedSignupSelectedWabaAssignmentService.ensureAssigned(request.wabaId());
+    }
+
+    @PostMapping("/embedded-signup/waba/subscribe-app")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionResult subscribeAppToSelectedWaba(
+            @Valid @RequestBody MetaWhatsAppEmbeddedSignupSelectedWabaRequest request) {
+        return embeddedSignupSelectedWabaSubscriptionService.ensureSubscribed(request.wabaId());
     }
 
     @PostMapping("/config/deactivate")
