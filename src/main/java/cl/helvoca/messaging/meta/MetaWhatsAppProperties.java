@@ -15,6 +15,7 @@ public class MetaWhatsAppProperties {
     private boolean embeddedSignupEnabled = false;
     private String embeddedSignupAppId = "";
     private String embeddedSignupConfigId = "";
+    private String embeddedSignupSystemUserAccessToken = "";
 
     public boolean isEnabled() {
         return enabled;
@@ -103,6 +104,18 @@ public class MetaWhatsAppProperties {
 
     public boolean hasEmbeddedSignupConfigId() {
         return !getEmbeddedSignupConfigId().isBlank();
+    }
+
+    public String getEmbeddedSignupSystemUserAccessToken() {
+        return clean(embeddedSignupSystemUserAccessToken);
+    }
+
+    public void setEmbeddedSignupSystemUserAccessToken(String embeddedSignupSystemUserAccessToken) {
+        this.embeddedSignupSystemUserAccessToken = embeddedSignupSystemUserAccessToken;
+    }
+
+    public boolean hasEmbeddedSignupSystemUserAccessToken() {
+        return !getEmbeddedSignupSystemUserAccessToken().isBlank();
     }
 
     public String graphApiRoot() {
