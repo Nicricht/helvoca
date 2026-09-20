@@ -93,6 +93,33 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionServiceTest {
     }
 
     @Test
+    void doesNotSubscribeWhenAssignmentDoesNotConfirmSystemUser() {
+        var assignment = mock(MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService.class);
+        var subscribe = mock(MetaWhatsAppEmbeddedSignupSubscribeAppClient.class);
+        MetaWhatsAppProperties meta = readyProperties();
+
+        when(assignment.ensureAssigned("1906385232743451"))
+                .thenReturn(new MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentResult(
+                        "SYSTEM_USER_ASSIGNMENT_UNCONFIRMED",
+                        false,
+                        false));
+
+        var service = new MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService(
+                assignment,
+                subscribe,
+                meta);
+
+        ConflictException error = assertThrows(
+                ConflictException.class,
+                () -> service.ensureSubscribed("1906385232743451"));
+
+        assertEquals(
+                "META_EMBEDDED_SIGNUP_SYSTEM_USER_NOT_ASSIGNED",
+                error.getMessage());
+        verifyNoInteractions(subscribe);
+    }
+
+    @Test
     void failsClosedWhenMetaDoesNotConfirmSubscription() {
         var assignment = mock(MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService.class);
         var subscribe = mock(MetaWhatsAppEmbeddedSignupSubscribeAppClient.class);
