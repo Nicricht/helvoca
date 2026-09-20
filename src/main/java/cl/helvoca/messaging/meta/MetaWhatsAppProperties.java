@@ -16,7 +16,9 @@ public class MetaWhatsAppProperties {
     private String embeddedSignupAppId = "";
     private String embeddedSignupConfigId = "";
     private String embeddedSignupBusinessId = "";
+    private String embeddedSignupSystemUserId = "";
     private String embeddedSignupSystemUserAccessToken = "";
+    private String embeddedSignupAdminSystemUserAccessToken = "";
 
     public boolean isEnabled() {
         return enabled;
@@ -119,6 +121,18 @@ public class MetaWhatsAppProperties {
         return !getEmbeddedSignupBusinessId().isBlank();
     }
 
+    public String getEmbeddedSignupSystemUserId() {
+        return clean(embeddedSignupSystemUserId);
+    }
+
+    public void setEmbeddedSignupSystemUserId(String embeddedSignupSystemUserId) {
+        this.embeddedSignupSystemUserId = embeddedSignupSystemUserId;
+    }
+
+    public boolean hasEmbeddedSignupSystemUserId() {
+        return !getEmbeddedSignupSystemUserId().isBlank();
+    }
+
     public String getEmbeddedSignupSystemUserAccessToken() {
         return clean(embeddedSignupSystemUserAccessToken);
     }
@@ -129,6 +143,18 @@ public class MetaWhatsAppProperties {
 
     public boolean hasEmbeddedSignupSystemUserAccessToken() {
         return !getEmbeddedSignupSystemUserAccessToken().isBlank();
+    }
+
+    public String getEmbeddedSignupAdminSystemUserAccessToken() {
+        return clean(embeddedSignupAdminSystemUserAccessToken);
+    }
+
+    public void setEmbeddedSignupAdminSystemUserAccessToken(String embeddedSignupAdminSystemUserAccessToken) {
+        this.embeddedSignupAdminSystemUserAccessToken = embeddedSignupAdminSystemUserAccessToken;
+    }
+
+    public boolean hasEmbeddedSignupAdminSystemUserAccessToken() {
+        return !getEmbeddedSignupAdminSystemUserAccessToken().isBlank();
     }
 
     public String graphApiRoot() {
