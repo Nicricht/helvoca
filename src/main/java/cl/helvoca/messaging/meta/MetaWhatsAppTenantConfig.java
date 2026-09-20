@@ -23,6 +23,9 @@ public class MetaWhatsAppTenantConfig {
     @Column(name = "credential_ref", nullable = false, length = 80)
     private String credentialRef;
 
+    @Column(name = "waba_id", length = 80)
+    private String wabaId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -63,6 +66,14 @@ public class MetaWhatsAppTenantConfig {
 
     public void setCredentialRef(String credentialRef) {
         this.credentialRef = credentialRef;
+    }
+
+    public String getWabaId() {
+        return wabaId;
+    }
+
+    public void setWabaId(String wabaId) {
+        this.wabaId = wabaId;
     }
 
     public Instant getCreatedAt() {
