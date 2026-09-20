@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class MetaWhatsAppEmbeddedSignupAuthorizationCodeService {
+    private static final String REQUIRED_EMBEDDED_SIGNUP_SCOPE = "whatsapp_business_management";
     private final MetaWhatsAppEmbeddedSignupReadinessService readinessService;
     private final MetaWhatsAppEmbeddedSignupTokenExchangeClient tokenExchangeClient;
     private final MetaWhatsAppEmbeddedSignupTokenDebugClient tokenDebugClient;
@@ -51,6 +52,10 @@ public class MetaWhatsAppEmbeddedSignupAuthorizationCodeService {
         if (debug.appId() == null
                 || !metaProperties.getEmbeddedSignupAppId().equals(debug.appId())) {
             throw new ConflictException("META_EMBEDDED_SIGNUP_TOKEN_APP_MISMATCH");
+        }
+
+        if (!debug.scopes().contains(REQUIRED_EMBEDDED_SIGNUP_SCOPE)) {
+            throw new ConflictException("META_EMBEDDED_SIGNUP_REQUIRED_SCOPE_MISSING");
         }
 
         MetaWhatsAppEmbeddedSignupSharedWabaPage sharedWabas =
