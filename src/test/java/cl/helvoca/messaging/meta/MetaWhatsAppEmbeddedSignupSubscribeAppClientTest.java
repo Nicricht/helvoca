@@ -101,8 +101,6 @@ class MetaWhatsAppEmbeddedSignupSubscribeAppClientTest {
         @SuppressWarnings("unchecked")
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(403);
-        when(response.body()).thenReturn(
-                "{\"error\":\"provider-sensitive-body system-user-secret\"}");
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
                 .thenReturn(response);
 
