@@ -3,6 +3,8 @@ package cl.helvoca.messaging.meta;
 import cl.helvoca.common.ConflictException;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class MetaWhatsAppEmbeddedSignupAuthorizationCodeService {
     private static final String REQUIRED_EMBEDDED_SIGNUP_SCOPE = "whatsapp_business_management";
@@ -10,6 +12,7 @@ public class MetaWhatsAppEmbeddedSignupAuthorizationCodeService {
     private final MetaWhatsAppEmbeddedSignupTokenExchangeClient tokenExchangeClient;
     private final MetaWhatsAppEmbeddedSignupTokenDebugClient tokenDebugClient;
     private final MetaWhatsAppEmbeddedSignupSharedWabaClient sharedWabaClient;
+    private final MetaWhatsAppEmbeddedSignupAssignedUsersClient assignedUsersClient;
     private final MetaWhatsAppProperties metaProperties;
 
     public MetaWhatsAppEmbeddedSignupAuthorizationCodeService(
@@ -17,11 +20,13 @@ public class MetaWhatsAppEmbeddedSignupAuthorizationCodeService {
             MetaWhatsAppEmbeddedSignupTokenExchangeClient tokenExchangeClient,
             MetaWhatsAppEmbeddedSignupTokenDebugClient tokenDebugClient,
             MetaWhatsAppEmbeddedSignupSharedWabaClient sharedWabaClient,
+            MetaWhatsAppEmbeddedSignupAssignedUsersClient assignedUsersClient,
             MetaWhatsAppProperties metaProperties) {
         this.readinessService = readinessService;
         this.tokenExchangeClient = tokenExchangeClient;
         this.tokenDebugClient = tokenDebugClient;
         this.sharedWabaClient = sharedWabaClient;
+        this.assignedUsersClient = assignedUsersClient;
         this.metaProperties = metaProperties;
     }
 
@@ -63,12 +68,37 @@ public class MetaWhatsAppEmbeddedSignupAuthorizationCodeService {
                         metaProperties.getEmbeddedSignupBusinessId(),
                         metaProperties.getEmbeddedSignupSystemUserAccessToken());
 
+        List<MetaWhatsAppEmbeddedSignupAuthorizationCodeResponse.WabaCandidate> candidates =
+                sharedWabas.wabas().stream()
+                        .map(this::toCandidate)
+                        .toList();
+
         return new MetaWhatsAppEmbeddedSignupAuthorizationCodeResponse(
                 "AUTHORIZATION_CODE_EXCHANGED_AND_VALIDATED",
                 true,
                 false,
                 false,
-                sharedWabas.wabas(),
+                candidates,
                 sharedWabas.afterCursor());
+    }
+
+    private MetaWhatsAppEmbeddedSignupAuthorizationCodeResponse.WabaCandidate toCandidate(
+            MetaWhatsAppEmbeddedSignupSharedWabaPage.Waba waba) {
+        MetaWhatsAppEmbeddedSignupAssignedUsersResult assignedUsers =
+                assignedUsersClient.fetch(
+                        waba.id(),
+                        metaProperties.getEmbeddedSignupBusinessId(),
+                        metaProperties.getEmbeddedSignupSystemUserAccessToken());
+
+        boolean systemUserAssigned = assignedUsers.users().stream()
+                .anyMatch(user -> metaProperties.getEmbeddedSignupSystemUserId().equals(user.id()));
+
+        return new MetaWhatsAppEmbeddedSignupAuthorizationCodeResponse.WabaCandidate(
+                waba.id(),
+                waba.name(),
+                waba.currency(),
+                waba.timezoneId(),
+                waba.messageTemplateNamespace(),
+                systemUserAssigned);
     }
 }

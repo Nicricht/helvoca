@@ -7,10 +7,20 @@ public record MetaWhatsAppEmbeddedSignupAuthorizationCodeResponse(
         boolean accepted,
         boolean retained,
         boolean exchangePending,
-        List<MetaWhatsAppEmbeddedSignupSharedWabaPage.Waba> wabas,
+        List<WabaCandidate> wabas,
         String wabaAfterCursor
 ) {
     public MetaWhatsAppEmbeddedSignupAuthorizationCodeResponse {
         wabas = wabas == null ? List.of() : List.copyOf(wabas);
+    }
+
+    public record WabaCandidate(
+            String id,
+            String name,
+            String currency,
+            String timezoneId,
+            String messageTemplateNamespace,
+            boolean systemUserAssigned
+    ) {
     }
 }
