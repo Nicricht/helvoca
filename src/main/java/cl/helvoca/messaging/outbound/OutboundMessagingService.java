@@ -230,6 +230,9 @@ public class OutboundMessagingService {
     private static int safeRevision(Integer revision) { return revision == null || revision < 1 ? 1 : revision; }
 
     private static String safeFailureCode(RuntimeException e) {
+        if (e instanceof MetaWhatsAppApiException meta) {
+            return meta.failureCode();
+        }
         String value = e.getClass().getSimpleName().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9_]", "_");
         return value.length() <= 80 ? value : value.substring(0, 80);
     }

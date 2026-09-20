@@ -107,6 +107,11 @@ public class MetaWhatsAppAssistantReplyJobHandler implements PersistentJobHandle
             messages.saveAndFlush(inbound);
         } catch (RetryableJobException e) {
             throw e;
+        } catch (MetaWhatsAppApiException e) {
+            if (e.retryable()) {
+                throw new RetryableJobException(e.getMessage(), e);
+            }
+            throw new PermanentJobException(e.getMessage(), e);
         } catch (IllegalArgumentException e) {
             throw new PermanentJobException("Meta WhatsApp AI reply is invalid", e);
         } catch (RuntimeException e) {
