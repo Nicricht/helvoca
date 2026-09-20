@@ -18,6 +18,7 @@ public class MetaWhatsAppTenantConfigurationController {
     private final MetaWhatsAppEmbeddedSignupReadinessService embeddedSignupReadinessService;
     private final MetaWhatsAppEmbeddedSignupBootstrapService embeddedSignupBootstrapService;
     private final MetaWhatsAppEmbeddedSignupAuthorizationCodeService embeddedSignupAuthorizationCodeService;
+    private final MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService embeddedSignupSelectedWabaAssignmentService;
 
     public MetaWhatsAppTenantConfigurationController(
             MetaWhatsAppTenantConfigurationService service,
@@ -25,13 +26,15 @@ public class MetaWhatsAppTenantConfigurationController {
             MetaWhatsAppDeploymentReadinessService deploymentReadinessService,
             MetaWhatsAppEmbeddedSignupReadinessService embeddedSignupReadinessService,
             MetaWhatsAppEmbeddedSignupBootstrapService embeddedSignupBootstrapService,
-            MetaWhatsAppEmbeddedSignupAuthorizationCodeService embeddedSignupAuthorizationCodeService) {
+            MetaWhatsAppEmbeddedSignupAuthorizationCodeService embeddedSignupAuthorizationCodeService,
+            MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService embeddedSignupSelectedWabaAssignmentService) {
         this.service = service;
         this.healthService = healthService;
         this.deploymentReadinessService = deploymentReadinessService;
         this.embeddedSignupReadinessService = embeddedSignupReadinessService;
         this.embeddedSignupBootstrapService = embeddedSignupBootstrapService;
         this.embeddedSignupAuthorizationCodeService = embeddedSignupAuthorizationCodeService;
+        this.embeddedSignupSelectedWabaAssignmentService = embeddedSignupSelectedWabaAssignmentService;
     }
 
     @GetMapping("/config")
@@ -69,6 +72,13 @@ public class MetaWhatsAppTenantConfigurationController {
     public MetaWhatsAppEmbeddedSignupAuthorizationCodeResponse acceptAuthorizationCode(
             @Valid @RequestBody MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest request) {
         return embeddedSignupAuthorizationCodeService.accept(request);
+    }
+
+    @PostMapping("/embedded-signup/waba/assign-system-user")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentResult assignSystemUserToSelectedWaba(
+            @Valid @RequestBody MetaWhatsAppEmbeddedSignupSelectedWabaRequest request) {
+        return embeddedSignupSelectedWabaAssignmentService.ensureAssigned(request.wabaId());
     }
 
     @PostMapping("/config/deactivate")
