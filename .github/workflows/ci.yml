@@ -19,6 +19,43 @@ jobs:
       - name: Fast production gate
         run: echo "Direct production mode enabled for main. Full verification runs on pull requests."
 
+  meta-webhook-public-smoke:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Verify Meta webhook rejects invalid verification token
+        run: |
+          set -euo pipefail
+
+          check_webhook() {
+            local base_url="$1"
+            local label="$2"
+            local output
+            local code
+
+            output="$(mktemp)"
+            code="$(curl --retry 2 --retry-delay 2 --connect-timeout 10 --max-time 20 -sS -o "$output" -w "%{http_code}"               "$base_url/webhooks/v1/meta/whatsapp?hub.mode=subscribe&hub.challenge=recepvoz-safe-check&hub.verify_token=invalid")"
+
+            echo "$label -> HTTP $code"
+            if [ "$code" != "403" ]; then
+              echo "Expected HTTP 403 from Meta webhook verification with an invalid token."
+              echo "Response body:"
+              head -c 500 "$output" || true
+              echo
+              exit 1
+            fi
+
+            if grep -Fq "recepvoz-safe-check" "$output"; then
+              echo "Invalid verification token unexpectedly returned the challenge."
+              exit 1
+            fi
+          }
+
+          check_webhook "https://helvoca-api-production.up.railway.app" "Railway public domain"
+          check_webhook "https://recepvoz.cl" "recepvoz.cl"
+
   test:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verify]'))
     runs-on: ubuntu-latest
