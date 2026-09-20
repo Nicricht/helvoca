@@ -244,7 +244,7 @@
         return;
       }
       trapDrawerFocus(event);
-    });
+    }, true);
     const drawer = document.querySelector("#homeBookingDetailDrawer");
     const body = document.querySelector("#homeBookingDetailBody");
     new MutationObserver(() => {
