@@ -12,6 +12,9 @@ public class MetaWhatsAppProperties {
     private String graphBaseUrl = "https://graph.facebook.com";
     private String verifyToken = "";
     private String appSecret = "";
+    private boolean embeddedSignupEnabled = false;
+    private String embeddedSignupAppId = "";
+    private String embeddedSignupConfigId = "";
 
     public boolean isEnabled() {
         return enabled;
@@ -68,6 +71,38 @@ public class MetaWhatsAppProperties {
 
     public boolean hasAppSecret() {
         return !getAppSecret().isBlank();
+    }
+
+    public boolean isEmbeddedSignupEnabled() {
+        return embeddedSignupEnabled;
+    }
+
+    public void setEmbeddedSignupEnabled(boolean embeddedSignupEnabled) {
+        this.embeddedSignupEnabled = embeddedSignupEnabled;
+    }
+
+    public String getEmbeddedSignupAppId() {
+        return clean(embeddedSignupAppId);
+    }
+
+    public void setEmbeddedSignupAppId(String embeddedSignupAppId) {
+        this.embeddedSignupAppId = embeddedSignupAppId;
+    }
+
+    public boolean hasEmbeddedSignupAppId() {
+        return !getEmbeddedSignupAppId().isBlank();
+    }
+
+    public String getEmbeddedSignupConfigId() {
+        return clean(embeddedSignupConfigId);
+    }
+
+    public void setEmbeddedSignupConfigId(String embeddedSignupConfigId) {
+        this.embeddedSignupConfigId = embeddedSignupConfigId;
+    }
+
+    public boolean hasEmbeddedSignupConfigId() {
+        return !getEmbeddedSignupConfigId().isBlank();
     }
 
     public String graphApiRoot() {

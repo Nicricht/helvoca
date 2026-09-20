@@ -96,6 +96,9 @@ app:
       graph-base-url: ${META_WHATSAPP_GRAPH_BASE_URL:https://graph.facebook.com}
       verify-token: ${META_WHATSAPP_VERIFY_TOKEN:}
       app-secret: ${META_WHATSAPP_APP_SECRET:}
+      embedded-signup-enabled: ${META_WHATSAPP_EMBEDDED_SIGNUP_ENABLED:false}
+      embedded-signup-app-id: ${META_WHATSAPP_EMBEDDED_SIGNUP_APP_ID:}
+      embedded-signup-config-id: ${META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID:}
   outbound:
     delivery-enabled: ${HELVOCA_OUTBOUND_DELIVERY_ENABLED:false}
     provider: ${HELVOCA_OUTBOUND_PROVIDER:NONE}
