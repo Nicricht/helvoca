@@ -14,12 +14,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class MetaWhatsAppTenantConfigurationController {
     private final MetaWhatsAppTenantConfigurationService service;
     private final MetaWhatsAppTenantHealthService healthService;
+    private final MetaWhatsAppDeploymentReadinessService deploymentReadinessService;
 
     public MetaWhatsAppTenantConfigurationController(
             MetaWhatsAppTenantConfigurationService service,
-            MetaWhatsAppTenantHealthService healthService) {
+            MetaWhatsAppTenantHealthService healthService,
+            MetaWhatsAppDeploymentReadinessService deploymentReadinessService) {
         this.service = service;
         this.healthService = healthService;
+        this.deploymentReadinessService = deploymentReadinessService;
     }
 
     @GetMapping("/config")
@@ -32,6 +35,12 @@ public class MetaWhatsAppTenantConfigurationController {
     @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
     public MetaWhatsAppTenantHealthResponse health() {
         return healthService.health();
+    }
+
+    @GetMapping("/deployment/readiness")
+    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    public MetaWhatsAppDeploymentReadinessResponse deploymentReadiness() {
+        return deploymentReadinessService.readiness();
     }
 
     @PostMapping("/config/deactivate")
