@@ -8,5 +8,6 @@ import java.util.UUID;
 
 public interface MessagingMessageRepository extends JpaRepository<MessagingMessage, UUID> {
     Optional<MessagingMessage> findByExternalMessageId(String externalMessageId);
+    Optional<MessagingMessage> findByProviderAndProviderMessageId(String provider, String providerMessageId);
     List<MessagingMessage> findAllByConversationIdOrderByCreatedAtAsc(UUID conversationId);
 }

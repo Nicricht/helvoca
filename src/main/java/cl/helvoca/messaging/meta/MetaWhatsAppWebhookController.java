@@ -1,9 +1,11 @@
 package cl.helvoca.messaging.meta;
 
 import cl.helvoca.messaging.WhatsAppReceptionistService;
+import cl.helvoca.messaging.outbound.MetaWhatsAppDeliveryStatusService;
 import cl.helvoca.security.TenantDatabaseContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +29,9 @@ public class MetaWhatsAppWebhookController {
     private final MetaWhatsAppTenantResolver tenantResolver;
     private final TenantDatabaseContext databaseContext;
     private final WhatsAppReceptionistService receptionist;
+
+    @Autowired(required = false)
+    private MetaWhatsAppDeliveryStatusService deliveryStatus;
 
     public MetaWhatsAppWebhookController(MetaWhatsAppProperties properties,
                                          MetaWhatsAppTenantResolver tenantResolver,
@@ -75,9 +80,13 @@ public class MetaWhatsAppWebhookController {
 
         try {
             var messages = MetaWhatsAppPayloadParser.parseTextMessages(payload);
+            var statuses = MetaWhatsAppPayloadParser.parseDeliveryStatuses(payload);
             int processed = 0;
+            int statusProcessed = 0;
             int unresolved = 0;
             int failed = 0;
+            int deferred = 0;
+
             for (MetaWhatsAppInboundMessage message : messages) {
                 var route = tenantResolver.resolveRoute(message.phoneNumberId()).orElse(null);
                 if (route == null) {
@@ -102,12 +111,49 @@ public class MetaWhatsAppWebhookController {
                             e.getClass().getSimpleName());
                 }
             }
+
+            if (deliveryStatus != null) {
+                for (MetaWhatsAppDeliveryStatus status : statuses) {
+                    var route = tenantResolver.resolveRoute(status.phoneNumberId()).orElse(null);
+                    if (route == null) {
+                        unresolved++;
+                        continue;
+                    }
+
+                    try {
+                        MetaWhatsAppDeliveryStatusService.Result result = databaseContext.callAsTenant(
+                                route.businessId(),
+                                () -> deliveryStatus.apply(
+                                        route.businessId(),
+                                        status.messageId(),
+                                        status.status(),
+                                        status.occurredAt(),
+                                        status.errorCode()));
+                        if (result == MetaWhatsAppDeliveryStatusService.Result.NOT_FOUND) {
+                            deferred++;
+                        } else {
+                            statusProcessed++;
+                        }
+                    } catch (Exception e) {
+                        failed++;
+                        log.warn("Meta WhatsApp status processing failed business={} type={}",
+                                route.businessId(),
+                                e.getClass().getSimpleName());
+                    }
+                }
+            }
+
             log.info(
-                    "Meta WhatsApp webhook parsed textMessages={} processed={} unresolvedTenants={} failed={} outboundDelivery=guarded",
+                    "Meta WhatsApp webhook textMessages={} statuses={} processed={} statusProcessed={} unresolvedTenants={} deferredStatuses={} failed={} outboundDelivery=guarded",
                     messages.size(),
+                    statuses.size(),
                     processed,
+                    statusProcessed,
                     unresolved,
+                    deferred,
                     failed);
+
+            if (deferred > 0) return ResponseEntity.status(503).build();
             return failed == 0
                     ? ResponseEntity.ok().build()
                     : ResponseEntity.status(500).build();
