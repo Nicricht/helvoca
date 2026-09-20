@@ -178,7 +178,6 @@ class WhatsAppReceptionistServiceTest {
         phone.setPhoneNumber("+56922222222");
         phone.setActive(true);
         phone.setWhatsappEnabled(true);
-        phone.setWhatsappProvider(MetaWhatsAppMessagingProvider.ID);
 
         MessagingConversation conversation = new MessagingConversation();
         ReflectionTestUtils.setField(conversation, "id", conversationId);
@@ -265,6 +264,7 @@ class WhatsAppReceptionistServiceTest {
         phone.setPhoneNumber("+56922222222");
         phone.setActive(true);
         phone.setWhatsappEnabled(true);
+        phone.setWhatsappProvider(MetaWhatsAppMessagingProvider.ID);
 
         MessagingConversation conversation = new MessagingConversation();
         ReflectionTestUtils.setField(conversation, "id", conversationId);
