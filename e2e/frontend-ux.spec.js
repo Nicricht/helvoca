@@ -196,6 +196,16 @@ test('ready customer sees operations on home and configuration on settings', asy
     contentType: 'application/javascript',
     body: 'window.FB={init:(options)=>{window.__fbInitOptions=options;},login:(callback,options)=>{window.__fbLoginOptions=options;callback({authResponse:{code:"temporary-code-for-e2e"}});}}; if(window.fbAsyncInit) window.fbAsyncInit();'
   }));
+  let embeddedSignupCodeHandoff = null;
+  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/authorization-code', async route => {
+    embeddedSignupCodeHandoff = route.request().postDataJSON();
+    await route.fulfill(json({
+      state: 'AUTHORIZATION_CODE_HANDOFF_VALIDATED',
+      accepted: true,
+      retained: false,
+      exchangePending: true
+    }));
+  });
 
   await page.goto('/');
 
@@ -245,7 +255,8 @@ test('ready customer sees operations on home and configuration on settings', asy
     override_default_response_type: true,
     extras: { setup: {} }
   });
-  await expect(page.locator('#metaWhatsAppConnectMessage')).toContainText('Autorización completada');
+  await expect.poll(() => embeddedSignupCodeHandoff).toEqual({ code: 'temporary-code-for-e2e' });
+  await expect(page.locator('#metaWhatsAppConnectMessage')).toContainText('recibida de forma segura por el servidor');
   await expect(page.locator('#metaWhatsAppConnectMessage')).not.toContainText('temporary-code-for-e2e');
 });
 

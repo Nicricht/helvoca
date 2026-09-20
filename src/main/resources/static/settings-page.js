@@ -176,13 +176,27 @@
         button.disabled = true;
         message.textContent = "Abriendo autorización segura de Meta…";
         message.classList.remove("hidden");
-        window.FB.login(response => {
-          button.disabled = false;
-          if (response?.authResponse?.code) {
-            message.textContent = "Autorización completada. Falta conectar el código de forma segura con el servidor.";
+        window.FB.login(async response => {
+          const code = response?.authResponse?.code;
+          if (!code) {
+            button.disabled = false;
+            message.textContent = "La autorización no se completó. Puedes intentarlo nuevamente.";
             return;
           }
-          message.textContent = "La autorización no se completó. Puedes intentarlo nuevamente.";
+
+          try {
+            const handoff = await api("/api/v1/channels/whatsapp/meta/embedded-signup/authorization-code", {
+              method: "POST",
+              body: JSON.stringify({ code })
+            });
+            message.textContent = handoff?.accepted
+              ? "Autorización recibida de forma segura por el servidor. Falta el intercambio con Meta."
+              : "El servidor no pudo aceptar la autorización.";
+          } catch (error) {
+            message.textContent = "No fue posible entregar la autorización al servidor. Intenta nuevamente.";
+          } finally {
+            button.disabled = false;
+          }
         }, {
           config_id: bootstrap.configId,
           auth_type: "rerequest",
