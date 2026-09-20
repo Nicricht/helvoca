@@ -6,6 +6,7 @@ import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.omnichannel.CustomerIdentityService;
 import cl.helvoca.operations.BusinessOperationCapabilityService;
+import cl.helvoca.messaging.outbound.WhatsAppAssistantReplyDeliveryService;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import org.json.JSONObject;
@@ -43,6 +44,9 @@ public class WhatsAppReceptionistService {
 
     @Autowired(required = false)
     private CustomerIdentityService customerIdentities;
+
+    @Autowired(required = false)
+    private WhatsAppAssistantReplyDeliveryService replyDelivery;
 
     public WhatsAppReceptionistService(PhoneNumberRepository phones,
                                        CustomerRepository customers,
@@ -159,6 +163,16 @@ public class WhatsAppReceptionistService {
         messages.save(inbound);
         conversation.setLastMessageAt(Instant.now());
         conversations.save(conversation);
+
+        if (replyDelivery != null) {
+            replyDelivery.scheduleMetaReply(
+                    phone.getBusinessId(),
+                    inbound.getId(),
+                    messageId,
+                    phone.getWhatsappProvider(),
+                    from,
+                    reply);
+        }
         return reply;
     }
 

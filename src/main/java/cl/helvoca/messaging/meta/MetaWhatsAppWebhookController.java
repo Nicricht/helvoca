@@ -103,7 +103,7 @@ public class MetaWhatsAppWebhookController {
                 }
             }
             log.info(
-                    "Meta WhatsApp webhook parsed textMessages={} processed={} unresolvedTenants={} failed={} outboundDelivery=false",
+                    "Meta WhatsApp webhook parsed textMessages={} processed={} unresolvedTenants={} failed={} outboundDelivery=guarded",
                     messages.size(),
                     processed,
                     unresolved,
