@@ -194,7 +194,7 @@ test('ready customer sees operations on home and configuration on settings', asy
   await page.route('https://connect.facebook.net/**/sdk.js', route => route.fulfill({
     status: 200,
     contentType: 'application/javascript',
-    body: 'window.FB={init:(options)=>{window.__fbInitOptions=options;}}; if(window.fbAsyncInit) window.fbAsyncInit();'
+    body: 'window.FB={init:(options)=>{window.__fbInitOptions=options;},login:(callback,options)=>{window.__fbLoginOptions=options;callback({authResponse:{code:"temporary-code-for-e2e"}});}}; if(window.fbAsyncInit) window.fbAsyncInit();'
   }));
 
   await page.goto('/');
@@ -236,6 +236,17 @@ test('ready customer sees operations on home and configuration on settings', asy
     xfbml: false,
     version: 'v26.0'
   });
+
+  await page.getByRole('button', { name: 'Continuar con Meta', exact: true }).click();
+  expect(await page.evaluate(() => window.__fbLoginOptions)).toEqual({
+    config_id: '987654321',
+    auth_type: 'rerequest',
+    response_type: 'code',
+    override_default_response_type: true,
+    extras: { setup: {} }
+  });
+  await expect(page.locator('#metaWhatsAppConnectMessage')).toContainText('Autorización completada');
+  await expect(page.locator('#metaWhatsAppConnectMessage')).not.toContainText('temporary-code-for-e2e');
 });
 
 test('primary and public navigation fit desktop tablet and mobile viewports', async ({ page }) => {
