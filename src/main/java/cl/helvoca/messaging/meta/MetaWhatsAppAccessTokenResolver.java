@@ -4,10 +4,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Resolves the outbound Meta access token for one tenant.
- *
- * No implementation is registered yet. Production therefore remains fail-closed
- * until secure tenant credentials are added in the next block.
+ * Resolves an outbound Meta access token for one tenant without exposing
+ * credential storage details to the messaging provider.
  */
 @FunctionalInterface
 public interface MetaWhatsAppAccessTokenResolver {
