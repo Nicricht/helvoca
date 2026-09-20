@@ -103,7 +103,8 @@ class MetaWhatsAppTenantConfigurationServiceTest {
                         UUID.randomUUID(),
                         "TWILIO_WHATSAPP",
                         "1234567890",
-                        "ACME_01")));
+                        "ACME_01",
+                        null)));
 
         assertEquals("Only META_WHATSAPP_CLOUD is supported", error.getMessage());
         verifyNoInteractions(configs, phones);
