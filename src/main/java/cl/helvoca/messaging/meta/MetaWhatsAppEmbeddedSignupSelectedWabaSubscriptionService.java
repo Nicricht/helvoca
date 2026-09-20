@@ -23,6 +23,10 @@ public class MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService {
         MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentResult assignment =
                 assignmentService.ensureAssigned(wabaId);
 
+        if (!assignment.systemUserAssigned()) {
+            throw new ConflictException("META_EMBEDDED_SIGNUP_SYSTEM_USER_NOT_ASSIGNED");
+        }
+
         MetaWhatsAppEmbeddedSignupSubscribeAppResult subscription =
                 subscribeAppClient.subscribe(
                         wabaId,
