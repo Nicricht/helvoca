@@ -24,6 +24,7 @@ public record PersistentJob(
 
     public enum Type {
         OUTBOUND_MESSAGE_DISPATCH,
+        META_WHATSAPP_AI_REPLY,
         CALENDAR_EVENT_SYNC
     }
 
