@@ -74,6 +74,55 @@ public class MetaWhatsAppTenantConfigurationService {
     }
 
     @Transactional
+    public MetaWhatsAppTenantStatusResponse deactivate() {
+        UUID businessId = tenantProvider.requireBusinessId();
+        MetaWhatsAppTenantConfig config = configs.findById(businessId).orElse(null);
+
+        List<PhoneNumber> metaPhones = phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)
+                .stream()
+                .filter(phone -> MetaWhatsAppMessagingProvider.ID.equals(phone.getWhatsappProvider()))
+                .toList();
+
+        if (config == null && metaPhones.isEmpty()) {
+            return MetaWhatsAppTenantStatusResponse.notConfigured();
+        }
+
+        if (config != null && config.isEnabled()) {
+            config.setEnabled(false);
+            configs.save(config);
+        }
+
+        for (PhoneNumber phone : metaPhones) {
+            if (phone.isWhatsappEnabled()) {
+                phone.setWhatsappEnabled(false);
+                phones.save(phone);
+            }
+        }
+
+        boolean credentialReferenceConfigured = config != null
+                && config.getCredentialRef() != null
+                && !config.getCredentialRef().isBlank();
+
+        List<PhoneNumber> configuredMetaPhones = metaPhones.stream()
+                .filter(phone -> phone.getWhatsappExternalId() != null
+                        && !phone.getWhatsappExternalId().isBlank())
+                .toList();
+
+        if (configuredMetaPhones.size() != 1 || !credentialReferenceConfigured) {
+            MetaWhatsAppTenantStatusResponse.PhoneView phoneView = configuredMetaPhones.size() == 1
+                    ? toPhoneView(configuredMetaPhones.get(0))
+                    : null;
+            return MetaWhatsAppTenantStatusResponse.incomplete(
+                    phoneView,
+                    credentialReferenceConfigured);
+        }
+
+        return MetaWhatsAppTenantStatusResponse.configured(
+                toPhoneView(configuredMetaPhones.get(0)),
+                false);
+    }
+
+    @Transactional
     public MetaWhatsAppTenantStatusResponse activate() {
         UUID businessId = tenantProvider.requireBusinessId();
         MetaWhatsAppTenantConfig config = configs.findById(businessId)
