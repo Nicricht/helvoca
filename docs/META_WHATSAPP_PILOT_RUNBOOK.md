@@ -261,19 +261,29 @@ Current Meta requirements verified against the official WhatsApp Business Platfo
 - the resulting `phone_number_id` is then registered and used for Cloud API messaging;
 - all callback and completion endpoints used by the onboarding flow must be HTTPS.
 
-### Helvoca persistence gap
+### Verified Embedded Signup sequence
 
-The current Helvoca Meta tenant model stores the tenant business ID, credential reference and Meta `phone_number_id`, but it does not persist the Meta `waba_id`.
+Verified on 2026-09-20 against Meta's official WhatsApp Business Platform Postman collection:
 
-This does not block the manual pilot.
+1. the Meta app needs Advanced Access to `business_management` and `whatsapp_business_management`;
+2. embed the flow with the Facebook JavaScript SDK and Facebook Login;
+3. validate/debug the OAuth user token returned after signup before trusting its granted WhatsApp scope and target WABA IDs;
+4. fetch the WABA shared with RecepVoz through `GET /<business_id>/client_whatsapp_business_accounts`;
+5. verify or assign the required system user to that WABA;
+6. subscribe the RecepVoz Meta app to that WABA through `POST /<waba_id>/subscribed_apps`;
+7. fetch the WABA phone numbers through `GET /<waba_id>/phone_numbers`;
+8. register the selected business phone number before Cloud API messaging;
+9. persist the tenant-to-`waba_id` and tenant-to-`phone_number_id` relationship for deterministic routing and audit.
 
-Before implementing production Embedded Signup, add an explicit tenant-scoped `waba_id` persistence field so Helvoca can:
-- identify the WABA authorized by the customer,
-- subscribe the correct WABA to webhooks,
-- query its phone numbers deterministically,
-- and audit the relationship between a Helvoca tenant, WABA and `phone_number_id`.
+The official Embedded Signup collection also includes credit-line sharing for BSP billing models. Treat that as conditional on the commercial/payment model used by RecepVoz rather than as a universal requirement for every tenant onboarding.
 
-Do not store temporary OAuth user access tokens in the tenant database.
+### Helvoca persistence status
+
+The persistence gap previously documented here is now closed.
+
+Helvoca now stores tenant-scoped `waba_id` in `business_meta_whatsapp_config` and exposes it through the tenant Meta configuration API while keeping it optional so the existing manual pilot remains compatible.
+
+Do not store temporary OAuth user access tokens in the tenant database. Token handling for Embedded Signup remains a separate implementation task.
 
 ## Real-pilot boundary
 
