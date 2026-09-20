@@ -15,6 +15,7 @@ public class MetaWhatsAppProperties {
     private boolean embeddedSignupEnabled = false;
     private String embeddedSignupAppId = "";
     private String embeddedSignupConfigId = "";
+    private String embeddedSignupBusinessId = "";
     private String embeddedSignupSystemUserAccessToken = "";
 
     public boolean isEnabled() {
@@ -104,6 +105,18 @@ public class MetaWhatsAppProperties {
 
     public boolean hasEmbeddedSignupConfigId() {
         return !getEmbeddedSignupConfigId().isBlank();
+    }
+
+    public String getEmbeddedSignupBusinessId() {
+        return clean(embeddedSignupBusinessId);
+    }
+
+    public void setEmbeddedSignupBusinessId(String embeddedSignupBusinessId) {
+        this.embeddedSignupBusinessId = embeddedSignupBusinessId;
+    }
+
+    public boolean hasEmbeddedSignupBusinessId() {
+        return !getEmbeddedSignupBusinessId().isBlank();
     }
 
     public String getEmbeddedSignupSystemUserAccessToken() {
