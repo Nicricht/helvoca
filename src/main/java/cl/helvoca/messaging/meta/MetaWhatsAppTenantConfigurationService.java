@@ -8,6 +8,7 @@ import cl.helvoca.security.TenantProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -24,6 +25,40 @@ public class MetaWhatsAppTenantConfigurationService {
         this.configs = configs;
         this.phones = phones;
         this.tenantProvider = tenantProvider;
+    }
+
+    @Transactional(readOnly = true)
+    public MetaWhatsAppTenantStatusResponse status() {
+        UUID businessId = tenantProvider.requireBusinessId();
+        MetaWhatsAppTenantConfig config = configs.findById(businessId).orElse(null);
+
+        List<PhoneNumber> metaPhones = phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)
+                .stream()
+                .filter(phone -> MetaWhatsAppMessagingProvider.ID.equals(phone.getWhatsappProvider()))
+                .filter(phone -> phone.getWhatsappExternalId() != null
+                        && !phone.getWhatsappExternalId().isBlank())
+                .toList();
+
+        if (config == null && metaPhones.isEmpty()) {
+            return MetaWhatsAppTenantStatusResponse.notConfigured();
+        }
+
+        boolean credentialReferenceConfigured = config != null
+                && config.getCredentialRef() != null
+                && !config.getCredentialRef().isBlank();
+
+        if (metaPhones.size() != 1 || !credentialReferenceConfigured) {
+            MetaWhatsAppTenantStatusResponse.PhoneView phoneView = metaPhones.size() == 1
+                    ? toPhoneView(metaPhones.get(0))
+                    : null;
+            return MetaWhatsAppTenantStatusResponse.incomplete(
+                    phoneView,
+                    credentialReferenceConfigured);
+        }
+
+        PhoneNumber phone = metaPhones.get(0);
+        boolean enabled = config.isEnabled() && phone.isWhatsappEnabled();
+        return MetaWhatsAppTenantStatusResponse.configured(toPhoneView(phone), enabled);
     }
 
     @Transactional
@@ -68,6 +103,15 @@ public class MetaWhatsAppTenantConfigurationService {
                 providerPhoneNumberId,
                 credentialRef,
                 false);
+    }
+
+    private static MetaWhatsAppTenantStatusResponse.PhoneView toPhoneView(PhoneNumber phone) {
+        return new MetaWhatsAppTenantStatusResponse.PhoneView(
+                phone.getId(),
+                phone.getWhatsappProvider(),
+                phone.getWhatsappExternalId(),
+                phone.getPhoneNumber(),
+                phone.getWhatsappCertifiedAt());
     }
 
     private static String normalizeProvider(String value) {
