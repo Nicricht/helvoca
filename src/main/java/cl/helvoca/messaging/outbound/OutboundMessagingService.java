@@ -1,6 +1,7 @@
 package cl.helvoca.messaging.outbound;
 
 import cl.helvoca.customer.CustomerRepository;
+import cl.helvoca.messaging.meta.MetaWhatsAppApiException;
 import cl.helvoca.omnichannel.CustomerIdentity;
 import cl.helvoca.omnichannel.CustomerIdentityRepository;
 import cl.helvoca.operations.BusinessOperation;

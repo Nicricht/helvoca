@@ -6,6 +6,7 @@ import cl.helvoca.messaging.MessagingConversation;
 import cl.helvoca.messaging.MessagingConversationRepository;
 import cl.helvoca.messaging.MessagingMessage;
 import cl.helvoca.messaging.MessagingMessageRepository;
+import cl.helvoca.messaging.meta.MetaWhatsAppApiException;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 
