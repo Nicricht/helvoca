@@ -3,6 +3,7 @@ package cl.helvoca.messaging.meta;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +23,12 @@ public class MetaWhatsAppTenantConfigurationController {
     @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
     public MetaWhatsAppTenantStatusResponse status() {
         return service.status();
+    }
+
+    @PostMapping("/config/activate")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public MetaWhatsAppTenantStatusResponse activate() {
+        return service.activate();
     }
 
     @PutMapping("/config")
