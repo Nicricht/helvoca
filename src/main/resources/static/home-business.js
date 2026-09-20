@@ -143,21 +143,20 @@
       return focusTarget(saved.element);
     };
 
-    if (restore()) return;
+    const fallbackTab = saved.kind === "order"
+      ? document.querySelector('[data-home-tab="orders"]')
+      : saved.kind === "customer"
+        ? document.querySelector('[data-home-tab="customers"]')
+        : document.querySelector('[data-home-tab="bookings"]');
 
     // A booking reschedule re-renders the table while the drawer is still open.
-    // Chromium can close the drawer before the replacement row has completed
-    // layout, so retry after layout instead of prematurely focusing the tab.
+    // Focus can be accepted synchronously and then be stolen by a pending layout
+    // or mutation callback. Re-verify it across two frames before falling back.
+    restore();
     requestAnimationFrame(() => {
-      if (restore()) return;
+      restore();
       requestAnimationFrame(() => {
         if (restore()) return;
-
-        const fallbackTab = saved.kind === "order"
-          ? document.querySelector('[data-home-tab="orders"]')
-          : saved.kind === "customer"
-            ? document.querySelector('[data-home-tab="customers"]')
-            : document.querySelector('[data-home-tab="bookings"]');
         focusTarget(fallbackTab);
       });
     });
