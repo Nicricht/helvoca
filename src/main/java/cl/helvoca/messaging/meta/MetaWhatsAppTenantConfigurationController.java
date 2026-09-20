@@ -21,6 +21,7 @@ public class MetaWhatsAppTenantConfigurationController {
     private final MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService embeddedSignupSelectedWabaAssignmentService;
     private final MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService embeddedSignupSelectedWabaSubscriptionService;
     private final MetaWhatsAppEmbeddedSignupSelectedWabaPhoneDiscoveryService embeddedSignupSelectedWabaPhoneDiscoveryService;
+    private final MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService embeddedSignupSelectedPhoneValidationService;
 
     public MetaWhatsAppTenantConfigurationController(
             MetaWhatsAppTenantConfigurationService service,
@@ -31,7 +32,8 @@ public class MetaWhatsAppTenantConfigurationController {
             MetaWhatsAppEmbeddedSignupAuthorizationCodeService embeddedSignupAuthorizationCodeService,
             MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService embeddedSignupSelectedWabaAssignmentService,
             MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService embeddedSignupSelectedWabaSubscriptionService,
-            MetaWhatsAppEmbeddedSignupSelectedWabaPhoneDiscoveryService embeddedSignupSelectedWabaPhoneDiscoveryService) {
+            MetaWhatsAppEmbeddedSignupSelectedWabaPhoneDiscoveryService embeddedSignupSelectedWabaPhoneDiscoveryService,
+            MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService embeddedSignupSelectedPhoneValidationService) {
         this.service = service;
         this.healthService = healthService;
         this.deploymentReadinessService = deploymentReadinessService;
@@ -41,6 +43,7 @@ public class MetaWhatsAppTenantConfigurationController {
         this.embeddedSignupSelectedWabaAssignmentService = embeddedSignupSelectedWabaAssignmentService;
         this.embeddedSignupSelectedWabaSubscriptionService = embeddedSignupSelectedWabaSubscriptionService;
         this.embeddedSignupSelectedWabaPhoneDiscoveryService = embeddedSignupSelectedWabaPhoneDiscoveryService;
+        this.embeddedSignupSelectedPhoneValidationService = embeddedSignupSelectedPhoneValidationService;
     }
 
     @GetMapping("/config")
@@ -99,6 +102,15 @@ public class MetaWhatsAppTenantConfigurationController {
     public MetaWhatsAppEmbeddedSignupSelectedWabaPhoneDiscoveryResult discoverSelectedWabaPhoneNumbers(
             @Valid @RequestBody MetaWhatsAppEmbeddedSignupSelectedWabaRequest request) {
         return embeddedSignupSelectedWabaPhoneDiscoveryService.discover(request.wabaId());
+    }
+
+    @PostMapping("/embedded-signup/waba/phone-number/validate")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public MetaWhatsAppEmbeddedSignupSelectedPhoneValidationResult validateSelectedWabaPhoneNumber(
+            @Valid @RequestBody MetaWhatsAppEmbeddedSignupSelectedPhoneRequest request) {
+        return embeddedSignupSelectedPhoneValidationService.validate(
+                request.wabaId(),
+                request.phoneNumberId());
     }
 
     @PostMapping("/config/deactivate")
