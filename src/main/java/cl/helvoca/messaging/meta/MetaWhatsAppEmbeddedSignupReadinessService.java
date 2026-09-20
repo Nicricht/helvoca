@@ -20,7 +20,9 @@ public class MetaWhatsAppEmbeddedSignupReadinessService {
         boolean appIdConfigured = metaProperties.hasEmbeddedSignupAppId();
         boolean configIdConfigured = metaProperties.hasEmbeddedSignupConfigId();
         boolean businessIdConfigured = metaProperties.hasEmbeddedSignupBusinessId();
+        boolean systemUserIdConfigured = metaProperties.hasEmbeddedSignupSystemUserId();
         boolean systemUserAccessTokenConfigured = metaProperties.hasEmbeddedSignupSystemUserAccessToken();
+        boolean adminSystemUserAccessTokenConfigured = metaProperties.hasEmbeddedSignupAdminSystemUserAccessToken();
         boolean appSecretConfigured = metaProperties.hasAppSecret();
         boolean verifyTokenConfigured = metaProperties.hasVerifyToken();
         boolean webhookValidationEnabled = metaProperties.isWebhookValidationEnabled();
@@ -45,10 +47,20 @@ public class MetaWhatsAppEmbeddedSignupReadinessService {
                     "BUSINESS_ID_MISSING",
                     "Meta provider business_id is not configured."));
         }
+        if (!systemUserIdConfigured) {
+            blockers.add(blocker(
+                    "SYSTEM_USER_ID_MISSING",
+                    "Meta Embedded Signup system user id is not configured."));
+        }
         if (!systemUserAccessTokenConfigured) {
             blockers.add(blocker(
                     "SYSTEM_USER_ACCESS_TOKEN_MISSING",
                     "Meta Embedded Signup system user access token is not configured."));
+        }
+        if (!adminSystemUserAccessTokenConfigured) {
+            blockers.add(blocker(
+                    "ADMIN_SYSTEM_USER_ACCESS_TOKEN_MISSING",
+                    "Meta Embedded Signup admin system user access token is not configured."));
         }
         if (!appSecretConfigured) {
             blockers.add(blocker(
@@ -74,6 +86,8 @@ public class MetaWhatsAppEmbeddedSignupReadinessService {
                 appIdConfigured,
                 configIdConfigured,
                 businessIdConfigured,
+                systemUserIdConfigured,
+                adminSystemUserAccessTokenConfigured,
                 appSecretConfigured,
                 verifyTokenConfigured,
                 webhookValidationEnabled,

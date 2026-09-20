@@ -193,7 +193,9 @@ class MetaWhatsAppEmbeddedSignupAuthorizationCodeServiceTest {
         meta.setEmbeddedSignupAppId("123456789");
         meta.setEmbeddedSignupConfigId("987654321");
         meta.setEmbeddedSignupBusinessId("112233445566778");
+        meta.setEmbeddedSignupSystemUserId("998877665544332");
         meta.setEmbeddedSignupSystemUserAccessToken("system-user-secret");
+        meta.setEmbeddedSignupAdminSystemUserAccessToken("admin-system-user-secret");
         meta.setAppSecret("app-secret");
         meta.setVerifyToken("verify-token");
         meta.setWebhookValidationEnabled(true);
