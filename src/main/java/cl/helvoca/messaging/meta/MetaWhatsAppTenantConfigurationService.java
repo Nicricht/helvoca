@@ -5,6 +5,7 @@ import cl.helvoca.messaging.outbound.MetaWhatsAppMessagingProvider;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,14 +18,25 @@ public class MetaWhatsAppTenantConfigurationService {
     private final MetaWhatsAppTenantConfigRepository configs;
     private final PhoneNumberRepository phones;
     private final TenantProvider tenantProvider;
+    private final MetaWhatsAppCredentialAvailability credentialAvailability;
 
+    @Autowired
     public MetaWhatsAppTenantConfigurationService(
             MetaWhatsAppTenantConfigRepository configs,
             PhoneNumberRepository phones,
-            TenantProvider tenantProvider) {
+            TenantProvider tenantProvider,
+            MetaWhatsAppCredentialAvailability credentialAvailability) {
         this.configs = configs;
         this.phones = phones;
         this.tenantProvider = tenantProvider;
+        this.credentialAvailability = credentialAvailability;
+    }
+
+    MetaWhatsAppTenantConfigurationService(
+            MetaWhatsAppTenantConfigRepository configs,
+            PhoneNumberRepository phones,
+            TenantProvider tenantProvider) {
+        this(configs, phones, tenantProvider, credentialRef -> false);
     }
 
     @Transactional(readOnly = true)
@@ -59,6 +71,45 @@ public class MetaWhatsAppTenantConfigurationService {
         PhoneNumber phone = metaPhones.get(0);
         boolean enabled = config.isEnabled() && phone.isWhatsappEnabled();
         return MetaWhatsAppTenantStatusResponse.configured(toPhoneView(phone), enabled);
+    }
+
+    @Transactional
+    public MetaWhatsAppTenantStatusResponse activate() {
+        UUID businessId = tenantProvider.requireBusinessId();
+        MetaWhatsAppTenantConfig config = configs.findById(businessId)
+                .orElseThrow(() -> new IllegalStateException("Meta WhatsApp is not configured"));
+
+        String credentialRef = normalizeCredentialRef(config.getCredentialRef());
+        if (!credentialAvailability.isAvailable(credentialRef)) {
+            throw new IllegalStateException("Meta WhatsApp credential is unavailable");
+        }
+
+        List<PhoneNumber> metaPhones = phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)
+                .stream()
+                .filter(phone -> MetaWhatsAppMessagingProvider.ID.equals(phone.getWhatsappProvider()))
+                .filter(phone -> phone.getWhatsappExternalId() != null
+                        && !phone.getWhatsappExternalId().isBlank())
+                .toList();
+
+        if (metaPhones.size() != 1) {
+            throw new IllegalStateException("Meta WhatsApp requires exactly one configured phone");
+        }
+
+        PhoneNumber phone = metaPhones.get(0);
+        if (!phone.isActive()) {
+            throw new IllegalStateException("Meta WhatsApp phone is inactive");
+        }
+
+        normalizeProviderPhoneNumberId(phone.getWhatsappExternalId());
+
+        config.setEnabled(true);
+        phone.setWhatsappEnabled(true);
+        configs.save(config);
+        phones.save(phone);
+
+        // This only arms the tenant. Global Meta delivery remains controlled by
+        // app.meta.whatsapp.enabled and the outbound delivery gate.
+        return MetaWhatsAppTenantStatusResponse.configured(toPhoneView(phone), true);
     }
 
     @Transactional
