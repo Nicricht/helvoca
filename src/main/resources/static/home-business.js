@@ -182,8 +182,18 @@
 
       repairFocus();
       requestAnimationFrame(() => {
-        if (!cancelledByUser) repairFocus();
-        cleanup();
+        if (cancelledByUser) {
+          cleanup();
+          return;
+        }
+
+        repairFocus();
+        // Run one final task after the frame. This removes the race with other
+        // Escape listeners that schedule their own requestAnimationFrame focus.
+        setTimeout(() => {
+          if (!cancelledByUser) repairFocus();
+          cleanup();
+        }, 0);
       });
     }, 0);
   }
