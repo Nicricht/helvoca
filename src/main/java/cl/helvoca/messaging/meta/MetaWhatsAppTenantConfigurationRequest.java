@@ -16,6 +16,9 @@ public record MetaWhatsAppTenantConfigurationRequest(
         String providerPhoneNumberId,
         @NotBlank
         @Pattern(regexp = "^[A-Za-z0-9_]{2,80}$")
-        String credentialRef
+        String credentialRef,
+        @JsonProperty("waba_id")
+        @Pattern(regexp = "^[0-9]{5,30}$")
+        String wabaId
 ) {
 }
