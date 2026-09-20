@@ -154,27 +154,38 @@
       focusTarget(fallbackTab);
     };
 
-    // Restore immediately for the normal path, then schedule one deterministic
-    // post-event repair. queueMicrotask runs after the current Escape dispatch,
-    // so the animation-frame callback is registered after any frame callback
-    // scheduled by another keydown listener during that same event.
+    // Restore immediately for the normal path, then repair again after the
+    // Escape event has fully finished dispatching. A microtask can run between
+    // listeners of the same DOM event in some browser scheduling paths, so use
+    // a timer task and then a frame callback to cover focus theft scheduled by
+    // later keydown listeners without racing them.
     repairFocus();
-    queueMicrotask(() => {
-      let cancelledByUser = false;
-      const cancelRepair = () => { cancelledByUser = true; };
-      const cleanup = () => {
-        document.removeEventListener("pointerdown", cancelRepair, true);
-        document.removeEventListener("keydown", cancelRepair, true);
-      };
 
-      document.addEventListener("pointerdown", cancelRepair, { capture: true, once: true });
-      document.addEventListener("keydown", cancelRepair, { capture: true, once: true });
+    let cancelledByUser = false;
+    const cancelRepair = event => {
+      if (event.type === "keydown" && event.key === "Escape") return;
+      cancelledByUser = true;
+    };
+    const cleanup = () => {
+      document.removeEventListener("pointerdown", cancelRepair, true);
+      document.removeEventListener("keydown", cancelRepair, true);
+    };
 
+    document.addEventListener("pointerdown", cancelRepair, true);
+    document.addEventListener("keydown", cancelRepair, true);
+
+    setTimeout(() => {
+      if (cancelledByUser) {
+        cleanup();
+        return;
+      }
+
+      repairFocus();
       requestAnimationFrame(() => {
         if (!cancelledByUser) repairFocus();
         cleanup();
       });
-    });
+    }, 0);
   }
 
   function drawerFocusableElements() {
