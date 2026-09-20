@@ -1,20 +1,24 @@
 package cl.helvoca.messaging.outbound;
 
+import cl.helvoca.jobs.PersistentJob;
+import cl.helvoca.jobs.PersistentJobService;
+import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class WhatsAppAssistantReplyDeliveryServiceTest {
 
     @Test
-    void deliveryDisabledDoesNotResolveOrCallProvider() {
+    void deliveryDisabledDoesNotEnqueueJob() {
         OutboundMessagingProperties properties = new OutboundMessagingProperties();
         properties.setDeliveryEnabled(false);
-        MessagingProviderRegistry providers = mock(MessagingProviderRegistry.class);
+        PersistentJobService jobs = mock(PersistentJobService.class);
 
-        var service = new WhatsAppAssistantReplyDeliveryService(properties, providers);
+        var service = new WhatsAppAssistantReplyDeliveryService(properties, jobs);
         service.scheduleMetaReply(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -23,16 +27,16 @@ class WhatsAppAssistantReplyDeliveryServiceTest {
                 "+56911111111",
                 "Respuesta IA");
 
-        verifyNoInteractions(providers);
+        verifyNoInteractions(jobs);
     }
 
     @Test
-    void nonMetaTenantDoesNotUseMetaProvider() {
+    void nonMetaTenantDoesNotEnqueueMetaJob() {
         OutboundMessagingProperties properties = new OutboundMessagingProperties();
         properties.setDeliveryEnabled(true);
-        MessagingProviderRegistry providers = mock(MessagingProviderRegistry.class);
+        PersistentJobService jobs = mock(PersistentJobService.class);
 
-        var service = new WhatsAppAssistantReplyDeliveryService(properties, providers);
+        var service = new WhatsAppAssistantReplyDeliveryService(properties, jobs);
         service.scheduleMetaReply(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -41,26 +45,18 @@ class WhatsAppAssistantReplyDeliveryServiceTest {
                 "+56911111111",
                 "Respuesta IA");
 
-        verifyNoInteractions(providers);
+        verifyNoInteractions(jobs);
     }
 
     @Test
-    void enabledMetaReplyUsesMetaProviderPipeline() {
+    void enabledMetaReplyEnqueuesDurableIdempotentJob() {
         OutboundMessagingProperties properties = new OutboundMessagingProperties();
         properties.setDeliveryEnabled(true);
-        MessagingProviderRegistry providers = mock(MessagingProviderRegistry.class);
-        MessagingProvider provider = mock(MessagingProvider.class);
-
-        when(providers.require(
-                MetaWhatsAppMessagingProvider.ID,
-                OutboundMessage.Channel.WHATSAPP))
-                .thenReturn(provider);
-        when(provider.send(any(MessagingProvider.SendCommand.class)))
-                .thenReturn(new MessagingProvider.SendResult("wamid.provider-1"));
+        PersistentJobService jobs = mock(PersistentJobService.class);
 
         UUID businessId = UUID.randomUUID();
         UUID messageId = UUID.randomUUID();
-        var service = new WhatsAppAssistantReplyDeliveryService(properties, providers);
+        var service = new WhatsAppAssistantReplyDeliveryService(properties, jobs);
 
         service.scheduleMetaReply(
                 businessId,
@@ -70,12 +66,12 @@ class WhatsAppAssistantReplyDeliveryServiceTest {
                 "+56911111111",
                 "Respuesta IA");
 
-        verify(provider).send(argThat(command ->
-                businessId.equals(command.businessId())
-                        && messageId.equals(command.messageId())
-                        && command.channel() == OutboundMessage.Channel.WHATSAPP
-                        && "+56911111111".equals(command.recipient())
-                        && "Respuesta IA".equals(command.content())
-                        && "META_AI_REPLY:wamid.inbound-1".equals(command.idempotencyKey())));
+        verify(jobs).enqueue(
+                eq(businessId),
+                isNull(),
+                eq(PersistentJob.Type.META_WHATSAPP_AI_REPLY),
+                eq("meta-ai-reply:wamid.inbound-1"),
+                argThat(payload -> messageId.toString().equals(
+                        new JSONObject(payload).getString("messageId"))));
     }
 }

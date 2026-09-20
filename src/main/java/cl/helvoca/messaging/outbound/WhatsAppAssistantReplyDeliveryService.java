@@ -1,25 +1,22 @@
 package cl.helvoca.messaging.outbound;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import cl.helvoca.jobs.PersistentJob;
+import cl.helvoca.jobs.PersistentJobService;
+import org.json.JSONObject;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.UUID;
 
 @Service
 public class WhatsAppAssistantReplyDeliveryService {
-    private static final Logger log = LoggerFactory.getLogger(WhatsAppAssistantReplyDeliveryService.class);
-
     private final OutboundMessagingProperties properties;
-    private final MessagingProviderRegistry providers;
+    private final PersistentJobService jobs;
 
     public WhatsAppAssistantReplyDeliveryService(
             OutboundMessagingProperties properties,
-            MessagingProviderRegistry providers) {
+            PersistentJobService jobs) {
         this.properties = properties;
-        this.providers = providers;
+        this.jobs = jobs;
     }
 
     public void scheduleMetaReply(
@@ -38,66 +35,27 @@ public class WhatsAppAssistantReplyDeliveryService {
         if (businessId == null || messageId == null) {
             throw new IllegalArgumentException("Meta reply identifiers are required");
         }
+        if (inboundMessageId == null || inboundMessageId.isBlank()) {
+            throw new IllegalArgumentException("Meta inbound message id is required");
+        }
         if (recipient == null || recipient.isBlank() || content == null || content.isBlank()) {
             throw new IllegalArgumentException("Meta reply recipient and content are required");
         }
 
-        Runnable delivery = () -> deliver(
+        String idempotencyKey = "meta-ai-reply:" + safeInboundMessageId(inboundMessageId);
+        String payload = new JSONObject()
+                .put("messageId", messageId.toString())
+                .toString();
+
+        jobs.enqueue(
                 businessId,
-                messageId,
-                inboundMessageId,
-                recipient,
-                content);
-
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    delivery.run();
-                }
-            });
-            return;
-        }
-
-        delivery.run();
+                null,
+                PersistentJob.Type.META_WHATSAPP_AI_REPLY,
+                idempotencyKey,
+                payload);
     }
 
-    private void deliver(
-            UUID businessId,
-            UUID messageId,
-            String inboundMessageId,
-            String recipient,
-            String content) {
-        try {
-            MessagingProvider provider = providers.require(
-                    MetaWhatsAppMessagingProvider.ID,
-                    OutboundMessage.Channel.WHATSAPP);
-            MessagingProvider.SendResult result = provider.send(new MessagingProvider.SendCommand(
-                    businessId,
-                    messageId,
-                    OutboundMessage.Channel.WHATSAPP,
-                    recipient,
-                    content,
-                    "META_AI_REPLY:" + safeInboundMessageId(inboundMessageId)));
-            if (result == null
-                    || result.providerMessageId() == null
-                    || result.providerMessageId().isBlank()) {
-                throw new IllegalStateException("Provider did not confirm Meta reply message id");
-            }
-            log.info(
-                    "Meta WhatsApp AI reply dispatched business={} inboundMessage={} providerMessagePresent=true",
-                    businessId,
-                    safeInboundMessageId(inboundMessageId));
-        } catch (RuntimeException e) {
-            log.warn(
-                    "Meta WhatsApp AI reply dispatch failed business={} inboundMessage={} type={}",
-                    businessId,
-                    safeInboundMessageId(inboundMessageId),
-                    e.getClass().getSimpleName());
-        }
-    }
-
-    private static String safeInboundMessageId(String value) {
+    static String safeInboundMessageId(String value) {
         if (value == null || value.isBlank()) return "unknown";
         String clean = value.trim().replaceAll("[^A-Za-z0-9._:-]", "_");
         return clean.length() <= 120 ? clean : clean.substring(0, 120);
