@@ -164,6 +164,37 @@
     const button = section.querySelector("#metaWhatsAppConnectBtn");
     const message = section.querySelector("#metaWhatsAppConnectMessage");
     button?.addEventListener("click", async () => {
+      if (button.dataset.sdkReady === "true") {
+        if (!window.FB?.login) {
+          button.dataset.sdkReady = "false";
+          button.textContent = "Conectar WhatsApp";
+          message.textContent = "Meta necesita prepararse nuevamente. Intenta otra vez.";
+          message.classList.remove("hidden");
+          return;
+        }
+
+        button.disabled = true;
+        message.textContent = "Abriendo autorización segura de Meta…";
+        message.classList.remove("hidden");
+        window.FB.login(response => {
+          button.disabled = false;
+          if (response?.authResponse?.code) {
+            message.textContent = "Autorización completada. Falta conectar el código de forma segura con el servidor.";
+            return;
+          }
+          message.textContent = "La autorización no se completó. Puedes intentarlo nuevamente.";
+        }, {
+          config_id: bootstrap.configId,
+          auth_type: "rerequest",
+          response_type: "code",
+          override_default_response_type: true,
+          extras: {
+            setup: {}
+          }
+        });
+        return;
+      }
+
       button.disabled = true;
       message.textContent = "Preparando conexión segura con Meta…";
       message.classList.remove("hidden");
@@ -171,7 +202,7 @@
         await loadFacebookSdk(bootstrap);
         button.textContent = "Continuar con Meta";
         button.dataset.sdkReady = "true";
-        message.textContent = "SDK de Meta preparado. La autorización todavía está desactivada.";
+        message.textContent = "SDK de Meta preparado. Continúa para autorizar tu WhatsApp Business.";
       } catch (error) {
         button.textContent = "Conectar WhatsApp";
         button.dataset.sdkReady = "false";
