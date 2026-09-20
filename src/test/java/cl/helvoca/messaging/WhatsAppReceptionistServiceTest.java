@@ -6,6 +6,8 @@ import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.messaging.outbound.MetaWhatsAppMessagingProvider;
+import cl.helvoca.messaging.outbound.WhatsAppAssistantReplyDeliveryService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -176,6 +178,7 @@ class WhatsAppReceptionistServiceTest {
         phone.setPhoneNumber("+56922222222");
         phone.setActive(true);
         phone.setWhatsappEnabled(true);
+        phone.setWhatsappProvider(MetaWhatsAppMessagingProvider.ID);
 
         MessagingConversation conversation = new MessagingConversation();
         ReflectionTestUtils.setField(conversation, "id", conversationId);
@@ -290,8 +293,10 @@ class WhatsAppReceptionistServiceTest {
         when(tools.buildInstructions(conversation)).thenReturn("Instrucciones oficiales");
 
         AtomicReference<MessagingMessage> persistedInbound = new AtomicReference<>();
+        UUID inboundId = UUID.randomUUID();
         when(messages.saveAndFlush(any(MessagingMessage.class))).thenAnswer(invocation -> {
             MessagingMessage saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", inboundId);
             persistedInbound.set(saved);
             return saved;
         });
@@ -304,6 +309,8 @@ class WhatsAppReceptionistServiceTest {
 
         WhatsAppReceptionistService service = new WhatsAppReceptionistService(
                 phones, customers, conversations, messages, tools, subscriptions, ai, properties, aiAgents);
+        WhatsAppAssistantReplyDeliveryService replyDelivery = mock(WhatsAppAssistantReplyDeliveryService.class);
+        ReflectionTestUtils.setField(service, "replyDelivery", replyDelivery);
 
         String reply = service.handle(
                 "SM-outbound-link",
@@ -330,5 +337,13 @@ class WhatsAppReceptionistServiceTest {
         assertEquals("INBOUND", inbound.getDirection());
         assertEquals(reply, inbound.getReplyText());
         assertEquals(outbound.getContent(), inbound.getReplyText());
+
+        verify(replyDelivery).scheduleMetaReply(
+                businessId,
+                inboundId,
+                "SM-outbound-link",
+                MetaWhatsAppMessagingProvider.ID,
+                "+56911111111",
+                reply);
     }
 }
