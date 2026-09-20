@@ -17,18 +17,21 @@ public class MetaWhatsAppTenantConfigurationController {
     private final MetaWhatsAppDeploymentReadinessService deploymentReadinessService;
     private final MetaWhatsAppEmbeddedSignupReadinessService embeddedSignupReadinessService;
     private final MetaWhatsAppEmbeddedSignupBootstrapService embeddedSignupBootstrapService;
+    private final MetaWhatsAppEmbeddedSignupAuthorizationCodeService embeddedSignupAuthorizationCodeService;
 
     public MetaWhatsAppTenantConfigurationController(
             MetaWhatsAppTenantConfigurationService service,
             MetaWhatsAppTenantHealthService healthService,
             MetaWhatsAppDeploymentReadinessService deploymentReadinessService,
             MetaWhatsAppEmbeddedSignupReadinessService embeddedSignupReadinessService,
-            MetaWhatsAppEmbeddedSignupBootstrapService embeddedSignupBootstrapService) {
+            MetaWhatsAppEmbeddedSignupBootstrapService embeddedSignupBootstrapService,
+            MetaWhatsAppEmbeddedSignupAuthorizationCodeService embeddedSignupAuthorizationCodeService) {
         this.service = service;
         this.healthService = healthService;
         this.deploymentReadinessService = deploymentReadinessService;
         this.embeddedSignupReadinessService = embeddedSignupReadinessService;
         this.embeddedSignupBootstrapService = embeddedSignupBootstrapService;
+        this.embeddedSignupAuthorizationCodeService = embeddedSignupAuthorizationCodeService;
     }
 
     @GetMapping("/config")
@@ -59,6 +62,13 @@ public class MetaWhatsAppTenantConfigurationController {
     @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
     public MetaWhatsAppEmbeddedSignupBootstrapResponse embeddedSignupBootstrap() {
         return embeddedSignupBootstrapService.bootstrap();
+    }
+
+    @PostMapping("/embedded-signup/authorization-code")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public MetaWhatsAppEmbeddedSignupAuthorizationCodeResponse acceptAuthorizationCode(
+            @Valid @RequestBody MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest request) {
+        return embeddedSignupAuthorizationCodeService.accept(request);
     }
 
     @PostMapping("/config/deactivate")
