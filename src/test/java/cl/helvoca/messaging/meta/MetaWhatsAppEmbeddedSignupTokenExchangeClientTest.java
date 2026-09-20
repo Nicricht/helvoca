@@ -95,7 +95,7 @@ class MetaWhatsAppEmbeddedSignupTokenExchangeClientTest {
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(400);
         when(response.body()).thenReturn(
-                "{"error":{"message":"sensitive-code-or-secret-must-not-leak"}}");
+                """\n                {"error":{"message":"sensitive-code-or-secret-must-not-leak"}}\n                """);
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
                 .thenReturn(response);
 
