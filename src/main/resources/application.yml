@@ -99,6 +99,7 @@ app:
       embedded-signup-enabled: ${META_WHATSAPP_EMBEDDED_SIGNUP_ENABLED:false}
       embedded-signup-app-id: ${META_WHATSAPP_EMBEDDED_SIGNUP_APP_ID:}
       embedded-signup-config-id: ${META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID:}
+      embedded-signup-system-user-access-token: ${META_WHATSAPP_EMBEDDED_SIGNUP_SYSTEM_USER_ACCESS_TOKEN:}
   outbound:
     delivery-enabled: ${HELVOCA_OUTBOUND_DELIVERY_ENABLED:false}
     provider: ${HELVOCA_OUTBOUND_PROVIDER:NONE}
