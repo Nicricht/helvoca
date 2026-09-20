@@ -16,16 +16,19 @@ public class MetaWhatsAppTenantConfigurationController {
     private final MetaWhatsAppTenantHealthService healthService;
     private final MetaWhatsAppDeploymentReadinessService deploymentReadinessService;
     private final MetaWhatsAppEmbeddedSignupReadinessService embeddedSignupReadinessService;
+    private final MetaWhatsAppEmbeddedSignupBootstrapService embeddedSignupBootstrapService;
 
     public MetaWhatsAppTenantConfigurationController(
             MetaWhatsAppTenantConfigurationService service,
             MetaWhatsAppTenantHealthService healthService,
             MetaWhatsAppDeploymentReadinessService deploymentReadinessService,
-            MetaWhatsAppEmbeddedSignupReadinessService embeddedSignupReadinessService) {
+            MetaWhatsAppEmbeddedSignupReadinessService embeddedSignupReadinessService,
+            MetaWhatsAppEmbeddedSignupBootstrapService embeddedSignupBootstrapService) {
         this.service = service;
         this.healthService = healthService;
         this.deploymentReadinessService = deploymentReadinessService;
         this.embeddedSignupReadinessService = embeddedSignupReadinessService;
+        this.embeddedSignupBootstrapService = embeddedSignupBootstrapService;
     }
 
     @GetMapping("/config")
@@ -50,6 +53,12 @@ public class MetaWhatsAppTenantConfigurationController {
     @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
     public MetaWhatsAppEmbeddedSignupReadinessResponse embeddedSignupReadiness() {
         return embeddedSignupReadinessService.readiness();
+    }
+
+    @GetMapping("/embedded-signup/bootstrap")
+    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    public MetaWhatsAppEmbeddedSignupBootstrapResponse embeddedSignupBootstrap() {
+        return embeddedSignupBootstrapService.bootstrap();
     }
 
     @PostMapping("/config/deactivate")
