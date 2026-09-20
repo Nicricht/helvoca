@@ -209,6 +209,27 @@ Webhook verification uses:
 
 Do not disable signature validation for the pilot.
 
+### WABA webhook subscription
+
+To receive WhatsApp webhook events, the Meta app must be explicitly subscribed to the pilot WABA.
+
+Important details verified against Meta's official WhatsApp Business Platform Postman collection:
+
+- subscribe the application to the **WABA**, not separately to each phone number;
+- one WABA subscription covers webhook events for the phone numbers under that WABA;
+- use a System User Access Token with the `whatsapp_business_management` permission for the subscription endpoint;
+- ensure the webhook field `messages` is subscribed.
+
+The `messages` webhook field carries both:
+- inbound customer messages, and
+- message-status notifications such as `sent`, `delivered`, `read`, and `failed`.
+
+For inbound text messages and status callbacks, Helvoca should therefore expect webhook changes whose field is:
+
+```
+messages
+```
+
 ## Stop conditions
 
 Do not continue to real certification if any of these are true:
