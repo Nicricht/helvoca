@@ -64,7 +64,7 @@ public class MetaWhatsAppCloudClient {
 
             JSONObject body = new JSONObject(response.body());
             JSONArray messages = body.optJSONArray("messages");
-            if (messages == null || messages.isEmpty()) {
+            if (messages == null || messages.length() == 0) {
                 throw new IllegalStateException("Meta WhatsApp did not return a message id");
             }
             String messageId = messages.optJSONObject(0) == null
