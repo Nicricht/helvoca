@@ -8,6 +8,7 @@ public record MetaWhatsAppEmbeddedSignupReadinessResponse(
         boolean embeddedSignupEnabled,
         boolean appIdConfigured,
         boolean configIdConfigured,
+        boolean businessIdConfigured,
         boolean appSecretConfigured,
         boolean verifyTokenConfigured,
         boolean webhookValidationEnabled,
