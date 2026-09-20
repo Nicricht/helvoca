@@ -149,29 +149,31 @@
         ? document.querySelector('[data-home-tab="customers"]')
         : document.querySelector('[data-home-tab="bookings"]');
 
-    const backdrop = document.querySelector("#homeBookingDetailBackdrop");
-    const focusNeedsRepair = () => {
-      const active = document.activeElement;
-      if (!active || active === document.body || active === document.documentElement) return true;
-      if (active === fallbackTab) return true;
-      return Boolean(backdrop?.contains(active));
-    };
-
     const repairFocus = () => {
-      if (!focusNeedsRepair()) return;
       if (restore()) return;
       focusTarget(fallbackTab);
     };
 
-    // Re-renders can replace the original opener while the drawer is open.
-    // Some browser/layout callbacks can also steal focus one frame later.
-    // Repair once immediately, once on the next frame, and once after that
-    // frame's callbacks have drained. Stop repairing if the user intentionally
-    // moved focus somewhere else.
+    // Restore immediately for the normal path, then schedule one deterministic
+    // post-event repair. queueMicrotask runs after the current Escape dispatch,
+    // so the animation-frame callback is registered after any frame callback
+    // scheduled by another keydown listener during that same event.
     repairFocus();
-    requestAnimationFrame(() => {
-      repairFocus();
-      setTimeout(repairFocus, 0);
+    queueMicrotask(() => {
+      let cancelledByUser = false;
+      const cancelRepair = () => { cancelledByUser = true; };
+      const cleanup = () => {
+        document.removeEventListener("pointerdown", cancelRepair, true);
+        document.removeEventListener("keydown", cancelRepair, true);
+      };
+
+      document.addEventListener("pointerdown", cancelRepair, { capture: true, once: true });
+      document.addEventListener("keydown", cancelRepair, { capture: true, once: true });
+
+      requestAnimationFrame(() => {
+        if (!cancelledByUser) repairFocus();
+        cleanup();
+      });
     });
   }
 
