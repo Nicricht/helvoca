@@ -1827,6 +1827,18 @@ test('booking reschedule checks availability and updates the drawer', async ({ p
   await expect(page.locator('#homeBookingDetailMeta')).toContainText('Confirmada');
   await expect(page.getByRole('button', { name: 'Reprogramar' })).toBeVisible();
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
+
+  // Simulate the delayed focus theft that previously made this path flaky in CI.
+  // The drawer must still restore focus to the semantic replacement booking row.
+  await page.evaluate(() => {
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      requestAnimationFrame(() => {
+        document.querySelector('[data-home-tab="bookings"]')?.focus();
+      });
+    }, { once: true });
+  });
+
   await page.keyboard.press('Escape');
   await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
   await expect(page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]')).toBeFocused();
