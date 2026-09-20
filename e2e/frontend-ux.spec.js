@@ -47,6 +47,13 @@ async function mockReadyTenant(page) {
     provider: 'TWILIO',
     message: 'No disponible en E2E'
   })));
+  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/bootstrap', route => route.fulfill(json({
+    enabled: true,
+    available: true,
+    appId: '123456789',
+    configId: '987654321',
+    graphApiVersion: 'v26.0'
+  })));
   await page.route('**/api/v1/billing/status', route => route.fulfill(json({
     provider: 'mercadopago',
     billingEnabled: true,
@@ -215,6 +222,9 @@ test('ready customer sees operations on home and configuration on settings', asy
   await expect(page.getByRole('button', { name: 'Conectar mi número' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Buscar un número nuevo' })).toBeVisible();
   await expect(page.locator('#provisioningSearchForm')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Conectar WhatsApp', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Conectar WhatsApp', exact: true }).click();
+  await expect(page.locator('#metaWhatsAppConnectMessage')).toContainText('inicio de sesión seguro');
 });
 
 test('primary and public navigation fit desktop tablet and mobile viewports', async ({ page }) => {
