@@ -13,6 +13,7 @@ public record MetaWhatsAppTenantStatusResponse(
         UUID phoneRecordId,
         String phoneNumber,
         @JsonProperty("phone_number_id") String providerPhoneNumberId,
+        @JsonProperty("waba_id") String wabaId,
         boolean credentialReferenceConfigured,
         Instant certifiedAt
 ) {
@@ -25,12 +26,14 @@ public record MetaWhatsAppTenantStatusResponse(
                 null,
                 null,
                 null,
+                null,
                 false,
                 null);
     }
 
     static MetaWhatsAppTenantStatusResponse incomplete(
             PhoneView phone,
+            String wabaId,
             boolean credentialReferenceConfigured) {
         return new MetaWhatsAppTenantStatusResponse(
                 "INCOMPLETE",
@@ -40,12 +43,14 @@ public record MetaWhatsAppTenantStatusResponse(
                 phone == null ? null : phone.phoneRecordId(),
                 phone == null ? null : phone.phoneNumber(),
                 phone == null ? null : phone.providerPhoneNumberId(),
+                wabaId,
                 credentialReferenceConfigured,
                 phone == null ? null : phone.certifiedAt());
     }
 
     static MetaWhatsAppTenantStatusResponse configured(
             PhoneView phone,
+            String wabaId,
             boolean enabled) {
         return new MetaWhatsAppTenantStatusResponse(
                 enabled ? "CONFIGURED_ENABLED" : "CONFIGURED_DISABLED",
@@ -55,6 +60,7 @@ public record MetaWhatsAppTenantStatusResponse(
                 phone.phoneRecordId(),
                 phone.phoneNumber(),
                 phone.providerPhoneNumberId(),
+                wabaId,
                 true,
                 phone.certifiedAt());
     }

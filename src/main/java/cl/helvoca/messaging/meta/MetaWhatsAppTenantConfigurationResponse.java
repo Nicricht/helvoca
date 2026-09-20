@@ -8,6 +8,7 @@ public record MetaWhatsAppTenantConfigurationResponse(
         UUID phoneRecordId,
         String provider,
         @JsonProperty("phone_number_id") String providerPhoneNumberId,
+        @JsonProperty("waba_id") String wabaId,
         String credentialRef,
         boolean enabled
 ) {

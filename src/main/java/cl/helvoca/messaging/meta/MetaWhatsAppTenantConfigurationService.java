@@ -65,12 +65,16 @@ public class MetaWhatsAppTenantConfigurationService {
                     : null;
             return MetaWhatsAppTenantStatusResponse.incomplete(
                     phoneView,
+                    config == null ? null : config.getWabaId(),
                     credentialReferenceConfigured);
         }
 
         PhoneNumber phone = metaPhones.get(0);
         boolean enabled = config.isEnabled() && phone.isWhatsappEnabled();
-        return MetaWhatsAppTenantStatusResponse.configured(toPhoneView(phone), enabled);
+        return MetaWhatsAppTenantStatusResponse.configured(
+                toPhoneView(phone),
+                config.getWabaId(),
+                enabled);
     }
 
     @Transactional
@@ -114,11 +118,13 @@ public class MetaWhatsAppTenantConfigurationService {
                     : null;
             return MetaWhatsAppTenantStatusResponse.incomplete(
                     phoneView,
+                    config == null ? null : config.getWabaId(),
                     credentialReferenceConfigured);
         }
 
         return MetaWhatsAppTenantStatusResponse.configured(
                 toPhoneView(configuredMetaPhones.get(0)),
+                config == null ? null : config.getWabaId(),
                 false);
     }
 
@@ -158,7 +164,10 @@ public class MetaWhatsAppTenantConfigurationService {
 
         // This only arms the tenant. Global Meta delivery remains controlled by
         // app.meta.whatsapp.enabled and the outbound delivery gate.
-        return MetaWhatsAppTenantStatusResponse.configured(toPhoneView(phone), true);
+        return MetaWhatsAppTenantStatusResponse.configured(
+                toPhoneView(phone),
+                config.getWabaId(),
+                true);
     }
 
     @Transactional
@@ -177,6 +186,7 @@ public class MetaWhatsAppTenantConfigurationService {
 
         String providerPhoneNumberId = normalizeProviderPhoneNumberId(request.providerPhoneNumberId());
         String credentialRef = normalizeCredentialRef(request.credentialRef());
+        String wabaId = normalizeOptionalWabaId(request.wabaId());
 
         PhoneNumber phone = phones.findByIdAndBusinessId(request.phoneRecordId(), businessId)
                 .orElseThrow(() -> new NotFoundException("Phone number not found"));
@@ -194,6 +204,7 @@ public class MetaWhatsAppTenantConfigurationService {
                 .orElseGet(MetaWhatsAppTenantConfig::new);
         config.setBusinessId(businessId);
         config.setCredentialRef(credentialRef);
+        config.setWabaId(wabaId);
         config.setEnabled(false);
         configs.save(config);
 
@@ -201,6 +212,7 @@ public class MetaWhatsAppTenantConfigurationService {
                 request.phoneRecordId(),
                 MetaWhatsAppMessagingProvider.ID,
                 providerPhoneNumberId,
+                wabaId,
                 credentialRef,
                 false);
     }
@@ -223,6 +235,15 @@ public class MetaWhatsAppTenantConfigurationService {
         String normalized = value == null ? "" : value.trim();
         if (!normalized.matches("^[0-9]{5,30}$")) {
             throw new IllegalArgumentException("Invalid Meta phone_number_id");
+        }
+        return normalized;
+    }
+
+    private static String normalizeOptionalWabaId(String value) {
+        if (value == null || value.isBlank()) return null;
+        String normalized = value.trim();
+        if (!normalized.matches("^[0-9]{5,30}$")) {
+            throw new IllegalArgumentException("Invalid Meta waba_id");
         }
         return normalized;
     }

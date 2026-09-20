@@ -41,10 +41,12 @@ class MetaWhatsAppTenantConfigurationServiceTest {
                 phoneRecordId,
                 "meta_whatsapp_cloud",
                 "123456789012345",
-                " acme_01 "));
+                " acme_01 ",
+                "987654321098765"));
 
         assertEquals("META_WHATSAPP_CLOUD", response.provider());
         assertEquals("123456789012345", response.providerPhoneNumberId());
+        assertEquals("987654321098765", response.wabaId());
         assertEquals("ACME_01", response.credentialRef());
         assertFalse(response.enabled());
 
@@ -57,7 +59,8 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         verify(configs).save(argThat(config ->
                 businessId.equals(config.getBusinessId())
                         && !config.isEnabled()
-                        && "ACME_01".equals(config.getCredentialRef())));
+                        && "ACME_01".equals(config.getCredentialRef())
+                        && "987654321098765".equals(config.getWabaId())));
     }
 
     @Test
@@ -79,7 +82,8 @@ class MetaWhatsAppTenantConfigurationServiceTest {
                         phoneRecordId,
                         "META_WHATSAPP_CLOUD",
                         "1234567890",
-                        "ACME_01")));
+                        "ACME_01",
+                        null)));
 
         verify(configs, never()).save(any());
         verify(phones, never()).save(any());
@@ -119,14 +123,16 @@ class MetaWhatsAppTenantConfigurationServiceTest {
                         UUID.randomUUID(),
                         "META_WHATSAPP_CLOUD",
                         "../bad",
-                        "ACME_01")));
+                        "ACME_01",
+                        null)));
 
         assertThrows(IllegalArgumentException.class, () -> service.replace(
                 new MetaWhatsAppTenantConfigurationRequest(
                         UUID.randomUUID(),
                         "META_WHATSAPP_CLOUD",
                         "1234567890",
-                        "../BAD")));
+                        "../BAD",
+                        null)));
 
         verifyNoInteractions(configs, phones);
     }
@@ -166,6 +172,7 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         MetaWhatsAppTenantConfig config = new MetaWhatsAppTenantConfig();
         config.setBusinessId(businessId);
         config.setCredentialRef("ACME_01");
+        config.setWabaId("987654321098765");
         config.setEnabled(false);
 
         when(tenantProvider.requireBusinessId()).thenReturn(businessId);
@@ -188,6 +195,7 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         assertEquals(phoneRecordId, response.phoneRecordId());
         assertEquals("+56922222222", response.phoneNumber());
         assertEquals("123456789012345", response.providerPhoneNumberId());
+        assertEquals("987654321098765", response.wabaId());
         assertTrue(response.credentialReferenceConfigured());
         assertEquals(certifiedAt, response.certifiedAt());
     }
