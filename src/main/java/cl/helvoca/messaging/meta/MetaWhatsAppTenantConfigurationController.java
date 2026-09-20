@@ -13,16 +13,25 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/channels/whatsapp/meta")
 public class MetaWhatsAppTenantConfigurationController {
     private final MetaWhatsAppTenantConfigurationService service;
+    private final MetaWhatsAppTenantHealthService healthService;
 
     public MetaWhatsAppTenantConfigurationController(
-            MetaWhatsAppTenantConfigurationService service) {
+            MetaWhatsAppTenantConfigurationService service,
+            MetaWhatsAppTenantHealthService healthService) {
         this.service = service;
+        this.healthService = healthService;
     }
 
     @GetMapping("/config")
     @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
     public MetaWhatsAppTenantStatusResponse status() {
         return service.status();
+    }
+
+    @GetMapping("/health")
+    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    public MetaWhatsAppTenantHealthResponse health() {
+        return healthService.health();
     }
 
     @PostMapping("/config/deactivate")
