@@ -175,11 +175,11 @@
     focusable[nextIndex].focus({ preventScroll: true });
   }
 
-  function showBookingDrawer() {
+  function showBookingDrawer(opener = null) {
     const backdrop = document.querySelector("#homeBookingDetailBackdrop");
     if (!backdrop) return;
     if (backdrop.classList.contains("hidden")) {
-      bookingDrawerReturnFocus = rememberDrawerOpener(document.activeElement);
+      bookingDrawerReturnFocus = rememberDrawerOpener(opener || document.activeElement);
     }
     backdrop.classList.remove("hidden");
     backdrop.setAttribute("aria-hidden", "false");
@@ -710,7 +710,7 @@
         : `No se encontró una conversación enlazada a ${entityKind === "pedido" ? "este pedido" : "esta reserva"}.`;
     return `<section class="home-detail-section"><h3>Origen</h3><p class="home-detail-muted">${originText}</p></section>`;
   }
-  async function openBookingDetail(id) {
+  async function openBookingDetail(id, opener = null) {
     const booking = state.bookings.find(item => String(item.id) === String(id));
     if (!booking) return;
     const customers = new Map(state.customers.map(x => [String(x.id), x]));
@@ -725,7 +725,7 @@
     body.innerHTML = bookingFacts(booking, customer, service) + renderBookingActions(booking) +
       '<div class="home-detail-loading">Cargando conversación…</div>' + bookingActivityLoading();
     bindBookingActions(booking);
-    showBookingDrawer();
+    showBookingDrawer(opener);
 
     try {
       const context = await api(`/api/v1/bookings/${encodeURIComponent(id)}/context`);
@@ -751,7 +751,7 @@
 
   function bindBookingOpeners() {
     document.querySelectorAll("[data-home-booking-id]").forEach(node => {
-      const open = () => openBookingDetail(node.dataset.homeBookingId);
+      const open = () => openBookingDetail(node.dataset.homeBookingId, node);
       node.addEventListener("click", open);
       node.addEventListener("keydown", event => {
         if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); }
