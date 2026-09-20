@@ -24,7 +24,7 @@ When a `call_session` has an `ended_at` timestamp and a duration, PostgreSQL rec
 
 When an `outbound_message` reaches `SENT`, PostgreSQL records one `OUTBOUND_MESSAGES` event with quantity `1`. A migration baseline imports existing sent messages. No provider price is invented when the application does not know it.
 
-Database triggers are used for these authoritative sources so a future adapter or retry path cannot silently bypass usage capture.
+Database triggers are used for these authoritative sources so a future adapter or retry path cannot silently bypass usage capture. Meta WhatsApp conversational AI replies persisted through `messaging_message` are also recorded as `OUTBOUND_MESSAGES` once Meta accepts the send and a provider message id is durable; later `delivered`/`read` callbacks do not double count.
 
 ## Application API
 
