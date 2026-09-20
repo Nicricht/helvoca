@@ -8,16 +8,19 @@ public class MetaWhatsAppEmbeddedSignupAuthorizationCodeService {
     private final MetaWhatsAppEmbeddedSignupReadinessService readinessService;
     private final MetaWhatsAppEmbeddedSignupTokenExchangeClient tokenExchangeClient;
     private final MetaWhatsAppEmbeddedSignupTokenDebugClient tokenDebugClient;
+    private final MetaWhatsAppEmbeddedSignupSharedWabaClient sharedWabaClient;
     private final MetaWhatsAppProperties metaProperties;
 
     public MetaWhatsAppEmbeddedSignupAuthorizationCodeService(
             MetaWhatsAppEmbeddedSignupReadinessService readinessService,
             MetaWhatsAppEmbeddedSignupTokenExchangeClient tokenExchangeClient,
             MetaWhatsAppEmbeddedSignupTokenDebugClient tokenDebugClient,
+            MetaWhatsAppEmbeddedSignupSharedWabaClient sharedWabaClient,
             MetaWhatsAppProperties metaProperties) {
         this.readinessService = readinessService;
         this.tokenExchangeClient = tokenExchangeClient;
         this.tokenDebugClient = tokenDebugClient;
+        this.sharedWabaClient = sharedWabaClient;
         this.metaProperties = metaProperties;
     }
 
@@ -50,10 +53,17 @@ public class MetaWhatsAppEmbeddedSignupAuthorizationCodeService {
             throw new ConflictException("META_EMBEDDED_SIGNUP_TOKEN_APP_MISMATCH");
         }
 
+        MetaWhatsAppEmbeddedSignupSharedWabaPage sharedWabas =
+                sharedWabaClient.list(
+                        metaProperties.getEmbeddedSignupBusinessId(),
+                        metaProperties.getEmbeddedSignupSystemUserAccessToken());
+
         return new MetaWhatsAppEmbeddedSignupAuthorizationCodeResponse(
                 "AUTHORIZATION_CODE_EXCHANGED_AND_VALIDATED",
                 true,
                 false,
-                false);
+                false,
+                sharedWabas.wabas(),
+                sharedWabas.afterCursor());
     }
 }
