@@ -2,6 +2,7 @@ package cl.helvoca.messaging.meta;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
@@ -21,6 +22,7 @@ public class MetaWhatsAppEmbeddedSignupTokenDebugClient {
     private final MetaWhatsAppProperties properties;
     private final HttpClient http;
 
+    @Autowired
     public MetaWhatsAppEmbeddedSignupTokenDebugClient(MetaWhatsAppProperties properties) {
         this(properties, HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(8))
