@@ -23,6 +23,7 @@ class MetaWhatsAppTenantConfigurationControllerEmbeddedSignupTest {
         var assignment = mock(MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService.class);
         var subscription = mock(MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService.class);
         var phoneDiscovery = mock(MetaWhatsAppEmbeddedSignupSelectedWabaPhoneDiscoveryService.class);
+        var phoneValidation = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
 
         var expected = new MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentResult(
                 "SYSTEM_USER_ASSIGNED",
@@ -39,7 +40,8 @@ class MetaWhatsAppTenantConfigurationControllerEmbeddedSignupTest {
                 authorization,
                 assignment,
                 subscription,
-                phoneDiscovery);
+                phoneDiscovery,
+                phoneValidation);
 
         var actual = controller.assignSystemUserToSelectedWaba(
                 new MetaWhatsAppEmbeddedSignupSelectedWabaRequest(" 1906385232743451 "));
@@ -69,6 +71,7 @@ class MetaWhatsAppTenantConfigurationControllerEmbeddedSignupTest {
         var assignment = mock(MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService.class);
         var subscription = mock(MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService.class);
         var phoneDiscovery = mock(MetaWhatsAppEmbeddedSignupSelectedWabaPhoneDiscoveryService.class);
+        var phoneValidation = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
 
         var expected = new MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionResult(
                 "APP_SUBSCRIBED",
@@ -86,7 +89,8 @@ class MetaWhatsAppTenantConfigurationControllerEmbeddedSignupTest {
                 authorization,
                 assignment,
                 subscription,
-                phoneDiscovery);
+                phoneDiscovery,
+                phoneValidation);
 
         var actual = controller.subscribeAppToSelectedWaba(
                 new MetaWhatsAppEmbeddedSignupSelectedWabaRequest(" 1906385232743451 "));
@@ -118,6 +122,7 @@ class MetaWhatsAppTenantConfigurationControllerEmbeddedSignupTest {
         var assignment = mock(MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService.class);
         var subscription = mock(MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService.class);
         var phoneDiscovery = mock(MetaWhatsAppEmbeddedSignupSelectedWabaPhoneDiscoveryService.class);
+        var phoneValidation = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
 
         var expected = new MetaWhatsAppEmbeddedSignupSelectedWabaPhoneDiscoveryResult(
                 "PHONE_NUMBERS_DISCOVERED",
@@ -140,7 +145,8 @@ class MetaWhatsAppTenantConfigurationControllerEmbeddedSignupTest {
                 authorization,
                 assignment,
                 subscription,
-                phoneDiscovery);
+                phoneDiscovery,
+                phoneValidation);
 
         var actual = controller.discoverSelectedWabaPhoneNumbers(
                 new MetaWhatsAppEmbeddedSignupSelectedWabaRequest(" 1906385232743451 "));
@@ -158,6 +164,65 @@ class MetaWhatsAppTenantConfigurationControllerEmbeddedSignupTest {
 
         PostMapping mapping = endpoint.getAnnotation(PostMapping.class);
         assertEquals("/embedded-signup/waba/phone-numbers", mapping.value()[0]);
+    }
+
+
+    @Test
+    void selectedPhoneValidationEndpointIsAdminOnlyAndDelegatesSelectedIds() throws Exception {
+        var configuration = mock(MetaWhatsAppTenantConfigurationService.class);
+        var health = mock(MetaWhatsAppTenantHealthService.class);
+        var deployment = mock(MetaWhatsAppDeploymentReadinessService.class);
+        var readiness = mock(MetaWhatsAppEmbeddedSignupReadinessService.class);
+        var bootstrap = mock(MetaWhatsAppEmbeddedSignupBootstrapService.class);
+        var authorization = mock(MetaWhatsAppEmbeddedSignupAuthorizationCodeService.class);
+        var assignment = mock(MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService.class);
+        var subscription = mock(MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService.class);
+        var phoneDiscovery = mock(MetaWhatsAppEmbeddedSignupSelectedWabaPhoneDiscoveryService.class);
+        var phoneValidation = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
+
+        var expected = new MetaWhatsAppEmbeddedSignupSelectedPhoneValidationResult(
+                "PHONE_NUMBER_VALIDATED",
+                "1913623884432103",
+                "+56 9 3333 4444",
+                "RecepVoz Demo",
+                "GREEN",
+                "VERIFIED");
+        when(phoneValidation.validate(
+                "1906385232743451",
+                "1913623884432103")).thenReturn(expected);
+
+        var controller = new MetaWhatsAppTenantConfigurationController(
+                configuration,
+                health,
+                deployment,
+                readiness,
+                bootstrap,
+                authorization,
+                assignment,
+                subscription,
+                phoneDiscovery,
+                phoneValidation);
+
+        var actual = controller.validateSelectedWabaPhoneNumber(
+                new MetaWhatsAppEmbeddedSignupSelectedPhoneRequest(
+                        " 1906385232743451 ",
+                        " 1913623884432103 "));
+
+        assertSame(expected, actual);
+        verify(phoneValidation).validate(
+                "1906385232743451",
+                "1913623884432103");
+        verifyNoInteractions(assignment, subscription, phoneDiscovery);
+
+        Method endpoint = MetaWhatsAppTenantConfigurationController.class.getMethod(
+                "validateSelectedWabaPhoneNumber",
+                MetaWhatsAppEmbeddedSignupSelectedPhoneRequest.class);
+
+        PreAuthorize rule = endpoint.getAnnotation(PreAuthorize.class);
+        assertEquals("hasRole('BUSINESS_ADMIN')", rule.value());
+
+        PostMapping mapping = endpoint.getAnnotation(PostMapping.class);
+        assertEquals("/embedded-signup/waba/phone-number/validate", mapping.value()[0]);
     }
 
 }
