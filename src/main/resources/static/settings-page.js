@@ -40,3 +40,94 @@
   }).observe(advanced, { attributes: true, attributeFilter: ["class"] });
   queueMicrotask(apply);
 })();
+
+
+(() => {
+  const dashboard = document.querySelector("#dashboardView");
+  if (!dashboard) return;
+
+  const style = document.createElement("style");
+  style.textContent = `
+    #metaWhatsAppConnect {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,.07);
+    }
+    #metaWhatsAppConnect .meta-whatsapp-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    #metaWhatsAppConnect .meta-whatsapp-copy { min-width: 0; }
+    #metaWhatsAppConnect .meta-whatsapp-copy strong { display: block; font-size: 13px; }
+    #metaWhatsAppConnect .meta-whatsapp-copy span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    #metaWhatsAppConnectMessage {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    @media (max-width: 520px) {
+      #metaWhatsAppConnect .meta-whatsapp-row {
+        align-items: stretch;
+        flex-direction: column;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+
+  let requested = false;
+
+  function renderConnectButton(bootstrap) {
+    if (!bootstrap?.available) return;
+    const panel = document.querySelector("#configPhonePanel");
+    if (!panel || panel.querySelector("#metaWhatsAppConnect")) return;
+
+    const section = document.createElement("section");
+    section.id = "metaWhatsAppConnect";
+    section.innerHTML = `
+      <div class="meta-whatsapp-row">
+        <div class="meta-whatsapp-copy">
+          <strong>WhatsApp</strong>
+          <span>Conecta el WhatsApp Business de tu negocio con Meta.</span>
+        </div>
+        <button id="metaWhatsAppConnectBtn" class="button secondary" type="button">Conectar WhatsApp</button>
+      </div>
+      <div id="metaWhatsAppConnectMessage" class="hidden" role="status"></div>
+    `;
+    panel.appendChild(section);
+
+    const button = section.querySelector("#metaWhatsAppConnectBtn");
+    const message = section.querySelector("#metaWhatsAppConnectMessage");
+    button?.addEventListener("click", () => {
+      message.textContent = "Meta está preparado. El inicio de sesión seguro se habilitará en el siguiente paso.";
+      message.classList.remove("hidden");
+    });
+  }
+
+  async function loadBootstrap() {
+    if (requested || dashboard.classList.contains("hidden")) return;
+    if (!sessionStorage.getItem("helvoca_access_token")) return;
+    requested = true;
+    try {
+      const bootstrap = await api("/api/v1/channels/whatsapp/meta/embedded-signup/bootstrap");
+      renderConnectButton(bootstrap);
+    } catch (error) {
+      if (error?.status === 401) return;
+      // Fail closed: no button is rendered when bootstrap cannot be verified.
+    }
+  }
+
+  new MutationObserver(loadBootstrap).observe(dashboard, {
+    attributes: true,
+    attributeFilter: ["class"]
+  });
+  queueMicrotask(loadBootstrap);
+})();
