@@ -27,6 +27,7 @@ public class MetaWhatsAppEmbeddedSignupSelectedWabaPhoneDiscoveryService {
             throw new ConflictException("META_EMBEDDED_SIGNUP_APP_NOT_SUBSCRIBED");
         }
 
+        // Discovery is read-only here: selection, registration and persistence happen later.
         MetaWhatsAppEmbeddedSignupPhoneNumberPage phonePage =
                 phoneNumberClient.list(
                         wabaId,
