@@ -46,6 +46,15 @@ Before staging a real tenant in Helvoca, the Meta side must already provide:
 
 Meta's current developer documentation states that a business phone number must be registered before it can send and receive via Cloud API.
 
+### App permissions verified for WhatsApp app review
+
+Meta's current sample App Review submission for WhatsApp Business Platform explicitly requires both of these permissions:
+
+- `whatsapp_business_messaging`
+- `whatsapp_business_management`
+
+Do not add broader permissions to the pilot app unless a current Meta flow explicitly requires them. In particular, this runbook does not currently treat `business_management` as a verified pilot requirement.
+
 ## Secrets and identifiers
 
 Never commit these values to Git:
