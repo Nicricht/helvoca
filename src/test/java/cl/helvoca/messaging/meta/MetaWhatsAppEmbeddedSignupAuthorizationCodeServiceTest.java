@@ -155,6 +155,38 @@ class MetaWhatsAppEmbeddedSignupAuthorizationCodeServiceTest {
         verifyNoInteractions(sharedWabas);
     }
 
+    @Test
+    void rejectsTokenWithoutWhatsAppBusinessManagementScopeBeforeWabaDiscovery() {
+        MetaWhatsAppProperties meta = readyProperties();
+        var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
+        var exchange = mock(MetaWhatsAppEmbeddedSignupTokenExchangeClient.class);
+        var debug = mock(MetaWhatsAppEmbeddedSignupTokenDebugClient.class);
+        var sharedWabas = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
+
+        when(exchange.exchange("temporary-code"))
+                .thenReturn(new MetaWhatsAppEmbeddedSignupToken("oauth-token", "bearer", 3600L));
+        when(debug.debug("oauth-token", "system-user-secret"))
+                .thenReturn(new MetaWhatsAppEmbeddedSignupTokenDebugResult(
+                        true,
+                        "123456789",
+                        "USER",
+                        1790000000L,
+                        1800000000L,
+                        List.of("business_management", "public_profile"),
+                        List.of()));
+
+        var service = new MetaWhatsAppEmbeddedSignupAuthorizationCodeService(
+                readiness, exchange, debug, sharedWabas, meta);
+
+        ConflictException error = assertThrows(
+                ConflictException.class,
+                () -> service.accept(
+                        new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("temporary-code")));
+
+        assertEquals("META_EMBEDDED_SIGNUP_REQUIRED_SCOPE_MISSING", error.getMessage());
+        verifyNoInteractions(sharedWabas);
+    }
+
     private static MetaWhatsAppProperties readyProperties() {
         MetaWhatsAppProperties meta = new MetaWhatsAppProperties();
         meta.setEmbeddedSignupEnabled(true);
