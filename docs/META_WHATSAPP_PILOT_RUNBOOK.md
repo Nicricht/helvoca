@@ -55,6 +55,27 @@ Meta's current sample App Review submission for WhatsApp Business Platform expli
 
 Do not add broader permissions to the pilot app unless a current Meta flow explicitly requires them. In particular, this runbook does not currently treat `business_management` as a verified pilot requirement.
 
+### Business phone registration requirements
+
+Before the pilot number can be used by Cloud API:
+
+1. Verify ownership of the business phone number using the SMS or voice verification flow provided by Meta.
+2. Obtain the Meta `phone_number_id` for the number. Meta exposes this identifier from the WABA phone-numbers collection.
+3. Register the number with Cloud API using:
+
+```
+POST /<phone_number_id>/register
+```
+
+with:
+- `messaging_product` set to `whatsapp`,
+- a 6-digit registration PIN chosen for two-step verification,
+- an access token authorized for WhatsApp messaging.
+
+Meta requires two-step verification as part of Cloud API registration.
+
+For numbers onboarded through Embedded Signup, registration must be completed within 14 days of finishing the Embedded Signup flow. If that window expires, Meta requires the Embedded Signup flow to be completed again before registration.
+
 ## Secrets and identifiers
 
 Never commit these values to Git:
