@@ -323,4 +323,97 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         verify(phones, never()).save(any());
     }
 
+    @Test
+    void deactivateDisablesTenantWithoutDeletingConfiguration() {
+        UUID businessId = UUID.randomUUID();
+        MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+
+        MetaWhatsAppTenantConfig config = new MetaWhatsAppTenantConfig();
+        config.setBusinessId(businessId);
+        config.setCredentialRef("ACME_01");
+        config.setEnabled(true);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(configs.findById(businessId)).thenReturn(Optional.of(config));
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of(phone));
+        when(phone.getWhatsappProvider()).thenReturn("META_WHATSAPP_CLOUD");
+        when(phone.getWhatsappExternalId()).thenReturn("123456789012345");
+        when(phone.isWhatsappEnabled()).thenReturn(true);
+
+        var service = new MetaWhatsAppTenantConfigurationService(configs, phones, tenantProvider);
+        var response = service.deactivate();
+
+        assertFalse(config.isEnabled());
+        verify(configs).save(config);
+        verify(phone).setWhatsappEnabled(false);
+        verify(phones).save(phone);
+        assertEquals("CONFIGURED_DISABLED", response.status());
+        assertTrue(response.configured());
+        assertFalse(response.enabled());
+
+        verify(configs, never()).delete(any());
+        verify(phones, never()).delete(any());
+    }
+
+    @Test
+    void deactivateIsIdempotentWhenNothingIsConfigured() {
+        UUID businessId = UUID.randomUUID();
+        MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(configs.findById(businessId)).thenReturn(Optional.empty());
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of());
+
+        var service = new MetaWhatsAppTenantConfigurationService(configs, phones, tenantProvider);
+        var response = service.deactivate();
+
+        assertEquals("NOT_CONFIGURED", response.status());
+        assertFalse(response.configured());
+        assertFalse(response.enabled());
+        verify(configs, never()).save(any());
+        verify(phones, never()).save(any());
+    }
+
+    @Test
+    void deactivateFailsClosedByDisablingEveryMetaPhoneWhenConfigurationIsAmbiguous() {
+        UUID businessId = UUID.randomUUID();
+        MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        PhoneNumber first = mock(PhoneNumber.class);
+        PhoneNumber second = mock(PhoneNumber.class);
+
+        MetaWhatsAppTenantConfig config = new MetaWhatsAppTenantConfig();
+        config.setBusinessId(businessId);
+        config.setCredentialRef("ACME_01");
+        config.setEnabled(true);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(configs.findById(businessId)).thenReturn(Optional.of(config));
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of(first, second));
+        when(first.getWhatsappProvider()).thenReturn("META_WHATSAPP_CLOUD");
+        when(second.getWhatsappProvider()).thenReturn("META_WHATSAPP_CLOUD");
+        when(first.getWhatsappExternalId()).thenReturn("1111111111");
+        when(second.getWhatsappExternalId()).thenReturn("2222222222");
+        when(first.isWhatsappEnabled()).thenReturn(true);
+        when(second.isWhatsappEnabled()).thenReturn(true);
+
+        var service = new MetaWhatsAppTenantConfigurationService(configs, phones, tenantProvider);
+        var response = service.deactivate();
+
+        assertFalse(config.isEnabled());
+        verify(first).setWhatsappEnabled(false);
+        verify(second).setWhatsappEnabled(false);
+        verify(phones).save(first);
+        verify(phones).save(second);
+        assertEquals("INCOMPLETE", response.status());
+        assertFalse(response.configured());
+        assertFalse(response.enabled());
+    }
+
 }

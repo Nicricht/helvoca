@@ -25,6 +25,12 @@ public class MetaWhatsAppTenantConfigurationController {
         return service.status();
     }
 
+    @PostMapping("/config/deactivate")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public MetaWhatsAppTenantStatusResponse deactivate() {
+        return service.deactivate();
+    }
+
     @PostMapping("/config/activate")
     @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public MetaWhatsAppTenantStatusResponse activate() {
