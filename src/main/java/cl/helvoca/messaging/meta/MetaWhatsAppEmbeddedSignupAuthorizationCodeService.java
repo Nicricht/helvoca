@@ -6,10 +6,19 @@ import org.springframework.stereotype.Service;
 @Service
 public class MetaWhatsAppEmbeddedSignupAuthorizationCodeService {
     private final MetaWhatsAppEmbeddedSignupReadinessService readinessService;
+    private final MetaWhatsAppEmbeddedSignupTokenExchangeClient tokenExchangeClient;
+    private final MetaWhatsAppEmbeddedSignupTokenDebugClient tokenDebugClient;
+    private final MetaWhatsAppProperties metaProperties;
 
     public MetaWhatsAppEmbeddedSignupAuthorizationCodeService(
-            MetaWhatsAppEmbeddedSignupReadinessService readinessService) {
+            MetaWhatsAppEmbeddedSignupReadinessService readinessService,
+            MetaWhatsAppEmbeddedSignupTokenExchangeClient tokenExchangeClient,
+            MetaWhatsAppEmbeddedSignupTokenDebugClient tokenDebugClient,
+            MetaWhatsAppProperties metaProperties) {
         this.readinessService = readinessService;
+        this.tokenExchangeClient = tokenExchangeClient;
+        this.tokenDebugClient = tokenDebugClient;
+        this.metaProperties = metaProperties;
     }
 
     public MetaWhatsAppEmbeddedSignupAuthorizationCodeResponse accept(
@@ -18,16 +27,33 @@ public class MetaWhatsAppEmbeddedSignupAuthorizationCodeService {
             throw new ConflictException("META_EMBEDDED_SIGNUP_NOT_READY");
         }
 
-        // The authorization code is intentionally not logged or persisted here.
-        // A later isolated step will exchange it server-side with Meta.
         if (request == null || request.code() == null || request.code().isBlank()) {
             throw new IllegalArgumentException("Meta authorization code is required");
         }
 
+        // The authorization code and resulting OAuth token only live in memory for this request.
+        // Neither value is logged, returned to the browser, or persisted.
+        MetaWhatsAppEmbeddedSignupToken token =
+                tokenExchangeClient.exchange(request.code());
+
+        MetaWhatsAppEmbeddedSignupTokenDebugResult debug =
+                tokenDebugClient.debug(
+                        token.accessToken(),
+                        metaProperties.getEmbeddedSignupSystemUserAccessToken());
+
+        if (!debug.valid()) {
+            throw new ConflictException("META_EMBEDDED_SIGNUP_TOKEN_INVALID");
+        }
+
+        if (debug.appId() == null
+                || !metaProperties.getEmbeddedSignupAppId().equals(debug.appId())) {
+            throw new ConflictException("META_EMBEDDED_SIGNUP_TOKEN_APP_MISMATCH");
+        }
+
         return new MetaWhatsAppEmbeddedSignupAuthorizationCodeResponse(
-                "AUTHORIZATION_CODE_HANDOFF_VALIDATED",
+                "AUTHORIZATION_CODE_EXCHANGED_AND_VALIDATED",
                 true,
                 false,
-                true);
+                false);
     }
 }
