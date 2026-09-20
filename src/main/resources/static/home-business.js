@@ -149,16 +149,29 @@
         ? document.querySelector('[data-home-tab="customers"]')
         : document.querySelector('[data-home-tab="bookings"]');
 
-    // A booking reschedule re-renders the table while the drawer is still open.
-    // Focus can be accepted synchronously and then be stolen by a pending layout
-    // or mutation callback. Re-verify it across two frames before falling back.
-    restore();
+    const backdrop = document.querySelector("#homeBookingDetailBackdrop");
+    const focusNeedsRepair = () => {
+      const active = document.activeElement;
+      if (!active || active === document.body || active === document.documentElement) return true;
+      if (active === fallbackTab) return true;
+      return Boolean(backdrop?.contains(active));
+    };
+
+    const repairFocus = () => {
+      if (!focusNeedsRepair()) return;
+      if (restore()) return;
+      focusTarget(fallbackTab);
+    };
+
+    // Re-renders can replace the original opener while the drawer is open.
+    // Some browser/layout callbacks can also steal focus one frame later.
+    // Repair once immediately, once on the next frame, and once after that
+    // frame's callbacks have drained. Stop repairing if the user intentionally
+    // moved focus somewhere else.
+    repairFocus();
     requestAnimationFrame(() => {
-      restore();
-      requestAnimationFrame(() => {
-        if (restore()) return;
-        focusTarget(fallbackTab);
-      });
+      repairFocus();
+      setTimeout(repairFocus, 0);
     });
   }
 
