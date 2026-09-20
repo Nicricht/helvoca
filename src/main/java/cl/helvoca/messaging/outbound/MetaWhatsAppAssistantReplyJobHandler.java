@@ -9,6 +9,7 @@ import cl.helvoca.messaging.MessagingMessageRepository;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Component
@@ -59,6 +60,13 @@ public class MetaWhatsAppAssistantReplyJobHandler implements PersistentJobHandle
             throw new PermanentJobException("Meta AI reply idempotency key does not match source message");
         }
 
+        if (MetaWhatsAppMessagingProvider.ID.equals(inbound.getProvider())
+                && inbound.getProviderMessageId() != null
+                && !inbound.getProviderMessageId().isBlank()
+                && isAccepted(inbound.getProviderDeliveryStatus())) {
+            return;
+        }
+
         MessagingConversation conversation = conversations
                 .findByIdAndBusinessId(inbound.getConversationId(), job.businessId())
                 .orElseThrow(() -> new PermanentJobException("Meta AI reply conversation was not found for tenant"));
@@ -88,6 +96,15 @@ public class MetaWhatsAppAssistantReplyJobHandler implements PersistentJobHandle
                     || result.providerMessageId().isBlank()) {
                 throw new RetryableJobException("Meta WhatsApp did not confirm the AI reply message id");
             }
+
+            Instant now = Instant.now();
+            inbound.setProvider(MetaWhatsAppMessagingProvider.ID);
+            inbound.setProviderMessageId(result.providerMessageId().trim());
+            inbound.setProviderDeliveryStatus("SENT");
+            inbound.setFailureCode(null);
+            inbound.setSentAt(now);
+            inbound.setDeliveryUpdatedAt(now);
+            messages.saveAndFlush(inbound);
         } catch (RetryableJobException e) {
             throw e;
         } catch (IllegalArgumentException e) {
@@ -95,6 +112,10 @@ public class MetaWhatsAppAssistantReplyJobHandler implements PersistentJobHandle
         } catch (RuntimeException e) {
             throw new RetryableJobException("Meta WhatsApp AI reply dispatch failed", e);
         }
+    }
+
+    private static boolean isAccepted(String status) {
+        return "SENT".equals(status) || "DELIVERED".equals(status) || "READ".equals(status);
     }
 
     private static UUID messageId(PersistentJob job) {
