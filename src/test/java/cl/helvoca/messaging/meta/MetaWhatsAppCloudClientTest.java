@@ -83,7 +83,6 @@ class MetaWhatsAppCloudClientTest {
         @SuppressWarnings("unchecked")
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(400);
-        when(response.body()).thenReturn("{\"error\":{\"message\":\"sensitive provider details\"}}");
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
 
         MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
