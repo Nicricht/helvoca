@@ -19,6 +19,7 @@ public class MetaWhatsAppEmbeddedSignupReadinessService {
         boolean enabled = metaProperties.isEmbeddedSignupEnabled();
         boolean appIdConfigured = metaProperties.hasEmbeddedSignupAppId();
         boolean configIdConfigured = metaProperties.hasEmbeddedSignupConfigId();
+        boolean systemUserAccessTokenConfigured = metaProperties.hasEmbeddedSignupSystemUserAccessToken();
         boolean appSecretConfigured = metaProperties.hasAppSecret();
         boolean verifyTokenConfigured = metaProperties.hasVerifyToken();
         boolean webhookValidationEnabled = metaProperties.isWebhookValidationEnabled();
@@ -37,6 +38,11 @@ public class MetaWhatsAppEmbeddedSignupReadinessService {
             blockers.add(blocker(
                     "CONFIG_ID_MISSING",
                     "Meta Embedded Signup configuration_id is not configured."));
+        }
+        if (!systemUserAccessTokenConfigured) {
+            blockers.add(blocker(
+                    "SYSTEM_USER_ACCESS_TOKEN_MISSING",
+                    "Meta Embedded Signup system user access token is not configured."));
         }
         if (!appSecretConfigured) {
             blockers.add(blocker(
