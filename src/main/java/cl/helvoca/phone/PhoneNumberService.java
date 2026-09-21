@@ -1,23 +1,35 @@
 package cl.helvoca.phone;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 public class PhoneNumberService {
     private final PhoneNumberRepository repository;
     private final TenantProvider tenantProvider;
+    private final AuditService auditService;
 
+    @Autowired
     public PhoneNumberService(PhoneNumberRepository repository,
-                              TenantProvider tenantProvider) {
+                              TenantProvider tenantProvider,
+                              AuditService auditService) {
         this.repository = repository;
         this.tenantProvider = tenantProvider;
+        this.auditService = auditService;
+    }
+
+    PhoneNumberService(PhoneNumberRepository repository,
+                       TenantProvider tenantProvider) {
+        this(repository, tenantProvider, null);
     }
 
     @Transactional(readOnly = true)
@@ -90,9 +102,28 @@ public class PhoneNumberService {
             }
         }
 
+        boolean wasCertified = phone.getWhatsappCertifiedAt() != null;
+        boolean wasEnabled = phone.isWhatsappEnabled();
+
         phone.setWhatsappEnabled(enabled);
         if (!enabled) phone.setWhatsappCertifiedAt(null);
-        return PhoneNumberResponse.from(repository.save(phone));
+        PhoneNumber saved = repository.save(phone);
+
+        if (!enabled && wasCertified && auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "WHATSAPP_CERTIFICATION_CLEARED",
+                    "WHATSAPP_SENDER",
+                    businessId,
+                    Map.of(
+                            "whatsappEnabled", wasEnabled,
+                            "certified", true),
+                    Map.of(
+                            "whatsappEnabled", false,
+                            "certified", false));
+        }
+
+        return PhoneNumberResponse.from(saved);
     }
 
     @Transactional
