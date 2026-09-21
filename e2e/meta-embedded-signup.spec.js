@@ -10,6 +10,7 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   const authorizationBodies = [];
   const phoneDiscoveryBodies = [];
   const phoneValidationBodies = [];
+  const phoneRegistrationBodies = [];
   const unexpectedEmbeddedSignupRequests = [];
 
   page.on('request', request => {
@@ -19,7 +20,8 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
       `${embeddedSignupPrefix}bootstrap`,
       `${embeddedSignupPrefix}authorization-code`,
       `${embeddedSignupPrefix}waba/phone-numbers`,
-      `${embeddedSignupPrefix}waba/phone-number/validate`
+      `${embeddedSignupPrefix}waba/phone-number/validate`,
+      `${embeddedSignupPrefix}waba/phone-number/register`
     ]);
     if (pathname.startsWith(embeddedSignupPrefix) && !allowed.has(pathname)) {
       unexpectedEmbeddedSignupRequests.push(pathname);
@@ -81,6 +83,18 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
       verifiedName: 'RecepVoz Sucursal',
       qualityRating: 'YELLOW',
       codeVerificationStatus: 'NOT_VERIFIED'
+    }));
+  });
+
+  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/waba/phone-number/register', async route => {
+    const body = route.request().postDataJSON();
+    phoneRegistrationBodies.push(body);
+    await route.fulfill(json({
+      state: 'PHONE_NUMBER_REGISTERED',
+      phoneNumberId: body.phoneNumberId,
+      displayPhoneNumber: '+56 9 3333 4444',
+      verifiedName: 'RecepVoz Sucursal',
+      registered: true
     }));
   });
 
@@ -274,18 +288,37 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(page.locator('#metaWhatsAppPinStatus'))
     .toHaveText('El PIN debe tener exactamente 6 dígitos.');
 
+  const registerPhoneButton = page.getByRole('button', { name: 'Registrar número', exact: true });
+  await expect(registerPhoneButton).toBeDisabled();
+  await expect.poll(() => phoneRegistrationBodies).toEqual([]);
+
   await pinInput.fill('123456');
   await expect(pinInput).toHaveValue('123456');
   await expect(page.locator('#metaWhatsAppPinStatus'))
-    .toHaveText('PIN listo para el siguiente paso.');
+    .toHaveText('PIN listo para registrar este número.');
+  await expect(registerPhoneButton).toBeEnabled();
 
-  await pinInput.fill('12345');
+  await registerPhoneButton.click();
+
+  await expect.poll(() => phoneRegistrationBodies).toEqual([{
+    wabaId: '1906385232743452',
+    phoneNumberId: '12025550124',
+    pin: '123456'
+  }]);
   await expect(page.locator('#metaWhatsAppPinStatus'))
-    .toHaveText('El PIN debe tener exactamente 6 dígitos.');
+    .toHaveText('Número registrado en Meta. PIN eliminado del formulario.');
+  await expect(pinInput).toHaveValue('');
+  await expect(pinInput).toBeDisabled();
+  await expect(registerPhoneButton).toBeDisabled();
 
   await expect.poll(() => phoneValidationBodies).toEqual([{
     wabaId: '1906385232743452',
     phoneNumberId: '12025550124'
+  }]);
+  await expect.poll(() => phoneRegistrationBodies).toEqual([{
+    wabaId: '1906385232743452',
+    phoneNumberId: '12025550124',
+    pin: '123456'
   }]);
   await expect.poll(() => phoneDiscoveryBodies).toEqual([{ wabaId: '1906385232743452' }]);
   await expect.poll(() => unexpectedEmbeddedSignupRequests).toEqual([]);

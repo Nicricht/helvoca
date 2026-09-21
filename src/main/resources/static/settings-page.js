@@ -205,6 +205,7 @@
   let facebookSdkPromise = null;
   let selectedPhoneDiscovery = null;
   let selectedPhoneValidation = null;
+  let selectedPhoneRegistration = null;
 
   function initFacebookSdk(bootstrap) {
     if (!window.FB?.init) throw new Error("Facebook SDK unavailable");
@@ -451,7 +452,8 @@
           spellcheck="false"
           aria-describedby="metaWhatsAppPinHelp metaWhatsAppPinStatus"
         />
-        <span id="metaWhatsAppPinHelp">Ingresa exactamente 6 dígitos. El PIN no se guarda ni se envía todavía.</span>
+        <span id="metaWhatsAppPinHelp">Ingresa exactamente 6 dígitos. El PIN se usa solo para registrar este número y luego se elimina del formulario.</span>
+        <button id="metaWhatsAppRegisterPhoneBtn" class="button secondary" type="button" disabled>Registrar número</button>
         <span id="metaWhatsAppPinStatus" role="status"></span>
       </div>
     `;
@@ -469,10 +471,16 @@
     const phoneConfirmStatus = section.querySelector("#metaWhatsAppPhoneConfirmStatus");
     const pinSetup = section.querySelector("#metaWhatsAppPinSetup");
     const pinInput = section.querySelector("#metaWhatsAppPinInput");
+    const registerPhoneButton = section.querySelector("#metaWhatsAppRegisterPhoneBtn");
     const pinStatus = section.querySelector("#metaWhatsAppPinStatus");
 
     function resetPinSetup() {
-      if (pinInput) pinInput.value = "";
+      selectedPhoneRegistration = null;
+      if (pinInput) {
+        pinInput.value = "";
+        pinInput.disabled = false;
+      }
+      if (registerPhoneButton) registerPhoneButton.disabled = true;
       if (pinStatus) pinStatus.textContent = "";
       pinSetup?.classList.add("hidden");
     }
@@ -480,6 +488,7 @@
     wabaCandidates?.addEventListener("meta-waba-selected", () => {
       selectedPhoneDiscovery = null;
       selectedPhoneValidation = null;
+      selectedPhoneRegistration = null;
       resetPinSetup();
       renderPhoneCandidates(null, phoneCandidates);
       phoneConfirm?.classList.add("hidden");
@@ -491,6 +500,7 @@
 
     phoneCandidates?.addEventListener("meta-phone-selected", () => {
       selectedPhoneValidation = null;
+      selectedPhoneRegistration = null;
       resetPinSetup();
       if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
       phoneConfirm?.classList.remove("hidden");
@@ -515,12 +525,15 @@
           throw new Error("Meta phone validation response mismatch");
         }
         selectedPhoneValidation = validation;
+        selectedPhoneRegistration = null;
         if (phoneConfirmStatus) phoneConfirmStatus.textContent = "Número validado por Meta.";
+        if (pinInput) pinInput.disabled = false;
         if (pinStatus) pinStatus.textContent = "";
         pinSetup?.classList.remove("hidden");
         pinInput?.focus();
       } catch (error) {
         selectedPhoneValidation = null;
+        selectedPhoneRegistration = null;
         resetPinSetup();
         if (phoneConfirmStatus) {
           phoneConfirmStatus.textContent = "No fue posible validar este número. Intenta nuevamente.";
@@ -533,12 +546,59 @@
     pinInput?.addEventListener("input", () => {
       const digitsOnly = pinInput.value.replace(/\D/g, "").slice(0, 6);
       if (pinInput.value !== digitsOnly) pinInput.value = digitsOnly;
+      const valid = /^[0-9]{6}$/.test(digitsOnly);
+      const canRegister = valid && selectedPhoneRegistration === null;
+      if (registerPhoneButton) registerPhoneButton.disabled = !canRegister;
       if (pinStatus) {
-        pinStatus.textContent = digitsOnly.length === 6
-          ? "PIN listo para el siguiente paso."
+        pinStatus.textContent = selectedPhoneRegistration
+          ? "Número ya registrado en Meta."
+          : valid
+            ? "PIN listo para registrar este número."
           : digitsOnly.length
             ? "El PIN debe tener exactamente 6 dígitos."
             : "";
+      }
+    });
+
+    registerPhoneButton?.addEventListener("click", async () => {
+      const selectedWabaCard = wabaCandidates?.querySelector('.meta-whatsapp-waba-card[data-selected="true"]');
+      const selectedPhoneCard = phoneCandidates?.querySelector('.meta-whatsapp-phone-card[data-selected="true"]');
+      const wabaId = selectedWabaCard?.dataset.wabaId;
+      const phoneNumberId = selectedPhoneCard?.dataset.phoneNumberId;
+      const pin = pinInput?.value || "";
+
+      if (!wabaId || !phoneNumberId || !/^[0-9]{6}$/.test(pin)) return;
+      if (selectedPhoneValidation?.state !== "PHONE_NUMBER_VALIDATED"
+          || String(selectedPhoneValidation?.phoneNumberId || "") !== phoneNumberId) {
+        if (pinStatus) pinStatus.textContent = "Vuelve a validar el número antes de registrarlo.";
+        return;
+      }
+
+      registerPhoneButton.disabled = true;
+      if (pinStatus) pinStatus.textContent = "Registrando número con Meta…";
+      try {
+        const registration = await api("/api/v1/channels/whatsapp/meta/embedded-signup/waba/phone-number/register", {
+          method: "POST",
+          body: JSON.stringify({ wabaId, phoneNumberId, pin })
+        });
+        if (registration?.state !== "PHONE_NUMBER_REGISTERED"
+            || registration?.registered !== true
+            || String(registration?.phoneNumberId || "") !== phoneNumberId) {
+          throw new Error("Meta phone registration response mismatch");
+        }
+        selectedPhoneRegistration = registration;
+        if (pinInput) {
+          pinInput.value = "";
+          pinInput.disabled = true;
+        }
+        if (pinStatus) pinStatus.textContent = "Número registrado en Meta. PIN eliminado del formulario.";
+      } catch (error) {
+        selectedPhoneRegistration = null;
+        if (pinStatus) pinStatus.textContent = "No fue posible registrar el número. Revisa el PIN e intenta nuevamente.";
+      } finally {
+        const retryAllowed = selectedPhoneRegistration === null
+          && /^[0-9]{6}$/.test(pinInput?.value || "");
+        registerPhoneButton.disabled = !retryAllowed;
       }
     });
 
@@ -555,6 +615,7 @@
           body: JSON.stringify({ wabaId })
         });
         selectedPhoneValidation = null;
+        selectedPhoneRegistration = null;
         resetPinSetup();
         phoneConfirm?.classList.add("hidden");
         if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
@@ -565,6 +626,7 @@
       } catch (error) {
         selectedPhoneDiscovery = null;
         selectedPhoneValidation = null;
+        selectedPhoneRegistration = null;
         resetPinSetup();
         renderPhoneCandidates(null, phoneCandidates);
         phoneConfirm?.classList.add("hidden");
@@ -591,6 +653,7 @@
         renderWabaCandidates(null, wabaCandidates);
         selectedPhoneDiscovery = null;
         selectedPhoneValidation = null;
+        selectedPhoneRegistration = null;
         resetPinSetup();
         renderPhoneCandidates(null, phoneCandidates);
         phoneConfirm?.classList.add("hidden");
