@@ -25,6 +25,7 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
         PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService audit = mock(AuditService.class);
 
         PhoneNumber phone = new PhoneNumber();
         phone.setBusinessId(businessId);
@@ -38,7 +39,8 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         when(phones.findByIdAndBusinessId(phoneRecordId, businessId)).thenReturn(Optional.of(phone));
         when(configs.findById(businessId)).thenReturn(Optional.empty());
 
-        var service = new MetaWhatsAppTenantConfigurationService(configs, phones, tenantProvider);
+        var service = new MetaWhatsAppTenantConfigurationService(
+                configs, phones, tenantProvider, credentialRef -> false, null, null, audit);
         var response = service.replace(new MetaWhatsAppTenantConfigurationRequest(
                 phoneRecordId,
                 "meta_whatsapp_cloud",
@@ -63,6 +65,19 @@ class MetaWhatsAppTenantConfigurationServiceTest {
                         && !config.isEnabled()
                         && "ACME_01".equals(config.getCredentialRef())
                         && "987654321098765".equals(config.getWabaId())));
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("META_WHATSAPP_CONFIG_REPLACE"),
+                eq("META_WHATSAPP_CONFIG"),
+                eq(businessId),
+                eq(Map.of(
+                        "provider", "META_WHATSAPP_CLOUD",
+                        "configured", false,
+                        "enabled", false)),
+                eq(Map.of(
+                        "provider", "META_WHATSAPP_CLOUD",
+                        "configured", true,
+                        "enabled", false)));
     }
 
     @Test
