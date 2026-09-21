@@ -1,7 +1,12 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.ConflictException;
+import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -10,9 +15,13 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
 
     @Test
     void registersOnlyAfterSelectedPhoneWasValidatedAgainstWaba() {
+        UUID businessId = UUID.randomUUID();
         var validation = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
         var registration = mock(MetaWhatsAppEmbeddedSignupRegisterPhoneClient.class);
+        var tenantProvider = mock(TenantProvider.class);
+        var audit = mock(AuditService.class);
         MetaWhatsAppProperties meta = readyProperties();
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
 
         when(validation.validate("1906385232743451", "1913623884432103"))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSelectedPhoneValidationResult(
@@ -31,7 +40,9 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
         var service = new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService(
                 validation,
                 registration,
-                meta);
+                meta,
+                tenantProvider,
+                audit);
 
         var result = service.register(
                 "1906385232743451",
@@ -54,6 +65,15 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
                 "1913623884432103",
                 "system-user-secret",
                 "123456");
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("META_WHATSAPP_PHONE_REGISTERED"),
+                eq("META_WHATSAPP_CONFIG"),
+                eq(businessId),
+                isNull(),
+                eq(Map.of(
+                        "phoneRegistered", true,
+                        "phoneValidated", true)));
     }
 
     @Test
@@ -84,6 +104,8 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
     void failsClosedWhenMetaDoesNotConfirmRegistration() {
         var validation = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
         var registration = mock(MetaWhatsAppEmbeddedSignupRegisterPhoneClient.class);
+        var tenantProvider = mock(TenantProvider.class);
+        var audit = mock(AuditService.class);
         MetaWhatsAppProperties meta = readyProperties();
 
         when(validation.validate("1906385232743451", "1913623884432103"))
@@ -103,7 +125,9 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
         var service = new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService(
                 validation,
                 registration,
-                meta);
+                meta,
+                tenantProvider,
+                audit);
 
         ConflictException error = assertThrows(
                 ConflictException.class,
@@ -115,6 +139,7 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
         assertEquals(
                 "META_EMBEDDED_SIGNUP_PHONE_REGISTRATION_FAILED",
                 error.getMessage());
+        verifyNoInteractions(audit);
     }
 
     private static MetaWhatsAppProperties readyProperties() {
