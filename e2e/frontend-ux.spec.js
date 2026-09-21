@@ -3,7 +3,10 @@ const { test, expect } = require('@playwright/test');
 const json = body => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 
 async function mockReadyTenant(page) {
-  await page.route('**/api/v1/auth/me', route => route.fulfill(json({ email: 'admin@demo.cl' })));
+  await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+    email: 'admin@demo.cl',
+    roles: ['BUSINESS_ADMIN']
+  })));
   await page.route('**/api/v1/business', route => route.fulfill(json({
     name: 'Negocio E2E', timezone: 'America/Santiago', language: 'es', humanTransferPhone: null
   })));

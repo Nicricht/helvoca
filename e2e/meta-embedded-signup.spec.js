@@ -504,6 +504,7 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
     .toContainText('Este negocio está habilitado para Meta.');
   await expect(enabledActivateButton).toHaveClass(/hidden/);
   await expect(deactivateButton).toHaveClass(/hidden/);
+  await expect(page.locator('#metaWhatsAppConnectBtn')).toHaveClass(/hidden/);
   await expect.poll(() => activationRequests).toBe(1);
   await expect.poll(() => deactivationRequests).toBe(0);
 
@@ -535,6 +536,7 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect.poll(() => tenantConfigRequests).toBe(6);
   await expect(page.locator('#metaWhatsAppActivateBtn')).toHaveClass(/hidden/);
   await expect(page.locator('#metaWhatsAppDeactivateBtn')).toHaveClass(/hidden/);
+  await expect(page.locator('#metaWhatsAppConnectBtn')).toHaveClass(/hidden/);
   await expect.poll(() => activationRequests).toBe(1);
   await expect.poll(() => deactivationRequests).toBe(1);
 });
