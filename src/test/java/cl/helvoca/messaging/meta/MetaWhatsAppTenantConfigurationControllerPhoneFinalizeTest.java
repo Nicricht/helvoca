@@ -30,7 +30,6 @@ class MetaWhatsAppTenantConfigurationControllerPhoneFinalizeTest {
         when(staging.registerAndStage(
                 "1906385232743451",
                 "1913623884432103",
-                "TENANT_01",
                 registrationCode)).thenReturn(expected);
 
         var controller = new MetaWhatsAppTenantConfigurationController(
@@ -50,7 +49,6 @@ class MetaWhatsAppTenantConfigurationControllerPhoneFinalizeTest {
         var request = new MetaWhatsAppEmbeddedSignupPhoneFinalizeRequest(
                 "1906385232743451",
                 "1913623884432103",
-                "TENANT_01",
                 registrationCode);
 
         var actual = controller.finalizeSelectedWabaPhoneNumber(request);
@@ -60,7 +58,6 @@ class MetaWhatsAppTenantConfigurationControllerPhoneFinalizeTest {
         verify(staging).registerAndStage(
                 "1906385232743451",
                 "1913623884432103",
-                "TENANT_01",
                 registrationCode);
 
         Method endpoint = MetaWhatsAppTenantConfigurationController.class.getMethod(
