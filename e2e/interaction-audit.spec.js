@@ -74,3 +74,14 @@ test('static interaction markup has unique targets and complete controls', async
 
   expect(failures, failures.join('\n')).toEqual([]);
 });
+
+test('Meta state handlers fail closed before privileged actions', async () => {
+  const settings = fs.readFileSync(path.join(staticDir, 'settings-page.js'), 'utf8');
+
+  expect(settings).toMatch(
+    /activationButton\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
+  );
+  expect(settings).toMatch(
+    /deactivationButton\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
+  );
+});
