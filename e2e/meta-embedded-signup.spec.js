@@ -265,7 +265,9 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
 
   const pinSetup = page.locator('#metaWhatsAppPinSetup');
   const pinInput = page.getByLabel('PIN de Meta', { exact: true });
+  const preparedState = page.locator('#metaWhatsAppPreparedState');
   await expect(pinSetup).toHaveClass(/hidden/);
+  await expect(preparedState).toHaveClass(/hidden/);
 
   const phoneConfirmButton = page.getByRole('button', { name: 'Continuar con este número', exact: true });
   await expect(phoneConfirmButton).toBeVisible();
@@ -308,7 +310,11 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
     pin: '123456'
   }]);
   await expect(page.locator('#metaWhatsAppPinStatus'))
-    .toHaveText('Configuración guardada desactivada. PIN eliminado del formulario.');
+    .toHaveText('PIN eliminado del formulario.');
+  await expect(preparedState).toBeVisible();
+  await expect(preparedState).toContainText('WhatsApp preparado');
+  await expect(preparedState)
+    .toContainText('Configuración guardada y desactivada. Todavía no se ha activado el tráfico real.');
   await expect(pinInput).toHaveValue('');
   await expect(pinInput).toBeDisabled();
   await expect(finalizePhoneButton).toBeDisabled();
