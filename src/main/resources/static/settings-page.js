@@ -268,6 +268,10 @@
       font-size: 11px;
       line-height: 1.4;
     }
+    #metaWhatsAppActivateBtn {
+      margin-top: 10px;
+    }
+    #metaWhatsAppActivateBtn.hidden { display: none; }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -547,6 +551,8 @@
       <div id="metaWhatsAppActivationGate" class="hidden" role="status">
         <strong></strong>
         <span></span>
+        <button id="metaWhatsAppActivateBtn" class="button secondary hidden" type="button">Activar WhatsApp</button>
+        <span id="metaWhatsAppActivationStatus" role="status"></span>
       </div>
     `;
     panel.appendChild(section);
@@ -575,6 +581,8 @@
     const activationGate = section.querySelector("#metaWhatsAppActivationGate");
     const activationGateTitle = activationGate?.querySelector("strong");
     const activationGateCopy = activationGate?.querySelector("span");
+    const activationButton = section.querySelector("#metaWhatsAppActivateBtn");
+    const activationStatus = section.querySelector("#metaWhatsAppActivationStatus");
     let onboardingInteractionStarted = false;
 
     function renderCertificationReadiness(readiness) {
@@ -645,10 +653,15 @@
       const certified = certification?.ready === true && certification?.alreadyCertified === true;
       const stagingReady = deployment?.state === "READY_FOR_TENANT_STAGING"
         && deployment?.readyForTenantStaging === true;
+      const activationReady = configuredDisabled && certified && stagingReady;
 
-      if (configuredDisabled && certified && stagingReady) {
+      activationButton?.classList.toggle("hidden", !activationReady);
+      if (activationButton) activationButton.disabled = false;
+      if (activationStatus) activationStatus.textContent = "";
+
+      if (activationReady) {
         activationGateTitle.textContent = "Activación disponible con autorización manual";
-        activationGateCopy.textContent = "Las validaciones técnicas están completas. El tráfico real solo puede activarse mediante una acción explícita autorizada.";
+        activationGateCopy.textContent = "Las validaciones técnicas están completas. Activar habilita este negocio para Meta; la entrega real sigue sujeta a las compuertas globales del despliegue.";
       } else {
         const missing = [];
         if (!configuredDisabled) missing.push("configuración guardada y desactivada");
@@ -707,6 +720,9 @@
       certificationState?.classList.add("hidden");
       deploymentState?.classList.add("hidden");
       activationGate?.classList.add("hidden");
+      activationButton?.classList.add("hidden");
+      if (activationButton) activationButton.disabled = false;
+      if (activationStatus) activationStatus.textContent = "";
       if (certificationTitle) certificationTitle.textContent = "";
       if (certificationCopy) certificationCopy.textContent = "";
       if (deploymentTitle) deploymentTitle.textContent = "";
@@ -714,6 +730,35 @@
       if (activationGateTitle) activationGateTitle.textContent = "";
       if (activationGateCopy) activationGateCopy.textContent = "";
     }
+
+    activationButton?.addEventListener("click", async () => {
+      const accepted = window.confirm(
+        "Vas a habilitar WhatsApp para este negocio. La entrega real seguirá sujeta a las compuertas globales del despliegue. ¿Confirmas?"
+      );
+      if (!accepted) return;
+
+      activationButton.disabled = true;
+      if (activationStatus) activationStatus.textContent = "Activando WhatsApp…";
+      try {
+        const status = await api("/api/v1/channels/whatsapp/meta/config/activate", {
+          method: "POST"
+        });
+        if (status?.status !== "CONFIGURED_ENABLED"
+            || status?.configured !== true
+            || status?.enabled !== true) {
+          throw new Error("Meta activation response mismatch");
+        }
+        activationGateTitle.textContent = "WhatsApp activado";
+        activationGateCopy.textContent = "Este negocio quedó habilitado para Meta. La entrega real continúa sujeta a las compuertas globales del despliegue.";
+        activationButton.classList.add("hidden");
+        if (activationStatus) activationStatus.textContent = "Activación confirmada.";
+      } catch (error) {
+        if (activationStatus) {
+          activationStatus.textContent = "No fue posible activar WhatsApp. Revisa las validaciones e intenta nuevamente.";
+        }
+        activationButton.disabled = false;
+      }
+    });
 
     wabaCandidates?.addEventListener("meta-waba-selected", () => {
       selectedPhoneDiscovery = null;

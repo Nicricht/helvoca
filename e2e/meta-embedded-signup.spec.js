@@ -137,6 +137,16 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
     await route.fulfill(json(tenantConfigStatus));
   });
 
+  await page.route('**/api/v1/channels/whatsapp/meta/config/activate', async route => {
+    tenantConfigStatus = {
+      ...tenantConfigStatus,
+      status: 'CONFIGURED_ENABLED',
+      configured: true,
+      enabled: true
+    };
+    await route.fulfill(json(tenantConfigStatus));
+  });
+
   await page.route('**/api/v1/channels/whatsapp/meta/certification/readiness', async route => {
     certificationReadinessRequests += 1;
     await route.fulfill(json({
@@ -438,7 +448,21 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(restoredActivationGate)
     .toContainText('Activación disponible con autorización manual');
   await expect(restoredActivationGate)
-    .toContainText('El tráfico real solo puede activarse mediante una acción explícita autorizada.');
+    .toContainText('Activar habilita este negocio para Meta');
+  const activateButton = page.locator('#metaWhatsAppActivateBtn');
+  await expect(activateButton).toBeVisible();
   await expect.poll(() => phoneFinalizeBodies).toHaveLength(1);
   await expect.poll(() => activationRequests).toBe(0);
+
+  page.once('dialog', dialog => dialog.dismiss());
+  await activateButton.click();
+  await expect.poll(() => activationRequests).toBe(0);
+  await expect(activateButton).toBeEnabled();
+
+  page.once('dialog', dialog => dialog.accept());
+  await activateButton.click();
+  await expect.poll(() => activationRequests).toBe(1);
+  await expect(restoredActivationGate).toContainText('WhatsApp activado');
+  await expect(restoredActivationGate).toContainText('Activación confirmada.');
+  await expect(activateButton).toHaveClass(/hidden/);
 });
