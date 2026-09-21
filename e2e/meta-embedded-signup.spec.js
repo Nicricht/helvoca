@@ -465,4 +465,18 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(restoredActivationGate).toContainText('WhatsApp activado');
   await expect(restoredActivationGate).toContainText('Activación confirmada.');
   await expect(activateButton).toHaveClass(/hidden/);
+
+  await page.reload();
+  await page.getByRole('button', { name: '📞 Canales', exact: true }).click();
+
+  const enabledActivationGate = page.locator('#metaWhatsAppActivationGate');
+  const enabledActivateButton = page.locator('#metaWhatsAppActivateBtn');
+  await expect.poll(() => tenantConfigRequests).toBe(4);
+  await expect(page.locator('#metaWhatsAppPreparedState')).toHaveClass(/hidden/);
+  await expect(enabledActivationGate).toBeVisible();
+  await expect(enabledActivationGate).toContainText('WhatsApp activado');
+  await expect(enabledActivationGate)
+    .toContainText('Este negocio está habilitado para Meta.');
+  await expect(enabledActivateButton).toHaveClass(/hidden/);
+  await expect.poll(() => activationRequests).toBe(1);
 });
