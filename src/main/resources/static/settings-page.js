@@ -650,6 +650,9 @@
       const configuredDisabled = tenantStatus?.status === "CONFIGURED_DISABLED"
         && tenantStatus?.configured === true
         && tenantStatus?.enabled === false;
+      const configuredEnabled = tenantStatus?.status === "CONFIGURED_ENABLED"
+        && tenantStatus?.configured === true
+        && tenantStatus?.enabled === true;
       const certified = certification?.ready === true && certification?.alreadyCertified === true;
       const stagingReady = deployment?.state === "READY_FOR_TENANT_STAGING"
         && deployment?.readyForTenantStaging === true;
@@ -659,7 +662,10 @@
       if (activationButton) activationButton.disabled = false;
       if (activationStatus) activationStatus.textContent = "";
 
-      if (activationReady) {
+      if (configuredEnabled) {
+        activationGateTitle.textContent = "WhatsApp activado";
+        activationGateCopy.textContent = "Este negocio está habilitado para Meta. La entrega real continúa sujeta a las compuertas globales del despliegue.";
+      } else if (activationReady) {
         activationGateTitle.textContent = "Activación disponible con autorización manual";
         activationGateCopy.textContent = "Las validaciones técnicas están completas. Activar habilita este negocio para Meta; la entrega real sigue sujeta a las compuertas globales del despliegue.";
       } else {
@@ -695,12 +701,15 @@
       try {
         const status = await api("/api/v1/channels/whatsapp/meta/config");
         if (onboardingInteractionStarted) return;
-        if (status?.status !== "CONFIGURED_DISABLED"
-            || status?.configured !== true
-            || status?.enabled !== false) {
-          return;
-        }
-        preparedState?.classList.remove("hidden");
+        const configuredDisabled = status?.status === "CONFIGURED_DISABLED"
+          && status?.configured === true
+          && status?.enabled === false;
+        const configuredEnabled = status?.status === "CONFIGURED_ENABLED"
+          && status?.configured === true
+          && status?.enabled === true;
+        if (!configuredDisabled && !configuredEnabled) return;
+
+        preparedState?.classList.toggle("hidden", configuredEnabled);
         await loadPreparedDiagnostics(status);
       } catch (error) {
         // Fail closed: do not infer a prepared state when tenant status cannot be verified.
