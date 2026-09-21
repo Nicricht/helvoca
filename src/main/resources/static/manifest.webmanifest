@@ -1,0 +1,11 @@
+{
+  "name": "RecepVoz",
+  "short_name": "RecepVoz",
+  "description": "Recepcionista virtual con IA para negocios.",
+  "lang": "es-CL",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14"
+}
