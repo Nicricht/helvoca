@@ -523,6 +523,7 @@
     const certificationState = section.querySelector("#metaWhatsAppCertificationState");
     const certificationTitle = certificationState?.querySelector("strong");
     const certificationCopy = certificationState?.querySelector("span");
+    let onboardingInteractionStarted = false;
 
     function renderCertificationReadiness(readiness) {
       if (!certificationState || !certificationTitle || !certificationCopy) return;
@@ -540,6 +541,33 @@
           : "La certificación todavía no está lista.";
       }
       certificationState.classList.remove("hidden");
+    }
+
+    async function loadCertificationReadiness() {
+      try {
+        const readiness = await api("/api/v1/channels/whatsapp/meta/certification/readiness");
+        renderCertificationReadiness(readiness);
+      } catch (error) {
+        if (certificationTitle) certificationTitle.textContent = "Certificación pendiente";
+        if (certificationCopy) certificationCopy.textContent = "No fue posible verificar la readiness técnica.";
+        certificationState?.classList.remove("hidden");
+      }
+    }
+
+    async function restoreConfiguredState() {
+      try {
+        const status = await api("/api/v1/channels/whatsapp/meta/config");
+        if (onboardingInteractionStarted) return;
+        if (status?.status !== "CONFIGURED_DISABLED"
+            || status?.configured !== true
+            || status?.enabled !== false) {
+          return;
+        }
+        preparedState?.classList.remove("hidden");
+        await loadCertificationReadiness();
+      } catch (error) {
+        // Fail closed: do not infer a prepared state when tenant status cannot be verified.
+      }
     }
 
     function resetPinSetup() {
@@ -666,14 +694,7 @@
         }
         if (pinStatus) pinStatus.textContent = "PIN eliminado del formulario.";
         preparedState?.classList.remove("hidden");
-        try {
-          const readiness = await api("/api/v1/channels/whatsapp/meta/certification/readiness");
-          renderCertificationReadiness(readiness);
-        } catch (error) {
-          if (certificationTitle) certificationTitle.textContent = "Certificación pendiente";
-          if (certificationCopy) certificationCopy.textContent = "No fue posible verificar la readiness técnica.";
-          certificationState?.classList.remove("hidden");
-        }
+        await loadCertificationReadiness();
       } catch (error) {
         selectedPhoneFinalization = null;
         if (pinStatus) pinStatus.textContent = "No fue posible finalizar la configuración. Revisa el PIN e intenta nuevamente.";
@@ -722,6 +743,7 @@
     });
 
     button?.addEventListener("click", async () => {
+      onboardingInteractionStarted = true;
       if (button.dataset.sdkReady === "true") {
         if (!window.FB?.login) {
           button.dataset.sdkReady = "false";
@@ -801,6 +823,8 @@
         button.disabled = false;
       }
     });
+
+    queueMicrotask(restoreConfiguredState);
   }
 
   async function loadBootstrap() {
