@@ -267,9 +267,10 @@ public class MetaWhatsAppTenantConfigurationService {
         MetaWhatsAppTenantConfig existingConfig = configs.findById(businessId).orElse(null);
         boolean wasConfigured = existingConfig != null
                 || MetaWhatsAppMessagingProvider.ID.equals(phone.getWhatsappProvider());
+        boolean wasPhoneWhatsappEnabled = phone.isWhatsappEnabled();
         boolean wasEnabled = (existingConfig != null && existingConfig.isEnabled())
                 || (MetaWhatsAppMessagingProvider.ID.equals(phone.getWhatsappProvider())
-                        && phone.isWhatsappEnabled());
+                        && wasPhoneWhatsappEnabled);
         boolean wasCertified = phone.getWhatsappCertifiedAt() != null;
 
         phone.setWhatsappProvider(MetaWhatsAppMessagingProvider.ID);
@@ -306,7 +307,7 @@ public class MetaWhatsAppTenantConfigurationService {
                         "WHATSAPP_SENDER",
                         businessId,
                         Map.of(
-                                "whatsappEnabled", wasEnabled,
+                                "whatsappEnabled", wasPhoneWhatsappEnabled,
                                 "certified", true),
                         Map.of(
                                 "whatsappEnabled", false,
