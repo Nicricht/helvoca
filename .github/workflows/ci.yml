@@ -56,6 +56,47 @@ jobs:
           check_webhook "https://helvoca-api-production.up.railway.app" "Railway public domain"
           check_webhook "https://recepvoz.cl" "recepvoz.cl"
 
+  pwa-public-smoke:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify public PWA assets in production
+        run: |
+          set -euo pipefail
+
+          check_asset() {
+            local base_url="$1"
+            local path="$2"
+            local label="$3"
+            local code=""
+
+            for attempt in $(seq 1 18); do
+              code="$(curl --connect-timeout 10 --max-time 20 -sS -o /dev/null -w "%{http_code}" "$base_url$path" || true)"
+              echo "$label $path -> HTTP $code (attempt $attempt/18)"
+
+              if [ "$code" = "200" ]; then
+                return 0
+              fi
+
+              if [ "$code" = "401" ] || [ "$code" = "403" ] || [ "$code" = "404" ]; then
+                echo "PWA asset is not publicly available: $base_url$path"
+                return 1
+              fi
+
+              sleep 10
+            done
+
+            echo "PWA asset never returned HTTP 200: $base_url$path"
+            return 1
+          }
+
+          for path in /manifest.webmanifest /service-worker.js /recepvoz-icon-192.png /recepvoz-icon-512.png; do
+            check_asset "https://helvoca-api-production.up.railway.app" "$path" "Railway"
+            check_asset "https://recepvoz.cl" "$path" "recepvoz.cl"
+          done
+
   test:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[verify]'))
     runs-on: ubuntu-latest
