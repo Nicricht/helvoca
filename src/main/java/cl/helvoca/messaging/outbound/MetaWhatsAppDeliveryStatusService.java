@@ -1,12 +1,17 @@
 package cl.helvoca.messaging.outbound;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.messaging.MessagingConversationRepository;
 import cl.helvoca.messaging.MessagingMessage;
 import cl.helvoca.messaging.MessagingMessageRepository;
+import cl.helvoca.phone.PhoneNumber;
+import cl.helvoca.phone.PhoneNumberRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -17,14 +22,28 @@ public class MetaWhatsAppDeliveryStatusService {
     private final OutboundMessageRepository outboundMessages;
     private final MessagingMessageRepository conversationMessages;
     private final MessagingConversationRepository conversations;
+    private final PhoneNumberRepository phones;
+    private final AuditService auditService;
 
+    @Autowired
     public MetaWhatsAppDeliveryStatusService(
             OutboundMessageRepository outboundMessages,
             MessagingMessageRepository conversationMessages,
-            MessagingConversationRepository conversations) {
+            MessagingConversationRepository conversations,
+            PhoneNumberRepository phones,
+            AuditService auditService) {
         this.outboundMessages = outboundMessages;
         this.conversationMessages = conversationMessages;
         this.conversations = conversations;
+        this.phones = phones;
+        this.auditService = auditService;
+    }
+
+    MetaWhatsAppDeliveryStatusService(
+            OutboundMessageRepository outboundMessages,
+            MessagingMessageRepository conversationMessages,
+            MessagingConversationRepository conversations) {
+        this(outboundMessages, conversationMessages, conversations, null, null);
     }
 
     @Transactional
@@ -44,7 +63,9 @@ public class MetaWhatsAppDeliveryStatusService {
                         MetaWhatsAppMessagingProvider.ID, messageId)
                 .orElse(null);
         if (outbound != null && businessId.equals(outbound.getBusinessId())) {
-            return apply(outbound, next, occurredAt, rawErrorCode);
+            Result result = apply(outbound, next, occurredAt, rawErrorCode);
+            certifyMetaSenderIfNeeded(businessId, next, occurredAt, result);
+            return result;
         }
 
         MessagingMessage conversationMessage = conversationMessages
@@ -56,7 +77,40 @@ public class MetaWhatsAppDeliveryStatusService {
                         conversationMessage.getConversationId(), businessId).isEmpty()) {
             return Result.NOT_FOUND;
         }
-        return apply(conversationMessage, next, occurredAt, rawErrorCode);
+        Result result = apply(conversationMessage, next, occurredAt, rawErrorCode);
+        certifyMetaSenderIfNeeded(businessId, next, occurredAt, result);
+        return result;
+    }
+
+    private void certifyMetaSenderIfNeeded(
+            UUID businessId,
+            String next,
+            Instant occurredAt,
+            Result result) {
+        if (result != Result.UPDATED
+                || (!"DELIVERED".equals(next) && !"READ".equals(next))
+                || phones == null
+                || auditService == null) {
+            return;
+        }
+
+        List<PhoneNumber> senders = phones
+                .findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId)
+                .stream()
+                .filter(phone -> MetaWhatsAppMessagingProvider.ID.equalsIgnoreCase(phone.getWhatsappProvider()))
+                .toList();
+        if (senders.size() != 1) return;
+
+        PhoneNumber sender = senders.getFirst();
+        if (sender.getWhatsappCertifiedAt() != null) return;
+
+        sender.setWhatsappCertifiedAt(occurredAt == null ? Instant.now() : occurredAt);
+        phones.saveAndFlush(sender);
+        auditService.success(
+                businessId,
+                "META_WHATSAPP_CERTIFICATION_COMPLETED",
+                "WHATSAPP_SENDER",
+                sender.getId());
     }
 
     private Result apply(
