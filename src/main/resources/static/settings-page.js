@@ -230,6 +230,25 @@
       font-size: 11px;
       line-height: 1.4;
     }
+    #metaWhatsAppDeploymentState {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      background: rgba(255,255,255,.025);
+    }
+    #metaWhatsAppDeploymentState.hidden { display: none; }
+    #metaWhatsAppDeploymentState strong {
+      display: block;
+      font-size: 12px;
+    }
+    #metaWhatsAppDeploymentState span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -502,6 +521,10 @@
         <strong></strong>
         <span></span>
       </div>
+      <div id="metaWhatsAppDeploymentState" class="hidden" role="status">
+        <strong></strong>
+        <span></span>
+      </div>
     `;
     panel.appendChild(section);
 
@@ -523,6 +546,9 @@
     const certificationState = section.querySelector("#metaWhatsAppCertificationState");
     const certificationTitle = certificationState?.querySelector("strong");
     const certificationCopy = certificationState?.querySelector("span");
+    const deploymentState = section.querySelector("#metaWhatsAppDeploymentState");
+    const deploymentTitle = deploymentState?.querySelector("strong");
+    const deploymentCopy = deploymentState?.querySelector("span");
     let onboardingInteractionStarted = false;
 
     function renderCertificationReadiness(readiness) {
@@ -554,6 +580,40 @@
       }
     }
 
+    function renderDeploymentReadiness(readiness) {
+      if (!deploymentState || !deploymentTitle || !deploymentCopy) return;
+      const blockers = Array.isArray(readiness?.blockers) ? readiness.blockers : [];
+      if (readiness?.state === "READY_FOR_TENANT_STAGING"
+          && readiness?.readyForTenantStaging === true) {
+        deploymentTitle.textContent = "Infraestructura lista para staging";
+        deploymentCopy.textContent = "Las compuertas de tráfico real siguen apagadas, como exige el staging seguro.";
+      } else {
+        deploymentTitle.textContent = "Staging técnico bloqueado";
+        deploymentCopy.textContent = blockers.length
+          ? `Hay ${blockers.length} bloqueo${blockers.length === 1 ? "" : "s"} de infraestructura pendiente${blockers.length === 1 ? "" : "s"}.`
+          : "La infraestructura todavía no cumple las condiciones de staging seguro.";
+      }
+      deploymentState.classList.remove("hidden");
+    }
+
+    async function loadDeploymentReadiness() {
+      try {
+        const readiness = await api("/api/v1/channels/whatsapp/meta/deployment/readiness");
+        renderDeploymentReadiness(readiness);
+      } catch (error) {
+        if (deploymentTitle) deploymentTitle.textContent = "Staging técnico pendiente";
+        if (deploymentCopy) deploymentCopy.textContent = "No fue posible verificar la infraestructura de staging.";
+        deploymentState?.classList.remove("hidden");
+      }
+    }
+
+    async function loadPreparedDiagnostics() {
+      await Promise.all([
+        loadCertificationReadiness(),
+        loadDeploymentReadiness()
+      ]);
+    }
+
     async function restoreConfiguredState() {
       try {
         const status = await api("/api/v1/channels/whatsapp/meta/config");
@@ -564,7 +624,7 @@
           return;
         }
         preparedState?.classList.remove("hidden");
-        await loadCertificationReadiness();
+        await loadPreparedDiagnostics();
       } catch (error) {
         // Fail closed: do not infer a prepared state when tenant status cannot be verified.
       }
@@ -581,8 +641,11 @@
       pinSetup?.classList.add("hidden");
       preparedState?.classList.add("hidden");
       certificationState?.classList.add("hidden");
+      deploymentState?.classList.add("hidden");
       if (certificationTitle) certificationTitle.textContent = "";
       if (certificationCopy) certificationCopy.textContent = "";
+      if (deploymentTitle) deploymentTitle.textContent = "";
+      if (deploymentCopy) deploymentCopy.textContent = "";
     }
 
     wabaCandidates?.addEventListener("meta-waba-selected", () => {
@@ -694,7 +757,7 @@
         }
         if (pinStatus) pinStatus.textContent = "PIN eliminado del formulario.";
         preparedState?.classList.remove("hidden");
-        await loadCertificationReadiness();
+        await loadPreparedDiagnostics();
       } catch (error) {
         selectedPhoneFinalization = null;
         if (pinStatus) pinStatus.textContent = "No fue posible finalizar la configuración. Revisa el PIN e intenta nuevamente.";
