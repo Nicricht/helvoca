@@ -476,7 +476,10 @@
 
     function resetPinSetup() {
       selectedPhoneRegistration = null;
-      if (pinInput) pinInput.value = "";
+      if (pinInput) {
+        pinInput.value = "";
+        pinInput.disabled = false;
+      }
       if (registerPhoneButton) registerPhoneButton.disabled = true;
       if (pinStatus) pinStatus.textContent = "";
       pinSetup?.classList.add("hidden");
@@ -524,6 +527,7 @@
         selectedPhoneValidation = validation;
         selectedPhoneRegistration = null;
         if (phoneConfirmStatus) phoneConfirmStatus.textContent = "Número validado por Meta.";
+        if (pinInput) pinInput.disabled = false;
         if (pinStatus) pinStatus.textContent = "";
         pinSetup?.classList.remove("hidden");
         pinInput?.focus();
@@ -583,7 +587,10 @@
           throw new Error("Meta phone registration response mismatch");
         }
         selectedPhoneRegistration = registration;
-        if (pinInput) pinInput.value = "";
+        if (pinInput) {
+          pinInput.value = "";
+          pinInput.disabled = true;
+        }
         if (pinStatus) pinStatus.textContent = "Número registrado en Meta. PIN eliminado del formulario.";
       } catch (error) {
         selectedPhoneRegistration = null;
