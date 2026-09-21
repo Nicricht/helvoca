@@ -3,6 +3,7 @@ package cl.helvoca.phone;
 import cl.helvoca.audit.AuditService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -22,6 +23,7 @@ public class WhatsAppSenderActivationStartupRunner implements ApplicationRunner 
     private final PhoneNumberRepository repository;
     private final AuditService auditService;
 
+    @Autowired
     public WhatsAppSenderActivationStartupRunner(
             @Value("${HELVOCA_WHATSAPP_SENDER_ACTIVATE_ON_STARTUP:false}") boolean enabled,
             @Value("${HELVOCA_WHATSAPP_SENDER_E164:}") String senderE164,
