@@ -479,6 +479,7 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(restoredActivationGate).toContainText('WhatsApp activado');
   await expect(restoredActivationGate).toContainText('Activación confirmada.');
   await expect(activateButton).toHaveClass(/hidden/);
+  await expect(page.locator('#metaWhatsAppDeactivateBtn')).toBeVisible();
 
   await page.reload();
   await page.getByRole('button', { name: '📞 Canales', exact: true }).click();
