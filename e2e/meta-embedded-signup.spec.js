@@ -56,6 +56,13 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
           verifiedName: '<img src=x onerror=alert(2)>',
           qualityRating: 'GREEN',
           codeVerificationStatus: 'VERIFIED'
+        },
+        {
+          id: '12025550124',
+          displayPhoneNumber: '+56 9 3333 4444',
+          verifiedName: 'RecepVoz Sucursal',
+          qualityRating: 'YELLOW',
+          codeVerificationStatus: 'NOT_VERIFIED'
         }
       ],
       afterCursor: null
@@ -189,16 +196,40 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
 
   await expect.poll(() => phoneDiscoveryBodies).toEqual([{ wabaId: '1906385232743452' }]);
   await expect(page.locator('#metaWhatsAppWabaConfirmStatus'))
-    .toHaveText('Cuenta confirmada. Meta devolvió 1 número.');
+    .toHaveText('Cuenta confirmada. Meta devolvió 2 números.');
 
   const phoneCandidates = page.locator('#metaWhatsAppPhoneCandidates');
   await expect(phoneCandidates).toBeVisible();
-  await expect(phoneCandidates.locator('.meta-whatsapp-phone-card')).toHaveCount(1);
+  await expect(phoneCandidates.locator('.meta-whatsapp-phone-card')).toHaveCount(2);
   await expect(phoneCandidates).toContainText('+56 9 1111 2222');
   await expect(phoneCandidates).toContainText('<img src=x onerror=alert(2)>');
   await expect(phoneCandidates).toContainText('ID 12025550123 · Calidad GREEN · Verificación VERIFIED');
+  await expect(phoneCandidates).toContainText('+56 9 3333 4444');
+  await expect(phoneCandidates).toContainText('ID 12025550124 · Calidad YELLOW · Verificación NOT_VERIFIED');
   await expect(phoneCandidates.locator('img')).toHaveCount(0);
-  await expect(phoneCandidates.getByRole('button')).toHaveCount(0);
 
+  const phoneCards = phoneCandidates.locator('.meta-whatsapp-phone-card');
+  const firstPhoneCard = phoneCards.nth(0);
+  const secondPhoneCard = phoneCards.nth(1);
+
+  await firstPhoneCard.getByRole('button', { name: 'Seleccionar', exact: true }).click();
+  await expect(firstPhoneCard).toHaveClass(/selected/);
+  await expect(firstPhoneCard).toHaveAttribute('data-selected', 'true');
+  await expect(firstPhoneCard.getByRole('button', { name: 'Seleccionado', exact: true }))
+    .toHaveAttribute('aria-pressed', 'true');
+  await expect(secondPhoneCard).not.toHaveClass(/selected/);
+  await expect(secondPhoneCard).toHaveAttribute('data-selected', 'false');
+
+  await secondPhoneCard.getByRole('button', { name: 'Seleccionar', exact: true }).click();
+  await expect(secondPhoneCard).toHaveClass(/selected/);
+  await expect(secondPhoneCard).toHaveAttribute('data-selected', 'true');
+  await expect(secondPhoneCard.getByRole('button', { name: 'Seleccionado', exact: true }))
+    .toHaveAttribute('aria-pressed', 'true');
+  await expect(firstPhoneCard).not.toHaveClass(/selected/);
+  await expect(firstPhoneCard).toHaveAttribute('data-selected', 'false');
+  await expect(firstPhoneCard.getByRole('button', { name: 'Seleccionar', exact: true }))
+    .toHaveAttribute('aria-pressed', 'false');
+
+  await expect.poll(() => phoneDiscoveryBodies).toEqual([{ wabaId: '1906385232743452' }]);
   await expect.poll(() => unexpectedEmbeddedSignupRequests).toEqual([]);
 });
