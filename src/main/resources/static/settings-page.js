@@ -158,6 +158,18 @@
     #metaWhatsAppPhoneCandidates .meta-whatsapp-phone-select {
       margin-top: 9px;
     }
+    #metaWhatsAppPhoneConfirm {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    #metaWhatsAppPhoneConfirm.hidden { display: none; }
+    #metaWhatsAppPhoneConfirmStatus {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -170,6 +182,7 @@
   let requested = false;
   let facebookSdkPromise = null;
   let selectedPhoneDiscovery = null;
+  let selectedPhoneValidation = null;
 
   function initFacebookSdk(bootstrap) {
     if (!window.FB?.init) throw new Error("Facebook SDK unavailable");
@@ -358,6 +371,9 @@
               candidateButton.textContent = selected ? "Seleccionado" : "Seleccionar";
             }
           });
+          container.dispatchEvent(new CustomEvent("meta-phone-selected", {
+            detail: { phoneNumberId: selectedPhoneNumberId }
+          }));
         });
       }
 
@@ -397,6 +413,10 @@
         <span id="metaWhatsAppWabaConfirmStatus" role="status"></span>
       </div>
       <div id="metaWhatsAppPhoneCandidates" class="hidden" aria-live="polite"></div>
+      <div id="metaWhatsAppPhoneConfirm" class="hidden">
+        <button id="metaWhatsAppPhoneConfirmBtn" class="button secondary" type="button">Continuar con este número</button>
+        <span id="metaWhatsAppPhoneConfirmStatus" role="status"></span>
+      </div>
     `;
     panel.appendChild(section);
 
@@ -407,13 +427,55 @@
     const wabaConfirmButton = section.querySelector("#metaWhatsAppWabaConfirmBtn");
     const wabaConfirmStatus = section.querySelector("#metaWhatsAppWabaConfirmStatus");
     const phoneCandidates = section.querySelector("#metaWhatsAppPhoneCandidates");
+    const phoneConfirm = section.querySelector("#metaWhatsAppPhoneConfirm");
+    const phoneConfirmButton = section.querySelector("#metaWhatsAppPhoneConfirmBtn");
+    const phoneConfirmStatus = section.querySelector("#metaWhatsAppPhoneConfirmStatus");
 
     wabaCandidates?.addEventListener("meta-waba-selected", () => {
       selectedPhoneDiscovery = null;
+      selectedPhoneValidation = null;
       renderPhoneCandidates(null, phoneCandidates);
+      phoneConfirm?.classList.add("hidden");
+      if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
       if (wabaConfirmStatus) wabaConfirmStatus.textContent = "";
       wabaConfirm?.classList.remove("hidden");
       if (wabaConfirmButton) wabaConfirmButton.disabled = false;
+    });
+
+    phoneCandidates?.addEventListener("meta-phone-selected", () => {
+      selectedPhoneValidation = null;
+      if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
+      phoneConfirm?.classList.remove("hidden");
+      if (phoneConfirmButton) phoneConfirmButton.disabled = false;
+    });
+
+    phoneConfirmButton?.addEventListener("click", async () => {
+      const selectedWabaCard = wabaCandidates?.querySelector('.meta-whatsapp-waba-card[data-selected="true"]');
+      const selectedPhoneCard = phoneCandidates?.querySelector('.meta-whatsapp-phone-card[data-selected="true"]');
+      const wabaId = selectedWabaCard?.dataset.wabaId;
+      const phoneNumberId = selectedPhoneCard?.dataset.phoneNumberId;
+      if (!wabaId || !phoneNumberId) return;
+
+      phoneConfirmButton.disabled = true;
+      if (phoneConfirmStatus) phoneConfirmStatus.textContent = "Validando número con Meta…";
+      try {
+        const validation = await api("/api/v1/channels/whatsapp/meta/embedded-signup/waba/phone-number/validate", {
+          method: "POST",
+          body: JSON.stringify({ wabaId, phoneNumberId })
+        });
+        if (validation?.state !== "PHONE_NUMBER_VALIDATED" || String(validation?.phoneNumberId || "") !== phoneNumberId) {
+          throw new Error("Meta phone validation response mismatch");
+        }
+        selectedPhoneValidation = validation;
+        if (phoneConfirmStatus) phoneConfirmStatus.textContent = "Número validado por Meta.";
+      } catch (error) {
+        selectedPhoneValidation = null;
+        if (phoneConfirmStatus) {
+          phoneConfirmStatus.textContent = "No fue posible validar este número. Intenta nuevamente.";
+        }
+      } finally {
+        phoneConfirmButton.disabled = false;
+      }
     });
 
     wabaConfirmButton?.addEventListener("click", async () => {
@@ -428,13 +490,19 @@
           method: "POST",
           body: JSON.stringify({ wabaId })
         });
+        selectedPhoneValidation = null;
+        phoneConfirm?.classList.add("hidden");
+        if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
         const phoneCount = renderPhoneCandidates(selectedPhoneDiscovery, phoneCandidates);
         if (wabaConfirmStatus) {
           wabaConfirmStatus.textContent = "Cuenta confirmada. Meta devolvió " + phoneCount + " número" + (phoneCount === 1 ? "" : "s") + ".";
         }
       } catch (error) {
         selectedPhoneDiscovery = null;
+        selectedPhoneValidation = null;
         renderPhoneCandidates(null, phoneCandidates);
+        phoneConfirm?.classList.add("hidden");
+        if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
         if (wabaConfirmStatus) {
           wabaConfirmStatus.textContent = "No fue posible consultar los números de esta cuenta. Intenta nuevamente.";
         }
@@ -456,7 +524,10 @@
         button.disabled = true;
         renderWabaCandidates(null, wabaCandidates);
         selectedPhoneDiscovery = null;
+        selectedPhoneValidation = null;
         renderPhoneCandidates(null, phoneCandidates);
+        phoneConfirm?.classList.add("hidden");
+        if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
         wabaConfirm?.classList.add("hidden");
         if (wabaConfirmStatus) wabaConfirmStatus.textContent = "";
         message.textContent = "Abriendo autorización segura de Meta…";
