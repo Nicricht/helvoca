@@ -12,11 +12,28 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   const phoneValidationBodies = [];
   const phoneFinalizeBodies = [];
   let certificationReadinessRequests = 0;
+  let tenantConfigRequests = 0;
+  let activationRequests = 0;
+  let tenantConfigStatus = {
+    status: 'NOT_CONFIGURED',
+    configured: false,
+    enabled: false,
+    provider: null,
+    phoneRecordId: null,
+    phoneNumber: null,
+    phone_number_id: null,
+    waba_id: null,
+    credentialReferenceConfigured: false,
+    certifiedAt: null
+  };
   const unexpectedEmbeddedSignupRequests = [];
 
   page.on('request', request => {
     const pathname = new URL(request.url()).pathname;
     const embeddedSignupPrefix = '/api/v1/channels/whatsapp/meta/embedded-signup/';
+    if (pathname === '/api/v1/channels/whatsapp/meta/config/activate') {
+      activationRequests += 1;
+    }
     const allowed = new Set([
       `${embeddedSignupPrefix}bootstrap`,
       `${embeddedSignupPrefix}authorization-code`,
@@ -90,6 +107,18 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/waba/phone-number/finalize', async route => {
     const body = route.request().postDataJSON();
     phoneFinalizeBodies.push(body);
+    tenantConfigStatus = {
+      status: 'CONFIGURED_DISABLED',
+      configured: true,
+      enabled: false,
+      provider: 'META_WHATSAPP_CLOUD',
+      phoneRecordId: '11111111-1111-4111-8111-111111111111',
+      phoneNumber: '+56 9 3333 4444',
+      phone_number_id: body.phoneNumberId,
+      waba_id: body.wabaId,
+      credentialReferenceConfigured: true,
+      certifiedAt: null
+    };
     await route.fulfill(json({
       state: 'PHONE_NUMBER_REGISTERED_AND_STAGED',
       phoneRecordId: '11111111-1111-4111-8111-111111111111',
@@ -99,6 +128,11 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
       credentialRef: 'EMBEDDED_SIGNUP_SYSTEM_USER',
       enabled: false
     }));
+  });
+
+  await page.route('**/api/v1/channels/whatsapp/meta/config', async route => {
+    tenantConfigRequests += 1;
+    await route.fulfill(json(tenantConfigStatus));
   });
 
   await page.route('**/api/v1/channels/whatsapp/meta/certification/readiness', async route => {
@@ -281,6 +315,7 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(pinSetup).toHaveClass(/hidden/);
   await expect(preparedState).toHaveClass(/hidden/);
   await expect(certificationState).toHaveClass(/hidden/);
+  await expect.poll(() => tenantConfigRequests).toBe(1);
   await expect.poll(() => certificationReadinessRequests).toBe(0);
 
   const phoneConfirmButton = page.getByRole('button', { name: 'Continuar con este número', exact: true });
@@ -349,4 +384,18 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   }]);
   await expect.poll(() => phoneDiscoveryBodies).toEqual([{ wabaId: '1906385232743452' }]);
   await expect.poll(() => unexpectedEmbeddedSignupRequests).toEqual([]);
+
+  await page.reload();
+  await page.getByRole('button', { name: '📞 Canales', exact: true }).click();
+
+  const restoredPreparedState = page.locator('#metaWhatsAppPreparedState');
+  const restoredCertificationState = page.locator('#metaWhatsAppCertificationState');
+  await expect.poll(() => tenantConfigRequests).toBe(2);
+  await expect(restoredPreparedState).toBeVisible();
+  await expect(restoredPreparedState).toContainText('WhatsApp preparado');
+  await expect.poll(() => certificationReadinessRequests).toBe(2);
+  await expect(restoredCertificationState).toBeVisible();
+  await expect(restoredCertificationState).toContainText('Listo para certificación piloto');
+  await expect.poll(() => phoneFinalizeBodies).toHaveLength(1);
+  await expect.poll(() => activationRequests).toBe(0);
 });
