@@ -982,6 +982,7 @@
     });
 
     button?.addEventListener("click", async () => {
+      if (!canManageMeta) return;
       onboardingInteractionStarted = true;
       if (button.dataset.sdkReady === "true") {
         if (!window.FB?.login) {

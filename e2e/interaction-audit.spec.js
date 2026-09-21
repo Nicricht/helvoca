@@ -79,6 +79,9 @@ test('Meta state handlers fail closed before privileged actions', async () => {
   const settings = fs.readFileSync(path.join(staticDir, 'settings-page.js'), 'utf8');
 
   expect(settings).toMatch(
+    /button\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
+  );
+  expect(settings).toMatch(
     /activationButton\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
   );
   expect(settings).toMatch(
