@@ -12,6 +12,7 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   const phoneValidationBodies = [];
   const phoneFinalizeBodies = [];
   let certificationReadinessRequests = 0;
+  let deploymentReadinessRequests = 0;
   let tenantConfigRequests = 0;
   let activationRequests = 0;
   let tenantConfigStatus = {
@@ -141,6 +142,22 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
       state: 'READY_FOR_PILOT_CERTIFICATION',
       ready: true,
       alreadyCertified: false,
+      blockers: []
+    }));
+  });
+
+  await page.route('**/api/v1/channels/whatsapp/meta/deployment/readiness', async route => {
+    deploymentReadinessRequests += 1;
+    await route.fulfill(json({
+      state: 'READY_FOR_TENANT_STAGING',
+      readyForTenantStaging: true,
+      webhookValidationEnabled: true,
+      appSecretConfigured: true,
+      verifyTokenConfigured: true,
+      globalMetaEnabled: false,
+      outboundDeliveryEnabled: false,
+      outboundProvider: 'NONE',
+      jobsEnabled: false,
       blockers: []
     }));
   });
@@ -312,11 +329,14 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   const pinInput = page.getByLabel('PIN de Meta', { exact: true });
   const preparedState = page.locator('#metaWhatsAppPreparedState');
   const certificationState = page.locator('#metaWhatsAppCertificationState');
+  const deploymentState = page.locator('#metaWhatsAppDeploymentState');
   await expect(pinSetup).toHaveClass(/hidden/);
   await expect(preparedState).toHaveClass(/hidden/);
   await expect(certificationState).toHaveClass(/hidden/);
+  await expect(deploymentState).toHaveClass(/hidden/);
   await expect.poll(() => tenantConfigRequests).toBe(1);
   await expect.poll(() => certificationReadinessRequests).toBe(0);
+  await expect.poll(() => deploymentReadinessRequests).toBe(0);
 
   const phoneConfirmButton = page.getByRole('button', { name: 'Continuar con este número', exact: true });
   await expect(phoneConfirmButton).toBeVisible();
@@ -369,6 +389,11 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(certificationState).toContainText('Listo para certificación piloto');
   await expect(certificationState)
     .toContainText('No hay bloqueos técnicos pendientes para iniciar la certificación.');
+  await expect.poll(() => deploymentReadinessRequests).toBe(1);
+  await expect(deploymentState).toBeVisible();
+  await expect(deploymentState).toContainText('Infraestructura lista para staging');
+  await expect(deploymentState)
+    .toContainText('Las compuertas de tráfico real siguen apagadas, como exige el staging seguro.');
   await expect(pinInput).toHaveValue('');
   await expect(pinInput).toBeDisabled();
   await expect(finalizePhoneButton).toBeDisabled();
@@ -390,12 +415,16 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
 
   const restoredPreparedState = page.locator('#metaWhatsAppPreparedState');
   const restoredCertificationState = page.locator('#metaWhatsAppCertificationState');
+  const restoredDeploymentState = page.locator('#metaWhatsAppDeploymentState');
   await expect.poll(() => tenantConfigRequests).toBe(2);
   await expect(restoredPreparedState).toBeVisible();
   await expect(restoredPreparedState).toContainText('WhatsApp preparado');
   await expect.poll(() => certificationReadinessRequests).toBe(2);
   await expect(restoredCertificationState).toBeVisible();
   await expect(restoredCertificationState).toContainText('Listo para certificación piloto');
+  await expect.poll(() => deploymentReadinessRequests).toBe(2);
+  await expect(restoredDeploymentState).toBeVisible();
+  await expect(restoredDeploymentState).toContainText('Infraestructura lista para staging');
   await expect.poll(() => phoneFinalizeBodies).toHaveLength(1);
   await expect.poll(() => activationRequests).toBe(0);
 });
