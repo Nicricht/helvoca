@@ -1,7 +1,12 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.ConflictException;
+import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -10,9 +15,13 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionServiceTest {
 
     @Test
     void subscribesOnlyAfterSystemUserAssignmentIsEnsured() {
+        UUID businessId = UUID.randomUUID();
         var assignment = mock(MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService.class);
         var subscribe = mock(MetaWhatsAppEmbeddedSignupSubscribeAppClient.class);
+        var tenantProvider = mock(TenantProvider.class);
+        var audit = mock(AuditService.class);
         MetaWhatsAppProperties meta = readyProperties();
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
 
         when(assignment.ensureAssigned("1906385232743451"))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentResult(
@@ -27,7 +36,9 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionServiceTest {
         var service = new MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService(
                 assignment,
                 subscribe,
-                meta);
+                meta,
+                tenantProvider,
+                audit);
 
         var result = service.ensureSubscribed("1906385232743451");
 
@@ -41,6 +52,15 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionServiceTest {
         ordered.verify(subscribe).subscribe(
                 "1906385232743451",
                 "system-user-secret");
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("META_WHATSAPP_APP_SUBSCRIBED"),
+                eq("META_WHATSAPP_CONFIG"),
+                eq(businessId),
+                isNull(),
+                eq(Map.of(
+                        "appSubscribed", true,
+                        "assignmentChanged", false)));
     }
 
     @Test
@@ -123,6 +143,8 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionServiceTest {
     void failsClosedWhenMetaDoesNotConfirmSubscription() {
         var assignment = mock(MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService.class);
         var subscribe = mock(MetaWhatsAppEmbeddedSignupSubscribeAppClient.class);
+        var tenantProvider = mock(TenantProvider.class);
+        var audit = mock(AuditService.class);
         MetaWhatsAppProperties meta = readyProperties();
 
         when(assignment.ensureAssigned("1906385232743451"))
@@ -138,7 +160,9 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionServiceTest {
         var service = new MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService(
                 assignment,
                 subscribe,
-                meta);
+                meta,
+                tenantProvider,
+                audit);
 
         ConflictException error = assertThrows(
                 ConflictException.class,
@@ -147,6 +171,7 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionServiceTest {
         assertEquals(
                 "META_EMBEDDED_SIGNUP_APP_SUBSCRIPTION_FAILED",
                 error.getMessage());
+        verifyNoInteractions(audit);
     }
 
     private static MetaWhatsAppProperties readyProperties() {
