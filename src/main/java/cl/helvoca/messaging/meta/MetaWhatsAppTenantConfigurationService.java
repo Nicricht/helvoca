@@ -1,5 +1,6 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.messaging.outbound.MetaWhatsAppMessagingProvider;
 import cl.helvoca.phone.PhoneNumber;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -21,6 +23,7 @@ public class MetaWhatsAppTenantConfigurationService {
     private final MetaWhatsAppCredentialAvailability credentialAvailability;
     private final MetaWhatsAppCertificationReadinessService certificationReadinessService;
     private final MetaWhatsAppDeploymentReadinessService deploymentReadinessService;
+    private final AuditService auditService;
 
     @Autowired
     public MetaWhatsAppTenantConfigurationService(
@@ -29,13 +32,32 @@ public class MetaWhatsAppTenantConfigurationService {
             TenantProvider tenantProvider,
             MetaWhatsAppCredentialAvailability credentialAvailability,
             MetaWhatsAppCertificationReadinessService certificationReadinessService,
-            MetaWhatsAppDeploymentReadinessService deploymentReadinessService) {
+            MetaWhatsAppDeploymentReadinessService deploymentReadinessService,
+            AuditService auditService) {
         this.configs = configs;
         this.phones = phones;
         this.tenantProvider = tenantProvider;
         this.credentialAvailability = credentialAvailability;
         this.certificationReadinessService = certificationReadinessService;
         this.deploymentReadinessService = deploymentReadinessService;
+        this.auditService = auditService;
+    }
+
+    MetaWhatsAppTenantConfigurationService(
+            MetaWhatsAppTenantConfigRepository configs,
+            PhoneNumberRepository phones,
+            TenantProvider tenantProvider,
+            MetaWhatsAppCredentialAvailability credentialAvailability,
+            MetaWhatsAppCertificationReadinessService certificationReadinessService,
+            MetaWhatsAppDeploymentReadinessService deploymentReadinessService) {
+        this(
+                configs,
+                phones,
+                tenantProvider,
+                credentialAvailability,
+                certificationReadinessService,
+                deploymentReadinessService,
+                null);
     }
 
     MetaWhatsAppTenantConfigurationService(
@@ -105,6 +127,9 @@ public class MetaWhatsAppTenantConfigurationService {
             return MetaWhatsAppTenantStatusResponse.notConfigured();
         }
 
+        boolean wasEnabled = (config != null && config.isEnabled())
+                || metaPhones.stream().anyMatch(PhoneNumber::isWhatsappEnabled);
+
         if (config != null && config.isEnabled()) {
             config.setEnabled(false);
             configs.save(config);
@@ -115,6 +140,16 @@ public class MetaWhatsAppTenantConfigurationService {
                 phone.setWhatsappEnabled(false);
                 phones.save(phone);
             }
+        }
+
+        if (wasEnabled && auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "META_WHATSAPP_DEACTIVATE",
+                    "META_WHATSAPP_CONFIG",
+                    businessId,
+                    auditSnapshot(true),
+                    auditSnapshot(false));
         }
 
         boolean credentialReferenceConfigured = config != null
@@ -190,6 +225,15 @@ public class MetaWhatsAppTenantConfigurationService {
         phone.setWhatsappEnabled(true);
         configs.save(config);
         phones.save(phone);
+        if (auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "META_WHATSAPP_ACTIVATE",
+                    "META_WHATSAPP_CONFIG",
+                    businessId,
+                    auditSnapshot(false),
+                    auditSnapshot(true));
+        }
 
         // This only arms the tenant. Global Meta delivery remains controlled by
         // app.meta.whatsapp.enabled and the outbound delivery gate.
@@ -244,6 +288,12 @@ public class MetaWhatsAppTenantConfigurationService {
                 wabaId,
                 credentialRef,
                 false);
+    }
+
+    private static Map<String, Object> auditSnapshot(boolean enabled) {
+        return Map.of(
+                "provider", MetaWhatsAppMessagingProvider.ID,
+                "enabled", enabled);
     }
 
     private static MetaWhatsAppTenantStatusResponse.PhoneView toPhoneView(PhoneNumber phone) {
