@@ -1,5 +1,6 @@
 package cl.helvoca.messaging.outbound;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.messaging.WhatsAppProperties;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
@@ -17,6 +18,7 @@ import java.net.http.HttpResponse;
 import java.net.URLDecoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
@@ -33,6 +35,7 @@ import static org.mockito.Mockito.*;
 class TwilioWhatsAppMessagingProviderTest {
     @Mock PhoneNumberRepository phones;
     @Mock HttpClient http;
+    @Mock AuditService audit;
 
     @Test
     void sendsExpectedTwilioRequestAndReturnsProviderSid() throws Exception {
@@ -73,6 +76,56 @@ class TwilioWhatsAppMessagingProviderTest {
                 "Body", "Mensaje seguro",
                 "StatusCallback", "https://helvoca.example/webhooks/v1/twilio/whatsapp-status"),
                 parseForm(bodyOf(request)));
+    }
+
+    @Test
+    void firstProductionSendAuditsTwilioCertification() throws Exception {
+        UUID businessId = UUID.randomUUID();
+        UUID phoneId = UUID.randomUUID();
+        PhoneNumber sender = mock(PhoneNumber.class);
+        when(sender.getPhoneNumber()).thenReturn("+56922222222");
+        when(sender.getWhatsappCertifiedAt()).thenReturn(null);
+        when(sender.getId()).thenReturn(phoneId);
+        when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(sender));
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(201);
+        when(response.body()).thenReturn("{\"sid\":\"SMaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}");
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        providerWithAudit().send(command(businessId));
+
+        verify(sender).setWhatsappCertifiedAt(any(Instant.class));
+        verify(phones).save(sender);
+        verify(audit).success(
+                businessId,
+                "TWILIO_WHATSAPP_CERTIFICATION_COMPLETED",
+                "WHATSAPP_SENDER",
+                phoneId);
+    }
+
+    @Test
+    void alreadyCertifiedProductionSenderDoesNotRewriteOrAuditCertification() throws Exception {
+        UUID businessId = UUID.randomUUID();
+        PhoneNumber sender = mock(PhoneNumber.class);
+        when(sender.getPhoneNumber()).thenReturn("+56922222222");
+        when(sender.getWhatsappCertifiedAt()).thenReturn(Instant.parse("2026-09-20T00:00:00Z"));
+        when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(sender));
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(201);
+        when(response.body()).thenReturn("{\"sid\":\"SMbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}");
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        providerWithAudit().send(command(businessId));
+
+        verify(sender, never()).setWhatsappCertifiedAt(any());
+        verify(phones, never()).save(sender);
+        verifyNoInteractions(audit);
     }
 
     @Test
@@ -150,6 +203,14 @@ class TwilioWhatsAppMessagingProviderTest {
         twilio.setAuthToken("test-token");
         twilio.setPublicBaseUrl("https://helvoca.example");
         return new TwilioWhatsAppMessagingProvider(twilio, phones, whatsApp, http);
+    }
+
+    private TwilioWhatsAppMessagingProvider providerWithAudit() {
+        TwilioProperties twilio = new TwilioProperties();
+        twilio.setAccountSid("ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        twilio.setAuthToken("test-token");
+        twilio.setPublicBaseUrl("https://helvoca.example");
+        return new TwilioWhatsAppMessagingProvider(twilio, phones, new WhatsAppProperties(), http, audit);
     }
 
     private MessagingProvider.SendCommand command(UUID businessId) {
