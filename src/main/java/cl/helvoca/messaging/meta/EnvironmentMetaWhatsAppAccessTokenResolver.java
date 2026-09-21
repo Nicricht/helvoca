@@ -14,18 +14,28 @@ public class EnvironmentMetaWhatsAppAccessTokenResolver
         implements MetaWhatsAppAccessTokenResolver {
 
     private final MetaWhatsAppTenantConfigRepository configs;
+    private final MetaWhatsAppProperties metaProperties;
     private final Function<String, String> environment;
 
     @Autowired
     public EnvironmentMetaWhatsAppAccessTokenResolver(
-            MetaWhatsAppTenantConfigRepository configs) {
-        this(configs, System::getenv);
+            MetaWhatsAppTenantConfigRepository configs,
+            MetaWhatsAppProperties metaProperties) {
+        this(configs, metaProperties, System::getenv);
     }
 
     EnvironmentMetaWhatsAppAccessTokenResolver(
             MetaWhatsAppTenantConfigRepository configs,
             Function<String, String> environment) {
+        this(configs, new MetaWhatsAppProperties(), environment);
+    }
+
+    EnvironmentMetaWhatsAppAccessTokenResolver(
+            MetaWhatsAppTenantConfigRepository configs,
+            MetaWhatsAppProperties metaProperties,
+            Function<String, String> environment) {
         this.configs = configs;
+        this.metaProperties = metaProperties;
         this.environment = environment;
     }
 
@@ -39,6 +49,12 @@ public class EnvironmentMetaWhatsAppAccessTokenResolver
 
         String credentialRef = normalizeCredentialRef(config.getCredentialRef());
         if (credentialRef == null) return Optional.empty();
+
+        if (MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.EMBEDDED_SIGNUP_SYSTEM_USER
+                .equals(credentialRef)) {
+            String token = metaProperties.getEmbeddedSignupSystemUserAccessToken();
+            return token.isBlank() ? Optional.empty() : Optional.of(token);
+        }
 
         String variable = "HELVOCA_META_WHATSAPP_" + credentialRef + "_ACCESS_TOKEN";
         String token = environment.apply(variable);
