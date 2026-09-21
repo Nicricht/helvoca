@@ -761,6 +761,7 @@
     }
 
     activationButton?.addEventListener("click", async () => {
+      if (!canManageMeta) return;
       const accepted = window.confirm(
         "Vas a habilitar WhatsApp para este negocio. La entrega real seguirá sujeta a las compuertas globales del despliegue. ¿Confirmas?"
       );
@@ -795,6 +796,7 @@
     });
 
     deactivationButton?.addEventListener("click", async () => {
+      if (!canManageMeta) return;
       const accepted = window.confirm(
         "Vas a desactivar WhatsApp para este negocio. La configuración se conservará y podrás volver a activarla cuando las validaciones estén listas. ¿Confirmas?"
       );
