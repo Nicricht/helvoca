@@ -274,6 +274,84 @@ class MetaWhatsAppTenantConfigurationServiceTest {
     }
 
     @Test
+    void activateRefusesAlreadyEnabledTenantAndChangesNothing() {
+        UUID businessId = UUID.randomUUID();
+        MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        MetaWhatsAppCredentialAvailability credentials = mock(MetaWhatsAppCredentialAvailability.class);
+        MetaWhatsAppCertificationReadinessService certification = mock(MetaWhatsAppCertificationReadinessService.class);
+        MetaWhatsAppDeploymentReadinessService deployment = mock(MetaWhatsAppDeploymentReadinessService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+
+        MetaWhatsAppTenantConfig config = new MetaWhatsAppTenantConfig();
+        config.setBusinessId(businessId);
+        config.setCredentialRef("ACME_01");
+        config.setEnabled(true);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(configs.findById(businessId)).thenReturn(Optional.of(config));
+        when(credentials.isAvailable("ACME_01")).thenReturn(true);
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of(phone));
+        when(phone.getWhatsappProvider()).thenReturn("META_WHATSAPP_CLOUD");
+        when(phone.getWhatsappExternalId()).thenReturn("123456789012345");
+        when(phone.isActive()).thenReturn(true);
+        when(phone.isWhatsappEnabled()).thenReturn(true);
+
+        var service = new MetaWhatsAppTenantConfigurationService(
+                configs, phones, tenantProvider, credentials, certification, deployment);
+
+        var error = assertThrows(IllegalStateException.class, service::activate);
+
+        assertEquals("Meta WhatsApp must be configured and disabled before activation", error.getMessage());
+        assertTrue(config.isEnabled());
+        verify(certification, never()).readiness();
+        verify(deployment, never()).readiness();
+        verify(configs, never()).save(any());
+        verify(phones, never()).save(any());
+        verify(phone, never()).setWhatsappEnabled(true);
+    }
+
+    @Test
+    void activateRefusesPartiallyEnabledPhoneAndChangesNothing() {
+        UUID businessId = UUID.randomUUID();
+        MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        MetaWhatsAppCredentialAvailability credentials = mock(MetaWhatsAppCredentialAvailability.class);
+        MetaWhatsAppCertificationReadinessService certification = mock(MetaWhatsAppCertificationReadinessService.class);
+        MetaWhatsAppDeploymentReadinessService deployment = mock(MetaWhatsAppDeploymentReadinessService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+
+        MetaWhatsAppTenantConfig config = new MetaWhatsAppTenantConfig();
+        config.setBusinessId(businessId);
+        config.setCredentialRef("ACME_01");
+        config.setEnabled(false);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(configs.findById(businessId)).thenReturn(Optional.of(config));
+        when(credentials.isAvailable("ACME_01")).thenReturn(true);
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of(phone));
+        when(phone.getWhatsappProvider()).thenReturn("META_WHATSAPP_CLOUD");
+        when(phone.getWhatsappExternalId()).thenReturn("123456789012345");
+        when(phone.isActive()).thenReturn(true);
+        when(phone.isWhatsappEnabled()).thenReturn(true);
+
+        var service = new MetaWhatsAppTenantConfigurationService(
+                configs, phones, tenantProvider, credentials, certification, deployment);
+
+        var error = assertThrows(IllegalStateException.class, service::activate);
+
+        assertEquals("Meta WhatsApp must be configured and disabled before activation", error.getMessage());
+        assertFalse(config.isEnabled());
+        verify(certification, never()).readiness();
+        verify(deployment, never()).readiness();
+        verify(configs, never()).save(any());
+        verify(phones, never()).save(any());
+        verify(phone, never()).setWhatsappEnabled(true);
+    }
+
+    @Test
     void activateRefusesIncompleteCertificationAndChangesNothing() {
         UUID businessId = UUID.randomUUID();
         MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
