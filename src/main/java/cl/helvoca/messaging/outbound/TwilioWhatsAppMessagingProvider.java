@@ -1,5 +1,6 @@
 package cl.helvoca.messaging.outbound;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.messaging.WhatsAppProperties;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
@@ -32,22 +33,38 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
     private final PhoneNumberRepository phones;
     private final WhatsAppProperties whatsApp;
     private final HttpClient http;
+    private final AuditService auditService;
 
     @Autowired
     public TwilioWhatsAppMessagingProvider(TwilioProperties twilio,
                                            PhoneNumberRepository phones,
-                                           WhatsAppProperties whatsApp) {
-        this(twilio, phones, whatsApp, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
+                                           WhatsAppProperties whatsApp,
+                                           AuditService auditService) {
+        this(
+                twilio,
+                phones,
+                whatsApp,
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build(),
+                auditService);
     }
 
     TwilioWhatsAppMessagingProvider(TwilioProperties twilio,
                                     PhoneNumberRepository phones,
                                     WhatsAppProperties whatsApp,
                                     HttpClient http) {
+        this(twilio, phones, whatsApp, http, null);
+    }
+
+    TwilioWhatsAppMessagingProvider(TwilioProperties twilio,
+                                    PhoneNumberRepository phones,
+                                    WhatsAppProperties whatsApp,
+                                    HttpClient http,
+                                    AuditService auditService) {
         this.twilio = twilio;
         this.phones = phones;
         this.whatsApp = whatsApp;
         this.http = http;
+        this.auditService = auditService;
     }
 
     @Override
@@ -112,9 +129,16 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
             }
             String sid = new JSONObject(response.body()).optString("sid", "").trim();
             if (sid.isBlank()) throw new IllegalStateException("Twilio did not return a message SID");
-            if (!sandbox) {
+            if (!sandbox && senderPhone.getWhatsappCertifiedAt() == null) {
                 senderPhone.setWhatsappCertifiedAt(Instant.now());
                 phones.save(senderPhone);
+                if (auditService != null) {
+                    auditService.success(
+                            command.businessId(),
+                            "TWILIO_WHATSAPP_CERTIFICATION_COMPLETED",
+                            "WHATSAPP_SENDER",
+                            senderPhone.getId());
+                }
             }
             return new SendResult(sid);
         } catch (InterruptedException e) {
