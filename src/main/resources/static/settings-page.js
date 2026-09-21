@@ -767,6 +767,7 @@
         }
         activationGateTitle.textContent = "WhatsApp activado";
         activationGateCopy.textContent = "Este negocio quedó habilitado para Meta. La entrega real continúa sujeta a las compuertas globales del despliegue.";
+        preparedState?.classList.add("hidden");
         activationButton.classList.add("hidden");
         deactivationButton?.classList.remove("hidden");
         if (deactivationButton) deactivationButton.disabled = false;
