@@ -87,4 +87,13 @@ test('Meta state handlers fail closed before privileged actions', async () => {
   expect(settings).toMatch(
     /deactivationButton\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
   );
+  expect(settings).toMatch(
+    /wabaConfirmButton\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
+  );
+  expect(settings).toMatch(
+    /phoneConfirmButton\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
+  );
+  expect(settings).toMatch(
+    /finalizePhoneButton\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
+  );
 });
