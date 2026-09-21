@@ -17,6 +17,7 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
         var registration = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService.class);
         var configuration = mock(MetaWhatsAppTenantConfigurationService.class);
         var resolver = mock(MetaWhatsAppEmbeddedSignupPhoneRecordResolverService.class);
+        var credentialReference = mock(MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.class);
 
         when(registration.register("1906385232743451", "1913623884432103", "123456"))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationResult(
@@ -26,41 +27,48 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
                         "RecepVoz Demo",
                         true));
         when(resolver.resolve("+56 9 3333 4444")).thenReturn(phoneRecordId);
+        when(credentialReference.requireReference())
+                .thenReturn(MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.EMBEDDED_SIGNUP_SYSTEM_USER);
         when(configuration.replace(any(MetaWhatsAppTenantConfigurationRequest.class)))
                 .thenReturn(new MetaWhatsAppTenantConfigurationResponse(
                         phoneRecordId,
                         MetaWhatsAppMessagingProvider.ID,
                         "1913623884432103",
                         "1906385232743451",
-                        "TENANT_01",
+                        MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.EMBEDDED_SIGNUP_SYSTEM_USER,
                         false));
 
         var service = new MetaWhatsAppEmbeddedSignupPhoneStagingService(
                 registration,
                 configuration,
-                resolver);
+                resolver,
+                credentialReference);
 
         var result = service.registerAndStage(
                 "1906385232743451",
                 "1913623884432103",
-                "TENANT_01",
                 "123456");
 
         assertEquals("PHONE_NUMBER_REGISTERED_AND_STAGED", result.state());
         assertEquals(phoneRecordId, result.phoneRecordId());
+        assertEquals(
+                MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.EMBEDDED_SIGNUP_SYSTEM_USER,
+                result.credentialRef());
         assertFalse(result.enabled());
 
-        var ordered = inOrder(registration, resolver, configuration);
+        var ordered = inOrder(registration, resolver, credentialReference, configuration);
         ordered.verify(registration).register(
                 "1906385232743451",
                 "1913623884432103",
                 "123456");
         ordered.verify(resolver).resolve("+56 9 3333 4444");
+        ordered.verify(credentialReference).requireReference();
         ordered.verify(configuration).replace(argThat(request ->
                 phoneRecordId.equals(request.phoneRecordId())
                         && MetaWhatsAppMessagingProvider.ID.equals(request.provider())
                         && "1913623884432103".equals(request.providerPhoneNumberId())
-                        && "TENANT_01".equals(request.credentialRef())
+                        && MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.EMBEDDED_SIGNUP_SYSTEM_USER
+                                .equals(request.credentialRef())
                         && "1906385232743451".equals(request.wabaId())));
     }
 
@@ -69,6 +77,7 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
         var registration = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService.class);
         var configuration = mock(MetaWhatsAppTenantConfigurationService.class);
         var resolver = mock(MetaWhatsAppEmbeddedSignupPhoneRecordResolverService.class);
+        var credentialReference = mock(MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.class);
 
         when(registration.register(anyString(), anyString(), anyString()))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationResult(
@@ -81,17 +90,17 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
         var service = new MetaWhatsAppEmbeddedSignupPhoneStagingService(
                 registration,
                 configuration,
-                resolver);
+                resolver,
+                credentialReference);
 
         ConflictException error = assertThrows(
                 ConflictException.class,
                 () -> service.registerAndStage(
                         "1906385232743451",
                         "1913623884432103",
-                        "TENANT_01",
                         "123456"));
 
         assertEquals("META_EMBEDDED_SIGNUP_PHONE_NOT_REGISTERED", error.getMessage());
-        verifyNoInteractions(resolver, configuration);
+        verifyNoInteractions(resolver, credentialReference, configuration);
     }
 }
