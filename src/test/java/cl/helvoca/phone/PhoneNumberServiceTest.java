@@ -1,11 +1,13 @@
 package cl.helvoca.phone;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -65,6 +67,7 @@ class PhoneNumberServiceTest {
     void disablingWhatsappClearsPreviousCertification() {
         PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService audit = mock(AuditService.class);
         UUID businessId = UUID.randomUUID();
         UUID phoneId = UUID.randomUUID();
         when(tenantProvider.requireBusinessId()).thenReturn(businessId);
@@ -77,12 +80,23 @@ class PhoneNumberServiceTest {
         when(repository.findByIdAndBusinessId(phoneId, businessId)).thenReturn(Optional.of(phone));
         when(repository.save(phone)).thenReturn(phone);
 
-        PhoneNumberService service = new PhoneNumberService(repository, tenantProvider);
+        PhoneNumberService service = new PhoneNumberService(repository, tenantProvider, audit);
         PhoneNumberResponse response = service.setWhatsappEnabled(phoneId, false);
 
         assertFalse(response.whatsappEnabled());
         assertNull(response.whatsappCertifiedAt());
         verify(repository).save(phone);
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("WHATSAPP_CERTIFICATION_CLEARED"),
+                eq("WHATSAPP_SENDER"),
+                eq(businessId),
+                eq(Map.of(
+                        "whatsappEnabled", true,
+                        "certified", true)),
+                eq(Map.of(
+                        "whatsappEnabled", false,
+                        "certified", false)));
     }
 
     @Test
