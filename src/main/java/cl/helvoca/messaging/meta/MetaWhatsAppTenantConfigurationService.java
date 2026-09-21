@@ -19,24 +19,38 @@ public class MetaWhatsAppTenantConfigurationService {
     private final PhoneNumberRepository phones;
     private final TenantProvider tenantProvider;
     private final MetaWhatsAppCredentialAvailability credentialAvailability;
+    private final MetaWhatsAppCertificationReadinessService certificationReadinessService;
+    private final MetaWhatsAppDeploymentReadinessService deploymentReadinessService;
 
     @Autowired
     public MetaWhatsAppTenantConfigurationService(
             MetaWhatsAppTenantConfigRepository configs,
             PhoneNumberRepository phones,
             TenantProvider tenantProvider,
-            MetaWhatsAppCredentialAvailability credentialAvailability) {
+            MetaWhatsAppCredentialAvailability credentialAvailability,
+            MetaWhatsAppCertificationReadinessService certificationReadinessService,
+            MetaWhatsAppDeploymentReadinessService deploymentReadinessService) {
         this.configs = configs;
         this.phones = phones;
         this.tenantProvider = tenantProvider;
         this.credentialAvailability = credentialAvailability;
+        this.certificationReadinessService = certificationReadinessService;
+        this.deploymentReadinessService = deploymentReadinessService;
     }
 
     MetaWhatsAppTenantConfigurationService(
             MetaWhatsAppTenantConfigRepository configs,
             PhoneNumberRepository phones,
             TenantProvider tenantProvider) {
-        this(configs, phones, tenantProvider, credentialRef -> false);
+        this(configs, phones, tenantProvider, credentialRef -> false, null, null);
+    }
+
+    MetaWhatsAppTenantConfigurationService(
+            MetaWhatsAppTenantConfigRepository configs,
+            PhoneNumberRepository phones,
+            TenantProvider tenantProvider,
+            MetaWhatsAppCredentialAvailability credentialAvailability) {
+        this(configs, phones, tenantProvider, credentialAvailability, null, null);
     }
 
     @Transactional(readOnly = true)
@@ -156,6 +170,21 @@ public class MetaWhatsAppTenantConfigurationService {
         }
 
         normalizeProviderPhoneNumberId(phone.getWhatsappExternalId());
+
+        if (certificationReadinessService == null || deploymentReadinessService == null) {
+            throw new IllegalStateException("Meta WhatsApp activation readiness is unavailable");
+        }
+
+        MetaWhatsAppCertificationReadinessResponse certification = certificationReadinessService.readiness();
+        if (!certification.ready() || !certification.alreadyCertified()) {
+            throw new IllegalStateException("Meta WhatsApp certification is incomplete");
+        }
+
+        MetaWhatsAppDeploymentReadinessResponse deployment = deploymentReadinessService.readiness();
+        if (!"READY_FOR_TENANT_STAGING".equals(deployment.state())
+                || !deployment.readyForTenantStaging()) {
+            throw new IllegalStateException("Meta WhatsApp deployment staging is not ready");
+        }
 
         config.setEnabled(true);
         phone.setWhatsappEnabled(true);
