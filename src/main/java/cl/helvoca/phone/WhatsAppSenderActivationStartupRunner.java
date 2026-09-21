@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 public class WhatsAppSenderActivationStartupRunner implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(WhatsAppSenderActivationStartupRunner.class);
     private static final Pattern E164 = Pattern.compile("^\\+[1-9][0-9]{7,14}$");
+    private static final String TWILIO_WHATSAPP_PROVIDER = "TWILIO_WHATSAPP";
 
     private final boolean enabled;
     private final String senderE164;
@@ -39,6 +40,9 @@ public class WhatsAppSenderActivationStartupRunner implements ApplicationRunner 
                 .orElseThrow(() -> new IllegalStateException("Configured WhatsApp sender is not registered in Helvoca"));
         if (!phone.isActive()) {
             throw new IllegalStateException("Configured WhatsApp sender must be active");
+        }
+        if (!TWILIO_WHATSAPP_PROVIDER.equalsIgnoreCase(phone.getWhatsappProvider())) {
+            throw new IllegalStateException("Configured WhatsApp sender must use TWILIO_WHATSAPP provider");
         }
 
         boolean anotherSender = repository
