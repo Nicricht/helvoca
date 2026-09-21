@@ -8,6 +8,7 @@ const json = body => ({
 
 test('Embedded Signup renders WABA candidates after secure authorization', async ({ page }) => {
   const authorizationBodies = [];
+  const phoneDiscoveryBodies = [];
   const unexpectedEmbeddedSignupRequests = [];
 
   page.on('request', request => {
@@ -15,7 +16,8 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
     const embeddedSignupPrefix = '/api/v1/channels/whatsapp/meta/embedded-signup/';
     const allowed = new Set([
       `${embeddedSignupPrefix}bootstrap`,
-      `${embeddedSignupPrefix}authorization-code`
+      `${embeddedSignupPrefix}authorization-code`,
+      `${embeddedSignupPrefix}waba/phone-numbers`
     ]);
     if (pathname.startsWith(embeddedSignupPrefix) && !allowed.has(pathname)) {
       unexpectedEmbeddedSignupRequests.push(pathname);
@@ -41,6 +43,24 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
       graphApiVersion: 'v99.0'
     }))
   );
+
+  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/waba/phone-numbers', async route => {
+    phoneDiscoveryBodies.push(route.request().postDataJSON());
+    await route.fulfill(json({
+      state: 'PHONE_NUMBERS_DISCOVERED',
+      appSubscribed: true,
+      phoneNumbers: [
+        {
+          id: '12025550123',
+          displayPhoneNumber: '+56 9 1111 2222',
+          verifiedName: 'RecepVoz Demo',
+          qualityRating: 'GREEN',
+          codeVerificationStatus: 'VERIFIED'
+        }
+      ],
+      afterCursor: null
+    }));
+  });
 
   await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/authorization-code', async route => {
     authorizationBodies.push(route.request().postDataJSON());
@@ -160,5 +180,15 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(firstCard.getByRole('button', { name: 'Seleccionar', exact: true }))
     .toHaveAttribute('aria-pressed', 'false');
 
+  await expect.poll(() => phoneDiscoveryBodies).toEqual([]);
+  await expect.poll(() => unexpectedEmbeddedSignupRequests).toEqual([]);
+
+  const confirmButton = page.getByRole('button', { name: 'Continuar con esta cuenta', exact: true });
+  await expect(confirmButton).toBeVisible();
+  await confirmButton.click();
+
+  await expect.poll(() => phoneDiscoveryBodies).toEqual([{ wabaId: '1906385232743452' }]);
+  await expect(page.locator('#metaWhatsAppWabaConfirmStatus'))
+    .toHaveText('Cuenta confirmada. Meta devolvió 1 número.');
   await expect.poll(() => unexpectedEmbeddedSignupRequests).toEqual([]);
 });
