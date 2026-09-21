@@ -452,7 +452,7 @@
           spellcheck="false"
           aria-describedby="metaWhatsAppPinHelp metaWhatsAppPinStatus"
         />
-        <span id="metaWhatsAppPinHelp">Ingresa exactamente 6 dígitos. El PIN se usa solo para registrar este número y luego se elimina del formulario.</span>
+        <span id="metaWhatsAppPinHelp">Ingresa exactamente 6 dígitos. El PIN se usa solo para registrar el número y guardar la configuración desactivada; luego se elimina del formulario.</span>
         <button id="metaWhatsAppFinalizePhoneBtn" class="button secondary" type="button" disabled>Finalizar configuración</button>
         <span id="metaWhatsAppPinStatus" role="status"></span>
       </div>
