@@ -561,6 +561,7 @@
     panel.appendChild(section);
 
     const button = section.querySelector("#metaWhatsAppConnectBtn");
+    button?.classList.toggle("hidden", !canManageMeta);
     const message = section.querySelector("#metaWhatsAppConnectMessage");
     const wabaCandidates = section.querySelector("#metaWhatsAppWabaCandidates");
     const wabaConfirm = section.querySelector("#metaWhatsAppWabaConfirm");
