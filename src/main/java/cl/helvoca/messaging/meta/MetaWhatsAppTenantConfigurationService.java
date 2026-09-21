@@ -168,6 +168,9 @@ public class MetaWhatsAppTenantConfigurationService {
         if (!phone.isActive()) {
             throw new IllegalStateException("Meta WhatsApp phone is inactive");
         }
+        if (config.isEnabled() || phone.isWhatsappEnabled()) {
+            throw new IllegalStateException("Meta WhatsApp must be configured and disabled before activation");
+        }
 
         normalizeProviderPhoneNumberId(phone.getWhatsappExternalId());
 
