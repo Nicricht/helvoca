@@ -264,6 +264,13 @@ public class MetaWhatsAppTenantConfigurationService {
         PhoneNumber phone = phones.findByIdAndBusinessId(request.phoneRecordId(), businessId)
                 .orElseThrow(() -> new NotFoundException("Phone number not found"));
 
+        MetaWhatsAppTenantConfig existingConfig = configs.findById(businessId).orElse(null);
+        boolean wasConfigured = existingConfig != null
+                || MetaWhatsAppMessagingProvider.ID.equals(phone.getWhatsappProvider());
+        boolean wasEnabled = (existingConfig != null && existingConfig.isEnabled())
+                || (MetaWhatsAppMessagingProvider.ID.equals(phone.getWhatsappProvider())
+                        && phone.isWhatsappEnabled());
+
         phone.setWhatsappProvider(MetaWhatsAppMessagingProvider.ID);
         phone.setWhatsappExternalId(providerPhoneNumberId);
 
@@ -273,13 +280,24 @@ public class MetaWhatsAppTenantConfigurationService {
         phone.setWhatsappCertifiedAt(null);
         phones.save(phone);
 
-        MetaWhatsAppTenantConfig config = configs.findById(businessId)
-                .orElseGet(MetaWhatsAppTenantConfig::new);
+        MetaWhatsAppTenantConfig config = existingConfig == null
+                ? new MetaWhatsAppTenantConfig()
+                : existingConfig;
         config.setBusinessId(businessId);
         config.setCredentialRef(credentialRef);
         config.setWabaId(wabaId);
         config.setEnabled(false);
         configs.save(config);
+
+        if (auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "META_WHATSAPP_CONFIG_REPLACE",
+                    "META_WHATSAPP_CONFIG",
+                    businessId,
+                    auditConfigurationSnapshot(wasConfigured, wasEnabled),
+                    auditConfigurationSnapshot(true, false));
+        }
 
         return new MetaWhatsAppTenantConfigurationResponse(
                 request.phoneRecordId(),
@@ -293,6 +311,13 @@ public class MetaWhatsAppTenantConfigurationService {
     private static Map<String, Object> auditSnapshot(boolean enabled) {
         return Map.of(
                 "provider", MetaWhatsAppMessagingProvider.ID,
+                "enabled", enabled);
+    }
+
+    private static Map<String, Object> auditConfigurationSnapshot(boolean configured, boolean enabled) {
+        return Map.of(
+                "provider", MetaWhatsAppMessagingProvider.ID,
+                "configured", configured,
                 "enabled", enabled);
     }
 
