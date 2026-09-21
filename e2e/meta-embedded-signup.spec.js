@@ -308,11 +308,8 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(page.locator('#metaWhatsAppPinStatus'))
     .toHaveText('Número registrado en Meta. PIN eliminado del formulario.');
   await expect(pinInput).toHaveValue('');
+  await expect(pinInput).toBeDisabled();
   await expect(registerPhoneButton).toBeDisabled();
-
-  await pinInput.fill('12345');
-  await expect(page.locator('#metaWhatsAppPinStatus'))
-    .toHaveText('El PIN debe tener exactamente 6 dígitos.');
 
   await expect.poll(() => phoneValidationBodies).toEqual([{
     wabaId: '1906385232743452',
