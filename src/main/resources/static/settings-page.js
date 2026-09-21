@@ -211,6 +211,25 @@
       font-size: 11px;
       line-height: 1.4;
     }
+    #metaWhatsAppCertificationState {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      background: rgba(255,255,255,.025);
+    }
+    #metaWhatsAppCertificationState.hidden { display: none; }
+    #metaWhatsAppCertificationState strong {
+      display: block;
+      font-size: 12px;
+    }
+    #metaWhatsAppCertificationState span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -479,6 +498,10 @@
         <strong>WhatsApp preparado</strong>
         <span>Configuración guardada y desactivada. Todavía no se ha activado el tráfico real.</span>
       </div>
+      <div id="metaWhatsAppCertificationState" class="hidden" role="status">
+        <strong></strong>
+        <span></span>
+      </div>
     `;
     panel.appendChild(section);
 
@@ -497,6 +520,27 @@
     const finalizePhoneButton = section.querySelector("#metaWhatsAppFinalizePhoneBtn");
     const pinStatus = section.querySelector("#metaWhatsAppPinStatus");
     const preparedState = section.querySelector("#metaWhatsAppPreparedState");
+    const certificationState = section.querySelector("#metaWhatsAppCertificationState");
+    const certificationTitle = certificationState?.querySelector("strong");
+    const certificationCopy = certificationState?.querySelector("span");
+
+    function renderCertificationReadiness(readiness) {
+      if (!certificationState || !certificationTitle || !certificationCopy) return;
+      const blockers = Array.isArray(readiness?.blockers) ? readiness.blockers : [];
+      if (readiness?.alreadyCertified === true && readiness?.ready === true) {
+        certificationTitle.textContent = "WhatsApp certificado";
+        certificationCopy.textContent = "La configuración ya superó la certificación técnica.";
+      } else if (readiness?.ready === true) {
+        certificationTitle.textContent = "Listo para certificación piloto";
+        certificationCopy.textContent = "No hay bloqueos técnicos pendientes para iniciar la certificación.";
+      } else {
+        certificationTitle.textContent = "Certificación pendiente";
+        certificationCopy.textContent = blockers.length
+          ? `Hay ${blockers.length} bloqueo${blockers.length === 1 ? "" : "s"} técnico${blockers.length === 1 ? "" : "s"} pendiente${blockers.length === 1 ? "" : "s"}.`
+          : "La certificación todavía no está lista.";
+      }
+      certificationState.classList.remove("hidden");
+    }
 
     function resetPinSetup() {
       selectedPhoneFinalization = null;
@@ -508,6 +552,9 @@
       if (pinStatus) pinStatus.textContent = "";
       pinSetup?.classList.add("hidden");
       preparedState?.classList.add("hidden");
+      certificationState?.classList.add("hidden");
+      if (certificationTitle) certificationTitle.textContent = "";
+      if (certificationCopy) certificationCopy.textContent = "";
     }
 
     wabaCandidates?.addEventListener("meta-waba-selected", () => {
@@ -619,6 +666,14 @@
         }
         if (pinStatus) pinStatus.textContent = "PIN eliminado del formulario.";
         preparedState?.classList.remove("hidden");
+        try {
+          const readiness = await api("/api/v1/channels/whatsapp/meta/certification/readiness");
+          renderCertificationReadiness(readiness);
+        } catch (error) {
+          if (certificationTitle) certificationTitle.textContent = "Certificación pendiente";
+          if (certificationCopy) certificationCopy.textContent = "No fue posible verificar la readiness técnica.";
+          certificationState?.classList.remove("hidden");
+        }
       } catch (error) {
         selectedPhoneFinalization = null;
         if (pinStatus) pinStatus.textContent = "No fue posible finalizar la configuración. Revisa el PIN e intenta nuevamente.";
