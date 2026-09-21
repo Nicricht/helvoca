@@ -110,6 +110,18 @@
     #metaWhatsAppWabaCandidates .meta-whatsapp-waba-select {
       margin-top: 9px;
     }
+    #metaWhatsAppWabaConfirm {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    #metaWhatsAppWabaConfirm.hidden { display: none; }
+    #metaWhatsAppWabaConfirmStatus {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -121,6 +133,7 @@
 
   let requested = false;
   let facebookSdkPromise = null;
+  let selectedPhoneDiscovery = null;
 
   function initFacebookSdk(bootstrap) {
     if (!window.FB?.init) throw new Error("Facebook SDK unavailable");
@@ -224,6 +237,7 @@
       } else {
         selectButton.addEventListener("click", () => {
           const selectedWabaId = String(waba.id);
+          selectedPhoneDiscovery = null;
           container.querySelectorAll(".meta-whatsapp-waba-card").forEach(candidate => {
             const selected = candidate.dataset.wabaId === selectedWabaId;
             candidate.classList.toggle("selected", selected);
@@ -234,6 +248,9 @@
               candidateButton.textContent = selected ? "Seleccionado" : "Seleccionar";
             }
           });
+          container.dispatchEvent(new CustomEvent("meta-waba-selected", {
+            detail: { wabaId: selectedWabaId }
+          }));
         });
       }
 
@@ -268,12 +285,55 @@
       </div>
       <div id="metaWhatsAppConnectMessage" class="hidden" role="status"></div>
       <div id="metaWhatsAppWabaCandidates" class="hidden" aria-live="polite"></div>
+      <div id="metaWhatsAppWabaConfirm" class="hidden">
+        <button id="metaWhatsAppWabaConfirmBtn" class="button secondary" type="button">Continuar con esta cuenta</button>
+        <span id="metaWhatsAppWabaConfirmStatus" role="status"></span>
+      </div>
     `;
     panel.appendChild(section);
 
     const button = section.querySelector("#metaWhatsAppConnectBtn");
     const message = section.querySelector("#metaWhatsAppConnectMessage");
     const wabaCandidates = section.querySelector("#metaWhatsAppWabaCandidates");
+    const wabaConfirm = section.querySelector("#metaWhatsAppWabaConfirm");
+    const wabaConfirmButton = section.querySelector("#metaWhatsAppWabaConfirmBtn");
+    const wabaConfirmStatus = section.querySelector("#metaWhatsAppWabaConfirmStatus");
+
+    wabaCandidates?.addEventListener("meta-waba-selected", () => {
+      selectedPhoneDiscovery = null;
+      if (wabaConfirmStatus) wabaConfirmStatus.textContent = "";
+      wabaConfirm?.classList.remove("hidden");
+      if (wabaConfirmButton) wabaConfirmButton.disabled = false;
+    });
+
+    wabaConfirmButton?.addEventListener("click", async () => {
+      const selectedCard = wabaCandidates?.querySelector('.meta-whatsapp-waba-card[data-selected="true"]');
+      const wabaId = selectedCard?.dataset.wabaId;
+      if (!wabaId) return;
+
+      wabaConfirmButton.disabled = true;
+      if (wabaConfirmStatus) wabaConfirmStatus.textContent = "Consultando números de WhatsApp Business…";
+      try {
+        selectedPhoneDiscovery = await api("/api/v1/channels/whatsapp/meta/embedded-signup/waba/phone-numbers", {
+          method: "POST",
+          body: JSON.stringify({ wabaId })
+        });
+        const phoneCount = Array.isArray(selectedPhoneDiscovery?.phoneNumbers)
+          ? selectedPhoneDiscovery.phoneNumbers.length
+          : 0;
+        if (wabaConfirmStatus) {
+          wabaConfirmStatus.textContent = "Cuenta confirmada. Meta devolvió " + phoneCount + " número" + (phoneCount === 1 ? "" : "s") + ".";
+        }
+      } catch (error) {
+        selectedPhoneDiscovery = null;
+        if (wabaConfirmStatus) {
+          wabaConfirmStatus.textContent = "No fue posible consultar los números de esta cuenta. Intenta nuevamente.";
+        }
+      } finally {
+        wabaConfirmButton.disabled = false;
+      }
+    });
+
     button?.addEventListener("click", async () => {
       if (button.dataset.sdkReady === "true") {
         if (!window.FB?.login) {
@@ -286,6 +346,9 @@
 
         button.disabled = true;
         renderWabaCandidates(null, wabaCandidates);
+        selectedPhoneDiscovery = null;
+        wabaConfirm?.classList.add("hidden");
+        if (wabaConfirmStatus) wabaConfirmStatus.textContent = "";
         message.textContent = "Abriendo autorización segura de Meta…";
         message.classList.remove("hidden");
         window.FB.login(async response => {
