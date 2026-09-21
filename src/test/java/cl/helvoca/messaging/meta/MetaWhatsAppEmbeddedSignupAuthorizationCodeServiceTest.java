@@ -1,9 +1,13 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.ConflictException;
+import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -29,12 +33,16 @@ class MetaWhatsAppEmbeddedSignupAuthorizationCodeServiceTest {
 
     @Test
     void exchangesValidatesDiscoversWabasAndReportsAssignmentWithoutExposingSecrets() {
+        UUID businessId = UUID.randomUUID();
         MetaWhatsAppProperties meta = readyProperties();
         var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
         var exchange = mock(MetaWhatsAppEmbeddedSignupTokenExchangeClient.class);
         var debug = mock(MetaWhatsAppEmbeddedSignupTokenDebugClient.class);
         var sharedWabas = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
         var assignedUsers = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
+        var tenantProvider = mock(TenantProvider.class);
+        var audit = mock(AuditService.class);
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
 
         when(exchange.exchange("temporary-sensitive-code"))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupToken(
@@ -77,7 +85,14 @@ class MetaWhatsAppEmbeddedSignupAuthorizationCodeServiceTest {
                                 List.of("MANAGE")))));
 
         var service = new MetaWhatsAppEmbeddedSignupAuthorizationCodeService(
-                readiness, exchange, debug, sharedWabas, assignedUsers, meta);
+                readiness,
+                exchange,
+                debug,
+                sharedWabas,
+                assignedUsers,
+                meta,
+                tenantProvider,
+                audit);
         var request = new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest(
                 "  temporary-sensitive-code  ");
 
@@ -115,6 +130,15 @@ class MetaWhatsAppEmbeddedSignupAuthorizationCodeServiceTest {
                 "1972385232742141",
                 "112233445566778",
                 "system-user-secret");
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("META_WHATSAPP_AUTHORIZATION_ACCEPTED"),
+                eq("META_WHATSAPP_CONFIG"),
+                eq(businessId),
+                isNull(),
+                eq(Map.of(
+                        "accepted", true,
+                        "wabaCandidates", 2)));
     }
 
     @Test
