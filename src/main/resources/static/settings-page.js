@@ -249,6 +249,25 @@
       font-size: 11px;
       line-height: 1.4;
     }
+    #metaWhatsAppActivationGate {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      background: rgba(255,255,255,.025);
+    }
+    #metaWhatsAppActivationGate.hidden { display: none; }
+    #metaWhatsAppActivationGate strong {
+      display: block;
+      font-size: 12px;
+    }
+    #metaWhatsAppActivationGate span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -525,6 +544,10 @@
         <strong></strong>
         <span></span>
       </div>
+      <div id="metaWhatsAppActivationGate" class="hidden" role="status">
+        <strong></strong>
+        <span></span>
+      </div>
     `;
     panel.appendChild(section);
 
@@ -549,6 +572,9 @@
     const deploymentState = section.querySelector("#metaWhatsAppDeploymentState");
     const deploymentTitle = deploymentState?.querySelector("strong");
     const deploymentCopy = deploymentState?.querySelector("span");
+    const activationGate = section.querySelector("#metaWhatsAppActivationGate");
+    const activationGateTitle = activationGate?.querySelector("strong");
+    const activationGateCopy = activationGate?.querySelector("span");
     let onboardingInteractionStarted = false;
 
     function renderCertificationReadiness(readiness) {
@@ -573,10 +599,12 @@
       try {
         const readiness = await api("/api/v1/channels/whatsapp/meta/certification/readiness");
         renderCertificationReadiness(readiness);
+        return readiness;
       } catch (error) {
         if (certificationTitle) certificationTitle.textContent = "Certificación pendiente";
         if (certificationCopy) certificationCopy.textContent = "No fue posible verificar la readiness técnica.";
         certificationState?.classList.remove("hidden");
+        return null;
       }
     }
 
@@ -600,18 +628,42 @@
       try {
         const readiness = await api("/api/v1/channels/whatsapp/meta/deployment/readiness");
         renderDeploymentReadiness(readiness);
+        return readiness;
       } catch (error) {
         if (deploymentTitle) deploymentTitle.textContent = "Staging técnico pendiente";
         if (deploymentCopy) deploymentCopy.textContent = "No fue posible verificar la infraestructura de staging.";
         deploymentState?.classList.remove("hidden");
+        return null;
       }
     }
 
+    function renderActivationGate(certification, deployment) {
+      if (!activationGate || !activationGateTitle || !activationGateCopy) return;
+      const certified = certification?.ready === true && certification?.alreadyCertified === true;
+      const stagingReady = deployment?.state === "READY_FOR_TENANT_STAGING"
+        && deployment?.readyForTenantStaging === true;
+
+      if (certified && stagingReady) {
+        activationGateTitle.textContent = "Activación disponible con autorización manual";
+        activationGateCopy.textContent = "Las validaciones técnicas están completas. El tráfico real solo puede activarse mediante una acción explícita autorizada.";
+      } else {
+        const missing = [];
+        if (!certified) missing.push("certificación técnica");
+        if (!stagingReady) missing.push("staging seguro");
+        activationGateTitle.textContent = "Activación bloqueada";
+        activationGateCopy.textContent = missing.length
+          ? "Falta completar: " + missing.join(" y ") + "."
+          : "La activación real todavía no está autorizada.";
+      }
+      activationGate.classList.remove("hidden");
+    }
+
     async function loadPreparedDiagnostics() {
-      await Promise.all([
+      const [certification, deployment] = await Promise.all([
         loadCertificationReadiness(),
         loadDeploymentReadiness()
       ]);
+      renderActivationGate(certification, deployment);
     }
 
     async function restoreConfiguredState() {
@@ -642,10 +694,13 @@
       preparedState?.classList.add("hidden");
       certificationState?.classList.add("hidden");
       deploymentState?.classList.add("hidden");
+      activationGate?.classList.add("hidden");
       if (certificationTitle) certificationTitle.textContent = "";
       if (certificationCopy) certificationCopy.textContent = "";
       if (deploymentTitle) deploymentTitle.textContent = "";
       if (deploymentCopy) deploymentCopy.textContent = "";
+      if (activationGateTitle) activationGateTitle.textContent = "";
+      if (activationGateCopy) activationGateCopy.textContent = "";
     }
 
     wabaCandidates?.addEventListener("meta-waba-selected", () => {

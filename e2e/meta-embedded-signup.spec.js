@@ -12,6 +12,7 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   const phoneValidationBodies = [];
   const phoneFinalizeBodies = [];
   let certificationReadinessRequests = 0;
+  let certificationAlreadyCertified = false;
   let deploymentReadinessRequests = 0;
   let tenantConfigRequests = 0;
   let activationRequests = 0;
@@ -139,9 +140,9 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await page.route('**/api/v1/channels/whatsapp/meta/certification/readiness', async route => {
     certificationReadinessRequests += 1;
     await route.fulfill(json({
-      state: 'READY_FOR_PILOT_CERTIFICATION',
+      state: certificationAlreadyCertified ? 'CERTIFIED' : 'READY_FOR_PILOT_CERTIFICATION',
       ready: true,
-      alreadyCertified: false,
+      alreadyCertified: certificationAlreadyCertified,
       blockers: []
     }));
   });
@@ -330,10 +331,12 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   const preparedState = page.locator('#metaWhatsAppPreparedState');
   const certificationState = page.locator('#metaWhatsAppCertificationState');
   const deploymentState = page.locator('#metaWhatsAppDeploymentState');
+  const activationGate = page.locator('#metaWhatsAppActivationGate');
   await expect(pinSetup).toHaveClass(/hidden/);
   await expect(preparedState).toHaveClass(/hidden/);
   await expect(certificationState).toHaveClass(/hidden/);
   await expect(deploymentState).toHaveClass(/hidden/);
+  await expect(activationGate).toHaveClass(/hidden/);
   await expect.poll(() => tenantConfigRequests).toBe(1);
   await expect.poll(() => certificationReadinessRequests).toBe(0);
   await expect.poll(() => deploymentReadinessRequests).toBe(0);
@@ -394,6 +397,9 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(deploymentState).toContainText('Infraestructura lista para staging');
   await expect(deploymentState)
     .toContainText('Las compuertas de tráfico real siguen apagadas, como exige el staging seguro.');
+  await expect(activationGate).toBeVisible();
+  await expect(activationGate).toContainText('Activación bloqueada');
+  await expect(activationGate).toContainText('Falta completar: certificación técnica.');
   await expect(pinInput).toHaveValue('');
   await expect(pinInput).toBeDisabled();
   await expect(finalizePhoneButton).toBeDisabled();
@@ -409,22 +415,30 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   }]);
   await expect.poll(() => phoneDiscoveryBodies).toEqual([{ wabaId: '1906385232743452' }]);
   await expect.poll(() => unexpectedEmbeddedSignupRequests).toEqual([]);
+  await expect.poll(() => activationRequests).toBe(0);
 
+  certificationAlreadyCertified = true;
   await page.reload();
   await page.getByRole('button', { name: '📞 Canales', exact: true }).click();
 
   const restoredPreparedState = page.locator('#metaWhatsAppPreparedState');
   const restoredCertificationState = page.locator('#metaWhatsAppCertificationState');
   const restoredDeploymentState = page.locator('#metaWhatsAppDeploymentState');
+  const restoredActivationGate = page.locator('#metaWhatsAppActivationGate');
   await expect.poll(() => tenantConfigRequests).toBe(2);
   await expect(restoredPreparedState).toBeVisible();
   await expect(restoredPreparedState).toContainText('WhatsApp preparado');
   await expect.poll(() => certificationReadinessRequests).toBe(2);
   await expect(restoredCertificationState).toBeVisible();
-  await expect(restoredCertificationState).toContainText('Listo para certificación piloto');
+  await expect(restoredCertificationState).toContainText('WhatsApp certificado');
   await expect.poll(() => deploymentReadinessRequests).toBe(2);
   await expect(restoredDeploymentState).toBeVisible();
   await expect(restoredDeploymentState).toContainText('Infraestructura lista para staging');
+  await expect(restoredActivationGate).toBeVisible();
+  await expect(restoredActivationGate)
+    .toContainText('Activación disponible con autorización manual');
+  await expect(restoredActivationGate)
+    .toContainText('El tráfico real solo puede activarse mediante una acción explícita autorizada.');
   await expect.poll(() => phoneFinalizeBodies).toHaveLength(1);
   await expect.poll(() => activationRequests).toBe(0);
 });
