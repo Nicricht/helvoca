@@ -11,20 +11,22 @@ public class MetaWhatsAppEmbeddedSignupPhoneStagingService {
     private final MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService registrationService;
     private final MetaWhatsAppTenantConfigurationService configurationService;
     private final MetaWhatsAppEmbeddedSignupPhoneRecordResolverService phoneRecordResolver;
+    private final MetaWhatsAppEmbeddedSignupCredentialReferenceResolver credentialReferenceResolver;
 
     public MetaWhatsAppEmbeddedSignupPhoneStagingService(
             MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService registrationService,
             MetaWhatsAppTenantConfigurationService configurationService,
-            MetaWhatsAppEmbeddedSignupPhoneRecordResolverService phoneRecordResolver) {
+            MetaWhatsAppEmbeddedSignupPhoneRecordResolverService phoneRecordResolver,
+            MetaWhatsAppEmbeddedSignupCredentialReferenceResolver credentialReferenceResolver) {
         this.registrationService = registrationService;
         this.configurationService = configurationService;
         this.phoneRecordResolver = phoneRecordResolver;
+        this.credentialReferenceResolver = credentialReferenceResolver;
     }
 
     public MetaWhatsAppEmbeddedSignupPhoneStagingResult registerAndStage(
             String wabaId,
             String phoneNumberId,
-            String credentialRef,
             String pin) {
         MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationResult registration =
                 registrationService.register(
@@ -36,6 +38,7 @@ public class MetaWhatsAppEmbeddedSignupPhoneStagingService {
             throw new ConflictException("META_EMBEDDED_SIGNUP_PHONE_NOT_REGISTERED");
         }
 
+        String credentialRef = credentialReferenceResolver.requireReference();
         UUID phoneRecordId = phoneRecordResolver.resolve(
                 registration.displayPhoneNumber());
 
