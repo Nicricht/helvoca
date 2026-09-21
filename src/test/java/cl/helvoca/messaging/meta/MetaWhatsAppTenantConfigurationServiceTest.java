@@ -78,6 +78,17 @@ class MetaWhatsAppTenantConfigurationServiceTest {
                         "provider", "META_WHATSAPP_CLOUD",
                         "configured", true,
                         "enabled", false)));
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("WHATSAPP_CERTIFICATION_CLEARED"),
+                eq("WHATSAPP_SENDER"),
+                eq(businessId),
+                eq(Map.of(
+                        "whatsappEnabled", true,
+                        "certified", true)),
+                eq(Map.of(
+                        "whatsappEnabled", false,
+                        "certified", false)));
     }
 
     @Test
