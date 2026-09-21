@@ -150,6 +150,14 @@
       font-size: 11px;
       line-height: 1.4;
     }
+    #metaWhatsAppPhoneCandidates .meta-whatsapp-phone-card.selected {
+      border-color: rgba(90, 180, 255, .55);
+      background: rgba(90, 180, 255, .08);
+      box-shadow: 0 0 0 1px rgba(90, 180, 255, .12);
+    }
+    #metaWhatsAppPhoneCandidates .meta-whatsapp-phone-select {
+      margin-top: 9px;
+    }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -314,6 +322,7 @@
     phoneNumbers.forEach((phone, index) => {
       const card = document.createElement("div");
       card.className = "meta-whatsapp-phone-card";
+      card.dataset.selected = "false";
       if (phone?.id) card.dataset.phoneNumberId = String(phone.id);
 
       const number = document.createElement("strong");
@@ -329,7 +338,30 @@
       if (phone?.codeVerificationStatus) detailParts.push(`Verificación ${phone.codeVerificationStatus}`);
       details.textContent = detailParts.join(" · ");
 
-      card.append(number, name, details);
+      const selectButton = document.createElement("button");
+      selectButton.type = "button";
+      selectButton.className = "button secondary meta-whatsapp-phone-select";
+      selectButton.textContent = "Seleccionar";
+      selectButton.setAttribute("aria-pressed", "false");
+      if (!phone?.id) {
+        selectButton.disabled = true;
+      } else {
+        selectButton.addEventListener("click", () => {
+          const selectedPhoneNumberId = String(phone.id);
+          container.querySelectorAll(".meta-whatsapp-phone-card").forEach(candidate => {
+            const selected = candidate.dataset.phoneNumberId === selectedPhoneNumberId;
+            candidate.classList.toggle("selected", selected);
+            candidate.dataset.selected = selected ? "true" : "false";
+            const candidateButton = candidate.querySelector(".meta-whatsapp-phone-select");
+            if (candidateButton) {
+              candidateButton.setAttribute("aria-pressed", selected ? "true" : "false");
+              candidateButton.textContent = selected ? "Seleccionado" : "Seleccionar";
+            }
+          });
+        });
+      }
+
+      card.append(number, name, details, selectButton);
       container.appendChild(card);
     });
 
