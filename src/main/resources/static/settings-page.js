@@ -979,89 +979,88 @@
       }
     });
 
-    if (canManageMeta) {
-      button?.addEventListener("click", async () => {
-        onboardingInteractionStarted = true;
-        if (button.dataset.sdkReady === "true") {
-          if (!window.FB?.login) {
-            button.dataset.sdkReady = "false";
-            button.textContent = "Conectar WhatsApp";
-            message.textContent = "Meta necesita prepararse nuevamente. Intenta otra vez.";
-            message.classList.remove("hidden");
-            return;
-          }
-  
-          button.disabled = true;
-          renderWabaCandidates(null, wabaCandidates);
-          selectedPhoneDiscovery = null;
-          selectedPhoneValidation = null;
-          selectedPhoneFinalization = null;
-          resetPinSetup();
-          renderPhoneCandidates(null, phoneCandidates);
-          phoneConfirm?.classList.add("hidden");
-          if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
-          wabaConfirm?.classList.add("hidden");
-          if (wabaConfirmStatus) wabaConfirmStatus.textContent = "";
-          message.textContent = "Abriendo autorización segura de Meta…";
+    button?.addEventListener("click", async () => {
+      if (!canManageMeta) return;
+      onboardingInteractionStarted = true;
+      if (button.dataset.sdkReady === "true") {
+        if (!window.FB?.login) {
+          button.dataset.sdkReady = "false";
+          button.textContent = "Conectar WhatsApp";
+          message.textContent = "Meta necesita prepararse nuevamente. Intenta otra vez.";
           message.classList.remove("hidden");
-          window.FB.login(async response => {
-            const code = response?.authResponse?.code;
-            if (!code) {
-              button.disabled = false;
-              renderWabaCandidates(null, wabaCandidates);
-              message.textContent = "La autorización no se completó. Puedes intentarlo nuevamente.";
-              return;
-            }
-  
-            try {
-              const handoff = await api("/api/v1/channels/whatsapp/meta/embedded-signup/authorization-code", {
-                method: "POST",
-                body: JSON.stringify({ code })
-              });
-              if (!handoff?.accepted) {
-                renderWabaCandidates(null, wabaCandidates);
-                message.textContent = "El servidor no pudo aceptar la autorización.";
-              } else {
-                const candidateCount = renderWabaCandidates(handoff, wabaCandidates);
-                message.textContent = candidateCount
-                  ? `Autorización completada. Encontramos ${candidateCount} cuenta${candidateCount === 1 ? "" : "s"} de WhatsApp Business.`
-                  : "Autorización completada, pero Meta no devolvió cuentas de WhatsApp Business disponibles.";
-              }
-            } catch (error) {
-              renderWabaCandidates(null, wabaCandidates);
-              message.textContent = "No fue posible completar la autorización con Meta. Intenta nuevamente.";
-            } finally {
-              button.disabled = false;
-            }
-          }, {
-            config_id: bootstrap.configId,
-            auth_type: "rerequest",
-            response_type: "code",
-            override_default_response_type: true,
-            extras: {
-              setup: {}
-            }
-          });
           return;
         }
-  
+
         button.disabled = true;
-        message.textContent = "Preparando conexión segura con Meta…";
+        renderWabaCandidates(null, wabaCandidates);
+        selectedPhoneDiscovery = null;
+        selectedPhoneValidation = null;
+        selectedPhoneFinalization = null;
+        resetPinSetup();
+        renderPhoneCandidates(null, phoneCandidates);
+        phoneConfirm?.classList.add("hidden");
+        if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
+        wabaConfirm?.classList.add("hidden");
+        if (wabaConfirmStatus) wabaConfirmStatus.textContent = "";
+        message.textContent = "Abriendo autorización segura de Meta…";
         message.classList.remove("hidden");
-        try {
-          await loadFacebookSdk(bootstrap);
-          button.textContent = "Continuar con Meta";
-          button.dataset.sdkReady = "true";
-          message.textContent = "SDK de Meta preparado. Continúa para autorizar tu WhatsApp Business.";
-        } catch (error) {
-          button.textContent = "Conectar WhatsApp";
-          button.dataset.sdkReady = "false";
-          message.textContent = "No fue posible preparar Meta. Intenta nuevamente.";
-        } finally {
-          button.disabled = false;
-        }
-      });
-    }
+        window.FB.login(async response => {
+          const code = response?.authResponse?.code;
+          if (!code) {
+            button.disabled = false;
+            renderWabaCandidates(null, wabaCandidates);
+            message.textContent = "La autorización no se completó. Puedes intentarlo nuevamente.";
+            return;
+          }
+
+          try {
+            const handoff = await api("/api/v1/channels/whatsapp/meta/embedded-signup/authorization-code", {
+              method: "POST",
+              body: JSON.stringify({ code })
+            });
+            if (!handoff?.accepted) {
+              renderWabaCandidates(null, wabaCandidates);
+              message.textContent = "El servidor no pudo aceptar la autorización.";
+            } else {
+              const candidateCount = renderWabaCandidates(handoff, wabaCandidates);
+              message.textContent = candidateCount
+                ? `Autorización completada. Encontramos ${candidateCount} cuenta${candidateCount === 1 ? "" : "s"} de WhatsApp Business.`
+                : "Autorización completada, pero Meta no devolvió cuentas de WhatsApp Business disponibles.";
+            }
+          } catch (error) {
+            renderWabaCandidates(null, wabaCandidates);
+            message.textContent = "No fue posible completar la autorización con Meta. Intenta nuevamente.";
+          } finally {
+            button.disabled = false;
+          }
+        }, {
+          config_id: bootstrap.configId,
+          auth_type: "rerequest",
+          response_type: "code",
+          override_default_response_type: true,
+          extras: {
+            setup: {}
+          }
+        });
+        return;
+      }
+
+      button.disabled = true;
+      message.textContent = "Preparando conexión segura con Meta…";
+      message.classList.remove("hidden");
+      try {
+        await loadFacebookSdk(bootstrap);
+        button.textContent = "Continuar con Meta";
+        button.dataset.sdkReady = "true";
+        message.textContent = "SDK de Meta preparado. Continúa para autorizar tu WhatsApp Business.";
+      } catch (error) {
+        button.textContent = "Conectar WhatsApp";
+        button.dataset.sdkReady = "false";
+        message.textContent = "No fue posible preparar Meta. Intenta nuevamente.";
+      } finally {
+        button.disabled = false;
+      }
+    });
 
     queueMicrotask(restoreConfiguredState);
   }
