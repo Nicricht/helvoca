@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">RecepVoz</title>
+  <desc id="desc">Ícono de RecepVoz con una R y ondas de voz.</desc>
+  <rect width="512" height="512" rx="112" fill="#0b0e14"/>
+  <circle cx="256" cy="256" r="170" fill="#121722" stroke="#7c5cff" stroke-width="18"/>
+  <path d="M177 337V175h86c47 0 78 27 78 66 0 28-16 50-43 60l52 36h-55l-45-31h-27v31h-46zm46-70h36c23 0 36-10 36-27 0-18-13-27-36-27h-36v54z"
+        fill="#f7f8fb"/>
+  <path d="M365 202c19 15 31 34 31 54s-12 39-31 54M392 176c30 22 49 50 49 80s-19 58-49 80"
+        fill="none" stroke="#38d996" stroke-width="18" stroke-linecap="round"/>
+</svg>
