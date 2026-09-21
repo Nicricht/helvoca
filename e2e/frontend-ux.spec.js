@@ -200,10 +200,19 @@ test('ready customer sees operations on home and configuration on settings', asy
   await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/authorization-code', async route => {
     embeddedSignupCodeHandoff = route.request().postDataJSON();
     await route.fulfill(json({
-      state: 'AUTHORIZATION_CODE_HANDOFF_VALIDATED',
+      state: 'AUTHORIZATION_CODE_EXCHANGED_AND_VALIDATED',
       accepted: true,
       retained: false,
-      exchangePending: true
+      exchangePending: false,
+      wabas: [{
+        id: '1906385232743451',
+        name: 'Negocio E2E WhatsApp',
+        currency: 'CLP',
+        timezoneId: 'America/Santiago',
+        messageTemplateNamespace: 'e2e',
+        systemUserAssigned: true
+      }],
+      wabaAfterCursor: null
     }));
   });
 
@@ -256,7 +265,9 @@ test('ready customer sees operations on home and configuration on settings', asy
     extras: { setup: {} }
   });
   await expect.poll(() => embeddedSignupCodeHandoff).toEqual({ code: 'temporary-code-for-e2e' });
-  await expect(page.locator('#metaWhatsAppConnectMessage')).toContainText('recibida de forma segura por el servidor');
+  await expect(page.locator('#metaWhatsAppConnectMessage'))
+    .toHaveText('Autorización completada. Encontramos 1 cuenta de WhatsApp Business.');
+  await expect(page.locator('#metaWhatsAppWabaCandidates')).toContainText('Negocio E2E WhatsApp');
   await expect(page.locator('#metaWhatsAppConnectMessage')).not.toContainText('temporary-code-for-e2e');
 });
 
