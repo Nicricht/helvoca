@@ -543,10 +543,13 @@
       const digitsOnly = pinInput.value.replace(/\D/g, "").slice(0, 6);
       if (pinInput.value !== digitsOnly) pinInput.value = digitsOnly;
       const valid = /^[0-9]{6}$/.test(digitsOnly);
-      if (registerPhoneButton) registerPhoneButton.disabled = !valid;
+      const canRegister = valid && selectedPhoneRegistration === null;
+      if (registerPhoneButton) registerPhoneButton.disabled = !canRegister;
       if (pinStatus) {
-        pinStatus.textContent = valid
-          ? "PIN listo para registrar este número."
+        pinStatus.textContent = selectedPhoneRegistration
+          ? "Número ya registrado en Meta."
+          : valid
+            ? "PIN listo para registrar este número."
           : digitsOnly.length
             ? "El PIN debe tener exactamente 6 dígitos."
             : "";
@@ -586,7 +589,9 @@
         selectedPhoneRegistration = null;
         if (pinStatus) pinStatus.textContent = "No fue posible registrar el número. Revisa el PIN e intenta nuevamente.";
       } finally {
-        registerPhoneButton.disabled = true;
+        const retryAllowed = selectedPhoneRegistration === null
+          && /^[0-9]{6}$/.test(pinInput?.value || "");
+        registerPhoneButton.disabled = !retryAllowed;
       }
     });
 
