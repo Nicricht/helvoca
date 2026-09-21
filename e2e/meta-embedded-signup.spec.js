@@ -16,6 +16,7 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   let deploymentReadinessRequests = 0;
   let tenantConfigRequests = 0;
   let activationRequests = 0;
+  let deactivationRequests = 0;
   let tenantConfigStatus = {
     status: 'NOT_CONFIGURED',
     configured: false,
@@ -35,6 +36,9 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
     const embeddedSignupPrefix = '/api/v1/channels/whatsapp/meta/embedded-signup/';
     if (pathname === '/api/v1/channels/whatsapp/meta/config/activate') {
       activationRequests += 1;
+    }
+    if (pathname === '/api/v1/channels/whatsapp/meta/config/deactivate') {
+      deactivationRequests += 1;
     }
     const allowed = new Set([
       `${embeddedSignupPrefix}bootstrap`,
@@ -143,6 +147,16 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
       status: 'CONFIGURED_ENABLED',
       configured: true,
       enabled: true
+    };
+    await route.fulfill(json(tenantConfigStatus));
+  });
+
+  await page.route('**/api/v1/channels/whatsapp/meta/config/deactivate', async route => {
+    tenantConfigStatus = {
+      ...tenantConfigStatus,
+      status: 'CONFIGURED_DISABLED',
+      configured: true,
+      enabled: false
     };
     await route.fulfill(json(tenantConfigStatus));
   });
@@ -478,5 +492,25 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(enabledActivationGate)
     .toContainText('Este negocio está habilitado para Meta.');
   await expect(enabledActivateButton).toHaveClass(/hidden/);
+  await expect.poll(() => activationRequests).toBe(1);
+
+  const deactivateButton = page.locator('#metaWhatsAppDeactivateBtn');
+  await expect(deactivateButton).toBeVisible();
+  await expect.poll(() => deactivationRequests).toBe(0);
+
+  page.once('dialog', dialog => dialog.dismiss());
+  await deactivateButton.click();
+  await expect.poll(() => deactivationRequests).toBe(0);
+
+  page.once('dialog', dialog => dialog.accept());
+  await deactivateButton.click();
+  await expect.poll(() => deactivationRequests).toBe(1);
+  await expect(page.locator('#metaWhatsAppPreparedState')).toBeVisible();
+  await expect(enabledActivationGate)
+    .toContainText('Activación disponible con autorización manual');
+  await expect(page.locator('#metaWhatsAppActivationStatus'))
+    .toHaveText('Desactivación confirmada.');
+  await expect(deactivateButton).toHaveClass(/hidden/);
+  await expect(enabledActivateButton).toBeVisible();
   await expect.poll(() => activationRequests).toBe(1);
 });

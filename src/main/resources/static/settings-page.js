@@ -268,10 +268,12 @@
       font-size: 11px;
       line-height: 1.4;
     }
-    #metaWhatsAppActivateBtn {
+    #metaWhatsAppActivateBtn,
+    #metaWhatsAppDeactivateBtn {
       margin-top: 10px;
     }
-    #metaWhatsAppActivateBtn.hidden { display: none; }
+    #metaWhatsAppActivateBtn.hidden,
+    #metaWhatsAppDeactivateBtn.hidden { display: none; }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -552,6 +554,7 @@
         <strong></strong>
         <span></span>
         <button id="metaWhatsAppActivateBtn" class="button secondary hidden" type="button">Activar WhatsApp</button>
+        <button id="metaWhatsAppDeactivateBtn" class="button secondary hidden" type="button">Desactivar WhatsApp</button>
         <span id="metaWhatsAppActivationStatus" role="status"></span>
       </div>
     `;
@@ -582,6 +585,7 @@
     const activationGateTitle = activationGate?.querySelector("strong");
     const activationGateCopy = activationGate?.querySelector("span");
     const activationButton = section.querySelector("#metaWhatsAppActivateBtn");
+    const deactivationButton = section.querySelector("#metaWhatsAppDeactivateBtn");
     const activationStatus = section.querySelector("#metaWhatsAppActivationStatus");
     let onboardingInteractionStarted = false;
 
@@ -659,7 +663,9 @@
       const activationReady = configuredDisabled && certified && stagingReady;
 
       activationButton?.classList.toggle("hidden", !activationReady);
+      deactivationButton?.classList.toggle("hidden", !configuredEnabled);
       if (activationButton) activationButton.disabled = false;
+      if (deactivationButton) deactivationButton.disabled = false;
       if (activationStatus) activationStatus.textContent = "";
 
       if (configuredEnabled) {
@@ -730,7 +736,9 @@
       deploymentState?.classList.add("hidden");
       activationGate?.classList.add("hidden");
       activationButton?.classList.add("hidden");
+      deactivationButton?.classList.add("hidden");
       if (activationButton) activationButton.disabled = false;
+      if (deactivationButton) deactivationButton.disabled = false;
       if (activationStatus) activationStatus.textContent = "";
       if (certificationTitle) certificationTitle.textContent = "";
       if (certificationCopy) certificationCopy.textContent = "";
@@ -766,6 +774,34 @@
           activationStatus.textContent = "No fue posible activar WhatsApp. Revisa las validaciones e intenta nuevamente.";
         }
         activationButton.disabled = false;
+      }
+    });
+
+    deactivationButton?.addEventListener("click", async () => {
+      const accepted = window.confirm(
+        "Vas a desactivar WhatsApp para este negocio. La configuración se conservará y podrás volver a activarla cuando las validaciones estén listas. ¿Confirmas?"
+      );
+      if (!accepted) return;
+
+      deactivationButton.disabled = true;
+      if (activationStatus) activationStatus.textContent = "Desactivando WhatsApp…";
+      try {
+        const status = await api("/api/v1/channels/whatsapp/meta/config/deactivate", {
+          method: "POST"
+        });
+        if (status?.status !== "CONFIGURED_DISABLED"
+            || status?.configured !== true
+            || status?.enabled !== false) {
+          throw new Error("Meta deactivation response mismatch");
+        }
+        preparedState?.classList.remove("hidden");
+        await loadPreparedDiagnostics(status);
+        if (activationStatus) activationStatus.textContent = "Desactivación confirmada.";
+      } catch (error) {
+        if (activationStatus) {
+          activationStatus.textContent = "No fue posible desactivar WhatsApp. Intenta nuevamente.";
+        }
+        deactivationButton.disabled = false;
       }
     });
 
