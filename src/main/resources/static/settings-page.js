@@ -847,6 +847,7 @@
     });
 
     phoneConfirmButton?.addEventListener("click", async () => {
+      if (!canManageMeta) return;
       const selectedWabaCard = wabaCandidates?.querySelector('.meta-whatsapp-waba-card[data-selected="true"]');
       const selectedPhoneCard = phoneCandidates?.querySelector('.meta-whatsapp-phone-card[data-selected="true"]');
       const wabaId = selectedWabaCard?.dataset.wabaId;
@@ -900,6 +901,7 @@
     });
 
     finalizePhoneButton?.addEventListener("click", async () => {
+      if (!canManageMeta) return;
       const selectedWabaCard = wabaCandidates?.querySelector('.meta-whatsapp-waba-card[data-selected="true"]');
       const selectedPhoneCard = phoneCandidates?.querySelector('.meta-whatsapp-phone-card[data-selected="true"]');
       const wabaId = selectedWabaCard?.dataset.wabaId;
@@ -945,6 +947,7 @@
     });
 
     wabaConfirmButton?.addEventListener("click", async () => {
+      if (!canManageMeta) return;
       const selectedCard = wabaCandidates?.querySelector('.meta-whatsapp-waba-card[data-selected="true"]');
       const wabaId = selectedCard?.dataset.wabaId;
       if (!wabaId) return;
