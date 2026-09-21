@@ -190,7 +190,6 @@ public class MetaWhatsAppTenantConfigurationController {
         return embeddedSignupPhoneStagingService.registerAndStage(
                 request.wabaId(),
                 request.phoneNumberId(),
-                request.credentialRef(),
                 request.pin());
     }
 
