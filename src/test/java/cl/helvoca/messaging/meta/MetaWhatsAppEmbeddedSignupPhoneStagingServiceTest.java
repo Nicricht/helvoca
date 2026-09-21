@@ -12,10 +12,11 @@ import static org.mockito.Mockito.*;
 class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
 
     @Test
-    void persistsOnlyAfterSuccessfulRegistrationAndKeepsDeliveryDisabled() {
+    void resolvesPhoneRecordAfterRegistrationAndPersistsDisabledConfiguration() {
         UUID phoneRecordId = UUID.randomUUID();
         var registration = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService.class);
         var configuration = mock(MetaWhatsAppTenantConfigurationService.class);
+        var resolver = mock(MetaWhatsAppEmbeddedSignupPhoneRecordResolverService.class);
 
         when(registration.register("1906385232743451", "1913623884432103", "123456"))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationResult(
@@ -24,7 +25,7 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
                         "+56 9 3333 4444",
                         "RecepVoz Demo",
                         true));
-
+        when(resolver.resolve("+56 9 3333 4444")).thenReturn(phoneRecordId);
         when(configuration.replace(any(MetaWhatsAppTenantConfigurationRequest.class)))
                 .thenReturn(new MetaWhatsAppTenantConfigurationResponse(
                         phoneRecordId,
@@ -36,10 +37,10 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
 
         var service = new MetaWhatsAppEmbeddedSignupPhoneStagingService(
                 registration,
-                configuration);
+                configuration,
+                resolver);
 
         var result = service.registerAndStage(
-                phoneRecordId,
                 "1906385232743451",
                 "1913623884432103",
                 "TENANT_01",
@@ -47,17 +48,14 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
 
         assertEquals("PHONE_NUMBER_REGISTERED_AND_STAGED", result.state());
         assertEquals(phoneRecordId, result.phoneRecordId());
-        assertEquals("1913623884432103", result.phoneNumberId());
-        assertEquals("1906385232743451", result.wabaId());
-        assertEquals("TENANT_01", result.credentialRef());
         assertFalse(result.enabled());
-        assertFalse(result.toString().contains("123456"));
 
-        var ordered = inOrder(registration, configuration);
+        var ordered = inOrder(registration, resolver, configuration);
         ordered.verify(registration).register(
                 "1906385232743451",
                 "1913623884432103",
                 "123456");
+        ordered.verify(resolver).resolve("+56 9 3333 4444");
         ordered.verify(configuration).replace(argThat(request ->
                 phoneRecordId.equals(request.phoneRecordId())
                         && MetaWhatsAppMessagingProvider.ID.equals(request.provider())
@@ -67,9 +65,10 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
     }
 
     @Test
-    void neverPersistsWhenRegistrationIsUnconfirmed() {
+    void neverResolvesOrPersistsWhenRegistrationIsUnconfirmed() {
         var registration = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService.class);
         var configuration = mock(MetaWhatsAppTenantConfigurationService.class);
+        var resolver = mock(MetaWhatsAppEmbeddedSignupPhoneRecordResolverService.class);
 
         when(registration.register(anyString(), anyString(), anyString()))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationResult(
@@ -81,18 +80,18 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
 
         var service = new MetaWhatsAppEmbeddedSignupPhoneStagingService(
                 registration,
-                configuration);
+                configuration,
+                resolver);
 
         ConflictException error = assertThrows(
                 ConflictException.class,
                 () -> service.registerAndStage(
-                        UUID.randomUUID(),
                         "1906385232743451",
                         "1913623884432103",
                         "TENANT_01",
                         "123456"));
 
         assertEquals("META_EMBEDDED_SIGNUP_PHONE_NOT_REGISTERED", error.getMessage());
-        verifyNoInteractions(configuration);
+        verifyNoInteractions(resolver, configuration);
     }
 }

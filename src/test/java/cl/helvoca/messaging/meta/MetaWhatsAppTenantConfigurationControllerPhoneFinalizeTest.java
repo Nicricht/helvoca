@@ -28,7 +28,6 @@ class MetaWhatsAppTenantConfigurationControllerPhoneFinalizeTest {
                 false);
 
         when(staging.registerAndStage(
-                phoneRecordId,
                 "1906385232743451",
                 "1913623884432103",
                 "TENANT_01",
@@ -49,7 +48,6 @@ class MetaWhatsAppTenantConfigurationControllerPhoneFinalizeTest {
                 staging);
 
         var request = new MetaWhatsAppEmbeddedSignupPhoneFinalizeRequest(
-                phoneRecordId,
                 "1906385232743451",
                 "1913623884432103",
                 "TENANT_01",
@@ -60,7 +58,6 @@ class MetaWhatsAppTenantConfigurationControllerPhoneFinalizeTest {
         assertSame(expected, actual);
         assertFalse(actual.enabled());
         verify(staging).registerAndStage(
-                phoneRecordId,
                 "1906385232743451",
                 "1913623884432103",
                 "TENANT_01",

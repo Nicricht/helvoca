@@ -10,24 +10,22 @@ import java.util.UUID;
 public class MetaWhatsAppEmbeddedSignupPhoneStagingService {
     private final MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService registrationService;
     private final MetaWhatsAppTenantConfigurationService configurationService;
+    private final MetaWhatsAppEmbeddedSignupPhoneRecordResolverService phoneRecordResolver;
 
     public MetaWhatsAppEmbeddedSignupPhoneStagingService(
             MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService registrationService,
-            MetaWhatsAppTenantConfigurationService configurationService) {
+            MetaWhatsAppTenantConfigurationService configurationService,
+            MetaWhatsAppEmbeddedSignupPhoneRecordResolverService phoneRecordResolver) {
         this.registrationService = registrationService;
         this.configurationService = configurationService;
+        this.phoneRecordResolver = phoneRecordResolver;
     }
 
     public MetaWhatsAppEmbeddedSignupPhoneStagingResult registerAndStage(
-            UUID phoneRecordId,
             String wabaId,
             String phoneNumberId,
             String credentialRef,
             String pin) {
-        if (phoneRecordId == null) {
-            throw new IllegalArgumentException("Phone record id is required");
-        }
-
         MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationResult registration =
                 registrationService.register(
                         wabaId,
@@ -37,6 +35,9 @@ public class MetaWhatsAppEmbeddedSignupPhoneStagingService {
         if (!registration.registered()) {
             throw new ConflictException("META_EMBEDDED_SIGNUP_PHONE_NOT_REGISTERED");
         }
+
+        UUID phoneRecordId = phoneRecordResolver.resolve(
+                registration.displayPhoneNumber());
 
         MetaWhatsAppTenantConfigurationResponse staged =
                 configurationService.replace(
