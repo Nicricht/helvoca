@@ -491,6 +491,10 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   const enabledActivateButton = page.locator('#metaWhatsAppActivateBtn');
   await expect.poll(() => tenantConfigRequests).toBe(4);
   await expect(page.locator('#metaWhatsAppPreparedState')).toHaveClass(/hidden/);
+  await expect(page.locator('#metaWhatsAppCertificationState')).not.toBeVisible();
+  await expect(page.locator('#metaWhatsAppDeploymentState')).not.toBeVisible();
+  await expect.poll(() => certificationReadinessRequests).toBe(2);
+  await expect.poll(() => deploymentReadinessRequests).toBe(2);
   await expect(enabledActivationGate).toBeVisible();
   await expect(enabledActivationGate).toContainText('WhatsApp activado');
   await expect(enabledActivationGate)
