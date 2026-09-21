@@ -50,6 +50,9 @@ public class PhoneNumberService {
                 throw new ConflictException("Este número ya está conectado a otro negocio");
             }
 
+            boolean wasCertified = existing.getWhatsappCertifiedAt() != null;
+            boolean wasEnabled = existing.isWhatsappEnabled();
+
             String externalId = blankToNull(request.externalId());
             if (externalId != null) existing.setExternalId(externalId);
             existing.setActive(request.active() == null || request.active());
@@ -57,7 +60,22 @@ public class PhoneNumberService {
                 existing.setWhatsappEnabled(false);
                 existing.setWhatsappCertifiedAt(null);
             }
-            return PhoneNumberResponse.from(repository.save(existing));
+
+            PhoneNumber saved = repository.save(existing);
+            if (!saved.isActive() && wasCertified && auditService != null) {
+                auditService.humanSuccess(
+                        businessId,
+                        "WHATSAPP_CERTIFICATION_CLEARED",
+                        "WHATSAPP_SENDER",
+                        businessId,
+                        Map.of(
+                                "whatsappEnabled", wasEnabled,
+                                "certified", true),
+                        Map.of(
+                                "whatsappEnabled", false,
+                                "certified", false));
+            }
+            return PhoneNumberResponse.from(saved);
         }
 
         PhoneNumber phone = new PhoneNumber();

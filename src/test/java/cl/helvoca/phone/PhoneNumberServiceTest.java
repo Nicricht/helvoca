@@ -40,6 +40,44 @@ class PhoneNumberServiceTest {
     }
 
     @Test
+    void updatingExistingPhoneToInactiveAuditsClearedCertification() {
+        PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService audit = mock(AuditService.class);
+        UUID businessId = UUID.randomUUID();
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        phone.setProvider("TWILIO");
+        phone.setPhoneNumber("+14355652512");
+        phone.setActive(true);
+        phone.setWhatsappEnabled(true);
+        phone.setWhatsappCertifiedAt(Instant.now());
+        when(repository.findByPhoneNumber("+14355652512")).thenReturn(Optional.of(phone));
+        when(repository.save(phone)).thenReturn(phone);
+
+        PhoneNumberService service = new PhoneNumberService(repository, tenantProvider, audit);
+        PhoneNumberResponse response = service.create(
+                new PhoneNumberRequest("+14355652512", null, false));
+
+        assertFalse(response.active());
+        assertFalse(response.whatsappEnabled());
+        assertNull(response.whatsappCertifiedAt());
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("WHATSAPP_CERTIFICATION_CLEARED"),
+                eq("WHATSAPP_SENDER"),
+                eq(businessId),
+                eq(Map.of(
+                        "whatsappEnabled", true,
+                        "certified", true)),
+                eq(Map.of(
+                        "whatsappEnabled", false,
+                        "certified", false)));
+    }
+
+    @Test
     void cannotBindNumberOwnedByAnotherTenant() {
         PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
