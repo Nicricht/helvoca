@@ -8,6 +8,19 @@ const json = body => ({
 
 test('Embedded Signup renders WABA candidates after secure authorization', async ({ page }) => {
   const authorizationBodies = [];
+  const unexpectedEmbeddedSignupRequests = [];
+
+  page.on('request', request => {
+    const pathname = new URL(request.url()).pathname;
+    const embeddedSignupPrefix = '/api/v1/channels/whatsapp/meta/embedded-signup/';
+    const allowed = new Set([
+      `${embeddedSignupPrefix}bootstrap`,
+      `${embeddedSignupPrefix}authorization-code`
+    ]);
+    if (pathname.startsWith(embeddedSignupPrefix) && !allowed.has(pathname)) {
+      unexpectedEmbeddedSignupRequests.push(pathname);
+    }
+  });
 
   await page.addInitScript(() => {
     sessionStorage.setItem('helvoca_access_token', 'e2e-token');
@@ -124,4 +137,28 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(candidates.locator('img')).toHaveCount(0);
   await expect(candidates).toContainText('Acceso técnico pendiente de asignación');
   await expect(candidates).toContainText('Meta indica que existen más cuentas. Esta vista muestra la primera página.');
+
+  const cards = candidates.locator('.meta-whatsapp-waba-card');
+  const firstCard = cards.nth(0);
+  const secondCard = cards.nth(1);
+
+  await firstCard.getByRole('button', { name: 'Seleccionar', exact: true }).click();
+  await expect(firstCard).toHaveClass(/selected/);
+  await expect(firstCard).toHaveAttribute('data-selected', 'true');
+  await expect(firstCard.getByRole('button', { name: 'Seleccionado', exact: true }))
+    .toHaveAttribute('aria-pressed', 'true');
+  await expect(secondCard).not.toHaveClass(/selected/);
+  await expect(secondCard).toHaveAttribute('data-selected', 'false');
+
+  await secondCard.getByRole('button', { name: 'Seleccionar', exact: true }).click();
+  await expect(secondCard).toHaveClass(/selected/);
+  await expect(secondCard).toHaveAttribute('data-selected', 'true');
+  await expect(secondCard.getByRole('button', { name: 'Seleccionado', exact: true }))
+    .toHaveAttribute('aria-pressed', 'true');
+  await expect(firstCard).not.toHaveClass(/selected/);
+  await expect(firstCard).toHaveAttribute('data-selected', 'false');
+  await expect(firstCard.getByRole('button', { name: 'Seleccionar', exact: true }))
+    .toHaveAttribute('aria-pressed', 'false');
+
+  await expect.poll(() => unexpectedEmbeddedSignupRequests).toEqual([]);
 });
