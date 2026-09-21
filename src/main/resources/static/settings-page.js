@@ -122,6 +122,34 @@
       font-size: 11px;
       line-height: 1.4;
     }
+    #metaWhatsAppPhoneCandidates {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    #metaWhatsAppPhoneCandidates.hidden { display: none; }
+    #metaWhatsAppPhoneCandidates .meta-whatsapp-phone-title {
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    #metaWhatsAppPhoneCandidates .meta-whatsapp-phone-card {
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      background: rgba(255,255,255,.025);
+    }
+    #metaWhatsAppPhoneCandidates .meta-whatsapp-phone-card strong {
+      display: block;
+      font-size: 12px;
+    }
+    #metaWhatsAppPhoneCandidates .meta-whatsapp-phone-card span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -268,6 +296,53 @@
     return wabas.length;
   }
 
+  function renderPhoneCandidates(discovery, container) {
+    if (!container) return 0;
+    container.replaceChildren();
+
+    const phoneNumbers = Array.isArray(discovery?.phoneNumbers) ? discovery.phoneNumbers : [];
+    if (!phoneNumbers.length) {
+      container.classList.add("hidden");
+      return 0;
+    }
+
+    const title = document.createElement("div");
+    title.className = "meta-whatsapp-phone-title";
+    title.textContent = "Números de WhatsApp Business disponibles";
+    container.appendChild(title);
+
+    phoneNumbers.forEach((phone, index) => {
+      const card = document.createElement("div");
+      card.className = "meta-whatsapp-phone-card";
+      if (phone?.id) card.dataset.phoneNumberId = String(phone.id);
+
+      const number = document.createElement("strong");
+      number.textContent = String(phone?.displayPhoneNumber || "").trim() || `Número de WhatsApp ${index + 1}`;
+
+      const name = document.createElement("span");
+      name.textContent = String(phone?.verifiedName || "").trim() || "Nombre verificado no disponible";
+
+      const details = document.createElement("span");
+      const detailParts = [];
+      if (phone?.id) detailParts.push(`ID ${phone.id}`);
+      if (phone?.qualityRating) detailParts.push(`Calidad ${phone.qualityRating}`);
+      if (phone?.codeVerificationStatus) detailParts.push(`Verificación ${phone.codeVerificationStatus}`);
+      details.textContent = detailParts.join(" · ");
+
+      card.append(number, name, details);
+      container.appendChild(card);
+    });
+
+    if (discovery?.afterCursor) {
+      const note = document.createElement("span");
+      note.textContent = "Meta indica que existen más números. Esta vista muestra la primera página.";
+      container.appendChild(note);
+    }
+
+    container.classList.remove("hidden");
+    return phoneNumbers.length;
+  }
+
   function renderConnectButton(bootstrap) {
     if (!bootstrap?.available) return;
     const panel = document.querySelector("#configPhonePanel");
@@ -289,6 +364,7 @@
         <button id="metaWhatsAppWabaConfirmBtn" class="button secondary" type="button">Continuar con esta cuenta</button>
         <span id="metaWhatsAppWabaConfirmStatus" role="status"></span>
       </div>
+      <div id="metaWhatsAppPhoneCandidates" class="hidden" aria-live="polite"></div>
     `;
     panel.appendChild(section);
 
@@ -298,9 +374,11 @@
     const wabaConfirm = section.querySelector("#metaWhatsAppWabaConfirm");
     const wabaConfirmButton = section.querySelector("#metaWhatsAppWabaConfirmBtn");
     const wabaConfirmStatus = section.querySelector("#metaWhatsAppWabaConfirmStatus");
+    const phoneCandidates = section.querySelector("#metaWhatsAppPhoneCandidates");
 
     wabaCandidates?.addEventListener("meta-waba-selected", () => {
       selectedPhoneDiscovery = null;
+      renderPhoneCandidates(null, phoneCandidates);
       if (wabaConfirmStatus) wabaConfirmStatus.textContent = "";
       wabaConfirm?.classList.remove("hidden");
       if (wabaConfirmButton) wabaConfirmButton.disabled = false;
@@ -318,14 +396,13 @@
           method: "POST",
           body: JSON.stringify({ wabaId })
         });
-        const phoneCount = Array.isArray(selectedPhoneDiscovery?.phoneNumbers)
-          ? selectedPhoneDiscovery.phoneNumbers.length
-          : 0;
+        const phoneCount = renderPhoneCandidates(selectedPhoneDiscovery, phoneCandidates);
         if (wabaConfirmStatus) {
           wabaConfirmStatus.textContent = "Cuenta confirmada. Meta devolvió " + phoneCount + " número" + (phoneCount === 1 ? "" : "s") + ".";
         }
       } catch (error) {
         selectedPhoneDiscovery = null;
+        renderPhoneCandidates(null, phoneCandidates);
         if (wabaConfirmStatus) {
           wabaConfirmStatus.textContent = "No fue posible consultar los números de esta cuenta. Intenta nuevamente.";
         }
@@ -347,6 +424,7 @@
         button.disabled = true;
         renderWabaCandidates(null, wabaCandidates);
         selectedPhoneDiscovery = null;
+        renderPhoneCandidates(null, phoneCandidates);
         wabaConfirm?.classList.add("hidden");
         if (wabaConfirmStatus) wabaConfirmStatus.textContent = "";
         message.textContent = "Abriendo autorización segura de Meta…";

@@ -53,7 +53,7 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
         {
           id: '12025550123',
           displayPhoneNumber: '+56 9 1111 2222',
-          verifiedName: 'RecepVoz Demo',
+          verifiedName: '<img src=x onerror=alert(2)>',
           qualityRating: 'GREEN',
           codeVerificationStatus: 'VERIFIED'
         }
@@ -190,5 +190,15 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect.poll(() => phoneDiscoveryBodies).toEqual([{ wabaId: '1906385232743452' }]);
   await expect(page.locator('#metaWhatsAppWabaConfirmStatus'))
     .toHaveText('Cuenta confirmada. Meta devolvió 1 número.');
+
+  const phoneCandidates = page.locator('#metaWhatsAppPhoneCandidates');
+  await expect(phoneCandidates).toBeVisible();
+  await expect(phoneCandidates.locator('.meta-whatsapp-phone-card')).toHaveCount(1);
+  await expect(phoneCandidates).toContainText('+56 9 1111 2222');
+  await expect(phoneCandidates).toContainText('<img src=x onerror=alert(2)>');
+  await expect(phoneCandidates).toContainText('ID 12025550123 · Calidad GREEN · Verificación VERIFIED');
+  await expect(phoneCandidates.locator('img')).toHaveCount(0);
+  await expect(phoneCandidates.getByRole('button')).toHaveCount(0);
+
   await expect.poll(() => unexpectedEmbeddedSignupRequests).toEqual([]);
 });
