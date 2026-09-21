@@ -11,6 +11,7 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   const phoneDiscoveryBodies = [];
   const phoneValidationBodies = [];
   const phoneFinalizeBodies = [];
+  let certificationReadinessRequests = 0;
   const unexpectedEmbeddedSignupRequests = [];
 
   page.on('request', request => {
@@ -97,6 +98,16 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
       wabaId: body.wabaId,
       credentialRef: 'EMBEDDED_SIGNUP_SYSTEM_USER',
       enabled: false
+    }));
+  });
+
+  await page.route('**/api/v1/channels/whatsapp/meta/certification/readiness', async route => {
+    certificationReadinessRequests += 1;
+    await route.fulfill(json({
+      state: 'READY_FOR_PILOT_CERTIFICATION',
+      ready: true,
+      alreadyCertified: false,
+      blockers: []
     }));
   });
 
@@ -266,8 +277,11 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   const pinSetup = page.locator('#metaWhatsAppPinSetup');
   const pinInput = page.getByLabel('PIN de Meta', { exact: true });
   const preparedState = page.locator('#metaWhatsAppPreparedState');
+  const certificationState = page.locator('#metaWhatsAppCertificationState');
   await expect(pinSetup).toHaveClass(/hidden/);
   await expect(preparedState).toHaveClass(/hidden/);
+  await expect(certificationState).toHaveClass(/hidden/);
+  await expect.poll(() => certificationReadinessRequests).toBe(0);
 
   const phoneConfirmButton = page.getByRole('button', { name: 'Continuar con este número', exact: true });
   await expect(phoneConfirmButton).toBeVisible();
@@ -315,6 +329,11 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(preparedState).toContainText('WhatsApp preparado');
   await expect(preparedState)
     .toContainText('Configuración guardada y desactivada. Todavía no se ha activado el tráfico real.');
+  await expect.poll(() => certificationReadinessRequests).toBe(1);
+  await expect(certificationState).toBeVisible();
+  await expect(certificationState).toContainText('Listo para certificación piloto');
+  await expect(certificationState)
+    .toContainText('No hay bloqueos técnicos pendientes para iniciar la certificación.');
   await expect(pinInput).toHaveValue('');
   await expect(pinInput).toBeDisabled();
   await expect(finalizePhoneButton).toBeDisabled();
