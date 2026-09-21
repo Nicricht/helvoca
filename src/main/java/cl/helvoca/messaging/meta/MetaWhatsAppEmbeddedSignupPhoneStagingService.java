@@ -38,9 +38,9 @@ public class MetaWhatsAppEmbeddedSignupPhoneStagingService {
             throw new ConflictException("META_EMBEDDED_SIGNUP_PHONE_NOT_REGISTERED");
         }
 
+        String credentialRef = credentialReferenceResolver.requireReference();
         UUID phoneRecordId = phoneRecordResolver.resolve(
                 registration.displayPhoneNumber());
-        String credentialRef = credentialReferenceResolver.requireReference();
 
         MetaWhatsAppTenantConfigurationResponse staged =
                 configurationService.replace(
