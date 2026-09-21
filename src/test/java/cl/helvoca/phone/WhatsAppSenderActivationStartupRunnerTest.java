@@ -45,6 +45,27 @@ class WhatsAppSenderActivationStartupRunnerTest {
     }
 
     @Test
+    void refusesMetaWhatsappSender() {
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(UUID.randomUUID());
+        phone.setPhoneNumber("+14355652512");
+        phone.setActive(true);
+        phone.setWhatsappProvider("META_WHATSAPP_CLOUD");
+
+        PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
+        when(repository.findByPhoneNumber("+14355652512")).thenReturn(Optional.of(phone));
+
+        WhatsAppSenderActivationStartupRunner runner =
+                new WhatsAppSenderActivationStartupRunner(true, "+14355652512", repository);
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> runner.run(null));
+
+        assertTrue(error.getMessage().contains("TWILIO_WHATSAPP"));
+        verify(repository, never()).save(any());
+        verify(repository, never()).findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(any());
+    }
+
+    @Test
     void refusesInactivePhone() {
         PhoneNumber phone = new PhoneNumber();
         phone.setBusinessId(UUID.randomUUID());
