@@ -188,7 +188,6 @@ public class MetaWhatsAppTenantConfigurationController {
     public MetaWhatsAppEmbeddedSignupPhoneStagingResult finalizeSelectedWabaPhoneNumber(
             @Valid @RequestBody MetaWhatsAppEmbeddedSignupPhoneFinalizeRequest request) {
         return embeddedSignupPhoneStagingService.registerAndStage(
-                request.phoneRecordId(),
                 request.wabaId(),
                 request.phoneNumberId(),
                 request.credentialRef(),
