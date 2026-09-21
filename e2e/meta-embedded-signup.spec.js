@@ -247,6 +247,10 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
 
   await expect.poll(() => phoneValidationBodies).toEqual([]);
 
+  const pinSetup = page.locator('#metaWhatsAppPinSetup');
+  const pinInput = page.getByLabel('PIN de Meta', { exact: true });
+  await expect(pinSetup).toHaveClass(/hidden/);
+
   const phoneConfirmButton = page.getByRole('button', { name: 'Continuar con este número', exact: true });
   await expect(phoneConfirmButton).toBeVisible();
   await phoneConfirmButton.click();
@@ -258,6 +262,31 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(page.locator('#metaWhatsAppPhoneConfirmStatus'))
     .toHaveText('Número validado por Meta.');
 
+  await expect(pinSetup).toBeVisible();
+  await expect(pinInput).toBeFocused();
+  await expect(pinInput).toHaveAttribute('type', 'password');
+  await expect(pinInput).toHaveAttribute('inputmode', 'numeric');
+  await expect(pinInput).toHaveAttribute('maxlength', '6');
+  await expect(pinInput).toHaveAttribute('autocomplete', 'off');
+
+  await pinInput.fill('12ab34');
+  await expect(pinInput).toHaveValue('1234');
+  await expect(page.locator('#metaWhatsAppPinStatus'))
+    .toHaveText('El PIN debe tener exactamente 6 dígitos.');
+
+  await pinInput.fill('123456');
+  await expect(pinInput).toHaveValue('123456');
+  await expect(page.locator('#metaWhatsAppPinStatus'))
+    .toHaveText('PIN listo para el siguiente paso.');
+
+  await pinInput.fill('12345');
+  await expect(page.locator('#metaWhatsAppPinStatus'))
+    .toHaveText('El PIN debe tener exactamente 6 dígitos.');
+
+  await expect.poll(() => phoneValidationBodies).toEqual([{
+    wabaId: '1906385232743452',
+    phoneNumberId: '12025550124'
+  }]);
   await expect.poll(() => phoneDiscoveryBodies).toEqual([{ wabaId: '1906385232743452' }]);
   await expect.poll(() => unexpectedEmbeddedSignupRequests).toEqual([]);
 });
