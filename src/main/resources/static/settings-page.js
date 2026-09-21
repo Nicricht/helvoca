@@ -102,6 +102,14 @@
       font-size: 11px;
       line-height: 1.4;
     }
+    #metaWhatsAppWabaCandidates .meta-whatsapp-waba-card.selected {
+      border-color: rgba(90, 180, 255, .55);
+      background: rgba(90, 180, 255, .08);
+      box-shadow: 0 0 0 1px rgba(90, 180, 255, .12);
+    }
+    #metaWhatsAppWabaCandidates .meta-whatsapp-waba-select {
+      margin-top: 9px;
+    }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -188,6 +196,7 @@
     wabas.forEach((waba, index) => {
       const card = document.createElement("div");
       card.className = "meta-whatsapp-waba-card";
+      card.dataset.selected = "false";
       if (waba?.id) card.dataset.wabaId = String(waba.id);
 
       const name = document.createElement("strong");
@@ -205,7 +214,30 @@
         ? "Acceso técnico de RecepVoz listo"
         : "Acceso técnico pendiente de asignación";
 
-      card.append(name, details, access);
+      const selectButton = document.createElement("button");
+      selectButton.type = "button";
+      selectButton.className = "button secondary meta-whatsapp-waba-select";
+      selectButton.textContent = "Seleccionar";
+      selectButton.setAttribute("aria-pressed", "false");
+      if (!waba?.id) {
+        selectButton.disabled = true;
+      } else {
+        selectButton.addEventListener("click", () => {
+          const selectedWabaId = String(waba.id);
+          container.querySelectorAll(".meta-whatsapp-waba-card").forEach(candidate => {
+            const selected = candidate.dataset.wabaId === selectedWabaId;
+            candidate.classList.toggle("selected", selected);
+            candidate.dataset.selected = selected ? "true" : "false";
+            const candidateButton = candidate.querySelector(".meta-whatsapp-waba-select");
+            if (candidateButton) {
+              candidateButton.setAttribute("aria-pressed", selected ? "true" : "false");
+              candidateButton.textContent = selected ? "Seleccionado" : "Seleccionar";
+            }
+          });
+        });
+      }
+
+      card.append(name, details, access, selectButton);
       container.appendChild(card);
     });
 
