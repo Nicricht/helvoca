@@ -1,6 +1,7 @@
 package cl.helvoca.messaging.meta;
 
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +25,7 @@ public class MetaWhatsAppTenantConfigurationController {
     private final MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService embeddedSignupSelectedPhoneValidationService;
     private final MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService embeddedSignupSelectedPhoneRegistrationService;
 
+    @Autowired
     public MetaWhatsAppTenantConfigurationController(
             MetaWhatsAppTenantConfigurationService service,
             MetaWhatsAppTenantHealthService healthService,
@@ -47,6 +49,31 @@ public class MetaWhatsAppTenantConfigurationController {
         this.embeddedSignupSelectedWabaPhoneDiscoveryService = embeddedSignupSelectedWabaPhoneDiscoveryService;
         this.embeddedSignupSelectedPhoneValidationService = embeddedSignupSelectedPhoneValidationService;
         this.embeddedSignupSelectedPhoneRegistrationService = embeddedSignupSelectedPhoneRegistrationService;
+    }
+
+    MetaWhatsAppTenantConfigurationController(
+            MetaWhatsAppTenantConfigurationService service,
+            MetaWhatsAppTenantHealthService healthService,
+            MetaWhatsAppDeploymentReadinessService deploymentReadinessService,
+            MetaWhatsAppEmbeddedSignupReadinessService embeddedSignupReadinessService,
+            MetaWhatsAppEmbeddedSignupBootstrapService embeddedSignupBootstrapService,
+            MetaWhatsAppEmbeddedSignupAuthorizationCodeService embeddedSignupAuthorizationCodeService,
+            MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService embeddedSignupSelectedWabaAssignmentService,
+            MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService embeddedSignupSelectedWabaSubscriptionService,
+            MetaWhatsAppEmbeddedSignupSelectedWabaPhoneDiscoveryService embeddedSignupSelectedWabaPhoneDiscoveryService,
+            MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService embeddedSignupSelectedPhoneValidationService) {
+        this(
+                service,
+                healthService,
+                deploymentReadinessService,
+                embeddedSignupReadinessService,
+                embeddedSignupBootstrapService,
+                embeddedSignupAuthorizationCodeService,
+                embeddedSignupSelectedWabaAssignmentService,
+                embeddedSignupSelectedWabaSubscriptionService,
+                embeddedSignupSelectedWabaPhoneDiscoveryService,
+                embeddedSignupSelectedPhoneValidationService,
+                null);
     }
 
     @GetMapping("/config")
