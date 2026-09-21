@@ -1,9 +1,13 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.ConflictException;
+import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -12,9 +16,13 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneValidationServiceTest {
 
     @Test
     void validatesSelectedPhoneFromFirstPageAfterSubscriptionIsConfirmed() {
+        UUID businessId = UUID.randomUUID();
         var subscription = mock(MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService.class);
         var phones = mock(MetaWhatsAppEmbeddedSignupPhoneNumberClient.class);
+        var tenantProvider = mock(TenantProvider.class);
+        var audit = mock(AuditService.class);
         MetaWhatsAppProperties meta = readyProperties();
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
 
         when(subscription.ensureSubscribed("1906385232743451"))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionResult(
@@ -27,7 +35,7 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneValidationServiceTest {
                         null));
 
         var service = new MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService(
-                subscription, phones, meta);
+                subscription, phones, meta, tenantProvider, audit);
 
         var result = service.validate("1906385232743451", "1913623884432103");
 
@@ -38,6 +46,15 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneValidationServiceTest {
         var ordered = inOrder(subscription, phones);
         ordered.verify(subscription).ensureSubscribed("1906385232743451");
         ordered.verify(phones).list("1906385232743451", "system-user-secret");
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("META_WHATSAPP_PHONE_VALIDATED"),
+                eq("META_WHATSAPP_CONFIG"),
+                eq(businessId),
+                isNull(),
+                eq(Map.of(
+                        "phoneValidated", true,
+                        "appSubscribed", true)));
     }
 
     @Test
@@ -74,6 +91,8 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneValidationServiceTest {
     void rejectsPhoneThatDoesNotBelongToSelectedWaba() {
         var subscription = mock(MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService.class);
         var phones = mock(MetaWhatsAppEmbeddedSignupPhoneNumberClient.class);
+        var tenantProvider = mock(TenantProvider.class);
+        var audit = mock(AuditService.class);
         MetaWhatsAppProperties meta = readyProperties();
 
         when(subscription.ensureSubscribed("1906385232743451"))
@@ -85,13 +104,14 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneValidationServiceTest {
                         null));
 
         var service = new MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService(
-                subscription, phones, meta);
+                subscription, phones, meta, tenantProvider, audit);
 
         ConflictException error = assertThrows(
                 ConflictException.class,
                 () -> service.validate("1906385232743451", "1913623884432103"));
 
         assertEquals("META_EMBEDDED_SIGNUP_PHONE_NOT_IN_WABA", error.getMessage());
+        verifyNoInteractions(audit);
     }
 
     @Test

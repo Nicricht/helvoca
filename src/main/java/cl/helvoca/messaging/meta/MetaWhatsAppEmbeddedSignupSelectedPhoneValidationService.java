@@ -1,10 +1,15 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.ConflictException;
+import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService {
@@ -13,14 +18,28 @@ public class MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService {
     private final MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService subscriptionService;
     private final MetaWhatsAppEmbeddedSignupPhoneNumberClient phoneNumberClient;
     private final MetaWhatsAppProperties metaProperties;
+    private final TenantProvider tenantProvider;
+    private final AuditService auditService;
 
+    @Autowired
     public MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService(
             MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService subscriptionService,
             MetaWhatsAppEmbeddedSignupPhoneNumberClient phoneNumberClient,
-            MetaWhatsAppProperties metaProperties) {
+            MetaWhatsAppProperties metaProperties,
+            TenantProvider tenantProvider,
+            AuditService auditService) {
         this.subscriptionService = subscriptionService;
         this.phoneNumberClient = phoneNumberClient;
         this.metaProperties = metaProperties;
+        this.tenantProvider = tenantProvider;
+        this.auditService = auditService;
+    }
+
+    MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService(
+            MetaWhatsAppEmbeddedSignupSelectedWabaSubscriptionService subscriptionService,
+            MetaWhatsAppEmbeddedSignupPhoneNumberClient phoneNumberClient,
+            MetaWhatsAppProperties metaProperties) {
+        this(subscriptionService, phoneNumberClient, metaProperties, null, null);
     }
 
     public MetaWhatsAppEmbeddedSignupSelectedPhoneValidationResult validate(
@@ -58,6 +77,19 @@ public class MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService {
 
             for (MetaWhatsAppEmbeddedSignupPhoneNumberPage.PhoneNumber phone : page.phoneNumbers()) {
                 if (cleanPhoneNumberId.equals(phone.id())) {
+                    if (auditService != null && tenantProvider != null) {
+                        UUID businessId = tenantProvider.requireBusinessId();
+                        auditService.humanSuccess(
+                                businessId,
+                                "META_WHATSAPP_PHONE_VALIDATED",
+                                "META_WHATSAPP_CONFIG",
+                                businessId,
+                                null,
+                                Map.of(
+                                        "phoneValidated", true,
+                                        "appSubscribed", true));
+                    }
+
                     return new MetaWhatsAppEmbeddedSignupSelectedPhoneValidationResult(
                             "PHONE_NUMBER_VALIDATED",
                             phone.id(),
