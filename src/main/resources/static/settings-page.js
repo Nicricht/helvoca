@@ -192,6 +192,25 @@
       font-size: 11px;
       line-height: 1.4;
     }
+    #metaWhatsAppPreparedState {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid rgba(90, 180, 255, .35);
+      border-radius: 10px;
+      background: rgba(90, 180, 255, .07);
+    }
+    #metaWhatsAppPreparedState.hidden { display: none; }
+    #metaWhatsAppPreparedState strong {
+      display: block;
+      font-size: 12px;
+    }
+    #metaWhatsAppPreparedState span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -456,6 +475,10 @@
         <button id="metaWhatsAppFinalizePhoneBtn" class="button secondary" type="button" disabled>Finalizar configuración</button>
         <span id="metaWhatsAppPinStatus" role="status"></span>
       </div>
+      <div id="metaWhatsAppPreparedState" class="hidden" role="status">
+        <strong>WhatsApp preparado</strong>
+        <span>Configuración guardada y desactivada. Todavía no se ha activado el tráfico real.</span>
+      </div>
     `;
     panel.appendChild(section);
 
@@ -473,6 +496,7 @@
     const pinInput = section.querySelector("#metaWhatsAppPinInput");
     const finalizePhoneButton = section.querySelector("#metaWhatsAppFinalizePhoneBtn");
     const pinStatus = section.querySelector("#metaWhatsAppPinStatus");
+    const preparedState = section.querySelector("#metaWhatsAppPreparedState");
 
     function resetPinSetup() {
       selectedPhoneFinalization = null;
@@ -483,6 +507,7 @@
       if (finalizePhoneButton) finalizePhoneButton.disabled = true;
       if (pinStatus) pinStatus.textContent = "";
       pinSetup?.classList.add("hidden");
+      preparedState?.classList.add("hidden");
     }
 
     wabaCandidates?.addEventListener("meta-waba-selected", () => {
@@ -592,7 +617,8 @@
           pinInput.value = "";
           pinInput.disabled = true;
         }
-        if (pinStatus) pinStatus.textContent = "Configuración guardada desactivada. PIN eliminado del formulario.";
+        if (pinStatus) pinStatus.textContent = "PIN eliminado del formulario.";
+        preparedState?.classList.remove("hidden");
       } catch (error) {
         selectedPhoneFinalization = null;
         if (pinStatus) pinStatus.textContent = "No fue posible finalizar la configuración. Revisa el PIN e intenta nuevamente.";
