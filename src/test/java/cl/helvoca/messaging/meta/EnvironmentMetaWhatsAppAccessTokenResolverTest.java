@@ -32,6 +32,29 @@ class EnvironmentMetaWhatsAppAccessTokenResolverTest {
     }
 
     @Test
+    void resolvesEmbeddedSignupSystemUserTokenWithoutReadingTenantNamedSecret() {
+        UUID businessId = UUID.randomUUID();
+        MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        when(configs.findById(businessId)).thenReturn(Optional.of(config(
+                businessId,
+                true,
+                MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.EMBEDDED_SIGNUP_SYSTEM_USER)));
+
+        MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
+        properties.setEmbeddedSignupSystemUserAccessToken("  embedded-system-user-token  ");
+
+        @SuppressWarnings("unchecked")
+        Function<String, String> env = mock(Function.class);
+        var resolver = new EnvironmentMetaWhatsAppAccessTokenResolver(
+                configs,
+                properties,
+                env);
+
+        assertEquals(Optional.of("embedded-system-user-token"), resolver.resolve(businessId));
+        verifyNoInteractions(env);
+    }
+
+    @Test
     void disabledTenantNeverReadsDeploymentSecret() {
         UUID businessId = UUID.randomUUID();
         MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
