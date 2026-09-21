@@ -9,6 +9,7 @@ const json = body => ({
 test('Embedded Signup renders WABA candidates after secure authorization', async ({ page }) => {
   const authorizationBodies = [];
   const phoneDiscoveryBodies = [];
+  const phoneValidationBodies = [];
   const unexpectedEmbeddedSignupRequests = [];
 
   page.on('request', request => {
@@ -17,7 +18,8 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
     const allowed = new Set([
       `${embeddedSignupPrefix}bootstrap`,
       `${embeddedSignupPrefix}authorization-code`,
-      `${embeddedSignupPrefix}waba/phone-numbers`
+      `${embeddedSignupPrefix}waba/phone-numbers`,
+      `${embeddedSignupPrefix}waba/phone-number/validate`
     ]);
     if (pathname.startsWith(embeddedSignupPrefix) && !allowed.has(pathname)) {
       unexpectedEmbeddedSignupRequests.push(pathname);
@@ -66,6 +68,19 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
         }
       ],
       afterCursor: null
+    }));
+  });
+
+  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/waba/phone-number/validate', async route => {
+    const body = route.request().postDataJSON();
+    phoneValidationBodies.push(body);
+    await route.fulfill(json({
+      state: 'PHONE_NUMBER_VALIDATED',
+      phoneNumberId: body.phoneNumberId,
+      displayPhoneNumber: '+56 9 3333 4444',
+      verifiedName: 'RecepVoz Sucursal',
+      qualityRating: 'YELLOW',
+      codeVerificationStatus: 'NOT_VERIFIED'
     }));
   });
 
@@ -229,6 +244,19 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(firstPhoneCard).toHaveAttribute('data-selected', 'false');
   await expect(firstPhoneCard.getByRole('button', { name: 'Seleccionar', exact: true }))
     .toHaveAttribute('aria-pressed', 'false');
+
+  await expect.poll(() => phoneValidationBodies).toEqual([]);
+
+  const phoneConfirmButton = page.getByRole('button', { name: 'Continuar con este número', exact: true });
+  await expect(phoneConfirmButton).toBeVisible();
+  await phoneConfirmButton.click();
+
+  await expect.poll(() => phoneValidationBodies).toEqual([{
+    wabaId: '1906385232743452',
+    phoneNumberId: '12025550124'
+  }]);
+  await expect(page.locator('#metaWhatsAppPhoneConfirmStatus'))
+    .toHaveText('Número validado por Meta.');
 
   await expect.poll(() => phoneDiscoveryBodies).toEqual([{ wabaId: '1906385232743452' }]);
   await expect.poll(() => unexpectedEmbeddedSignupRequests).toEqual([]);
