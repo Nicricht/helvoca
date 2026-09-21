@@ -696,6 +696,17 @@
           status = null;
         }
       }
+
+      const configuredEnabled = status?.status === "CONFIGURED_ENABLED"
+        && status?.configured === true
+        && status?.enabled === true;
+      if (configuredEnabled) {
+        certificationState?.classList.add("hidden");
+        deploymentState?.classList.add("hidden");
+        renderActivationGate(null, null, status);
+        return;
+      }
+
       const [certification, deployment] = await Promise.all([
         loadCertificationReadiness(),
         loadDeploymentReadiness()
@@ -768,6 +779,8 @@
         activationGateTitle.textContent = "WhatsApp activado";
         activationGateCopy.textContent = "Este negocio quedó habilitado para Meta. La entrega real continúa sujeta a las compuertas globales del despliegue.";
         preparedState?.classList.add("hidden");
+        certificationState?.classList.add("hidden");
+        deploymentState?.classList.add("hidden");
         activationButton.classList.add("hidden");
         deactivationButton?.classList.remove("hidden");
         if (deactivationButton) deactivationButton.disabled = false;
