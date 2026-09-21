@@ -449,7 +449,7 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
     .toContainText('Activación disponible con autorización manual');
   await expect(restoredActivationGate)
     .toContainText('Activar habilita este negocio para Meta');
-  const activateButton = page.getByRole('button', { name: 'Activar WhatsApp', exact: true });
+  const activateButton = page.locator('#metaWhatsAppActivateBtn');
   await expect(activateButton).toBeVisible();
   await expect.poll(() => phoneFinalizeBodies).toHaveLength(1);
   await expect.poll(() => activationRequests).toBe(0);
