@@ -74,6 +74,34 @@
       font-size: 11px;
       line-height: 1.45;
     }
+    #metaWhatsAppWabaCandidates {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    #metaWhatsAppWabaCandidates.hidden { display: none; }
+    #metaWhatsAppWabaCandidates .meta-whatsapp-waba-title {
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    #metaWhatsAppWabaCandidates .meta-whatsapp-waba-card {
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      background: rgba(255,255,255,.025);
+    }
+    #metaWhatsAppWabaCandidates .meta-whatsapp-waba-card strong {
+      display: block;
+      font-size: 12px;
+    }
+    #metaWhatsAppWabaCandidates .meta-whatsapp-waba-card span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -142,6 +170,55 @@
     return facebookSdkPromise;
   }
 
+  function renderWabaCandidates(handoff, container) {
+    if (!container) return 0;
+    container.replaceChildren();
+
+    const wabas = Array.isArray(handoff?.wabas) ? handoff.wabas : [];
+    if (!wabas.length) {
+      container.classList.add("hidden");
+      return 0;
+    }
+
+    const title = document.createElement("div");
+    title.className = "meta-whatsapp-waba-title";
+    title.textContent = "Cuentas de WhatsApp Business disponibles";
+    container.appendChild(title);
+
+    wabas.forEach((waba, index) => {
+      const card = document.createElement("div");
+      card.className = "meta-whatsapp-waba-card";
+      if (waba?.id) card.dataset.wabaId = String(waba.id);
+
+      const name = document.createElement("strong");
+      name.textContent = String(waba?.name || "").trim() || `Cuenta de WhatsApp Business ${index + 1}`;
+
+      const details = document.createElement("span");
+      const detailParts = [];
+      if (waba?.id) detailParts.push(`ID ${waba.id}`);
+      if (waba?.currency) detailParts.push(String(waba.currency));
+      if (waba?.timezoneId) detailParts.push(String(waba.timezoneId));
+      details.textContent = detailParts.join(" · ");
+
+      const access = document.createElement("span");
+      access.textContent = waba?.systemUserAssigned
+        ? "Acceso técnico de RecepVoz listo"
+        : "Acceso técnico pendiente de asignación";
+
+      card.append(name, details, access);
+      container.appendChild(card);
+    });
+
+    if (handoff?.wabaAfterCursor) {
+      const note = document.createElement("span");
+      note.textContent = "Meta indica que existen más cuentas. Esta vista muestra la primera página.";
+      container.appendChild(note);
+    }
+
+    container.classList.remove("hidden");
+    return wabas.length;
+  }
+
   function renderConnectButton(bootstrap) {
     if (!bootstrap?.available) return;
     const panel = document.querySelector("#configPhonePanel");
@@ -158,11 +235,13 @@
         <button id="metaWhatsAppConnectBtn" class="button secondary" type="button">Conectar WhatsApp</button>
       </div>
       <div id="metaWhatsAppConnectMessage" class="hidden" role="status"></div>
+      <div id="metaWhatsAppWabaCandidates" class="hidden" aria-live="polite"></div>
     `;
     panel.appendChild(section);
 
     const button = section.querySelector("#metaWhatsAppConnectBtn");
     const message = section.querySelector("#metaWhatsAppConnectMessage");
+    const wabaCandidates = section.querySelector("#metaWhatsAppWabaCandidates");
     button?.addEventListener("click", async () => {
       if (button.dataset.sdkReady === "true") {
         if (!window.FB?.login) {
@@ -174,12 +253,14 @@
         }
 
         button.disabled = true;
+        renderWabaCandidates(null, wabaCandidates);
         message.textContent = "Abriendo autorización segura de Meta…";
         message.classList.remove("hidden");
         window.FB.login(async response => {
           const code = response?.authResponse?.code;
           if (!code) {
             button.disabled = false;
+            renderWabaCandidates(null, wabaCandidates);
             message.textContent = "La autorización no se completó. Puedes intentarlo nuevamente.";
             return;
           }
@@ -189,11 +270,18 @@
               method: "POST",
               body: JSON.stringify({ code })
             });
-            message.textContent = handoff?.accepted
-              ? "Autorización recibida de forma segura por el servidor. Falta el intercambio con Meta."
-              : "El servidor no pudo aceptar la autorización.";
+            if (!handoff?.accepted) {
+              renderWabaCandidates(null, wabaCandidates);
+              message.textContent = "El servidor no pudo aceptar la autorización.";
+            } else {
+              const candidateCount = renderWabaCandidates(handoff, wabaCandidates);
+              message.textContent = candidateCount
+                ? `Autorización completada. Encontramos ${candidateCount} cuenta${candidateCount === 1 ? "" : "s"} de WhatsApp Business.`
+                : "Autorización completada, pero Meta no devolvió cuentas de WhatsApp Business disponibles.";
+            }
           } catch (error) {
-            message.textContent = "No fue posible entregar la autorización al servidor. Intenta nuevamente.";
+            renderWabaCandidates(null, wabaCandidates);
+            message.textContent = "No fue posible completar la autorización con Meta. Intenta nuevamente.";
           } finally {
             button.disabled = false;
           }
