@@ -1,12 +1,16 @@
 package cl.helvoca.messaging.outbound;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.messaging.MessagingConversation;
 import cl.helvoca.messaging.MessagingConversationRepository;
 import cl.helvoca.messaging.MessagingMessage;
 import cl.helvoca.messaging.MessagingMessageRepository;
+import cl.helvoca.phone.PhoneNumber;
+import cl.helvoca.phone.PhoneNumberRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,6 +54,45 @@ class MetaWhatsAppDeliveryStatusServiceTest {
         assertEquals(occurredAt, message.getDeliveredAt());
         assertEquals(occurredAt, message.getDeliveryUpdatedAt());
         verify(messages).saveAndFlush(message);
+    }
+
+    @Test
+    void firstDeliveredCallbackCertifiesMetaSenderAndAuditsSuccess() {
+        OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
+        MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
+        MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        AuditService audit = mock(AuditService.class);
+        UUID businessId = UUID.randomUUID();
+        UUID phoneId = UUID.randomUUID();
+        Instant occurredAt = Instant.ofEpochSecond(1720000000L);
+
+        OutboundMessage message = mock(OutboundMessage.class);
+        when(message.getBusinessId()).thenReturn(businessId);
+        when(message.getProviderDeliveryStatus()).thenReturn("SENT");
+        when(outbound.findTopByProviderAndProviderMessageIdOrderByUpdatedAtDesc(
+                MetaWhatsAppMessagingProvider.ID, "wamid.CERT-1"))
+                .thenReturn(Optional.of(message));
+
+        PhoneNumber sender = mock(PhoneNumber.class);
+        when(sender.getId()).thenReturn(phoneId);
+        when(sender.getWhatsappProvider()).thenReturn(MetaWhatsAppMessagingProvider.ID);
+        when(sender.getWhatsappCertifiedAt()).thenReturn(null);
+        when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(sender));
+
+        var result = new MetaWhatsAppDeliveryStatusService(
+                outbound, messages, conversations, phones, audit)
+                .apply(businessId, "wamid.CERT-1", "delivered", occurredAt, null);
+
+        assertEquals(MetaWhatsAppDeliveryStatusService.Result.UPDATED, result);
+        verify(sender).setWhatsappCertifiedAt(occurredAt);
+        verify(phones).saveAndFlush(sender);
+        verify(audit).success(
+                businessId,
+                "META_WHATSAPP_CERTIFICATION_COMPLETED",
+                "WHATSAPP_SENDER",
+                phoneId);
     }
 
     @Test
