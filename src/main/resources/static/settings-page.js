@@ -170,6 +170,28 @@
       font-size: 11px;
       line-height: 1.4;
     }
+    #metaWhatsAppPinSetup {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+      max-width: 320px;
+    }
+    #metaWhatsAppPinSetup.hidden { display: none; }
+    #metaWhatsAppPinSetup label {
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    #metaWhatsAppPinInput {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #metaWhatsAppPinHelp,
+    #metaWhatsAppPinStatus {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+    }
     @media (max-width: 520px) {
       #metaWhatsAppConnect .meta-whatsapp-row {
         align-items: stretch;
@@ -417,6 +439,21 @@
         <button id="metaWhatsAppPhoneConfirmBtn" class="button secondary" type="button">Continuar con este número</button>
         <span id="metaWhatsAppPhoneConfirmStatus" role="status"></span>
       </div>
+      <div id="metaWhatsAppPinSetup" class="hidden">
+        <label for="metaWhatsAppPinInput">PIN de Meta</label>
+        <input
+          id="metaWhatsAppPinInput"
+          type="password"
+          inputmode="numeric"
+          pattern="[0-9]{6}"
+          maxlength="6"
+          autocomplete="off"
+          spellcheck="false"
+          aria-describedby="metaWhatsAppPinHelp metaWhatsAppPinStatus"
+        />
+        <span id="metaWhatsAppPinHelp">Ingresa exactamente 6 dígitos. El PIN no se guarda ni se envía todavía.</span>
+        <span id="metaWhatsAppPinStatus" role="status"></span>
+      </div>
     `;
     panel.appendChild(section);
 
@@ -430,10 +467,20 @@
     const phoneConfirm = section.querySelector("#metaWhatsAppPhoneConfirm");
     const phoneConfirmButton = section.querySelector("#metaWhatsAppPhoneConfirmBtn");
     const phoneConfirmStatus = section.querySelector("#metaWhatsAppPhoneConfirmStatus");
+    const pinSetup = section.querySelector("#metaWhatsAppPinSetup");
+    const pinInput = section.querySelector("#metaWhatsAppPinInput");
+    const pinStatus = section.querySelector("#metaWhatsAppPinStatus");
+
+    function resetPinSetup() {
+      if (pinInput) pinInput.value = "";
+      if (pinStatus) pinStatus.textContent = "";
+      pinSetup?.classList.add("hidden");
+    }
 
     wabaCandidates?.addEventListener("meta-waba-selected", () => {
       selectedPhoneDiscovery = null;
       selectedPhoneValidation = null;
+      resetPinSetup();
       renderPhoneCandidates(null, phoneCandidates);
       phoneConfirm?.classList.add("hidden");
       if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
@@ -444,6 +491,7 @@
 
     phoneCandidates?.addEventListener("meta-phone-selected", () => {
       selectedPhoneValidation = null;
+      resetPinSetup();
       if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
       phoneConfirm?.classList.remove("hidden");
       if (phoneConfirmButton) phoneConfirmButton.disabled = false;
@@ -468,13 +516,29 @@
         }
         selectedPhoneValidation = validation;
         if (phoneConfirmStatus) phoneConfirmStatus.textContent = "Número validado por Meta.";
+        if (pinStatus) pinStatus.textContent = "";
+        pinSetup?.classList.remove("hidden");
+        pinInput?.focus();
       } catch (error) {
         selectedPhoneValidation = null;
+        resetPinSetup();
         if (phoneConfirmStatus) {
           phoneConfirmStatus.textContent = "No fue posible validar este número. Intenta nuevamente.";
         }
       } finally {
         phoneConfirmButton.disabled = false;
+      }
+    });
+
+    pinInput?.addEventListener("input", () => {
+      const digitsOnly = pinInput.value.replace(/\D/g, "").slice(0, 6);
+      if (pinInput.value !== digitsOnly) pinInput.value = digitsOnly;
+      if (pinStatus) {
+        pinStatus.textContent = digitsOnly.length === 6
+          ? "PIN listo para el siguiente paso."
+          : digitsOnly.length
+            ? "El PIN debe tener exactamente 6 dígitos."
+            : "";
       }
     });
 
@@ -491,6 +555,7 @@
           body: JSON.stringify({ wabaId })
         });
         selectedPhoneValidation = null;
+        resetPinSetup();
         phoneConfirm?.classList.add("hidden");
         if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
         const phoneCount = renderPhoneCandidates(selectedPhoneDiscovery, phoneCandidates);
@@ -500,6 +565,7 @@
       } catch (error) {
         selectedPhoneDiscovery = null;
         selectedPhoneValidation = null;
+        resetPinSetup();
         renderPhoneCandidates(null, phoneCandidates);
         phoneConfirm?.classList.add("hidden");
         if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
@@ -525,6 +591,7 @@
         renderWabaCandidates(null, wabaCandidates);
         selectedPhoneDiscovery = null;
         selectedPhoneValidation = null;
+        resetPinSetup();
         renderPhoneCandidates(null, phoneCandidates);
         phoneConfirm?.classList.add("hidden");
         if (phoneConfirmStatus) phoneConfirmStatus.textContent = "";
