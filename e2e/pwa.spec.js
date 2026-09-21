@@ -27,4 +27,21 @@ test('PWA manifest is linked and service worker controls the app scope', async (
     const registration = await navigator.serviceWorker.ready;
     return new URL(registration.scope).pathname;
   })).toBe('/');
+
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
+    .toBe(true);
+
+  await page.route('**/api/v1/pwa-route-probe', route => {
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ intercepted: true })
+    });
+  });
+
+  const probe = await page.evaluate(async () => {
+    const response = await fetch('/api/v1/pwa-route-probe');
+    return response.json();
+  });
+  expect(probe).toEqual({ intercepted: true });
 });
