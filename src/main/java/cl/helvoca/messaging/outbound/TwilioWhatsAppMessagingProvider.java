@@ -94,8 +94,11 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
             throw new IllegalArgumentException("Outbound content is required");
         }
 
-        List<PhoneNumber> senders = phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(
-                command.businessId());
+        List<PhoneNumber> senders = phones
+                .findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(command.businessId())
+                .stream()
+                .filter(phone -> ID.equalsIgnoreCase(phone.getWhatsappProvider()))
+                .toList();
         if (senders.size() != 1) {
             throw new IllegalStateException(senders.isEmpty()
                     ? "Tenant has no WhatsApp-enabled sender"
