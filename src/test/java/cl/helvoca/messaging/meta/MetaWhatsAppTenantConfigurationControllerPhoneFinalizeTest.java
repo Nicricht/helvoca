@@ -24,7 +24,7 @@ class MetaWhatsAppTenantConfigurationControllerPhoneFinalizeTest {
                 "META_WHATSAPP_CLOUD",
                 "1913623884432103",
                 "1906385232743451",
-                "TENANT_01",
+                MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.EMBEDDED_SIGNUP_SYSTEM_USER,
                 false);
 
         when(staging.registerAndStage(
