@@ -1,9 +1,13 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.ConflictException;
+import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -60,11 +64,15 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentServiceTest {
 
     @Test
     void findsSelectedWabaOnLaterPageAndSkipsWriteWhenAlreadyAssigned() {
+        UUID businessId = UUID.randomUUID();
         MetaWhatsAppProperties meta = readyProperties();
         var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
         var sharedWabas = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
         var assignedUsers = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
         var assign = mock(MetaWhatsAppEmbeddedSignupAssignSystemUserClient.class);
+        var tenantProvider = mock(TenantProvider.class);
+        var audit = mock(AuditService.class);
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
 
         when(sharedWabas.list("112233445566778", "system-user-secret"))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSharedWabaPage(
@@ -93,23 +101,27 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentServiceTest {
                                 List.of("MANAGE")))));
 
         var service = new MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService(
-                readiness, sharedWabas, assignedUsers, assign, meta);
+                readiness, sharedWabas, assignedUsers, assign, meta, tenantProvider, audit);
 
         var result = service.ensureAssigned("1906385232743451");
 
         assertEquals("SYSTEM_USER_ALREADY_ASSIGNED", result.state());
         assertTrue(result.systemUserAssigned());
         assertFalse(result.changed());
-        verifyNoInteractions(assign);
+        verifyNoInteractions(assign, audit);
     }
 
     @Test
     void assignsManageTaskOnlyAfterSelectedWabaIsVerifiedShared() {
+        UUID businessId = UUID.randomUUID();
         MetaWhatsAppProperties meta = readyProperties();
         var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
         var sharedWabas = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
         var assignedUsers = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
         var assign = mock(MetaWhatsAppEmbeddedSignupAssignSystemUserClient.class);
+        var tenantProvider = mock(TenantProvider.class);
+        var audit = mock(AuditService.class);
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
 
         when(sharedWabas.list("112233445566778", "system-user-secret"))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSharedWabaPage(
@@ -133,7 +145,7 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentServiceTest {
                 .thenReturn(new MetaWhatsAppEmbeddedSignupAssignSystemUserResult(true));
 
         var service = new MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService(
-                readiness, sharedWabas, assignedUsers, assign, meta);
+                readiness, sharedWabas, assignedUsers, assign, meta, tenantProvider, audit);
 
         var result = service.ensureAssigned("1906385232743451");
 
@@ -145,6 +157,15 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentServiceTest {
                 "998877665544332",
                 "MANAGE",
                 "admin-system-user-secret");
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("META_WHATSAPP_SYSTEM_USER_ASSIGNED"),
+                eq("META_WHATSAPP_CONFIG"),
+                eq(businessId),
+                isNull(),
+                eq(Map.of(
+                        "assigned", true,
+                        "changed", true)));
     }
 
     @Test

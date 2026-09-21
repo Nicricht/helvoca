@@ -1,10 +1,15 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.ConflictException;
+import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService {
@@ -16,18 +21,41 @@ public class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService {
     private final MetaWhatsAppEmbeddedSignupAssignedUsersClient assignedUsersClient;
     private final MetaWhatsAppEmbeddedSignupAssignSystemUserClient assignSystemUserClient;
     private final MetaWhatsAppProperties metaProperties;
+    private final TenantProvider tenantProvider;
+    private final AuditService auditService;
 
+    @Autowired
     public MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService(
             MetaWhatsAppEmbeddedSignupReadinessService readinessService,
             MetaWhatsAppEmbeddedSignupSharedWabaClient sharedWabaClient,
             MetaWhatsAppEmbeddedSignupAssignedUsersClient assignedUsersClient,
             MetaWhatsAppEmbeddedSignupAssignSystemUserClient assignSystemUserClient,
-            MetaWhatsAppProperties metaProperties) {
+            MetaWhatsAppProperties metaProperties,
+            TenantProvider tenantProvider,
+            AuditService auditService) {
         this.readinessService = readinessService;
         this.sharedWabaClient = sharedWabaClient;
         this.assignedUsersClient = assignedUsersClient;
         this.assignSystemUserClient = assignSystemUserClient;
         this.metaProperties = metaProperties;
+        this.tenantProvider = tenantProvider;
+        this.auditService = auditService;
+    }
+
+    MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService(
+            MetaWhatsAppEmbeddedSignupReadinessService readinessService,
+            MetaWhatsAppEmbeddedSignupSharedWabaClient sharedWabaClient,
+            MetaWhatsAppEmbeddedSignupAssignedUsersClient assignedUsersClient,
+            MetaWhatsAppEmbeddedSignupAssignSystemUserClient assignSystemUserClient,
+            MetaWhatsAppProperties metaProperties) {
+        this(
+                readinessService,
+                sharedWabaClient,
+                assignedUsersClient,
+                assignSystemUserClient,
+                metaProperties,
+                null,
+                null);
     }
 
     public MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentResult ensureAssigned(String wabaId) {
@@ -65,6 +93,19 @@ public class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService {
 
         if (!assignment.success()) {
             throw new ConflictException("META_EMBEDDED_SIGNUP_SYSTEM_USER_ASSIGNMENT_FAILED");
+        }
+
+        if (auditService != null && tenantProvider != null) {
+            UUID businessId = tenantProvider.requireBusinessId();
+            auditService.humanSuccess(
+                    businessId,
+                    "META_WHATSAPP_SYSTEM_USER_ASSIGNED",
+                    "META_WHATSAPP_CONFIG",
+                    businessId,
+                    null,
+                    Map.of(
+                            "assigned", true,
+                            "changed", true));
         }
 
         return new MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentResult(
