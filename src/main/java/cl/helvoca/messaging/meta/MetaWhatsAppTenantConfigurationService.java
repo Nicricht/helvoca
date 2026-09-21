@@ -270,6 +270,7 @@ public class MetaWhatsAppTenantConfigurationService {
         boolean wasEnabled = (existingConfig != null && existingConfig.isEnabled())
                 || (MetaWhatsAppMessagingProvider.ID.equals(phone.getWhatsappProvider())
                         && phone.isWhatsappEnabled());
+        boolean wasCertified = phone.getWhatsappCertifiedAt() != null;
 
         phone.setWhatsappProvider(MetaWhatsAppMessagingProvider.ID);
         phone.setWhatsappExternalId(providerPhoneNumberId);
@@ -297,6 +298,20 @@ public class MetaWhatsAppTenantConfigurationService {
                     businessId,
                     auditConfigurationSnapshot(wasConfigured, wasEnabled),
                     auditConfigurationSnapshot(true, false));
+
+            if (wasCertified) {
+                auditService.humanSuccess(
+                        businessId,
+                        "WHATSAPP_CERTIFICATION_CLEARED",
+                        "WHATSAPP_SENDER",
+                        businessId,
+                        Map.of(
+                                "whatsappEnabled", wasEnabled,
+                                "certified", true),
+                        Map.of(
+                                "whatsappEnabled", false,
+                                "certified", false));
+            }
         }
 
         return new MetaWhatsAppTenantConfigurationResponse(
