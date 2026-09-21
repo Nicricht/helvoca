@@ -1,9 +1,12 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.messaging.outbound.MetaWhatsAppMessagingProvider;
+import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -13,11 +16,15 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
 
     @Test
     void resolvesPhoneRecordAfterRegistrationAndPersistsDisabledConfiguration() {
+        UUID businessId = UUID.randomUUID();
         UUID phoneRecordId = UUID.randomUUID();
         var registration = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService.class);
         var configuration = mock(MetaWhatsAppTenantConfigurationService.class);
         var resolver = mock(MetaWhatsAppEmbeddedSignupPhoneRecordResolverService.class);
         var credentialReference = mock(MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.class);
+        var tenantProvider = mock(TenantProvider.class);
+        var audit = mock(AuditService.class);
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
 
         when(registration.register("1906385232743451", "1913623884432103", "123456"))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationResult(
@@ -42,7 +49,9 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
                 registration,
                 configuration,
                 resolver,
-                credentialReference);
+                credentialReference,
+                tenantProvider,
+                audit);
 
         var result = service.registerAndStage(
                 "1906385232743451",
@@ -70,6 +79,15 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
                         && MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.EMBEDDED_SIGNUP_SYSTEM_USER
                                 .equals(request.credentialRef())
                         && "1906385232743451".equals(request.wabaId())));
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("META_WHATSAPP_PHONE_STAGED"),
+                eq("META_WHATSAPP_CONFIG"),
+                eq(businessId),
+                isNull(),
+                eq(Map.of(
+                        "phoneStaged", true,
+                        "enabled", false)));
     }
 
     @Test
@@ -78,6 +96,8 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
         var configuration = mock(MetaWhatsAppTenantConfigurationService.class);
         var resolver = mock(MetaWhatsAppEmbeddedSignupPhoneRecordResolverService.class);
         var credentialReference = mock(MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.class);
+        var tenantProvider = mock(TenantProvider.class);
+        var audit = mock(AuditService.class);
 
         when(registration.register("1906385232743451", "1913623884432103", "123456"))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationResult(
@@ -93,7 +113,9 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
                 registration,
                 configuration,
                 resolver,
-                credentialReference);
+                credentialReference,
+                tenantProvider,
+                audit);
 
         assertThrows(
                 IllegalStateException.class,
@@ -102,7 +124,7 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
                         "1913623884432103",
                         "123456"));
 
-        verifyNoInteractions(resolver, configuration);
+        verifyNoInteractions(resolver, configuration, audit);
     }
 
     @Test
