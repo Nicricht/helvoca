@@ -160,6 +160,40 @@ class TwilioWhatsAppMessagingProviderTest {
     }
 
     @Test
+    void ignoresMetaSenderAndUsesOnlyTwilioWhatsappSender() throws Exception {
+        UUID businessId = UUID.randomUUID();
+
+        PhoneNumber metaSender = new PhoneNumber();
+        metaSender.setPhoneNumber("+56911111111");
+        metaSender.setBusinessId(businessId);
+        metaSender.setWhatsappEnabled(true);
+        metaSender.setWhatsappProvider("META_WHATSAPP_CLOUD");
+
+        PhoneNumber twilioSender = new PhoneNumber();
+        twilioSender.setPhoneNumber("+56922222222");
+        twilioSender.setBusinessId(businessId);
+        twilioSender.setWhatsappEnabled(true);
+        twilioSender.setWhatsappProvider("TWILIO_WHATSAPP");
+
+        when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(metaSender, twilioSender));
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(201);
+        when(response.body()).thenReturn("{\"sid\":\"SMcccccccccccccccccccccccccccccccc\"}");
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        MessagingProvider.SendResult result = provider().send(command(businessId));
+
+        assertEquals("SMcccccccccccccccccccccccccccccccc", result.providerMessageId());
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(http).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        assertEquals("whatsapp:+56922222222", parseForm(bodyOf(requestCaptor.getValue())).get("From"));
+        assertNull(metaSender.getWhatsappCertifiedAt());
+    }
+
+    @Test
     void refusesDeliveryWhenTenantHasNoExplicitWhatsappSender() {
         UUID businessId = UUID.randomUUID();
         when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
