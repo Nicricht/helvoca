@@ -496,7 +496,7 @@
     return phoneNumbers.length;
   }
 
-  function renderConnectButton(bootstrap) {
+  function renderConnectButton(bootstrap, canManageMeta) {
     if (!bootstrap?.available) return;
     const panel = document.querySelector("#configPhonePanel");
     if (!panel || panel.querySelector("#metaWhatsAppConnect")) return;
@@ -662,8 +662,8 @@
         && deployment?.readyForTenantStaging === true;
       const activationReady = configuredDisabled && certified && stagingReady;
 
-      activationButton?.classList.toggle("hidden", !activationReady);
-      deactivationButton?.classList.toggle("hidden", !configuredEnabled);
+      activationButton?.classList.toggle("hidden", !canManageMeta || !activationReady);
+      deactivationButton?.classList.toggle("hidden", !canManageMeta || !configuredEnabled);
       if (activationButton) activationButton.disabled = false;
       if (deactivationButton) deactivationButton.disabled = false;
       if (activationStatus) activationStatus.textContent = "";
@@ -782,7 +782,7 @@
         certificationState?.classList.add("hidden");
         deploymentState?.classList.add("hidden");
         activationButton.classList.add("hidden");
-        deactivationButton?.classList.remove("hidden");
+        deactivationButton?.classList.toggle("hidden", !canManageMeta);
         if (deactivationButton) deactivationButton.disabled = false;
         if (activationStatus) activationStatus.textContent = "Activación confirmada.";
       } catch (error) {
@@ -1068,8 +1068,13 @@
     if (!sessionStorage.getItem("helvoca_access_token")) return;
     requested = true;
     try {
-      const bootstrap = await api("/api/v1/channels/whatsapp/meta/embedded-signup/bootstrap");
-      renderConnectButton(bootstrap);
+      const [bootstrap, me] = await Promise.all([
+        api("/api/v1/channels/whatsapp/meta/embedded-signup/bootstrap"),
+        api("/api/v1/auth/me")
+      ]);
+      const canManageMeta = Array.isArray(me?.roles)
+        && me.roles.map(String).includes("BUSINESS_ADMIN");
+      renderConnectButton(bootstrap, canManageMeta);
     } catch (error) {
       if (error?.status === 401) return;
       // Fail closed: no button is rendered when bootstrap cannot be verified.
