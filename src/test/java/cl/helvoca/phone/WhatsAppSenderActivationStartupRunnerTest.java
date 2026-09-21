@@ -1,5 +1,6 @@
 package cl.helvoca.phone;
 
+import cl.helvoca.audit.AuditService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -20,17 +21,23 @@ class WhatsAppSenderActivationStartupRunnerTest {
         phone.setWhatsappEnabled(false);
 
         PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
+        AuditService audit = mock(AuditService.class);
         when(repository.findByPhoneNumber("+14355652512")).thenReturn(Optional.of(phone));
         when(repository.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
                 .thenReturn(List.of());
 
         WhatsAppSenderActivationStartupRunner runner =
-                new WhatsAppSenderActivationStartupRunner(true, "+14355652512", repository);
+                new WhatsAppSenderActivationStartupRunner(true, "+14355652512", repository, audit);
 
         runner.run(null);
 
         assertTrue(phone.isWhatsappEnabled());
         verify(repository).save(phone);
+        verify(audit).success(
+                businessId,
+                "TWILIO_WHATSAPP_SENDER_ACTIVATED_ON_STARTUP",
+                "WHATSAPP_SENDER",
+                businessId);
     }
 
     @Test
