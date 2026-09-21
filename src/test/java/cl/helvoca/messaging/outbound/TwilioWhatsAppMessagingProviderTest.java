@@ -84,6 +84,7 @@ class TwilioWhatsAppMessagingProviderTest {
         UUID phoneId = UUID.randomUUID();
         PhoneNumber sender = mock(PhoneNumber.class);
         when(sender.getPhoneNumber()).thenReturn("+56922222222");
+        when(sender.getWhatsappProvider()).thenReturn("TWILIO_WHATSAPP");
         when(sender.getWhatsappCertifiedAt()).thenReturn(null);
         when(sender.getId()).thenReturn(phoneId);
         when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
@@ -111,6 +112,7 @@ class TwilioWhatsAppMessagingProviderTest {
         UUID businessId = UUID.randomUUID();
         PhoneNumber sender = mock(PhoneNumber.class);
         when(sender.getPhoneNumber()).thenReturn("+56922222222");
+        when(sender.getWhatsappProvider()).thenReturn("TWILIO_WHATSAPP");
         when(sender.getWhatsappCertifiedAt()).thenReturn(Instant.parse("2026-09-20T00:00:00Z"));
         when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
                 .thenReturn(List.of(sender));
