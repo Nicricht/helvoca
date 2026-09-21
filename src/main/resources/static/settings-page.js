@@ -637,17 +637,21 @@
       }
     }
 
-    function renderActivationGate(certification, deployment) {
+    function renderActivationGate(certification, deployment, tenantStatus) {
       if (!activationGate || !activationGateTitle || !activationGateCopy) return;
+      const configuredDisabled = tenantStatus?.status === "CONFIGURED_DISABLED"
+        && tenantStatus?.configured === true
+        && tenantStatus?.enabled === false;
       const certified = certification?.ready === true && certification?.alreadyCertified === true;
       const stagingReady = deployment?.state === "READY_FOR_TENANT_STAGING"
         && deployment?.readyForTenantStaging === true;
 
-      if (certified && stagingReady) {
+      if (configuredDisabled && certified && stagingReady) {
         activationGateTitle.textContent = "Activación disponible con autorización manual";
         activationGateCopy.textContent = "Las validaciones técnicas están completas. El tráfico real solo puede activarse mediante una acción explícita autorizada.";
       } else {
         const missing = [];
+        if (!configuredDisabled) missing.push("configuración guardada y desactivada");
         if (!certified) missing.push("certificación técnica");
         if (!stagingReady) missing.push("staging seguro");
         activationGateTitle.textContent = "Activación bloqueada";
@@ -658,12 +662,20 @@
       activationGate.classList.remove("hidden");
     }
 
-    async function loadPreparedDiagnostics() {
+    async function loadPreparedDiagnostics(tenantStatus = null) {
+      let status = tenantStatus;
+      if (!status) {
+        try {
+          status = await api("/api/v1/channels/whatsapp/meta/config");
+        } catch (error) {
+          status = null;
+        }
+      }
       const [certification, deployment] = await Promise.all([
         loadCertificationReadiness(),
         loadDeploymentReadiness()
       ]);
-      renderActivationGate(certification, deployment);
+      renderActivationGate(certification, deployment, status);
     }
 
     async function restoreConfiguredState() {
@@ -676,7 +688,7 @@
           return;
         }
         preparedState?.classList.remove("hidden");
-        await loadPreparedDiagnostics();
+        await loadPreparedDiagnostics(status);
       } catch (error) {
         // Fail closed: do not infer a prepared state when tenant status cannot be verified.
       }
