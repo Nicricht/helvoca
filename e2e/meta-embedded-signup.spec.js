@@ -269,7 +269,12 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(pinInput).toHaveAttribute('maxlength', '6');
   await expect(pinInput).toHaveAttribute('autocomplete', 'off');
 
-  await pinInput.fill('12ab345678');
+  await pinInput.fill('12ab34');
+  await expect(pinInput).toHaveValue('1234');
+  await expect(page.locator('#metaWhatsAppPinStatus'))
+    .toHaveText('El PIN debe tener exactamente 6 dígitos.');
+
+  await pinInput.fill('123456');
   await expect(pinInput).toHaveValue('123456');
   await expect(page.locator('#metaWhatsAppPinStatus'))
     .toHaveText('PIN listo para el siguiente paso.');
