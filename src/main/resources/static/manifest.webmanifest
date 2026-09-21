@@ -1,6 +1,7 @@
 {
   "name": "RecepVoz",
   "short_name": "RecepVoz",
+  "id": "/",
   "description": "Recepcionista virtual con IA para negocios.",
   "lang": "es-CL",
   "start_url": "/",
