@@ -25,6 +25,7 @@ public class SecurityConfig {
             "/pricing.html", "/pricing.js", "/pricing.css",
             "/settings.html", "/settings-page.js",
             "/simulator.html", "/simulator.js", "/simulator.css",
+            "/manifest.webmanifest", "/service-worker.js", "/recepvoz-icon-192.png", "/recepvoz-icon-512.png",
             "/favicon.ico", "/error"
     };
 
