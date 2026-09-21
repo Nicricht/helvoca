@@ -75,11 +75,29 @@ public class PhoneNumberService {
         UUID businessId = tenantProvider.requireBusinessId();
         PhoneNumber phone = repository.findByIdAndBusinessId(id, businessId)
                 .orElseThrow(() -> new NotFoundException("Phone number not found"));
+        boolean wasCertified = phone.getWhatsappCertifiedAt() != null;
+        boolean wasEnabled = phone.isWhatsappEnabled();
+
         phone.setActive(active);
         if (!active) {
             phone.setWhatsappEnabled(false);
             phone.setWhatsappCertifiedAt(null);
         }
+
+        if (!active && wasCertified && auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "WHATSAPP_CERTIFICATION_CLEARED",
+                    "WHATSAPP_SENDER",
+                    businessId,
+                    Map.of(
+                            "whatsappEnabled", wasEnabled,
+                            "certified", true),
+                    Map.of(
+                            "whatsappEnabled", false,
+                            "certified", false));
+        }
+
         return PhoneNumberResponse.from(phone);
     }
 
