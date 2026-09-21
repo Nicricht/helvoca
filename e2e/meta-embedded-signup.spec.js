@@ -13,6 +13,7 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   const phoneFinalizeBodies = [];
   let certificationReadinessRequests = 0;
   let tenantConfigRequests = 0;
+  let activationRequests = 0;
   let tenantConfigStatus = {
     status: 'NOT_CONFIGURED',
     configured: false,
@@ -30,6 +31,9 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   page.on('request', request => {
     const pathname = new URL(request.url()).pathname;
     const embeddedSignupPrefix = '/api/v1/channels/whatsapp/meta/embedded-signup/';
+    if (pathname === '/api/v1/channels/whatsapp/meta/config/activate') {
+      activationRequests += 1;
+    }
     const allowed = new Set([
       `${embeddedSignupPrefix}bootstrap`,
       `${embeddedSignupPrefix}authorization-code`,
@@ -393,4 +397,5 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(restoredCertificationState).toBeVisible();
   await expect(restoredCertificationState).toContainText('Listo para certificación piloto');
   await expect.poll(() => phoneFinalizeBodies).toHaveLength(1);
+  await expect.poll(() => activationRequests).toBe(0);
 });
