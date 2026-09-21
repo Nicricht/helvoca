@@ -56,13 +56,13 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
                 result.credentialRef());
         assertFalse(result.enabled());
 
-        var ordered = inOrder(registration, resolver, credentialReference, configuration);
+        var ordered = inOrder(registration, credentialReference, resolver, configuration);
         ordered.verify(registration).register(
                 "1906385232743451",
                 "1913623884432103",
                 "123456");
-        ordered.verify(resolver).resolve("+56 9 3333 4444");
         ordered.verify(credentialReference).requireReference();
+        ordered.verify(resolver).resolve("+56 9 3333 4444");
         ordered.verify(configuration).replace(argThat(request ->
                 phoneRecordId.equals(request.phoneRecordId())
                         && MetaWhatsAppMessagingProvider.ID.equals(request.provider())
@@ -70,6 +70,39 @@ class MetaWhatsAppEmbeddedSignupPhoneStagingServiceTest {
                         && MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.EMBEDDED_SIGNUP_SYSTEM_USER
                                 .equals(request.credentialRef())
                         && "1906385232743451".equals(request.wabaId())));
+    }
+
+    @Test
+    void missingCredentialReferenceStopsBeforePhonePersistence() {
+        var registration = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService.class);
+        var configuration = mock(MetaWhatsAppTenantConfigurationService.class);
+        var resolver = mock(MetaWhatsAppEmbeddedSignupPhoneRecordResolverService.class);
+        var credentialReference = mock(MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.class);
+
+        when(registration.register("1906385232743451", "1913623884432103", "123456"))
+                .thenReturn(new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationResult(
+                        "PHONE_NUMBER_REGISTERED",
+                        "1913623884432103",
+                        "+56 9 3333 4444",
+                        "RecepVoz Demo",
+                        true));
+        when(credentialReference.requireReference())
+                .thenThrow(new IllegalStateException("credential unavailable"));
+
+        var service = new MetaWhatsAppEmbeddedSignupPhoneStagingService(
+                registration,
+                configuration,
+                resolver,
+                credentialReference);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> service.registerAndStage(
+                        "1906385232743451",
+                        "1913623884432103",
+                        "123456"));
+
+        verifyNoInteractions(resolver, configuration);
     }
 
     @Test
