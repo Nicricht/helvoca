@@ -608,6 +608,13 @@
     syncCounts();
 })();
 </script>
+<script>
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/service-worker.js");
+    });
+}
+</script>
 <script src="/app.js?v=20260918-4" defer></script>
 <script src="/commercial-status.js?v=20260918-4" defer></script>
 <script src="/home-business.js?v=20260919-1" defer></script>
