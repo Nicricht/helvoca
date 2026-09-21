@@ -292,6 +292,7 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         MetaWhatsAppCredentialAvailability credentials = mock(MetaWhatsAppCredentialAvailability.class);
         MetaWhatsAppCertificationReadinessService certification = mock(MetaWhatsAppCertificationReadinessService.class);
         MetaWhatsAppDeploymentReadinessService deployment = mock(MetaWhatsAppDeploymentReadinessService.class);
+        AuditService audit = mock(AuditService.class);
         PhoneNumber phone = mock(PhoneNumber.class);
 
         MetaWhatsAppTenantConfig config = new MetaWhatsAppTenantConfig();
@@ -310,7 +311,7 @@ class MetaWhatsAppTenantConfigurationServiceTest {
                 "READY_FOR_PILOT_CERTIFICATION", true, false, List.of()));
 
         var service = new MetaWhatsAppTenantConfigurationService(
-                configs, phones, tenantProvider, credentials, certification, deployment);
+                configs, phones, tenantProvider, credentials, certification, deployment, audit);
 
         var error = assertThrows(IllegalStateException.class, service::activate);
 
@@ -320,6 +321,7 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         verify(configs, never()).save(any());
         verify(phones, never()).save(any());
         verify(phone, never()).setWhatsappEnabled(true);
+        verifyNoInteractions(audit);
     }
 
     @Test
