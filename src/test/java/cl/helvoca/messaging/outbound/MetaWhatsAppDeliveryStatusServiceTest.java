@@ -193,6 +193,38 @@ class MetaWhatsAppDeliveryStatusServiceTest {
     }
 
     @Test
+    void twilioSenderIsIgnoredForMetaCertification() {
+        OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
+        MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
+        MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        AuditService audit = mock(AuditService.class);
+        UUID businessId = UUID.randomUUID();
+        Instant occurredAt = Instant.ofEpochSecond(1720000000L);
+
+        OutboundMessage message = mock(OutboundMessage.class);
+        when(message.getBusinessId()).thenReturn(businessId);
+        when(message.getProviderDeliveryStatus()).thenReturn("SENT");
+        when(outbound.findTopByProviderAndProviderMessageIdOrderByUpdatedAtDesc(
+                MetaWhatsAppMessagingProvider.ID, "wamid.CERT-TWILIO"))
+                .thenReturn(Optional.of(message));
+
+        PhoneNumber twilioSender = mock(PhoneNumber.class);
+        when(twilioSender.getWhatsappProvider()).thenReturn("TWILIO_WHATSAPP");
+        when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(twilioSender));
+
+        var result = new MetaWhatsAppDeliveryStatusService(
+                outbound, messages, conversations, phones, audit)
+                .apply(businessId, "wamid.CERT-TWILIO", "delivered", occurredAt, null);
+
+        assertEquals(MetaWhatsAppDeliveryStatusService.Result.UPDATED, result);
+        verify(twilioSender, never()).setWhatsappCertifiedAt(any());
+        verify(phones, never()).saveAndFlush(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
     void readDoesNotRegressWhenLateSentCallbackArrives() {
         OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
         MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
