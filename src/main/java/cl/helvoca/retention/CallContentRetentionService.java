@@ -35,33 +35,57 @@ public class CallContentRetentionService {
         int transcripts = jdbc.update("""
                 DELETE FROM call_transcript
                 WHERE call_id IN (
-                    SELECT id
-                    FROM call_session
-                    WHERE business_id = ?
-                      AND ended_at IS NOT NULL
-                      AND ended_at < ?
+                    SELECT c.id
+                    FROM call_session c
+                    WHERE c.business_id = ?
+                      AND c.ended_at IS NOT NULL
+                      AND c.ended_at < ?
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM retention_legal_hold h
+                          WHERE h.business_id = c.business_id
+                            AND h.target_type = 'CALL_SESSION'
+                            AND h.target_id = c.id
+                            AND h.released_at IS NULL
+                      )
                 )
                 """, businessId, cutoff);
 
         int summaries = jdbc.update("""
                 DELETE FROM call_summary
                 WHERE call_id IN (
-                    SELECT id
-                    FROM call_session
-                    WHERE business_id = ?
-                      AND ended_at IS NOT NULL
-                      AND ended_at < ?
+                    SELECT c.id
+                    FROM call_session c
+                    WHERE c.business_id = ?
+                      AND c.ended_at IS NOT NULL
+                      AND c.ended_at < ?
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM retention_legal_hold h
+                          WHERE h.business_id = c.business_id
+                            AND h.target_type = 'CALL_SESSION'
+                            AND h.target_id = c.id
+                            AND h.released_at IS NULL
+                      )
                 )
                 """, businessId, cutoff);
 
         int actions = jdbc.update("""
                 DELETE FROM call_action
                 WHERE call_id IN (
-                    SELECT id
-                    FROM call_session
-                    WHERE business_id = ?
-                      AND ended_at IS NOT NULL
-                      AND ended_at < ?
+                    SELECT c.id
+                    FROM call_session c
+                    WHERE c.business_id = ?
+                      AND c.ended_at IS NOT NULL
+                      AND c.ended_at < ?
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM retention_legal_hold h
+                          WHERE h.business_id = c.business_id
+                            AND h.target_type = 'CALL_SESSION'
+                            AND h.target_id = c.id
+                            AND h.released_at IS NULL
+                      )
                 )
                 """, businessId, cutoff);
 

@@ -18,7 +18,7 @@ import static org.mockito.Mockito.*;
 class CallContentRetentionServiceTest {
 
     @Test
-    void purgesOnlyExpiredCallContentInsideCurrentTenant() {
+    void purgesOnlyExpiredCallContentWithoutActiveLegalHoldInsideCurrentTenant() {
         UUID businessId = UUID.randomUUID();
         Instant now = Instant.parse("2026-09-22T12:00:00Z");
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
@@ -48,6 +48,11 @@ class CallContentRetentionServiceTest {
         assertTrue(statements.stream().allMatch(value -> value.contains("business_id = ?")));
         assertTrue(statements.stream().allMatch(value -> value.contains("ended_at IS NOT NULL")));
         assertTrue(statements.stream().allMatch(value -> value.contains("ended_at < ?")));
+        assertTrue(statements.stream().allMatch(value -> value.contains("retention_legal_hold")));
+        assertTrue(statements.stream().allMatch(value -> value.contains("h.business_id = c.business_id")));
+        assertTrue(statements.stream().allMatch(value -> value.contains("h.target_type = 'CALL_SESSION'")));
+        assertTrue(statements.stream().allMatch(value -> value.contains("h.target_id = c.id")));
+        assertTrue(statements.stream().allMatch(value -> value.contains("h.released_at IS NULL")));
         assertTrue(args.getAllValues().stream().allMatch(values ->
                 values.length == 2
                         && businessId.equals(values[0])
