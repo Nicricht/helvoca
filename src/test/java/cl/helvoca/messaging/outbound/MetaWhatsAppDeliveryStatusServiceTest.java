@@ -130,6 +130,41 @@ class MetaWhatsAppDeliveryStatusServiceTest {
     }
 
     @Test
+    void ambiguousMetaSendersDoNotCertifyOrAuditOnDeliveredCallback() {
+        OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
+        MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
+        MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        AuditService audit = mock(AuditService.class);
+        UUID businessId = UUID.randomUUID();
+        Instant occurredAt = Instant.ofEpochSecond(1720000000L);
+
+        OutboundMessage message = mock(OutboundMessage.class);
+        when(message.getBusinessId()).thenReturn(businessId);
+        when(message.getProviderDeliveryStatus()).thenReturn("SENT");
+        when(outbound.findTopByProviderAndProviderMessageIdOrderByUpdatedAtDesc(
+                MetaWhatsAppMessagingProvider.ID, "wamid.CERT-AMBIGUOUS"))
+                .thenReturn(Optional.of(message));
+
+        PhoneNumber first = mock(PhoneNumber.class);
+        PhoneNumber second = mock(PhoneNumber.class);
+        when(first.getWhatsappProvider()).thenReturn(MetaWhatsAppMessagingProvider.ID);
+        when(second.getWhatsappProvider()).thenReturn(MetaWhatsAppMessagingProvider.ID);
+        when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(first, second));
+
+        var result = new MetaWhatsAppDeliveryStatusService(
+                outbound, messages, conversations, phones, audit)
+                .apply(businessId, "wamid.CERT-AMBIGUOUS", "delivered", occurredAt, null);
+
+        assertEquals(MetaWhatsAppDeliveryStatusService.Result.UPDATED, result);
+        verify(first, never()).setWhatsappCertifiedAt(any());
+        verify(second, never()).setWhatsappCertifiedAt(any());
+        verify(phones, never()).saveAndFlush(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
     void readDoesNotRegressWhenLateSentCallbackArrives() {
         OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
         MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
