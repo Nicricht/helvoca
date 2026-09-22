@@ -25,6 +25,32 @@ class MetaWhatsAppCloudClientTest {
     @Mock HttpClient http;
 
     @Test
+    void subscribesAppToWaba() throws Exception {
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn("{\"success\":true}");
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
+        properties.setGraphBaseUrl("https://graph.example.test/");
+        properties.setGraphApiVersion("v99.0");
+
+        new MetaWhatsAppCloudClient(properties, http)
+                .subscribeWaba("1388561203388953", "test-token");
+
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(http).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        HttpRequest request = requestCaptor.getValue();
+
+        assertEquals("POST", request.method());
+        assertEquals(
+                "https://graph.example.test/v99.0/1388561203388953/subscribed_apps",
+                request.uri().toString());
+        assertEquals("Bearer test-token", request.headers().firstValue("Authorization").orElseThrow());
+    }
+
+    @Test
     void buildsExpectedTextMessageRequestAndReturnsMessageId() throws Exception {
         @SuppressWarnings("unchecked")
         HttpResponse<String> response = mock(HttpResponse.class);
