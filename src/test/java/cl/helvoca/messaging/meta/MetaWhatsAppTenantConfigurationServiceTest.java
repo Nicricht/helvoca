@@ -532,6 +532,17 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         verify(phones, never()).delete(any());
         verify(audit).humanSuccess(
                 eq(businessId),
+                eq("WHATSAPP_SENDER_DISABLED"),
+                eq("WHATSAPP_SENDER"),
+                eq(businessId),
+                eq(Map.of(
+                        "whatsappEnabled", true,
+                        "certified", false)),
+                eq(Map.of(
+                        "whatsappEnabled", false,
+                        "certified", false)));
+        verify(audit).humanSuccess(
+                eq(businessId),
                 eq("META_WHATSAPP_DEACTIVATE"),
                 eq("META_WHATSAPP_CONFIG"),
                 eq(businessId),
