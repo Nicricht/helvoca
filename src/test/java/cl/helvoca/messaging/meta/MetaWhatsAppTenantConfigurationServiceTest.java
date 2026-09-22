@@ -634,6 +634,45 @@ class MetaWhatsAppTenantConfigurationServiceTest {
     }
 
     @Test
+    void deactivateAlreadyDisabledTenantDoesNotDuplicateDisableAudits() {
+        UUID businessId = UUID.randomUUID();
+        UUID phoneRecordId = UUID.randomUUID();
+
+        MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService audit = mock(AuditService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+
+        MetaWhatsAppTenantConfig config = new MetaWhatsAppTenantConfig();
+        config.setBusinessId(businessId);
+        config.setCredentialRef("ACME_01");
+        config.setWabaId("987654321098765");
+        config.setEnabled(false);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(configs.findById(businessId)).thenReturn(Optional.of(config));
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of(phone));
+        when(phone.getId()).thenReturn(phoneRecordId);
+        when(phone.getWhatsappProvider()).thenReturn("META_WHATSAPP_CLOUD");
+        when(phone.getWhatsappExternalId()).thenReturn("123456789012345");
+        when(phone.getPhoneNumber()).thenReturn("+56922222222");
+        when(phone.isWhatsappEnabled()).thenReturn(false);
+
+        var service = new MetaWhatsAppTenantConfigurationService(
+                configs, phones, tenantProvider, credentialRef -> false, null, null, audit);
+        var response = service.deactivate();
+
+        assertEquals("CONFIGURED_DISABLED", response.status());
+        assertTrue(response.configured());
+        assertFalse(response.enabled());
+        verify(configs, never()).save(any());
+        verify(phones, never()).save(any());
+        verify(phone, never()).setWhatsappEnabled(false);
+        verifyNoInteractions(audit);
+    }
+
+    @Test
     void deactivateFailsClosedByDisablingEveryMetaPhoneWhenConfigurationIsAmbiguous() {
         UUID businessId = UUID.randomUUID();
         MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
