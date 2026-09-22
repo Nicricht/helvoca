@@ -12,6 +12,9 @@ import com.openai.models.responses.ResponseCreateParams;
 import com.openai.models.responses.ResponseInputItem;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -22,17 +25,49 @@ import java.util.Set;
 @Component
 public class OpenAiMessagingAiClient implements MessagingAiClient {
     private static final int MAX_TOOL_ROUNDS = 4;
+    private static final Logger log = LoggerFactory.getLogger(OpenAiMessagingAiClient.class);
 
     private final OpenAiRealtimeProperties properties;
+    private final GeminiMessagingAiFallback geminiFallback;
 
-    public OpenAiMessagingAiClient(OpenAiRealtimeProperties properties) {
+    @Autowired
+    public OpenAiMessagingAiClient(
+            OpenAiRealtimeProperties properties,
+            GeminiMessagingAiFallback geminiFallback) {
         this.properties = properties;
+        this.geminiFallback = geminiFallback;
+    }
+
+    // Retained for focused unit tests that do not bootstrap the fallback component.
+    public OpenAiMessagingAiClient(OpenAiRealtimeProperties properties) {
+        this(properties, null);
     }
 
     @Override
     public String respond(String instructions, List<Turn> history, Set<String> allowedToolNames, ToolInvoker toolInvoker) {
-        if (!properties.hasApiKey()) throw new IllegalStateException("OpenAI is not configured");
+        if (!properties.hasApiKey()) {
+            if (geminiFallback != null && geminiFallback.configured()) {
+                return geminiFallback.respond(instructions, history, allowedToolNames, toolInvoker);
+            }
+            throw new IllegalStateException("OpenAI is not configured");
+        }
 
+        try {
+            return respondWithOpenAi(instructions, history, allowedToolNames, toolInvoker);
+        } catch (RuntimeException e) {
+            if (isRateLimit(e) && geminiFallback != null && geminiFallback.configured()) {
+                log.warn("OpenAI messaging rate limited; switching provider fallback=gemini");
+                return geminiFallback.respond(instructions, history, allowedToolNames, toolInvoker);
+            }
+            throw e;
+        }
+    }
+
+    private String respondWithOpenAi(
+            String instructions,
+            List<Turn> history,
+            Set<String> allowedToolNames,
+            ToolInvoker toolInvoker) {
         OpenAIClient client = OpenAIOkHttpClient.fromEnv();
         List<ResponseInputItem> inputs = new ArrayList<>();
         for (Turn turn : history) {
@@ -122,6 +157,15 @@ public class OpenAiMessagingAiClient implements MessagingAiClient {
                 .replace("de esta llamada", "de este chat")
                 .replace("en esta misma llamada", "en este mismo chat")
                 .replace("llamada", "conversación por WhatsApp");
+    }
+
+    static boolean isRateLimit(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if ("RateLimitException".equals(current.getClass().getSimpleName())) return true;
+            current = current.getCause();
+        }
+        return false;
     }
 
     private static String sanitize(String text) {
