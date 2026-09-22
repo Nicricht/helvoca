@@ -134,6 +134,86 @@ class CommercialOperationsAdminServiceTest {
     }
 
     @Test
+    void readyQuoteCanBeAcceptedAndCompletesUniversalOperation() {
+        UUID businessId = UUID.randomUUID();
+        UUID quoteId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        BusinessQuoteRepository quotes = mock(BusinessQuoteRepository.class);
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+
+        BusinessQuote quote = new BusinessQuote();
+        quote.setId(quoteId);
+        quote.setOperationId(operationId);
+        quote.setBusinessId(businessId);
+        quote.setTitle("Cotización");
+        quote.setStatus(BusinessQuote.Status.READY);
+        quote.setSource(BusinessOrder.Source.API);
+
+        BusinessOperation operation = new BusinessOperation();
+        operation.setId(operationId);
+        operation.setBusinessId(businessId);
+        operation.setType(BusinessOperation.Type.QUOTE);
+        operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        operation.setRevision(2);
+        operation.setMetadata(Map.of("intent", "QUOTE"));
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(quotes.findByIdAndBusinessId(quoteId, businessId)).thenReturn(Optional.of(quote));
+        when(quotes.saveAndFlush(any(BusinessQuote.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(operations.findByIdAndBusinessId(operationId, businessId)).thenReturn(Optional.of(operation));
+        when(operations.saveAndFlush(any(BusinessOperation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CommercialOperationsAdminService service = new CommercialOperationsAdminService(
+                mock(BusinessOrderRepository.class),
+                mock(BusinessOrderLineRepository.class),
+                quotes,
+                mock(BusinessLeadRepository.class),
+                mock(BusinessDeliveryRepository.class),
+                operations,
+                tenant);
+
+        var view = service.updateQuoteStatus(quoteId, BusinessQuote.Status.ACCEPTED);
+
+        assertEquals(BusinessQuote.Status.ACCEPTED, view.status());
+        assertEquals(BusinessOperation.Status.COMPLETED, operation.getStatus());
+        assertEquals(3, operation.getRevision());
+        assertEquals("ACCEPTED", operation.getMetadata().get("projectionStatus"));
+        assertEquals(quoteId.toString(), operation.getMetadata().get("quoteId"));
+        verify(quotes).saveAndFlush(quote);
+        verify(operations).saveAndFlush(operation);
+    }
+
+    @Test
+    void acceptedQuoteIsTerminal() {
+        UUID businessId = UUID.randomUUID();
+        UUID quoteId = UUID.randomUUID();
+        BusinessQuoteRepository quotes = mock(BusinessQuoteRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        BusinessQuote quote = new BusinessQuote();
+        quote.setId(quoteId);
+        quote.setBusinessId(businessId);
+        quote.setTitle("Cotización");
+        quote.setStatus(BusinessQuote.Status.ACCEPTED);
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(quotes.findByIdAndBusinessId(quoteId, businessId)).thenReturn(Optional.of(quote));
+
+        CommercialOperationsAdminService service = new CommercialOperationsAdminService(
+                mock(BusinessOrderRepository.class),
+                mock(BusinessOrderLineRepository.class),
+                quotes,
+                mock(BusinessLeadRepository.class),
+                mock(BusinessDeliveryRepository.class),
+                mock(BusinessOperationRepository.class),
+                tenant);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.updateQuoteStatus(quoteId, BusinessQuote.Status.READY));
+        verify(quotes, never()).saveAndFlush(any());
+    }
+
+    @Test
     void qualifiedLeadCanBeWonAndCompletesUniversalOperation() {
         UUID businessId = UUID.randomUUID();
         UUID leadId = UUID.randomUUID();
