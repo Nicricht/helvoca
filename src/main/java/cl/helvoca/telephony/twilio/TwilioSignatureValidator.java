@@ -12,18 +12,24 @@ import java.util.Set;
 @Component
 public class TwilioSignatureValidator {
     private final TwilioProperties properties;
+    private final TwilioAuthTokenResolver tokens;
 
-    public TwilioSignatureValidator(TwilioProperties properties) {
+    public TwilioSignatureValidator(TwilioProperties properties,
+                                    TwilioAuthTokenResolver tokens) {
         this.properties = properties;
+        this.tokens = tokens;
     }
 
     public boolean validateHttp(HttpServletRequest request) {
         String signature = request.getHeader("X-Twilio-Signature");
-        if (!properties.hasAuthToken() || signature == null || signature.isBlank()) {
+        if (signature == null || signature.isBlank()) {
             return false;
         }
 
-        RequestValidator validator = new RequestValidator(properties.getAuthToken());
+        String authToken = tokens.resolve(request.getParameter("AccountSid"));
+        if (authToken == null || authToken.isBlank()) return false;
+
+        RequestValidator validator = new RequestValidator(authToken);
         Map<String, String> parameters = new LinkedHashMap<>();
         request.getParameterMap().forEach((key, values) ->
                 parameters.put(key, values == null || values.length == 0 ? "" : values[0]));
