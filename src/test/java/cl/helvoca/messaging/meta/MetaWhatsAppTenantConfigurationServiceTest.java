@@ -366,6 +366,55 @@ class MetaWhatsAppTenantConfigurationServiceTest {
     }
 
     @Test
+    void activateDoesNotAuditSenderEnableWhenSenderWasAlreadyEnabled() {
+        UUID businessId = UUID.randomUUID();
+        MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        MetaWhatsAppCredentialAvailability credentials = mock(MetaWhatsAppCredentialAvailability.class);
+        MetaWhatsAppCertificationReadinessService certification = mock(MetaWhatsAppCertificationReadinessService.class);
+        MetaWhatsAppDeploymentReadinessService deployment = mock(MetaWhatsAppDeploymentReadinessService.class);
+        AuditService audit = mock(AuditService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+
+        MetaWhatsAppTenantConfig config = new MetaWhatsAppTenantConfig();
+        config.setBusinessId(businessId);
+        config.setCredentialRef("ACME_01");
+        config.setEnabled(false);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(configs.findById(businessId)).thenReturn(Optional.of(config));
+        when(credentials.isAvailable("ACME_01")).thenReturn(true);
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of(phone));
+        when(phone.getWhatsappProvider()).thenReturn("META_WHATSAPP_CLOUD");
+        when(phone.getWhatsappExternalId()).thenReturn("123456789012345");
+        when(phone.isActive()).thenReturn(true);
+        when(phone.isWhatsappEnabled()).thenReturn(true);
+        when(phone.getWhatsappCertifiedAt()).thenReturn(Instant.parse("2026-09-20T00:00:00Z"));
+        when(certification.readiness()).thenReturn(certifiedReadiness());
+        when(deployment.readiness()).thenReturn(stagingReadiness());
+
+        var service = new MetaWhatsAppTenantConfigurationService(
+                configs, phones, tenantProvider, credentials, certification, deployment, audit);
+        service.activate();
+
+        verify(audit, never()).humanSuccess(
+                eq(businessId),
+                eq("WHATSAPP_SENDER_ENABLED"),
+                anyString(),
+                any(UUID.class),
+                anyMap(),
+                anyMap());
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("META_WHATSAPP_ACTIVATE"),
+                eq("META_WHATSAPP_CONFIG"),
+                eq(businessId),
+                eq(Map.of("provider", "META_WHATSAPP_CLOUD", "enabled", false)),
+                eq(Map.of("provider", "META_WHATSAPP_CLOUD", "enabled", true)));
+    }
+
+    @Test
     void activateRefusesIncompleteCertificationAndChangesNothing() {
         UUID businessId = UUID.randomUUID();
         MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
