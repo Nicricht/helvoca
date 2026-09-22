@@ -388,6 +388,37 @@ class PhoneNumberServiceTest {
     }
 
     @Test
+    void detachingWhatsappEnabledPhoneAuditsSenderDisable() {
+        PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService audit = mock(AuditService.class);
+        UUID businessId = UUID.randomUUID();
+        UUID phoneId = UUID.randomUUID();
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        phone.setWhatsappEnabled(true);
+        when(repository.findByIdAndBusinessId(phoneId, businessId)).thenReturn(Optional.of(phone));
+
+        PhoneNumberService service = new PhoneNumberService(repository, tenantProvider, audit);
+        service.detach(phoneId);
+
+        verify(repository).delete(phone);
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("WHATSAPP_SENDER_DISABLED"),
+                eq("WHATSAPP_SENDER"),
+                eq(businessId),
+                eq(Map.of(
+                        "whatsappEnabled", true,
+                        "certified", false)),
+                eq(Map.of(
+                        "whatsappEnabled", false,
+                        "certified", false)));
+    }
+
+    @Test
     void detachingCertifiedPhoneAuditsClearedCertification() {
         PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);
