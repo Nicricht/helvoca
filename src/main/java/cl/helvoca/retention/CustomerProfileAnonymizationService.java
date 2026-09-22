@@ -301,6 +301,66 @@ public class CustomerProfileAnonymizationService {
                    )
                 """, businessId, customerId);
 
+        int businessLeadsScrubbed = jdbc.update("""
+                UPDATE business_lead l
+                   SET name = '[redacted]',
+                       phone = NULL,
+                       email = NULL,
+                       notes = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE l.business_id = ?
+                   AND l.customer_id = ?
+                   AND EXISTS (
+                       SELECT 1
+                       FROM business_operation o
+                       WHERE o.id = l.operation_id
+                         AND o.business_id = l.business_id
+                         AND o.customer_id = l.customer_id
+                         AND o.type = 'LEAD'
+                         AND o.status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')
+                         AND NOT EXISTS (
+                             SELECT 1
+                             FROM retention_legal_hold h
+                             WHERE h.business_id = o.business_id
+                               AND h.target_type = 'BUSINESS_OPERATION'
+                               AND h.target_id = o.id
+                               AND h.released_at IS NULL
+                         )
+                   )
+                   AND (
+                       l.name <> '[redacted]'
+                       OR l.phone IS NOT NULL
+                       OR l.email IS NOT NULL
+                       OR l.notes IS NOT NULL
+                   )
+                """, businessId, customerId);
+
+        int leadOperationPiiScrubbed = jdbc.update("""
+                UPDATE business_operation o
+                   SET contact_name = NULL,
+                       contact_phone = NULL,
+                       metadata_json = o.metadata_json - 'name' - 'email' - 'notes'
+                 WHERE o.business_id = ?
+                   AND o.customer_id = ?
+                   AND o.type = 'LEAD'
+                   AND o.status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')
+                   AND (
+                       o.contact_name IS NOT NULL
+                       OR o.contact_phone IS NOT NULL
+                       OR jsonb_exists(o.metadata_json, 'name')
+                       OR jsonb_exists(o.metadata_json, 'email')
+                       OR jsonb_exists(o.metadata_json, 'notes')
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM retention_legal_hold h
+                       WHERE h.business_id = o.business_id
+                         AND h.target_type = 'BUSINESS_OPERATION'
+                         AND h.target_id = o.id
+                         AND h.released_at IS NULL
+                   )
+                """, businessId, customerId);
+
         int identitiesDeleted = jdbc.update("""
                 DELETE FROM customer_identity
                 WHERE business_id = ?
@@ -321,6 +381,8 @@ public class CustomerProfileAnonymizationService {
                 bookingOperationMetadataScrubbed,
                 businessRequestsScrubbed,
                 requestOperationPiiScrubbed,
+                businessLeadsScrubbed,
+                leadOperationPiiScrubbed,
                 identitiesDeleted);
     }
 
@@ -332,6 +394,8 @@ public class CustomerProfileAnonymizationService {
             int bookingOperationMetadataScrubbed,
             int businessRequestsScrubbed,
             int requestOperationPiiScrubbed,
+            int businessLeadsScrubbed,
+            int leadOperationPiiScrubbed,
             int identitiesDeleted
     ) {}
 }
