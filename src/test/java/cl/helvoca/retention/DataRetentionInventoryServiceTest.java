@@ -80,5 +80,15 @@ class DataRetentionInventoryServiceTest {
         assertTrue(callSessionInventory.contains("h.target_type = 'CALL_SESSION'"));
         assertTrue(callSessionInventory.contains("h.target_id = c.id"));
         assertTrue(callSessionInventory.contains("h.released_at IS NULL"));
+
+        String messagingMessageInventory = statements.get(4);
+        String messagingConversationInventory = statements.get(5);
+        for (String statement : List.of(messagingMessageInventory, messagingConversationInventory)) {
+            assertTrue(statement.contains("retention_legal_hold"));
+            assertTrue(statement.contains("h.business_id = c.business_id"));
+            assertTrue(statement.contains("h.target_type = 'MESSAGING_CONVERSATION'"));
+            assertTrue(statement.contains("h.target_id = c.id"));
+            assertTrue(statement.contains("h.released_at IS NULL"));
+        }
     }
 }
