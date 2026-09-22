@@ -12,16 +12,20 @@ import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
 
 class TwilioSignatureValidatorTest {
     private static final String TOKEN = "test-auth-token";
+    private static final String SUB_TOKEN = "subaccount-auth-token";
+    private static final String SUBACCOUNT_SID = "ACbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
     @Test
     void validatesExactPublicWebhookUrlAndFormParameters() throws Exception {
         TwilioProperties properties = new TwilioProperties();
-        properties.setAuthToken(TOKEN);
         properties.setPublicBaseUrl("https://helvoca.example");
-        TwilioSignatureValidator validator = new TwilioSignatureValidator(properties);
+        TwilioAuthTokenResolver tokens = mock(TwilioAuthTokenResolver.class);
+        when(tokens.resolve(null)).thenReturn(TOKEN);
+        TwilioSignatureValidator validator = new TwilioSignatureValidator(properties, tokens);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/v1/twilio/voice");
         request.addParameter("CallSid", "CA123");
@@ -31,7 +35,7 @@ class TwilioSignatureValidatorTest {
         String signature = signature(url, Map.of(
                 "CallSid", "CA123",
                 "From", "+56911111111",
-                "To", "+56220000000"));
+                "To", "+56220000000"), TOKEN);
         request.addHeader("X-Twilio-Signature", signature);
 
         assertTrue(validator.validateHttp(request));
@@ -43,8 +47,9 @@ class TwilioSignatureValidatorTest {
     @Test
     void validatesWebhookUsingForwardedPublicUrlBehindProxy() throws Exception {
         TwilioProperties properties = new TwilioProperties();
-        properties.setAuthToken(TOKEN);
-        TwilioSignatureValidator validator = new TwilioSignatureValidator(properties);
+        TwilioAuthTokenResolver tokens = mock(TwilioAuthTokenResolver.class);
+        when(tokens.resolve(null)).thenReturn(TOKEN);
+        TwilioSignatureValidator validator = new TwilioSignatureValidator(properties, tokens);
 
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/v1/twilio/outbound-test");
         request.setScheme("http");
@@ -60,16 +65,40 @@ class TwilioSignatureValidatorTest {
         request.addHeader("X-Twilio-Signature", signature(url, Map.of(
                 "CallSid", "CA123",
                 "From", "+14355652512",
-                "To", "+56911111111")));
+                "To", "+56911111111"), TOKEN));
 
         assertTrue(validator.validateHttp(request));
     }
 
-    private static String signature(String url, Map<String, String> params) throws Exception {
+    @Test
+    void usesOwningSubaccountTokenWhenAccountSidIsPresent() throws Exception {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setPublicBaseUrl("https://recepvoz.cl");
+        TwilioAuthTokenResolver tokens = mock(TwilioAuthTokenResolver.class);
+        when(tokens.resolve(SUBACCOUNT_SID)).thenReturn(SUB_TOKEN);
+        TwilioSignatureValidator validator = new TwilioSignatureValidator(properties, tokens);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/v1/twilio/voice");
+        request.addParameter("AccountSid", SUBACCOUNT_SID);
+        request.addParameter("CallSid", "CA123");
+        request.addParameter("From", "+56911111111");
+        request.addParameter("To", "+14705331828");
+        String url = "https://recepvoz.cl/webhooks/v1/twilio/voice";
+        request.addHeader("X-Twilio-Signature", signature(url, Map.of(
+                "AccountSid", SUBACCOUNT_SID,
+                "CallSid", "CA123",
+                "From", "+56911111111",
+                "To", "+14705331828"), SUB_TOKEN));
+
+        assertTrue(validator.validateHttp(request));
+        verify(tokens).resolve(SUBACCOUNT_SID);
+    }
+
+    private static String signature(String url, Map<String, String> params, String token) throws Exception {
         StringBuilder value = new StringBuilder(url);
         new TreeMap<>(params).forEach((key, item) -> value.append(key).append(item));
         Mac mac = Mac.getInstance("HmacSHA1");
-        mac.init(new SecretKeySpec(TOKEN.getBytes(StandardCharsets.UTF_8), "HmacSHA1"));
+        mac.init(new SecretKeySpec(token.getBytes(StandardCharsets.UTF_8), "HmacSHA1"));
         return Base64.getEncoder().encodeToString(mac.doFinal(value.toString().getBytes(StandardCharsets.UTF_8)));
     }
 }
