@@ -637,10 +637,50 @@ public class CustomerProfileAnonymizationService {
                    )
                 """, businessId, customerId);
 
+        int referencedIdentitiesAnonymized = jdbc.update("""
+                UPDATE customer_identity ci
+                   SET normalized_value = 'anonymized:' || ci.id::text,
+                       verification_status = 'UNVERIFIED',
+                       source = 'ANONYMIZED',
+                       verified_at = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE ci.business_id = ?
+                   AND ci.customer_id = ?
+                   AND EXISTS (
+                       SELECT 1
+                       FROM outbound_message om
+                       WHERE om.business_id = ci.business_id
+                         AND om.recipient_identity_id = ci.id
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM outbound_message om
+                       JOIN retention_legal_hold h
+                         ON h.business_id = om.business_id
+                        AND h.target_type = 'OUTBOUND_MESSAGE'
+                        AND h.target_id = om.id
+                        AND h.released_at IS NULL
+                       WHERE om.business_id = ci.business_id
+                         AND om.recipient_identity_id = ci.id
+                   )
+                   AND (
+                       ci.normalized_value <> 'anonymized:' || ci.id::text
+                       OR ci.verification_status <> 'UNVERIFIED'
+                       OR ci.source <> 'ANONYMIZED'
+                       OR ci.verified_at IS NOT NULL
+                   )
+                """, businessId, customerId);
+
         int identitiesDeleted = jdbc.update("""
-                DELETE FROM customer_identity
-                WHERE business_id = ?
-                  AND customer_id = ?
+                DELETE FROM customer_identity ci
+                 WHERE ci.business_id = ?
+                   AND ci.customer_id = ?
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM outbound_message om
+                       WHERE om.business_id = ci.business_id
+                         AND om.recipient_identity_id = ci.id
+                   )
                 """, businessId, customerId);
 
         auditService.humanSuccess(
@@ -668,6 +708,7 @@ public class CustomerProfileAnonymizationService {
                 deliveryOperationPiiScrubbed,
                 conversationStatesScrubbed,
                 unansweredQuestionsScrubbed,
+                referencedIdentitiesAnonymized,
                 identitiesDeleted);
     }
 
@@ -690,6 +731,7 @@ public class CustomerProfileAnonymizationService {
             int deliveryOperationPiiScrubbed,
             int conversationStatesScrubbed,
             int unansweredQuestionsScrubbed,
+            int referencedIdentitiesAnonymized,
             int identitiesDeleted
     ) {}
 }
