@@ -1,6 +1,7 @@
 package cl.helvoca.retention;
 
 import cl.helvoca.audit.AuditService;
+import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.security.TenantProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,6 +31,24 @@ public class CustomerProfileAnonymizationService {
 
         UUID businessId = tenantProvider.requireBusinessId();
 
+        Boolean held = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM retention_legal_hold h
+                    WHERE h.business_id = ?
+                      AND h.target_type = 'CUSTOMER'
+                      AND h.target_id = ?
+                      AND h.released_at IS NULL
+                )
+                """,
+                Boolean.class,
+                businessId,
+                customerId);
+
+        if (Boolean.TRUE.equals(held)) {
+            throw new ConflictException("Customer is protected by an active legal hold");
+        }
+
         int customersUpdated = jdbc.update("""
                 UPDATE customer
                 SET name = NULL,
@@ -39,6 +58,14 @@ public class CustomerProfileAnonymizationService {
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                   AND business_id = ?
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM retention_legal_hold h
+                      WHERE h.business_id = customer.business_id
+                        AND h.target_type = 'CUSTOMER'
+                        AND h.target_id = customer.id
+                        AND h.released_at IS NULL
+                  )
                 """, customerId, businessId);
 
         if (customersUpdated != 1) {
