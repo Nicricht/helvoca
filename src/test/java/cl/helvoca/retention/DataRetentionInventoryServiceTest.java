@@ -73,5 +73,12 @@ class DataRetentionInventoryServiceTest {
         assertTrue(statements.stream().allMatch(statement -> statement.contains("business_id = ?")));
         assertTrue(tenant.getAllValues().stream().allMatch(businessId::equals));
         assertTrue(statements.stream().allMatch(statement -> statement.stripLeading().toUpperCase().startsWith("SELECT")));
+
+        String callSessionInventory = statements.get(3);
+        assertTrue(callSessionInventory.contains("retention_legal_hold"));
+        assertTrue(callSessionInventory.contains("h.business_id = c.business_id"));
+        assertTrue(callSessionInventory.contains("h.target_type = 'CALL_SESSION'"));
+        assertTrue(callSessionInventory.contains("h.target_id = c.id"));
+        assertTrue(callSessionInventory.contains("h.released_at IS NULL"));
     }
 }
