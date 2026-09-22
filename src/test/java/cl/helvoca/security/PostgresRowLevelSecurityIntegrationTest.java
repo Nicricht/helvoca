@@ -137,14 +137,21 @@ class PostgresRowLevelSecurityIntegrationTest {
     }
 
     @Test
-    void auditRetentionFunctionDeletesOnlyExpiredRowsForActiveTenant() {
+    void auditRetentionFunctionDeletesOnlyExpiredUnheldRowsForActiveTenant() {
         UUID oldAuditA = UUID.randomUUID();
+        UUID heldOldAuditA = UUID.randomUUID();
         UUID recentAuditA = UUID.randomUUID();
         UUID oldAuditB = UUID.randomUUID();
 
         ownerJdbc.update(
                 "INSERT INTO audit_log(id, business_id, action, result, created_at) VALUES (?, ?, ?, ?, NOW() - INTERVAL '25 months')",
                 oldAuditA, businessA, "OLD_A", "SUCCESS");
+        ownerJdbc.update(
+                "INSERT INTO audit_log(id, business_id, action, result, created_at) VALUES (?, ?, ?, ?, NOW() - INTERVAL '25 months')",
+                heldOldAuditA, businessA, "HELD_OLD_A", "SUCCESS");
+        ownerJdbc.update(
+                "INSERT INTO retention_legal_hold(business_id, target_type, target_id, reason_code, actor_type) VALUES (?, 'AUDIT_LOG', ?, 'LEGAL_REQUEST', 'SYSTEM')",
+                businessA, heldOldAuditA);
         ownerJdbc.update(
                 "INSERT INTO audit_log(id, business_id, action, result, created_at) VALUES (?, ?, ?, ?, NOW() - INTERVAL '23 months')",
                 recentAuditA, businessA, "RECENT_A", "SUCCESS");
@@ -163,6 +170,10 @@ class PostgresRowLevelSecurityIntegrationTest {
                 "SELECT COUNT(*) FROM audit_log WHERE id = ?",
                 Long.class,
                 oldAuditA));
+        assertEquals(1L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE id = ?",
+                Long.class,
+                heldOldAuditA));
         assertEquals(1L, ownerJdbc.queryForObject(
                 "SELECT COUNT(*) FROM audit_log WHERE id = ?",
                 Long.class,
