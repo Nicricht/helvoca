@@ -174,9 +174,17 @@ public class DataRetentionInventoryService {
 
         long auditLogs = count("""
                 SELECT COUNT(*)
-                FROM audit_log
-                WHERE business_id = ?
-                  AND created_at < ?
+                FROM audit_log a
+                WHERE a.business_id = ?
+                  AND a.created_at < ?
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM retention_legal_hold h
+                      WHERE h.business_id = a.business_id
+                        AND h.target_type = 'AUDIT_LOG'
+                        AND h.target_id = a.id
+                        AND h.released_at IS NULL
+                  )
                 """, businessId, cutoffs.auditBefore());
 
         return new Inventory(

@@ -97,5 +97,12 @@ class DataRetentionInventoryServiceTest {
         assertTrue(nonFinancialOperationInventory.contains("h.target_type = 'BUSINESS_OPERATION'"));
         assertTrue(nonFinancialOperationInventory.contains("h.target_id = o.id"));
         assertTrue(nonFinancialOperationInventory.contains("h.released_at IS NULL"));
+
+        String auditInventory = statements.get(10);
+        assertTrue(auditInventory.contains("retention_legal_hold"));
+        assertTrue(auditInventory.contains("h.business_id = a.business_id"));
+        assertTrue(auditInventory.contains("h.target_type = 'AUDIT_LOG'"));
+        assertTrue(auditInventory.contains("h.target_id = a.id"));
+        assertTrue(auditInventory.contains("h.released_at IS NULL"));
     }
 }
