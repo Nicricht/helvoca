@@ -92,11 +92,25 @@ public class DataRetentionInventoryService {
 
         long nonFinancialOperations = count("""
                 SELECT COUNT(*)
-                FROM business_operation
-                WHERE business_id = ?
-                  AND type <> 'PAYMENT'
-                  AND status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')
-                  AND updated_at < ?
+                FROM business_operation o
+                WHERE o.business_id = ?
+                  AND o.type <> 'PAYMENT'
+                  AND o.status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')
+                  AND o.updated_at < ?
+                  AND NOT EXISTS (SELECT 1 FROM business_order x WHERE x.operation_id = o.id)
+                  AND NOT EXISTS (SELECT 1 FROM business_quote x WHERE x.operation_id = o.id)
+                  AND NOT EXISTS (SELECT 1 FROM business_lead x WHERE x.operation_id = o.id)
+                  AND NOT EXISTS (SELECT 1 FROM business_request x WHERE x.operation_id = o.id)
+                  AND NOT EXISTS (SELECT 1 FROM booking x WHERE x.operation_id = o.id)
+                  AND NOT EXISTS (SELECT 1 FROM business_delivery x WHERE x.operation_id = o.id)
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM business_payment x
+                      WHERE x.operation_id = o.id
+                         OR x.target_operation_id = o.id
+                  )
+                  AND NOT EXISTS (SELECT 1 FROM outbound_message x WHERE x.operation_id = o.id)
+                  AND NOT EXISTS (SELECT 1 FROM persistent_job x WHERE x.operation_id = o.id)
                 """, businessId, cutoffs.operationsBefore());
 
         long financialOperationsHeld = count("""
