@@ -97,6 +97,21 @@ public class CommercialOperationsAdminService {
                 .toList();
     }
 
+    @Transactional
+    public QuoteView updateQuoteStatus(UUID quoteId, BusinessQuote.Status status) {
+        if (status == null) throw new IllegalArgumentException("Quote status is required");
+        UUID businessId = tenantProvider.requireBusinessId();
+        BusinessQuote quote = quotes.findByIdAndBusinessId(quoteId, businessId)
+                .orElseThrow(() -> new NotFoundException("Quote not found"));
+        validateQuoteTransition(quote, status);
+        if (quote.getStatus() != status) {
+            quote.setStatus(status);
+            quote = quotes.saveAndFlush(quote);
+            synchronizeQuoteOperation(businessId, quote);
+        }
+        return QuoteView.from(quote);
+    }
+
     @Transactional(readOnly = true)
     public List<LeadView> leads() {
         UUID businessId = tenantProvider.requireBusinessId();
@@ -139,6 +154,23 @@ public class CommercialOperationsAdminService {
         }
     }
 
+    private static void validateQuoteTransition(BusinessQuote quote, BusinessQuote.Status next) {
+        BusinessQuote.Status current = quote.getStatus();
+        if (current == next) return;
+
+        Set<BusinessQuote.Status> allowed = switch (current) {
+            case REQUESTED -> Set.of(BusinessQuote.Status.READY, BusinessQuote.Status.CANCELLED);
+            case READY -> Set.of(
+                    BusinessQuote.Status.ACCEPTED,
+                    BusinessQuote.Status.REJECTED,
+                    BusinessQuote.Status.CANCELLED);
+            case ACCEPTED, REJECTED, CANCELLED -> Set.of();
+        };
+        if (!allowed.contains(next)) {
+            throw new IllegalArgumentException("Invalid quote status transition: " + current + " -> " + next);
+        }
+    }
+
     private static void validateLeadTransition(BusinessLead lead, BusinessLead.Status next) {
         BusinessLead.Status current = lead.getStatus();
         if (current == next) return;
@@ -166,6 +198,31 @@ public class CommercialOperationsAdminService {
         if (!allowed.contains(next)) {
             throw new IllegalArgumentException("Invalid delivery status transition: " + current + " -> " + next);
         }
+    }
+
+    private void synchronizeQuoteOperation(UUID businessId, BusinessQuote quote) {
+        BusinessOperation operation = operations
+                .findByIdAndBusinessId(quote.getOperationId(), businessId)
+                .orElseThrow(() -> new IllegalStateException("Quote operation projection is missing"));
+        if (operation.getType() != BusinessOperation.Type.QUOTE) {
+            throw new IllegalStateException("Quote points to a non-quote operation");
+        }
+
+        operation.setStatus(switch (quote.getStatus()) {
+            case ACCEPTED -> BusinessOperation.Status.COMPLETED;
+            case REJECTED, CANCELLED -> BusinessOperation.Status.CANCELLED;
+            default -> BusinessOperation.Status.CONFIRMED;
+        });
+        operation.setConfirmationToken(null);
+        operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (operation.getMetadata() != null) metadata.putAll(operation.getMetadata());
+        metadata.put("intent", "QUOTE");
+        metadata.put("confirmationPending", false);
+        metadata.put("projectionStatus", quote.getStatus().name());
+        metadata.put("quoteId", quote.getId().toString());
+        operation.setMetadata(metadata);
+        operations.saveAndFlush(operation);
     }
 
     private void synchronizeLeadOperation(UUID businessId, BusinessLead lead) {
