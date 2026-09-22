@@ -284,9 +284,11 @@ public class CommercialOperationsAdminService {
             throw new IllegalStateException("Delivery points to a non-delivery operation");
         }
 
-        operation.setStatus(delivery.getStatus() == BusinessDelivery.Status.CANCELLED
-                ? BusinessOperation.Status.CANCELLED
-                : BusinessOperation.Status.CONFIRMED);
+        operation.setStatus(switch (delivery.getStatus()) {
+            case DELIVERED -> BusinessOperation.Status.COMPLETED;
+            case CANCELLED -> BusinessOperation.Status.CANCELLED;
+            default -> BusinessOperation.Status.CONFIRMED;
+        });
         operation.setConfirmationToken(null);
         operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
         Map<String, Object> metadata = new LinkedHashMap<>();
