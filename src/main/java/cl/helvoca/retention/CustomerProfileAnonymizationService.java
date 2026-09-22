@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -89,6 +90,25 @@ public class CustomerProfileAnonymizationService {
             throw new ConflictException("Customer has an active call session");
         }
 
+        Instant conversationCutoff = DataRetentionPolicy.cutoffs(Instant.now()).conversationsBefore();
+        Boolean hasRecentConversation = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM messaging_conversation mc
+                    WHERE mc.business_id = ?
+                      AND mc.customer_id = ?
+                      AND mc.last_message_at >= ?
+                )
+                """,
+                Boolean.class,
+                businessId,
+                customerId,
+                conversationCutoff);
+
+        if (Boolean.TRUE.equals(hasRecentConversation)) {
+            throw new ConflictException("Customer has a recent messaging conversation");
+        }
+
         int customersUpdated = jdbc.update("""
                 UPDATE customer c
                 SET name = NULL,
@@ -126,7 +146,14 @@ public class CustomerProfileAnonymizationService {
                         AND cs.customer_id = c.id
                         AND cs.ended_at IS NULL
                   )
-                """, customerId, businessId);
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM messaging_conversation mc
+                      WHERE mc.business_id = c.business_id
+                        AND mc.customer_id = c.id
+                        AND mc.last_message_at >= ?
+                  )
+                """, customerId, businessId, conversationCutoff);
 
         if (customersUpdated != 1) {
             throw new NotFoundException("Customer not found");
@@ -150,6 +177,24 @@ public class CustomerProfileAnonymizationService {
                    )
                 """, businessId, customerId);
 
+        int messagingConversationsScrubbed = jdbc.update("""
+                UPDATE messaging_conversation mc
+                   SET sender = '[redacted]',
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE mc.business_id = ?
+                   AND mc.customer_id = ?
+                   AND mc.last_message_at < ?
+                   AND mc.sender <> '[redacted]'
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM retention_legal_hold h
+                       WHERE h.business_id = mc.business_id
+                         AND h.target_type = 'MESSAGING_CONVERSATION'
+                         AND h.target_id = mc.id
+                         AND h.released_at IS NULL
+                   )
+                """, businessId, customerId, conversationCutoff);
+
         int identitiesDeleted = jdbc.update("""
                 DELETE FROM customer_identity
                 WHERE business_id = ?
@@ -162,12 +207,17 @@ public class CustomerProfileAnonymizationService {
                 "CUSTOMER",
                 customerId);
 
-        return new Result(customerId, callSessionsScrubbed, identitiesDeleted);
+        return new Result(
+                customerId,
+                callSessionsScrubbed,
+                messagingConversationsScrubbed,
+                identitiesDeleted);
     }
 
     public record Result(
             UUID customerId,
             int callSessionsScrubbed,
+            int messagingConversationsScrubbed,
             int identitiesDeleted
     ) {}
 }
