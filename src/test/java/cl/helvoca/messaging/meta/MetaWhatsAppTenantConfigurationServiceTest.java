@@ -135,6 +135,64 @@ class MetaWhatsAppTenantConfigurationServiceTest {
     }
 
     @Test
+    void replacingDisabledUncertifiedSenderDoesNotAuditDisableOrCertificationClear() {
+        UUID businessId = UUID.randomUUID();
+        UUID phoneRecordId = UUID.randomUUID();
+
+        MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService audit = mock(AuditService.class);
+
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        phone.setPhoneNumber("+56922222222");
+        phone.setActive(true);
+        phone.setWhatsappEnabled(false);
+        phone.setWhatsappProvider("META_WHATSAPP_CLOUD");
+
+        MetaWhatsAppTenantConfig config = new MetaWhatsAppTenantConfig();
+        config.setBusinessId(businessId);
+        config.setCredentialRef("ACME_01");
+        config.setEnabled(false);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(phones.findByIdAndBusinessId(phoneRecordId, businessId)).thenReturn(Optional.of(phone));
+        when(configs.findById(businessId)).thenReturn(Optional.of(config));
+
+        var service = new MetaWhatsAppTenantConfigurationService(
+                configs, phones, tenantProvider, credentialRef -> false, null, null, audit);
+        service.replace(new MetaWhatsAppTenantConfigurationRequest(
+                phoneRecordId,
+                "META_WHATSAPP_CLOUD",
+                "123456789012345",
+                "ACME_01",
+                null));
+
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("META_WHATSAPP_CONFIG_REPLACE"),
+                eq("META_WHATSAPP_CONFIG"),
+                eq(businessId),
+                anyMap(),
+                anyMap());
+        verify(audit, never()).humanSuccess(
+                eq(businessId),
+                eq("WHATSAPP_SENDER_DISABLED"),
+                anyString(),
+                any(UUID.class),
+                anyMap(),
+                anyMap());
+        verify(audit, never()).humanSuccess(
+                eq(businessId),
+                eq("WHATSAPP_CERTIFICATION_CLEARED"),
+                anyString(),
+                any(UUID.class),
+                anyMap(),
+                anyMap());
+    }
+
+    @Test
     void refusesPhoneRecordFromAnotherTenant() {
         UUID businessId = UUID.randomUUID();
         UUID phoneRecordId = UUID.randomUUID();
