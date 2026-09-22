@@ -1,10 +1,14 @@
 package cl.helvoca.payment;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -14,13 +18,23 @@ public class PaymentProviderConfigService {
     private final PaymentProviderConfigRepository configs;
     private final PaymentProviderCredentialResolver credentials;
     private final TenantProvider tenantProvider;
+    private final AuditService auditService;
+
+    @Autowired
+    public PaymentProviderConfigService(PaymentProviderConfigRepository configs,
+                                        PaymentProviderCredentialResolver credentials,
+                                        TenantProvider tenantProvider,
+                                        AuditService auditService) {
+        this.configs = configs;
+        this.credentials = credentials;
+        this.tenantProvider = tenantProvider;
+        this.auditService = auditService;
+    }
 
     public PaymentProviderConfigService(PaymentProviderConfigRepository configs,
                                         PaymentProviderCredentialResolver credentials,
                                         TenantProvider tenantProvider) {
-        this.configs = configs;
-        this.credentials = credentials;
-        this.tenantProvider = tenantProvider;
+        this(configs, credentials, tenantProvider, null);
     }
 
     @Transactional(readOnly = true)
@@ -50,13 +64,24 @@ public class PaymentProviderConfigService {
             throw new IllegalArgumentException("Sandbox merchant credentials are not configured for credentialRef.");
         }
 
-        PaymentProviderConfig config = configs.findById(businessId).orElseGet(PaymentProviderConfig::new);
+        PaymentProviderConfig config = configs.findById(businessId).orElse(null);
+        Map<String, Object> before = config == null ? null : snapshot(config);
+        if (config == null) config = new PaymentProviderConfig();
         config.setBusinessId(businessId);
         config.setProvider(provider);
         config.setMode(mode);
         config.setCredentialRef(credentialRef);
         config.setEnabled(request.enabled());
         config = configs.saveAndFlush(config);
+        if (auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "PAYMENT_PROVIDER_CONFIG_REPLACE",
+                    "PAYMENT_PROVIDER_CONFIG",
+                    businessId,
+                    before,
+                    snapshot(config));
+        }
         return view(config);
     }
 
@@ -77,6 +102,16 @@ public class PaymentProviderConfigService {
                 || config.getMode() != PaymentProviderConfig.Mode.SANDBOX
                 || !MERCADO_PAGO.equalsIgnoreCase(config.getProvider())) return null;
         return config;
+    }
+
+    private static Map<String, Object> snapshot(PaymentProviderConfig config) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("provider", config.getProvider());
+        snapshot.put("mode", config.getMode() == null ? null : config.getMode().name());
+        snapshot.put("enabled", config.isEnabled());
+        snapshot.put("credentialReferenceConfigured",
+                config.getCredentialRef() != null && !config.getCredentialRef().isBlank());
+        return snapshot;
     }
 
     private View view(PaymentProviderConfig config) {
