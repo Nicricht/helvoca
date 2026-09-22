@@ -118,6 +118,10 @@ class DataRetentionInventoryServiceTest {
         assertTrue(customerInventory.contains("'DRAFT'"));
         assertTrue(customerInventory.contains("'AWAITING_CONFIRMATION'"));
         assertTrue(customerInventory.contains("'EXECUTING'"));
+        assertTrue(customerInventory.contains("call_session cs"));
+        assertTrue(customerInventory.contains("cs.business_id = c.business_id"));
+        assertTrue(customerInventory.contains("cs.customer_id = c.id"));
+        assertTrue(customerInventory.contains("cs.ended_at IS NULL"));
 
         String nonFinancialOperationInventory = statements.get(8);
         assertTrue(nonFinancialOperationInventory.contains("retention_legal_hold"));

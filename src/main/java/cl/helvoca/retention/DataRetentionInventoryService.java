@@ -184,6 +184,13 @@ public class DataRetentionInventoryService {
                             'EXECUTING'
                         )
                   )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM call_session cs
+                      WHERE cs.business_id = c.business_id
+                        AND cs.customer_id = c.id
+                        AND cs.ended_at IS NULL
+                  )
                 """, businessId, cutoffs.customerReviewBefore());
 
         long nonFinancialOperations = count("""

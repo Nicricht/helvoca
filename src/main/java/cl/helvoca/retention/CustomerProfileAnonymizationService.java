@@ -72,6 +72,23 @@ public class CustomerProfileAnonymizationService {
             throw new ConflictException("Customer has an active business operation");
         }
 
+        Boolean hasActiveCall = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM call_session cs
+                    WHERE cs.business_id = ?
+                      AND cs.customer_id = ?
+                      AND cs.ended_at IS NULL
+                )
+                """,
+                Boolean.class,
+                businessId,
+                customerId);
+
+        if (Boolean.TRUE.equals(hasActiveCall)) {
+            throw new ConflictException("Customer has an active call session");
+        }
+
         int customersUpdated = jdbc.update("""
                 UPDATE customer c
                 SET name = NULL,
@@ -102,11 +119,36 @@ public class CustomerProfileAnonymizationService {
                             'EXECUTING'
                         )
                   )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM call_session cs
+                      WHERE cs.business_id = c.business_id
+                        AND cs.customer_id = c.id
+                        AND cs.ended_at IS NULL
+                  )
                 """, customerId, businessId);
 
         if (customersUpdated != 1) {
             throw new NotFoundException("Customer not found");
         }
+
+        int callSessionsScrubbed = jdbc.update("""
+                UPDATE call_session cs
+                   SET caller_number = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE cs.business_id = ?
+                   AND cs.customer_id = ?
+                   AND cs.ended_at IS NOT NULL
+                   AND cs.caller_number IS NOT NULL
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM retention_legal_hold h
+                       WHERE h.business_id = cs.business_id
+                         AND h.target_type = 'CALL_SESSION'
+                         AND h.target_id = cs.id
+                         AND h.released_at IS NULL
+                   )
+                """, businessId, customerId);
 
         int identitiesDeleted = jdbc.update("""
                 DELETE FROM customer_identity
@@ -120,11 +162,12 @@ public class CustomerProfileAnonymizationService {
                 "CUSTOMER",
                 customerId);
 
-        return new Result(customerId, identitiesDeleted);
+        return new Result(customerId, callSessionsScrubbed, identitiesDeleted);
     }
 
     public record Result(
             UUID customerId,
+            int callSessionsScrubbed,
             int identitiesDeleted
     ) {}
 }
