@@ -17,7 +17,7 @@ import static org.mockito.Mockito.*;
 class OutboundMessageContentRetentionServiceTest {
 
     @Test
-    void redactsOnlyExpiredTerminalOutboundMessageContentForCurrentTenant() {
+    void redactsOnlyExpiredTerminalOutboundMessageContentWithoutActiveLegalHold() {
         UUID businessId = UUID.randomUUID();
         Instant now = Instant.parse("2026-09-22T12:00:00Z");
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
@@ -47,9 +47,14 @@ class OutboundMessageContentRetentionServiceTest {
         assertTrue(statement.contains("recipient_address = ?"));
         assertTrue(statement.contains("content_text = ?"));
         assertTrue(statement.contains("provider_message_id = NULL"));
-        assertTrue(statement.contains("business_id = ?"));
-        assertTrue(statement.contains("status IN ('SENT', 'FAILED', 'CANCELLED', 'BLOCKED')"));
-        assertTrue(statement.contains("updated_at < ?"));
+        assertTrue(statement.contains("om.business_id = ?"));
+        assertTrue(statement.contains("om.status IN ('SENT', 'FAILED', 'CANCELLED', 'BLOCKED')"));
+        assertTrue(statement.contains("om.updated_at < ?"));
+        assertTrue(statement.contains("retention_legal_hold"));
+        assertTrue(statement.contains("h.business_id = om.business_id"));
+        assertTrue(statement.contains("h.target_type = 'OUTBOUND_MESSAGE'"));
+        assertTrue(statement.contains("h.target_id = om.id"));
+        assertTrue(statement.contains("h.released_at IS NULL"));
         assertFalse(statement.contains("idempotency_key ="));
         assertFalse(statement.contains("operation_id ="));
         assertFalse(statement.contains("customer_id ="));

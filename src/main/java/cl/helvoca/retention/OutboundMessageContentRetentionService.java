@@ -38,18 +38,26 @@ public class OutboundMessageContentRetentionService {
         Instant cutoff = DataRetentionPolicy.cutoffs(clock.instant()).messageContentBefore();
 
         int redacted = jdbc.update("""
-                UPDATE outbound_message
+                UPDATE outbound_message om
                    SET recipient_address = ?,
                        content_text = ?,
                        provider_message_id = NULL,
                        updated_at = CURRENT_TIMESTAMP
-                 WHERE business_id = ?
-                   AND status IN ('SENT', 'FAILED', 'CANCELLED', 'BLOCKED')
-                   AND updated_at < ?
+                 WHERE om.business_id = ?
+                   AND om.status IN ('SENT', 'FAILED', 'CANCELLED', 'BLOCKED')
+                   AND om.updated_at < ?
                    AND (
-                       recipient_address <> ?
-                       OR content_text <> ?
-                       OR provider_message_id IS NOT NULL
+                       om.recipient_address <> ?
+                       OR om.content_text <> ?
+                       OR om.provider_message_id IS NOT NULL
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM retention_legal_hold h
+                       WHERE h.business_id = om.business_id
+                         AND h.target_type = 'OUTBOUND_MESSAGE'
+                         AND h.target_id = om.id
+                         AND h.released_at IS NULL
                    )
                 """,
                 REDACTED,
