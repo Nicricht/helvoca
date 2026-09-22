@@ -96,6 +96,40 @@ class MetaWhatsAppDeliveryStatusServiceTest {
     }
 
     @Test
+    void alreadyCertifiedMetaSenderDoesNotRewriteOrAuditCertification() {
+        OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
+        MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
+        MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        AuditService audit = mock(AuditService.class);
+        UUID businessId = UUID.randomUUID();
+        Instant occurredAt = Instant.ofEpochSecond(1720000000L);
+        Instant certifiedAt = Instant.ofEpochSecond(1710000000L);
+
+        OutboundMessage message = mock(OutboundMessage.class);
+        when(message.getBusinessId()).thenReturn(businessId);
+        when(message.getProviderDeliveryStatus()).thenReturn("SENT");
+        when(outbound.findTopByProviderAndProviderMessageIdOrderByUpdatedAtDesc(
+                MetaWhatsAppMessagingProvider.ID, "wamid.CERT-2"))
+                .thenReturn(Optional.of(message));
+
+        PhoneNumber sender = mock(PhoneNumber.class);
+        when(sender.getWhatsappProvider()).thenReturn(MetaWhatsAppMessagingProvider.ID);
+        when(sender.getWhatsappCertifiedAt()).thenReturn(certifiedAt);
+        when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(sender));
+
+        var result = new MetaWhatsAppDeliveryStatusService(
+                outbound, messages, conversations, phones, audit)
+                .apply(businessId, "wamid.CERT-2", "delivered", occurredAt, null);
+
+        assertEquals(MetaWhatsAppDeliveryStatusService.Result.UPDATED, result);
+        verify(sender, never()).setWhatsappCertifiedAt(any());
+        verify(phones, never()).saveAndFlush(sender);
+        verifyNoInteractions(audit);
+    }
+
+    @Test
     void readDoesNotRegressWhenLateSentCallbackArrives() {
         OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
         MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
