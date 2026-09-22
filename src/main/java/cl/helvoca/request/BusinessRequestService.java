@@ -65,9 +65,11 @@ public class BusinessRequestService {
 
         BusinessRequest saved = request;
         operations.findByIdAndBusinessId(saved.getOperationId(), businessId).ifPresent(operation -> {
-            operation.setStatus(status == RequestStatus.CANCELLED
-                    ? BusinessOperation.Status.CANCELLED
-                    : BusinessOperation.Status.CONFIRMED);
+            operation.setStatus(switch (status) {
+                case CANCELLED -> BusinessOperation.Status.CANCELLED;
+                case RESOLVED -> BusinessOperation.Status.COMPLETED;
+                default -> BusinessOperation.Status.CONFIRMED;
+            });
             operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
             LinkedHashMap<String, Object> metadata = new LinkedHashMap<>();
             if (operation.getMetadata() != null) metadata.putAll(operation.getMetadata());
