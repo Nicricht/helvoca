@@ -390,7 +390,7 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         when(phone.isWhatsappEnabled()).thenReturn(false);
         when(phone.getWhatsappCertifiedAt()).thenReturn(null);
         when(certification.readiness()).thenReturn(new MetaWhatsAppCertificationReadinessResponse(
-                "BLOCKED", false, false, List.of()));
+                "READY_FOR_PILOT_CERTIFICATION", true, false, List.of()));
         when(deployment.readiness()).thenReturn(stagingReadiness());
 
         var service = new MetaWhatsAppTenantConfigurationService(
@@ -498,7 +498,7 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         when(phone.getWhatsappExternalId()).thenReturn("123456789012345");
         when(phone.isActive()).thenReturn(true);
         when(certification.readiness()).thenReturn(new MetaWhatsAppCertificationReadinessResponse(
-                "READY_FOR_PILOT_CERTIFICATION", true, false, List.of()));
+                "BLOCKED", false, false, List.of()));
 
         var service = new MetaWhatsAppTenantConfigurationService(
                 configs, phones, tenantProvider, credentials, certification, deployment, audit);
