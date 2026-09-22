@@ -1819,11 +1819,17 @@ test('booking reschedule checks availability and updates the drawer', async ({ p
     expect(dialog.message()).toContain('Ana Reserva');
     dialog.accept();
   });
+  const detailMetaBeforeReschedule = await page.locator('#homeBookingDetailMeta').textContent();
   await page.getByRole('button', { name: 'Confirmar cambio' }).click();
 
   await expect.poll(() => patchPayload).not.toBeNull();
   expect(patchPayload.startAt).toBe(availabilityCalls[1].startAt);
   expect(patchPayload.notes).toBeNull();
+
+  // patchPayload is assigned before the mocked PATCH response has been fully
+  // consumed by the UI. Wait for the drawer to reflect the updated booking so
+  // Escape cannot race the asynchronous post-reschedule refresh.
+  await expect(page.locator('#homeBookingDetailMeta')).not.toHaveText(detailMetaBeforeReschedule || '');
   await expect(page.locator('#homeBookingDetailMeta')).toContainText('Confirmada');
   await expect(page.getByRole('button', { name: 'Reprogramar' })).toBeVisible();
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
