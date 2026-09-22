@@ -67,6 +67,19 @@ class GeminiMessagingAiFallbackTest {
     }
 
     @Test
+    void preservesGeminiFunctionCallIdInFunctionResponse() {
+        var part = GeminiMessagingAiFallback.functionResponsePart(
+                "lookup_booking",
+                "call_123",
+                "{\"success\":true}");
+
+        var functionResponse = part.getJSONObject("functionResponse");
+        assertEquals("lookup_booking", functionResponse.getString("name"));
+        assertEquals("call_123", functionResponse.getString("id"));
+        assertTrue(functionResponse.getJSONObject("response").getBoolean("success"));
+    }
+
+    @Test
     void recognizesNestedOpenAiRateLimit() {
         RuntimeException wrapped = new RuntimeException(new RateLimitException());
         assertTrue(OpenAiMessagingAiClient.isRateLimit(wrapped));

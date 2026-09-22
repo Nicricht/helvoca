@@ -99,10 +99,10 @@ public class GeminiMessagingAiFallback {
                     String name = call.optString("name", "");
                     JSONObject args = call.optJSONObject("args");
                     String result = toolInvoker.execute(name, args == null ? "{}" : args.toString());
-                    functionResponses.put(new JSONObject()
-                            .put("functionResponse", new JSONObject()
-                                    .put("name", name)
-                                    .put("response", responseObject(result))));
+                    functionResponses.put(functionResponsePart(
+                            name,
+                            call.optString("id", ""),
+                            result));
                 }
             }
 
@@ -191,6 +191,17 @@ public class GeminiMessagingAiFallback {
         for (int i = 0; i < source.length(); i++) {
             target.put(source.getJSONObject(i));
         }
+    }
+
+    static JSONObject functionResponsePart(String name, String callId, String result) {
+        JSONObject functionResponse = new JSONObject()
+                .put("name", name)
+                .put("response", responseObject(result));
+        String cleanCallId = clean(callId);
+        if (!cleanCallId.isBlank()) {
+            functionResponse.put("id", cleanCallId);
+        }
+        return new JSONObject().put("functionResponse", functionResponse);
     }
 
     private static JSONObject responseObject(String raw) {
