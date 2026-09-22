@@ -1,6 +1,7 @@
 package cl.helvoca.retention;
 
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ public class CallContentRetentionService {
     private final TenantProvider tenantProvider;
     private final Clock clock;
 
+    @Autowired
     public CallContentRetentionService(JdbcTemplate jdbc, TenantProvider tenantProvider) {
         this(jdbc, tenantProvider, Clock.systemUTC());
     }
