@@ -46,6 +46,14 @@ public class CallSessionRetentionService {
                       AND NOT EXISTS (
                           SELECT 1 FROM unanswered_question q WHERE q.call_id = c.id
                       )
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM retention_legal_hold h
+                          WHERE h.business_id = c.business_id
+                            AND h.target_type = 'CALL_SESSION'
+                            AND h.target_id = c.id
+                            AND h.released_at IS NULL
+                      )
                 )
                 """, businessId, cutoff);
 
@@ -59,6 +67,14 @@ public class CallSessionRetentionService {
                   )
                   AND NOT EXISTS (
                       SELECT 1 FROM unanswered_question q WHERE q.call_id = c.id
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM retention_legal_hold h
+                      WHERE h.business_id = c.business_id
+                        AND h.target_type = 'CALL_SESSION'
+                        AND h.target_id = c.id
+                        AND h.released_at IS NULL
                   )
                 """, businessId, cutoff);
 
