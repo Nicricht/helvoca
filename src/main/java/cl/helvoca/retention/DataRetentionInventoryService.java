@@ -89,6 +89,19 @@ public class DataRetentionInventoryService {
                   AND last_message_at < ?
                 """, businessId, cutoffs.conversationsBefore());
 
+        long outboundMessageContent = count("""
+                SELECT COUNT(*)
+                FROM outbound_message
+                WHERE business_id = ?
+                  AND status IN ('SENT', 'FAILED', 'CANCELLED', 'BLOCKED')
+                  AND updated_at < ?
+                  AND (
+                      recipient_address <> '[redacted]'
+                      OR content_text <> '[redacted]'
+                      OR provider_message_id IS NOT NULL
+                  )
+                """, businessId, cutoffs.messageContentBefore());
+
         long customerReviewCandidates = count("""
                 SELECT COUNT(*)
                 FROM customer
@@ -144,6 +157,7 @@ public class DataRetentionInventoryService {
                 callSessions,
                 messagingMessages,
                 messagingConversations,
+                outboundMessageContent,
                 customerReviewCandidates,
                 nonFinancialOperations,
                 financialOperationsHeld,
@@ -165,6 +179,7 @@ public class DataRetentionInventoryService {
             long callSessionsEligible,
             long messagingMessagesEligible,
             long messagingConversationsEligible,
+            long outboundMessageContentEligible,
             long customerInactivityReviewCandidates,
             long nonFinancialOperationsEligible,
             long financialOperationsHeldFromAutomation,
