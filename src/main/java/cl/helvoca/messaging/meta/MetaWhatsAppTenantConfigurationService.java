@@ -300,6 +300,20 @@ public class MetaWhatsAppTenantConfigurationService {
                     auditConfigurationSnapshot(wasConfigured, wasEnabled),
                     auditConfigurationSnapshot(true, false));
 
+            if (wasPhoneWhatsappEnabled) {
+                auditService.humanSuccess(
+                        businessId,
+                        "WHATSAPP_SENDER_DISABLED",
+                        "WHATSAPP_SENDER",
+                        businessId,
+                        Map.of(
+                                "whatsappEnabled", true,
+                                "certified", wasCertified),
+                        Map.of(
+                                "whatsappEnabled", false,
+                                "certified", false));
+            }
+
             if (wasCertified) {
                 auditService.humanSuccess(
                         businessId,
