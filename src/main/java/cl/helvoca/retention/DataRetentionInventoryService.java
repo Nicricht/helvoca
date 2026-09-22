@@ -136,9 +136,17 @@ public class DataRetentionInventoryService {
 
         long customerReviewCandidates = count("""
                 SELECT COUNT(*)
-                FROM customer
-                WHERE business_id = ?
-                  AND updated_at < ?
+                FROM customer c
+                WHERE c.business_id = ?
+                  AND c.updated_at < ?
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM retention_legal_hold h
+                      WHERE h.business_id = c.business_id
+                        AND h.target_type = 'CUSTOMER'
+                        AND h.target_id = c.id
+                        AND h.released_at IS NULL
+                  )
                 """, businessId, cutoffs.customerReviewBefore());
 
         long nonFinancialOperations = count("""

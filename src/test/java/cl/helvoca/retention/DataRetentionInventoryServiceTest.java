@@ -98,6 +98,13 @@ class DataRetentionInventoryServiceTest {
         assertTrue(outboundMessageInventory.contains("h.target_id = om.id"));
         assertTrue(outboundMessageInventory.contains("h.released_at IS NULL"));
 
+        String customerInventory = statements.get(7);
+        assertTrue(customerInventory.contains("retention_legal_hold"));
+        assertTrue(customerInventory.contains("h.business_id = c.business_id"));
+        assertTrue(customerInventory.contains("h.target_type = 'CUSTOMER'"));
+        assertTrue(customerInventory.contains("h.target_id = c.id"));
+        assertTrue(customerInventory.contains("h.released_at IS NULL"));
+
         String nonFinancialOperationInventory = statements.get(8);
         assertTrue(nonFinancialOperationInventory.contains("retention_legal_hold"));
         assertTrue(nonFinancialOperationInventory.contains("h.business_id = o.business_id"));
