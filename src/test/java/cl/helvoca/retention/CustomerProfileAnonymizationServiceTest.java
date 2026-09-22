@@ -1,6 +1,7 @@
 package cl.helvoca.retention;
 
 import cl.helvoca.audit.AuditService;
+import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,11 @@ class CustomerProfileAnonymizationServiceTest {
         assertTrue(sql.getAllValues().get(0).contains("notes = NULL"));
         assertTrue(sql.getAllValues().get(0).contains("WHERE id = ?"));
         assertTrue(sql.getAllValues().get(0).contains("business_id = ?"));
+        assertTrue(sql.getAllValues().get(0).contains("retention_legal_hold"));
+        assertTrue(sql.getAllValues().get(0).contains("h.business_id = customer.business_id"));
+        assertTrue(sql.getAllValues().get(0).contains("h.target_type = 'CUSTOMER'"));
+        assertTrue(sql.getAllValues().get(0).contains("h.target_id = customer.id"));
+        assertTrue(sql.getAllValues().get(0).contains("h.released_at IS NULL"));
         assertArrayEquals(new Object[]{customerId, businessId}, args.getAllValues().get(0));
 
         assertTrue(sql.getAllValues().get(1).contains("DELETE FROM customer_identity"));
@@ -58,6 +64,41 @@ class CustomerProfileAnonymizationServiceTest {
                 "CUSTOMER_PROFILE_ANONYMIZE",
                 "CUSTOMER",
                 customerId);
+    }
+
+    @Test
+    void refusesAnonymizationBeforeMutationWhenCustomerHasActiveLegalHold() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService auditService = mock(AuditService.class);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq(businessId), eq(customerId)))
+                .thenReturn(true);
+
+        CustomerProfileAnonymizationService service =
+                new CustomerProfileAnonymizationService(jdbc, tenantProvider, auditService);
+
+        assertThrows(
+                ConflictException.class,
+                () -> service.anonymizeCurrentTenantCustomer(customerId));
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(
+                sql.capture(),
+                eq(Boolean.class),
+                eq(businessId),
+                eq(customerId));
+        assertTrue(sql.getValue().contains("retention_legal_hold"));
+        assertTrue(sql.getValue().contains("h.business_id = ?"));
+        assertTrue(sql.getValue().contains("h.target_type = 'CUSTOMER'"));
+        assertTrue(sql.getValue().contains("h.target_id = ?"));
+        assertTrue(sql.getValue().contains("h.released_at IS NULL"));
+
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+        verifyNoInteractions(auditService);
     }
 
     @Test
