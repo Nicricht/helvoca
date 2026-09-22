@@ -616,6 +616,27 @@ public class CustomerProfileAnonymizationService {
                    )
                 """, businessId, customerId, customerId, customerId, customerId);
 
+        int unansweredQuestionsScrubbed = jdbc.update("""
+                UPDATE unanswered_question q
+                   SET question = '[redacted]',
+                       normalized_question = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE q.business_id = ?
+                   AND q.customer_id = ?
+                   AND (
+                       q.question <> '[redacted]'
+                       OR q.normalized_question IS NOT NULL
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM retention_legal_hold h
+                       WHERE h.business_id = q.business_id
+                         AND h.target_type = 'CALL_SESSION'
+                         AND h.target_id = q.call_id
+                         AND h.released_at IS NULL
+                   )
+                """, businessId, customerId);
+
         int identitiesDeleted = jdbc.update("""
                 DELETE FROM customer_identity
                 WHERE business_id = ?
@@ -646,6 +667,7 @@ public class CustomerProfileAnonymizationService {
                 businessDeliveriesScrubbed,
                 deliveryOperationPiiScrubbed,
                 conversationStatesScrubbed,
+                unansweredQuestionsScrubbed,
                 identitiesDeleted);
     }
 
@@ -667,6 +689,7 @@ public class CustomerProfileAnonymizationService {
             int businessDeliveriesScrubbed,
             int deliveryOperationPiiScrubbed,
             int conversationStatesScrubbed,
+            int unansweredQuestionsScrubbed,
             int identitiesDeleted
     ) {}
 }
