@@ -225,6 +225,51 @@ class MetaWhatsAppDeliveryStatusServiceTest {
     }
 
     @Test
+    void mixedMetaAndTwilioSendersCertifyOnlyMetaSender() {
+        OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
+        MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
+        MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        AuditService audit = mock(AuditService.class);
+        UUID businessId = UUID.randomUUID();
+        UUID metaPhoneId = UUID.randomUUID();
+        Instant occurredAt = Instant.ofEpochSecond(1720000000L);
+
+        OutboundMessage message = mock(OutboundMessage.class);
+        when(message.getBusinessId()).thenReturn(businessId);
+        when(message.getProviderDeliveryStatus()).thenReturn("SENT");
+        when(outbound.findTopByProviderAndProviderMessageIdOrderByUpdatedAtDesc(
+                MetaWhatsAppMessagingProvider.ID, "wamid.CERT-MIXED"))
+                .thenReturn(Optional.of(message));
+
+        PhoneNumber metaSender = mock(PhoneNumber.class);
+        when(metaSender.getId()).thenReturn(metaPhoneId);
+        when(metaSender.getWhatsappProvider()).thenReturn(MetaWhatsAppMessagingProvider.ID);
+        when(metaSender.getWhatsappCertifiedAt()).thenReturn(null);
+
+        PhoneNumber twilioSender = mock(PhoneNumber.class);
+        when(twilioSender.getWhatsappProvider()).thenReturn("TWILIO_WHATSAPP");
+
+        when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(metaSender, twilioSender));
+
+        var result = new MetaWhatsAppDeliveryStatusService(
+                outbound, messages, conversations, phones, audit)
+                .apply(businessId, "wamid.CERT-MIXED", "delivered", occurredAt, null);
+
+        assertEquals(MetaWhatsAppDeliveryStatusService.Result.UPDATED, result);
+        verify(metaSender).setWhatsappCertifiedAt(occurredAt);
+        verify(twilioSender, never()).setWhatsappCertifiedAt(any());
+        verify(phones).saveAndFlush(metaSender);
+        verify(phones, never()).saveAndFlush(twilioSender);
+        verify(audit).success(
+                businessId,
+                "META_WHATSAPP_CERTIFICATION_COMPLETED",
+                "WHATSAPP_SENDER",
+                metaPhoneId);
+    }
+
+    @Test
     void readDoesNotRegressWhenLateSentCallbackArrives() {
         OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
         MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
