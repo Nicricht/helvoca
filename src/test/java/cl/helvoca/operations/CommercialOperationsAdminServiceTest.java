@@ -362,6 +362,56 @@ class CommercialOperationsAdminServiceTest {
     }
 
     @Test
+    void inTransitDeliveryCanBeDeliveredAndCompletesUniversalOperation() {
+        UUID businessId = UUID.randomUUID();
+        UUID deliveryId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        BusinessDeliveryRepository deliveries = mock(BusinessDeliveryRepository.class);
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+
+        BusinessDelivery delivery = new BusinessDelivery();
+        delivery.setId(deliveryId);
+        delivery.setOperationId(operationId);
+        delivery.setBusinessId(businessId);
+        delivery.setDeliveryZoneId(UUID.randomUUID());
+        delivery.setDeliveryAddress("Apoquindo 3000");
+        delivery.setStatus(BusinessDelivery.Status.IN_TRANSIT);
+        delivery.setSource(BusinessOrder.Source.VOICE);
+
+        BusinessOperation operation = new BusinessOperation();
+        operation.setId(operationId);
+        operation.setBusinessId(businessId);
+        operation.setType(BusinessOperation.Type.DELIVERY);
+        operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        operation.setRevision(2);
+        operation.setMetadata(Map.of("intent", "DELIVERY"));
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(deliveries.findByIdAndBusinessId(deliveryId, businessId)).thenReturn(Optional.of(delivery));
+        when(deliveries.saveAndFlush(any(BusinessDelivery.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(operations.findByIdAndBusinessId(operationId, businessId)).thenReturn(Optional.of(operation));
+        when(operations.saveAndFlush(any(BusinessOperation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CommercialOperationsAdminService service = service(
+                mock(BusinessOrderRepository.class),
+                mock(BusinessOrderLineRepository.class),
+                tenant,
+                deliveries,
+                operations);
+
+        var view = service.updateDeliveryStatus(deliveryId, BusinessDelivery.Status.DELIVERED);
+
+        assertEquals(BusinessDelivery.Status.DELIVERED, view.status());
+        assertEquals(BusinessOperation.Status.COMPLETED, operation.getStatus());
+        assertEquals(3, operation.getRevision());
+        assertEquals("DELIVERED", operation.getMetadata().get("projectionStatus"));
+        assertEquals(deliveryId.toString(), operation.getMetadata().get("deliveryId"));
+        verify(deliveries).saveAndFlush(delivery);
+        verify(operations).saveAndFlush(operation);
+    }
+
+    @Test
     void deliveredStandaloneDeliveryIsTerminal() {
         UUID businessId = UUID.randomUUID();
         UUID deliveryId = UUID.randomUUID();
