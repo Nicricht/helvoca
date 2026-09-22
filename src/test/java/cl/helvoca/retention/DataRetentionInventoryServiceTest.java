@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -83,7 +84,7 @@ class DataRetentionInventoryServiceTest {
                 eq(Instant.parse("2024-09-22T12:00:00Z")),
                 eq(Instant.parse("2026-03-26T12:00:00Z")));
 
-        List<String> statements = sql.getAllValues();
+        List<String> statements = new ArrayList<>(sql.getAllValues());
         statements.add(7, customerSql.getValue());
         assertEquals(11, statements.size());
         assertTrue(statements.stream().allMatch(statement -> statement.contains("business_id = ?")));
