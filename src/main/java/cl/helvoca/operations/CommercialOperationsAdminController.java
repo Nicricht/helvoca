@@ -57,6 +57,15 @@ public class CommercialOperationsAdminController {
         return ResponseEntity.ok(service.leads());
     }
 
+    @PatchMapping("/leads/{id}/status")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public ResponseEntity<CommercialOperationsAdminService.LeadView> updateLeadStatus(
+            @PathVariable UUID id,
+            @RequestBody LeadStatusRequest request) {
+        return ResponseEntity.ok(service.updateLeadStatus(id, request == null ? null : request.status()));
+    }
+
     public record OrderStatusRequest(BusinessOrder.Status status) {}
     public record DeliveryStatusRequest(BusinessDelivery.Status status) {}
+    public record LeadStatusRequest(BusinessLead.Status status) {}
 }
