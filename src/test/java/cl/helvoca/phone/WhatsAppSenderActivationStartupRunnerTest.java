@@ -41,6 +41,31 @@ class WhatsAppSenderActivationStartupRunnerTest {
     }
 
     @Test
+    void alreadyEnabledSenderDoesNotSaveOrAuditActivation() throws Exception {
+        UUID businessId = UUID.randomUUID();
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        phone.setPhoneNumber("+14355652512");
+        phone.setActive(true);
+        phone.setWhatsappEnabled(true);
+        phone.setWhatsappProvider("TWILIO_WHATSAPP");
+
+        PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
+        AuditService audit = mock(AuditService.class);
+        when(repository.findByPhoneNumber("+14355652512")).thenReturn(Optional.of(phone));
+        when(repository.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(phone));
+
+        WhatsAppSenderActivationStartupRunner runner =
+                new WhatsAppSenderActivationStartupRunner(true, "+14355652512", repository, audit);
+
+        runner.run(null);
+
+        verify(repository, never()).save(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
     void doesNothingWhenDisabled() throws Exception {
         PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
         WhatsAppSenderActivationStartupRunner runner =
