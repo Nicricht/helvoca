@@ -18,7 +18,7 @@ import static org.mockito.Mockito.*;
 class CallSessionRetentionServiceTest {
 
     @Test
-    void purgesOnlyOldEndedUnreferencedSessionsForCurrentTenant() {
+    void purgesOnlyOldEndedUnreferencedSessionsWithoutActiveLegalHold() {
         UUID businessId = UUID.randomUUID();
         Instant now = Instant.parse("2026-09-22T12:00:00Z");
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
@@ -52,6 +52,11 @@ class CallSessionRetentionServiceTest {
             assertTrue(statement.contains("c.ended_at < ?"));
             assertTrue(statement.contains("business_request"));
             assertTrue(statement.contains("unanswered_question"));
+            assertTrue(statement.contains("retention_legal_hold"));
+            assertTrue(statement.contains("h.business_id = c.business_id"));
+            assertTrue(statement.contains("h.target_type = 'CALL_SESSION'"));
+            assertTrue(statement.contains("h.target_id = c.id"));
+            assertTrue(statement.contains("h.released_at IS NULL"));
         }
 
         Object[] expectedArgs = {
