@@ -45,12 +45,12 @@ class CustomerProfileAnonymizationServiceTest {
         assertTrue(sql.getAllValues().get(0).contains("phone = NULL"));
         assertTrue(sql.getAllValues().get(0).contains("email = NULL"));
         assertTrue(sql.getAllValues().get(0).contains("notes = NULL"));
-        assertTrue(sql.getAllValues().get(0).contains("WHERE id = ?"));
-        assertTrue(sql.getAllValues().get(0).contains("business_id = ?"));
+        assertTrue(sql.getAllValues().get(0).contains("WHERE c.id = ?"));
+        assertTrue(sql.getAllValues().get(0).contains("c.business_id = ?"));
         assertTrue(sql.getAllValues().get(0).contains("retention_legal_hold"));
-        assertTrue(sql.getAllValues().get(0).contains("h.business_id = customer.business_id"));
+        assertTrue(sql.getAllValues().get(0).contains("h.business_id = c.business_id"));
         assertTrue(sql.getAllValues().get(0).contains("h.target_type = 'CUSTOMER'"));
-        assertTrue(sql.getAllValues().get(0).contains("h.target_id = customer.id"));
+        assertTrue(sql.getAllValues().get(0).contains("h.target_id = c.id"));
         assertTrue(sql.getAllValues().get(0).contains("h.released_at IS NULL"));
         assertArrayEquals(new Object[]{customerId, businessId}, args.getAllValues().get(0));
 
