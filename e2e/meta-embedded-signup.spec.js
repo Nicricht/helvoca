@@ -423,8 +423,10 @@ test('Embedded Signup renders WABA candidates after secure authorization', async
   await expect(deploymentState)
     .toContainText('Las compuertas de tráfico real siguen apagadas, como exige el staging seguro.');
   await expect(activationGate).toBeVisible();
-  await expect(activationGate).toContainText('Activación bloqueada');
-  await expect(activationGate).toContainText('Falta completar: certificación técnica.');
+  await expect(activationGate).toContainText('Activación disponible con autorización manual');
+  await expect(activationGate)
+    .toContainText('Activar arma este negocio para el piloto');
+  await expect(page.locator('#metaWhatsAppActivateBtn')).toBeVisible();
   await expect(pinInput).toHaveValue('');
   await expect(pinInput).toBeDisabled();
   await expect(finalizePhoneButton).toBeDisabled();
