@@ -99,10 +99,15 @@ public class GeminiMessagingAiFallback {
                     String name = call.optString("name", "");
                     JSONObject args = call.optJSONObject("args");
                     String result = toolInvoker.execute(name, args == null ? "{}" : args.toString());
+                    JSONObject functionResponse = new JSONObject()
+                            .put("name", name)
+                            .put("response", responseObject(result));
+                    String callId = call.optString("id", "").trim();
+                    if (!callId.isBlank()) {
+                        functionResponse.put("id", callId);
+                    }
                     functionResponses.put(new JSONObject()
-                            .put("functionResponse", new JSONObject()
-                                    .put("name", name)
-                                    .put("response", responseObject(result))));
+                            .put("functionResponse", functionResponse));
                 }
             }
 
