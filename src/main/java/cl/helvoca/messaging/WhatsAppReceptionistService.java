@@ -6,6 +6,7 @@ import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.omnichannel.CustomerIdentityService;
 import cl.helvoca.operations.BusinessOperationCapabilityService;
+import cl.helvoca.messaging.outbound.MetaWhatsAppMessagingProvider;
 import cl.helvoca.messaging.outbound.WhatsAppAssistantReplyDeliveryService;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
@@ -79,7 +80,7 @@ public class WhatsAppReceptionistService {
         PhoneNumber phone = phones.findByPhoneNumberAndActiveTrue(tenantDestination)
                 .filter(PhoneNumber::isWhatsappEnabled)
                 .orElseThrow(() -> new IllegalArgumentException("WhatsApp destination is not registered or enabled"));
-        return process(messageSid, rawFrom, phone, body);
+        return process(messageSid, rawFrom, phone, body, phone.getWhatsappProvider());
     }
 
     @Transactional
@@ -98,10 +99,10 @@ public class WhatsAppReceptionistService {
                 .filter(PhoneNumber::isActive)
                 .filter(PhoneNumber::isWhatsappEnabled)
                 .orElseThrow(() -> new IllegalArgumentException("Resolved WhatsApp destination is not registered or enabled"));
-        return process(messageId, rawFrom, phone, body);
+        return process(messageId, rawFrom, phone, body, MetaWhatsAppMessagingProvider.ID);
     }
 
-    private String process(String messageId, String rawFrom, PhoneNumber phone, String body) {
+    private String process(String messageId, String rawFrom, PhoneNumber phone, String body, String replyProviderId) {
         String from = normalizeAddress(rawFrom);
         String to = normalizeAddress(phone.getPhoneNumber());
         String text = body == null ? "" : body.trim();
@@ -169,7 +170,7 @@ public class WhatsAppReceptionistService {
                     phone.getBusinessId(),
                     inbound.getId(),
                     messageId,
-                    phone.getWhatsappProvider(),
+                    replyProviderId,
                     from,
                     reply);
         }
