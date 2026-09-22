@@ -171,6 +171,19 @@ public class DataRetentionInventoryService {
                         AND h.target_id = c.id
                         AND h.released_at IS NULL
                   )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM business_operation o
+                      WHERE o.business_id = c.business_id
+                        AND o.customer_id = c.id
+                        AND o.status IN (
+                            'DRAFT',
+                            'PROPOSED',
+                            'AWAITING_CONFIRMATION',
+                            'CONFIRMED',
+                            'EXECUTING'
+                        )
+                  )
                 """, businessId, cutoffs.customerReviewBefore());
 
         long nonFinancialOperations = count("""

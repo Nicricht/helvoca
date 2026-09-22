@@ -49,6 +49,29 @@ public class CustomerProfileAnonymizationService {
             throw new ConflictException("Customer is protected by an active legal hold");
         }
 
+        Boolean hasActiveOperation = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM business_operation o
+                    WHERE o.business_id = ?
+                      AND o.customer_id = ?
+                      AND o.status IN (
+                          'DRAFT',
+                          'PROPOSED',
+                          'AWAITING_CONFIRMATION',
+                          'CONFIRMED',
+                          'EXECUTING'
+                      )
+                )
+                """,
+                Boolean.class,
+                businessId,
+                customerId);
+
+        if (Boolean.TRUE.equals(hasActiveOperation)) {
+            throw new ConflictException("Customer has an active business operation");
+        }
+
         int customersUpdated = jdbc.update("""
                 UPDATE customer c
                 SET name = NULL,
@@ -65,6 +88,19 @@ public class CustomerProfileAnonymizationService {
                         AND h.target_type = 'CUSTOMER'
                         AND h.target_id = c.id
                         AND h.released_at IS NULL
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM business_operation o
+                      WHERE o.business_id = c.business_id
+                        AND o.customer_id = c.id
+                        AND o.status IN (
+                            'DRAFT',
+                            'PROPOSED',
+                            'AWAITING_CONFIRMATION',
+                            'CONFIRMED',
+                            'EXECUTING'
+                        )
                   )
                 """, customerId, businessId);
 
