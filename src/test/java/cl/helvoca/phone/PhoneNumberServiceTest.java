@@ -186,7 +186,7 @@ class PhoneNumberServiceTest {
         phone.setWhatsappEnabled(true);
         when(repository.findByIdAndBusinessId(phoneId, businessId)).thenReturn(Optional.of(phone));
         when(repository.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
-                .thenReturn(java.util.List.of(phone));
+                .thenReturn(java.util.List.of());
         when(repository.save(phone)).thenReturn(phone);
 
         PhoneNumberService service = new PhoneNumberService(repository, tenantProvider, audit);
