@@ -1,25 +1,38 @@
 package cl.helvoca.catalog;
 
+import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.security.TenantProvider;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 public class UniversalCatalogService {
     private final CatalogItemRepository repository;
     private final TenantProvider tenantProvider;
+    private final AuditService auditService;
 
-    public UniversalCatalogService(CatalogItemRepository repository, TenantProvider tenantProvider) {
+    @Autowired
+    public UniversalCatalogService(CatalogItemRepository repository,
+                                   TenantProvider tenantProvider,
+                                   AuditService auditService) {
         this.repository = repository;
         this.tenantProvider = tenantProvider;
+        this.auditService = auditService;
+    }
+
+    public UniversalCatalogService(CatalogItemRepository repository, TenantProvider tenantProvider) {
+        this(repository, tenantProvider, null);
     }
 
     @Transactional(readOnly = true)
@@ -39,7 +52,17 @@ public class UniversalCatalogService {
         CatalogItem item = new CatalogItem();
         item.setBusinessId(businessId);
         apply(item, input);
-        return ItemView.from(repository.saveAndFlush(item));
+        CatalogItem saved = repository.saveAndFlush(item);
+        if (auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "CATALOG_ITEM_CREATE",
+                    "CATALOG_ITEM",
+                    saved.getId(),
+                    null,
+                    snapshot(saved));
+        }
+        return ItemView.from(saved);
     }
 
     @Transactional
@@ -55,8 +78,19 @@ public class UniversalCatalogService {
                 businessId, input.kind(), input.name().trim())) {
             throw new ConflictException("A catalog item with that name and kind already exists");
         }
+        Map<String, Object> before = snapshot(item);
         apply(item, input);
-        return ItemView.from(repository.saveAndFlush(item));
+        CatalogItem saved = repository.saveAndFlush(item);
+        if (auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "CATALOG_ITEM_UPDATE",
+                    "CATALOG_ITEM",
+                    saved.getId(),
+                    before,
+                    snapshot(saved));
+        }
+        return ItemView.from(saved);
     }
 
     @Transactional
@@ -64,8 +98,19 @@ public class UniversalCatalogService {
         UUID businessId = tenantProvider.requireBusinessId();
         CatalogItem item = require(id, businessId);
         requireDirectlyMutable(item);
+        Map<String, Object> before = snapshot(item);
+        boolean wasActive = item.isActive();
         item.setActive(false);
-        repository.save(item);
+        CatalogItem saved = repository.save(item);
+        if (wasActive && auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "CATALOG_ITEM_DEACTIVATE",
+                    "CATALOG_ITEM",
+                    saved.getId(),
+                    before,
+                    snapshot(saved));
+        }
     }
 
     private CatalogItem require(UUID id, UUID businessId) {
@@ -105,6 +150,17 @@ public class UniversalCatalogService {
         item.setDurationMinutes(input.durationMinutes());
         item.setMetadataJson(blankToNull(input.metadataJson()));
         if (input.active() != null) item.setActive(input.active());
+    }
+
+    private static Map<String, Object> snapshot(CatalogItem item) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("kind", item.getKind() == null ? null : item.getKind().name());
+        snapshot.put("name", item.getName());
+        snapshot.put("price", item.getPrice());
+        snapshot.put("currency", item.getCurrency());
+        snapshot.put("durationMinutes", item.getDurationMinutes());
+        snapshot.put("active", item.isActive());
+        return snapshot;
     }
 
     private static String normalizeCurrency(String currency) {
