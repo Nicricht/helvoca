@@ -165,6 +165,34 @@ class MetaWhatsAppDeliveryStatusServiceTest {
     }
 
     @Test
+    void missingMetaSenderDoesNotCertifyOrAuditOnDeliveredCallback() {
+        OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
+        MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
+        MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        AuditService audit = mock(AuditService.class);
+        UUID businessId = UUID.randomUUID();
+        Instant occurredAt = Instant.ofEpochSecond(1720000000L);
+
+        OutboundMessage message = mock(OutboundMessage.class);
+        when(message.getBusinessId()).thenReturn(businessId);
+        when(message.getProviderDeliveryStatus()).thenReturn("SENT");
+        when(outbound.findTopByProviderAndProviderMessageIdOrderByUpdatedAtDesc(
+                MetaWhatsAppMessagingProvider.ID, "wamid.CERT-NONE"))
+                .thenReturn(Optional.of(message));
+        when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of());
+
+        var result = new MetaWhatsAppDeliveryStatusService(
+                outbound, messages, conversations, phones, audit)
+                .apply(businessId, "wamid.CERT-NONE", "delivered", occurredAt, null);
+
+        assertEquals(MetaWhatsAppDeliveryStatusService.Result.UPDATED, result);
+        verify(phones, never()).saveAndFlush(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
     void readDoesNotRegressWhenLateSentCallbackArrives() {
         OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
         MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
