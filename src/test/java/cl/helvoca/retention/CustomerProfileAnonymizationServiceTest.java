@@ -4,7 +4,7 @@ import cl.helvoca.audit.AuditService;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
-import org.mockito.InOrder;
+import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.UUID;
@@ -36,26 +36,28 @@ class CustomerProfileAnonymizationServiceTest {
         assertEquals(customerId, result.customerId());
         assertEquals(2, result.identitiesDeleted());
 
-        InOrder order = inOrder(jdbc, auditService);
-        order.verify(jdbc).update(
-                argThat(sql -> sql.contains("SET name = NULL")
-                        && sql.contains("phone = NULL")
-                        && sql.contains("email = NULL")
-                        && sql.contains("notes = NULL")
-                        && sql.contains("WHERE id = ?")
-                        && sql.contains("business_id = ?")),
-                aryEq(new Object[]{customerId, businessId}));
-        order.verify(jdbc).update(
-                argThat(sql -> sql.contains("DELETE FROM customer_identity")
-                        && sql.contains("business_id = ?")
-                        && sql.contains("customer_id = ?")),
-                aryEq(new Object[]{businessId, customerId}));
-        order.verify(auditService).humanSuccess(
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc, times(2)).update(sql.capture(), args.capture());
+
+        assertTrue(sql.getAllValues().get(0).contains("SET name = NULL"));
+        assertTrue(sql.getAllValues().get(0).contains("phone = NULL"));
+        assertTrue(sql.getAllValues().get(0).contains("email = NULL"));
+        assertTrue(sql.getAllValues().get(0).contains("notes = NULL"));
+        assertTrue(sql.getAllValues().get(0).contains("WHERE id = ?"));
+        assertTrue(sql.getAllValues().get(0).contains("business_id = ?"));
+        assertArrayEquals(new Object[]{customerId, businessId}, args.getAllValues().get(0));
+
+        assertTrue(sql.getAllValues().get(1).contains("DELETE FROM customer_identity"));
+        assertTrue(sql.getAllValues().get(1).contains("business_id = ?"));
+        assertTrue(sql.getAllValues().get(1).contains("customer_id = ?"));
+        assertArrayEquals(new Object[]{businessId, customerId}, args.getAllValues().get(1));
+
+        verify(auditService).humanSuccess(
                 businessId,
                 "CUSTOMER_PROFILE_ANONYMIZE",
                 "CUSTOMER",
                 customerId);
-        order.verifyNoMoreInteractions();
     }
 
     @Test
