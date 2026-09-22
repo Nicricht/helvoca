@@ -137,6 +137,72 @@ class PhoneNumberServiceTest {
     }
 
     @Test
+    void enablingWhatsappAuditsSenderEnable() {
+        PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService audit = mock(AuditService.class);
+        UUID businessId = UUID.randomUUID();
+        UUID phoneId = UUID.randomUUID();
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        phone.setActive(true);
+        phone.setWhatsappEnabled(false);
+        when(repository.findByIdAndBusinessId(phoneId, businessId)).thenReturn(Optional.of(phone));
+        when(repository.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(java.util.List.of());
+        when(repository.save(phone)).thenReturn(phone);
+
+        PhoneNumberService service = new PhoneNumberService(repository, tenantProvider, audit);
+        PhoneNumberResponse response = service.setWhatsappEnabled(phoneId, true);
+
+        assertTrue(response.whatsappEnabled());
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("WHATSAPP_SENDER_ENABLED"),
+                eq("WHATSAPP_SENDER"),
+                eq(businessId),
+                eq(Map.of(
+                        "whatsappEnabled", false,
+                        "certified", false)),
+                eq(Map.of(
+                        "whatsappEnabled", true,
+                        "certified", false)));
+    }
+
+    @Test
+    void enablingAlreadyEnabledWhatsappDoesNotDuplicateSenderEnableAudit() {
+        PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService audit = mock(AuditService.class);
+        UUID businessId = UUID.randomUUID();
+        UUID phoneId = UUID.randomUUID();
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        phone.setActive(true);
+        phone.setWhatsappEnabled(true);
+        when(repository.findByIdAndBusinessId(phoneId, businessId)).thenReturn(Optional.of(phone));
+        when(repository.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(java.util.List.of());
+        when(repository.save(phone)).thenReturn(phone);
+
+        PhoneNumberService service = new PhoneNumberService(repository, tenantProvider, audit);
+        PhoneNumberResponse response = service.setWhatsappEnabled(phoneId, true);
+
+        assertTrue(response.whatsappEnabled());
+        verify(audit, never()).humanSuccess(
+                eq(businessId),
+                eq("WHATSAPP_SENDER_ENABLED"),
+                anyString(),
+                any(),
+                any(),
+                any());
+    }
+
+    @Test
     void disablingWhatsappClearsPreviousCertification() {
         PhoneNumberRepository repository = mock(PhoneNumberRepository.class);
         TenantProvider tenantProvider = mock(TenantProvider.class);

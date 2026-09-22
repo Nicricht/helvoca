@@ -145,6 +145,20 @@ public class PhoneNumberService {
         if (!enabled) phone.setWhatsappCertifiedAt(null);
         PhoneNumber saved = repository.save(phone);
 
+        if (enabled && !wasEnabled && auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "WHATSAPP_SENDER_ENABLED",
+                    "WHATSAPP_SENDER",
+                    businessId,
+                    Map.of(
+                            "whatsappEnabled", false,
+                            "certified", wasCertified),
+                    Map.of(
+                            "whatsappEnabled", true,
+                            "certified", wasCertified));
+        }
+
         if (!enabled && wasCertified && auditService != null) {
             auditService.humanSuccess(
                     businessId,
