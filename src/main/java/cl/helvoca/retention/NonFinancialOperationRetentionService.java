@@ -52,6 +52,14 @@ public class NonFinancialOperationRetentionService {
                   )
                   AND NOT EXISTS (SELECT 1 FROM outbound_message x WHERE x.operation_id = o.id)
                   AND NOT EXISTS (SELECT 1 FROM persistent_job x WHERE x.operation_id = o.id)
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM retention_legal_hold h
+                      WHERE h.business_id = o.business_id
+                        AND h.target_type = 'BUSINESS_OPERATION'
+                        AND h.target_id = o.id
+                        AND h.released_at IS NULL
+                  )
                 """, businessId, cutoff);
 
         return new Result(cutoff, deleted);
