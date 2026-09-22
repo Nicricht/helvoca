@@ -30,6 +30,36 @@ public class MetaWhatsAppCloudClient {
         this.http = http;
     }
 
+    public void subscribeWaba(String wabaId, String accessToken) {
+        String accountId = normalizeWabaId(wabaId);
+        String token = require(accessToken, "Meta WhatsApp access token is required");
+
+        URI uri = URI.create(properties.graphApiRoot() + "/" + accountId + "/subscribed_apps");
+        HttpRequest request = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofSeconds(12))
+                .header("Authorization", "Bearer " + token)
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+
+        try {
+            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw apiError(response.statusCode(), response.body());
+            }
+            JSONObject body = new JSONObject(response.body());
+            if (!body.optBoolean("success", false)) {
+                throw new IllegalStateException("Meta WhatsApp WABA subscription was not confirmed");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Meta WhatsApp WABA subscription was interrupted", e);
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException("Meta WhatsApp WABA subscription failed", e);
+        }
+    }
+
     public String sendText(String phoneNumberId,
                            String accessToken,
                            String recipient,
@@ -111,6 +141,14 @@ public class MetaWhatsAppCloudClient {
         if (source == null || !source.has(key) || source.isNull(key)) return null;
         String value = String.valueOf(source.get(key)).trim();
         return value.isBlank() ? null : value;
+    }
+
+    private static String normalizeWabaId(String value) {
+        String clean = require(value, "Meta WABA id is required");
+        if (!PHONE_NUMBER_ID.matcher(clean).matches()) {
+            throw new IllegalArgumentException("Invalid Meta WABA id");
+        }
+        return clean;
     }
 
     private static String normalizePhoneNumberId(String value) {
