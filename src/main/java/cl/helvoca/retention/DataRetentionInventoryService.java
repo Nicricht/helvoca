@@ -62,10 +62,16 @@ public class DataRetentionInventoryService {
 
         long callSessions = count("""
                 SELECT COUNT(*)
-                FROM call_session
-                WHERE business_id = ?
-                  AND ended_at IS NOT NULL
-                  AND ended_at < ?
+                FROM call_session c
+                WHERE c.business_id = ?
+                  AND c.ended_at IS NOT NULL
+                  AND c.ended_at < ?
+                  AND NOT EXISTS (
+                      SELECT 1 FROM business_request r WHERE r.call_id = c.id
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM unanswered_question q WHERE q.call_id = c.id
+                  )
                 """, businessId, cutoffs.callSessionsBefore());
 
         long messagingMessages = count("""
