@@ -50,20 +50,20 @@ public class CustomerProfileAnonymizationService {
         }
 
         int customersUpdated = jdbc.update("""
-                UPDATE customer
+                UPDATE customer c
                 SET name = NULL,
                     phone = NULL,
                     email = NULL,
                     notes = NULL,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                  AND business_id = ?
+                WHERE c.id = ?
+                  AND c.business_id = ?
                   AND NOT EXISTS (
                       SELECT 1
                       FROM retention_legal_hold h
-                      WHERE h.business_id = customer.business_id
+                      WHERE h.business_id = c.business_id
                         AND h.target_type = 'CUSTOMER'
-                        AND h.target_id = customer.id
+                        AND h.target_id = c.id
                         AND h.released_at IS NULL
                   )
                 """, customerId, businessId);
