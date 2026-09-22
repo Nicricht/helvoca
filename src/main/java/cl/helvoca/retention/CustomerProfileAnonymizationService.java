@@ -565,6 +565,57 @@ public class CustomerProfileAnonymizationService {
                    )
                 """, businessId, customerId);
 
+        int conversationStatesScrubbed = jdbc.update("""
+                UPDATE conversation_operation_state cos
+                   SET state_json = cos.state_json - 'deliveryAddress' - 'name' - 'title'
+                 WHERE cos.business_id = ?
+                   AND (
+                       jsonb_exists(cos.state_json, 'deliveryAddress')
+                       OR jsonb_exists(cos.state_json, 'name')
+                       OR jsonb_exists(cos.state_json, 'title')
+                   )
+                   AND (
+                       EXISTS (
+                           SELECT 1
+                           FROM omnichannel_session os
+                           WHERE os.id = cos.omnichannel_session_id
+                             AND os.business_id = cos.business_id
+                             AND os.customer_id = ?
+                       )
+                       OR (
+                           cos.channel = 'VOICE'
+                           AND EXISTS (
+                               SELECT 1
+                               FROM call_session cs
+                               WHERE cs.id = cos.source_reference_id
+                                 AND cs.business_id = cos.business_id
+                                 AND cs.customer_id = ?
+                           )
+                       )
+                       OR (
+                           cos.channel = 'WHATSAPP'
+                           AND EXISTS (
+                               SELECT 1
+                               FROM messaging_conversation mc
+                               WHERE mc.id = cos.source_reference_id
+                                 AND mc.business_id = cos.business_id
+                                 AND mc.customer_id = ?
+                           )
+                       )
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM business_operation o
+                       JOIN retention_legal_hold h
+                         ON h.business_id = o.business_id
+                        AND h.target_type = 'BUSINESS_OPERATION'
+                        AND h.target_id = o.id
+                        AND h.released_at IS NULL
+                       WHERE o.business_id = cos.business_id
+                         AND o.customer_id = ?
+                   )
+                """, businessId, customerId, customerId, customerId, customerId);
+
         int identitiesDeleted = jdbc.update("""
                 DELETE FROM customer_identity
                 WHERE business_id = ?
@@ -594,6 +645,7 @@ public class CustomerProfileAnonymizationService {
                 orderOperationPiiScrubbed,
                 businessDeliveriesScrubbed,
                 deliveryOperationPiiScrubbed,
+                conversationStatesScrubbed,
                 identitiesDeleted);
     }
 
@@ -614,6 +666,7 @@ public class CustomerProfileAnonymizationService {
             int orderOperationPiiScrubbed,
             int businessDeliveriesScrubbed,
             int deliveryOperationPiiScrubbed,
+            int conversationStatesScrubbed,
             int identitiesDeleted
     ) {}
 }
