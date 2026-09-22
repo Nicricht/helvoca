@@ -158,7 +158,7 @@ public class DataRetentionInventoryService {
                   )
                 """, businessId, cutoffs.messageContentBefore());
 
-        long customerReviewCandidates = count("""
+        Long customerReviewCandidatesValue = jdbc.queryForObject("""
                 SELECT COUNT(*)
                 FROM customer c
                 WHERE c.business_id = ?
@@ -191,7 +191,20 @@ public class DataRetentionInventoryService {
                         AND cs.customer_id = c.id
                         AND cs.ended_at IS NULL
                   )
-                """, businessId, cutoffs.customerReviewBefore());
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM messaging_conversation mc
+                      WHERE mc.business_id = c.business_id
+                        AND mc.customer_id = c.id
+                        AND mc.last_message_at >= ?
+                  )
+                """,
+                Long.class,
+                businessId,
+                cutoffs.customerReviewBefore(),
+                cutoffs.conversationsBefore());
+        long customerReviewCandidates =
+                customerReviewCandidatesValue == null ? 0L : customerReviewCandidatesValue;
 
         long nonFinancialOperations = count("""
                 SELECT COUNT(*)
