@@ -51,6 +51,14 @@ public class CommercialOperationsAdminController {
         return ResponseEntity.ok(service.quotes());
     }
 
+    @PatchMapping("/quotes/{id}/status")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public ResponseEntity<CommercialOperationsAdminService.QuoteView> updateQuoteStatus(
+            @PathVariable UUID id,
+            @RequestBody QuoteStatusRequest request) {
+        return ResponseEntity.ok(service.updateQuoteStatus(id, request == null ? null : request.status()));
+    }
+
     @GetMapping("/leads")
     @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
     public ResponseEntity<List<CommercialOperationsAdminService.LeadView>> leads() {
@@ -67,5 +75,6 @@ public class CommercialOperationsAdminController {
 
     public record OrderStatusRequest(BusinessOrder.Status status) {}
     public record DeliveryStatusRequest(BusinessDelivery.Status status) {}
+    public record QuoteStatusRequest(BusinessQuote.Status status) {}
     public record LeadStatusRequest(BusinessLead.Status status) {}
 }
