@@ -56,6 +56,7 @@ class CustomerProfileAnonymizationServiceTest {
                 && sql.contains("o.type = 'DELIVERY'")), any(Object[].class))).thenReturn(17);
         when(jdbc.update(startsWith("UPDATE conversation_operation_state"), any(Object[].class))).thenReturn(18);
         when(jdbc.update(startsWith("UPDATE unanswered_question"), any(Object[].class))).thenReturn(19);
+        when(jdbc.update(startsWith("UPDATE customer_identity"), any(Object[].class))).thenReturn(20);
         when(jdbc.update(startsWith("DELETE FROM customer_identity"), any(Object[].class))).thenReturn(2);
 
         CustomerProfileAnonymizationService service =
@@ -82,11 +83,12 @@ class CustomerProfileAnonymizationServiceTest {
         assertEquals(17, result.deliveryOperationPiiScrubbed());
         assertEquals(18, result.conversationStatesScrubbed());
         assertEquals(19, result.unansweredQuestionsScrubbed());
+        assertEquals(20, result.referencedIdentitiesAnonymized());
         assertEquals(2, result.identitiesDeleted());
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
-        verify(jdbc, times(19)).update(sql.capture(), args.capture());
+        verify(jdbc, times(20)).update(sql.capture(), args.capture());
 
         assertTrue(sql.getAllValues().get(0).contains("SET name = NULL"));
         assertTrue(sql.getAllValues().get(0).contains("phone = NULL"));
@@ -371,10 +373,24 @@ class CustomerProfileAnonymizationServiceTest {
         assertFalse(sql.getAllValues().get(17).contains("knowledge_item_id ="));
         assertArrayEquals(new Object[]{businessId, customerId}, args.getAllValues().get(17));
 
-        assertTrue(sql.getAllValues().get(18).contains("DELETE FROM customer_identity"));
-        assertTrue(sql.getAllValues().get(18).contains("business_id = ?"));
-        assertTrue(sql.getAllValues().get(18).contains("customer_id = ?"));
+        assertTrue(sql.getAllValues().get(18).contains("UPDATE customer_identity"));
+        assertTrue(sql.getAllValues().get(18).contains("normalized_value = 'anonymized:' || ci.id::text"));
+        assertTrue(sql.getAllValues().get(18).contains("verification_status = 'UNVERIFIED'"));
+        assertTrue(sql.getAllValues().get(18).contains("source = 'ANONYMIZED'"));
+        assertTrue(sql.getAllValues().get(18).contains("verified_at = NULL"));
+        assertTrue(sql.getAllValues().get(18).contains("om.recipient_identity_id = ci.id"));
+        assertTrue(sql.getAllValues().get(18).contains("h.target_type = 'OUTBOUND_MESSAGE'"));
+        assertTrue(sql.getAllValues().get(18).contains("h.target_id = om.id"));
+        assertTrue(sql.getAllValues().get(18).contains("h.released_at IS NULL"));
         assertArrayEquals(new Object[]{businessId, customerId}, args.getAllValues().get(18));
+
+        assertTrue(sql.getAllValues().get(19).contains("DELETE FROM customer_identity ci"));
+        assertTrue(sql.getAllValues().get(19).contains("ci.business_id = ?"));
+        assertTrue(sql.getAllValues().get(19).contains("ci.customer_id = ?"));
+        assertTrue(sql.getAllValues().get(19).contains("NOT EXISTS"));
+        assertTrue(sql.getAllValues().get(19).contains("outbound_message om"));
+        assertTrue(sql.getAllValues().get(19).contains("om.recipient_identity_id = ci.id"));
+        assertArrayEquals(new Object[]{businessId, customerId}, args.getAllValues().get(19));
 
         verify(auditService).humanSuccess(
                 businessId,
