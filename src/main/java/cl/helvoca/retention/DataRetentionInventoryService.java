@@ -88,13 +88,29 @@ public class DataRetentionInventoryService {
                 JOIN messaging_conversation c ON c.id = m.conversation_id
                 WHERE c.business_id = ?
                   AND m.created_at < ?
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM retention_legal_hold h
+                      WHERE h.business_id = c.business_id
+                        AND h.target_type = 'MESSAGING_CONVERSATION'
+                        AND h.target_id = c.id
+                        AND h.released_at IS NULL
+                  )
                 """, businessId, cutoffs.messageContentBefore());
 
         long messagingConversations = count("""
                 SELECT COUNT(*)
-                FROM messaging_conversation
-                WHERE business_id = ?
-                  AND last_message_at < ?
+                FROM messaging_conversation c
+                WHERE c.business_id = ?
+                  AND c.last_message_at < ?
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM retention_legal_hold h
+                      WHERE h.business_id = c.business_id
+                        AND h.target_type = 'MESSAGING_CONVERSATION'
+                        AND h.target_id = c.id
+                        AND h.released_at IS NULL
+                  )
                 """, businessId, cutoffs.conversationsBefore());
 
         long outboundMessageContent = count("""
