@@ -56,6 +56,7 @@ class PostgresRowLevelSecurityIntegrationTest {
     void seed() {
         ownerJdbc = new JdbcTemplate(migrationDataSource);
 
+        ownerJdbc.update("DELETE FROM retention_legal_hold");
         ownerJdbc.update("DELETE FROM audit_log");
         ownerJdbc.update("DELETE FROM user_role");
         ownerJdbc.update("DELETE FROM app_user");
@@ -187,6 +188,83 @@ class PostgresRowLevelSecurityIntegrationTest {
                 Boolean.class));
         assertFalse(ownerJdbc.queryForObject(
                 "SELECT has_table_privilege('helvoca_runtime', 'public.audit_log', 'DELETE')",
+                Boolean.class));
+    }
+
+    @Test
+    void legalHoldFoundationIsTenantIsolatedReadOnlyAndUniquePerActiveTarget() {
+        UUID targetA = UUID.randomUUID();
+        UUID targetB = UUID.randomUUID();
+        UUID actorA = ownerJdbc.queryForObject(
+                "SELECT id FROM app_user WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessA);
+        UUID actorB = ownerJdbc.queryForObject(
+                "SELECT id FROM app_user WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessB);
+
+        ownerJdbc.update("""
+                INSERT INTO retention_legal_hold(
+                    business_id, target_type, target_id, reason_code, actor_type, actor_user_id
+                ) VALUES (?, 'CUSTOMER', ?, 'LEGAL_REQUEST', 'HUMAN', ?)
+                """, businessA, targetA, actorA);
+        ownerJdbc.update("""
+                INSERT INTO retention_legal_hold(
+                    business_id, target_type, target_id, reason_code, actor_type, actor_user_id
+                ) VALUES (?, 'CUSTOMER', ?, 'PAYMENT_DISPUTE', 'HUMAN', ?)
+                """, businessB, targetB, actorB);
+
+        long visibleA = databaseContext.callAsTenant(
+                businessA,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM retention_legal_hold",
+                        Long.class));
+        long visibleB = databaseContext.callAsTenant(
+                businessB,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM retention_legal_hold",
+                        Long.class));
+
+        assertEquals(1L, visibleA);
+        assertEquals(1L, visibleB);
+
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(
+                businessA,
+                () -> runtimeJdbc.update("""
+                        INSERT INTO retention_legal_hold(
+                            business_id, target_type, target_id, reason_code, actor_type, actor_user_id
+                        ) VALUES (?, 'CUSTOMER', ?, 'LEGAL_REQUEST', 'HUMAN', ?)
+                        """, businessA, UUID.randomUUID(), actorA)));
+
+        assertThrows(DataAccessException.class, () -> ownerJdbc.update("""
+                INSERT INTO retention_legal_hold(
+                    business_id, target_type, target_id, reason_code, actor_type, actor_user_id
+                ) VALUES (?, 'CUSTOMER', ?, 'CONTRACTUAL', 'HUMAN', ?)
+                """, businessA, targetA, actorA));
+
+        ownerJdbc.update("""
+                UPDATE retention_legal_hold
+                   SET released_at = NOW()
+                 WHERE business_id = ?
+                   AND target_type = 'CUSTOMER'
+                   AND target_id = ?
+                """, businessA, targetA);
+
+        ownerJdbc.update("""
+                INSERT INTO retention_legal_hold(
+                    business_id, target_type, target_id, reason_code, actor_type, actor_user_id
+                ) VALUES (?, 'CUSTOMER', ?, 'CONTRACTUAL', 'HUMAN', ?)
+                """, businessA, targetA, actorA);
+
+        assertFalse(ownerJdbc.queryForObject(
+                "SELECT has_table_privilege('helvoca_runtime', 'public.retention_legal_hold', 'INSERT')",
+                Boolean.class));
+        assertFalse(ownerJdbc.queryForObject(
+                "SELECT has_table_privilege('helvoca_runtime', 'public.retention_legal_hold', 'UPDATE')",
+                Boolean.class));
+        assertTrue(ownerJdbc.queryForObject(
+                "SELECT has_table_privilege('helvoca_runtime', 'public.retention_legal_hold', 'SELECT')",
                 Boolean.class));
     }
 
