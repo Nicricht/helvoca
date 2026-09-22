@@ -117,6 +117,11 @@ class CustomerProfileAnonymizationServiceTest {
 
         assertThrows(NotFoundException.class, () -> service.anonymizeCurrentTenantCustomer(customerId));
 
+        verify(jdbc).queryForObject(
+                anyString(),
+                eq(Boolean.class),
+                eq(businessId),
+                eq(customerId));
         verify(jdbc, times(1)).update(startsWith("UPDATE customer"), any(Object[].class));
         verifyNoMoreInteractions(jdbc);
         verifyNoInteractions(auditService);
