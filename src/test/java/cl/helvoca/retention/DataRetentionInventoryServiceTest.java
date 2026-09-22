@@ -41,7 +41,14 @@ class DataRetentionInventoryServiceTest {
 
         when(tenantProvider.requireBusinessId()).thenReturn(businessId);
         when(jdbc.queryForObject(anyString(), eq(Long.class), any(), any()))
-                .thenReturn(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L);
+                .thenReturn(1L, 2L, 3L, 4L, 5L, 6L, 7L, 9L, 10L, 11L);
+        when(jdbc.queryForObject(
+                contains("FROM customer c"),
+                eq(Long.class),
+                any(),
+                any(),
+                any()))
+                .thenReturn(8L);
 
         DataRetentionInventoryService service = new DataRetentionInventoryService(
                 jdbc,
@@ -66,9 +73,18 @@ class DataRetentionInventoryServiceTest {
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Object> tenant = ArgumentCaptor.forClass(Object.class);
-        verify(jdbc, times(11)).queryForObject(sql.capture(), eq(Long.class), tenant.capture(), any());
+        verify(jdbc, times(10)).queryForObject(sql.capture(), eq(Long.class), tenant.capture(), any());
+
+        ArgumentCaptor<String> customerSql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(
+                customerSql.capture(),
+                eq(Long.class),
+                eq(businessId),
+                eq(Instant.parse("2024-09-22T12:00:00Z")),
+                eq(Instant.parse("2026-03-26T12:00:00Z")));
 
         List<String> statements = sql.getAllValues();
+        statements.add(7, customerSql.getValue());
         assertEquals(11, statements.size());
         assertTrue(statements.stream().allMatch(statement -> statement.contains("business_id = ?")));
         assertTrue(tenant.getAllValues().stream().allMatch(businessId::equals));
@@ -122,6 +138,10 @@ class DataRetentionInventoryServiceTest {
         assertTrue(customerInventory.contains("cs.business_id = c.business_id"));
         assertTrue(customerInventory.contains("cs.customer_id = c.id"));
         assertTrue(customerInventory.contains("cs.ended_at IS NULL"));
+        assertTrue(customerInventory.contains("messaging_conversation mc"));
+        assertTrue(customerInventory.contains("mc.business_id = c.business_id"));
+        assertTrue(customerInventory.contains("mc.customer_id = c.id"));
+        assertTrue(customerInventory.contains("mc.last_message_at >= ?"));
 
         String nonFinancialOperationInventory = statements.get(8);
         assertTrue(nonFinancialOperationInventory.contains("retention_legal_hold"));
