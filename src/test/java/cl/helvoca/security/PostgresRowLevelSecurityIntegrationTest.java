@@ -136,6 +136,61 @@ class PostgresRowLevelSecurityIntegrationTest {
     }
 
     @Test
+    void auditRetentionFunctionDeletesOnlyExpiredRowsForActiveTenant() {
+        UUID oldAuditA = UUID.randomUUID();
+        UUID recentAuditA = UUID.randomUUID();
+        UUID oldAuditB = UUID.randomUUID();
+
+        ownerJdbc.update(
+                "INSERT INTO audit_log(id, business_id, action, result, created_at) VALUES (?, ?, ?, ?, NOW() - INTERVAL '25 months')",
+                oldAuditA, businessA, "OLD_A", "SUCCESS");
+        ownerJdbc.update(
+                "INSERT INTO audit_log(id, business_id, action, result, created_at) VALUES (?, ?, ?, ?, NOW() - INTERVAL '23 months')",
+                recentAuditA, businessA, "RECENT_A", "SUCCESS");
+        ownerJdbc.update(
+                "INSERT INTO audit_log(id, business_id, action, result, created_at) VALUES (?, ?, ?, ?, NOW() - INTERVAL '25 months')",
+                oldAuditB, businessB, "OLD_B", "SUCCESS");
+
+        Integer deleted = databaseContext.callAsTenant(
+                businessA,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT public.purge_expired_audit_log_for_current_tenant()",
+                        Integer.class));
+
+        assertEquals(1, deleted);
+        assertEquals(0L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE id = ?",
+                Long.class,
+                oldAuditA));
+        assertEquals(1L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE id = ?",
+                Long.class,
+                recentAuditA));
+        assertEquals(1L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE id = ?",
+                Long.class,
+                oldAuditB));
+
+        assertThrows(DataAccessException.class, () -> {
+            try (TenantDatabaseContext.Scope ignored = databaseContext.deny()) {
+                runtimeJdbc.queryForObject(
+                        "SELECT public.purge_expired_audit_log_for_current_tenant()",
+                        Integer.class);
+            }
+        });
+
+        assertTrue(ownerJdbc.queryForObject(
+                "SELECT has_function_privilege('helvoca_runtime', 'public.purge_expired_audit_log_for_current_tenant()', 'EXECUTE')",
+                Boolean.class));
+        assertFalse(ownerJdbc.queryForObject(
+                "SELECT has_function_privilege('helvoca_system', 'public.purge_expired_audit_log_for_current_tenant()', 'EXECUTE')",
+                Boolean.class));
+        assertFalse(ownerJdbc.queryForObject(
+                "SELECT has_table_privilege('helvoca_runtime', 'public.audit_log', 'DELETE')",
+                Boolean.class));
+    }
+
+    @Test
     void tenantReadWithoutBusinessPredicateCannotSeeAnotherTenant() {
         long visibleA = databaseContext.callAsTenant(businessA,
                 () -> runtimeJdbc.queryForObject("SELECT COUNT(*) FROM customer", Long.class));
