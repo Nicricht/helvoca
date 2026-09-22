@@ -134,6 +134,86 @@ class CommercialOperationsAdminServiceTest {
     }
 
     @Test
+    void qualifiedLeadCanBeWonAndCompletesUniversalOperation() {
+        UUID businessId = UUID.randomUUID();
+        UUID leadId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        BusinessLeadRepository leads = mock(BusinessLeadRepository.class);
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+
+        BusinessLead lead = new BusinessLead();
+        lead.setId(leadId);
+        lead.setOperationId(operationId);
+        lead.setBusinessId(businessId);
+        lead.setName("Cliente");
+        lead.setInterest("Servicio");
+        lead.setStatus(BusinessLead.Status.QUALIFIED);
+        lead.setSource(BusinessOrder.Source.API);
+
+        BusinessOperation operation = new BusinessOperation();
+        operation.setId(operationId);
+        operation.setBusinessId(businessId);
+        operation.setType(BusinessOperation.Type.LEAD);
+        operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        operation.setRevision(3);
+        operation.setMetadata(Map.of("intent", "LEAD"));
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(leads.findByIdAndBusinessId(leadId, businessId)).thenReturn(Optional.of(lead));
+        when(leads.saveAndFlush(any(BusinessLead.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(operations.findByIdAndBusinessId(operationId, businessId)).thenReturn(Optional.of(operation));
+        when(operations.saveAndFlush(any(BusinessOperation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CommercialOperationsAdminService service = new CommercialOperationsAdminService(
+                mock(BusinessOrderRepository.class),
+                mock(BusinessOrderLineRepository.class),
+                mock(BusinessQuoteRepository.class),
+                leads,
+                mock(BusinessDeliveryRepository.class),
+                operations,
+                tenant);
+
+        var view = service.updateLeadStatus(leadId, BusinessLead.Status.WON);
+
+        assertEquals(BusinessLead.Status.WON, view.status());
+        assertEquals(BusinessOperation.Status.COMPLETED, operation.getStatus());
+        assertEquals(4, operation.getRevision());
+        assertEquals("WON", operation.getMetadata().get("projectionStatus"));
+        assertEquals(leadId.toString(), operation.getMetadata().get("leadId"));
+        verify(leads).saveAndFlush(lead);
+        verify(operations).saveAndFlush(operation);
+    }
+
+    @Test
+    void wonLeadIsTerminal() {
+        UUID businessId = UUID.randomUUID();
+        UUID leadId = UUID.randomUUID();
+        BusinessLeadRepository leads = mock(BusinessLeadRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        BusinessLead lead = new BusinessLead();
+        lead.setId(leadId);
+        lead.setBusinessId(businessId);
+        lead.setStatus(BusinessLead.Status.WON);
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(leads.findByIdAndBusinessId(leadId, businessId)).thenReturn(Optional.of(lead));
+
+        CommercialOperationsAdminService service = new CommercialOperationsAdminService(
+                mock(BusinessOrderRepository.class),
+                mock(BusinessOrderLineRepository.class),
+                mock(BusinessQuoteRepository.class),
+                leads,
+                mock(BusinessDeliveryRepository.class),
+                mock(BusinessOperationRepository.class),
+                tenant);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.updateLeadStatus(leadId, BusinessLead.Status.CONTACTED));
+        verify(leads, never()).saveAndFlush(any());
+    }
+
+    @Test
     void deliveredStandaloneDeliveryIsTerminal() {
         UUID businessId = UUID.randomUUID();
         UUID deliveryId = UUID.randomUUID();
