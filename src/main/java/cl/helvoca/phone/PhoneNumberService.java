@@ -228,6 +228,20 @@ public class PhoneNumberService {
 
         repository.delete(phone);
 
+        if (wasEnabled && auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "WHATSAPP_SENDER_DISABLED",
+                    "WHATSAPP_SENDER",
+                    businessId,
+                    Map.of(
+                            "whatsappEnabled", true,
+                            "certified", wasCertified),
+                    Map.of(
+                            "whatsappEnabled", false,
+                            "certified", false));
+        }
+
         if (wasCertified && auditService != null) {
             auditService.humanSuccess(
                     businessId,
