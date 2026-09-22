@@ -658,10 +658,12 @@
       const configuredEnabled = tenantStatus?.status === "CONFIGURED_ENABLED"
         && tenantStatus?.configured === true
         && tenantStatus?.enabled === true;
-      const certified = certification?.ready === true && certification?.alreadyCertified === true;
+      const certificationReady = certification?.ready === true
+        && (certification?.alreadyCertified === true
+          || certification?.state === "READY_FOR_PILOT_CERTIFICATION");
       const stagingReady = deployment?.state === "READY_FOR_TENANT_STAGING"
         && deployment?.readyForTenantStaging === true;
-      const activationReady = configuredDisabled && certified && stagingReady;
+      const activationReady = configuredDisabled && certificationReady && stagingReady;
 
       activationButton?.classList.toggle("hidden", !canManageMeta || !activationReady);
       deactivationButton?.classList.toggle("hidden", !canManageMeta || !configuredEnabled);
@@ -674,11 +676,13 @@
         activationGateCopy.textContent = "Este negocio está habilitado para Meta. La entrega real continúa sujeta a las compuertas globales del despliegue.";
       } else if (activationReady) {
         activationGateTitle.textContent = "Activación disponible con autorización manual";
-        activationGateCopy.textContent = "Las validaciones técnicas están completas. Activar habilita este negocio para Meta; la entrega real sigue sujeta a las compuertas globales del despliegue.";
+        activationGateCopy.textContent = certification?.alreadyCertified === true
+          ? "Las validaciones técnicas están completas. Activar habilita este negocio para Meta; la entrega real sigue sujeta a las compuertas globales del despliegue."
+          : "El preflight está listo. Activar arma este negocio para el piloto; la certificación se completa después de una entrega real confirmada por Meta.";
       } else {
         const missing = [];
         if (!configuredDisabled) missing.push("configuración guardada y desactivada");
-        if (!certified) missing.push("certificación técnica");
+        if (!certificationReady) missing.push("preflight de certificación");
         if (!stagingReady) missing.push("staging seguro");
         activationGateTitle.textContent = "Activación bloqueada";
         activationGateCopy.textContent = missing.length

@@ -226,8 +226,11 @@ public class MetaWhatsAppTenantConfigurationService {
         }
 
         MetaWhatsAppCertificationReadinessResponse certification = certificationReadinessService.readiness();
-        if (!certification.ready() || !certification.alreadyCertified()) {
-            throw new IllegalStateException("Meta WhatsApp certification is incomplete");
+        boolean certificationPreflightReady = certification.ready()
+                && ("READY_FOR_PILOT_CERTIFICATION".equals(certification.state())
+                    || "ALREADY_CERTIFIED".equals(certification.state()));
+        if (!certificationPreflightReady) {
+            throw new IllegalStateException("Meta WhatsApp certification preflight is not ready");
         }
 
         MetaWhatsAppDeploymentReadinessResponse deployment = deploymentReadinessService.readiness();
