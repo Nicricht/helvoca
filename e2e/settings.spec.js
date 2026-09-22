@@ -77,7 +77,7 @@ async function mockSettings(page, state = {}) {
     const request = route.request();
     const url = new URL(request.url());
     const parts = url.pathname.split('/').filter(Boolean);
-    const date = parts.length > 5 ? decodeURIComponent(parts[parts.length - 1]) : null;
+    const date = parts.length > 4 ? decodeURIComponent(parts[parts.length - 1]) : null;
 
     if (request.method() === 'GET' && !date) {
       await route.fulfill(json(state.scheduleExceptions));
