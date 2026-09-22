@@ -637,6 +637,53 @@ public class CustomerProfileAnonymizationService {
                    )
                 """, businessId, customerId);
 
+        int businessPaymentsScrubbed = jdbc.update("""
+                UPDATE business_payment p
+                   SET contact_phone = NULL
+                 WHERE p.business_id = ?
+                   AND p.customer_id = ?
+                   AND p.contact_phone IS NOT NULL
+                   AND EXISTS (
+                       SELECT 1
+                       FROM business_operation o
+                       WHERE o.id = p.operation_id
+                         AND o.business_id = p.business_id
+                         AND o.customer_id = p.customer_id
+                         AND o.type = 'PAYMENT'
+                         AND o.status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')
+                         AND NOT EXISTS (
+                             SELECT 1
+                             FROM retention_legal_hold h
+                             WHERE h.business_id = o.business_id
+                               AND h.target_type = 'BUSINESS_OPERATION'
+                               AND h.target_id = o.id
+                               AND h.released_at IS NULL
+                         )
+                   )
+                """, businessId, customerId);
+
+        int paymentOperationPiiScrubbed = jdbc.update("""
+                UPDATE business_operation o
+                   SET contact_name = NULL,
+                       contact_phone = NULL
+                 WHERE o.business_id = ?
+                   AND o.customer_id = ?
+                   AND o.type = 'PAYMENT'
+                   AND o.status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')
+                   AND (
+                       o.contact_name IS NOT NULL
+                       OR o.contact_phone IS NOT NULL
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM retention_legal_hold h
+                       WHERE h.business_id = o.business_id
+                         AND h.target_type = 'BUSINESS_OPERATION'
+                         AND h.target_id = o.id
+                         AND h.released_at IS NULL
+                   )
+                """, businessId, customerId);
+
         int referencedIdentitiesAnonymized = jdbc.update("""
                 UPDATE customer_identity ci
                    SET normalized_value = 'anonymized:' || ci.id::text,
@@ -708,6 +755,8 @@ public class CustomerProfileAnonymizationService {
                 deliveryOperationPiiScrubbed,
                 conversationStatesScrubbed,
                 unansweredQuestionsScrubbed,
+                businessPaymentsScrubbed,
+                paymentOperationPiiScrubbed,
                 referencedIdentitiesAnonymized,
                 identitiesDeleted);
     }
@@ -731,6 +780,8 @@ public class CustomerProfileAnonymizationService {
             int deliveryOperationPiiScrubbed,
             int conversationStatesScrubbed,
             int unansweredQuestionsScrubbed,
+            int businessPaymentsScrubbed,
+            int paymentOperationPiiScrubbed,
             int referencedIdentitiesAnonymized,
             int identitiesDeleted
     ) {}
