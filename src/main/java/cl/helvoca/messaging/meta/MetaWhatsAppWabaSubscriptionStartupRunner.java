@@ -2,6 +2,7 @@ package cl.helvoca.messaging.meta;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -20,6 +21,7 @@ public class MetaWhatsAppWabaSubscriptionStartupRunner implements ApplicationRun
     private final MetaWhatsAppCloudClient client;
     private final Function<String, String> environment;
 
+    @Autowired
     public MetaWhatsAppWabaSubscriptionStartupRunner(
             @Value("${HELVOCA_META_WHATSAPP_WABA_SUBSCRIBE_ON_STARTUP:false}") boolean enabled,
             @Value("${HELVOCA_META_WHATSAPP_TEST_WABA_ID:}") String wabaId,
