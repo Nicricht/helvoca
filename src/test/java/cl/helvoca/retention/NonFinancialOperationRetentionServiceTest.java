@@ -17,7 +17,7 @@ import static org.mockito.Mockito.*;
 class NonFinancialOperationRetentionServiceTest {
 
     @Test
-    void purgesOnlyTerminalOldNonFinancialOperationsWithoutBlockingDependencies() {
+    void purgesOnlyTerminalOldNonFinancialOperationsWithoutBlockingDependenciesOrActiveLegalHold() {
         UUID businessId = UUID.randomUUID();
         Instant now = Instant.parse("2026-09-22T12:00:00Z");
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
@@ -58,6 +58,11 @@ class NonFinancialOperationRetentionServiceTest {
         assertTrue(statement.contains("target_operation_id"));
         assertTrue(statement.contains("outbound_message"));
         assertTrue(statement.contains("persistent_job"));
+        assertTrue(statement.contains("retention_legal_hold"));
+        assertTrue(statement.contains("h.business_id = o.business_id"));
+        assertTrue(statement.contains("h.target_type = 'BUSINESS_OPERATION'"));
+        assertTrue(statement.contains("h.target_id = o.id"));
+        assertTrue(statement.contains("h.released_at IS NULL"));
         assertArrayEquals(
                 new Object[]{businessId, Instant.parse("2024-09-22T12:00:00Z")},
                 args.getValue());
