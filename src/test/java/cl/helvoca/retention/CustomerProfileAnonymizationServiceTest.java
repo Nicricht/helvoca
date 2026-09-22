@@ -52,6 +52,11 @@ class CustomerProfileAnonymizationServiceTest {
         assertTrue(sql.getAllValues().get(0).contains("h.target_type = 'CUSTOMER'"));
         assertTrue(sql.getAllValues().get(0).contains("h.target_id = c.id"));
         assertTrue(sql.getAllValues().get(0).contains("h.released_at IS NULL"));
+        assertTrue(sql.getAllValues().get(0).contains("business_operation"));
+        assertTrue(sql.getAllValues().get(0).contains("o.business_id = c.business_id"));
+        assertTrue(sql.getAllValues().get(0).contains("o.customer_id = c.id"));
+        assertTrue(sql.getAllValues().get(0).contains("'AWAITING_CONFIRMATION'"));
+        assertTrue(sql.getAllValues().get(0).contains("'EXECUTING'"));
         assertArrayEquals(new Object[]{customerId, businessId}, args.getAllValues().get(0));
 
         assertTrue(sql.getAllValues().get(1).contains("DELETE FROM customer_identity"));
@@ -102,6 +107,56 @@ class CustomerProfileAnonymizationServiceTest {
     }
 
     @Test
+    void refusesAnonymizationBeforeMutationWhenCustomerHasActiveOperation() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService auditService = mock(AuditService.class);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(jdbc.queryForObject(
+                contains("retention_legal_hold"),
+                eq(Boolean.class),
+                eq(businessId),
+                eq(customerId)))
+                .thenReturn(false);
+        when(jdbc.queryForObject(
+                contains("business_operation"),
+                eq(Boolean.class),
+                eq(businessId),
+                eq(customerId)))
+                .thenReturn(true);
+
+        CustomerProfileAnonymizationService service =
+                new CustomerProfileAnonymizationService(jdbc, tenantProvider, auditService);
+
+        assertThrows(
+                ConflictException.class,
+                () -> service.anonymizeCurrentTenantCustomer(customerId));
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc, times(2)).queryForObject(
+                sql.capture(),
+                eq(Boolean.class),
+                eq(businessId),
+                eq(customerId));
+
+        String activeOperationSql = sql.getAllValues().get(1);
+        assertTrue(activeOperationSql.contains("business_operation"));
+        assertTrue(activeOperationSql.contains("o.business_id = ?"));
+        assertTrue(activeOperationSql.contains("o.customer_id = ?"));
+        assertTrue(activeOperationSql.contains("'DRAFT'"));
+        assertTrue(activeOperationSql.contains("'PROPOSED'"));
+        assertTrue(activeOperationSql.contains("'AWAITING_CONFIRMATION'"));
+        assertTrue(activeOperationSql.contains("'CONFIRMED'"));
+        assertTrue(activeOperationSql.contains("'EXECUTING'"));
+
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
     void doesNotDeleteIdentitiesOrAuditWhenCustomerIsOutsideTenant() {
         UUID businessId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
@@ -117,7 +172,7 @@ class CustomerProfileAnonymizationServiceTest {
 
         assertThrows(NotFoundException.class, () -> service.anonymizeCurrentTenantCustomer(customerId));
 
-        verify(jdbc).queryForObject(
+        verify(jdbc, times(2)).queryForObject(
                 anyString(),
                 eq(Boolean.class),
                 eq(businessId),
