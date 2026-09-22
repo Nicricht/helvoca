@@ -159,6 +159,20 @@ public class PhoneNumberService {
                             "certified", wasCertified));
         }
 
+        if (!enabled && wasEnabled && auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "WHATSAPP_SENDER_DISABLED",
+                    "WHATSAPP_SENDER",
+                    businessId,
+                    Map.of(
+                            "whatsappEnabled", true,
+                            "certified", wasCertified),
+                    Map.of(
+                            "whatsappEnabled", false,
+                            "certified", false));
+        }
+
         if (!enabled && wasCertified && auditService != null) {
             auditService.humanSuccess(
                     businessId,
