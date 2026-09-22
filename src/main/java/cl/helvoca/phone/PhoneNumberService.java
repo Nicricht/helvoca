@@ -102,6 +102,20 @@ public class PhoneNumberService {
             phone.setWhatsappCertifiedAt(null);
         }
 
+        if (!active && wasEnabled && auditService != null) {
+            auditService.humanSuccess(
+                    businessId,
+                    "WHATSAPP_SENDER_DISABLED",
+                    "WHATSAPP_SENDER",
+                    businessId,
+                    Map.of(
+                            "whatsappEnabled", true,
+                            "certified", wasCertified),
+                    Map.of(
+                            "whatsappEnabled", false,
+                            "certified", false));
+        }
+
         if (!active && wasCertified && auditService != null) {
             auditService.humanSuccess(
                     businessId,
