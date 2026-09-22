@@ -18,7 +18,7 @@ import static org.mockito.Mockito.*;
 class MessagingRetentionServiceTest {
 
     @Test
-    void purgesExpiredMessagesThenOnlyInactiveConversationsForCurrentTenant() {
+    void purgesExpiredMessagesThenOnlyInactiveConversationsWithoutActiveLegalHold() {
         UUID businessId = UUID.randomUUID();
         Instant now = Instant.parse("2026-09-22T12:00:00Z");
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
@@ -62,6 +62,14 @@ class MessagingRetentionServiceTest {
 
         assertTrue(statements.get(1).contains("NOT EXISTS"));
         assertTrue(statements.get(1).contains("m.created_at >= ?"));
+
+        for (String statement : statements) {
+            assertTrue(statement.contains("retention_legal_hold"));
+            assertTrue(statement.contains("h.business_id = c.business_id"));
+            assertTrue(statement.contains("h.target_type = 'MESSAGING_CONVERSATION'"));
+            assertTrue(statement.contains("h.target_id = c.id"));
+            assertTrue(statement.contains("h.released_at IS NULL"));
+        }
     }
 
     @Test

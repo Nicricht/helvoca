@@ -33,13 +33,21 @@ public class MessagingRetentionService {
         DataRetentionPolicy.Cutoffs cutoffs = DataRetentionPolicy.cutoffs(clock.instant());
 
         int messages = jdbc.update("""
-                DELETE FROM messaging_message
-                WHERE conversation_id IN (
-                    SELECT id
-                    FROM messaging_conversation
-                    WHERE business_id = ?
+                DELETE FROM messaging_message m
+                WHERE m.conversation_id IN (
+                    SELECT c.id
+                    FROM messaging_conversation c
+                    WHERE c.business_id = ?
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM retention_legal_hold h
+                          WHERE h.business_id = c.business_id
+                            AND h.target_type = 'MESSAGING_CONVERSATION'
+                            AND h.target_id = c.id
+                            AND h.released_at IS NULL
+                      )
                 )
-                  AND created_at < ?
+                  AND m.created_at < ?
                 """, businessId, cutoffs.messageContentBefore());
 
         int conversations = jdbc.update("""
@@ -51,6 +59,14 @@ public class MessagingRetentionService {
                       FROM messaging_message m
                       WHERE m.conversation_id = c.id
                         AND m.created_at >= ?
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM retention_legal_hold h
+                      WHERE h.business_id = c.business_id
+                        AND h.target_type = 'MESSAGING_CONVERSATION'
+                        AND h.target_id = c.id
+                        AND h.released_at IS NULL
                   )
                 """, businessId, cutoffs.conversationsBefore(), cutoffs.conversationsBefore());
 
