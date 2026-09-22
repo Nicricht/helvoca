@@ -106,6 +106,21 @@ public class CommercialOperationsAdminService {
                 .toList();
     }
 
+    @Transactional
+    public LeadView updateLeadStatus(UUID leadId, BusinessLead.Status status) {
+        if (status == null) throw new IllegalArgumentException("Lead status is required");
+        UUID businessId = tenantProvider.requireBusinessId();
+        BusinessLead lead = leads.findByIdAndBusinessId(leadId, businessId)
+                .orElseThrow(() -> new NotFoundException("Lead not found"));
+        validateLeadTransition(lead, status);
+        if (lead.getStatus() != status) {
+            lead.setStatus(status);
+            lead = leads.saveAndFlush(lead);
+            synchronizeLeadOperation(businessId, lead);
+        }
+        return LeadView.from(lead);
+    }
+
     private static void validateTransition(BusinessOrder order, BusinessOrder.Status next) {
         BusinessOrder.Status current = order.getStatus();
         if (current == next) return;
@@ -124,6 +139,21 @@ public class CommercialOperationsAdminService {
         }
     }
 
+    private static void validateLeadTransition(BusinessLead lead, BusinessLead.Status next) {
+        BusinessLead.Status current = lead.getStatus();
+        if (current == next) return;
+
+        Set<BusinessLead.Status> allowed = switch (current) {
+            case NEW -> Set.of(BusinessLead.Status.CONTACTED, BusinessLead.Status.LOST);
+            case CONTACTED -> Set.of(BusinessLead.Status.QUALIFIED, BusinessLead.Status.LOST);
+            case QUALIFIED -> Set.of(BusinessLead.Status.WON, BusinessLead.Status.LOST);
+            case WON, LOST -> Set.of();
+        };
+        if (!allowed.contains(next)) {
+            throw new IllegalArgumentException("Invalid lead status transition: " + current + " -> " + next);
+        }
+    }
+
     private static void validateDeliveryTransition(BusinessDelivery delivery, BusinessDelivery.Status next) {
         BusinessDelivery.Status current = delivery.getStatus();
         if (current == next) return;
@@ -136,6 +166,31 @@ public class CommercialOperationsAdminService {
         if (!allowed.contains(next)) {
             throw new IllegalArgumentException("Invalid delivery status transition: " + current + " -> " + next);
         }
+    }
+
+    private void synchronizeLeadOperation(UUID businessId, BusinessLead lead) {
+        BusinessOperation operation = operations
+                .findByIdAndBusinessId(lead.getOperationId(), businessId)
+                .orElseThrow(() -> new IllegalStateException("Lead operation projection is missing"));
+        if (operation.getType() != BusinessOperation.Type.LEAD) {
+            throw new IllegalStateException("Lead points to a non-lead operation");
+        }
+
+        operation.setStatus(switch (lead.getStatus()) {
+            case WON -> BusinessOperation.Status.COMPLETED;
+            case LOST -> BusinessOperation.Status.CANCELLED;
+            default -> BusinessOperation.Status.CONFIRMED;
+        });
+        operation.setConfirmationToken(null);
+        operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (operation.getMetadata() != null) metadata.putAll(operation.getMetadata());
+        metadata.put("intent", "LEAD");
+        metadata.put("confirmationPending", false);
+        metadata.put("projectionStatus", lead.getStatus().name());
+        metadata.put("leadId", lead.getId().toString());
+        operation.setMetadata(metadata);
+        operations.saveAndFlush(operation);
     }
 
     private void synchronizeDeliveryOperation(UUID businessId, BusinessDelivery delivery) {
