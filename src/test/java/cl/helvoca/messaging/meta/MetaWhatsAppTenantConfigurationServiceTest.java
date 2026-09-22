@@ -92,6 +92,49 @@ class MetaWhatsAppTenantConfigurationServiceTest {
     }
 
     @Test
+    void replacingEnabledUncertifiedSenderAuditsSenderDisable() {
+        UUID businessId = UUID.randomUUID();
+        UUID phoneRecordId = UUID.randomUUID();
+
+        MetaWhatsAppTenantConfigRepository configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService audit = mock(AuditService.class);
+
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        phone.setPhoneNumber("+56922222222");
+        phone.setActive(true);
+        phone.setWhatsappEnabled(true);
+        phone.setWhatsappProvider("META_WHATSAPP_CLOUD");
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(phones.findByIdAndBusinessId(phoneRecordId, businessId)).thenReturn(Optional.of(phone));
+        when(configs.findById(businessId)).thenReturn(Optional.empty());
+
+        var service = new MetaWhatsAppTenantConfigurationService(
+                configs, phones, tenantProvider, credentialRef -> false, null, null, audit);
+        service.replace(new MetaWhatsAppTenantConfigurationRequest(
+                phoneRecordId,
+                "META_WHATSAPP_CLOUD",
+                "123456789012345",
+                "ACME_01",
+                null));
+
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("WHATSAPP_SENDER_DISABLED"),
+                eq("WHATSAPP_SENDER"),
+                eq(businessId),
+                eq(Map.of(
+                        "whatsappEnabled", true,
+                        "certified", false)),
+                eq(Map.of(
+                        "whatsappEnabled", false,
+                        "certified", false)));
+    }
+
+    @Test
     void refusesPhoneRecordFromAnotherTenant() {
         UUID businessId = UUID.randomUUID();
         UUID phoneRecordId = UUID.randomUUID();
