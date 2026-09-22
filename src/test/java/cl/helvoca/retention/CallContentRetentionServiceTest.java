@@ -25,7 +25,7 @@ class CallContentRetentionServiceTest {
         TenantProvider tenantProvider = mock(TenantProvider.class);
 
         when(tenantProvider.requireBusinessId()).thenReturn(businessId);
-        when(jdbc.update(anyString(), any(), any())).thenReturn(4, 2, 3);
+        when(jdbc.update(anyString(), any(Object[].class))).thenReturn(4, 2, 3);
 
         CallContentRetentionService service = new CallContentRetentionService(
                 jdbc,
@@ -40,18 +40,18 @@ class CallContentRetentionServiceTest {
         assertEquals(3, result.actionsDeleted());
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Object> tenant = ArgumentCaptor.forClass(Object.class);
-        ArgumentCaptor<Object> cutoff = ArgumentCaptor.forClass(Object.class);
-        verify(jdbc, times(3)).update(sql.capture(), tenant.capture(), cutoff.capture());
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc, times(3)).update(sql.capture(), args.capture());
 
         List<String> statements = sql.getAllValues();
         assertTrue(statements.stream().allMatch(value -> value.stripLeading().toUpperCase().startsWith("DELETE")));
         assertTrue(statements.stream().allMatch(value -> value.contains("business_id = ?")));
         assertTrue(statements.stream().allMatch(value -> value.contains("ended_at IS NOT NULL")));
         assertTrue(statements.stream().allMatch(value -> value.contains("ended_at < ?")));
-        assertTrue(tenant.getAllValues().stream().allMatch(businessId::equals));
-        assertTrue(cutoff.getAllValues().stream()
-                .allMatch(Instant.parse("2026-06-24T12:00:00Z")::equals));
+        assertTrue(args.getAllValues().stream().allMatch(values ->
+                values.length == 2
+                        && businessId.equals(values[0])
+                        && Instant.parse("2026-06-24T12:00:00Z").equals(values[1])));
     }
 
     @Test
