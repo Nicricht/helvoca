@@ -5,6 +5,7 @@ import cl.helvoca.ai.realtime.RealtimeToolDefinitions;
 import cl.helvoca.operations.CommercialToolDefinitions;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +26,7 @@ public class GeminiMessagingAiFallback {
     private final String baseUrl;
     private final HttpClient http;
 
+    @Autowired
     public GeminiMessagingAiFallback(
             GeminiLiveProperties properties,
             @Value("${GEMINI_MESSAGING_MODEL:gemini-3.8-flash}") String model,
