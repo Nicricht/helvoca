@@ -420,6 +420,91 @@ public class CustomerProfileAnonymizationService {
                    )
                 """, businessId, customerId);
 
+        int businessOrdersScrubbed = jdbc.update("""
+                UPDATE business_order bo
+                   SET contact_name = NULL,
+                       contact_phone = NULL,
+                       delivery_address = NULL,
+                       notes = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE bo.business_id = ?
+                   AND bo.customer_id = ?
+                   AND EXISTS (
+                       SELECT 1
+                       FROM business_operation o
+                       WHERE o.id = bo.operation_id
+                         AND o.business_id = bo.business_id
+                         AND o.customer_id = bo.customer_id
+                         AND o.type = 'ORDER'
+                         AND o.status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')
+                         AND NOT EXISTS (
+                             SELECT 1
+                             FROM retention_legal_hold h
+                             WHERE h.business_id = o.business_id
+                               AND h.target_type = 'BUSINESS_OPERATION'
+                               AND h.target_id = o.id
+                               AND h.released_at IS NULL
+                         )
+                   )
+                   AND (
+                       bo.contact_name IS NOT NULL
+                       OR bo.contact_phone IS NOT NULL
+                       OR bo.delivery_address IS NOT NULL
+                       OR bo.notes IS NOT NULL
+                   )
+                """, businessId, customerId);
+
+        int orderLineNotesScrubbed = jdbc.update("""
+                UPDATE business_order_line bol
+                   SET notes = NULL
+                 WHERE bol.notes IS NOT NULL
+                   AND EXISTS (
+                       SELECT 1
+                       FROM business_order bo
+                       JOIN business_operation o
+                         ON o.id = bo.operation_id
+                        AND o.business_id = bo.business_id
+                        AND o.customer_id = bo.customer_id
+                       WHERE bo.id = bol.order_id
+                         AND bo.business_id = ?
+                         AND bo.customer_id = ?
+                         AND o.type = 'ORDER'
+                         AND o.status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')
+                         AND NOT EXISTS (
+                             SELECT 1
+                             FROM retention_legal_hold h
+                             WHERE h.business_id = o.business_id
+                               AND h.target_type = 'BUSINESS_OPERATION'
+                               AND h.target_id = o.id
+                               AND h.released_at IS NULL
+                         )
+                   )
+                """, businessId, customerId);
+
+        int orderOperationPiiScrubbed = jdbc.update("""
+                UPDATE business_operation o
+                   SET contact_name = NULL,
+                       contact_phone = NULL,
+                       delivery_address = NULL
+                 WHERE o.business_id = ?
+                   AND o.customer_id = ?
+                   AND o.type = 'ORDER'
+                   AND o.status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')
+                   AND (
+                       o.contact_name IS NOT NULL
+                       OR o.contact_phone IS NOT NULL
+                       OR o.delivery_address IS NOT NULL
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM retention_legal_hold h
+                       WHERE h.business_id = o.business_id
+                         AND h.target_type = 'BUSINESS_OPERATION'
+                         AND h.target_id = o.id
+                         AND h.released_at IS NULL
+                   )
+                """, businessId, customerId);
+
         int identitiesDeleted = jdbc.update("""
                 DELETE FROM customer_identity
                 WHERE business_id = ?
@@ -444,6 +529,9 @@ public class CustomerProfileAnonymizationService {
                 leadOperationPiiScrubbed,
                 businessQuotesScrubbed,
                 quoteOperationPiiScrubbed,
+                businessOrdersScrubbed,
+                orderLineNotesScrubbed,
+                orderOperationPiiScrubbed,
                 identitiesDeleted);
     }
 
@@ -459,6 +547,9 @@ public class CustomerProfileAnonymizationService {
             int leadOperationPiiScrubbed,
             int businessQuotesScrubbed,
             int quoteOperationPiiScrubbed,
+            int businessOrdersScrubbed,
+            int orderLineNotesScrubbed,
+            int orderOperationPiiScrubbed,
             int identitiesDeleted
     ) {}
 }

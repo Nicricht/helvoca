@@ -45,6 +45,11 @@ class CustomerProfileAnonymizationServiceTest {
         when(jdbc.update(argThat(sql -> sql != null
                 && sql.stripLeading().startsWith("UPDATE business_operation")
                 && sql.contains("o.type = 'QUOTE'")), any(Object[].class))).thenReturn(12);
+        when(jdbc.update(startsWith("UPDATE business_order bo"), any(Object[].class))).thenReturn(13);
+        when(jdbc.update(startsWith("UPDATE business_order_line"), any(Object[].class))).thenReturn(14);
+        when(jdbc.update(argThat(sql -> sql != null
+                && sql.stripLeading().startsWith("UPDATE business_operation")
+                && sql.contains("o.type = 'ORDER'")), any(Object[].class))).thenReturn(15);
         when(jdbc.update(startsWith("DELETE FROM customer_identity"), any(Object[].class))).thenReturn(2);
 
         CustomerProfileAnonymizationService service =
@@ -64,11 +69,14 @@ class CustomerProfileAnonymizationServiceTest {
         assertEquals(10, result.leadOperationPiiScrubbed());
         assertEquals(11, result.businessQuotesScrubbed());
         assertEquals(12, result.quoteOperationPiiScrubbed());
+        assertEquals(13, result.businessOrdersScrubbed());
+        assertEquals(14, result.orderLineNotesScrubbed());
+        assertEquals(15, result.orderOperationPiiScrubbed());
         assertEquals(2, result.identitiesDeleted());
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
-        verify(jdbc, times(12)).update(sql.capture(), args.capture());
+        verify(jdbc, times(15)).update(sql.capture(), args.capture());
 
         assertTrue(sql.getAllValues().get(0).contains("SET name = NULL"));
         assertTrue(sql.getAllValues().get(0).contains("phone = NULL"));
@@ -235,10 +243,55 @@ class CustomerProfileAnonymizationServiceTest {
         assertFalse(sql.getAllValues().get(10).contains("currency ="));
         assertArrayEquals(new Object[]{businessId, customerId}, args.getAllValues().get(10));
 
-        assertTrue(sql.getAllValues().get(11).contains("DELETE FROM customer_identity"));
-        assertTrue(sql.getAllValues().get(11).contains("business_id = ?"));
-        assertTrue(sql.getAllValues().get(11).contains("customer_id = ?"));
+        assertTrue(sql.getAllValues().get(11).contains("UPDATE business_order bo"));
+        assertTrue(sql.getAllValues().get(11).contains("contact_name = NULL"));
+        assertTrue(sql.getAllValues().get(11).contains("contact_phone = NULL"));
+        assertTrue(sql.getAllValues().get(11).contains("delivery_address = NULL"));
+        assertTrue(sql.getAllValues().get(11).contains("notes = NULL"));
+        assertTrue(sql.getAllValues().get(11).contains("o.type = 'ORDER'"));
+        assertTrue(sql.getAllValues().get(11).contains("o.status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')"));
+        assertTrue(sql.getAllValues().get(11).contains("h.target_type = 'BUSINESS_OPERATION'"));
+        assertTrue(sql.getAllValues().get(11).contains("h.target_id = o.id"));
+        assertTrue(sql.getAllValues().get(11).contains("h.released_at IS NULL"));
+        assertFalse(sql.getAllValues().get(11).contains("subtotal ="));
+        assertFalse(sql.getAllValues().get(11).contains("total ="));
+        assertFalse(sql.getAllValues().get(11).contains("currency ="));
         assertArrayEquals(new Object[]{businessId, customerId}, args.getAllValues().get(11));
+
+        assertTrue(sql.getAllValues().get(12).contains("UPDATE business_order_line"));
+        assertTrue(sql.getAllValues().get(12).contains("SET notes = NULL"));
+        assertTrue(sql.getAllValues().get(12).contains("JOIN business_operation o"));
+        assertTrue(sql.getAllValues().get(12).contains("bo.id = bol.order_id"));
+        assertTrue(sql.getAllValues().get(12).contains("bo.business_id = ?"));
+        assertTrue(sql.getAllValues().get(12).contains("bo.customer_id = ?"));
+        assertTrue(sql.getAllValues().get(12).contains("o.type = 'ORDER'"));
+        assertTrue(sql.getAllValues().get(12).contains("h.target_type = 'BUSINESS_OPERATION'"));
+        assertTrue(sql.getAllValues().get(12).contains("h.target_id = o.id"));
+        assertTrue(sql.getAllValues().get(12).contains("h.released_at IS NULL"));
+        assertFalse(sql.getAllValues().get(12).contains("modifiers_json ="));
+        assertFalse(sql.getAllValues().get(12).contains("unit_price ="));
+        assertFalse(sql.getAllValues().get(12).contains("line_total ="));
+        assertArrayEquals(new Object[]{businessId, customerId}, args.getAllValues().get(12));
+
+        assertTrue(sql.getAllValues().get(13).contains("UPDATE business_operation"));
+        assertTrue(sql.getAllValues().get(13).contains("contact_name = NULL"));
+        assertTrue(sql.getAllValues().get(13).contains("contact_phone = NULL"));
+        assertTrue(sql.getAllValues().get(13).contains("delivery_address = NULL"));
+        assertTrue(sql.getAllValues().get(13).contains("o.type = 'ORDER'"));
+        assertTrue(sql.getAllValues().get(13).contains("o.status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')"));
+        assertTrue(sql.getAllValues().get(13).contains("h.target_type = 'BUSINESS_OPERATION'"));
+        assertTrue(sql.getAllValues().get(13).contains("h.target_id = o.id"));
+        assertTrue(sql.getAllValues().get(13).contains("h.released_at IS NULL"));
+        assertFalse(sql.getAllValues().get(13).contains("updated_at ="));
+        assertFalse(sql.getAllValues().get(13).contains("subtotal ="));
+        assertFalse(sql.getAllValues().get(13).contains("total ="));
+        assertFalse(sql.getAllValues().get(13).contains("currency ="));
+        assertArrayEquals(new Object[]{businessId, customerId}, args.getAllValues().get(13));
+
+        assertTrue(sql.getAllValues().get(14).contains("DELETE FROM customer_identity"));
+        assertTrue(sql.getAllValues().get(14).contains("business_id = ?"));
+        assertTrue(sql.getAllValues().get(14).contains("customer_id = ?"));
+        assertArrayEquals(new Object[]{businessId, customerId}, args.getAllValues().get(14));
 
         verify(auditService).humanSuccess(
                 businessId,
