@@ -137,8 +137,23 @@ public class MetaWhatsAppTenantConfigurationService {
 
         for (PhoneNumber phone : metaPhones) {
             if (phone.isWhatsappEnabled()) {
+                boolean wasCertified = phone.getWhatsappCertifiedAt() != null;
                 phone.setWhatsappEnabled(false);
                 phones.save(phone);
+
+                if (auditService != null) {
+                    auditService.humanSuccess(
+                            businessId,
+                            "WHATSAPP_SENDER_DISABLED",
+                            "WHATSAPP_SENDER",
+                            businessId,
+                            Map.of(
+                                    "whatsappEnabled", true,
+                                    "certified", wasCertified),
+                            Map.of(
+                                    "whatsappEnabled", false,
+                                    "certified", wasCertified));
+                }
             }
         }
 
