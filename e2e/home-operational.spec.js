@@ -1828,12 +1828,12 @@ test('booking reschedule checks availability and updates the drawer', async ({ p
   await expect(page.getByRole('button', { name: 'Reprogramar' })).toBeVisible();
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
 
-  // Simulate the delayed focus theft that previously made this path flaky in CI.
-  // The drawer must still restore focus to the semantic replacement booking row.
+  // Simulate post-Escape focus theft deterministically in a microtask.
+  // The drawer's deferred repair must restore the semantic replacement booking row.
   await page.evaluate(() => {
     document.addEventListener('keydown', event => {
       if (event.key !== 'Escape') return;
-      requestAnimationFrame(() => {
+      queueMicrotask(() => {
         document.querySelector('[data-home-tab="bookings"]')?.focus();
       });
     }, { once: true });
