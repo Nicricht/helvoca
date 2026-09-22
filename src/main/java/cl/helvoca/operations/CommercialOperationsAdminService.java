@@ -60,6 +60,7 @@ public class CommercialOperationsAdminService {
         if (order.getStatus() != status) {
             order.setStatus(status);
             order = orders.saveAndFlush(order);
+            synchronizeOrderOperation(businessId, order);
         }
         return orderView(order);
     }
@@ -198,6 +199,31 @@ public class CommercialOperationsAdminService {
         if (!allowed.contains(next)) {
             throw new IllegalArgumentException("Invalid delivery status transition: " + current + " -> " + next);
         }
+    }
+
+    private void synchronizeOrderOperation(UUID businessId, BusinessOrder order) {
+        BusinessOperation operation = operations
+                .findByIdAndBusinessId(order.getOperationId(), businessId)
+                .orElseThrow(() -> new IllegalStateException("Order operation projection is missing"));
+        if (operation.getType() != BusinessOperation.Type.ORDER) {
+            throw new IllegalStateException("Order points to a non-order operation");
+        }
+
+        operation.setStatus(switch (order.getStatus()) {
+            case COMPLETED -> BusinessOperation.Status.COMPLETED;
+            case CANCELLED -> BusinessOperation.Status.CANCELLED;
+            default -> BusinessOperation.Status.CONFIRMED;
+        });
+        operation.setConfirmationToken(null);
+        operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (operation.getMetadata() != null) metadata.putAll(operation.getMetadata());
+        metadata.put("intent", "ORDER");
+        metadata.put("confirmationPending", false);
+        metadata.put("projectionStatus", order.getStatus().name());
+        metadata.put("orderId", order.getId().toString());
+        operation.setMetadata(metadata);
+        operations.saveAndFlush(operation);
     }
 
     private void synchronizeQuoteOperation(UUID businessId, BusinessQuote quote) {
