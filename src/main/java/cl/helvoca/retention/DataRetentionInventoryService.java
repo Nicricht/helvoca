@@ -115,14 +115,22 @@ public class DataRetentionInventoryService {
 
         long outboundMessageContent = count("""
                 SELECT COUNT(*)
-                FROM outbound_message
-                WHERE business_id = ?
-                  AND status IN ('SENT', 'FAILED', 'CANCELLED', 'BLOCKED')
-                  AND updated_at < ?
+                FROM outbound_message om
+                WHERE om.business_id = ?
+                  AND om.status IN ('SENT', 'FAILED', 'CANCELLED', 'BLOCKED')
+                  AND om.updated_at < ?
                   AND (
-                      recipient_address <> '[redacted]'
-                      OR content_text <> '[redacted]'
-                      OR provider_message_id IS NOT NULL
+                      om.recipient_address <> '[redacted]'
+                      OR om.content_text <> '[redacted]'
+                      OR om.provider_message_id IS NOT NULL
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM retention_legal_hold h
+                      WHERE h.business_id = om.business_id
+                        AND h.target_type = 'OUTBOUND_MESSAGE'
+                        AND h.target_id = om.id
+                        AND h.released_at IS NULL
                   )
                 """, businessId, cutoffs.messageContentBefore());
 
