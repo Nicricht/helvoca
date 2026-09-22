@@ -195,6 +195,50 @@ public class CustomerProfileAnonymizationService {
                    )
                 """, businessId, customerId, conversationCutoff);
 
+        int bookingNotesScrubbed = jdbc.update("""
+                UPDATE booking b
+                   SET notes = NULL,
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE b.business_id = ?
+                   AND b.customer_id = ?
+                   AND b.notes IS NOT NULL
+                   AND EXISTS (
+                       SELECT 1
+                       FROM business_operation o
+                       WHERE o.id = b.operation_id
+                         AND o.business_id = b.business_id
+                         AND o.customer_id = b.customer_id
+                         AND o.type = 'BOOKING'
+                         AND o.status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')
+                         AND NOT EXISTS (
+                             SELECT 1
+                             FROM retention_legal_hold h
+                             WHERE h.business_id = o.business_id
+                               AND h.target_type = 'BUSINESS_OPERATION'
+                               AND h.target_id = o.id
+                               AND h.released_at IS NULL
+                         )
+                   )
+                """, businessId, customerId);
+
+        int bookingOperationMetadataScrubbed = jdbc.update("""
+                UPDATE business_operation o
+                   SET metadata_json = o.metadata_json - 'notes'
+                 WHERE o.business_id = ?
+                   AND o.customer_id = ?
+                   AND o.type = 'BOOKING'
+                   AND o.status IN ('COMPLETED', 'CANCELLED', 'EXPIRED', 'FAILED')
+                   AND jsonb_exists(o.metadata_json, 'notes')
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM retention_legal_hold h
+                       WHERE h.business_id = o.business_id
+                         AND h.target_type = 'BUSINESS_OPERATION'
+                         AND h.target_id = o.id
+                         AND h.released_at IS NULL
+                   )
+                """, businessId, customerId);
+
         int identitiesDeleted = jdbc.update("""
                 DELETE FROM customer_identity
                 WHERE business_id = ?
@@ -211,6 +255,8 @@ public class CustomerProfileAnonymizationService {
                 customerId,
                 callSessionsScrubbed,
                 messagingConversationsScrubbed,
+                bookingNotesScrubbed,
+                bookingOperationMetadataScrubbed,
                 identitiesDeleted);
     }
 
@@ -218,6 +264,8 @@ public class CustomerProfileAnonymizationService {
             UUID customerId,
             int callSessionsScrubbed,
             int messagingConversationsScrubbed,
+            int bookingNotesScrubbed,
+            int bookingOperationMetadataScrubbed,
             int identitiesDeleted
     ) {}
 }
