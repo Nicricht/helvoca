@@ -41,7 +41,7 @@ class DataRetentionInventoryServiceTest {
 
         when(tenantProvider.requireBusinessId()).thenReturn(businessId);
         when(jdbc.queryForObject(anyString(), eq(Long.class), any(), any()))
-                .thenReturn(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
+                .thenReturn(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L);
 
         DataRetentionInventoryService service = new DataRetentionInventoryService(
                 jdbc,
@@ -58,17 +58,18 @@ class DataRetentionInventoryServiceTest {
         assertEquals(4L, inventory.callSessionsEligible());
         assertEquals(5L, inventory.messagingMessagesEligible());
         assertEquals(6L, inventory.messagingConversationsEligible());
-        assertEquals(7L, inventory.customerInactivityReviewCandidates());
-        assertEquals(8L, inventory.nonFinancialOperationsEligible());
-        assertEquals(9L, inventory.financialOperationsHeldFromAutomation());
-        assertEquals(10L, inventory.auditLogsEligible());
+        assertEquals(7L, inventory.outboundMessageContentEligible());
+        assertEquals(8L, inventory.customerInactivityReviewCandidates());
+        assertEquals(9L, inventory.nonFinancialOperationsEligible());
+        assertEquals(10L, inventory.financialOperationsHeldFromAutomation());
+        assertEquals(11L, inventory.auditLogsEligible());
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Object> tenant = ArgumentCaptor.forClass(Object.class);
-        verify(jdbc, times(10)).queryForObject(sql.capture(), eq(Long.class), tenant.capture(), any());
+        verify(jdbc, times(11)).queryForObject(sql.capture(), eq(Long.class), tenant.capture(), any());
 
         List<String> statements = sql.getAllValues();
-        assertEquals(10, statements.size());
+        assertEquals(11, statements.size());
         assertTrue(statements.stream().allMatch(statement -> statement.contains("business_id = ?")));
         assertTrue(tenant.getAllValues().stream().allMatch(businessId::equals));
         assertTrue(statements.stream().allMatch(statement -> statement.stripLeading().toUpperCase().startsWith("SELECT")));
