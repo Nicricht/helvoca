@@ -10,6 +10,18 @@ async function mockSettings(page, state = {}) {
   state.whatsappPatches = [];
   state.setupPayloads = [];
   state.profilePayloads = [];
+  state.scheduleExceptionPuts = [];
+  state.scheduleExceptionDeletes = [];
+  state.scheduleExceptions = state.scheduleExceptions || [
+    {
+      id: 'exception-1',
+      exceptionDate: '2026-12-25',
+      closed: true,
+      openTime: null,
+      closeTime: null,
+      reason: 'Navidad'
+    }
+  ];
   state.profile = state.profile || {
     businessId: 'business-1',
     presetKey: 'store',
@@ -28,7 +40,7 @@ async function mockSettings(page, state = {}) {
     usesReservations: false
   };
 
-  await page.route('**/api/v1/auth/me', route => route.fulfill(json({ email: 'admin@demo.cl' })));
+  await page.route('**/api/v1/auth/me', route => route.fulfill(json({ email: 'admin@demo.cl', roles: state.roles || ['BUSINESS_ADMIN'] })));
   await page.route('**/api/v1/business/profile', async route => {
     if (route.request().method() === 'PUT') {
       const payload = route.request().postDataJSON();
@@ -61,6 +73,45 @@ async function mockSettings(page, state = {}) {
   await page.route('**/api/v1/business/hours', route => route.fulfill(json([
     { dayOfWeek: 1, openTime: '09:00:00', closeTime: '18:00:00' }
   ])));
+  await page.route(/\/api\/v1\/business\/schedule-exceptions(?:\/([^/?]+))?$/, async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const parts = url.pathname.split('/').filter(Boolean);
+    const date = parts.length > 4 ? decodeURIComponent(parts[parts.length - 1]) : null;
+
+    if (request.method() === 'GET' && !date) {
+      await route.fulfill(json(state.scheduleExceptions));
+      return;
+    }
+
+    if (request.method() === 'PUT' && date) {
+      const payload = request.postDataJSON();
+      state.scheduleExceptionPuts.push({ date, payload });
+      const existing = state.scheduleExceptions.find(item => item.exceptionDate === date);
+      const saved = {
+        id: existing?.id || 'exception-' + (state.scheduleExceptions.length + 1),
+        exceptionDate: date,
+        closed: payload.closed,
+        openTime: payload.openTime,
+        closeTime: payload.closeTime,
+        reason: payload.reason
+      };
+      const index = state.scheduleExceptions.findIndex(item => item.exceptionDate === date);
+      if (index >= 0) state.scheduleExceptions[index] = saved;
+      else state.scheduleExceptions.push(saved);
+      await route.fulfill(json(saved));
+      return;
+    }
+
+    if (request.method() === 'DELETE' && date) {
+      state.scheduleExceptionDeletes.push(date);
+      state.scheduleExceptions = state.scheduleExceptions.filter(item => item.exceptionDate !== date);
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+
+    await route.fulfill({ status: 405, body: '' });
+  });
   await page.route('**/api/v1/knowledge?activeOnly=false', route => route.fulfill(json([
     { id: 'knowledge-1', title: 'Ubicación', category: 'Información', content: 'Centro', active: true }
   ])));
@@ -370,4 +421,64 @@ test('settings reports agent save errors after the business payload succeeds', a
   await expect(save).toBeEnabled();
   expect(state.setupPayloads).toHaveLength(1);
   expect(state.agentPayload).toBeTruthy();
+});
+
+
+test('settings manages closed dates and special opening hours', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const state = {};
+  await mockSettings(page, state);
+  await page.goto('/settings.html');
+
+  await page.getByRole('button', { name: '📅 Horarios', exact: true }).click();
+
+  const panel = page.locator('#scheduleExceptionsPanel');
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText('Días especiales');
+  await expect(page.locator('[data-exception-date="2026-12-25"]')).toContainText('Cerrado todo el día');
+  await expect(page.locator('[data-exception-date="2026-12-25"]')).toContainText('Navidad');
+
+  const form = page.locator('#scheduleExceptionForm');
+  await form.locator('[name="date"]').fill('2026-12-31');
+  await form.locator('[name="kind"]').selectOption('special');
+  await form.locator('[name="openTime"]').fill('09:30');
+  await form.locator('[name="closeTime"]').fill('13:00');
+  await form.locator('[name="reason"]').fill('Horario fin de año');
+  await form.getByRole('button', { name: 'Guardar día' }).click();
+
+  await expect.poll(() => state.scheduleExceptionPuts).toEqual([{
+    date: '2026-12-31',
+    payload: {
+      closed: false,
+      openTime: '09:30',
+      closeTime: '13:00',
+      reason: 'Horario fin de año'
+    }
+  }]);
+  await expect(page.locator('[data-exception-date="2026-12-31"]')).toContainText('Horario especial · 09:30–13:00');
+  await expect(page.locator('#scheduleExceptionMessage')).toContainText('Día especial guardado.');
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('[data-exception-date="2026-12-25"]').getByRole('button', { name: 'Eliminar' }).click();
+
+  await expect.poll(() => state.scheduleExceptionDeletes).toEqual(['2026-12-25']);
+  await expect(page.locator('[data-exception-date="2026-12-25"]')).toHaveCount(0);
+  await expect(page.locator('#scheduleExceptionMessage')).toContainText('Día especial eliminado.');
+});
+
+test('settings lets operators review schedule exceptions without mutation controls', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const state = { roles: ['OPERATOR'] };
+  await mockSettings(page, state);
+  await page.goto('/settings.html');
+
+  await page.getByRole('button', { name: '📅 Horarios', exact: true }).click();
+
+  await expect(page.locator('#scheduleExceptionsReadonly')).toBeVisible();
+  await expect(page.locator('#scheduleExceptionForm')).toBeHidden();
+  await expect(page.locator('[data-exception-date="2026-12-25"]')).toContainText('Navidad');
+  await expect(page.locator('[data-exception-date="2026-12-25"]').getByRole('button', { name: 'Editar' })).toHaveCount(0);
+  await expect(page.locator('[data-exception-date="2026-12-25"]').getByRole('button', { name: 'Eliminar' })).toHaveCount(0);
+  expect(state.scheduleExceptionPuts).toEqual([]);
+  expect(state.scheduleExceptionDeletes).toEqual([]);
 });
