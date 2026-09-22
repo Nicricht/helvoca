@@ -236,11 +236,28 @@ public class MetaWhatsAppTenantConfigurationService {
             throw new IllegalStateException("Meta WhatsApp deployment staging is not ready");
         }
 
+        boolean wasPhoneWhatsappEnabled = phone.isWhatsappEnabled();
+        boolean wasCertified = phone.getWhatsappCertifiedAt() != null;
+
         config.setEnabled(true);
         phone.setWhatsappEnabled(true);
         configs.save(config);
         phones.save(phone);
         if (auditService != null) {
+            if (!wasPhoneWhatsappEnabled) {
+                auditService.humanSuccess(
+                        businessId,
+                        "WHATSAPP_SENDER_ENABLED",
+                        "WHATSAPP_SENDER",
+                        businessId,
+                        Map.of(
+                                "whatsappEnabled", false,
+                                "certified", wasCertified),
+                        Map.of(
+                                "whatsappEnabled", true,
+                                "certified", wasCertified));
+            }
+
             auditService.humanSuccess(
                     businessId,
                     "META_WHATSAPP_ACTIVATE",

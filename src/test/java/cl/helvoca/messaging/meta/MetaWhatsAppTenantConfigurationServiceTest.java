@@ -329,6 +329,8 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         when(phone.getWhatsappProvider()).thenReturn("META_WHATSAPP_CLOUD");
         when(phone.getWhatsappExternalId()).thenReturn("123456789012345");
         when(phone.isActive()).thenReturn(true);
+        when(phone.isWhatsappEnabled()).thenReturn(false);
+        when(phone.getWhatsappCertifiedAt()).thenReturn(Instant.parse("2026-09-20T00:00:00Z"));
         when(certification.readiness()).thenReturn(certifiedReadiness());
         when(deployment.readiness()).thenReturn(stagingReadiness());
 
@@ -343,6 +345,17 @@ class MetaWhatsAppTenantConfigurationServiceTest {
         assertEquals("CONFIGURED_ENABLED", response.status());
         assertTrue(response.configured());
         assertTrue(response.enabled());
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("WHATSAPP_SENDER_ENABLED"),
+                eq("WHATSAPP_SENDER"),
+                eq(businessId),
+                eq(Map.of(
+                        "whatsappEnabled", false,
+                        "certified", true)),
+                eq(Map.of(
+                        "whatsappEnabled", true,
+                        "certified", true)));
         verify(audit).humanSuccess(
                 eq(businessId),
                 eq("META_WHATSAPP_ACTIVATE"),
