@@ -48,17 +48,85 @@ class CommercialOperationsAdminServiceTest {
         BusinessOrder order = order(orderId, businessId, BusinessOrder.Status.READY, BusinessOrder.FulfillmentType.DELIVERY);
 
         when(tenant.requireBusinessId()).thenReturn(businessId);
+        UUID operationId = UUID.randomUUID();
+        order.setOperationId(operationId);
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        BusinessOperation operation = new BusinessOperation();
+        operation.setId(operationId);
+        operation.setBusinessId(businessId);
+        operation.setType(BusinessOperation.Type.ORDER);
+        operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        operation.setRevision(2);
+        operation.setMetadata(Map.of("intent", "ORDER"));
+
         when(orders.findByIdAndBusinessId(orderId, businessId)).thenReturn(Optional.of(order));
         when(orders.saveAndFlush(any(BusinessOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(lines.findAllByOrderIdOrderByCreatedAtAsc(orderId)).thenReturn(List.of());
+        when(operations.findByIdAndBusinessId(operationId, businessId)).thenReturn(Optional.of(operation));
+        when(operations.saveAndFlush(any(BusinessOperation.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         CommercialOperationsAdminService service = service(orders, lines, tenant,
-                mock(BusinessDeliveryRepository.class), mock(BusinessOperationRepository.class));
+                mock(BusinessDeliveryRepository.class), operations);
 
         var view = service.updateOrderStatus(orderId, BusinessOrder.Status.DISPATCHED);
 
         assertEquals(BusinessOrder.Status.DISPATCHED, view.status());
+        assertEquals(BusinessOperation.Status.CONFIRMED, operation.getStatus());
+        assertEquals(3, operation.getRevision());
+        assertEquals("DISPATCHED", operation.getMetadata().get("projectionStatus"));
+        assertEquals(orderId.toString(), operation.getMetadata().get("orderId"));
         verify(orders).saveAndFlush(order);
+        verify(operations).saveAndFlush(operation);
+    }
+
+    @Test
+    void readyPickupOrderCanCompleteAndClosesUniversalOperation() {
+        UUID businessId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        BusinessOrderRepository orders = mock(BusinessOrderRepository.class);
+        BusinessOrderLineRepository lines = mock(BusinessOrderLineRepository.class);
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+
+        BusinessOrder order = order(
+                orderId,
+                businessId,
+                BusinessOrder.Status.READY,
+                BusinessOrder.FulfillmentType.PICKUP);
+        order.setOperationId(operationId);
+
+        BusinessOperation operation = new BusinessOperation();
+        operation.setId(operationId);
+        operation.setBusinessId(businessId);
+        operation.setType(BusinessOperation.Type.ORDER);
+        operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        operation.setRevision(4);
+        operation.setMetadata(Map.of("intent", "ORDER"));
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(orders.findByIdAndBusinessId(orderId, businessId)).thenReturn(Optional.of(order));
+        when(orders.saveAndFlush(any(BusinessOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(lines.findAllByOrderIdOrderByCreatedAtAsc(orderId)).thenReturn(List.of());
+        when(operations.findByIdAndBusinessId(operationId, businessId)).thenReturn(Optional.of(operation));
+        when(operations.saveAndFlush(any(BusinessOperation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CommercialOperationsAdminService service = service(
+                orders,
+                lines,
+                tenant,
+                mock(BusinessDeliveryRepository.class),
+                operations);
+
+        var view = service.updateOrderStatus(orderId, BusinessOrder.Status.COMPLETED);
+
+        assertEquals(BusinessOrder.Status.COMPLETED, view.status());
+        assertEquals(BusinessOperation.Status.COMPLETED, operation.getStatus());
+        assertEquals(5, operation.getRevision());
+        assertEquals("COMPLETED", operation.getMetadata().get("projectionStatus"));
+        assertEquals(orderId.toString(), operation.getMetadata().get("orderId"));
+        verify(orders).saveAndFlush(order);
+        verify(operations).saveAndFlush(operation);
     }
 
     @Test
