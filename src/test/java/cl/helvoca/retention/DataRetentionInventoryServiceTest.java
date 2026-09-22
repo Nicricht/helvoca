@@ -71,8 +71,6 @@ class DataRetentionInventoryServiceTest {
         assertEquals(10, statements.size());
         assertTrue(statements.stream().allMatch(statement -> statement.contains("business_id = ?")));
         assertTrue(tenant.getAllValues().stream().allMatch(businessId::equals));
-        assertTrue(statements.stream().noneMatch(statement -> statement.toUpperCase().contains("DELETE")));
-        assertTrue(statements.stream().noneMatch(statement -> statement.toUpperCase().contains("UPDATE")));
-        assertTrue(statements.stream().noneMatch(statement -> statement.toUpperCase().contains("INSERT")));
+        assertTrue(statements.stream().allMatch(statement -> statement.stripLeading().toUpperCase().startsWith("SELECT")));
     }
 }
