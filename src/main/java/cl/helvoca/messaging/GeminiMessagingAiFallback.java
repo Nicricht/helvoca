@@ -9,10 +9,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
@@ -20,6 +22,8 @@ import java.util.Set;
 @Component
 public class GeminiMessagingAiFallback {
     private static final int MAX_TOOL_ROUNDS = 5;
+    private static final int MAX_HTTP_ATTEMPTS = 2;
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(6);
 
     private final GeminiLiveProperties properties;
     private final String model;
@@ -127,28 +131,37 @@ public class GeminiMessagingAiFallback {
     }
 
     private JSONObject execute(JSONObject body) {
-        try {
-            URI uri = URI.create(baseUrl + "/models/" + model + ":generateContent");
-            HttpRequest request = HttpRequest.newBuilder(uri)
-                    .timeout(Duration.ofSeconds(20))
-                    .header("Content-Type", "application/json")
-                    .header("x-goog-api-key", properties.getApiKey().trim())
-                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
-                    .build();
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalStateException(
-                        "Gemini messaging fallback failed with HTTP " + response.statusCode());
+        URI uri = URI.create(baseUrl + "/models/" + model + ":generateContent");
+        HttpRequest request = HttpRequest.newBuilder(uri)
+                .timeout(REQUEST_TIMEOUT)
+                .header("Content-Type", "application/json")
+                .header("x-goog-api-key", properties.getApiKey().trim())
+                .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                .build();
+
+        for (int attempt = 1; attempt <= MAX_HTTP_ATTEMPTS; attempt++) {
+            try {
+                HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+                int status = response.statusCode();
+                if (status >= 200 && status < 300) {
+                    return new JSONObject(response.body());
+                }
+                if (attempt < MAX_HTTP_ATTEMPTS && (status == 429 || status >= 500)) {
+                    continue;
+                }
+                throw new IllegalStateException("Gemini messaging fallback failed with HTTP " + status);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Gemini messaging fallback was interrupted", e);
+            } catch (HttpTimeoutException e) {
+                throw new IllegalStateException("Gemini messaging fallback timed out", e);
+            } catch (IOException e) {
+                if (attempt < MAX_HTTP_ATTEMPTS) continue;
+                throw new IllegalStateException("Gemini messaging fallback request failed", e);
             }
-            return new JSONObject(response.body());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Gemini messaging fallback was interrupted", e);
-        } catch (IllegalStateException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalStateException("Gemini messaging fallback request failed", e);
         }
+
+        throw new IllegalStateException("Gemini messaging fallback request failed");
     }
 
     private static JSONObject firstContent(JSONObject response) {
