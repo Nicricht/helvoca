@@ -39,6 +39,9 @@ class MetaWhatsAppWabaSubscriptionStartupRunnerTest {
                 "OAuthException",
                 "trace-123"))
                 .when(client).subscribeWaba(WABA_ID, "secret-token");
+        when(client.diagnoseAccess(WABA_ID, "secret-token"))
+                .thenReturn(new MetaWhatsAppCloudClient.AccessDiagnostic(
+                        "GRANTED", "GRANTED", "NONE", false, "META_200"));
 
         MetaWhatsAppWabaSubscriptionStartupRunner runner =
                 new MetaWhatsAppWabaSubscriptionStartupRunner(
@@ -46,6 +49,7 @@ class MetaWhatsAppWabaSubscriptionStartupRunnerTest {
 
         assertDoesNotThrow(() -> runner.run(null));
         verify(client).subscribeWaba(WABA_ID, "secret-token");
+        verify(client).diagnoseAccess(WABA_ID, "secret-token");
     }
 
     @Test
