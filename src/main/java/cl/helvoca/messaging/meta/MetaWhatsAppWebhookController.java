@@ -46,6 +46,10 @@ public class MetaWhatsAppWebhookController {
         this.receptionist = receptionist;
     }
 
+    void setAudioTranscription(MetaWhatsAppAudioTranscriptionService audioTranscription) {
+        this.audioTranscription = audioTranscription;
+    }
+
     @GetMapping(value = "/whatsapp", produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> verify(
             @RequestParam(name = "hub.mode", required = false) String mode,
