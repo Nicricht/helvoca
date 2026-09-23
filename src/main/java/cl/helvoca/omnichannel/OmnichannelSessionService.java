@@ -68,6 +68,9 @@ public class OmnichannelSessionService {
                     .orElseThrow(() -> new IllegalStateException("Omnichannel channel link references an invalid tenant session"));
             if (source != null && source.customerId() != null
                     && !source.customerId().equals(existingSession.getCustomerId())) {
+                OmnichannelSession rebound = rebindVerifiedWhatsappSource(
+                        businessId, safeChannel, source, existingLink);
+                if (rebound != null) return rebound;
                 throw new IllegalStateException("Channel source is already linked to a different customer");
             }
             lock(existingSession.getId());
@@ -111,6 +114,43 @@ public class OmnichannelSessionService {
     public OmnichannelSession findById(UUID businessId, UUID sessionId) {
         if (businessId == null || sessionId == null) return null;
         return sessions.findByIdAndBusinessId(sessionId, businessId).orElse(null);
+    }
+
+    private OmnichannelSession rebindVerifiedWhatsappSource(UUID businessId,
+                                                            BusinessOrder.Source channel,
+                                                            SourceContext source,
+                                                            OmnichannelChannelSession existingLink) {
+        if (channel != BusinessOrder.Source.WHATSAPP
+                || source == null
+                || source.customerId() == null
+                || source.address() == null) {
+            return null;
+        }
+        if (customers.findByIdAndBusinessId(source.customerId(), businessId).isEmpty()) {
+            return null;
+        }
+
+        UUID verifiedCustomerId = identities.resolveVerifiedPhone(businessId, source.address()).orElse(null);
+        if (!source.customerId().equals(verifiedCustomerId)) {
+            return null;
+        }
+
+        lock(source.customerId());
+        OmnichannelSession currentSession = sessions
+                .findFirstByBusinessIdAndCustomerIdAndStatusOrderByLastActivityAtDesc(
+                        businessId, source.customerId(), OmnichannelSession.Status.ACTIVE)
+                .orElseGet(() -> newSession(businessId, source.customerId()));
+        lock(currentSession.getId());
+
+        existingLink.setOmnichannelSessionId(currentSession.getId());
+        existingLink.setNormalizedAddress(CustomerIdentityService.normalizePhone(source.address()));
+        identities.recordProviderAssertedPhone(
+                businessId,
+                source.customerId(),
+                source.address(),
+                "WHATSAPP_CHANNEL");
+        touch(currentSession, existingLink);
+        return currentSession;
     }
 
     private SourceContext sourceContext(UUID businessId,
