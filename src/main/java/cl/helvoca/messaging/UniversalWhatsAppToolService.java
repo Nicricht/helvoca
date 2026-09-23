@@ -133,6 +133,26 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
                 return error("INVALID_ARGUMENT", "Los datos de la reserva no son válidos.").toString();
             }
             Customer customer = currentCustomer(conversation);
+            boolean proposalPhase = args.optString("operationId", "").isBlank()
+                    && args.optString("confirmationToken", "").isBlank();
+            if (proposalPhase) {
+                String customerName = optional(args, "customerName");
+                if (customerName == null) {
+                    return error("BOOKING_NAME_REQUIRED",
+                            "Antes de preparar la reserva, confirma explícitamente a nombre de quién va.")
+                            .toString();
+                }
+                if (customer == null) {
+                    return error("CUSTOMER_NOT_REGISTERED",
+                            "Primero necesito identificar al cliente con ese nombre.")
+                            .toString();
+                }
+                String normalizedName = customerName.trim();
+                if (!normalizedName.equals(customer.getName())) {
+                    customer.setName(normalizedName);
+                    customer = customers.saveAndFlush(customer);
+                }
+            }
             JSONObject result = bookingConfirmationWorkflow.execute(
                     conversation.getBusinessId(),
                     customer == null ? null : customer.getId(),
@@ -155,7 +175,8 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
         return super.buildInstructions(conversation)
                 + CommercialToolDefinitions.instructions(capabilities.enabled(conversation.getBusinessId()))
                 + "\nNunca uses create_request para reservar, agendar una cita o pedir una reserva de un servicio reservable. En esos casos usa las herramientas de disponibilidad y después create_booking en sus dos fases. create_request es solo para solicitudes no reservables."
-                + "\nPara create_booking usa siempre dos fases: primero crea una propuesta con serviceId/startAt, presenta literalmente sus condiciones al cliente y pide confirmación explícita; solo después vuelve a llamar create_booking con operationId y confirmationToken devueltos. Una propuesta sin bookingId NO es una reserva creada."
+                + "\nAntes de la FASE 1 de create_booking pregunta siempre a nombre de quién va la reserva, incluso si find_caller ya devolvió un nombre guardado. No reutilices silenciosamente el nombre del perfil. Si el usuario ya indicó el nombre en su mensaje actual, no lo preguntes de nuevo. Envía ese nombre exacto como customerName en la FASE 1."
+                + "\nPara create_booking usa siempre dos fases: primero crea una propuesta con serviceId/startAt/customerName, presenta literalmente sus condiciones al cliente y pide confirmación explícita; solo después vuelve a llamar create_booking con operationId y confirmationToken devueltos. Una propuesta sin bookingId NO es una reserva creada."
                 + "\nSi una herramienta devuelve automation.fallbackAction, aplica esa alternativa con las herramientas disponibles antes de pedir intervención humana. No repitas manualmente una operación que automation ya reintentó. Solo informa que el caso quedó escalado a atención humana cuando automation.fallbackAction=HUMAN_HANDOFF, automation.humanEscalation=true y exista automation.handoffId. Si devuelve STOP_SAFELY o humanEscalation=false, no afirmes que una persona fue avisada.";
     }
 
