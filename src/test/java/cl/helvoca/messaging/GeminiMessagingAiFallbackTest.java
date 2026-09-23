@@ -97,7 +97,7 @@ class GeminiMessagingAiFallbackTest {
     }
 
     @Test
-    void capsEachGeminiMessagingRequestAtSixSeconds() throws Exception {
+    void defaultsEachGeminiMessagingRequestToTwelveSeconds() throws Exception {
         GeminiLiveProperties properties = new GeminiLiveProperties();
         properties.setApiKey("secret-key");
 
@@ -122,7 +122,7 @@ class GeminiMessagingAiFallbackTest {
 
         var requestCaptor = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
         verify(http).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
-        assertEquals(Duration.ofSeconds(6), requestCaptor.getValue().timeout().orElseThrow());
+        assertEquals(Duration.ofSeconds(12), requestCaptor.getValue().timeout().orElseThrow());
     }
 
     @Test

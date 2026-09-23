@@ -26,20 +26,23 @@ public class GeminiMessagingAiFallback {
     private static final Logger log = LoggerFactory.getLogger(GeminiMessagingAiFallback.class);
     private static final int MAX_TOOL_ROUNDS = 5;
     private static final int MAX_HTTP_ATTEMPTS = 2;
-    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(6);
+    private static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(12);
 
     private final GeminiLiveProperties properties;
     private final String model;
     private final String baseUrl;
     private final HttpClient http;
+    private final Duration requestTimeout;
 
     @Autowired
     public GeminiMessagingAiFallback(
             GeminiLiveProperties properties,
             @Value("${GEMINI_MESSAGING_MODEL:gemini-3.8-flash}") String model,
-            @Value("${GEMINI_GENERATE_CONTENT_BASE_URL:https://generativelanguage.googleapis.com/v1beta}") String baseUrl) {
+            @Value("${GEMINI_GENERATE_CONTENT_BASE_URL:https://generativelanguage.googleapis.com/v1beta}") String baseUrl,
+            @Value("${GEMINI_MESSAGING_TIMEOUT_SECONDS:12}") int timeoutSeconds) {
         this(properties, model, baseUrl,
-                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build());
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build(),
+                Duration.ofSeconds(normalizeTimeoutSeconds(timeoutSeconds)));
     }
 
     GeminiMessagingAiFallback(
@@ -47,10 +50,20 @@ public class GeminiMessagingAiFallback {
             String model,
             String baseUrl,
             HttpClient http) {
+        this(properties, model, baseUrl, http, DEFAULT_REQUEST_TIMEOUT);
+    }
+
+    GeminiMessagingAiFallback(
+            GeminiLiveProperties properties,
+            String model,
+            String baseUrl,
+            HttpClient http,
+            Duration requestTimeout) {
         this.properties = properties;
         this.model = clean(model);
         this.baseUrl = clean(baseUrl).replaceAll("/+$", "");
         this.http = http;
+        this.requestTimeout = requestTimeout == null ? DEFAULT_REQUEST_TIMEOUT : requestTimeout;
     }
 
     public boolean configured() {
@@ -136,7 +149,7 @@ public class GeminiMessagingAiFallback {
     private JSONObject execute(JSONObject body) {
         URI uri = URI.create(baseUrl + "/models/" + model + ":generateContent");
         HttpRequest request = HttpRequest.newBuilder(uri)
-                .timeout(REQUEST_TIMEOUT)
+                .timeout(requestTimeout)
                 .header("Content-Type", "application/json")
                 .header("x-goog-api-key", properties.getApiKey().trim())
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
@@ -160,7 +173,7 @@ public class GeminiMessagingAiFallback {
                 throw new IllegalStateException("Gemini messaging fallback was interrupted", e);
             } catch (HttpTimeoutException e) {
                 log.warn("GEMINI_MESSAGING_FAILURE reason=timeout attempt={} model={} timeoutMs={}",
-                        attempt, model, REQUEST_TIMEOUT.toMillis());
+                        attempt, model, requestTimeout.toMillis());
                 throw new IllegalStateException("Gemini messaging fallback timed out", e);
             } catch (IOException e) {
                 log.warn("GEMINI_MESSAGING_FAILURE reason=network attempt={} model={} cause={}",
@@ -254,6 +267,10 @@ public class GeminiMessagingAiFallback {
                 .trim();
         if (cleaned.length() > 700) cleaned = cleaned.substring(0, 700);
         return cleaned.isBlank() ? "No pude responder en este momento." : cleaned;
+    }
+
+    private static int normalizeTimeoutSeconds(int value) {
+        return Math.max(6, Math.min(value, 30));
     }
 
     private static String clean(String value) {
