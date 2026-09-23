@@ -1,5 +1,6 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.jobs.PersistentJobProperties;
 import cl.helvoca.messaging.WhatsAppReceptionistService;
 import cl.helvoca.security.TenantDatabaseContext;
 import org.junit.jupiter.api.Test;
@@ -60,6 +61,115 @@ class MetaWhatsAppWebhookTenantRoutingTest {
                 phoneRecordId,
                 "56911111111",
                 "Hola");
+    }
+
+    @Test
+    void asyncTextEnqueuesDurablyAndDoesNotRunReceptionistInsideWebhook() {
+        MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
+        properties.setEnabled(true);
+        properties.setWebhookValidationEnabled(false);
+        MetaWhatsAppInboundProperties inboundProperties = new MetaWhatsAppInboundProperties();
+        inboundProperties.setAsyncTextEnabled(true);
+        PersistentJobProperties jobProperties = new PersistentJobProperties();
+        jobProperties.setEnabled(true);
+
+        MetaWhatsAppTenantResolver resolver = mock(MetaWhatsAppTenantResolver.class);
+        WhatsAppReceptionistService receptionist = mock(WhatsAppReceptionistService.class);
+        MetaWhatsAppInboundJobService inboundJobs = mock(MetaWhatsAppInboundJobService.class);
+        TenantDatabaseContext context = new TenantDatabaseContext();
+
+        UUID businessId = UUID.randomUUID();
+        UUID phoneRecordId = UUID.randomUUID();
+        MetaWhatsAppTenantRoute route = new MetaWhatsAppTenantRoute(
+                businessId, phoneRecordId, "+56955555555");
+        MetaWhatsAppInboundMessage parsedMessage = new MetaWhatsAppInboundMessage(
+                "wamid.TEXT-ASYNC", "PHONE-123", "56911111111", "Hola");
+        when(resolver.resolveRoute("PHONE-123")).thenReturn(Optional.of(route));
+
+        byte[] body = """
+                {
+                  "entry": [{
+                    "changes": [{
+                      "value": {
+                        "metadata": {"phone_number_id": "PHONE-123"},
+                        "messages": [{
+                          "from": "56911111111",
+                          "id": "wamid.TEXT-ASYNC",
+                          "type": "text",
+                          "text": {"body": "Hola"}
+                        }]
+                      }
+                    }]
+                  }]
+                }
+                """.getBytes(StandardCharsets.UTF_8);
+
+        var response = new MetaWhatsAppWebhookController(
+                properties,
+                resolver,
+                context,
+                receptionist,
+                inboundJobs,
+                inboundProperties,
+                jobProperties)
+                .inbound(null, body);
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(inboundJobs).enqueueText(route, parsedMessage);
+        verifyNoInteractions(receptionist);
+    }
+
+    @Test
+    void asyncTextReturns503WhenDurableWorkerIsDisabled() {
+        MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
+        properties.setEnabled(true);
+        properties.setWebhookValidationEnabled(false);
+        MetaWhatsAppInboundProperties inboundProperties = new MetaWhatsAppInboundProperties();
+        inboundProperties.setAsyncTextEnabled(true);
+        PersistentJobProperties jobProperties = new PersistentJobProperties();
+        jobProperties.setEnabled(false);
+
+        MetaWhatsAppTenantResolver resolver = mock(MetaWhatsAppTenantResolver.class);
+        WhatsAppReceptionistService receptionist = mock(WhatsAppReceptionistService.class);
+        MetaWhatsAppInboundJobService inboundJobs = mock(MetaWhatsAppInboundJobService.class);
+        TenantDatabaseContext context = new TenantDatabaseContext();
+
+        UUID businessId = UUID.randomUUID();
+        UUID phoneRecordId = UUID.randomUUID();
+        when(resolver.resolveRoute("PHONE-123"))
+                .thenReturn(Optional.of(new MetaWhatsAppTenantRoute(
+                        businessId, phoneRecordId, "+56955555555")));
+
+        byte[] body = """
+                {
+                  "entry": [{
+                    "changes": [{
+                      "value": {
+                        "metadata": {"phone_number_id": "PHONE-123"},
+                        "messages": [{
+                          "from": "56911111111",
+                          "id": "wamid.TEXT-JOBS-OFF",
+                          "type": "text",
+                          "text": {"body": "Hola"}
+                        }]
+                      }
+                    }]
+                  }]
+                }
+                """.getBytes(StandardCharsets.UTF_8);
+
+        var response = new MetaWhatsAppWebhookController(
+                properties,
+                resolver,
+                context,
+                receptionist,
+                inboundJobs,
+                inboundProperties,
+                jobProperties)
+                .inbound(null, body);
+
+        assertEquals(503, response.getStatusCode().value());
+        verifyNoInteractions(inboundJobs, receptionist);
     }
 
     @Test
