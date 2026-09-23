@@ -1,5 +1,6 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.jobs.PersistentJobProperties;
 import cl.helvoca.messaging.WhatsAppReceptionistService;
 import cl.helvoca.messaging.outbound.MetaWhatsAppDeliveryStatusService;
 import cl.helvoca.security.TenantDatabaseContext;
@@ -29,6 +30,9 @@ public class MetaWhatsAppWebhookController {
     private final MetaWhatsAppTenantResolver tenantResolver;
     private final TenantDatabaseContext databaseContext;
     private final WhatsAppReceptionistService receptionist;
+    private final MetaWhatsAppInboundJobService inboundJobs;
+    private final MetaWhatsAppInboundProperties inboundProperties;
+    private final PersistentJobProperties jobProperties;
 
     @Autowired(required = false)
     private MetaWhatsAppDeliveryStatusService deliveryStatus;
@@ -36,14 +40,35 @@ public class MetaWhatsAppWebhookController {
     @Autowired(required = false)
     private MetaWhatsAppAudioTranscriptionService audioTranscription;
 
+    @Autowired
     public MetaWhatsAppWebhookController(MetaWhatsAppProperties properties,
                                          MetaWhatsAppTenantResolver tenantResolver,
                                          TenantDatabaseContext databaseContext,
-                                         WhatsAppReceptionistService receptionist) {
+                                         WhatsAppReceptionistService receptionist,
+                                         MetaWhatsAppInboundJobService inboundJobs,
+                                         MetaWhatsAppInboundProperties inboundProperties,
+                                         PersistentJobProperties jobProperties) {
         this.properties = properties;
         this.tenantResolver = tenantResolver;
         this.databaseContext = databaseContext;
         this.receptionist = receptionist;
+        this.inboundJobs = inboundJobs;
+        this.inboundProperties = inboundProperties;
+        this.jobProperties = jobProperties;
+    }
+
+    public MetaWhatsAppWebhookController(MetaWhatsAppProperties properties,
+                                         MetaWhatsAppTenantResolver tenantResolver,
+                                         TenantDatabaseContext databaseContext,
+                                         WhatsAppReceptionistService receptionist) {
+        this(
+                properties,
+                tenantResolver,
+                databaseContext,
+                receptionist,
+                null,
+                new MetaWhatsAppInboundProperties(),
+                new PersistentJobProperties());
     }
 
     void setAudioTranscription(MetaWhatsAppAudioTranscriptionService audioTranscription) {
@@ -96,11 +121,37 @@ public class MetaWhatsAppWebhookController {
             int unresolved = 0;
             int failed = 0;
             int deferred = 0;
+            int asyncUnavailable = 0;
 
             for (MetaWhatsAppInboundMessage message : messages) {
                 var route = tenantResolver.resolveRoute(message.phoneNumberId()).orElse(null);
                 if (route == null) {
                     unresolved++;
+                    continue;
+                }
+
+                if (inboundProperties.isAsyncTextEnabled()) {
+                    if (!jobProperties.isEnabled() || inboundJobs == null) {
+                        asyncUnavailable++;
+                        log.warn(
+                                "Meta WhatsApp async text unavailable message={} business={} durableJobsEnabled={}",
+                                message.messageId(),
+                                route.businessId(),
+                                jobProperties.isEnabled());
+                        continue;
+                    }
+
+                    try {
+                        inboundJobs.enqueueText(route, message);
+                        processed++;
+                    } catch (Exception e) {
+                        failed++;
+                        log.warn(
+                                "Meta WhatsApp async text enqueue failed message={} business={} type={}",
+                                message.messageId(),
+                                route.businessId(),
+                                e.getClass().getSimpleName());
+                    }
                     continue;
                 }
 
@@ -189,7 +240,7 @@ public class MetaWhatsAppWebhookController {
             }
 
             log.info(
-                    "Meta WhatsApp webhook textMessages={} audioMessages={} statuses={} processed={} audioProcessed={} audioFailed={} statusProcessed={} unresolvedTenants={} deferredStatuses={} failed={} outboundDelivery=guarded",
+                    "Meta WhatsApp webhook textMessages={} audioMessages={} statuses={} processed={} audioProcessed={} audioFailed={} statusProcessed={} unresolvedTenants={} deferredStatuses={} asyncUnavailable={} failed={} outboundDelivery=guarded",
                     messages.size(),
                     audioMessages.size(),
                     statuses.size(),
@@ -199,9 +250,10 @@ public class MetaWhatsAppWebhookController {
                     statusProcessed,
                     unresolved,
                     deferred,
+                    asyncUnavailable,
                     failed);
 
-            if (deferred > 0) return ResponseEntity.status(503).build();
+            if (deferred > 0 || asyncUnavailable > 0) return ResponseEntity.status(503).build();
             return failed == 0
                     ? ResponseEntity.ok().build()
                     : ResponseEntity.status(500).build();
