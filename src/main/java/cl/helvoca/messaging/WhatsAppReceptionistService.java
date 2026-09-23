@@ -14,6 +14,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,8 @@ import java.util.UUID;
 public class WhatsAppReceptionistService {
     public static final String CHANNEL = "whatsapp";
     private static final Logger log = LoggerFactory.getLogger(WhatsAppReceptionistService.class);
+    private static final String MESSAGE_ID_LOCK_SQL =
+            "SELECT pg_advisory_xact_lock(hashtextextended(?, 0))";
 
     private final PhoneNumberRepository phones;
     private final CustomerRepository customers;
@@ -49,6 +52,9 @@ public class WhatsAppReceptionistService {
 
     @Autowired(required = false)
     private WhatsAppAssistantReplyDeliveryService replyDelivery;
+
+    @Autowired(required = false)
+    private JdbcTemplate jdbcTemplate;
 
     public WhatsAppReceptionistService(PhoneNumberRepository phones,
                                        CustomerRepository customers,
@@ -72,6 +78,7 @@ public class WhatsAppReceptionistService {
 
     @Transactional
     public String handle(String messageSid, String rawFrom, String rawTo, String body) {
+        acquireMessageProcessingLock(messageSid);
         String priorReply = priorReply(messageSid);
         if (priorReply != null) return priorReply;
 
@@ -90,6 +97,7 @@ public class WhatsAppReceptionistService {
                                  UUID phoneNumberId,
                                  String rawFrom,
                                  String body) {
+        acquireMessageProcessingLock(messageId);
         String priorReply = priorReply(messageId);
         if (priorReply != null) return priorReply;
 
@@ -101,6 +109,15 @@ public class WhatsAppReceptionistService {
                 .filter(PhoneNumber::isWhatsappEnabled)
                 .orElseThrow(() -> new IllegalArgumentException("Resolved WhatsApp destination is not registered or enabled"));
         return process(messageId, rawFrom, phone, body, MetaWhatsAppMessagingProvider.ID);
+    }
+
+    private void acquireMessageProcessingLock(String messageId) {
+        if (messageId == null || messageId.isBlank()) {
+            throw new IllegalArgumentException("Message id is required");
+        }
+        if (jdbcTemplate != null) {
+            jdbcTemplate.queryForList(MESSAGE_ID_LOCK_SQL, messageId);
+        }
     }
 
     private String process(String messageId, String rawFrom, PhoneNumber phone, String body, String replyProviderId) {
