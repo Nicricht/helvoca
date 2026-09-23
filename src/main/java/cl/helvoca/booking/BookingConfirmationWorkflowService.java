@@ -259,6 +259,7 @@ public class BookingConfirmationWorkflowService {
 
         confirmations.recordResolution(businessId, operationId, token, safeSource, sourceReferenceId);
         recordConversation(operation, sourceReferenceId, safeSource, booking);
+        registerBookingConfirmedEvidence(businessId, booking, operationId);
 
         JSONObject data = bookingData(businessId, booking, service);
         data.put("operationId", operationId.toString());
