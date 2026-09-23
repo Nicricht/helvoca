@@ -307,6 +307,84 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void certificationScenarioAdvancesOnlyAfterTwoPhaseBookingReturnsBookingId() {
+        GeminiLiveProperties properties = properties();
+        properties.setCertificationSimulation(true);
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+
+        UUID operationId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        when(tools.execute(eq(context), eq("list_available_slots"), anyString())).thenReturn(
+                new JSONObject().put("success", true)
+                        .put("data", new JSONObject().put("slots", new JSONArray()))
+                        .put("error", JSONObject.NULL)
+                        .toString());
+        when(tools.execute(eq(context), eq("create_booking"), anyString()))
+                .thenReturn(
+                        new JSONObject().put("success", true)
+                                .put("data", new JSONObject()
+                                        .put("operationId", operationId.toString())
+                                        .put("confirmationToken", "confirm-test-token")
+                                        .put("requiresConfirmation", true))
+                                .put("error", JSONObject.NULL)
+                                .toString(),
+                        new JSONObject().put("success", true)
+                                .put("data", new JSONObject()
+                                        .put("operationId", operationId.toString())
+                                        .put("bookingId", bookingId.toString())
+                                        .put("requiresConfirmation", false))
+                                .put("error", JSONObject.NULL)
+                                .toString());
+
+        CallTranscriptService transcripts = mock(CallTranscriptService.class);
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                transcripts,
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        session.onOpen(socket);
+        session.onText(socket, "{\"setupComplete\":{}}", true);
+        session.onText(socket, turnComplete(), true);
+        session.onText(socket, toolCall("slot-two-phase", "list_available_slots"), true);
+        session.onText(socket, turnComplete(), true);
+
+        session.onText(socket, toolCall("booking-proposal-two-phase", "create_booking"), true);
+        session.onText(socket, turnComplete(), true);
+
+        verify(transcripts).append(eq(context.callId()), eq("USER"), argThat(text ->
+                text.contains("solo una propuesta")
+                        && text.contains(operationId.toString())
+                        && text.contains("confirm-test-token")));
+        verify(transcripts, never()).append(eq(context.callId()), eq("USER"),
+                contains("ejecuta cancel_booking ahora"));
+
+        session.onText(socket, toolCall(
+                "booking-confirm-two-phase",
+                "create_booking",
+                new JSONObject()
+                        .put("operationId", operationId.toString())
+                        .put("confirmationToken", "confirm-test-token")), true);
+        session.onText(socket, turnComplete(), true);
+
+        verify(tools, times(2)).execute(eq(context), eq("create_booking"), anyString());
+        verify(transcripts).append(eq(context.callId()), eq("USER"),
+                contains("ejecuta cancel_booking ahora"));
+    }
+
+    @Test
     void certificationSimulationDoesNotForwardCarrierMicrophoneAudio() {
         GeminiLiveProperties properties = properties();
         properties.setCertificationSimulation(true);
@@ -379,12 +457,16 @@ class GeminiLiveVoiceSessionTest {
     }
 
     private static String toolCall(String id, String name) {
+        return toolCall(id, name, new JSONObject());
+    }
+
+    private static String toolCall(String id, String name, JSONObject args) {
         return new JSONObject()
                 .put("toolCall", new JSONObject()
                         .put("functionCalls", new JSONArray().put(new JSONObject()
                                 .put("id", id)
                                 .put("name", name)
-                                .put("args", new JSONObject()))))
+                                .put("args", args))))
                 .toString();
     }
 
