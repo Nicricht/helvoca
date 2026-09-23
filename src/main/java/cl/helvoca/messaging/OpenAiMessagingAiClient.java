@@ -15,6 +15,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -29,22 +30,36 @@ public class OpenAiMessagingAiClient implements MessagingAiClient {
 
     private final OpenAiRealtimeProperties properties;
     private final GeminiMessagingAiFallback geminiFallback;
+    private final boolean geminiPreferred;
 
     @Autowired
     public OpenAiMessagingAiClient(
             OpenAiRealtimeProperties properties,
-            GeminiMessagingAiFallback geminiFallback) {
+            GeminiMessagingAiFallback geminiFallback,
+            @Value("${GEMINI_MESSAGING_PREFERRED:false}") boolean geminiPreferred) {
         this.properties = properties;
         this.geminiFallback = geminiFallback;
+        this.geminiPreferred = geminiPreferred;
+    }
+
+    public OpenAiMessagingAiClient(
+            OpenAiRealtimeProperties properties,
+            GeminiMessagingAiFallback geminiFallback) {
+        this(properties, geminiFallback, false);
     }
 
     // Retained for focused unit tests that do not bootstrap the fallback component.
     public OpenAiMessagingAiClient(OpenAiRealtimeProperties properties) {
-        this(properties, null);
+        this(properties, null, false);
     }
 
     @Override
     public String respond(String instructions, List<Turn> history, Set<String> allowedToolNames, ToolInvoker toolInvoker) {
+        if (geminiPreferred && geminiFallback != null && geminiFallback.configured()) {
+            log.info("WhatsApp messaging provider primary=gemini reason=configuration");
+            return geminiFallback.respond(instructions, history, allowedToolNames, toolInvoker);
+        }
+
         if (!properties.hasApiKey()) {
             if (geminiFallback != null && geminiFallback.configured()) {
                 return geminiFallback.respond(instructions, history, allowedToolNames, toolInvoker);
