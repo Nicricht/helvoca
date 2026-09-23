@@ -23,6 +23,7 @@ import java.util.Set;
 public class GeminiMessagingAiFallback {
     private static final int MAX_TOOL_ROUNDS = 5;
     private static final int MAX_HTTP_ATTEMPTS = 2;
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(6);
 
     private final GeminiLiveProperties properties;
     private final String model;
@@ -132,7 +133,7 @@ public class GeminiMessagingAiFallback {
     private JSONObject execute(JSONObject body) {
         URI uri = URI.create(baseUrl + "/models/" + model + ":generateContent");
         HttpRequest request = HttpRequest.newBuilder(uri)
-                .timeout(Duration.ofSeconds(20))
+                .timeout(REQUEST_TIMEOUT)
                 .header("Content-Type", "application/json")
                 .header("x-goog-api-key", properties.getApiKey().trim())
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
@@ -153,7 +154,6 @@ public class GeminiMessagingAiFallback {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("Gemini messaging fallback was interrupted", e);
             } catch (HttpTimeoutException e) {
-                if (attempt < MAX_HTTP_ATTEMPTS) continue;
                 throw new IllegalStateException("Gemini messaging fallback timed out", e);
             } catch (IOException e) {
                 if (attempt < MAX_HTTP_ATTEMPTS) continue;
