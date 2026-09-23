@@ -5,6 +5,8 @@ import cl.helvoca.ai.realtime.RealtimeToolDefinitions;
 import cl.helvoca.operations.CommercialToolDefinitions;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -21,6 +23,7 @@ import java.util.Set;
 
 @Component
 public class GeminiMessagingAiFallback {
+    private static final Logger log = LoggerFactory.getLogger(GeminiMessagingAiFallback.class);
     private static final int MAX_TOOL_ROUNDS = 5;
     private static final int MAX_HTTP_ATTEMPTS = 2;
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(6);
@@ -146,6 +149,8 @@ public class GeminiMessagingAiFallback {
                 if (status >= 200 && status < 300) {
                     return new JSONObject(response.body());
                 }
+                log.warn("GEMINI_MESSAGING_FAILURE reason=http_status status={} attempt={} model={}",
+                        status, attempt, model);
                 if (attempt < MAX_HTTP_ATTEMPTS && (status == 429 || status >= 500)) {
                     continue;
                 }
@@ -154,8 +159,12 @@ public class GeminiMessagingAiFallback {
                 Thread.currentThread().interrupt();
                 throw new IllegalStateException("Gemini messaging fallback was interrupted", e);
             } catch (HttpTimeoutException e) {
+                log.warn("GEMINI_MESSAGING_FAILURE reason=timeout attempt={} model={} timeoutMs={}",
+                        attempt, model, REQUEST_TIMEOUT.toMillis());
                 throw new IllegalStateException("Gemini messaging fallback timed out", e);
             } catch (IOException e) {
+                log.warn("GEMINI_MESSAGING_FAILURE reason=network attempt={} model={} cause={}",
+                        attempt, model, e.getClass().getSimpleName());
                 if (attempt < MAX_HTTP_ATTEMPTS) continue;
                 throw new IllegalStateException("Gemini messaging fallback request failed", e);
             }
