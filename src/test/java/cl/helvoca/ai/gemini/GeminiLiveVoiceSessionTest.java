@@ -366,8 +366,9 @@ class GeminiLiveVoiceSessionTest {
 
         verify(transcripts).append(eq(context.callId()), eq("USER"), argThat(text ->
                 text.contains("solo una propuesta")
-                        && text.contains(operationId.toString())
-                        && text.contains("confirm-test-token")));
+                        && text.contains("operationId")
+                        && text.contains("confirmationToken")
+                        && text.contains("Confirmo explícitamente")));
         verify(transcripts, never()).append(eq(context.callId()), eq("USER"),
                 contains("ejecuta cancel_booking ahora"));
 
