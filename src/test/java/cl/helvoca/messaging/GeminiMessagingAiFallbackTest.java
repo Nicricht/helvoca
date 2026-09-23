@@ -174,6 +174,57 @@ class GeminiMessagingAiFallbackTest {
     }
 
     @Test
+    void allowsFiveToolCallsBeforeReturningTheCustomerReply() throws Exception {
+        GeminiLiveProperties properties = new GeminiLiveProperties();
+        properties.setApiKey("secret-key");
+
+        HttpClient http = mock(HttpClient.class);
+        HttpResponse<String> services = response("""
+                {"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"list_services","id":"call_1","args":{}}}]}}]}
+                """);
+        HttpResponse<String> slots = response("""
+                {"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"list_available_slots","id":"call_2","args":{"serviceId":"service-1","date":"2026-09-23"}}}]}}]}
+                """);
+        HttpResponse<String> caller = response("""
+                {"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"find_caller","id":"call_3","args":{}}}]}}]}
+                """);
+        HttpResponse<String> register = response("""
+                {"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"register_caller","id":"call_4","args":{"name":"bdko gonzaliz"}}}]}}]}
+                """);
+        HttpResponse<String> proposal = response("""
+                {"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"create_booking","id":"call_5","args":{"serviceId":"service-1","startAt":"2026-09-23T16:00:00-04:00"}}}]}}]}
+                """);
+        HttpResponse<String> finalReply = response("""
+                {"candidates":[{"content":{"role":"model","parts":[{"text":"Perfecto. ¿Confirmas la reserva para las 16:00?"}]}}]}
+                """);
+
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(services, slots, caller, register, proposal, finalReply);
+
+        GeminiMessagingAiFallback fallback = new GeminiMessagingAiFallback(
+                properties,
+                "gemini-3.8-flash",
+                "https://example.test/v1beta",
+                http);
+
+        List<String> calledTools = new ArrayList<>();
+        String answer = fallback.respond(
+                "Gestiona la reserva por WhatsApp.",
+                List.of(new MessagingAiClient.Turn("user", "A las 16:00 a nombre de bdko gonzaliz")),
+                Set.of("list_services", "list_available_slots", "find_caller", "register_caller", "create_booking"),
+                (name, args) -> {
+                    calledTools.add(name);
+                    return "{\"success\":true}";
+                });
+
+        assertEquals("Perfecto. ¿Confirmas la reserva para las 16:00?", answer);
+        assertEquals(
+                List.of("list_services", "list_available_slots", "find_caller", "register_caller", "create_booking"),
+                calledTools);
+        verify(http, times(6)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
     void preservesGeminiFunctionCallIdInFunctionResponse() {
         var part = GeminiMessagingAiFallback.functionResponsePart(
                 "lookup_booking",
