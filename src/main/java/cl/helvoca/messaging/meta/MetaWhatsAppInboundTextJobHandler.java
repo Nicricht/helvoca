@@ -5,6 +5,7 @@ import cl.helvoca.jobs.PersistentJobHandler;
 import cl.helvoca.messaging.WhatsAppReceptionistService;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -13,7 +14,7 @@ import java.util.UUID;
 public class MetaWhatsAppInboundTextJobHandler implements PersistentJobHandler {
     private final WhatsAppReceptionistService receptionist;
 
-    public MetaWhatsAppInboundTextJobHandler(WhatsAppReceptionistService receptionist) {
+    public MetaWhatsAppInboundTextJobHandler(@Lazy WhatsAppReceptionistService receptionist) {
         this.receptionist = receptionist;
     }
 
