@@ -60,6 +60,83 @@ public class MetaWhatsAppCloudClient {
         }
     }
 
+
+    public AccessDiagnostic diagnoseAccess(String wabaId, String accessToken) {
+        String accountId = normalizeWabaId(wabaId);
+        String token = require(accessToken, "Meta WhatsApp access token is required");
+
+        String managementPermission = "MISSING";
+        String messagingPermission = "MISSING";
+        String permissionsFailure = "NONE";
+
+        try {
+            HttpRequest request = HttpRequest.newBuilder(
+                            URI.create(properties.graphApiRoot() + "/me/permissions"))
+                    .timeout(Duration.ofSeconds(12))
+                    .header("Authorization", "Bearer " + token)
+                    .GET()
+                    .build();
+            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                MetaWhatsAppApiException error = apiError(response.statusCode(), response.body());
+                permissionsFailure = error.failureCode();
+                managementPermission = "UNKNOWN";
+                messagingPermission = "UNKNOWN";
+            } else {
+                JSONArray data = new JSONObject(response.body()).optJSONArray("data");
+                managementPermission = permissionStatus(data, "whatsapp_business_management");
+                messagingPermission = permissionStatus(data, "whatsapp_business_messaging");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            permissionsFailure = "INTERRUPTED";
+            managementPermission = "UNKNOWN";
+            messagingPermission = "UNKNOWN";
+        } catch (Exception e) {
+            permissionsFailure = "LOCAL_ERROR";
+            managementPermission = "UNKNOWN";
+            messagingPermission = "UNKNOWN";
+        }
+
+        boolean wabaReadable = false;
+        String wabaReadFailure = "NONE";
+        try {
+            HttpRequest request = HttpRequest.newBuilder(
+                            URI.create(properties.graphApiRoot() + "/" + accountId + "?fields=id"))
+                    .timeout(Duration.ofSeconds(12))
+                    .header("Authorization", "Bearer " + token)
+                    .GET()
+                    .build();
+            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                wabaReadFailure = apiError(response.statusCode(), response.body()).failureCode();
+            } else {
+                String returnedId = new JSONObject(response.body()).optString("id", "").trim();
+                wabaReadable = accountId.equals(returnedId);
+                if (!wabaReadable) wabaReadFailure = "ID_MISMATCH";
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            wabaReadFailure = "INTERRUPTED";
+        } catch (Exception e) {
+            wabaReadFailure = "LOCAL_ERROR";
+        }
+
+        return new AccessDiagnostic(
+                managementPermission,
+                messagingPermission,
+                permissionsFailure,
+                wabaReadable,
+                wabaReadFailure);
+    }
+
+    public record AccessDiagnostic(
+            String managementPermission,
+            String messagingPermission,
+            String permissionsFailure,
+            boolean wabaReadable,
+            String wabaReadFailure) {}
+
     public String sendText(String phoneNumberId,
                            String accessToken,
                            String recipient,
@@ -112,6 +189,19 @@ public class MetaWhatsAppCloudClient {
         } catch (Exception e) {
             throw new IllegalStateException("Meta WhatsApp send failed", e);
         }
+    }
+
+
+    private static String permissionStatus(JSONArray data, String permissionName) {
+        if (data == null) return "MISSING";
+        for (int i = 0; i < data.length(); i++) {
+            JSONObject item = data.optJSONObject(i);
+            if (item == null) continue;
+            if (!permissionName.equals(item.optString("permission", ""))) continue;
+            String status = item.optString("status", "UNKNOWN").trim();
+            return status.isBlank() ? "UNKNOWN" : status.toUpperCase();
+        }
+        return "MISSING";
     }
 
     private static MetaWhatsAppApiException apiError(int httpStatus, String rawBody) {

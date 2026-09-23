@@ -66,11 +66,17 @@ public class MetaWhatsAppWabaSubscriptionStartupRunner implements ApplicationRun
                     "META_WHATSAPP_WABA_SUBSCRIBED wabaIdEnding={} subscriptionReady=true",
                     lastFour(wabaId));
         } catch (MetaWhatsAppApiException e) {
+            MetaWhatsAppCloudClient.AccessDiagnostic diagnostic = client.diagnoseAccess(wabaId, accessToken);
             log.warn(
-                    "META_WHATSAPP_WABA_SUBSCRIBE_FAILED wabaIdEnding={} failureCode={} retryable={} startupContinues=true",
+                    "META_WHATSAPP_WABA_SUBSCRIBE_FAILED wabaIdEnding={} failureCode={} retryable={} managementPermission={} messagingPermission={} permissionsFailure={} wabaReadable={} wabaReadFailure={} startupContinues=true",
                     lastFour(wabaId),
                     e.failureCode(),
-                    e.retryable());
+                    e.retryable(),
+                    diagnostic.managementPermission(),
+                    diagnostic.messagingPermission(),
+                    diagnostic.permissionsFailure(),
+                    diagnostic.wabaReadable(),
+                    diagnostic.wabaReadFailure());
         }
     }
 
