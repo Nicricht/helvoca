@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -256,9 +257,28 @@ public class WhatsAppReceptionistService {
         List<MessagingAiClient.Turn> out = new ArrayList<>();
         for (int i = start; i < all.size(); i++) {
             MessagingMessage item = all.get(i);
-            out.add(new MessagingAiClient.Turn(item.getRole().toLowerCase(), item.getContent()));
+            if (isHistoricalHumanHandoff(item)) continue;
+            if (item.getRole() == null || item.getRole().isBlank()) continue;
+            if (item.getContent() == null || item.getContent().isBlank()) continue;
+            out.add(new MessagingAiClient.Turn(item.getRole().toLowerCase(Locale.ROOT), item.getContent()));
         }
         return out;
+    }
+
+    private static boolean isHistoricalHumanHandoff(MessagingMessage item) {
+        if (item == null || item.getRole() == null || item.getContent() == null) return false;
+        if (!"assistant".equalsIgnoreCase(item.getRole().trim())) return false;
+
+        String content = item.getContent().toLowerCase(Locale.ROOT);
+        boolean humanDestination = content.contains("humano")
+                || content.contains("humana")
+                || content.contains("human team")
+                || content.contains("human support");
+        boolean handoffAction = content.contains("escalad")
+                || content.contains("derivad")
+                || content.contains("transferid")
+                || content.contains("handoff");
+        return humanDestination && handoffAction;
     }
 
     static String normalizeAddress(String value) {
