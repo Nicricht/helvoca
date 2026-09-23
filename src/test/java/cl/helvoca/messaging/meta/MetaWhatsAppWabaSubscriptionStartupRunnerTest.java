@@ -28,6 +28,27 @@ class MetaWhatsAppWabaSubscriptionStartupRunnerTest {
     }
 
     @Test
+    void doesNotCrashStartupWhenMetaRejectsSubscription() {
+        MetaWhatsAppCloudClient client = mock(MetaWhatsAppCloudClient.class);
+        Function<String, String> env = name -> "secret-token";
+        doThrow(new MetaWhatsAppApiException(
+                400,
+                "200",
+                null,
+                false,
+                "OAuthException",
+                "trace-123"))
+                .when(client).subscribeWaba(WABA_ID, "secret-token");
+
+        MetaWhatsAppWabaSubscriptionStartupRunner runner =
+                new MetaWhatsAppWabaSubscriptionStartupRunner(
+                        true, WABA_ID, "PILOT_01", client, env);
+
+        assertDoesNotThrow(() -> runner.run(null));
+        verify(client).subscribeWaba(WABA_ID, "secret-token");
+    }
+
+    @Test
     void doesNothingWhenDisabled() {
         MetaWhatsAppCloudClient client = mock(MetaWhatsAppCloudClient.class);
 
