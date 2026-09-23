@@ -31,6 +31,8 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
+import java.text.Normalizer;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -39,6 +41,8 @@ import java.util.UUID;
 public class UniversalWhatsAppToolService extends WhatsAppToolService {
     private static final Set<String> BOOKING_MUTATIONS = Set.of(
             "create_booking", "reschedule_booking", "cancel_booking");
+    private static final Set<String> BOOKING_INTENT_WORDS = Set.of(
+            "reserva", "reservar", "reservacion", "agendar", "cita", "booking", "appointment");
 
     private final CommercialOperationToolService commercial;
     private final BusinessOperationCapabilityService capabilities;
@@ -150,6 +154,7 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     public String buildInstructions(MessagingConversation conversation) {
         return super.buildInstructions(conversation)
                 + CommercialToolDefinitions.instructions(capabilities.enabled(conversation.getBusinessId()))
+                + "\nNunca uses create_request para reservar, agendar una cita o pedir una reserva de un servicio reservable. En esos casos usa las herramientas de disponibilidad y después create_booking en sus dos fases. create_request es solo para solicitudes no reservables."
                 + "\nPara create_booking usa siempre dos fases: primero crea una propuesta con serviceId/startAt, presenta literalmente sus condiciones al cliente y pide confirmación explícita; solo después vuelve a llamar create_booking con operationId y confirmationToken devueltos. Una propuesta sin bookingId NO es una reserva creada."
                 + "\nSi una herramienta devuelve automation.fallbackAction, aplica esa alternativa con las herramientas disponibles antes de pedir intervención humana. No repitas manualmente una operación que automation ya reintentó. Solo informa que el caso quedó escalado a atención humana cuando automation.fallbackAction=HUMAN_HANDOFF, automation.humanEscalation=true y exista automation.handoffId. Si devuelve STOP_SAFELY o humanEscalation=false, no afirmes que una persona fue avisada.";
     }
@@ -185,6 +190,11 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
             JSONObject args = rawArguments == null || rawArguments.isBlank()
                     ? new JSONObject()
                     : new JSONObject(rawArguments);
+            if (containsBookingIntent(args)) {
+                return error("BOOKING_INTENT_MUST_USE_BOOKING",
+                        "Las reservas y citas deben gestionarse con las herramientas de reserva, no con create_request.");
+            }
+
             Customer customer = currentCustomer(conversation);
             String detailsJson = optional(args, "detailsJson");
             if (detailsJson != null) new JSONObject(detailsJson);
@@ -213,6 +223,24 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
         } catch (Exception e) {
             return error("REQUEST_OPERATION_FAILED", "La solicitud no pudo completarse.");
         }
+    }
+
+    private static boolean containsBookingIntent(JSONObject args) {
+        String raw = String.join(" ",
+                args.optString("requestType", ""),
+                args.optString("title", ""),
+                args.optString("description", ""));
+        String normalized = Normalizer.normalize(raw, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", " ")
+                .trim();
+        if (normalized.isBlank()) return false;
+
+        for (String word : normalized.split("\\s+")) {
+            if (BOOKING_INTENT_WORDS.contains(word)) return true;
+        }
+        return false;
     }
 
     private Customer currentCustomer(MessagingConversation conversation) {
