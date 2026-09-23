@@ -11,10 +11,14 @@ import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -38,6 +42,7 @@ import java.util.UUID;
  */
 @Service
 public class BookingConfirmationWorkflowService {
+    private static final Logger log = LoggerFactory.getLogger(BookingConfirmationWorkflowService.class);
     private final BookingRepository bookings;
     private final BusinessOperationRepository operations;
     private final ServiceItemRepository services;
@@ -254,12 +259,28 @@ public class BookingConfirmationWorkflowService {
 
         confirmations.recordResolution(businessId, operationId, token, safeSource, sourceReferenceId);
         recordConversation(operation, sourceReferenceId, safeSource, booking);
+        registerBookingConfirmedEvidence(businessId, booking, operationId);
 
         JSONObject data = bookingData(businessId, booking, service);
         data.put("operationId", operationId.toString());
         data.put("operationRevision", operation.getRevision());
         data.put("idempotentReplay", false);
         return success(data);
+    }
+
+    private void registerBookingConfirmedEvidence(UUID businessId, Booking booking, UUID operationId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) return;
+
+        UUID bookingId = booking.getId();
+        Instant startAt = booking.getStartAt();
+        BookingSource source = booking.getSource();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                log.info("BOOKING_CONFIRMED businessId={} bookingId={} operationId={} startAt={} source={}",
+                        businessId, bookingId, operationId, startAt, source);
+            }
+        });
     }
 
     private JSONObject availabilityError(UUID businessId, UUID serviceId, Instant startAt, Instant endAt) {
