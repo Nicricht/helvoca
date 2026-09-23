@@ -172,4 +172,62 @@ class MetaWhatsAppWebhookTenantRoutingTest {
         assertEquals(200, response.getStatusCode().value());
         verifyNoInteractions(resolver, receptionist);
     }
+    @Test
+    void audioMessageIsTranscribedThenProcessedByTheSameReceptionistFlow() {
+        MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
+        properties.setEnabled(true);
+        properties.setWebhookValidationEnabled(false);
+
+        MetaWhatsAppTenantResolver resolver = mock(MetaWhatsAppTenantResolver.class);
+        WhatsAppReceptionistService receptionist = mock(WhatsAppReceptionistService.class);
+        MetaWhatsAppAudioTranscriptionService audio = mock(MetaWhatsAppAudioTranscriptionService.class);
+        TenantDatabaseContext context = new TenantDatabaseContext();
+
+        UUID businessId = UUID.randomUUID();
+        UUID phoneRecordId = UUID.randomUUID();
+        when(resolver.resolveRoute("PHONE-123"))
+                .thenReturn(Optional.of(new MetaWhatsAppTenantRoute(
+                        businessId,
+                        phoneRecordId,
+                        "+56955555555")));
+        when(audio.transcribe(businessId, "123456789012345"))
+                .thenReturn("Quiero reservar hoy a las cuatro");
+
+        byte[] body = """
+                {
+                  "entry": [{
+                    "changes": [{
+                      "value": {
+                        "metadata": {"phone_number_id": "PHONE-123"},
+                        "messages": [{
+                          "from": "56911111111",
+                          "id": "wamid.AUDIO-1",
+                          "type": "audio",
+                          "audio": {
+                            "id": "123456789012345",
+                            "mime_type": "audio/ogg; codecs=opus"
+                          }
+                        }]
+                      }
+                    }]
+                  }]
+                }
+                """.getBytes(StandardCharsets.UTF_8);
+
+        MetaWhatsAppWebhookController controller =
+                new MetaWhatsAppWebhookController(properties, resolver, context, receptionist);
+        controller.setAudioTranscription(audio);
+
+        var response = controller.inbound(null, body);
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(audio).transcribe(businessId, "123456789012345");
+        verify(receptionist).handleResolved(
+                "wamid.AUDIO-1",
+                businessId,
+                phoneRecordId,
+                "56911111111",
+                "Quiero reservar hoy a las cuatro");
+    }
+
 }
