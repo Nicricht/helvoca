@@ -262,6 +262,21 @@ public class BookingConfirmationWorkflowService {
         return success(data);
     }
 
+    private void registerBookingConfirmedEvidence(UUID businessId, Booking booking, UUID operationId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) return;
+
+        UUID bookingId = booking.getId();
+        Instant startAt = booking.getStartAt();
+        BookingSource source = booking.getSource();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                log.info("BOOKING_CONFIRMED businessId={} bookingId={} operationId={} startAt={} source={}",
+                        businessId, bookingId, operationId, startAt, source);
+            }
+        });
+    }
+
     private JSONObject availabilityError(UUID businessId, UUID serviceId, Instant startAt, Instant endAt) {
         if (!schedule.isWithinBusinessHours(businessId, startAt, endAt)) {
             return error("BUSINESS_CLOSED", "Ese horario está fuera del horario de atención configurado.");
