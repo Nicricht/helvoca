@@ -25,7 +25,9 @@ public record PersistentJob(
     public enum Type {
         OUTBOUND_MESSAGE_DISPATCH,
         META_WHATSAPP_AI_REPLY,
-        CALENDAR_EVENT_SYNC
+        CALENDAR_EVENT_SYNC,
+        WHATSAPP_INBOUND_TEXT_PROCESS,
+        WHATSAPP_INBOUND_AUDIO_PROCESS
     }
 
     public enum Status {
