@@ -33,6 +33,8 @@ public class WhatsAppReceptionistService {
     private static final Logger log = LoggerFactory.getLogger(WhatsAppReceptionistService.class);
     private static final String MESSAGE_ID_LOCK_SQL =
             "SELECT pg_advisory_xact_lock(hashtextextended(?, 0))";
+    private static final String UNVERIFIED_BOOKING_CONFIRMATION_REPLY =
+            "No pude confirmar la reserva porque no recibí una confirmación válida del sistema. ¿Quieres que lo intente nuevamente?";
 
     private final PhoneNumberRepository phones;
     private final CustomerRepository customers;
@@ -155,6 +157,7 @@ public class WhatsAppReceptionistService {
         inbound = messages.saveAndFlush(inbound);
 
         String reply;
+        boolean[] successfulBookingCreation = {false};
         try {
             MessagingConversation current = conversation;
             Set<String> allowedTools = allowedTools(phone.getBusinessId());
@@ -162,9 +165,16 @@ public class WhatsAppReceptionistService {
                     omnichannelInstructions(tools.buildInstructions(current), agent),
                     history(current.getId()),
                     allowedTools,
-                    (name, args) -> allowedTools.contains(name)
-                            ? tools.execute(current, name, args)
-                            : disabledToolResult());
+                    (name, args) -> {
+                        String result = allowedTools.contains(name)
+                                ? tools.execute(current, name, args)
+                                : disabledToolResult();
+                        if (isSuccessfulBookingCreation(name, result)) {
+                            successfulBookingCreation[0] = true;
+                        }
+                        return result;
+                    });
+            reply = guardUnverifiedBookingConfirmation(text, reply, successfulBookingCreation[0]);
         } catch (Exception e) {
             log.warn("WhatsApp assistant failed message={} business={} type={}",
                     messageId, phone.getBusinessId(), e.getClass().getSimpleName());
@@ -248,6 +258,49 @@ public class WhatsAppReceptionistService {
                         .put("code", "TOOL_DISABLED")
                         .put("message", "Esta operación no está habilitada para el agente de este negocio."))
                 .toString();
+    }
+
+    private static boolean isSuccessfulBookingCreation(String toolName, String result) {
+        if (!"create_booking".equals(toolName) || result == null || result.isBlank()) return false;
+        try {
+            JSONObject payload = new JSONObject(result);
+            if (!payload.optBoolean("success", false)) return false;
+            JSONObject data = payload.optJSONObject("data");
+            return data != null && !data.optString("bookingId", "").isBlank();
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static String guardUnverifiedBookingConfirmation(String inboundText,
+                                                              String reply,
+                                                              boolean successfulBookingCreation) {
+        if (successfulBookingCreation || !isBookingApproval(inboundText) || !claimsBookingConfirmed(reply)) {
+            return reply;
+        }
+        return UNVERIFIED_BOOKING_CONFIRMATION_REPLY;
+    }
+
+    private static boolean isBookingApproval(String text) {
+        if (text == null) return false;
+        String value = text.trim().toLowerCase(Locale.ROOT);
+        return value.matches("^(sí|si|confirmo|confirmar|ok|okay|dale|de acuerdo|correcto|yes|confirm)([\\s,.!¡?¿].*)?$");
+    }
+
+    private static boolean claimsBookingConfirmed(String reply) {
+        if (reply == null || reply.isBlank()) return false;
+        String value = reply.toLowerCase(Locale.ROOT);
+        boolean bookingContext = value.contains("reserva")
+                || value.contains("cita")
+                || value.contains("booking")
+                || value.contains("appointment");
+        boolean positiveConfirmation = value.contains("confirmad")
+                || value.contains("agendad")
+                || value.contains("reservad")
+                || value.contains("confirmed")
+                || value.contains("booked");
+        boolean explicitNegation = value.matches("(?s).*(no|aún no|aun no|todavía no|todavia no|sin).{0,24}(confirmad|agendad|reservad|confirmed|booked).*");
+        return bookingContext && positiveConfirmation && !explicitNegation;
     }
 
     private MessagingConversation newConversation(PhoneNumber phone, String from, String to, Instant now) {
