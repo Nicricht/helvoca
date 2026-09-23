@@ -71,6 +71,34 @@ class PersistentJobStoreIntegrationTest {
     }
 
     @Test
+    void inboundWamidJobIsIdempotentWithinTenantAndDistinctAcrossTenants() {
+        Business firstBusiness = business("Inbound tenant one");
+        Business secondBusiness = business("Inbound tenant two");
+        String key = "wa-in-text:wamid.SHARED";
+        String firstPayload = "{\"messageId\":\"wamid.SHARED\",\"from\":\"56911111111\"}";
+        String equivalentPayload = "{\"from\":\"56911111111\",\"messageId\":\"wamid.SHARED\"}";
+
+        PersistentJob first = store.enqueue(
+                firstBusiness.getId(), null, PersistentJob.Type.WHATSAPP_INBOUND_TEXT_PROCESS,
+                key, firstPayload, 5, Instant.now());
+        PersistentJob replay = store.enqueue(
+                firstBusiness.getId(), null, PersistentJob.Type.WHATSAPP_INBOUND_TEXT_PROCESS,
+                key, equivalentPayload, 5, Instant.now());
+        PersistentJob otherTenant = store.enqueue(
+                secondBusiness.getId(), null, PersistentJob.Type.WHATSAPP_INBOUND_TEXT_PROCESS,
+                key, firstPayload, 5, Instant.now());
+
+        assertEquals(first.id(), replay.id());
+        assertNotEquals(first.id(), otherTenant.id());
+        assertEquals(1L, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM persistent_job WHERE business_id = ? AND idempotency_key = ?",
+                Long.class, firstBusiness.getId(), key));
+        assertEquals(1L, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM persistent_job WHERE business_id = ? AND idempotency_key = ?",
+                Long.class, secondBusiness.getId(), key));
+    }
+
+    @Test
     void reusingIdempotencyKeyWithDifferentPayloadFailsClosed() {
         Business business = business("Job payload conflict");
         UUID firstMessageId = UUID.randomUUID();
