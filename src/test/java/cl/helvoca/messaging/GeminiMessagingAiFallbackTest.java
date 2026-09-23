@@ -7,6 +7,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -69,17 +70,42 @@ class GeminiMessagingAiFallbackTest {
     }
 
     @Test
-    void retriesOnceWhenGeminiRequestTimesOut() throws Exception {
+    void failsFastWithoutRetryWhenGeminiRequestTimesOut() throws Exception {
+        GeminiLiveProperties properties = new GeminiLiveProperties();
+        properties.setApiKey("secret-key");
+
+        HttpClient http = mock(HttpClient.class);
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenThrow(new HttpTimeoutException("timed out"));
+
+        GeminiMessagingAiFallback fallback = new GeminiMessagingAiFallback(
+                properties,
+                "gemini-3.8-flash",
+                "https://example.test/v1beta",
+                http);
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> fallback.respond(
+                        "Responde en español.",
+                        List.of(new MessagingAiClient.Turn("user", "Quiero reservar")),
+                        Set.of(),
+                        (name, args) -> "{}"));
+
+        assertTrue(error.getMessage().contains("timed out"));
+        verify(http, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    void capsEachGeminiMessagingRequestAtSixSeconds() throws Exception {
         GeminiLiveProperties properties = new GeminiLiveProperties();
         properties.setApiKey("secret-key");
 
         HttpClient http = mock(HttpClient.class);
         HttpResponse<String> response = response("""
-                {"candidates":[{"content":{"role":"model","parts":[{"text":"Reserva disponible"}]}}]}
+                {"candidates":[{"content":{"role":"model","parts":[{"text":"Hola"}]}}]}
                 """);
-
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-                .thenThrow(new HttpTimeoutException("timed out"))
                 .thenReturn(response);
 
         GeminiMessagingAiFallback fallback = new GeminiMessagingAiFallback(
@@ -88,14 +114,15 @@ class GeminiMessagingAiFallbackTest {
                 "https://example.test/v1beta",
                 http);
 
-        String answer = fallback.respond(
+        fallback.respond(
                 "Responde en español.",
-                List.of(new MessagingAiClient.Turn("user", "Quiero reservar")),
+                List.of(new MessagingAiClient.Turn("user", "Hola")),
                 Set.of(),
                 (name, args) -> "{}");
 
-        assertEquals("Reserva disponible", answer);
-        verify(http, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        var requestCaptor = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
+        verify(http).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        assertEquals(Duration.ofSeconds(6), requestCaptor.getValue().timeout().orElseThrow());
     }
 
     @Test
