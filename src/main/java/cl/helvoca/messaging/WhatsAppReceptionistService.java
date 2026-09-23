@@ -284,6 +284,13 @@ public class WhatsAppReceptionistService {
     static String normalizeAddress(String value) {
         if (value == null) return "";
         String clean = value.trim();
-        return clean.regionMatches(true, 0, "whatsapp:", 0, 9) ? clean.substring(9).trim() : clean;
+        if (clean.regionMatches(true, 0, "whatsapp:", 0, 9)) {
+            clean = clean.substring(9).trim();
+        }
+
+        String strict = CustomerIdentityService.normalizePhone(clean);
+        if (strict != null) return strict;
+        if (clean.matches("[1-9][0-9]{7,14}")) return "+" + clean;
+        return clean;
     }
 }
