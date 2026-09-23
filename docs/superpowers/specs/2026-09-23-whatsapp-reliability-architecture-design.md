@@ -268,17 +268,20 @@ If the durable audio job reaches its final attempt without a transcript, schedul
 
 This recovery message is itself sent through the existing durable outbound WhatsApp mechanism.
 
-### 7.2 Dead-letter hook
+### 7.2 Terminal audio failure semantics
 
-The current job service marks exhausted jobs as `DEAD_LETTER` internally. The implementation must provide a deterministic way for the WhatsApp audio handler to schedule the recovery reply exactly once when exhaustion is reached.
+The current job service marks permanent or exhausted failures as `DEAD_LETTER`. The audio handler must preserve that terminal state while guaranteeing that recovery messaging survives the handler failure.
 
-Preferred design:
+Concrete design:
 
-- handler throws a typed retryable exception while attempts remain;
-- on final attempt, handler persists/schedules the recovery reply and then throws a permanent terminal exception or returns success after recording an explicit terminal-audio-failure outcome;
-- the chosen implementation must guarantee the recovery message is idempotent by `wamid`.
+1. while `attemptCount < maxAttempts`, an all-provider retryable failure throws `RetryableJobException`;
+2. on the final allowed attempt, the handler calls a dedicated audio-recovery service;
+3. that recovery service persists/schedules the outbound recovery reply in an independent `REQUIRES_NEW` transaction using an idempotency key `wa-audio-recovery:{safeWamid}`;
+4. after that transaction commits, the audio handler throws `PermanentJobException` with a sanitized terminal error;
+5. `PersistentJobService` marks the inbound audio job `DEAD_LETTER`;
+6. if the final worker execution is repeated because of a lease race or process crash, the recovery idempotency key returns the existing recovery job and cannot create a duplicate message.
 
-The implementation plan must choose one concrete mechanism and cover it with tests.
+This makes the state explicit: the inbound audio job truthfully records terminal failure, while the customer still receives exactly one durable recovery message.
 
 ## 8. Idempotency and consistency
 
