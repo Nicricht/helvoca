@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -65,6 +66,36 @@ class GeminiMessagingAiFallbackTest {
                 request.uri().toString());
         assertFalse(request.uri().toString().contains("secret-key"));
         assertEquals("secret-key", request.headers().firstValue("x-goog-api-key").orElseThrow());
+    }
+
+    @Test
+    void retriesOnceWhenGeminiRequestTimesOut() throws Exception {
+        GeminiLiveProperties properties = new GeminiLiveProperties();
+        properties.setApiKey("secret-key");
+
+        HttpClient http = mock(HttpClient.class);
+        HttpResponse<String> response = response("""
+                {"candidates":[{"content":{"role":"model","parts":[{"text":"Reserva disponible"}]}}]}
+                """);
+
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenThrow(new HttpTimeoutException("timed out"))
+                .thenReturn(response);
+
+        GeminiMessagingAiFallback fallback = new GeminiMessagingAiFallback(
+                properties,
+                "gemini-3.8-flash",
+                "https://example.test/v1beta",
+                http);
+
+        String answer = fallback.respond(
+                "Responde en español.",
+                List.of(new MessagingAiClient.Turn("user", "Quiero reservar")),
+                Set.of(),
+                (name, args) -> "{}");
+
+        assertEquals("Reserva disponible", answer);
+        verify(http, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     @Test
