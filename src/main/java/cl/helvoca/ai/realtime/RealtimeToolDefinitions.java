@@ -33,6 +33,7 @@ public final class RealtimeToolDefinitions {
                         object().put("properties", new JSONObject()
                                 .put("serviceId", string("FASE 1: UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
                                 .put("startAt", string("FASE 1: fecha/hora previamente validada"))
+                                .put("customerName", string("FASE 1 en WhatsApp: nombre exacto que el cliente confirmó explícitamente para la reserva; nunca reutilizar un nombre guardado sin confirmarlo"))
                                 .put("notes", string("FASE 1: notas opcionales"))
                                 .put("operationId", string("FASE 2: operationId exacto devuelto por la propuesta"))
                                 .put("confirmationToken", string("FASE 2: confirmationToken exacto devuelto por la propuesta")))))

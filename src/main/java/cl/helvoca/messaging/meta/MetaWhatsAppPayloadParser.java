@@ -42,6 +42,36 @@ final class MetaWhatsAppPayloadParser {
         return List.copyOf(messages);
     }
 
+    static List<MetaWhatsAppInboundAudio> parseAudioMessages(byte[] body) throws IOException {
+        JsonNode root = parse(body);
+        if (root == null) return List.of();
+
+        List<MetaWhatsAppInboundAudio> messages = new ArrayList<>();
+        for (JsonNode value : values(root)) {
+            String phoneNumberId = text(value.path("metadata").path("phone_number_id"));
+            JsonNode payloadMessages = value.path("messages");
+            if (phoneNumberId == null || !payloadMessages.isArray()) continue;
+
+            for (JsonNode message : payloadMessages) {
+                if (!"audio".equals(text(message.path("type")))) continue;
+
+                String messageId = text(message.path("id"));
+                String from = text(message.path("from"));
+                String mediaId = text(message.path("audio").path("id"));
+                String mimeType = text(message.path("audio").path("mime_type"));
+                if (messageId == null || from == null || mediaId == null) continue;
+
+                messages.add(new MetaWhatsAppInboundAudio(
+                        messageId,
+                        phoneNumberId,
+                        from,
+                        mediaId,
+                        mimeType));
+            }
+        }
+        return List.copyOf(messages);
+    }
+
     static List<MetaWhatsAppDeliveryStatus> parseDeliveryStatuses(byte[] body) throws IOException {
         JsonNode root = parse(body);
         if (root == null) return List.of();

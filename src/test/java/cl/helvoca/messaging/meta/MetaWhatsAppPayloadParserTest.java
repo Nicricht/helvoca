@@ -129,4 +129,38 @@ class MetaWhatsAppPayloadParserTest {
 
         assertTrue(MetaWhatsAppPayloadParser.parseTextMessages(body).isEmpty());
     }
+    @Test
+    void extractsAudioMessageMediaIdentityAndMimeType() throws Exception {
+        byte[] body = """
+                {
+                  "entry": [{
+                    "changes": [{
+                      "value": {
+                        "metadata": {"phone_number_id": "PHONE-123"},
+                        "messages": [{
+                          "from": "56911111111",
+                          "id": "wamid.AUDIO-1",
+                          "type": "audio",
+                          "audio": {
+                            "id": "123456789012345",
+                            "mime_type": "audio/ogg; codecs=opus",
+                            "voice": true
+                          }
+                        }]
+                      }
+                    }]
+                  }]
+                }
+                """.getBytes(StandardCharsets.UTF_8);
+
+        var messages = MetaWhatsAppPayloadParser.parseAudioMessages(body);
+
+        assertEquals(1, messages.size());
+        assertEquals("wamid.AUDIO-1", messages.getFirst().messageId());
+        assertEquals("PHONE-123", messages.getFirst().phoneNumberId());
+        assertEquals("56911111111", messages.getFirst().from());
+        assertEquals("123456789012345", messages.getFirst().mediaId());
+        assertEquals("audio/ogg; codecs=opus", messages.getFirst().mimeType());
+    }
+
 }

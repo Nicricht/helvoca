@@ -16,6 +16,8 @@ import java.util.regex.Pattern;
 public class MetaWhatsAppCloudClient {
     private static final Pattern PHONE_NUMBER_ID = Pattern.compile("^[0-9]{5,30}$");
     private static final Pattern RECIPIENT = Pattern.compile("^[1-9][0-9]{7,14}$");
+    private static final Pattern MEDIA_ID = Pattern.compile("^[0-9]{5,40}$");
+    private static final int MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 
     private final MetaWhatsAppProperties properties;
     private final HttpClient http;
@@ -137,6 +139,68 @@ public class MetaWhatsAppCloudClient {
             boolean wabaReadable,
             String wabaReadFailure) {}
 
+    public DownloadedMedia downloadMedia(String mediaId, String accessToken) {
+        String id = normalizeMediaId(mediaId);
+        String token = require(accessToken, "Meta WhatsApp access token is required");
+
+        try {
+            HttpRequest metadataRequest = HttpRequest.newBuilder(
+                            URI.create(properties.graphApiRoot() + "/" + id))
+                    .timeout(Duration.ofSeconds(12))
+                    .header("Authorization", "Bearer " + token)
+                    .GET()
+                    .build();
+            HttpResponse<String> metadataResponse = http.send(
+                    metadataRequest, HttpResponse.BodyHandlers.ofString());
+            if (metadataResponse.statusCode() < 200 || metadataResponse.statusCode() >= 300) {
+                throw apiError(metadataResponse.statusCode(), metadataResponse.body());
+            }
+
+            JSONObject metadata = new JSONObject(metadataResponse.body());
+            String url = require(metadata.optString("url", null), "Meta WhatsApp media URL is missing");
+            long declaredSize = metadata.optLong("file_size", -1L);
+            if (declaredSize > MAX_MEDIA_BYTES) {
+                throw new IllegalStateException("Meta WhatsApp audio exceeds the supported size");
+            }
+            URI mediaUri = URI.create(url);
+            if (!"https".equalsIgnoreCase(mediaUri.getScheme())) {
+                throw new IllegalStateException("Meta WhatsApp media URL must use HTTPS");
+            }
+
+            HttpRequest mediaRequest = HttpRequest.newBuilder(mediaUri)
+                    .timeout(Duration.ofSeconds(25))
+                    .header("Authorization", "Bearer " + token)
+                    .GET()
+                    .build();
+            HttpResponse<byte[]> mediaResponse = http.send(
+                    mediaRequest, HttpResponse.BodyHandlers.ofByteArray());
+            if (mediaResponse.statusCode() < 200 || mediaResponse.statusCode() >= 300) {
+                throw new IllegalStateException("Meta WhatsApp media download failed");
+            }
+            byte[] bytes = mediaResponse.body() == null ? new byte[0] : mediaResponse.body();
+            if (bytes.length == 0) {
+                throw new IllegalStateException("Meta WhatsApp audio is empty");
+            }
+            if (bytes.length > MAX_MEDIA_BYTES) {
+                throw new IllegalStateException("Meta WhatsApp audio exceeds the supported size");
+            }
+            String contentType = metadata.optString("mime_type", "");
+            if (contentType.isBlank()) {
+                contentType = mediaResponse.headers().firstValue("Content-Type").orElse("audio/ogg");
+            }
+            return new DownloadedMedia(bytes, contentType);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Meta WhatsApp media download was interrupted", e);
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException("Meta WhatsApp media download failed", e);
+        }
+    }
+
+    public record DownloadedMedia(byte[] bytes, String contentType) {}
+
     public String sendText(String phoneNumberId,
                            String accessToken,
                            String recipient,
@@ -231,6 +295,14 @@ public class MetaWhatsAppCloudClient {
         if (source == null || !source.has(key) || source.isNull(key)) return null;
         String value = String.valueOf(source.get(key)).trim();
         return value.isBlank() ? null : value;
+    }
+
+    private static String normalizeMediaId(String value) {
+        String clean = require(value, "Meta media id is required");
+        if (!MEDIA_ID.matcher(clean).matches()) {
+            throw new IllegalArgumentException("Invalid Meta media id");
+        }
+        return clean;
     }
 
     private static String normalizeWabaId(String value) {

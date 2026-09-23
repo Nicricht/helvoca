@@ -19,6 +19,7 @@ public enum AiCapability {
     CREATE_REQUEST("create_request", false),
     RECORD_UNANSWERED_QUESTION("record_unanswered_question", false),
     TRANSFER_TO_HUMAN("transfer_to_human", false),
+    SEND_WHATSAPP_OPERATION("send_whatsapp_operation", false),
 
     LIST_CATALOG("list_catalog", true),
     LIST_DELIVERY_ZONES("list_delivery_zones", true),
