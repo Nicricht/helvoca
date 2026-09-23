@@ -24,7 +24,7 @@ import java.util.Set;
 @Component
 public class GeminiMessagingAiFallback {
     private static final Logger log = LoggerFactory.getLogger(GeminiMessagingAiFallback.class);
-    private static final int MAX_TOOL_ROUNDS = 5;
+    private static final int MAX_TOOL_ROUNDS = 8;
     private static final int MAX_HTTP_ATTEMPTS = 2;
     private static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(12);
 
