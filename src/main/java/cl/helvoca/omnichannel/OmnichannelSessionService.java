@@ -163,9 +163,36 @@ public class OmnichannelSessionService {
         if (channel == BusinessOrder.Source.WHATSAPP) {
             MessagingConversation conversation = messagingConversations
                     .findByIdAndBusinessId(sourceReferenceId, businessId).orElse(null);
-            return conversation == null ? null : new SourceContext(conversation.getCustomerId(), conversation.getSender());
+            return conversation == null
+                    ? null
+                    : new SourceContext(
+                            conversation.getCustomerId(),
+                            canonicalWhatsappAddress(conversation.getSender()));
         }
         return null;
+    }
+
+    /**
+     * WhatsApp providers may emit an already-international sender as digits only
+     * (for example Meta Cloud API). Adding the '+' is safe here because no country
+     * code is guessed; the provider already supplied the complete international
+     * number. Other malformed values remain unchanged and therefore fail closed in
+     * CustomerIdentityService's strict normalization.
+     */
+    private static String canonicalWhatsappAddress(String rawAddress) {
+        if (rawAddress == null) return null;
+
+        String strict = CustomerIdentityService.normalizePhone(rawAddress);
+        if (strict != null) return strict;
+
+        String clean = rawAddress.trim();
+        if (clean.regionMatches(true, 0, "whatsapp:", 0, 9)) {
+            clean = clean.substring(9).trim();
+        }
+        if (clean.matches("[1-9][0-9]{7,14}")) {
+            return "+" + clean;
+        }
+        return rawAddress;
     }
 
     private OmnichannelSession newSession(UUID businessId, UUID customerId) {
