@@ -51,6 +51,42 @@ class MetaWhatsAppCloudClientTest {
     }
 
     @Test
+    void diagnosesGrantedPermissionsAndReadableWaba() throws Exception {
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> permissions = mock(HttpResponse.class);
+        when(permissions.statusCode()).thenReturn(200);
+        when(permissions.body()).thenReturn("""
+                {"data":[
+                  {"permission":"whatsapp_business_management","status":"granted"},
+                  {"permission":"whatsapp_business_messaging","status":"granted"}
+                ]}
+                """);
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> waba = mock(HttpResponse.class);
+        when(waba.statusCode()).thenReturn(200);
+        when(waba.body()).thenReturn("{\"id\":\"1388561203388953\"}");
+
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(permissions, waba);
+
+        MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
+        properties.setGraphBaseUrl("https://graph.example.test/");
+        properties.setGraphApiVersion("v99.0");
+
+        MetaWhatsAppCloudClient.AccessDiagnostic diagnostic =
+                new MetaWhatsAppCloudClient(properties, http)
+                        .diagnoseAccess("1388561203388953", "test-token");
+
+        assertEquals("GRANTED", diagnostic.managementPermission());
+        assertEquals("GRANTED", diagnostic.messagingPermission());
+        assertEquals("NONE", diagnostic.permissionsFailure());
+        assertTrue(diagnostic.wabaReadable());
+        assertEquals("NONE", diagnostic.wabaReadFailure());
+        verify(http, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
     void buildsExpectedTextMessageRequestAndReturnsMessageId() throws Exception {
         @SuppressWarnings("unchecked")
         HttpResponse<String> response = mock(HttpResponse.class);
