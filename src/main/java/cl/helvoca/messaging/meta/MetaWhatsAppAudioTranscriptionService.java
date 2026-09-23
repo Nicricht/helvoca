@@ -25,6 +25,9 @@ import java.util.UUID;
 public class MetaWhatsAppAudioTranscriptionService {
     private static final Logger log =
             LoggerFactory.getLogger(MetaWhatsAppAudioTranscriptionService.class);
+    private static final String DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3.6-flash";
+    private static final int GEMINI_PRIMARY_MAX_ATTEMPTS = 2;
+    private static final long GEMINI_RETRY_DELAY_MILLIS = 200L;
 
     private final MetaWhatsAppCloudClient meta;
     private final MetaWhatsAppAccessTokenResolver accessTokens;
@@ -34,6 +37,7 @@ public class MetaWhatsAppAudioTranscriptionService {
     private final String model;
     private final String endpoint;
     private final String geminiModel;
+    private final String geminiFallbackModel;
     private final String geminiBaseUrl;
     private final boolean geminiPreferred;
 
@@ -46,11 +50,12 @@ public class MetaWhatsAppAudioTranscriptionService {
             @Value("${OPENAI_WHATSAPP_TRANSCRIPTION_MODEL:gpt-transcribe}") String model,
             @Value("${OPENAI_AUDIO_TRANSCRIPTIONS_URL:https://api.openai.com/v1/audio/transcriptions}") String endpoint,
             @Value("${GEMINI_AUDIO_TRANSCRIPTION_MODEL:gemini-3.8-flash}") String geminiModel,
+            @Value("${GEMINI_AUDIO_TRANSCRIPTION_FALLBACK_MODEL:gemini-3.6-flash}") String geminiFallbackModel,
             @Value("${GEMINI_GENERATE_CONTENT_BASE_URL:https://generativelanguage.googleapis.com/v1beta}") String geminiBaseUrl,
             @Value("${GEMINI_AUDIO_TRANSCRIPTION_PREFERRED:false}") boolean geminiPreferred) {
         this(meta, accessTokens, openAi, gemini,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build(),
-                model, endpoint, geminiModel, geminiBaseUrl, geminiPreferred);
+                model, endpoint, geminiModel, geminiFallbackModel, geminiBaseUrl, geminiPreferred);
     }
 
     MetaWhatsAppAudioTranscriptionService(
@@ -60,7 +65,8 @@ public class MetaWhatsAppAudioTranscriptionService {
             HttpClient http,
             String model,
             String endpoint) {
-        this(meta, accessTokens, openAi, null, http, model, endpoint, "", "", false);
+        this(meta, accessTokens, openAi, null, http, model, endpoint,
+                "", DEFAULT_GEMINI_FALLBACK_MODEL, "", false);
     }
 
     MetaWhatsAppAudioTranscriptionService(
@@ -73,7 +79,8 @@ public class MetaWhatsAppAudioTranscriptionService {
             String endpoint,
             String geminiModel,
             String geminiBaseUrl) {
-        this(meta, accessTokens, openAi, gemini, http, model, endpoint, geminiModel, geminiBaseUrl, false);
+        this(meta, accessTokens, openAi, gemini, http, model, endpoint,
+                geminiModel, DEFAULT_GEMINI_FALLBACK_MODEL, geminiBaseUrl, false);
     }
 
     MetaWhatsAppAudioTranscriptionService(
@@ -87,6 +94,22 @@ public class MetaWhatsAppAudioTranscriptionService {
             String geminiModel,
             String geminiBaseUrl,
             boolean geminiPreferred) {
+        this(meta, accessTokens, openAi, gemini, http, model, endpoint,
+                geminiModel, DEFAULT_GEMINI_FALLBACK_MODEL, geminiBaseUrl, geminiPreferred);
+    }
+
+    MetaWhatsAppAudioTranscriptionService(
+            MetaWhatsAppCloudClient meta,
+            MetaWhatsAppAccessTokenResolver accessTokens,
+            OpenAiRealtimeProperties openAi,
+            GeminiLiveProperties gemini,
+            HttpClient http,
+            String model,
+            String endpoint,
+            String geminiModel,
+            String geminiFallbackModel,
+            String geminiBaseUrl,
+            boolean geminiPreferred) {
         this.meta = meta;
         this.accessTokens = accessTokens;
         this.openAi = openAi;
@@ -95,6 +118,7 @@ public class MetaWhatsAppAudioTranscriptionService {
         this.model = require(model, "WhatsApp transcription model is required");
         this.endpoint = require(endpoint, "Audio transcription endpoint is required");
         this.geminiModel = clean(geminiModel);
+        this.geminiFallbackModel = clean(geminiFallbackModel);
         this.geminiBaseUrl = clean(geminiBaseUrl).replaceAll("/+$", "");
         this.geminiPreferred = geminiPreferred;
     }
@@ -145,10 +169,7 @@ public class MetaWhatsAppAudioTranscriptionService {
             }
 
             try {
-                String transcript = transcribeGemini(media);
-                log.info("WHATSAPP_AUDIO_TRANSCRIPTION_SUCCESS provider=gemini model={} chars={}",
-                        geminiModel, transcript.length());
-                return transcript;
+                return transcribeGeminiResilient(media);
             } catch (RuntimeException geminiFailure) {
                 log.warn("WHATSAPP_AUDIO_TRANSCRIPTION_FAILURE stage=gemini model={} type={} reason={}",
                         geminiModel, geminiFailure.getClass().getSimpleName(), safeReason(geminiFailure));
@@ -160,10 +181,7 @@ public class MetaWhatsAppAudioTranscriptionService {
 
     private String transcribeGeminiPrimary(MetaWhatsAppCloudClient.DownloadedMedia media) {
         try {
-            String transcript = transcribeGemini(media);
-            log.info("WHATSAPP_AUDIO_TRANSCRIPTION_SUCCESS provider=gemini model={} chars={}",
-                    geminiModel, transcript.length());
-            return transcript;
+            return transcribeGeminiResilient(media);
         } catch (RuntimeException geminiFailure) {
             log.warn("WHATSAPP_AUDIO_TRANSCRIPTION_FAILURE stage=gemini model={} type={} reason={}",
                     geminiModel, geminiFailure.getClass().getSimpleName(), safeReason(geminiFailure));
@@ -180,9 +198,44 @@ public class MetaWhatsAppAudioTranscriptionService {
                 log.warn("WHATSAPP_AUDIO_TRANSCRIPTION_FAILURE stage=openai model={} type={} reason={}",
                         model, openAiFailure.getClass().getSimpleName(), safeReason(openAiFailure));
                 throw new IllegalStateException(
-                        "WhatsApp audio transcription failed in both providers", openAiFailure);
+                        "WhatsApp audio transcription failed in all providers", openAiFailure);
             }
         }
+    }
+
+    private String transcribeGeminiResilient(MetaWhatsAppCloudClient.DownloadedMedia media) {
+        RuntimeException primaryFailure = null;
+        for (int attempt = 1; attempt <= GEMINI_PRIMARY_MAX_ATTEMPTS; attempt++) {
+            try {
+                String transcript = transcribeGemini(media, geminiModel);
+                log.info("WHATSAPP_AUDIO_TRANSCRIPTION_SUCCESS provider=gemini model={} chars={} attempt={}",
+                        geminiModel, transcript.length(), attempt);
+                return transcript;
+            } catch (RuntimeException failure) {
+                primaryFailure = failure;
+                if (!isTransientGeminiFailure(failure)) {
+                    throw failure;
+                }
+                if (attempt < GEMINI_PRIMARY_MAX_ATTEMPTS) {
+                    log.warn("WHATSAPP_AUDIO_TRANSCRIPTION_RETRY provider=gemini model={} attempt={} reason={}",
+                            geminiModel, attempt + 1, safeReason(failure));
+                    sleepBeforeRetry();
+                }
+            }
+        }
+
+        if (fallbackGeminiConfigured()) {
+            log.warn("WHATSAPP_AUDIO_TRANSCRIPTION_FALLBACK provider=gemini primaryModel={} fallbackModel={}",
+                    geminiModel, geminiFallbackModel);
+            String transcript = transcribeGemini(media, geminiFallbackModel);
+            log.info("WHATSAPP_AUDIO_TRANSCRIPTION_SUCCESS provider=gemini model={} chars={} fallback=true",
+                    geminiFallbackModel, transcript.length());
+            return transcript;
+        }
+
+        throw primaryFailure == null
+                ? new IllegalStateException("Gemini audio transcription failed")
+                : primaryFailure;
     }
 
     private String transcribeOpenAi(MetaWhatsAppCloudClient.DownloadedMedia media) {
@@ -223,7 +276,7 @@ public class MetaWhatsAppAudioTranscriptionService {
         }
     }
 
-    private String transcribeGemini(MetaWhatsAppCloudClient.DownloadedMedia media) {
+    private String transcribeGemini(MetaWhatsAppCloudClient.DownloadedMedia media, String modelName) {
         String contentType = normalizeAudioContentType(media.contentType());
         JSONObject body = new JSONObject()
                 .put("contents", new JSONArray().put(
@@ -240,7 +293,7 @@ public class MetaWhatsAppAudioTranscriptionService {
                         .put("maxOutputTokens", 1024)
                         .put("temperature", 0));
 
-        URI uri = URI.create(geminiBaseUrl + "/models/" + geminiModel + ":generateContent");
+        URI uri = URI.create(geminiBaseUrl + "/models/" + modelName + ":generateContent");
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(40))
                 .header("Content-Type", "application/json")
@@ -251,8 +304,7 @@ public class MetaWhatsAppAudioTranscriptionService {
         try {
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalStateException(
-                        "Gemini audio transcription failed status=" + response.statusCode());
+                throw new GeminiHttpException(response.statusCode());
             }
 
             JSONObject json = new JSONObject(response.body());
@@ -290,6 +342,26 @@ public class MetaWhatsAppAudioTranscriptionService {
                 && !gemini.getApiKey().isBlank()
                 && !geminiModel.isBlank()
                 && geminiBaseUrl.startsWith("https://");
+    }
+
+    private boolean fallbackGeminiConfigured() {
+        return geminiConfigured()
+                && !geminiFallbackModel.isBlank()
+                && !geminiFallbackModel.equals(geminiModel);
+    }
+
+    private static boolean isTransientGeminiFailure(RuntimeException failure) {
+        if (!(failure instanceof GeminiHttpException httpFailure)) return false;
+        return httpFailure.statusCode == 429 || httpFailure.statusCode >= 500;
+    }
+
+    private static void sleepBeforeRetry() {
+        try {
+            Thread.sleep(GEMINI_RETRY_DELAY_MILLIS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Gemini audio transcription retry was interrupted", e);
+        }
     }
 
     private static byte[] multipart(String boundary,
@@ -349,5 +421,14 @@ public class MetaWhatsAppAudioTranscriptionService {
 
     private static String clean(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private static final class GeminiHttpException extends IllegalStateException {
+        private final int statusCode;
+
+        private GeminiHttpException(int statusCode) {
+            super("Gemini audio transcription failed status=" + statusCode);
+            this.statusCode = statusCode;
+        }
     }
 }
