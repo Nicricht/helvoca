@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -89,7 +90,7 @@ class BookingConfirmedStructuredLogTest {
         });
         when(operations.saveAndFlush(any(BusinessOperation.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(businesses.findById(businessId)).thenReturn(Optional.empty());
-        when(jdbc.execute(anyString())).thenReturn(null);
+        doNothing().when(jdbc).execute(anyString());
 
         BookingConfirmationWorkflowService workflow = new BookingConfirmationWorkflowService(
                 bookings, operations, services, schedule, confirmations, conversationState, businesses, jdbc);
