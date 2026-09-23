@@ -144,6 +144,67 @@ class BookingConfirmationWorkflowIntegrationTest {
     }
 
     @Test
+    void voiceProposalAndVoiceConfirmationCreateExactlyOneAiCallBooking() {
+        Fixture fixture = fixture();
+        Instant startAt = futureBusinessTime(5);
+        UUID voiceSource = UUID.randomUUID();
+
+        JSONObject proposal = workflow.execute(
+                fixture.business().getId(),
+                fixture.customer().getId(),
+                voiceSource,
+                "+56911111111",
+                BusinessOrder.Source.VOICE,
+                BookingSource.AI_CALL,
+                new JSONObject()
+                        .put("serviceId", fixture.service().getId().toString())
+                        .put("startAt", startAt.toString()));
+
+        assertTrue(proposal.getBoolean("success"));
+        JSONObject proposed = proposal.getJSONObject("data");
+        assertTrue(proposed.getBoolean("requiresConfirmation"));
+        assertFalse(proposed.has("bookingId"));
+        assertEquals(0, bookings.count());
+
+        UUID operationId = UUID.fromString(proposed.getString("operationId"));
+        UUID token = UUID.fromString(proposed.getString("confirmationToken"));
+
+        JSONObject confirmed = workflow.execute(
+                fixture.business().getId(),
+                fixture.customer().getId(),
+                voiceSource,
+                "+56911111111",
+                BusinessOrder.Source.VOICE,
+                BookingSource.AI_CALL,
+                new JSONObject()
+                        .put("operationId", operationId.toString())
+                        .put("confirmationToken", token.toString()));
+
+        assertTrue(confirmed.getBoolean("success"));
+        JSONObject data = confirmed.getJSONObject("data");
+        UUID bookingId = UUID.fromString(data.getString("bookingId"));
+        assertEquals(1, bookings.count());
+
+        Booking booking = bookings.findByIdAndBusinessId(bookingId, fixture.business().getId()).orElseThrow();
+        assertEquals(operationId, booking.getOperationId());
+        assertEquals(fixture.customer().getId(), booking.getCustomerId());
+        assertEquals(fixture.service().getId(), booking.getServiceId());
+        assertEquals(startAt, booking.getStartAt());
+        assertEquals(BookingSource.AI_CALL, booking.getSource());
+
+        BusinessOperation materialized = operations.findByIdAndBusinessId(operationId, fixture.business().getId()).orElseThrow();
+        assertEquals(BusinessOperation.Status.CONFIRMED, materialized.getStatus());
+        assertNull(materialized.getConfirmationToken());
+
+        OperationConfirmation consumed = confirmations
+                .findByBusinessIdAndToken(fixture.business().getId(), token)
+                .orElseThrow();
+        assertEquals(OperationConfirmation.State.CONSUMED, consumed.getState());
+        assertEquals(BusinessOrder.Source.VOICE, consumed.getResolvedChannel());
+        assertEquals(voiceSource, consumed.getResolvedSourceReferenceId());
+    }
+
+    @Test
     void slotOccupiedAfterProposalExpiresConfirmationWithoutCreatingSecondBooking() {
         Fixture fixture = fixture();
         Instant startAt = futureBusinessTime(4);
