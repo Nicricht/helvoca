@@ -237,8 +237,10 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
                 .trim();
         if (normalized.isBlank()) return false;
 
-        Set<String> words = Set.of(normalized.split("\\s+"));
-        return BOOKING_INTENT_WORDS.stream().anyMatch(words::contains);
+        for (String word : normalized.split("\\s+")) {
+            if (BOOKING_INTENT_WORDS.contains(word)) return true;
+        }
+        return false;
     }
 
     private Customer currentCustomer(MessagingConversation conversation) {
