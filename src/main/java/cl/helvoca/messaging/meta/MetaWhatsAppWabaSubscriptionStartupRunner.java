@@ -60,10 +60,18 @@ public class MetaWhatsAppWabaSubscriptionStartupRunner implements ApplicationRun
             throw new IllegalStateException("Meta WhatsApp WABA subscription access token is missing");
         }
 
-        client.subscribeWaba(wabaId, accessToken);
-        log.info(
-                "META_WHATSAPP_WABA_SUBSCRIBED wabaIdEnding={} subscriptionReady=true",
-                lastFour(wabaId));
+        try {
+            client.subscribeWaba(wabaId, accessToken);
+            log.info(
+                    "META_WHATSAPP_WABA_SUBSCRIBED wabaIdEnding={} subscriptionReady=true",
+                    lastFour(wabaId));
+        } catch (MetaWhatsAppApiException e) {
+            log.warn(
+                    "META_WHATSAPP_WABA_SUBSCRIBE_FAILED wabaIdEnding={} failureCode={} retryable={} startupContinues=true",
+                    lastFour(wabaId),
+                    e.failureCode(),
+                    e.retryable());
+        }
     }
 
     private static String clean(String value) {
