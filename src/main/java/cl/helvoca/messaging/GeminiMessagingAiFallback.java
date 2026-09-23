@@ -19,7 +19,7 @@ import java.util.Set;
 
 @Component
 public class GeminiMessagingAiFallback {
-    private static final int MAX_TOOL_ROUNDS = 4;
+    private static final int MAX_TOOL_ROUNDS = 5;
 
     private final GeminiLiveProperties properties;
     private final String model;
