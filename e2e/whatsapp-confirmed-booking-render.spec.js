@@ -149,7 +149,7 @@ test('confirmed WhatsApp booking is visible as WhatsApp and Confirmada', async (
 
   await page.goto('/');
 
-  const row = page.locator('[data-home-booking-id="wa-confirmed"]');
+  const row = page.locator('#homeBookingsList .home-business-table [data-home-booking-id="wa-confirmed"]');
   await expect(row).toBeVisible();
   await expect(row).toContainText('Cliente WhatsApp');
   await expect(row).toContainText('Peluquería');
