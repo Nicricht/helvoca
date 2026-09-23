@@ -91,6 +91,7 @@ public class MetaWhatsAppWebhookController {
             var statuses = MetaWhatsAppPayloadParser.parseDeliveryStatuses(payload);
             int processed = 0;
             int audioProcessed = 0;
+            int audioFailed = 0;
             int statusProcessed = 0;
             int unresolved = 0;
             int failed = 0;
@@ -128,8 +129,8 @@ public class MetaWhatsAppWebhookController {
                     continue;
                 }
                 if (audioTranscription == null) {
-                    failed++;
-                    log.warn("Meta WhatsApp audio processing unavailable message={} business={}",
+                    audioFailed++;
+                    log.warn("Meta WhatsApp audio processing unavailable message={} business={} webhookAcknowledged=true",
                             message.messageId(), route.businessId());
                     continue;
                 }
@@ -148,8 +149,8 @@ public class MetaWhatsAppWebhookController {
                     });
                     audioProcessed++;
                 } catch (Exception e) {
-                    failed++;
-                    log.warn("Meta WhatsApp audio processing failed message={} business={} type={}",
+                    audioFailed++;
+                    log.warn("Meta WhatsApp audio processing failed message={} business={} type={} webhookAcknowledged=true",
                             message.messageId(),
                             route.businessId(),
                             e.getClass().getSimpleName());
@@ -188,12 +189,13 @@ public class MetaWhatsAppWebhookController {
             }
 
             log.info(
-                    "Meta WhatsApp webhook textMessages={} audioMessages={} statuses={} processed={} audioProcessed={} statusProcessed={} unresolvedTenants={} deferredStatuses={} failed={} outboundDelivery=guarded",
+                    "Meta WhatsApp webhook textMessages={} audioMessages={} statuses={} processed={} audioProcessed={} audioFailed={} statusProcessed={} unresolvedTenants={} deferredStatuses={} failed={} outboundDelivery=guarded",
                     messages.size(),
                     audioMessages.size(),
                     statuses.size(),
                     processed,
                     audioProcessed,
+                    audioFailed,
                     statusProcessed,
                     unresolved,
                     deferred,
