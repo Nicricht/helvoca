@@ -105,7 +105,7 @@ class DeepgramAudioTranscriptionProviderTest {
         server.createContext("/v1/listen", exchange -> {
             try {
                 Thread.sleep(1500);
-                respond(exchange, 200, "{\"results\":{\"channels\":[{\"alternatives\":[{\"transcript\":\"late\"}]}]}}"));
+                respond(exchange, 200, "{\"results\":{\"channels\":[{\"alternatives\":[{\"transcript\":\"late\"}]}]}}");
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
             }
