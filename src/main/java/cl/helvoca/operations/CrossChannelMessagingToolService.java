@@ -91,6 +91,7 @@ public class CrossChannelMessagingToolService {
                 for (CatalogShowcaseMessagingService.PreparedShowcaseMessage value : messages) {
                     outbox.queue(businessId, value.message().getId());
                 }
+                showcase.markQueued(businessId, operationId, messages.size());
                 prepared.put("status", OutboundMessage.Status.QUEUED.name());
                 prepared.put("queued", true);
                 return success(prepared);
