@@ -124,6 +124,57 @@ class MetaWhatsAppCloudClientTest {
     }
 
     @Test
+    void buildsExpectedImageMessageRequestAndReturnsMessageId() throws Exception {
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn("{\"messages\":[{\"id\":\"wamid.MEDIA-123\"}]}");
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
+        properties.setGraphBaseUrl("https://graph.example.test/");
+        properties.setGraphApiVersion("v99.0");
+
+        String messageId = new MetaWhatsAppCloudClient(properties, http)
+                .sendMediaLink(
+                        "123456789012345",
+                        "test-token",
+                        "+56933333333",
+                        "image",
+                        "https://cdn.example.test/product.jpg",
+                        "Producto destacado");
+
+        assertEquals("wamid.MEDIA-123", messageId);
+
+        ArgumentCaptor<HttpRequest> requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(http).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        JSONObject body = new JSONObject(bodyOf(requestCaptor.getValue()));
+
+        assertEquals("image", body.getString("type"));
+        assertEquals("56933333333", body.getString("to"));
+        assertEquals("https://cdn.example.test/product.jpg",
+                body.getJSONObject("image").getString("link"));
+        assertEquals("Producto destacado",
+                body.getJSONObject("image").getString("caption"));
+    }
+
+    @Test
+    void rejectsUnsafeMediaLinksBeforeNetworkCall() {
+        MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
+        MetaWhatsAppCloudClient client = new MetaWhatsAppCloudClient(properties, http);
+
+        assertThrows(IllegalArgumentException.class, () -> client.sendMediaLink(
+                "1234567890",
+                "token",
+                "+56933333333",
+                "image",
+                "http://cdn.example.test/product.jpg",
+                "caption"));
+
+        verifyNoInteractions(http);
+    }
+
+    @Test
     void rejectsInvalidInputBeforeAnyNetworkCall() {
         MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
         MetaWhatsAppCloudClient client = new MetaWhatsAppCloudClient(properties, http);
