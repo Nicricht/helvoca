@@ -54,7 +54,7 @@ class GeminiAudioTranscriptionProviderTest {
     }
 
     @Test
-    void rateLimitIsRetryableWithoutImmediateSameProviderRetry() throws Exception {
+    void primaryRateLimitTriesFallbackModelOnce() throws Exception {
         GeminiLiveProperties gemini = new GeminiLiveProperties();
         gemini.setApiKey("gemini-key");
         HttpClient http = mock(HttpClient.class);
@@ -63,8 +63,16 @@ class GeminiAudioTranscriptionProviderTest {
         HttpResponse<String> limited = mock(HttpResponse.class);
         when(limited.statusCode()).thenReturn(429);
         when(limited.body()).thenReturn("{}");
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> success = mock(HttpResponse.class);
+        when(success.statusCode()).thenReturn(200);
+        when(success.body()).thenReturn("""
+                {"candidates":[{"content":{"parts":[{"text":"Audio por fallback"}]}}]}
+                """);
+
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-                .thenReturn(limited);
+                .thenReturn(limited, success);
 
         GeminiAudioTranscriptionProvider provider = new GeminiAudioTranscriptionProvider(
                 gemini,
@@ -73,14 +81,11 @@ class GeminiAudioTranscriptionProviderTest {
                 "gemini-3.6-flash",
                 "https://generativelanguage.googleapis.test/v1beta");
 
-        AudioTranscriptionException failure = assertThrows(
-                AudioTranscriptionException.class,
-                () -> provider.transcribe(input()));
+        TranscriptionResult result = provider.transcribe(input());
 
-        assertEquals("gemini", failure.providerId());
-        assertEquals(429, failure.httpStatus());
-        assertTrue(failure.retryable());
-        verify(http, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        assertEquals("Audio por fallback", result.text());
+        assertEquals("gemini-3.6-flash", result.modelId());
+        verify(http, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
     private static AudioInput input() {
