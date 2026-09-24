@@ -20,6 +20,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,12 +74,12 @@ class ShowcaseProductSelectionPersistenceIntegrationTest {
         agent.setLanguage("es");
         agent.setGreeting("Hola");
         agent.setActive(true);
-        agent.setCapabilities(Set.of(AiCapability.LIST_CATALOG));
+        agent.setCapabilities(Set.of(AiCapability.LIST_CATALOG, AiCapability.CREATE_QUOTE));
         agents.saveAndFlush(agent);
 
-        CatalogItem first = product(business.getId(), "Producto A");
-        CatalogItem second = product(business.getId(), "Producto B");
-        CatalogItem third = product(business.getId(), "Producto C");
+        CatalogItem first = product(business.getId(), "Producto A", "9900");
+        CatalogItem second = product(business.getId(), "Producto B", "12990");
+        CatalogItem third = product(business.getId(), "Producto C", "15990");
 
         BusinessOperation operation = new BusinessOperation();
         operation.setBusinessId(business.getId());
@@ -145,6 +146,66 @@ class ShowcaseProductSelectionPersistenceIntegrationTest {
         assertEquals(operationCountBefore, operations.count(),
                 "Selecting a shown product must never create another BusinessOperation");
 
+        JSONObject quote = new JSONObject(commercial.execute(
+                business.getId(),
+                customer.getId(),
+                sourceReferenceId,
+                customer.getPhone(),
+                BusinessOrder.Source.WHATSAPP,
+                CommercialOperationToolService.SHOWCASE_QUOTE_TOOL,
+                new JSONObject()
+                        .put("operationId", operationId.toString())
+                        .put("quantity", 2)
+                        .toString()));
+
+        assertTrue(quote.getBoolean("success"), quote::toString);
+        JSONObject quoted = quote.getJSONObject("data");
+        assertEquals(operationId.toString(), quoted.getString("operationId"));
+        assertEquals(second.getId().toString(), quoted.getString("selectedCatalogItemId"));
+        assertEquals(2, quoted.getInt("quantity"));
+        assertEquals(0, new BigDecimal(String.valueOf(quoted.get("unitPrice")))
+                .compareTo(new BigDecimal("12990")));
+        assertEquals(0, new BigDecimal(String.valueOf(quoted.get("total")))
+                .compareTo(new BigDecimal("25980")));
+        assertEquals("CLP", quoted.getString("currency"));
+        assertEquals("QUOTE_PENDING", quoted.getString("commercialStage"));
+        assertFalse(quoted.getBoolean("idempotent"));
+
+        BusinessOperation quotedOperation = operations.findByIdAndBusinessId(
+                operationId, business.getId()).orElseThrow();
+        assertEquals(operationId, quotedOperation.getId());
+        assertEquals(0, quotedOperation.getTotal().compareTo(new BigDecimal("25980")));
+        assertEquals(0, quotedOperation.getSubtotal().compareTo(new BigDecimal("25980")));
+        assertEquals(0, quotedOperation.getDeliveryFee().compareTo(BigDecimal.ZERO));
+        assertEquals("CLP", quotedOperation.getCurrency());
+        assertEquals("QUOTE_PENDING", quotedOperation.getMetadata().get("commercialStage"));
+        assertEquals("SELECTED_PRODUCT_QUOTED", quotedOperation.getMetadata().get("lastAction"));
+        assertEquals(second.getId().toString(),
+                quotedOperation.getMetadata().get("quotedCatalogItemId"));
+        assertEquals("preserve-me", quotedOperation.getMetadata().get("contextMarker"));
+        assertEquals(operationCountBefore, operations.count(),
+                "Quoting the selected product must preserve the same BusinessOperation");
+
+        int revisionAfterQuote = quotedOperation.getRevision();
+        JSONObject quoteReplay = new JSONObject(commercial.execute(
+                business.getId(),
+                customer.getId(),
+                sourceReferenceId,
+                customer.getPhone(),
+                BusinessOrder.Source.WHATSAPP,
+                CommercialOperationToolService.SHOWCASE_QUOTE_TOOL,
+                new JSONObject()
+                        .put("operationId", operationId.toString())
+                        .put("quantity", 2)
+                        .toString()));
+
+        assertTrue(quoteReplay.getBoolean("success"), quoteReplay::toString);
+        assertTrue(quoteReplay.getJSONObject("data").getBoolean("idempotent"));
+        BusinessOperation afterQuoteReplay = operations.findByIdAndBusinessId(
+                operationId, business.getId()).orElseThrow();
+        assertEquals(revisionAfterQuote, afterQuoteReplay.getRevision());
+        assertEquals(operationCountBefore, operations.count());
+
         JSONObject replay = new JSONObject(commercial.execute(
                 business.getId(),
                 customer.getId(),
@@ -163,14 +224,18 @@ class ShowcaseProductSelectionPersistenceIntegrationTest {
                 replay.getJSONObject("data").getString("operationId"));
         assertEquals(second.getId().toString(),
                 replay.getJSONObject("data").getString("selectedCatalogItemId"));
+        assertEquals("QUOTE_PENDING",
+                replay.getJSONObject("data").getString("commercialStage"),
+                "Replaying the selection must not regress a later commercial stage");
         assertEquals(operationCountBefore, operations.count());
     }
 
-    private CatalogItem product(UUID businessId, String name) {
+    private CatalogItem product(UUID businessId, String name, String price) {
         CatalogItem item = new CatalogItem();
         item.setBusinessId(businessId);
         item.setKind(CatalogItem.Kind.PRODUCT);
         item.setName(name);
+        item.setPrice(new BigDecimal(price));
         item.setCurrency("CLP");
         item.setActive(true);
         return catalog.saveAndFlush(item);
