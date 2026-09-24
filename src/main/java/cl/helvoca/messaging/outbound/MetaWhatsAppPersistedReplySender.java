@@ -7,9 +7,11 @@ import cl.helvoca.messaging.MessagingConversationRepository;
 import cl.helvoca.messaging.MessagingMessage;
 import cl.helvoca.messaging.MessagingMessageRepository;
 import cl.helvoca.messaging.meta.MetaWhatsAppApiException;
+import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Component
 public class MetaWhatsAppPersistedReplySender {
@@ -72,7 +74,7 @@ public class MetaWhatsAppPersistedReplySender {
         try {
             MessagingProvider.SendResult result = provider.send(new MessagingProvider.SendCommand(
                     job.businessId(),
-                    inbound.getId(),
+                    persistedMessageId(job),
                     OutboundMessage.Channel.WHATSAPP,
                     conversation.getSender(),
                     inbound.getReplyText(),
@@ -104,6 +106,15 @@ public class MetaWhatsAppPersistedReplySender {
         } catch (RuntimeException failure) {
             throw new PersistentJobHandler.RetryableJobException(
                     "Meta WhatsApp persisted reply dispatch failed", failure);
+        }
+    }
+
+    private static UUID persistedMessageId(PersistentJob job) {
+        try {
+            return UUID.fromString(new JSONObject(job.payloadJson()).getString("messageId"));
+        } catch (Exception failure) {
+            throw new PersistentJobHandler.PermanentJobException(
+                    "Meta persisted reply durable job payload is invalid", failure);
         }
     }
 
