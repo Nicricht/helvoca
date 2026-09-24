@@ -34,6 +34,16 @@ public class GeminiMessagingAiFallback {
     private final HttpClient http;
     private final Duration requestTimeout;
 
+    static final class ProviderUnavailableException extends IllegalStateException {
+        ProviderUnavailableException(String message) {
+            super(message);
+        }
+
+        ProviderUnavailableException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
     @Autowired
     public GeminiMessagingAiFallback(
             GeminiLiveProperties properties,
@@ -91,6 +101,7 @@ public class GeminiMessagingAiFallback {
         }
 
         JSONArray declarations = functionDeclarations(allowedToolNames);
+        boolean toolInvoked = false;
         for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
             JSONObject body = new JSONObject()
                     .put("systemInstruction", new JSONObject()
@@ -102,7 +113,16 @@ public class GeminiMessagingAiFallback {
                         new JSONObject().put("functionDeclarations", declarations)));
             }
 
-            JSONObject response = execute(body);
+            JSONObject response;
+            try {
+                response = execute(body);
+            } catch (ProviderUnavailableException e) {
+                if (toolInvoked) {
+                    throw new IllegalStateException(
+                            "Gemini messaging became unavailable after tool execution", e);
+                }
+                throw e;
+            }
             JSONObject content = firstContent(response);
             JSONArray parts = content.optJSONArray("parts");
             if (parts == null || parts.isEmpty()) break;
@@ -116,6 +136,7 @@ public class GeminiMessagingAiFallback {
                 JSONObject call = part.optJSONObject("functionCall");
                 if (call != null) {
                     calledTool = true;
+                    toolInvoked = true;
                     String name = call.optString("name", "");
                     JSONObject args = call.optJSONObject("args");
                     String result = toolInvoker.execute(name, args == null ? "{}" : args.toString());
@@ -167,6 +188,10 @@ public class GeminiMessagingAiFallback {
                 if (attempt < MAX_HTTP_ATTEMPTS && (status == 429 || status >= 500)) {
                     continue;
                 }
+                if (status == 429 || status >= 500) {
+                    throw new ProviderUnavailableException(
+                            "Gemini messaging fallback failed with HTTP " + status);
+                }
                 throw new IllegalStateException("Gemini messaging fallback failed with HTTP " + status);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -174,16 +199,16 @@ public class GeminiMessagingAiFallback {
             } catch (HttpTimeoutException e) {
                 log.warn("GEMINI_MESSAGING_FAILURE reason=timeout attempt={} model={} timeoutMs={}",
                         attempt, model, requestTimeout.toMillis());
-                throw new IllegalStateException("Gemini messaging fallback timed out", e);
+                throw new ProviderUnavailableException("Gemini messaging fallback timed out", e);
             } catch (IOException e) {
                 log.warn("GEMINI_MESSAGING_FAILURE reason=network attempt={} model={} cause={}",
                         attempt, model, e.getClass().getSimpleName());
                 if (attempt < MAX_HTTP_ATTEMPTS) continue;
-                throw new IllegalStateException("Gemini messaging fallback request failed", e);
+                throw new ProviderUnavailableException("Gemini messaging fallback request failed", e);
             }
         }
 
-        throw new IllegalStateException("Gemini messaging fallback request failed");
+        throw new ProviderUnavailableException("Gemini messaging fallback request failed");
     }
 
     private static JSONObject firstContent(JSONObject response) {

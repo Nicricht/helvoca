@@ -57,7 +57,13 @@ public class OpenAiMessagingAiClient implements MessagingAiClient {
     public String respond(String instructions, List<Turn> history, Set<String> allowedToolNames, ToolInvoker toolInvoker) {
         if (geminiPreferred && geminiFallback != null && geminiFallback.configured()) {
             log.info("WhatsApp messaging provider primary=gemini reason=configuration");
-            return geminiFallback.respond(instructions, history, allowedToolNames, toolInvoker);
+            try {
+                return geminiFallback.respond(instructions, history, allowedToolNames, toolInvoker);
+            } catch (GeminiMessagingAiFallback.ProviderUnavailableException e) {
+                if (!properties.hasApiKey()) throw e;
+                log.warn("Gemini messaging primary unavailable; switching provider fallback=openai");
+                return respondWithOpenAi(instructions, history, allowedToolNames, toolInvoker);
+            }
         }
 
         if (!properties.hasApiKey()) {
@@ -78,7 +84,7 @@ public class OpenAiMessagingAiClient implements MessagingAiClient {
         }
     }
 
-    private String respondWithOpenAi(
+    String respondWithOpenAi(
             String instructions,
             List<Turn> history,
             Set<String> allowedToolNames,

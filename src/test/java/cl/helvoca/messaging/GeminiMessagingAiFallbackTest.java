@@ -244,6 +244,73 @@ class GeminiMessagingAiFallbackTest {
         assertFalse(OpenAiMessagingAiClient.isRateLimit(new IllegalStateException("other")));
     }
 
+    @Test
+    void exposesTransient429AsProviderUnavailableBeforeAnyToolRuns() throws Exception {
+        GeminiLiveProperties properties = new GeminiLiveProperties();
+        properties.setApiKey("secret-key");
+
+        HttpClient http = mock(HttpClient.class);
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> throttled = mock(HttpResponse.class);
+        when(throttled.statusCode()).thenReturn(429);
+        when(throttled.body()).thenReturn("{}");
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(throttled);
+
+        GeminiMessagingAiFallback fallback = new GeminiMessagingAiFallback(
+                properties,
+                "gemini-3.8-flash",
+                "https://example.test/v1beta",
+                http);
+
+        assertThrows(
+                GeminiMessagingAiFallback.ProviderUnavailableException.class,
+                () -> fallback.respond(
+                        "Responde en español.",
+                        List.of(new MessagingAiClient.Turn("user", "Sí")),
+                        Set.of(),
+                        (name, args) -> "{}"));
+
+        verify(http, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    void doesNotExposeProviderFailoverAfterAToolWasAlreadyInvoked() throws Exception {
+        GeminiLiveProperties properties = new GeminiLiveProperties();
+        properties.setApiKey("secret-key");
+
+        HttpClient http = mock(HttpClient.class);
+        HttpResponse<String> toolCall = response("""
+                {"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"create_booking","id":"call_1","args":{}}}]}}]}
+                """);
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> throttled = mock(HttpResponse.class);
+        when(throttled.statusCode()).thenReturn(429);
+        when(throttled.body()).thenReturn("{}");
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(toolCall, throttled, throttled);
+
+        GeminiMessagingAiFallback fallback = new GeminiMessagingAiFallback(
+                properties,
+                "gemini-3.8-flash",
+                "https://example.test/v1beta",
+                http);
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> fallback.respond(
+                        "Gestiona la reserva.",
+                        List.of(new MessagingAiClient.Turn("user", "Sí")),
+                        Set.of("create_booking"),
+                        (name, args) -> "{\"success\":true}"));
+
+        assertFalse(error instanceof GeminiMessagingAiFallback.ProviderUnavailableException);
+        assertInstanceOf(
+                GeminiMessagingAiFallback.ProviderUnavailableException.class,
+                error.getCause());
+        verify(http, times(3)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
     @SuppressWarnings("unchecked")
     private static HttpResponse<String> response(String body) {
         HttpResponse<String> response = mock(HttpResponse.class);
