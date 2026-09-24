@@ -143,6 +143,7 @@ class CrossChannelMessagingToolServiceTest {
         assertFalse(data.getBoolean("sent"));
         verify(outbox).queue(businessId, messageAId);
         verify(outbox).queue(businessId, messageBId);
+        verify(showcase).markQueued(businessId, operationId, 2);
     }
 
     @Test
