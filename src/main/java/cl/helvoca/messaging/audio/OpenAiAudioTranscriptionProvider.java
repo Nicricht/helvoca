@@ -18,6 +18,7 @@ public class OpenAiAudioTranscriptionProvider implements AudioTranscriptionProvi
     private final OpenAiRealtimeProperties openAi;
     private final HttpClient http;
     private final String model;
+    private final String fallbackModel;
     private final String endpoint;
 
     public OpenAiAudioTranscriptionProvider(
@@ -25,9 +26,19 @@ public class OpenAiAudioTranscriptionProvider implements AudioTranscriptionProvi
             HttpClient http,
             String model,
             String endpoint) {
+        this(openAi, http, model, "", endpoint);
+    }
+
+    public OpenAiAudioTranscriptionProvider(
+            OpenAiRealtimeProperties openAi,
+            HttpClient http,
+            String model,
+            String fallbackModel,
+            String endpoint) {
         this.openAi = openAi;
         this.http = http;
         this.model = clean(model);
+        this.fallbackModel = clean(fallbackModel);
         this.endpoint = clean(endpoint);
     }
 
@@ -63,12 +74,28 @@ public class OpenAiAudioTranscriptionProvider implements AudioTranscriptionProvi
                     "Audio input is empty");
         }
 
+        try {
+            return transcribeModel(input, model, 1);
+        } catch (AudioTranscriptionException primaryFailure) {
+            if (primaryFailure.retryable()
+                    && fallbackConfigured()
+                    && !fallbackModel.equals(model)) {
+                return transcribeModel(input, fallbackModel, 2);
+            }
+            throw primaryFailure;
+        }
+    }
+
+    private TranscriptionResult transcribeModel(
+            AudioInput input,
+            String modelName,
+            int attemptCount) {
         long started = System.nanoTime();
         String boundary = "----helvoca-" + UUID.randomUUID();
         String mimeType = normalizeMime(input.mimeType());
         byte[] body = multipart(
                 boundary,
-                model,
+                modelName,
                 mimeType,
                 extension(mimeType),
                 input.bytes());
@@ -98,9 +125,9 @@ public class OpenAiAudioTranscriptionProvider implements AudioTranscriptionProvi
             return new TranscriptionResult(
                     text,
                     id(),
-                    model,
+                    modelName,
                     Duration.ofNanos(System.nanoTime() - started),
-                    1);
+                    attemptCount);
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             throw new AudioTranscriptionException(
@@ -129,6 +156,10 @@ public class OpenAiAudioTranscriptionProvider implements AudioTranscriptionProvi
                     "OpenAI audio transcription response was invalid",
                     failure);
         }
+    }
+
+    private boolean fallbackConfigured() {
+        return !fallbackModel.isBlank();
     }
 
     private AudioTranscriptionException httpFailure(int status) {
