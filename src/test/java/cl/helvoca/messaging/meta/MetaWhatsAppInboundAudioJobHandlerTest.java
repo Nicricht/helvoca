@@ -13,7 +13,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
@@ -49,7 +48,7 @@ class MetaWhatsAppInboundAudioJobHandlerTest {
                 java.util.Arrays.equals(bytes, input.bytes())
                         && "audio/ogg".equals(input.mimeType())
                         && businessId.equals(input.businessId())
-                        && "wamid.AUDIO-WORKER".equals(input.sourceMessageId())
+                        && "wamid.AUDIO-WORKER".equals(input.messageId())
                         && CORRELATION_ID.toString().equals(input.correlationId())));
         verify(receptionist).handleResolved(
                 "wamid.AUDIO-WORKER",
