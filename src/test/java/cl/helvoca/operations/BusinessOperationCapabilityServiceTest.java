@@ -94,6 +94,26 @@ class BusinessOperationCapabilityServiceTest {
     }
 
     @Test
+    void catalogPermissionAlsoDerivesAuthoritativeShowcaseSelectionTool() {
+        UUID businessId = UUID.randomUUID();
+        when(aiAgents.allowedToolNames(businessId)).thenReturn(Set.of("list_catalog"));
+        when(aiAgents.toolAllowed(businessId, "list_catalog")).thenReturn(true);
+
+        BusinessOperationCapabilityService service =
+                new BusinessOperationCapabilityService(aiAgents, tenantProvider);
+
+        Set<String> tools = service.allowedToolNames(businessId);
+
+        assertEquals(Set.of(
+                "list_catalog",
+                CommercialOperationToolService.SHOWCASE_SELECTION_TOOL), tools);
+        assertTrue(service.isToolAllowed(
+                businessId, CommercialOperationToolService.SHOWCASE_SELECTION_TOOL));
+        assertTrue(CommercialToolDefinitions.allowed(tools).toString()
+                .contains(CommercialOperationToolService.SHOWCASE_SELECTION_TOOL));
+    }
+
+    @Test
     void disabledAutomationHidesMutatingToolsButKeepsReadOnlyStatusTools() {
         UUID businessId = UUID.randomUUID();
         when(aiAgents.allowedToolNames(businessId)).thenReturn(Set.of(
