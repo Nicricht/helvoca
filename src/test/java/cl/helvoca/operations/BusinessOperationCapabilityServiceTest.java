@@ -137,6 +137,31 @@ class BusinessOperationCapabilityServiceTest {
     }
 
     @Test
+    void showcaseOrderRequiresCatalogQuoteOrderAndCreateOrderPermissions() {
+        UUID businessId = UUID.randomUUID();
+        when(aiAgents.allowedToolNames(businessId)).thenReturn(Set.of(
+                "list_catalog", "quote_order", "create_order"));
+        when(aiAgents.toolAllowed(businessId, "list_catalog")).thenReturn(true);
+        when(aiAgents.toolAllowed(businessId, "quote_order")).thenReturn(true);
+        when(aiAgents.toolAllowed(businessId, "create_order")).thenReturn(true);
+
+        BusinessOperationCapabilityService service =
+                new BusinessOperationCapabilityService(aiAgents, tenantProvider);
+
+        Set<String> tools = service.allowedToolNames(businessId);
+
+        assertTrue(tools.contains(CommercialOperationToolService.SHOWCASE_ORDER_TOOL));
+        assertTrue(service.isToolAllowed(
+                businessId, CommercialOperationToolService.SHOWCASE_ORDER_TOOL));
+        assertTrue(CommercialToolDefinitions.allowed(tools).toString()
+                .contains(CommercialOperationToolService.SHOWCASE_ORDER_TOOL));
+
+        when(aiAgents.toolAllowed(businessId, "create_order")).thenReturn(false);
+        assertFalse(service.isToolAllowed(
+                businessId, CommercialOperationToolService.SHOWCASE_ORDER_TOOL));
+    }
+
+    @Test
     void disabledAutomationHidesMutatingToolsButKeepsReadOnlyStatusTools() {
         UUID businessId = UUID.randomUUID();
         when(aiAgents.allowedToolNames(businessId)).thenReturn(Set.of(
