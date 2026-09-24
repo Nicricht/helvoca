@@ -102,6 +102,12 @@ public final class CommercialToolDefinitions {
                                         .put("selectionIndex", integer("Posición 1-based dentro del último escaparate: 1, 2 o 3"))
                                         .put("catalogItemId", string("UUID opcional del producto, únicamente si formó parte del último escaparate")))
                                 .put("required", new JSONArray().put("operationId"))))
+                .put(function(CommercialOperationToolService.SHOWCASE_QUOTE_TOOL,
+                        "Cotiza el producto ya seleccionado dentro de la MISMA operación comercial. El backend obtiene producto, precio y moneda actuales desde el catálogo; no acepta montos enviados por la IA. quantity es opcional y vale 1 por defecto. No crea otra BusinessOperation.",
+                        object().put("properties", new JSONObject()
+                                        .put("operationId", string("UUID exacto de la operación donde select_showcase_product guardó la selección"))
+                                        .put("quantity", integer("Cantidad a cotizar entre 1 y 100; omitir equivale a 1")))
+                                .put("required", new JSONArray().put("operationId"))))
                 .put(function("list_delivery_zones",
                         "Lista las zonas de despacho configuradas, su costo y compra mínima. No inventes cobertura ni costo de despacho.",
                         object()))
@@ -214,7 +220,8 @@ public final class CommercialToolDefinitions {
                     .append("Si el despacho solo forma parte de un ORDER que aún se está armando, conserva el flujo quote_order/update_order/create_order y no crees un DELIVERY separado salvo que el cliente realmente solicite una operación de despacho independiente.\n");
         }
         if (enabled.contains(BusinessOperationCapability.QUOTE)) {
-            out.append("Para cotizaciones: usa create_quote. Si el backend no devuelve un monto, explica que quedó solicitada para evaluación; nunca inventes el precio.\n");
+            out.append("Para cotizaciones: si esta misma operación ya tiene un producto elegido mediante select_showcase_product, usa quote_selected_product con el mismo operationId; el backend toma el precio y moneda actuales y conserva la continuidad comercial. ")
+                    .append("Usa create_quote solo para una cotización nueva o independiente que no provenga de ese escaparate. Si el backend no devuelve un monto, nunca inventes el precio.\n");
         }
         if (enabled.contains(BusinessOperationCapability.LEAD)) {
             out.append("Para potenciales clientes que requieren seguimiento comercial usa create_lead y conserva únicamente datos entregados por la persona.\n");
