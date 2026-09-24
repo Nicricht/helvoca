@@ -113,6 +113,7 @@ public class PaymentWebhookService {
             payment.setMetadata(merge(payment.getMetadata(), result.metadata()));
             payment = payments.saveAndFlush(payment);
             syncUniversalOperation(payment);
+            syncCommercialJourney(payment);
             syncConversation(payment);
 
             event.setStatus(PaymentWebhookEvent.Status.PROCESSED);
@@ -148,6 +149,42 @@ public class PaymentWebhookService {
         metadata.put("confirmationPending", false);
         operation.setMetadata(metadata);
         operations.saveAndFlush(operation);
+    }
+
+    private void syncCommercialJourney(BusinessPayment payment) {
+        if (payment == null) return;
+        BusinessOperation paymentOperation = operations
+                .findByIdAndBusinessId(payment.getOperationId(), payment.getBusinessId())
+                .orElse(null);
+        if (paymentOperation == null || paymentOperation.getMetadata() == null) return;
+
+        UUID journeyId = uuidOrNull(String.valueOf(
+                paymentOperation.getMetadata().get("commercialJourneyOperationId")));
+        if (journeyId == null) return;
+
+        BusinessOperation journey = operations
+                .findByIdAndBusinessId(journeyId, payment.getBusinessId())
+                .orElse(null);
+        if (journey == null) return;
+        if (payment.getCustomerId() != null
+                && journey.getCustomerId() != null
+                && !payment.getCustomerId().equals(journey.getCustomerId())) return;
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (journey.getMetadata() != null) metadata.putAll(journey.getMetadata());
+        metadata.put("paymentOperationId", payment.getOperationId().toString());
+        metadata.put("paymentId", payment.getId().toString());
+        metadata.put("paymentStatus", payment.getStatus().name());
+        metadata.put("commercialStage", switch (payment.getStatus()) {
+            case SUCCEEDED -> "PAID";
+            case REQUIRES_ACTION, PENDING -> "PAYMENT_LINK_SENT";
+            case REFUNDED -> "PAYMENT_REFUNDED";
+            case FAILED, CANCELLED, EXPIRED -> "PAYMENT_FAILED";
+        });
+        metadata.put("lastAction", "PAYMENT_STATUS_VERIFIED");
+        journey.setMetadata(metadata);
+        journey.setRevision(journey.getRevision() == null ? 1 : journey.getRevision() + 1);
+        operations.saveAndFlush(journey);
     }
 
     private void syncConversation(BusinessPayment payment) {

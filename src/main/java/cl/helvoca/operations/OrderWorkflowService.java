@@ -63,7 +63,7 @@ public class OrderWorkflowService {
         operation.setContactName(optional(args, "contactName"));
         operation.setContactPhone(blank(trustedPhone) ? null : trustedPhone.trim());
         applyCalculation(operation, calculation);
-        operation.setMetadata(stateMetadata(true));
+        operation.setMetadata(stateMetadata(null, true));
         operation = operations.saveAndFlush(operation);
         replaceItems(operation.getId(), calculation.lines());
         return success(quoteData(operation, calculation));
@@ -88,7 +88,7 @@ public class OrderWorkflowService {
         operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
         operation.setConfirmationToken(UUID.randomUUID());
         operation.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
-        operation.setMetadata(stateMetadata(true));
+        operation.setMetadata(stateMetadata(operation.getMetadata(), true));
         operation = operations.saveAndFlush(operation);
         replaceItems(operation.getId(), calculation.lines());
         return success(quoteData(operation, calculation));
@@ -141,7 +141,7 @@ public class OrderWorkflowService {
             operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
             operation.setConfirmationToken(UUID.randomUUID());
             operation.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
-            operation.setMetadata(stateMetadata(true));
+            operation.setMetadata(stateMetadata(operation.getMetadata(), true));
             operation = operations.saveAndFlush(operation);
             replaceItems(operation.getId(), recalculated.lines());
             return errorWithData("ORDER_TOTAL_CHANGED",
@@ -185,7 +185,7 @@ public class OrderWorkflowService {
 
         operation.setStatus(BusinessOperation.Status.CONFIRMED);
         operation.setConfirmationToken(null);
-        operation.setMetadata(stateMetadata(false));
+        operation.setMetadata(stateMetadata(operation.getMetadata(), false));
         operations.saveAndFlush(operation);
 
         JSONObject data = orderData(order, persisted);
@@ -440,11 +440,14 @@ public class OrderWorkflowService {
                 .trim();
     }
 
-    private static Map<String, Object> stateMetadata(boolean confirmationPending) {
-        return Map.of(
-                "intent", "ORDER",
-                "confirmationPending", confirmationPending,
-                "paymentPending", false);
+    private static Map<String, Object> stateMetadata(Map<String, Object> current,
+                                                     boolean confirmationPending) {
+        Map<String, Object> metadata = new java.util.LinkedHashMap<>();
+        if (current != null) metadata.putAll(current);
+        metadata.put("intent", "ORDER");
+        metadata.put("confirmationPending", confirmationPending);
+        metadata.put("paymentPending", false);
+        return metadata;
     }
 
     private static String required(JSONObject args, String key) {

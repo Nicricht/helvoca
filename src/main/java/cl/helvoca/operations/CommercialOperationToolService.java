@@ -27,11 +27,13 @@ import java.util.UUID;
 public class CommercialOperationToolService {
     public static final String SHOWCASE_SELECTION_TOOL = "select_showcase_product";
     public static final String SHOWCASE_QUOTE_TOOL = "quote_selected_product";
+    public static final String SHOWCASE_ORDER_TOOL = "quote_selected_product_order";
 
     private static final Set<String> SUPPORTED = Set.of(
             "list_catalog",
             SHOWCASE_SELECTION_TOOL,
             SHOWCASE_QUOTE_TOOL,
+            SHOWCASE_ORDER_TOOL,
             "list_delivery_zones",
             "validate_delivery_address",
             "quote_delivery",
@@ -53,6 +55,7 @@ public class CommercialOperationToolService {
             "cancel_payment");
 
     private static final Set<String> ORDER_STATE_TOOLS = Set.of(
+            SHOWCASE_ORDER_TOOL,
             "quote_order",
             "update_order",
             "create_order",
@@ -126,6 +129,8 @@ public class CommercialOperationToolService {
                 case "list_catalog" -> listCatalog(businessId);
                 case SHOWCASE_SELECTION_TOOL -> selectShowcaseProduct(businessId, customerId, args);
                 case SHOWCASE_QUOTE_TOOL -> quoteSelectedProduct(businessId, customerId, args);
+                case SHOWCASE_ORDER_TOOL -> quoteSelectedProductOrder(
+                        businessId, customerId, sourceReferenceId, trustedPhone, source, args);
                 case "list_delivery_zones" -> listDeliveryZones(businessId);
                 case "validate_delivery_address" -> validateDeliveryAddress(businessId, args);
                 case "quote_delivery" -> deliveryWorkflow.quote(
@@ -162,6 +167,9 @@ public class CommercialOperationToolService {
                         businessId, customerId, sourceReferenceId, trustedPhone, source, args);
                 default -> error("UNKNOWN_COMMERCIAL_TOOL", "La operación comercial solicitada no existe.");
             };
+
+            synchronizeCommercialJourney(
+                    businessId, customerId, toolName, args, result);
 
             recordConversationResult(
                     businessId,
@@ -409,6 +417,276 @@ public class CommercialOperationToolService {
                 .put("commercialStage", "QUOTE_PENDING")
                 .put("idempotent", idempotent)
                 .put("product", catalogData(item, media)));
+    }
+
+    private JSONObject quoteSelectedProductOrder(UUID businessId,
+                                                     UUID customerId,
+                                                     UUID sourceReferenceId,
+                                                     String trustedPhone,
+                                                     BusinessOrder.Source source,
+                                                     JSONObject args) {
+        if (businessId == null) {
+            return error("TENANT_CONTEXT_REQUIRED", "No pude verificar el negocio actual.");
+        }
+        if (customerId == null) {
+            return error("CUSTOMER_CONTEXT_REQUIRED",
+                    "Primero necesito identificar al cliente de forma segura.");
+        }
+
+        UUID journeyOperationId = uuid(required(args, "operationId"));
+        BusinessOperation journey = operations.findByIdAndBusinessId(journeyOperationId, businessId).orElse(null);
+        if (journey == null) {
+            return error("OPERATION_NOT_FOUND",
+                    "No encuentro la operación comercial de origen.");
+        }
+        if (journey.getCustomerId() == null || !customerId.equals(journey.getCustomerId())) {
+            return error("OPERATION_NOT_OWNED",
+                    "La operación comercial no pertenece al cliente actual.");
+        }
+
+        Map<String, Object> metadata = journey.getMetadata();
+        String selectedRaw = stringMetadata(metadata, "selectedCatalogItemId");
+        String quotedRaw = stringMetadata(metadata, "quotedCatalogItemId");
+        if (blank(selectedRaw) || !selectedRaw.equals(quotedRaw)) {
+            return error("SELECTED_PRODUCT_QUOTE_REQUIRED",
+                    "Primero presenta una cotización vigente del producto seleccionado.");
+        }
+
+        UUID selectedId;
+        try {
+            selectedId = UUID.fromString(selectedRaw);
+        } catch (Exception e) {
+            return error("SHOWCASE_SELECTION_INVALID",
+                    "La selección comercial guardada no es válida.");
+        }
+
+        List<UUID> showcaseIds = showcaseIds(metadata == null ? null : metadata.get("showcaseCatalogItemIds"));
+        if (showcaseIds.isEmpty() || !showcaseIds.contains(selectedId)) {
+            return error("SHOWCASE_SELECTION_INVALID",
+                    "El producto seleccionado no pertenece al escaparate autoritativo.");
+        }
+
+        Integer requestedQuantity = optionalInteger(args, "quantity");
+        int quotedQuantity = integerMetadata(metadata, "quotedQuantity");
+        int quantity = requestedQuantity == null
+                ? (quotedQuantity >= 1 && quotedQuantity <= 100 ? quotedQuantity : 1)
+                : requestedQuantity;
+        if (quantity < 1 || quantity > 100) {
+            return error("INVALID_QUANTITY", "La cantidad debe estar entre 1 y 100.");
+        }
+
+        JSONObject orderArgs = new JSONObject()
+                .put("items", new JSONArray().put(new JSONObject()
+                        .put("catalogItemId", selectedId.toString())
+                        .put("quantity", quantity)))
+                .put("fulfillmentType", required(args, "fulfillmentType"));
+        copyArgument(args, orderArgs, "deliveryZoneId");
+        copyArgument(args, orderArgs, "address");
+        copyArgument(args, orderArgs, "contactName");
+
+        JSONObject result;
+        UUID existingOrderOperationId = metadataUuid(metadata, "orderOperationId");
+        BusinessOperation existingOrder = existingOrderOperationId == null
+                ? null
+                : operations.findByIdAndBusinessId(existingOrderOperationId, businessId).orElse(null);
+
+        if (existingOrder != null
+                && existingOrder.getType() == BusinessOperation.Type.ORDER
+                && (existingOrder.getStatus() == BusinessOperation.Status.AWAITING_CONFIRMATION
+                    || existingOrder.getStatus() == BusinessOperation.Status.DRAFT)) {
+            orderArgs.put("operationId", existingOrderOperationId.toString());
+            result = orderWorkflow.update(
+                    businessId, customerId, sourceReferenceId, trustedPhone, orderArgs);
+        } else if (existingOrder != null
+                && existingOrder.getType() == BusinessOperation.Type.ORDER
+                && existingOrder.getStatus() == BusinessOperation.Status.CONFIRMED) {
+            return error("ORDER_ALREADY_CONFIRMED",
+                    "La compra seleccionada ya tiene un pedido confirmado.");
+        } else {
+            result = orderWorkflow.quote(
+                    businessId, customerId, sourceReferenceId, trustedPhone, source, orderArgs);
+        }
+
+        if (!result.optBoolean("success", false)) return result;
+        JSONObject data = result.optJSONObject("data");
+        if (data == null) return result;
+
+        UUID orderOperationId = uuid(data.getString("operationId"));
+        BusinessOperation orderOperation = operations.findByIdAndBusinessId(orderOperationId, businessId)
+                .orElseThrow(() -> new IllegalStateException("Order draft was not persisted"));
+
+        Map<String, Object> orderMetadata = orderOperation.getMetadata() == null
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(orderOperation.getMetadata());
+        orderMetadata.put("commercialJourneyOperationId", journeyOperationId.toString());
+        orderMetadata.put("selectedCatalogItemId", selectedId.toString());
+        orderOperation.setMetadata(orderMetadata);
+        operations.saveAndFlush(orderOperation);
+
+        updateJourneyMetadata(journey, Map.of(
+                "orderOperationId", orderOperationId.toString(),
+                "commercialStage", "PURCHASE_PENDING",
+                "lastAction", "ORDER_QUOTED"));
+
+        data.put("commercialJourneyOperationId", journeyOperationId.toString());
+        data.put("orderOperationId", orderOperationId.toString());
+        data.put("selectedCatalogItemId", selectedId.toString());
+        return result;
+    }
+
+    private void synchronizeCommercialJourney(UUID businessId,
+                                              UUID customerId,
+                                              String toolName,
+                                              JSONObject args,
+                                              JSONObject result) {
+        if (businessId == null || toolName == null || result == null) return;
+
+        boolean success = result.optBoolean("success", false);
+        JSONObject data = result.optJSONObject("data");
+        JSONObject error = result.optJSONObject("error");
+        String errorCode = error == null ? null : error.optString("code", null);
+
+        if ("create_order".equals(toolName)) {
+            if ((!success && !"ORDER_TOTAL_CHANGED".equals(errorCode)) || data == null) return;
+            UUID orderOperationId = uuidOrNull(data.optString("operationId", null));
+            BusinessOperation orderOperation = findOwnedOperation(
+                    businessId, customerId, orderOperationId, BusinessOperation.Type.ORDER);
+            UUID journeyId = journeyOperationId(orderOperation);
+            BusinessOperation journey = findOwnedJourney(businessId, customerId, journeyId);
+            if (journey == null) return;
+
+            Map<String, Object> patch = new LinkedHashMap<>();
+            patch.put("orderOperationId", orderOperationId.toString());
+            if (success) {
+                String orderId = data.optString("orderId", null);
+                if (!blank(orderId)) patch.put("orderId", orderId);
+                patch.put("commercialStage", "ORDER_CONFIRMED");
+                patch.put("lastAction", "ORDER_CONFIRMED");
+            } else {
+                patch.put("commercialStage", "PURCHASE_PENDING");
+                patch.put("lastAction", "ORDER_REQUOTED");
+            }
+            updateJourneyMetadata(journey, patch);
+            return;
+        }
+
+        if ("quote_payment".equals(toolName) && success && data != null) {
+            UUID targetOperationId = uuidOrNull(data.optString("targetOperationId", null));
+            BusinessOperation target = findOwnedOperation(
+                    businessId, customerId, targetOperationId, BusinessOperation.Type.ORDER);
+            UUID journeyId = journeyOperationId(target);
+            BusinessOperation journey = findOwnedJourney(businessId, customerId, journeyId);
+            if (journey == null) return;
+
+            UUID paymentOperationId = uuidOrNull(data.optString("operationId", null));
+            BusinessOperation paymentOperation = findOwnedOperation(
+                    businessId, customerId, paymentOperationId, BusinessOperation.Type.PAYMENT);
+            if (paymentOperation == null) return;
+
+            Map<String, Object> paymentMetadata = paymentOperation.getMetadata() == null
+                    ? new LinkedHashMap<>()
+                    : new LinkedHashMap<>(paymentOperation.getMetadata());
+            paymentMetadata.put("commercialJourneyOperationId", journeyId.toString());
+            paymentOperation.setMetadata(paymentMetadata);
+            operations.saveAndFlush(paymentOperation);
+
+            updateJourneyMetadata(journey, Map.of(
+                    "paymentOperationId", paymentOperationId.toString(),
+                    "commercialStage", "PAYMENT_PENDING",
+                    "lastAction", "PAYMENT_QUOTED"));
+            return;
+        }
+
+        if ("create_payment".equals(toolName) && success && data != null) {
+            UUID paymentOperationId = uuidOrNull(data.optString("operationId", null));
+            BusinessOperation paymentOperation = findOwnedOperation(
+                    businessId, customerId, paymentOperationId, BusinessOperation.Type.PAYMENT);
+            UUID journeyId = journeyOperationId(paymentOperation);
+            BusinessOperation journey = findOwnedJourney(businessId, customerId, journeyId);
+            if (journey == null) return;
+
+            String status = data.optString("status", "");
+            String stage = switch (status) {
+                case "SUCCEEDED" -> "PAID";
+                case "REQUIRES_ACTION", "PENDING" -> "PAYMENT_LINK_SENT";
+                default -> "PAYMENT_FAILED";
+            };
+
+            Map<String, Object> patch = new LinkedHashMap<>();
+            patch.put("paymentOperationId", paymentOperationId.toString());
+            String paymentId = data.optString("paymentId", null);
+            if (!blank(paymentId)) patch.put("paymentId", paymentId);
+            if (!blank(status)) patch.put("paymentStatus", status);
+            Object checkout = data.opt("checkoutUrl");
+            if (checkout != null && checkout != JSONObject.NULL && !String.valueOf(checkout).isBlank()) {
+                patch.put("checkoutUrl", String.valueOf(checkout));
+            }
+            patch.put("commercialStage", stage);
+            patch.put("lastAction", "SUCCEEDED".equals(status)
+                    ? "PAYMENT_CONFIRMED"
+                    : "PAYMENT_CREATED");
+            updateJourneyMetadata(journey, patch);
+        }
+    }
+
+    private BusinessOperation findOwnedOperation(UUID businessId,
+                                                 UUID customerId,
+                                                 UUID operationId,
+                                                 BusinessOperation.Type type) {
+        if (operationId == null) return null;
+        BusinessOperation operation = operations.findByIdAndBusinessId(operationId, businessId).orElse(null);
+        if (operation == null || operation.getType() != type) return null;
+        if (customerId != null && !customerId.equals(operation.getCustomerId())) return null;
+        return operation;
+    }
+
+    private BusinessOperation findOwnedJourney(UUID businessId,
+                                               UUID customerId,
+                                               UUID journeyId) {
+        if (journeyId == null) return null;
+        BusinessOperation journey = operations.findByIdAndBusinessId(journeyId, businessId).orElse(null);
+        if (journey == null) return null;
+        if (customerId != null && !customerId.equals(journey.getCustomerId())) return null;
+        return journey;
+    }
+
+    private static UUID journeyOperationId(BusinessOperation operation) {
+        if (operation == null) return null;
+        return metadataUuid(operation.getMetadata(), "commercialJourneyOperationId");
+    }
+
+    private void updateJourneyMetadata(BusinessOperation journey, Map<String, Object> patch) {
+        if (journey == null || patch == null || patch.isEmpty()) return;
+        Map<String, Object> metadata = journey.getMetadata() == null
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(journey.getMetadata());
+        metadata.putAll(patch);
+        journey.setMetadata(metadata);
+        journey.setRevision(journey.getRevision() == null ? 1 : journey.getRevision() + 1);
+        operations.saveAndFlush(journey);
+    }
+
+    private static UUID metadataUuid(Map<String, Object> metadata, String key) {
+        if (metadata == null || metadata.get(key) == null) return null;
+        try {
+            return UUID.fromString(String.valueOf(metadata.get(key)).trim());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static UUID uuidOrNull(String raw) {
+        if (blank(raw)) return null;
+        try {
+            return UUID.fromString(raw.trim());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static void copyArgument(JSONObject source, JSONObject target, String key) {
+        if (source == null || target == null || !source.has(key) || source.opt(key) == JSONObject.NULL) return;
+        target.put(key, source.get(key));
     }
 
     private static String stringMetadata(Map<String, Object> metadata, String key) {

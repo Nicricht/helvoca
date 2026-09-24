@@ -21,6 +21,8 @@ class PaymentWebhookServiceTest {
         UUID businessId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
         UUID operationId = UUID.randomUUID();
+        UUID journeyId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
         UUID sourceReferenceId = UUID.randomUUID();
 
         PaymentWebhookEventRepository events = mock(PaymentWebhookEventRepository.class);
@@ -31,12 +33,26 @@ class PaymentWebhookServiceTest {
         PaymentProviderAdapter adapter = mock(PaymentProviderAdapter.class);
 
         BusinessPayment payment = payment(paymentId, businessId, operationId, sourceReferenceId);
+        payment.setCustomerId(customerId);
         BusinessOperation operation = new BusinessOperation();
         operation.setId(operationId);
         operation.setBusinessId(businessId);
         operation.setType(BusinessOperation.Type.PAYMENT);
         operation.setStatus(BusinessOperation.Status.CONFIRMED);
         operation.setRevision(1);
+        operation.setCustomerId(customerId);
+        operation.setMetadata(new java.util.LinkedHashMap<>(Map.of(
+                "commercialJourneyOperationId", journeyId.toString())));
+
+        BusinessOperation journey = new BusinessOperation();
+        journey.setId(journeyId);
+        journey.setBusinessId(businessId);
+        journey.setCustomerId(customerId);
+        journey.setType(BusinessOperation.Type.REQUEST);
+        journey.setStatus(BusinessOperation.Status.CONFIRMED);
+        journey.setRevision(4);
+        journey.setMetadata(new java.util.LinkedHashMap<>(Map.of(
+                "commercialStage", "PAYMENT_LINK_SENT")));
 
         PaymentWebhookEvent claimed = new PaymentWebhookEvent();
         claimed.setBusinessId(businessId);
@@ -57,6 +73,7 @@ class PaymentWebhookServiceTest {
                 BusinessPayment.Status.SUCCEEDED,
                 Map.of("remoteStatus", "processed", "remoteStatusDetail", "accredited")));
         when(operations.findByIdAndBusinessId(operationId, businessId)).thenReturn(Optional.of(operation));
+        when(operations.findByIdAndBusinessId(journeyId, businessId)).thenReturn(Optional.of(journey));
         when(operations.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         PaymentWebhookService service = new PaymentWebhookService(
@@ -72,6 +89,10 @@ class PaymentWebhookServiceTest {
         assertEquals(PaymentWebhookService.Result.PROCESSED, result);
         assertEquals(BusinessPayment.Status.SUCCEEDED, payment.getStatus());
         assertEquals("processed", payment.getMetadata().get("remoteStatus"));
+        assertEquals("PAID", journey.getMetadata().get("commercialStage"));
+        assertEquals("SUCCEEDED", journey.getMetadata().get("paymentStatus"));
+        assertEquals(paymentId.toString(), journey.getMetadata().get("paymentId"));
+        assertEquals(5, journey.getRevision());
         verify(adapter).getStatus(any());
         verify(conversation).apply(eq(businessId), eq(sourceReferenceId),
                 eq(BusinessOrder.Source.WHATSAPP), eq(operationId), any());
