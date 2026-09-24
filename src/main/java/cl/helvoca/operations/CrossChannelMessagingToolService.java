@@ -5,10 +5,13 @@ import cl.helvoca.messaging.outbound.OutboundDispatchOutboxService;
 import cl.helvoca.messaging.outbound.OutboundMessage;
 import cl.helvoca.messaging.outbound.OutboundMessagingProperties;
 import cl.helvoca.messaging.outbound.OutboundMessagingService;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -25,15 +28,18 @@ public class CrossChannelMessagingToolService {
     private final OutboundMessagingProperties properties;
     private final MessagingProviderRegistry providers;
     private final OutboundDispatchOutboxService outbox;
+    private final CatalogShowcaseMessagingService showcase;
 
     public CrossChannelMessagingToolService(OutboundMessagingService outbound,
                                             OutboundMessagingProperties properties,
                                             MessagingProviderRegistry providers,
-                                            OutboundDispatchOutboxService outbox) {
+                                            OutboundDispatchOutboxService outbox,
+                                            CatalogShowcaseMessagingService showcase) {
         this.outbound = outbound;
         this.properties = properties;
         this.providers = providers;
         this.outbox = outbox;
+        this.showcase = showcase;
     }
 
     @Transactional
@@ -48,6 +54,47 @@ public class CrossChannelMessagingToolService {
             UUID operationId = UUID.fromString(required(args, "operationId"));
             OutboundMessage.Purpose purpose = purpose(required(args, "purpose"));
             UUID identityId = optionalUuid(args, "recipientIdentityId");
+
+            if (purpose == OutboundMessage.Purpose.PRODUCT_SHOWCASE) {
+                List<UUID> catalogItemIds = requiredUuidList(args, "catalogItemIds", 3);
+                List<CatalogShowcaseMessagingService.PreparedShowcaseMessage> messages =
+                        showcase.prepare(businessId, customerId, operationId, identityId, catalogItemIds);
+
+                JSONArray preparedMessages = new JSONArray();
+                for (CatalogShowcaseMessagingService.PreparedShowcaseMessage value : messages) {
+                    preparedMessages.put(new JSONObject()
+                            .put("messageId", value.message().getId().toString())
+                            .put("catalogItemId", value.catalogItemId().toString())
+                            .put("catalogItemName", value.catalogItemName())
+                            .put("catalogMediaId", value.catalogMediaId().toString())
+                            .put("mediaType", value.mediaType().name())
+                            .put("status", value.message().getStatus().name()));
+                }
+
+                JSONObject prepared = new JSONObject()
+                        .put("operationId", operationId.toString())
+                        .put("channel", OutboundMessage.Channel.WHATSAPP.name())
+                        .put("purpose", purpose.name())
+                        .put("messageCount", messages.size())
+                        .put("messages", preparedMessages)
+                        .put("prepared", true)
+                        .put("sent", false);
+
+                if (!properties.isDeliveryEnabled()) {
+                    return errorWithData(
+                            "WHATSAPP_DELIVERY_DISABLED",
+                            "La muestra quedó preparada, pero el envío real por WhatsApp está desactivado.",
+                            prepared);
+                }
+
+                providers.require(properties.getProvider(), OutboundMessage.Channel.WHATSAPP);
+                for (CatalogShowcaseMessagingService.PreparedShowcaseMessage value : messages) {
+                    outbox.queue(businessId, value.message().getId());
+                }
+                prepared.put("status", OutboundMessage.Status.QUEUED.name());
+                prepared.put("queued", true);
+                return success(prepared);
+            }
 
             OutboundMessage message = outbound.prepare(
                     businessId,
@@ -95,6 +142,23 @@ public class CrossChannelMessagingToolService {
         } catch (Exception e) {
             throw new IllegalArgumentException("Propósito de WhatsApp no soportado.");
         }
+    }
+
+    private static List<UUID> requiredUuidList(JSONObject args, String key, int maxItems) {
+        JSONArray raw = args.optJSONArray(key);
+        if (raw == null || raw.isEmpty()) {
+            throw new IllegalArgumentException("Falta el argumento " + key + ".");
+        }
+        if (raw.length() > maxItems) {
+            throw new IllegalArgumentException("Se pueden enviar como máximo " + maxItems + " productos por muestra.");
+        }
+        List<UUID> values = new ArrayList<>();
+        for (int i = 0; i < raw.length(); i++) {
+            String value = raw.optString(i, "").trim();
+            if (value.isBlank()) throw new IllegalArgumentException("Un identificador de catálogo es inválido.");
+            values.add(UUID.fromString(value));
+        }
+        return List.copyOf(values);
     }
 
     private static UUID optionalUuid(JSONObject args, String key) {
