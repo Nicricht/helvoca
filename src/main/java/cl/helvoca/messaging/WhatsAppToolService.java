@@ -408,7 +408,7 @@ public class WhatsAppToolService {
                 .put("localStart", formatLocal(businessId, booking.getStartAt()));
     }
 
-    private Business requireBusiness(UUID businessId) {
+    protected Business requireBusiness(UUID businessId) {
         return businesses.findById(businessId).orElseThrow(() -> new IllegalArgumentException("Negocio no encontrado."));
     }
 
