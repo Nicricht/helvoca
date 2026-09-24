@@ -26,10 +26,12 @@ import java.util.UUID;
 @Service
 public class CommercialOperationToolService {
     public static final String SHOWCASE_SELECTION_TOOL = "select_showcase_product";
+    public static final String SHOWCASE_QUOTE_TOOL = "quote_selected_product";
 
     private static final Set<String> SUPPORTED = Set.of(
             "list_catalog",
             SHOWCASE_SELECTION_TOOL,
+            SHOWCASE_QUOTE_TOOL,
             "list_delivery_zones",
             "validate_delivery_address",
             "quote_delivery",
@@ -123,6 +125,7 @@ public class CommercialOperationToolService {
             result = switch (toolName) {
                 case "list_catalog" -> listCatalog(businessId);
                 case SHOWCASE_SELECTION_TOOL -> selectShowcaseProduct(businessId, customerId, args);
+                case SHOWCASE_QUOTE_TOOL -> quoteSelectedProduct(businessId, customerId, args);
                 case "list_delivery_zones" -> listDeliveryZones(businessId);
                 case "validate_delivery_address" -> validateDeliveryAddress(businessId, args);
                 case "quote_delivery" -> deliveryWorkflow.quote(
@@ -296,6 +299,147 @@ public class CommercialOperationToolService {
                 .put("commercialStage", commercialStage)
                 .put("idempotent", idempotent)
                 .put("product", catalogData(item, media));
+    }
+
+    private JSONObject quoteSelectedProduct(UUID businessId,
+                                            UUID customerId,
+                                            JSONObject args) {
+        if (businessId == null) {
+            return error("TENANT_CONTEXT_REQUIRED", "No pude verificar el negocio actual.");
+        }
+        if (customerId == null) {
+            return error("CUSTOMER_CONTEXT_REQUIRED",
+                    "Primero necesito identificar al cliente de forma segura.");
+        }
+
+        UUID operationId = uuid(required(args, "operationId"));
+        BusinessOperation operation = operations.findByIdAndBusinessId(operationId, businessId).orElse(null);
+        if (operation == null) {
+            return error("OPERATION_NOT_FOUND",
+                    "No encuentro esa operación dentro del negocio actual.");
+        }
+        if (operation.getCustomerId() == null || !customerId.equals(operation.getCustomerId())) {
+            return error("OPERATION_NOT_OWNED",
+                    "La operación no pertenece al cliente actual.");
+        }
+
+        Map<String, Object> currentMetadata = operation.getMetadata();
+        String selectedRaw = currentMetadata == null
+                ? null
+                : String.valueOf(currentMetadata.getOrDefault("selectedCatalogItemId", ""));
+        if (blank(selectedRaw)) {
+            return error("SHOWCASE_SELECTION_REQUIRED",
+                    "Primero debe existir un producto seleccionado de forma autoritativa.");
+        }
+
+        UUID selectedId;
+        try {
+            selectedId = UUID.fromString(selectedRaw.trim());
+        } catch (Exception e) {
+            return error("SHOWCASE_SELECTION_INVALID",
+                    "La selección guardada no es válida.");
+        }
+
+        List<UUID> showcaseIds = showcaseIds(
+                currentMetadata == null ? null : currentMetadata.get("showcaseCatalogItemIds"));
+        if (showcaseIds.isEmpty() || !showcaseIds.contains(selectedId)) {
+            return error("SHOWCASE_SELECTION_INVALID",
+                    "El producto seleccionado no pertenece al escaparate autoritativo.");
+        }
+
+        CatalogItem item = catalog.findByIdAndBusinessId(selectedId, businessId)
+                .filter(CatalogItem::isActive)
+                .orElse(null);
+        if (item == null) {
+            return error("CATALOG_ITEM_UNAVAILABLE",
+                    "El producto seleccionado ya no está disponible en el catálogo activo.");
+        }
+        if (item.getPrice() == null) {
+            return error("CATALOG_PRICE_UNAVAILABLE",
+                    "El producto seleccionado no tiene un precio backend disponible para cotizar.");
+        }
+
+        Integer requestedQuantity = optionalInteger(args, "quantity");
+        int quantity = requestedQuantity == null ? 1 : requestedQuantity;
+        if (quantity < 1 || quantity > 100) {
+            return error("INVALID_QUANTITY",
+                    "La cantidad debe estar entre 1 y 100.");
+        }
+
+        java.math.BigDecimal unitPrice = item.getPrice();
+        java.math.BigDecimal total = unitPrice.multiply(java.math.BigDecimal.valueOf(quantity));
+        String currency = blank(item.getCurrency()) ? "CLP" : item.getCurrency().trim().toUpperCase();
+
+        boolean idempotent = selectedId.toString().equals(stringMetadata(currentMetadata, "quotedCatalogItemId"))
+                && quantity == integerMetadata(currentMetadata, "quotedQuantity")
+                && moneyMetadataEquals(currentMetadata, "quotedUnitPrice", unitPrice)
+                && moneyMetadataEquals(currentMetadata, "quotedTotal", total)
+                && currency.equals(stringMetadata(currentMetadata, "quotedCurrency"))
+                && "QUOTE_PENDING".equals(stringMetadata(currentMetadata, "commercialStage"));
+
+        if (!idempotent) {
+            Map<String, Object> metadata = currentMetadata == null
+                    ? new LinkedHashMap<>()
+                    : new LinkedHashMap<>(currentMetadata);
+            metadata.put("quotedCatalogItemId", selectedId.toString());
+            metadata.put("quotedQuantity", quantity);
+            metadata.put("quotedUnitPrice", unitPrice);
+            metadata.put("quotedTotal", total);
+            metadata.put("quotedCurrency", currency);
+            metadata.put("commercialStage", "QUOTE_PENDING");
+            metadata.put("lastAction", "SELECTED_PRODUCT_QUOTED");
+
+            operation.setSubtotal(total);
+            operation.setDeliveryFee(java.math.BigDecimal.ZERO);
+            operation.setTotal(total);
+            operation.setCurrency(currency);
+            operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
+            operation.setMetadata(metadata);
+            operations.saveAndFlush(operation);
+        }
+
+        List<CatalogMedia> media = catalogMedia
+                .findAllByBusinessIdAndCatalogItemIdAndActiveTrueOrderBySortOrderAscCreatedAtAsc(
+                        businessId, item.getId());
+        return success(new JSONObject()
+                .put("operationId", operation.getId().toString())
+                .put("selectedCatalogItemId", item.getId().toString())
+                .put("quantity", quantity)
+                .put("unitPrice", unitPrice)
+                .put("total", total)
+                .put("currency", currency)
+                .put("commercialStage", "QUOTE_PENDING")
+                .put("idempotent", idempotent)
+                .put("product", catalogData(item, media)));
+    }
+
+    private static String stringMetadata(Map<String, Object> metadata, String key) {
+        if (metadata == null || metadata.get(key) == null) return "";
+        return String.valueOf(metadata.get(key)).trim();
+    }
+
+    private static int integerMetadata(Map<String, Object> metadata, String key) {
+        if (metadata == null || metadata.get(key) == null) return Integer.MIN_VALUE;
+        Object value = metadata.get(key);
+        try {
+            if (value instanceof Number number) return number.intValue();
+            return Integer.parseInt(String.valueOf(value).trim());
+        } catch (Exception e) {
+            return Integer.MIN_VALUE;
+        }
+    }
+
+    private static boolean moneyMetadataEquals(Map<String, Object> metadata,
+                                               String key,
+                                               java.math.BigDecimal expected) {
+        if (metadata == null || metadata.get(key) == null || expected == null) return false;
+        try {
+            java.math.BigDecimal actual = new java.math.BigDecimal(
+                    String.valueOf(metadata.get(key)).trim());
+            return actual.compareTo(expected) == 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static List<UUID> showcaseIds(Object raw) {
