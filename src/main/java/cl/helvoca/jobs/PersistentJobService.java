@@ -2,6 +2,8 @@ package cl.helvoca.jobs;
 
 import cl.helvoca.observability.OperationalMetrics;
 import cl.helvoca.security.TenantDatabaseContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,7 @@ import java.util.UUID;
 
 @Service
 public class PersistentJobService {
+    private static final Logger log = LoggerFactory.getLogger(PersistentJobService.class);
     private static final Duration BASE_BACKOFF = Duration.ofSeconds(5);
     private static final Duration MAX_BACKOFF = Duration.ofMinutes(15);
 
@@ -84,6 +87,7 @@ public class PersistentJobService {
     private boolean executeClaimed(PersistentJob job, String workerId) {
         long started = System.nanoTime();
         String outcome = "unknown";
+        String failureCode = null;
         MDC.put("jobId", job.id().toString());
         MDC.put("jobType", job.jobType().name());
         try {
@@ -91,17 +95,27 @@ public class PersistentJobService {
             store.markSucceeded(job.id(), workerId);
             outcome = "success";
         } catch (PersistentJobHandler.PermanentJobException e) {
-            store.markFailed(job, workerId, failureCode(e), safeMessage(e), false, Duration.ZERO);
+            failureCode = failureCode(e);
+            store.markFailed(job, workerId, failureCode, safeMessage(e), false, Duration.ZERO);
             outcome = "dead_letter";
         } catch (PersistentJobHandler.RetryableJobException e) {
-            store.markFailed(job, workerId, failureCode(e), safeMessage(e), true, backoff(job.attemptCount()));
+            failureCode = failureCode(e);
+            store.markFailed(job, workerId, failureCode, safeMessage(e), true, backoff(job.attemptCount()));
             outcome = job.attemptCount() >= job.maxAttempts() ? "dead_letter" : "retry";
         } catch (RuntimeException e) {
             // Unknown runtime failures are retried within the bounded attempt budget.
             // A deterministic bug eventually reaches DEAD_LETTER instead of looping forever.
-            store.markFailed(job, workerId, failureCode(e), safeMessage(e), true, backoff(job.attemptCount()));
+            failureCode = failureCode(e);
+            store.markFailed(job, workerId, failureCode, safeMessage(e), true, backoff(job.attemptCount()));
             outcome = job.attemptCount() >= job.maxAttempts() ? "dead_letter" : "retry";
         } finally {
+            log.info(
+                    "PERSISTENT_JOB_EXECUTION type={} outcome={} attempt={}/{} failureCode={}",
+                    job.jobType(),
+                    outcome,
+                    job.attemptCount(),
+                    job.maxAttempts(),
+                    failureCode == null ? "NONE" : failureCode);
             if (metrics != null) {
                 metrics.jobExecution(job.jobType(), outcome, Duration.ofNanos(System.nanoTime() - started));
             }
