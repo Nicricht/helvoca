@@ -48,6 +48,7 @@ class RealtimeOperationsToolTest {
 
         BusinessRequest saved = new BusinessRequest();
         setId(saved, UUID.randomUUID());
+        saved.setOperationId(UUID.randomUUID());
         saved.setBusinessId(businessId);
         saved.setRequestType("cotizacion");
         saved.setTitle("Cotizar reparación");

@@ -10,7 +10,10 @@ import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.learning.UnansweredQuestionService;
+import cl.helvoca.request.BusinessRequest;
 import cl.helvoca.request.BusinessRequestService;
+import cl.helvoca.request.RequestPriority;
+import cl.helvoca.request.RequestStatus;
 import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
@@ -82,6 +85,65 @@ class RealtimeToolServiceTest {
         assertFalse(result.getBoolean("success"));
         assertEquals("CUSTOMER_NOT_REGISTERED", result.getJSONObject("error").getString("code"));
         verify(bookings, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createRequestReturnsOperationIdForCrossChannelContinuation() {
+        UUID businessId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        String streamSid = "MZhandoff";
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        BusinessRequestService requests = mock(BusinessRequestService.class);
+
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                requests, mock(UnansweredQuestionService.class));
+
+        CallSession handoffCall = trustedCall(businessId, null, streamSid);
+        setId(handoffCall, callId);
+        when(calls.findByIdAndBusinessId(callId, businessId))
+                .thenReturn(Optional.of(handoffCall));
+        when(customers.findFirstByBusinessIdAndPhone(businessId, "+56911111111"))
+                .thenReturn(Optional.empty());
+
+        BusinessRequest request = new BusinessRequest();
+        setId(request, requestId);
+        request.setOperationId(operationId);
+        request.setBusinessId(businessId);
+        request.setRequestType("product_showcase");
+        request.setTitle("Mostrar productos");
+        request.setPriority(RequestPriority.NORMAL);
+        request.setStatus(RequestStatus.OPEN);
+
+        when(requests.createFromAi(
+                eq(businessId), isNull(), eq(callId),
+                eq("product_showcase"), eq("Mostrar productos"), isNull(),
+                isNull(), eq("+56911111111"), eq(RequestPriority.NORMAL), isNull()))
+                .thenReturn(request);
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                callId, businessId, null, "+56911111111", "+56222222222", streamSid);
+
+        JSONObject result = new JSONObject(tools.execute(
+                context,
+                "create_request",
+                new JSONObject()
+                        .put("requestType", "product_showcase")
+                        .put("title", "Mostrar productos")
+                        .toString()));
+
+        assertTrue(result.getBoolean("success"));
+        assertEquals(requestId.toString(), result.getJSONObject("data").getString("requestId"));
+        assertEquals(operationId.toString(), result.getJSONObject("data").getString("operationId"));
     }
 
     @Test

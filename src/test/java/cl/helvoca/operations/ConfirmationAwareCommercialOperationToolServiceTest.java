@@ -1,6 +1,7 @@
 package cl.helvoca.operations;
 
 import cl.helvoca.catalog.CatalogItemRepository;
+import cl.helvoca.catalog.CatalogMediaRepository;
 import cl.helvoca.delivery.DeliveryCoverageService;
 import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZoneRepository;
@@ -22,6 +23,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ConfirmationAwareCommercialOperationToolServiceTest {
     @Mock CatalogItemRepository catalog;
+    @Mock CatalogMediaRepository catalogMedia;
     @Mock DeliveryZoneRepository deliveryZones;
     @Mock BusinessOrderRepository orders;
     @Mock BusinessOrderLineRepository orderLines;
@@ -42,6 +44,7 @@ class ConfirmationAwareCommercialOperationToolServiceTest {
     void setUp() {
         service = new ConfirmationAwareCommercialOperationToolService(
                 catalog,
+                catalogMedia,
                 deliveryZones,
                 new DeliveryCoverageService(deliveryZones),
                 orders,

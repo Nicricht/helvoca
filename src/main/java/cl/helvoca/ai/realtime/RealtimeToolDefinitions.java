@@ -53,7 +53,7 @@ public final class RealtimeToolDefinitions {
                         object().put("properties", new JSONObject()
                                         .put("bookingId", string("UUID exacto de la reserva devuelto por create_booking confirmado o list_customer_bookings")))
                                 .put("required", new JSONArray().put("bookingId"))))
-                .put(function("create_request", "Crea una solicitud real de seguimiento cuando la necesidad del cliente no corresponde a una reserva. Sirve para cotizaciones, soporte, visitas, leads, urgencias u otros casos configurables. Solo confirma al cliente cuando success=true.",
+                .put(function("create_request", "Crea una solicitud real de seguimiento cuando la necesidad del cliente no corresponde a una reserva. También úsala para abrir una operación product_showcase antes de continuar esa misma operación por WhatsApp. Cuando success=true devuelve requestId y operationId; conserva literalmente ese operationId para el handoff.",
                         object().put("properties", new JSONObject()
                                         .put("requestType", string("Tipo breve, por ejemplo cotización, soporte, visita, urgencia o contacto"))
                                         .put("title", string("Resumen corto de la solicitud"))
@@ -66,10 +66,14 @@ public final class RealtimeToolDefinitions {
                                         .put("question", string("Pregunta exacta o fielmente resumida del cliente")))
                                 .put("required", new JSONArray().put("question"))))
                 .put(function("send_whatsapp_operation",
-                        "Envía por WhatsApp contenido backend-autoritativo asociado a una operación ya existente del cliente actual, por ejemplo un enlace de pago. Nunca envíes texto, URL ni teléfono inventados. Usa literalmente un operationId devuelto por una herramienta del backend y un purpose compatible. Solo di que el mensaje fue enviado o quedó en cola cuando success=true. Si success=false, explica que WhatsApp no está disponible o no está listo y no afirmes que se envió.",
+                        "Continúa por WhatsApp una operación backend ya existente del cliente actual. Para PRODUCT_SHOWCASE envía hasta 3 productos reales seleccionados desde list_catalog; el backend toma su media configurada y nunca acepta URLs inventadas. Usa literalmente un operationId devuelto por create_request, create_quote, quote_order, create_booking u otra herramienta backend. Solo di que el contenido quedó enviado o en cola cuando success=true. Si success=false, no afirmes que se envió.",
                         object().put("properties", new JSONObject()
-                                        .put("operationId", string("UUID exacto de la operación backend que se quiere comunicar"))
-                                        .put("purpose", string("PAYMENT_LINK, BOOKING_CONFIRMATION, MEETING_LINK, ORDER_STATUS, QUOTE, REMINDER o DELIVERY_STATUS"))
+                                        .put("operationId", string("UUID exacto de la operación backend que se quiere continuar por WhatsApp"))
+                                        .put("purpose", string("PAYMENT_LINK, BOOKING_CONFIRMATION, MEETING_LINK, ORDER_STATUS, QUOTE, REMINDER, DELIVERY_STATUS o PRODUCT_SHOWCASE"))
+                                        .put("catalogItemIds", new JSONObject()
+                                                .put("type", "array")
+                                                .put("description", "Solo para PRODUCT_SHOWCASE: entre 1 y 3 UUID exactos devueltos por list_catalog y con hasMedia=true")
+                                                .put("items", string("UUID exacto de un producto del catálogo")))
                                         .put("recipientIdentityId", string("UUID opcional de una identidad telefónica verificada cuando el cliente tiene más de un teléfono verificado")))
                                 .put("required", new JSONArray().put("operationId").put("purpose"))))
                 .put(function("transfer_to_human", "Solicita transferir la llamada a una persona del negocio cuando el cliente lo pida o la atención automática no pueda resolver su necesidad. El destino se obtiene de la configuración segura del negocio, nunca de argumentos del modelo.", object()))

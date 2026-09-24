@@ -93,7 +93,7 @@ public final class CommercialToolDefinitions {
 
         return new JSONArray()
                 .put(function("list_catalog",
-                        "Lista el catálogo universal activo del negocio con productos y servicios, precios y moneda. Úsala antes de recomendar, cotizar o armar un pedido.",
+                        "Lista el catálogo universal activo del negocio con productos, servicios, precios, moneda y media comercial disponible. Cada ítem indica hasMedia y media[]. Usa los UUID exactos devueltos; nunca inventes productos, precios ni media.",
                         object()))
                 .put(function("list_delivery_zones",
                         "Lista las zonas de despacho configuradas, su costo y compra mínima. No inventes cobertura ni costo de despacho.",
@@ -188,7 +188,10 @@ public final class CommercialToolDefinitions {
         StringBuilder out = new StringBuilder("\nCAPACIDADES COMERCIALES ACTIVAS DEL NEGOCIO: ")
                 .append(enabled).append(".\n");
         if (enabled.contains(BusinessOperationCapability.CATALOG)) {
-            out.append("Usa list_catalog como fuente oficial de productos, servicios y precios comerciales. No inventes ítems ni precios.\n");
+            out.append("Usa list_catalog como fuente oficial de productos, servicios, precios y media comercial. No inventes ítems, precios, imágenes ni videos. ")
+                    .append("Si el cliente pide ver productos por WhatsApp, elige como máximo 3 ítems con hasMedia=true. Asegura primero que el cliente esté identificado en el contexto; en voz usa find_caller y, si hace falta, register_caller. ")
+                    .append("Luego crea una solicitud create_request de tipo product_showcase para obtener un operationId y usa send_whatsapp_operation con purpose PRODUCT_SHOWCASE y esos catalogItemIds exactos. ")
+                    .append("La llamada y WhatsApp deben conservar ese mismo operationId.\n");
         }
         if (enabled.contains(BusinessOperationCapability.ORDER)) {
             out.append("Para pedidos: usa quote_order para crear el borrador y obtener el total real. ")
