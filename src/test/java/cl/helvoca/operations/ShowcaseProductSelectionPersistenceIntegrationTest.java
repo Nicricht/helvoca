@@ -74,7 +74,12 @@ class ShowcaseProductSelectionPersistenceIntegrationTest {
         agent.setLanguage("es");
         agent.setGreeting("Hola");
         agent.setActive(true);
-        agent.setCapabilities(Set.of(AiCapability.LIST_CATALOG, AiCapability.CREATE_QUOTE));
+        agent.setCapabilities(Set.of(
+                AiCapability.LIST_CATALOG,
+                AiCapability.CREATE_QUOTE,
+                AiCapability.QUOTE_ORDER,
+                AiCapability.CREATE_ORDER,
+                AiCapability.QUOTE_PAYMENT));
         agents.saveAndFlush(agent);
 
         CatalogItem first = product(business.getId(), "Producto A", "9900");
@@ -206,6 +211,88 @@ class ShowcaseProductSelectionPersistenceIntegrationTest {
         assertEquals(revisionAfterQuote, afterQuoteReplay.getRevision());
         assertEquals(operationCountBefore, operations.count());
 
+        JSONObject orderQuote = new JSONObject(commercial.execute(
+                business.getId(),
+                customer.getId(),
+                sourceReferenceId,
+                customer.getPhone(),
+                BusinessOrder.Source.WHATSAPP,
+                CommercialOperationToolService.SHOWCASE_ORDER_TOOL,
+                new JSONObject()
+                        .put("operationId", operationId.toString())
+                        .put("fulfillmentType", "PICKUP")
+                        .toString()));
+
+        assertTrue(orderQuote.getBoolean("success"), orderQuote::toString);
+        JSONObject orderQuoted = orderQuote.getJSONObject("data");
+        UUID orderOperationId = UUID.fromString(orderQuoted.getString("orderOperationId"));
+        assertEquals(operationId.toString(),
+                orderQuoted.getString("commercialJourneyOperationId"));
+        assertEquals(0, new BigDecimal(String.valueOf(orderQuoted.get("total")))
+                .compareTo(new BigDecimal("25980")));
+
+        BusinessOperation rootAfterOrderQuote = operations.findByIdAndBusinessId(
+                operationId, business.getId()).orElseThrow();
+        assertEquals(orderOperationId.toString(),
+                rootAfterOrderQuote.getMetadata().get("orderOperationId"));
+        assertEquals("PURCHASE_PENDING",
+                rootAfterOrderQuote.getMetadata().get("commercialStage"));
+
+        JSONObject confirmedOrder = new JSONObject(commercial.execute(
+                business.getId(),
+                customer.getId(),
+                sourceReferenceId,
+                customer.getPhone(),
+                BusinessOrder.Source.WHATSAPP,
+                "create_order",
+                new JSONObject()
+                        .put("operationId", orderOperationId.toString())
+                        .put("confirmationToken", orderQuoted.getString("confirmationToken"))
+                        .toString()));
+
+        assertTrue(confirmedOrder.getBoolean("success"), confirmedOrder::toString);
+        assertNotNull(confirmedOrder.getJSONObject("data").getString("orderId"));
+
+        BusinessOperation rootAfterOrder = operations.findByIdAndBusinessId(
+                operationId, business.getId()).orElseThrow();
+        assertEquals("ORDER_CONFIRMED",
+                rootAfterOrder.getMetadata().get("commercialStage"));
+        assertEquals(orderOperationId.toString(),
+                rootAfterOrder.getMetadata().get("orderOperationId"));
+
+        JSONObject paymentQuote = new JSONObject(commercial.execute(
+                business.getId(),
+                customer.getId(),
+                sourceReferenceId,
+                customer.getPhone(),
+                BusinessOrder.Source.WHATSAPP,
+                "quote_payment",
+                new JSONObject()
+                        .put("targetOperationId", orderOperationId.toString())
+                        .toString()));
+
+        assertTrue(paymentQuote.getBoolean("success"), paymentQuote::toString);
+        JSONObject paymentQuoted = paymentQuote.getJSONObject("data");
+        UUID paymentOperationId = UUID.fromString(paymentQuoted.getString("operationId"));
+        assertEquals(orderOperationId.toString(),
+                paymentQuoted.getString("targetOperationId"));
+        assertEquals(0, new BigDecimal(String.valueOf(paymentQuoted.get("amount")))
+                .compareTo(new BigDecimal("25980")));
+
+        BusinessOperation paymentOperation = operations.findByIdAndBusinessId(
+                paymentOperationId, business.getId()).orElseThrow();
+        assertEquals(operationId.toString(),
+                paymentOperation.getMetadata().get("commercialJourneyOperationId"));
+
+        BusinessOperation rootAfterPaymentQuote = operations.findByIdAndBusinessId(
+                operationId, business.getId()).orElseThrow();
+        assertEquals(paymentOperationId.toString(),
+                rootAfterPaymentQuote.getMetadata().get("paymentOperationId"));
+        assertEquals("PAYMENT_PENDING",
+                rootAfterPaymentQuote.getMetadata().get("commercialStage"));
+        assertEquals(operationCountBefore + 2, operations.count(),
+                "The journey may add one ORDER and one PAYMENT operation, but no duplicate commercial roots");
+
         JSONObject replay = new JSONObject(commercial.execute(
                 business.getId(),
                 customer.getId(),
@@ -224,10 +311,10 @@ class ShowcaseProductSelectionPersistenceIntegrationTest {
                 replay.getJSONObject("data").getString("operationId"));
         assertEquals(second.getId().toString(),
                 replay.getJSONObject("data").getString("selectedCatalogItemId"));
-        assertEquals("QUOTE_PENDING",
+        assertEquals("PAYMENT_PENDING",
                 replay.getJSONObject("data").getString("commercialStage"),
                 "Replaying the selection must not regress a later commercial stage");
-        assertEquals(operationCountBefore, operations.count());
+        assertEquals(operationCountBefore + 2, operations.count());
     }
 
     private CatalogItem product(UUID businessId, String name, String price) {
