@@ -25,7 +25,7 @@ public class MetaWhatsAppInboundAudioJobHandler implements PersistentJobHandler 
             MetaWhatsAppAudioMediaService media,
             AudioTranscriber transcriber,
             @Lazy WhatsAppReceptionistService receptionist,
-            WhatsAppAudioRecoveryService recovery) {
+            @Lazy WhatsAppAudioRecoveryService recovery) {
         this.media = media;
         this.transcriber = transcriber;
         this.receptionist = receptionist;
