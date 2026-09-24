@@ -189,7 +189,8 @@ public final class CommercialToolDefinitions {
                 .append(enabled).append(".\n");
         if (enabled.contains(BusinessOperationCapability.CATALOG)) {
             out.append("Usa list_catalog como fuente oficial de productos, servicios, precios y media comercial. No inventes ítems, precios, imágenes ni videos. ")
-                    .append("Si el cliente pide ver productos por WhatsApp, elige como máximo 3 ítems con hasMedia=true, crea primero una solicitud create_request de tipo product_showcase para obtener un operationId y luego usa send_whatsapp_operation con purpose PRODUCT_SHOWCASE y esos catalogItemIds exactos. ")
+                    .append("Si el cliente pide ver productos por WhatsApp, elige como máximo 3 ítems con hasMedia=true. Asegura primero que el cliente esté identificado en el contexto; en voz usa find_caller y, si hace falta, register_caller. ")
+                    .append("Luego crea una solicitud create_request de tipo product_showcase para obtener un operationId y usa send_whatsapp_operation con purpose PRODUCT_SHOWCASE y esos catalogItemIds exactos. ")
                     .append("La llamada y WhatsApp deben conservar ese mismo operationId.\n");
         }
         if (enabled.contains(BusinessOperationCapability.ORDER)) {
