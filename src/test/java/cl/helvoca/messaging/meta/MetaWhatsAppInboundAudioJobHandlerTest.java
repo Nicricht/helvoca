@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
@@ -77,6 +78,34 @@ class MetaWhatsAppInboundAudioJobHandlerTest {
 
         assertThrows(PersistentJobHandler.RetryableJobException.class,
                 () -> handler.handle(job(businessId, phoneNumberId, 2, 5)));
+        verifyNoInteractions(receptionist, recovery);
+    }
+
+    @Test
+    void rateLimitedTranscriptionRequestsAtLeastSixtySecondsBeforeRetry() {
+        UUID businessId = UUID.randomUUID();
+        UUID phoneNumberId = UUID.randomUUID();
+        MetaWhatsAppAudioMediaService media = mock(MetaWhatsAppAudioMediaService.class);
+        AudioTranscriber transcriber = mock(AudioTranscriber.class);
+        WhatsAppReceptionistService receptionist = mock(WhatsAppReceptionistService.class);
+        WhatsAppAudioRecoveryService recovery = mock(WhatsAppAudioRecoveryService.class);
+        when(media.download(businessId, "MEDIA-1"))
+                .thenReturn(new MetaWhatsAppAudioMediaService.DownloadedAudio(new byte[]{1}, "audio/ogg"));
+
+        AudioTranscriptionException provider429 = new AudioTranscriptionException(
+                "OPENAI_HTTP_429", "openai", 429, true, "rate limited");
+        AudioTranscriptionException exhausted = new AudioTranscriptionException(
+                "AUDIO_TRANSCRIPTION_EXHAUSTED", "router", null, true, "exhausted", provider429);
+        when(transcriber.transcribe(any())).thenThrow(exhausted);
+
+        MetaWhatsAppInboundAudioJobHandler handler =
+                new MetaWhatsAppInboundAudioJobHandler(media, transcriber, receptionist, recovery);
+
+        PersistentJobHandler.RetryableJobException failure = assertThrows(
+                PersistentJobHandler.RetryableJobException.class,
+                () -> handler.handle(job(businessId, phoneNumberId, 2, 6)));
+
+        assertEquals(Duration.ofSeconds(60), failure.retryDelay());
         verifyNoInteractions(receptionist, recovery);
     }
 
