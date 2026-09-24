@@ -114,6 +114,29 @@ class BusinessOperationCapabilityServiceTest {
     }
 
     @Test
+    void selectedProductQuoteRequiresCatalogAndQuoteCapabilities() {
+        UUID businessId = UUID.randomUUID();
+        when(aiAgents.allowedToolNames(businessId)).thenReturn(Set.of("list_catalog", "create_quote"));
+        when(aiAgents.toolAllowed(businessId, "list_catalog")).thenReturn(true);
+        when(aiAgents.toolAllowed(businessId, "create_quote")).thenReturn(true);
+
+        BusinessOperationCapabilityService service =
+                new BusinessOperationCapabilityService(aiAgents, tenantProvider);
+
+        Set<String> tools = service.allowedToolNames(businessId);
+
+        assertTrue(tools.contains(CommercialOperationToolService.SHOWCASE_QUOTE_TOOL));
+        assertTrue(service.isToolAllowed(
+                businessId, CommercialOperationToolService.SHOWCASE_QUOTE_TOOL));
+        assertTrue(CommercialToolDefinitions.allowed(tools).toString()
+                .contains(CommercialOperationToolService.SHOWCASE_QUOTE_TOOL));
+
+        when(aiAgents.toolAllowed(businessId, "create_quote")).thenReturn(false);
+        assertFalse(service.isToolAllowed(
+                businessId, CommercialOperationToolService.SHOWCASE_QUOTE_TOOL));
+    }
+
+    @Test
     void disabledAutomationHidesMutatingToolsButKeepsReadOnlyStatusTools() {
         UUID businessId = UUID.randomUUID();
         when(aiAgents.allowedToolNames(businessId)).thenReturn(Set.of(
