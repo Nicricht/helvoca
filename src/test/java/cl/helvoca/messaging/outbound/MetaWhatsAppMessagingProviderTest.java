@@ -84,6 +84,53 @@ class MetaWhatsAppMessagingProviderTest {
     }
 
     @Test
+    void sendsCatalogImageThroughMetaMediaEndpoint() {
+        UUID businessId = UUID.randomUUID();
+        var properties = enabledProperties();
+        var phones = mock(PhoneNumberRepository.class);
+        var client = mock(MetaWhatsAppCloudClient.class);
+        PhoneNumber sender = metaSender(businessId);
+
+        when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(sender));
+        when(client.sendMediaLink(
+                "123456789012345",
+                "tenant-token",
+                "+56911111111",
+                "image",
+                "https://cdn.example.test/product.jpg",
+                "Producto destacado"))
+                .thenReturn("wamid.MEDIA-OUT");
+
+        MetaWhatsAppAccessTokenResolver resolver = id ->
+                id.equals(businessId) ? Optional.of("tenant-token") : Optional.empty();
+
+        MessagingProvider.SendCommand command = new MessagingProvider.SendCommand(
+                businessId,
+                UUID.randomUUID(),
+                OutboundMessage.Channel.WHATSAPP,
+                "+56911111111",
+                "Producto destacado",
+                "idem-media",
+                OutboundMessage.ContentType.IMAGE,
+                "https://cdn.example.test/product.jpg",
+                "image/jpeg",
+                "Producto destacado");
+
+        var result = provider(properties, phones, client, Optional.of(resolver)).send(command);
+
+        assertEquals("wamid.MEDIA-OUT", result.providerMessageId());
+        verify(client).sendMediaLink(
+                "123456789012345",
+                "tenant-token",
+                "+56911111111",
+                "image",
+                "https://cdn.example.test/product.jpg",
+                "Producto destacado");
+        verify(client, never()).sendText(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
     void ignoresNonMetaWhatsappSendersForTenant() {
         UUID businessId = UUID.randomUUID();
         var properties = enabledProperties();
