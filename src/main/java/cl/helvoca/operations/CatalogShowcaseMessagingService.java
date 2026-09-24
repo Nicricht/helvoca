@@ -10,8 +10,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -21,13 +23,16 @@ public class CatalogShowcaseMessagingService {
 
     private final CatalogItemRepository catalog;
     private final CatalogMediaRepository media;
+    private final BusinessOperationRepository operations;
     private final OutboundMessagingService outbound;
 
     public CatalogShowcaseMessagingService(CatalogItemRepository catalog,
                                            CatalogMediaRepository media,
+                                           BusinessOperationRepository operations,
                                            OutboundMessagingService outbound) {
         this.catalog = catalog;
         this.media = media;
+        this.operations = operations;
         this.outbound = outbound;
     }
 
@@ -42,6 +47,12 @@ public class CatalogShowcaseMessagingService {
         }
         if (catalogItemIds == null || catalogItemIds.isEmpty()) {
             throw new IllegalArgumentException("At least one catalog item is required");
+        }
+
+        BusinessOperation operation = operations.findByIdAndBusinessId(operationId, businessId)
+                .orElseThrow(() -> new IllegalArgumentException("Operation not found"));
+        if (operation.getCustomerId() == null || !operation.getCustomerId().equals(customerId)) {
+            throw new IllegalArgumentException("Operation does not belong to customer");
         }
 
         Set<UUID> unique = new LinkedHashSet<>(catalogItemIds);
@@ -85,7 +96,34 @@ public class CatalogShowcaseMessagingService {
                     selection.media().getId(),
                     selection.media().getMediaType()));
         }
+
+        Map<String, Object> metadata = operation.getMetadata() == null
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(operation.getMetadata());
+        metadata.put("handoffChannel", "WHATSAPP");
+        metadata.put("commercialStage", "MEDIA_PREPARED");
+        metadata.put("showcaseCatalogItemIds", unique.stream().map(UUID::toString).toList());
+        metadata.put("showcaseMessageCount", prepared.size());
+        metadata.put("lastAction", "PRODUCT_SHOWCASE_PREPARED");
+        operation.setMetadata(metadata);
+        operations.saveAndFlush(operation);
+
         return List.copyOf(prepared);
+    }
+
+    @Transactional
+    public void markQueued(UUID businessId, UUID operationId, int messageCount) {
+        BusinessOperation operation = operations.findByIdAndBusinessId(operationId, businessId)
+                .orElseThrow(() -> new IllegalArgumentException("Operation not found"));
+        Map<String, Object> metadata = operation.getMetadata() == null
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(operation.getMetadata());
+        metadata.put("handoffChannel", "WHATSAPP");
+        metadata.put("commercialStage", "MEDIA_QUEUED");
+        metadata.put("showcaseMessageCount", messageCount);
+        metadata.put("lastAction", "PRODUCT_SHOWCASE_QUEUED");
+        operation.setMetadata(metadata);
+        operations.saveAndFlush(operation);
     }
 
     public record PreparedShowcaseMessage(OutboundMessage message,
