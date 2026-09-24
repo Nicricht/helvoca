@@ -17,6 +17,7 @@ import java.util.UUID;
 public class AutomationPolicyToolGate {
     private static final Map<String, BusinessOperation.Type> OPERATION_TOOLS = Map.ofEntries(
             Map.entry("quote_order", BusinessOperation.Type.ORDER),
+            Map.entry(CommercialOperationToolService.SHOWCASE_ORDER_TOOL, BusinessOperation.Type.ORDER),
             Map.entry("update_order", BusinessOperation.Type.ORDER),
             Map.entry("create_order", BusinessOperation.Type.ORDER),
             Map.entry("cancel_order", BusinessOperation.Type.ORDER),
