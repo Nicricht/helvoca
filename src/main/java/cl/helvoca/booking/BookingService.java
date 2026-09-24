@@ -114,6 +114,23 @@ public class BookingService {
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public BookingResponse reschedule(UUID id, RescheduleBookingRequest request) {
         UUID businessId = tenantProvider.requireBusinessId();
+        return rescheduleInternal(businessId, id, request, true);
+    }
+
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public BookingResponse rescheduleForOperationalCorrection(
+            UUID businessId,
+            UUID id,
+            RescheduleBookingRequest request) {
+        if (businessId == null) throw new IllegalArgumentException("businessId is required");
+        return rescheduleInternal(businessId, id, request, false);
+    }
+
+    private BookingResponse rescheduleInternal(
+            UUID businessId,
+            UUID id,
+            RescheduleBookingRequest request,
+            boolean humanAudit) {
         validateFuture(request.startAt());
         Booking booking = requireBooking(id, businessId);
         if (booking.getStatus() == BookingStatus.CANCELLED) {
@@ -133,13 +150,21 @@ public class BookingService {
         booking.setStartAt(request.startAt());
         booking.setEndAt(endAt);
         booking.setNotes(request.notes());
-        auditService.humanSuccess(
-                businessId,
-                "BOOKING_RESCHEDULE",
-                "BOOKING",
-                id,
-                beforeState,
-                auditSnapshot(booking));
+        if (humanAudit) {
+            auditService.humanSuccess(
+                    businessId,
+                    "BOOKING_RESCHEDULE",
+                    "BOOKING",
+                    id,
+                    beforeState,
+                    auditSnapshot(booking));
+        } else {
+            auditService.success(
+                    businessId,
+                    "BOOKING_RESCHEDULE_OPERATIONAL_CORRECTION",
+                    "BOOKING",
+                    id);
+        }
         return BookingResponse.from(booking);
     }
 
