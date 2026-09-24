@@ -54,12 +54,10 @@ class CatalogShowcaseMessagingServiceTest {
         operation.setType(BusinessOperation.Type.REQUEST);
         operation.setStatus(BusinessOperation.Status.CONFIRMED);
 
-        OutboundMessage prepared = new OutboundMessage();
-        prepared.setId(messageId);
-        prepared.setBusinessId(businessId);
-        prepared.setCustomerId(customerId);
-        prepared.setOperationId(operationId);
-        prepared.setStatus(OutboundMessage.Status.PREPARED);
+        OutboundMessage prepared = mock(OutboundMessage.class);
+        when(prepared.getId()).thenReturn(messageId);
+        when(prepared.getOperationId()).thenReturn(operationId);
+        when(prepared.getStatus()).thenReturn(OutboundMessage.Status.PREPARED);
 
         when(operations.findByIdAndBusinessId(operationId, businessId)).thenReturn(Optional.of(operation));
         when(catalog.findByIdAndBusinessId(productId, businessId)).thenReturn(Optional.of(product));
