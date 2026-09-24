@@ -324,9 +324,7 @@ public class CommercialOperationToolService {
         }
 
         Map<String, Object> currentMetadata = operation.getMetadata();
-        String selectedRaw = currentMetadata == null
-                ? null
-                : String.valueOf(currentMetadata.getOrDefault("selectedCatalogItemId", ""));
+        String selectedRaw = stringMetadata(currentMetadata, "selectedCatalogItemId");
         if (blank(selectedRaw)) {
             return error("SHOWCASE_SELECTION_REQUIRED",
                     "Primero debe existir un producto seleccionado de forma autoritativa.");
