@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,8 +25,11 @@ import java.util.UUID;
 
 @Service
 public class CommercialOperationToolService {
+    public static final String SHOWCASE_SELECTION_TOOL = "select_showcase_product";
+
     private static final Set<String> SUPPORTED = Set.of(
             "list_catalog",
+            SHOWCASE_SELECTION_TOOL,
             "list_delivery_zones",
             "validate_delivery_address",
             "quote_delivery",
@@ -117,6 +122,7 @@ public class CommercialOperationToolService {
                     : new JSONObject(rawArguments);
             result = switch (toolName) {
                 case "list_catalog" -> listCatalog(businessId);
+                case SHOWCASE_SELECTION_TOOL -> selectShowcaseProduct(businessId, customerId, args);
                 case "list_delivery_zones" -> listDeliveryZones(businessId);
                 case "validate_delivery_address" -> validateDeliveryAddress(businessId, args);
                 case "quote_delivery" -> deliveryWorkflow.quote(
@@ -177,6 +183,158 @@ public class CommercialOperationToolService {
                             businessId, item.getId())));
         }
         return success(new JSONObject().put("items", items));
+    }
+
+    private JSONObject selectShowcaseProduct(UUID businessId,
+                                             UUID customerId,
+                                             JSONObject args) {
+        if (businessId == null) {
+            return error("TENANT_CONTEXT_REQUIRED", "No pude verificar el negocio actual.");
+        }
+        if (customerId == null) {
+            return error("CUSTOMER_CONTEXT_REQUIRED",
+                    "Primero necesito identificar al cliente de forma segura.");
+        }
+
+        UUID operationId = uuid(required(args, "operationId"));
+        BusinessOperation operation = operations.findByIdAndBusinessId(operationId, businessId).orElse(null);
+        if (operation == null) {
+            return error("OPERATION_NOT_FOUND",
+                    "No encuentro esa operación dentro del negocio actual.");
+        }
+        if (operation.getCustomerId() == null || !customerId.equals(operation.getCustomerId())) {
+            return error("OPERATION_NOT_OWNED",
+                    "La operación no pertenece al cliente actual.");
+        }
+
+        Map<String, Object> currentMetadata = operation.getMetadata();
+        List<UUID> showcaseIds = showcaseIds(
+                currentMetadata == null ? null : currentMetadata.get("showcaseCatalogItemIds"));
+        if (showcaseIds.isEmpty()) {
+            return error("SHOWCASE_NOT_FOUND",
+                    "La operación no tiene un escaparate válido contra el cual resolver la selección.");
+        }
+
+        Integer selectionIndex = optionalInteger(args, "selectionIndex");
+        String catalogItemIdRaw = optional(args, "catalogItemId");
+        UUID selectedByIndex = null;
+        UUID selectedById = null;
+
+        if (selectionIndex != null) {
+            if (selectionIndex < 1 || selectionIndex > showcaseIds.size()) {
+                return error("SHOWCASE_SELECTION_OUT_OF_RANGE",
+                        "La posición solicitada no existe en el último escaparate.");
+            }
+            selectedByIndex = showcaseIds.get(selectionIndex - 1);
+        }
+
+        if (!blank(catalogItemIdRaw)) {
+            selectedById = uuid(catalogItemIdRaw);
+            if (!showcaseIds.contains(selectedById)) {
+                return error("CATALOG_ITEM_NOT_IN_SHOWCASE",
+                        "Ese producto no formó parte del último escaparate de esta operación.");
+            }
+        }
+
+        if (selectedByIndex == null && selectedById == null) {
+            return error("SHOWCASE_SELECTION_REQUIRED",
+                    "Debes indicar selectionIndex o catalogItemId.");
+        }
+        if (selectedByIndex != null && selectedById != null && !selectedByIndex.equals(selectedById)) {
+            return error("SHOWCASE_SELECTION_MISMATCH",
+                    "La posición y el producto indicado no corresponden al mismo elemento del escaparate.");
+        }
+
+        UUID selectedId = selectedByIndex != null ? selectedByIndex : selectedById;
+        int resolvedIndex = showcaseIds.indexOf(selectedId) + 1;
+
+        CatalogItem item = catalog.findByIdAndBusinessId(selectedId, businessId)
+                .filter(CatalogItem::isActive)
+                .orElse(null);
+        if (item == null) {
+            return error("CATALOG_ITEM_UNAVAILABLE",
+                    "El producto mostrado ya no está disponible en el catálogo activo.");
+        }
+
+        Object existingSelection = currentMetadata == null
+                ? null
+                : currentMetadata.get("selectedCatalogItemId");
+        if (existingSelection != null
+                && selectedId.toString().equals(String.valueOf(existingSelection))) {
+            String stage = currentMetadata.get("commercialStage") == null
+                    ? "PRODUCT_SELECTED"
+                    : String.valueOf(currentMetadata.get("commercialStage"));
+            return success(showcaseSelectionData(
+                    operation, item, resolvedIndex, stage, true));
+        }
+
+        Map<String, Object> metadata = currentMetadata == null
+                ? new LinkedHashMap<>()
+                : new LinkedHashMap<>(currentMetadata);
+        metadata.put("selectedCatalogItemId", selectedId.toString());
+        metadata.put("commercialStage", "PRODUCT_SELECTED");
+        metadata.put("lastAction", "PRODUCT_SELECTED");
+        operation.setMetadata(metadata);
+        operations.saveAndFlush(operation);
+
+        return success(showcaseSelectionData(
+                operation, item, resolvedIndex, "PRODUCT_SELECTED", false));
+    }
+
+    private JSONObject showcaseSelectionData(BusinessOperation operation,
+                                             CatalogItem item,
+                                             int selectionIndex,
+                                             String commercialStage,
+                                             boolean idempotent) {
+        List<CatalogMedia> media = catalogMedia
+                .findAllByBusinessIdAndCatalogItemIdAndActiveTrueOrderBySortOrderAscCreatedAtAsc(
+                        operation.getBusinessId(), item.getId());
+        return new JSONObject()
+                .put("operationId", operation.getId().toString())
+                .put("selectionIndex", selectionIndex)
+                .put("selectedCatalogItemId", item.getId().toString())
+                .put("commercialStage", commercialStage)
+                .put("idempotent", idempotent)
+                .put("product", catalogData(item, media));
+    }
+
+    private static List<UUID> showcaseIds(Object raw) {
+        if (!(raw instanceof Collection<?> collection)
+                || collection.isEmpty()
+                || collection.size() > 3) {
+            return List.of();
+        }
+
+        List<UUID> ids = new ArrayList<>();
+        for (Object value : collection) {
+            if (value == null) return List.of();
+            UUID id;
+            try {
+                id = UUID.fromString(String.valueOf(value).trim());
+            } catch (Exception e) {
+                return List.of();
+            }
+            if (ids.contains(id)) return List.of();
+            ids.add(id);
+        }
+        return List.copyOf(ids);
+    }
+
+    private static Integer optionalInteger(JSONObject args, String key) {
+        if (args == null || !args.has(key) || args.opt(key) == JSONObject.NULL) return null;
+        Object raw = args.get(key);
+        try {
+            if (raw instanceof Number number) {
+                double value = number.doubleValue();
+                int integer = number.intValue();
+                if (value != integer) throw new NumberFormatException();
+                return integer;
+            }
+            String value = String.valueOf(raw).trim();
+            return value.isBlank() ? null : Integer.valueOf(value);
+        } catch (Exception e) {
+            throw new IllegalArgumentException(key + " debe ser un número entero.");
+        }
     }
 
     private JSONObject listDeliveryZones(UUID businessId) {
