@@ -60,6 +60,11 @@ public class BusinessOperationCapabilityService {
                 && automationAllowsTool(businessId, CommercialOperationToolService.SHOWCASE_SELECTION_TOOL)) {
             allowed.add(CommercialOperationToolService.SHOWCASE_SELECTION_TOOL);
         }
+        if (aiAgents.toolAllowed(businessId, "list_catalog")
+                && aiAgents.toolAllowed(businessId, "create_quote")
+                && automationAllowsTool(businessId, CommercialOperationToolService.SHOWCASE_QUOTE_TOOL)) {
+            allowed.add(CommercialOperationToolService.SHOWCASE_QUOTE_TOOL);
+        }
         return Set.copyOf(allowed);
     }
 
@@ -70,6 +75,11 @@ public class BusinessOperationCapabilityService {
         }
         if (CommercialOperationToolService.SHOWCASE_SELECTION_TOOL.equals(toolName)) {
             return aiAgents.toolAllowed(businessId, "list_catalog")
+                    && automationAllowsTool(businessId, toolName);
+        }
+        if (CommercialOperationToolService.SHOWCASE_QUOTE_TOOL.equals(toolName)) {
+            return aiAgents.toolAllowed(businessId, "list_catalog")
+                    && aiAgents.toolAllowed(businessId, "create_quote")
                     && automationAllowsTool(businessId, toolName);
         }
         return BusinessOperationCapability.isCommercialToolName(toolName)
@@ -116,7 +126,7 @@ public class BusinessOperationCapabilityService {
         return switch (toolName) {
             case "quote_order", "update_order", "create_order", "cancel_order" -> BusinessOperation.Type.ORDER;
             case "quote_delivery", "update_delivery", "create_delivery", "cancel_delivery" -> BusinessOperation.Type.DELIVERY;
-            case "create_quote" -> BusinessOperation.Type.QUOTE;
+            case "create_quote", CommercialOperationToolService.SHOWCASE_QUOTE_TOOL -> BusinessOperation.Type.QUOTE;
             case "create_lead" -> BusinessOperation.Type.LEAD;
             case CommercialOperationToolService.SHOWCASE_SELECTION_TOOL -> BusinessOperation.Type.REQUEST;
             case "quote_payment", "update_payment", "create_payment", "cancel_payment" -> BusinessOperation.Type.PAYMENT;
