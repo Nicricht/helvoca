@@ -53,7 +53,7 @@ public final class RealtimeToolDefinitions {
                         object().put("properties", new JSONObject()
                                         .put("bookingId", string("UUID exacto de la reserva devuelto por create_booking confirmado o list_customer_bookings")))
                                 .put("required", new JSONArray().put("bookingId"))))
-                .put(function("create_request", "Crea una solicitud real de seguimiento cuando la necesidad del cliente no corresponde a una reserva. Sirve para cotizaciones, soporte, visitas, leads, urgencias u otros casos configurables. Solo confirma al cliente cuando success=true.",
+                .put(function("create_request", "Crea una solicitud real de seguimiento cuando la necesidad del cliente no corresponde a una reserva. También úsala para abrir una operación product_showcase antes de continuar esa misma operación por WhatsApp. Cuando success=true devuelve requestId y operationId; conserva literalmente ese operationId para el handoff.",
                         object().put("properties", new JSONObject()
                                         .put("requestType", string("Tipo breve, por ejemplo cotización, soporte, visita, urgencia o contacto"))
                                         .put("title", string("Resumen corto de la solicitud"))
