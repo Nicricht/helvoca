@@ -108,6 +108,16 @@ public final class CommercialToolDefinitions {
                                         .put("operationId", string("UUID exacto de la operación donde select_showcase_product guardó la selección"))
                                         .put("quantity", integer("Cantidad a cotizar entre 1 y 100; omitir equivale a 1")))
                                 .put("required", new JSONArray().put("operationId"))))
+                .put(function(CommercialOperationToolService.SHOWCASE_ORDER_TOOL,
+                        "Convierte la cotización del producto seleccionado en un borrador ORDER enlazado al mismo viaje comercial. El backend reutiliza el catalogItemId seleccionado y vuelve a calcular precios; la IA no envía montos. Devuelve orderOperationId y confirmationToken. Todavía NO confirma la compra.",
+                        object().put("properties", new JSONObject()
+                                        .put("operationId", string("UUID de la operación comercial raíz que ya tiene PRODUCT_SELECTED y cotización"))
+                                        .put("quantity", integer("Cantidad entre 1 y 100; si se omite se reutiliza la cantidad cotizada"))
+                                        .put("fulfillmentType", string("PICKUP o DELIVERY"))
+                                        .put("deliveryZoneId", string("UUID opcional de zona validada, solo para DELIVERY"))
+                                        .put("address", string("Dirección obligatoria cuando fulfillmentType=DELIVERY"))
+                                        .put("contactName", string("Nombre del cliente si fue entregado")))
+                                .put("required", new JSONArray().put("operationId").put("fulfillmentType"))))
                 .put(function("list_delivery_zones",
                         "Lista las zonas de despacho configuradas, su costo y compra mínima. No inventes cobertura ni costo de despacho.",
                         object()))
@@ -208,9 +218,9 @@ public final class CommercialToolDefinitions {
                     .append("Cuando el cliente elija primero/segundo/tercero o 1/2/3, llama select_showcase_product con ese mismo operationId y selectionIndex 1-based. No afirmes qué producto quedó seleccionado hasta que success=true; nunca deduzcas ni persistas la selección solo desde el texto del modelo.\n");
         }
         if (enabled.contains(BusinessOperationCapability.ORDER)) {
-            out.append("Para pedidos: usa quote_order para crear el borrador y obtener el total real. ")
-                    .append("Si el cliente corrige cantidades, productos, modificadores, retiro, despacho o dirección, usa update_order con el estado completo más reciente. ")
-                    .append("Cada actualización invalida la confirmación anterior. Presenta el total vigente y solo después de un sí explícito usa create_order con el último confirmationToken. ")
+            out.append("Para una compra nacida del escaparate: después de quote_selected_product usa quote_selected_product_order con el operationId comercial raíz; el backend reutiliza el producto seleccionado y devuelve un orderOperationId y confirmationToken. ")
+                    .append("Presenta el total y condiciones vigentes y solo después de un sí explícito usa create_order con ese orderOperationId y el último confirmationToken. ")
+                    .append("Para pedidos independientes usa quote_order/update_order/create_order. Cada actualización invalida la confirmación anterior. ")
                     .append("Un pedido final solo existe si create_order devuelve success=true.\n");
         }
         if (enabled.contains(BusinessOperationCapability.DELIVERY)) {
@@ -227,10 +237,11 @@ public final class CommercialToolDefinitions {
             out.append("Para potenciales clientes que requieren seguimiento comercial usa create_lead y conserva únicamente datos entregados por la persona.\n");
         }
         if (enabled.contains(BusinessOperationCapability.PAYMENT)) {
-            out.append("Para pagos: nunca decidas el monto ni la moneda. Usa quote_payment con la operación CONFIRMED que el cliente quiere pagar. ")
+            out.append("Después de que create_order confirme un pedido del viaje comercial, usa quote_payment con ese orderOperationId CONFIRMED. Nunca decidas el monto ni la moneda: el backend los obtiene del pedido. ")
                     .append("Presenta el monto backend-autoritativo y solo después de un sí explícito usa create_payment con el último confirmationToken. ")
-                    .append("Si cambia la operación objetivo usa update_payment; la confirmación anterior queda inválida. ")
-                    .append("Nunca solicites números de tarjeta, CVV ni credenciales de pago. Un checkoutUrl solo inicia el pago: considera pagado únicamente un status SUCCEEDED verificado por el proveedor.\n");
+                    .append("Si create_payment devuelve checkoutUrl y status REQUIRES_ACTION/PENDING, puedes usar send_whatsapp_operation con purpose PAYMENT_LINK y el payment operationId para enviar el enlace por WhatsApp. ")
+                    .append("Si cambia la operación objetivo usa update_payment; la confirmación anterior queda inválida. Nunca solicites números de tarjeta, CVV ni credenciales de pago. ")
+                    .append("Un checkoutUrl solo inicia el pago: considera pagado únicamente un status SUCCEEDED verificado por el proveedor o webhook.\n");
         }
         return out.toString();
     }
