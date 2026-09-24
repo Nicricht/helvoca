@@ -1,6 +1,9 @@
 package cl.helvoca.operations;
 
+import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
+import cl.helvoca.catalog.CatalogMedia;
+import cl.helvoca.catalog.CatalogMediaRepository;
 import cl.helvoca.delivery.DeliveryCoverageService;
 import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZone;
@@ -26,6 +29,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class CommercialOperationToolServiceTest {
     @Mock CatalogItemRepository catalog;
+    @Mock CatalogMediaRepository catalogMedia;
     @Mock DeliveryZoneRepository deliveryZones;
     @Mock BusinessOrderRepository orders;
     @Mock BusinessOrderLineRepository orderLines;
@@ -44,9 +48,50 @@ class CommercialOperationToolServiceTest {
     void setUp() {
         deliveryCoverage = new DeliveryCoverageService(deliveryZones);
         service = new CommercialOperationToolService(
-                catalog, deliveryZones, deliveryCoverage, orders, orderLines,
+                catalog, catalogMedia, deliveryZones, deliveryCoverage, orders, orderLines,
                 operations, capabilities, orderWorkflow, deliveryWorkflow,
                 universalOperations, paymentWorkflow, conversationState);
+    }
+
+    @Test
+    void listCatalogIncludesBackendOwnedMediaIdsWithoutExposingUrls() {
+        UUID businessId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID mediaId = UUID.randomUUID();
+
+        CatalogItem item = new CatalogItem();
+        item.setId(itemId);
+        item.setBusinessId(businessId);
+        item.setKind(CatalogItem.Kind.PRODUCT);
+        item.setName("Shampoo");
+        item.setPrice(new BigDecimal("12990"));
+        item.setCurrency("CLP");
+        item.setActive(true);
+
+        CatalogMedia media = new CatalogMedia();
+        media.setId(mediaId);
+        media.setBusinessId(businessId);
+        media.setCatalogItemId(itemId);
+        media.setMediaType(CatalogMedia.Type.IMAGE);
+        media.setMediaUrl("https://cdn.example.test/shampoo.jpg");
+        media.setMimeType("image/jpeg");
+        media.setCaption("Shampoo hidratante");
+        media.setActive(true);
+
+        when(capabilities.isToolAllowed(businessId, "list_catalog")).thenReturn(true);
+        when(catalog.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId)).thenReturn(List.of(item));
+        when(catalogMedia.findAllByBusinessIdAndCatalogItemIdAndActiveTrueOrderBySortOrderAscCreatedAtAsc(
+                businessId, itemId)).thenReturn(List.of(media));
+
+        JSONObject result = new JSONObject(service.execute(
+                businessId, null, null, null, BusinessOrder.Source.VOICE, "list_catalog", "{}"));
+
+        assertTrue(result.getBoolean("success"));
+        JSONObject product = result.getJSONObject("data").getJSONArray("items").getJSONObject(0);
+        assertTrue(product.getBoolean("hasMedia"));
+        assertEquals(mediaId.toString(), product.getJSONArray("media").getJSONObject(0).getString("mediaId"));
+        assertEquals("IMAGE", product.getJSONArray("media").getJSONObject(0).getString("type"));
+        assertFalse(product.toString().contains("https://cdn.example.test"));
     }
 
     @Test
