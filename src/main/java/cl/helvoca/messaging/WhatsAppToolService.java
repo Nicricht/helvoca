@@ -226,7 +226,12 @@ public class WhatsAppToolService {
 
     private JSONObject checkAvailability(MessagingConversation c, JSONObject args) {
         UUID serviceId = uuid(required(args, "serviceId"));
-        Instant startAt = instant(required(args, "startAt"));
+        Instant startAt = resolveBookingStart(
+                args,
+                requireBusiness(c.getBusinessId()).getTimezone(),
+                "startAt",
+                "localDate",
+                "localTime");
         validateFuture(startAt);
         ServiceItem service = requireActiveService(c.getBusinessId(), serviceId);
         Instant endAt = startAt.plus(service.getDurationMinutes(), ChronoUnit.MINUTES);
@@ -245,7 +250,12 @@ public class WhatsAppToolService {
 
     private JSONObject createBooking(MessagingConversation c, JSONObject args) {
         UUID serviceId = uuid(required(args, "serviceId"));
-        Instant startAt = instant(required(args, "startAt"));
+        Instant startAt = resolveBookingStart(
+                args,
+                requireBusiness(c.getBusinessId()).getTimezone(),
+                "startAt",
+                "localDate",
+                "localTime");
         validateFuture(startAt);
         ServiceItem service = requireActiveService(c.getBusinessId(), serviceId);
         Customer customer = currentCustomer(c);
@@ -293,7 +303,12 @@ public class WhatsAppToolService {
         Customer customer = currentCustomer(c);
         if (customer == null) return error("CUSTOMER_NOT_REGISTERED", "No encuentro un cliente asociado a este WhatsApp.");
         UUID bookingId = uuid(required(args, "bookingId"));
-        Instant newStartAt = instant(required(args, "newStartAt"));
+        Instant newStartAt = resolveBookingStart(
+                args,
+                requireBusiness(c.getBusinessId()).getTimezone(),
+                "newStartAt",
+                "newLocalDate",
+                "newLocalTime");
         validateFuture(newStartAt);
         Booking booking = bookings.findByIdAndBusinessIdAndCustomerId(bookingId, c.getBusinessId(), customer.getId())
                 .orElse(null);
@@ -432,6 +447,29 @@ public class WhatsAppToolService {
     private static UUID uuid(String value) {
         try { return UUID.fromString(value); }
         catch (Exception e) { throw new IllegalArgumentException("UUID inválido."); }
+    }
+
+    static Instant resolveBookingStart(JSONObject args,
+                                       String timezone,
+                                       String instantKey,
+                                       String localDateKey,
+                                       String localTimeKey) {
+        String localDateValue = optional(args, localDateKey);
+        String localTimeValue = optional(args, localTimeKey);
+        if (localDateValue != null || localTimeValue != null) {
+            if (localDateValue == null || localTimeValue == null) {
+                throw new IllegalArgumentException("La fecha y hora local deben enviarse juntas.");
+            }
+            try {
+                ZoneId zone = ZoneId.of(timezone);
+                LocalDate date = LocalDate.parse(localDateValue);
+                LocalTime time = LocalTime.parse(localTimeValue);
+                return ZonedDateTime.of(date, time, zone).toInstant();
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Fecha/hora local inválida.");
+            }
+        }
+        return instant(required(args, instantKey));
     }
 
     private static Instant instant(String value) {
