@@ -67,11 +67,22 @@ public class MetaWhatsAppMessagingProvider implements MessagingProvider {
                         "Meta WhatsApp access token is not configured for tenant"));
 
         PhoneNumber sender = senders.getFirst();
-        String providerMessageId = client.sendText(
-                sender.getWhatsappExternalId(),
-                accessToken,
-                command.recipient(),
-                command.content());
+        String providerMessageId;
+        if (command.contentType() == OutboundMessage.ContentType.TEXT) {
+            providerMessageId = client.sendText(
+                    sender.getWhatsappExternalId(),
+                    accessToken,
+                    command.recipient(),
+                    command.content());
+        } else {
+            providerMessageId = client.sendMediaLink(
+                    sender.getWhatsappExternalId(),
+                    accessToken,
+                    command.recipient(),
+                    command.contentType().name().toLowerCase(),
+                    command.mediaUrl(),
+                    command.mediaCaption());
+        }
 
         return new SendResult(providerMessageId);
     }
@@ -86,8 +97,19 @@ public class MetaWhatsAppMessagingProvider implements MessagingProvider {
         if (command.recipient() == null || command.recipient().isBlank()) {
             throw new IllegalArgumentException("WhatsApp recipient is required");
         }
-        if (command.content() == null || command.content().isBlank()) {
-            throw new IllegalArgumentException("Outbound content is required");
+        if (command.contentType() == OutboundMessage.ContentType.TEXT) {
+            if (command.content() == null || command.content().isBlank()) {
+                throw new IllegalArgumentException("Outbound content is required");
+            }
+        } else {
+            if (command.mediaUrl() == null || command.mediaUrl().isBlank()) {
+                throw new IllegalArgumentException("Outbound media URL is required");
+            }
+            if (command.contentType() != OutboundMessage.ContentType.IMAGE
+                    && command.contentType() != OutboundMessage.ContentType.VIDEO
+                    && command.contentType() != OutboundMessage.ContentType.DOCUMENT) {
+                throw new IllegalArgumentException("Unsupported outbound content type");
+            }
         }
     }
 }
