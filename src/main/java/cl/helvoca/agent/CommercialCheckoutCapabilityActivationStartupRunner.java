@@ -1,5 +1,6 @@
 package cl.helvoca.agent;
 
+import cl.helvoca.operations.BusinessOperationCapability;
 import cl.helvoca.security.TenantDatabaseContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
