@@ -142,6 +142,7 @@ class BusinessOperationCapabilityServiceTest {
         when(aiAgents.allowedToolNames(businessId)).thenReturn(Set.of(
                 "list_catalog", "quote_order", "create_order"));
         when(aiAgents.toolAllowed(businessId, "list_catalog")).thenReturn(true);
+        when(aiAgents.toolAllowed(businessId, "create_quote")).thenReturn(false);
         when(aiAgents.toolAllowed(businessId, "quote_order")).thenReturn(true);
         when(aiAgents.toolAllowed(businessId, "create_order")).thenReturn(true);
 
