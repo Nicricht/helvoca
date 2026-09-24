@@ -32,6 +32,10 @@ public class MetaWhatsAppPersistedReplySender {
     }
 
     public void send(PersistentJob job, MessagingMessage inbound) {
+        send(job, inbound, false);
+    }
+
+    public void send(PersistentJob job, MessagingMessage inbound, boolean clearFailureCode) {
         if (!properties.isDeliveryEnabled()) {
             throw new PersistentJobHandler.PermanentJobException("Outbound delivery is disabled");
         }
@@ -90,6 +94,7 @@ public class MetaWhatsAppPersistedReplySender {
             inbound.setProvider(MetaWhatsAppMessagingProvider.ID);
             inbound.setProviderMessageId(result.providerMessageId().trim());
             inbound.setProviderDeliveryStatus("SENT");
+            if (clearFailureCode) inbound.setFailureCode(null);
             inbound.setSentAt(now);
             inbound.setDeliveryUpdatedAt(now);
             messages.saveAndFlush(inbound);
