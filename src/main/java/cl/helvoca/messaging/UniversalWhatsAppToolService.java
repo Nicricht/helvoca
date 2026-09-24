@@ -136,6 +136,14 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
             boolean proposalPhase = args.optString("operationId", "").isBlank()
                     && args.optString("confirmationToken", "").isBlank();
             if (proposalPhase) {
+                if (args.has("localDate") || args.has("localTime")) {
+                    args.put("startAt", resolveBookingStart(
+                            args,
+                            requireBusiness(conversation.getBusinessId()).getTimezone(),
+                            "startAt",
+                            "localDate",
+                            "localTime").toString());
+                }
                 String customerName = optional(args, "customerName");
                 if (customerName == null) {
                     return error("BOOKING_NAME_REQUIRED",
@@ -176,7 +184,8 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
                 + CommercialToolDefinitions.instructions(capabilities.enabled(conversation.getBusinessId()))
                 + "\nNunca uses create_request para reservar, agendar una cita o pedir una reserva de un servicio reservable. En esos casos usa las herramientas de disponibilidad y después create_booking en sus dos fases. create_request es solo para solicitudes no reservables."
                 + "\nAntes de la FASE 1 de create_booking pregunta siempre a nombre de quién va la reserva, incluso si find_caller ya devolvió un nombre guardado. No reutilices silenciosamente el nombre del perfil. Si el usuario ya indicó el nombre en su mensaje actual, no lo preguntes de nuevo. Envía ese nombre exacto como customerName en la FASE 1."
-                + "\nPara create_booking usa siempre dos fases: primero crea una propuesta con serviceId/startAt/customerName, presenta literalmente sus condiciones al cliente y pide confirmación explícita; solo después vuelve a llamar create_booking con operationId y confirmationToken devueltos. Una propuesta sin bookingId NO es una reserva creada."
+                + "\nCuando el cliente indique una fecha/hora local, por ejemplo mañana a las 11:30, usa check_booking_availability con localDate YYYY-MM-DD y localTime HH:mm. No calcules UTC ni offsets por tu cuenta. Copia literalmente el startAt que devuelva el backend."
+                + "\nPara create_booking usa siempre dos fases: primero crea una propuesta con serviceId/startAt/customerName. Si la petición original fue una hora local, envía también localDate y localTime; el backend los usará como fuente de verdad. Presenta literalmente localStart devuelto por la propuesta al cliente y pide confirmación explícita; solo después vuelve a llamar create_booking con operationId y confirmationToken devueltos. Una propuesta sin bookingId NO es una reserva creada."
                 + "\nSi una herramienta devuelve automation.fallbackAction, aplica esa alternativa con las herramientas disponibles antes de pedir intervención humana. No repitas manualmente una operación que automation ya reintentó. Solo informa que el caso quedó escalado a atención humana cuando automation.fallbackAction=HUMAN_HANDOFF, automation.humanEscalation=true y exista automation.handoffId. Si devuelve STOP_SAFELY o humanEscalation=false, no afirmes que una persona fue avisada.";
     }
 

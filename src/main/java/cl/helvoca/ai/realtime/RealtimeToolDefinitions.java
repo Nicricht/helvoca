@@ -24,15 +24,19 @@ public final class RealtimeToolDefinitions {
                                         .put("serviceId", string("UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
                                         .put("date", string("Fecha local del negocio en formato YYYY-MM-DD")))
                                 .put("required", new JSONArray().put("serviceId").put("date"))))
-                .put(function("check_booking_availability", "Comprueba una hora exacta antes de prometer o proponer una reserva. El serviceId debe provenir literalmente de list_services. Si todavía no lo tienes, llama list_services primero. Nunca inventes UUID. Solo si devuelve available=true puedes usar ese mismo startAt para la primera fase de create_booking. Si available=false, llama list_available_slots antes de proponer la reserva.",
+                .put(function("check_booking_availability", "Comprueba una hora exacta antes de prometer o proponer una reserva. El serviceId debe provenir literalmente de list_services. Si el cliente expresa una hora local, usa localDate y localTime y deja que el backend aplique la zona horaria del negocio. Usa startAt solo cuando lo copies literalmente de list_available_slots. Si available=true, copia literalmente el startAt devuelto para create_booking.",
                         object().put("properties", new JSONObject()
                                         .put("serviceId", string("UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
-                                        .put("startAt", string("Fecha y hora ISO-8601 con zona u offset")))
-                                .put("required", new JSONArray().put("serviceId").put("startAt"))))
+                                        .put("startAt", string("Instante ISO-8601; úsalo solo si fue devuelto literalmente por una herramienta"))
+                                        .put("localDate", string("Fecha local del negocio YYYY-MM-DD cuando el cliente habló en hora local"))
+                                        .put("localTime", string("Hora local del negocio HH:mm cuando el cliente habló en hora local")))
+                                .put("required", new JSONArray().put("serviceId"))))
                 .put(function("create_booking", "Reserva en dos fases. FASE 1: usa un serviceId devuelto literalmente por list_services, nunca inventes UUID, y envía ese serviceId con startAt previamente validado, más notes opcional. El backend devolverá operationId, confirmationToken y requiresConfirmation=true, pero todavía NO existe una reserva. Presenta exactamente esas condiciones al cliente y pide confirmación explícita. FASE 2: solo tras esa confirmación, vuelve a llamar esta misma herramienta enviando únicamente operationId y confirmationToken devueltos por la fase 1. No mezcles condiciones nuevas con el token. Solo cuando la segunda fase devuelva success=true y bookingId existe se considera creada la reserva.",
                         object().put("properties", new JSONObject()
                                 .put("serviceId", string("FASE 1: UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
-                                .put("startAt", string("FASE 1: fecha/hora previamente validada"))
+                                .put("startAt", string("FASE 1: startAt exacto devuelto por check_booking_availability o list_available_slots; no recalcular offset"))
+                                .put("localDate", string("FASE 1 en WhatsApp: fecha local YYYY-MM-DD si la petición original fue expresada en hora local"))
+                                .put("localTime", string("FASE 1 en WhatsApp: hora local HH:mm si la petición original fue expresada en hora local"))
                                 .put("customerName", string("FASE 1 en WhatsApp: nombre exacto que el cliente confirmó explícitamente para la reserva; nunca reutilizar un nombre guardado sin confirmarlo"))
                                 .put("notes", string("FASE 1: notas opcionales"))
                                 .put("operationId", string("FASE 2: operationId exacto devuelto por la propuesta"))
@@ -41,8 +45,10 @@ public final class RealtimeToolDefinitions {
                 .put(function("reschedule_booking", "Reprograma una reserva del cliente de esta llamada. Solo comunica el cambio cuando success=true. El backend vuelve a validar horario y solapamientos.",
                         object().put("properties", new JSONObject()
                                         .put("bookingId", string("UUID de la reserva obtenido desde list_customer_bookings o desde create_booking después de la segunda fase confirmada"))
-                                        .put("newStartAt", string("Nueva fecha y hora ISO-8601 con zona u offset")))
-                                .put("required", new JSONArray().put("bookingId").put("newStartAt"))))
+                                        .put("newStartAt", string("Nuevo instante ISO-8601; úsalo solo si fue devuelto literalmente por una herramienta"))
+                                        .put("newLocalDate", string("Nueva fecha local YYYY-MM-DD cuando el cliente expresó la hora local"))
+                                        .put("newLocalTime", string("Nueva hora local HH:mm cuando el cliente expresó la hora local")))
+                                .put("required", new JSONArray().put("bookingId"))))
                 .put(function("cancel_booking", "Cancela una reserva del cliente de esta llamada. Solo comunica la cancelación cuando success=true. Si acabas de crear la reserva en esta misma llamada, usa literalmente el bookingId devuelto por la segunda fase confirmada de create_booking; nunca uses operationId como bookingId.",
                         object().put("properties", new JSONObject()
                                         .put("bookingId", string("UUID exacto de la reserva devuelto por create_booking confirmado o list_customer_bookings")))
