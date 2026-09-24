@@ -29,6 +29,8 @@ class CatalogShowcaseMessagingServiceTest {
 
         CatalogItemRepository catalog = mock(CatalogItemRepository.class);
         CatalogMediaRepository media = mock(CatalogMediaRepository.class);
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
         OutboundMessagingService outbound = mock(OutboundMessagingService.class);
 
         CatalogItem product = new CatalogItem();
@@ -54,6 +56,20 @@ class CatalogShowcaseMessagingServiceTest {
         prepared.setOperationId(operationId);
         prepared.setStatus(OutboundMessage.Status.PREPARED);
 
+        BusinessOperation operation = new BusinessOperation();
+        operation.setId(operationId);
+        operation.setBusinessId(businessId);
+        operation.setCustomerId(customerId);
+        operation.setType(BusinessOperation.Type.REQUEST);
+        operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        when(operations.findByIdAndBusinessId(operationId, businessId)).thenReturn(Optional.of(operation));
+        BusinessOperation operation = new BusinessOperation();
+        operation.setId(operationId);
+        operation.setBusinessId(businessId);
+        operation.setCustomerId(customerId);
+        operation.setType(BusinessOperation.Type.REQUEST);
+        operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        when(operations.findByIdAndBusinessId(operationId, businessId)).thenReturn(Optional.of(operation));
         when(catalog.findByIdAndBusinessId(productId, businessId)).thenReturn(Optional.of(product));
         when(media.findAllByBusinessIdAndCatalogItemIdAndActiveTrueOrderBySortOrderAscCreatedAtAsc(
                 businessId, productId)).thenReturn(List.of(image));
@@ -61,7 +77,7 @@ class CatalogShowcaseMessagingServiceTest {
                 businessId, customerId, operationId, null, mediaId)).thenReturn(prepared);
 
         CatalogShowcaseMessagingService service =
-                new CatalogShowcaseMessagingService(catalog, media, outbound);
+                new CatalogShowcaseMessagingService(catalog, media, operations, outbound);
 
         var result = service.prepare(
                 businessId, customerId, operationId, null, List.of(productId));
@@ -73,6 +89,9 @@ class CatalogShowcaseMessagingServiceTest {
         assertEquals(CatalogMedia.Type.IMAGE, result.getFirst().mediaType());
         verify(outbound).prepareCatalogMedia(
                 businessId, customerId, operationId, null, mediaId);
+        verify(operations).saveAndFlush(operation);
+        assertEquals("WHATSAPP", operation.getMetadata().get("handoffChannel"));
+        assertEquals("MEDIA_PREPARED", operation.getMetadata().get("commercialStage"));
     }
 
     @Test
@@ -98,7 +117,7 @@ class CatalogShowcaseMessagingServiceTest {
                 businessId, productId)).thenReturn(List.of());
 
         CatalogShowcaseMessagingService service =
-                new CatalogShowcaseMessagingService(catalog, media, outbound);
+                new CatalogShowcaseMessagingService(catalog, media, operations, outbound);
 
         var error = assertThrows(IllegalStateException.class, () -> service.prepare(
                 businessId, customerId, operationId, null, List.of(productId)));
