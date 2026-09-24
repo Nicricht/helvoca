@@ -2,6 +2,10 @@ package cl.helvoca.messaging.outbound;
 
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
+import cl.helvoca.catalog.CatalogItem;
+import cl.helvoca.catalog.CatalogItemRepository;
+import cl.helvoca.catalog.CatalogMedia;
+import cl.helvoca.catalog.CatalogMediaRepository;
 import cl.helvoca.customer.Customer;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.omnichannel.CustomerIdentity;
@@ -47,6 +51,8 @@ class OutboundMessagingIntegrationTest {
     @Autowired CustomerIdentityService identities;
     @Autowired BusinessOperationRepository operations;
     @Autowired BusinessPaymentRepository payments;
+    @Autowired CatalogItemRepository catalog;
+    @Autowired CatalogMediaRepository catalogMedia;
     @Autowired OutboundMessagingService outbound;
     @Autowired OutboundMessageRepository messages;
 
@@ -82,6 +88,60 @@ class OutboundMessagingIntegrationTest {
         assertThrows(IllegalStateException.class, () -> outbound.dispatch(business.getId(), first.getId()));
         assertEquals(OutboundMessage.Status.PREPARED,
                 messages.findByIdAndBusinessId(first.getId(), business.getId()).orElseThrow().getStatus());
+    }
+
+    @Test
+    void catalogMediaPreparationIsTenantSafeAndIdempotent() {
+        Business business = business("Visual catalog tenant");
+        Customer customer = customer(business, "+56911113333");
+        BusinessOperation operation = operation(business, customer, BusinessOperation.Type.REQUEST);
+        CustomerIdentity identity = identities.verifyPhone(
+                business.getId(), customer.getId(), customer.getPhone(),
+                CustomerIdentity.VerificationStatus.CUSTOMER_VERIFIED, "TEST");
+
+        CatalogItem product = new CatalogItem();
+        product.setBusinessId(business.getId());
+        product.setKind(CatalogItem.Kind.PRODUCT);
+        product.setName("Shampoo hidratante");
+        product.setDescription("Para cabello seco");
+        product.setPrice(new BigDecimal("12990"));
+        product.setCurrency("CLP");
+        product.setActive(true);
+        product = catalog.saveAndFlush(product);
+
+        CatalogMedia media = new CatalogMedia();
+        media.setBusinessId(business.getId());
+        media.setCatalogItemId(product.getId());
+        media.setMediaType(CatalogMedia.Type.IMAGE);
+        media.setMediaUrl("https://cdn.example.test/shampoo.jpg");
+        media.setMimeType("image/jpeg");
+        media.setCaption("Mira esta opción");
+        media.setSortOrder(0);
+        media.setActive(true);
+        media = catalogMedia.saveAndFlush(media);
+
+        OutboundMessage first = outbound.prepareCatalogMedia(
+                business.getId(),
+                customer.getId(),
+                operation.getId(),
+                identity.getId(),
+                media.getId());
+        OutboundMessage second = outbound.prepareCatalogMedia(
+                business.getId(),
+                customer.getId(),
+                operation.getId(),
+                identity.getId(),
+                media.getId());
+
+        assertEquals(first.getId(), second.getId());
+        assertEquals(OutboundMessage.Purpose.PRODUCT_SHOWCASE, first.getPurpose());
+        assertEquals(OutboundMessage.ContentType.IMAGE, first.getContentType());
+        assertEquals(product.getId(), first.getCatalogItemId());
+        assertEquals("https://cdn.example.test/shampoo.jpg", first.getMediaUrl());
+        assertEquals("image/jpeg", first.getMediaMimeType());
+        assertTrue(first.getMediaCaption().contains("Mira esta opción"));
+        assertTrue(first.getMediaCaption().contains("CLP 12990"));
+        assertEquals(OutboundMessage.Status.PREPARED, first.getStatus());
     }
 
     @Test

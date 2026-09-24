@@ -44,6 +44,17 @@ public class OutboundMessagingController {
                 request.recipientIdentityId())));
     }
 
+    @PostMapping("/prepare-catalog-media")
+    public ResponseEntity<View> prepareCatalogMedia(@RequestBody CatalogMediaPrepareRequest request) {
+        UUID businessId = tenantProvider.requireBusinessId();
+        return ResponseEntity.ok(View.from(service.prepareCatalogMedia(
+                businessId,
+                request.customerId(),
+                request.operationId(),
+                request.recipientIdentityId(),
+                request.catalogMediaId())));
+    }
+
     @PostMapping("/{messageId}/queue")
     public ResponseEntity<QueueView> queue(@PathVariable UUID messageId) {
         PersistentJob job = outbox.queue(tenantProvider.requireBusinessId(), messageId);
@@ -66,6 +77,11 @@ public class OutboundMessagingController {
                                  UUID operationId,
                                  UUID recipientIdentityId) { }
 
+    public record CatalogMediaPrepareRequest(UUID customerId,
+                                             UUID operationId,
+                                             UUID recipientIdentityId,
+                                             UUID catalogMediaId) { }
+
     public record QueueView(UUID jobId,
                             String status,
                             int attemptCount,
@@ -80,6 +96,11 @@ public class OutboundMessagingController {
                        String provider,
                        String status,
                        String content,
+                       String contentType,
+                       String mediaUrl,
+                       String mediaMimeType,
+                       String mediaCaption,
+                       UUID catalogItemId,
                        String providerMessageId,
                        String failureCode,
                        Instant createdAt,
@@ -88,6 +109,8 @@ public class OutboundMessagingController {
             return new View(message.getId(), message.getCustomerId(), message.getOperationId(),
                     message.getChannel().name(), message.getPurpose().name(), message.getRecipientAddress(),
                     message.getProvider(), message.getStatus().name(), message.getContentText(),
+                    message.getContentType().name(), message.getMediaUrl(), message.getMediaMimeType(),
+                    message.getMediaCaption(), message.getCatalogItemId(),
                     message.getProviderMessageId(), message.getFailureCode(), message.getCreatedAt(), message.getSentAt());
         }
     }

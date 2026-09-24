@@ -1,5 +1,9 @@
 package cl.helvoca.messaging.outbound;
 
+import cl.helvoca.catalog.CatalogItem;
+import cl.helvoca.catalog.CatalogItemRepository;
+import cl.helvoca.catalog.CatalogMedia;
+import cl.helvoca.catalog.CatalogMediaRepository;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.messaging.meta.MetaWhatsAppApiException;
 import cl.helvoca.omnichannel.CustomerIdentity;
@@ -26,6 +30,8 @@ public class OutboundMessagingService {
     private final CustomerRepository customers;
     private final CustomerIdentityRepository identities;
     private final BusinessOperationRepository operations;
+    private final CatalogItemRepository catalog;
+    private final CatalogMediaRepository catalogMedia;
     private final OutboundContentResolver content;
     private final OutboundMessagingProperties properties;
     private final MessagingProviderRegistry providers;
@@ -35,6 +41,8 @@ public class OutboundMessagingService {
                                     CustomerRepository customers,
                                     CustomerIdentityRepository identities,
                                     BusinessOperationRepository operations,
+                                    CatalogItemRepository catalog,
+                                    CatalogMediaRepository catalogMedia,
                                     OutboundContentResolver content,
                                     OutboundMessagingProperties properties,
                                     MessagingProviderRegistry providers,
@@ -43,6 +51,8 @@ public class OutboundMessagingService {
         this.customers = customers;
         this.identities = identities;
         this.operations = operations;
+        this.catalog = catalog;
+        this.catalogMedia = catalogMedia;
         this.content = content;
         this.properties = properties;
         this.providers = providers;
@@ -94,6 +104,64 @@ public class OutboundMessagingService {
         message.setStatus(OutboundMessage.Status.PREPARED);
         message.setIdempotencyKey(key);
         message.setContentText(rendered);
+        return messages.saveAndFlush(message);
+    }
+
+    @Transactional
+    public OutboundMessage prepareCatalogMedia(UUID businessId,
+                                               UUID customerId,
+                                               UUID operationId,
+                                               UUID recipientIdentityId,
+                                               UUID catalogMediaId) {
+        if (businessId == null || customerId == null || operationId == null || catalogMediaId == null) {
+            throw new IllegalArgumentException("businessId, customerId, operationId and catalogMediaId are required");
+        }
+        if (customers.findByIdAndBusinessId(customerId, businessId).isEmpty()) {
+            throw new IllegalArgumentException("Customer does not belong to tenant");
+        }
+
+        BusinessOperation operation = operations.findByIdAndBusinessId(operationId, businessId)
+                .orElseThrow(() -> new IllegalArgumentException("Operation not found"));
+        if (operation.getCustomerId() == null || !operation.getCustomerId().equals(customerId)) {
+            throw new IllegalArgumentException("Operation does not belong to customer");
+        }
+
+        CatalogMedia media = catalogMedia.findByIdAndBusinessId(catalogMediaId, businessId)
+                .orElseThrow(() -> new IllegalArgumentException("Catalog media not found"));
+        if (!media.isActive()) throw new IllegalStateException("Catalog media is inactive");
+        CatalogItem item = catalog.findByIdAndBusinessId(media.getCatalogItemId(), businessId)
+                .orElseThrow(() -> new IllegalArgumentException("Catalog item not found"));
+        if (!item.isActive()) throw new IllegalStateException("Catalog item is inactive");
+
+        CustomerIdentity identity = resolveRecipient(businessId, customerId, recipientIdentityId);
+        String key = "PRODUCT_SHOWCASE:" + operationId + ":" + media.getId() + ":" + identity.getId()
+                + ":r" + safeRevision(operation.getRevision());
+
+        jdbc.execute("SELECT pg_advisory_xact_lock(" + businessId.hashCode() + "," + key.hashCode() + ")");
+        OutboundMessage existing = messages.findByBusinessIdAndIdempotencyKey(businessId, key).orElse(null);
+        if (existing != null) return existing;
+
+        String caption = productCaption(item, media);
+        OutboundMessage message = new OutboundMessage();
+        message.setBusinessId(businessId);
+        message.setCustomerId(customerId);
+        message.setOperationId(operationId);
+        message.setRecipientIdentityId(identity.getId());
+        message.setChannel(OutboundMessage.Channel.WHATSAPP);
+        message.setPurpose(OutboundMessage.Purpose.PRODUCT_SHOWCASE);
+        message.setRecipientAddress(identity.getNormalizedValue());
+        message.setStatus(OutboundMessage.Status.PREPARED);
+        message.setIdempotencyKey(key);
+        message.setContentText(caption);
+        message.setContentType(switch (media.getMediaType()) {
+            case IMAGE -> OutboundMessage.ContentType.IMAGE;
+            case VIDEO -> OutboundMessage.ContentType.VIDEO;
+            case DOCUMENT -> OutboundMessage.ContentType.DOCUMENT;
+        });
+        message.setMediaUrl(media.getMediaUrl());
+        message.setMediaMimeType(media.getMimeType());
+        message.setMediaCaption(caption);
+        message.setCatalogItemId(item.getId());
         return messages.saveAndFlush(message);
     }
 
@@ -162,7 +230,11 @@ public class OutboundMessagingService {
                     message.getChannel(),
                     message.getRecipientAddress(),
                     message.getContentText(),
-                    message.getIdempotencyKey()));
+                    message.getIdempotencyKey(),
+                    message.getContentType(),
+                    message.getMediaUrl(),
+                    message.getMediaMimeType(),
+                    message.getMediaCaption()));
             if (result == null || result.providerMessageId() == null || result.providerMessageId().isBlank()) {
                 throw new IllegalStateException("Provider did not confirm message id");
             }
@@ -204,6 +276,24 @@ public class OutboundMessagingService {
     @Transactional(readOnly = true)
     public List<OutboundMessage> recent(UUID businessId) {
         return messages.findTop100ByBusinessIdOrderByCreatedAtDesc(businessId);
+    }
+
+    private static String productCaption(CatalogItem item, CatalogMedia media) {
+        StringBuilder value = new StringBuilder();
+        if (media.getCaption() != null && !media.getCaption().isBlank()) {
+            value.append(media.getCaption().trim());
+        } else {
+            value.append(item.getName());
+            if (item.getDescription() != null && !item.getDescription().isBlank()) {
+                value.append("\n").append(item.getDescription().trim());
+            }
+        }
+        if (item.getPrice() != null) {
+            value.append("\n").append(item.getCurrency()).append(" ")
+                    .append(item.getPrice().stripTrailingZeros().toPlainString());
+        }
+        String caption = value.toString().trim();
+        return caption.length() <= 1024 ? caption : caption.substring(0, 1024);
     }
 
     private CustomerIdentity resolveRecipient(UUID businessId, UUID customerId, UUID identityId) {

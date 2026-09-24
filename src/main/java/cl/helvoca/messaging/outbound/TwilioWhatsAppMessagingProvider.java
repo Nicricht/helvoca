@@ -81,6 +81,9 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
             throw new IllegalArgumentException("Invalid outbound command");
         }
         if (!supports(command.channel())) throw new IllegalArgumentException("Unsupported outbound channel");
+        if (command.contentType() != OutboundMessage.ContentType.TEXT) {
+            throw new IllegalArgumentException("Twilio WhatsApp multimedia is not enabled for durable catalog delivery");
+        }
         if (!twilio.hasAccountSid() || !twilio.hasAuthToken()
                 || !ACCOUNT_SID.matcher(twilio.getAccountSid().trim()).matches()) {
             throw new IllegalStateException("Twilio outbound credentials are not configured");
