@@ -11,9 +11,10 @@ import java.util.UUID;
                 columnNames = {"business_id", "idempotency_key"}))
 public class OutboundMessage {
     public enum Channel { WHATSAPP }
+    public enum ContentType { TEXT, IMAGE, VIDEO, DOCUMENT }
     public enum Purpose {
         PAYMENT_LINK, BOOKING_CONFIRMATION, MEETING_LINK, ORDER_STATUS,
-        QUOTE, REMINDER, DELIVERY_STATUS, INCIDENT_NOTICE
+        QUOTE, REMINDER, DELIVERY_STATUS, INCIDENT_NOTICE, PRODUCT_SHOWCASE
     }
     public enum Status { PREPARED, QUEUED, SENT, FAILED, CANCELLED, BLOCKED }
 
@@ -30,6 +31,11 @@ public class OutboundMessage {
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20) private Status status = Status.PREPARED;
     @Column(name = "idempotency_key", nullable = false, length = 220) private String idempotencyKey;
     @Column(name = "content_text", nullable = false, columnDefinition = "text") private String contentText;
+    @Enumerated(EnumType.STRING) @Column(name = "content_type", nullable = false, length = 20) private ContentType contentType = ContentType.TEXT;
+    @Column(name = "media_url", length = 1200) private String mediaUrl;
+    @Column(name = "media_mime_type", length = 120) private String mediaMimeType;
+    @Column(name = "media_caption", length = 1024) private String mediaCaption;
+    @Column(name = "catalog_item_id") private UUID catalogItemId;
     @Column(name = "provider_message_id", length = 180) private String providerMessageId;
     @Column(name = "provider_delivery_status", length = 20) private String providerDeliveryStatus;
     @Column(name = "failure_code", length = 80) private String failureCode;
@@ -47,6 +53,7 @@ public class OutboundMessage {
         createdAt = now;
         updatedAt = now;
         if (status == null) status = Status.PREPARED;
+        if (contentType == null) contentType = ContentType.TEXT;
     }
     @PreUpdate void preUpdate() { updatedAt = Instant.now(); }
 
@@ -73,6 +80,16 @@ public class OutboundMessage {
     public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
     public String getContentText() { return contentText; }
     public void setContentText(String contentText) { this.contentText = contentText; }
+    public ContentType getContentType() { return contentType; }
+    public void setContentType(ContentType contentType) { this.contentType = contentType; }
+    public String getMediaUrl() { return mediaUrl; }
+    public void setMediaUrl(String mediaUrl) { this.mediaUrl = mediaUrl; }
+    public String getMediaMimeType() { return mediaMimeType; }
+    public void setMediaMimeType(String mediaMimeType) { this.mediaMimeType = mediaMimeType; }
+    public String getMediaCaption() { return mediaCaption; }
+    public void setMediaCaption(String mediaCaption) { this.mediaCaption = mediaCaption; }
+    public UUID getCatalogItemId() { return catalogItemId; }
+    public void setCatalogItemId(UUID catalogItemId) { this.catalogItemId = catalogItemId; }
     public String getProviderMessageId() { return providerMessageId; }
     public void setProviderMessageId(String providerMessageId) { this.providerMessageId = providerMessageId; }
     public String getProviderDeliveryStatus() { return providerDeliveryStatus; }
