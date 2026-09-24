@@ -65,6 +65,12 @@ public class BusinessOperationCapabilityService {
                 && automationAllowsTool(businessId, CommercialOperationToolService.SHOWCASE_QUOTE_TOOL)) {
             allowed.add(CommercialOperationToolService.SHOWCASE_QUOTE_TOOL);
         }
+        if (aiAgents.toolAllowed(businessId, "list_catalog")
+                && aiAgents.toolAllowed(businessId, "quote_order")
+                && aiAgents.toolAllowed(businessId, "create_order")
+                && automationAllowsTool(businessId, CommercialOperationToolService.SHOWCASE_ORDER_TOOL)) {
+            allowed.add(CommercialOperationToolService.SHOWCASE_ORDER_TOOL);
+        }
         return Set.copyOf(allowed);
     }
 
@@ -80,6 +86,12 @@ public class BusinessOperationCapabilityService {
         if (CommercialOperationToolService.SHOWCASE_QUOTE_TOOL.equals(toolName)) {
             return aiAgents.toolAllowed(businessId, "list_catalog")
                     && aiAgents.toolAllowed(businessId, "create_quote")
+                    && automationAllowsTool(businessId, toolName);
+        }
+        if (CommercialOperationToolService.SHOWCASE_ORDER_TOOL.equals(toolName)) {
+            return aiAgents.toolAllowed(businessId, "list_catalog")
+                    && aiAgents.toolAllowed(businessId, "quote_order")
+                    && aiAgents.toolAllowed(businessId, "create_order")
                     && automationAllowsTool(businessId, toolName);
         }
         return BusinessOperationCapability.isCommercialToolName(toolName)
@@ -124,7 +136,8 @@ public class BusinessOperationCapabilityService {
 
     private static BusinessOperation.Type mutatingOperationType(String toolName) {
         return switch (toolName) {
-            case "quote_order", "update_order", "create_order", "cancel_order" -> BusinessOperation.Type.ORDER;
+            case "quote_order", "update_order", "create_order", "cancel_order",
+                    CommercialOperationToolService.SHOWCASE_ORDER_TOOL -> BusinessOperation.Type.ORDER;
             case "quote_delivery", "update_delivery", "create_delivery", "cancel_delivery" -> BusinessOperation.Type.DELIVERY;
             case "create_quote", CommercialOperationToolService.SHOWCASE_QUOTE_TOOL -> BusinessOperation.Type.QUOTE;
             case "create_lead" -> BusinessOperation.Type.LEAD;
