@@ -75,7 +75,7 @@ public class GeminiAudioTranscriptionProvider implements AudioTranscriptionProvi
             } catch (AudioTranscriptionException failure) {
                 primaryFailure = failure;
                 if (failure.httpStatus() != null && failure.httpStatus() == 429) {
-                    throw failure;
+                    break;
                 }
                 if (!failure.retryable() || attempt >= PRIMARY_MAX_ATTEMPTS) {
                     break;
