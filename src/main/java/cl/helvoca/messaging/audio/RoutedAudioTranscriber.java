@@ -1,5 +1,8 @@
 package cl.helvoca.messaging.audio;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -12,6 +15,8 @@ import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 
 public class RoutedAudioTranscriber implements AudioTranscriber {
+    private static final Logger log = LoggerFactory.getLogger(RoutedAudioTranscriber.class);
+
     private final List<AudioTranscriptionProvider> providers;
     private final TranscriptionCircuitBreaker circuitBreaker;
     private final int retryMinMillis;
@@ -98,6 +103,7 @@ public class RoutedAudioTranscriber implements AudioTranscriber {
                 firstFailure = unexpected(provider, failure);
             }
 
+            logFailure(provider.id(), "initial", firstFailure);
             lastFailure = firstFailure;
             if (!firstFailure.retryable()) {
                 circuitBreaker.onPermanentFailure(provider.id());
@@ -116,6 +122,7 @@ public class RoutedAudioTranscriber implements AudioTranscriber {
                 circuitBreaker.onSuccess(provider.id());
                 return result;
             } catch (AudioTranscriptionException failure) {
+                logFailure(provider.id(), "retry", failure);
                 lastFailure = failure;
                 if (failure.retryable()) {
                     retryableFailureSeen = true;
@@ -125,6 +132,7 @@ public class RoutedAudioTranscriber implements AudioTranscriber {
                 }
             } catch (RuntimeException failure) {
                 lastFailure = unexpected(provider, failure);
+                logFailure(provider.id(), "retry", lastFailure);
                 retryableFailureSeen = true;
                 circuitBreaker.onRetryableFailure(provider.id());
             }
@@ -159,6 +167,16 @@ public class RoutedAudioTranscriber implements AudioTranscriber {
                     "Audio transcription provider returned no text");
         }
         return result;
+    }
+
+    private static void logFailure(String providerId, String phase, AudioTranscriptionException failure) {
+        log.warn(
+                "AUDIO_TRANSCRIPTION_PROVIDER_FAILURE provider={} phase={} code={} httpStatus={} retryable={}",
+                providerId,
+                phase,
+                failure.code(),
+                failure.httpStatus() == null ? "NONE" : failure.httpStatus(),
+                failure.retryable());
     }
 
     private long retryDelayMillis() {
