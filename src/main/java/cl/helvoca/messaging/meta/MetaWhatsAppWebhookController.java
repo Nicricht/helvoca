@@ -179,6 +179,32 @@ public class MetaWhatsAppWebhookController {
                     unresolved++;
                     continue;
                 }
+
+                if (inboundProperties.isAsyncAudioEnabled()) {
+                    if (!jobProperties.isEnabled() || inboundJobs == null) {
+                        asyncUnavailable++;
+                        log.warn(
+                                "Meta WhatsApp async audio unavailable message={} business={} durableJobsEnabled={}",
+                                message.messageId(),
+                                route.businessId(),
+                                jobProperties.isEnabled());
+                        continue;
+                    }
+
+                    try {
+                        inboundJobs.enqueueAudio(route, message);
+                        audioProcessed++;
+                    } catch (Exception e) {
+                        failed++;
+                        log.warn(
+                                "Meta WhatsApp async audio enqueue failed message={} business={} type={}",
+                                message.messageId(),
+                                route.businessId(),
+                                e.getClass().getSimpleName());
+                    }
+                    continue;
+                }
+
                 if (audioTranscription == null) {
                     audioFailed++;
                     log.warn("Meta WhatsApp audio processing unavailable message={} business={} webhookAcknowledged=true",

@@ -5,10 +5,12 @@ import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.messaging.audio.AudioInput;
 import cl.helvoca.messaging.audio.AudioTranscriber;
 import cl.helvoca.messaging.audio.AudioTranscriptionProvider;
+import cl.helvoca.messaging.audio.DeepgramAudioTranscriptionProvider;
 import cl.helvoca.messaging.audio.GeminiAudioTranscriptionProvider;
 import cl.helvoca.messaging.audio.OpenAiAudioTranscriptionProvider;
 import cl.helvoca.messaging.audio.RoutedAudioTranscriber;
 import cl.helvoca.messaging.audio.TranscriptionResult;
+import cl.helvoca.messaging.audio.WhatsAppAudioTranscriptionProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -36,6 +38,7 @@ public class MetaWhatsAppAudioTranscriptionService {
             MetaWhatsAppAccessTokenResolver accessTokens,
             OpenAiRealtimeProperties openAi,
             GeminiLiveProperties gemini,
+            WhatsAppAudioTranscriptionProperties audioProperties,
             @Value("${OPENAI_WHATSAPP_TRANSCRIPTION_MODEL:gpt-transcribe}") String model,
             @Value("${OPENAI_AUDIO_TRANSCRIPTIONS_URL:https://api.openai.com/v1/audio/transcriptions}") String endpoint,
             @Value("${GEMINI_AUDIO_TRANSCRIPTION_MODEL:gemini-3.8-flash}") String geminiModel,
@@ -43,17 +46,17 @@ public class MetaWhatsAppAudioTranscriptionService {
             @Value("${GEMINI_GENERATE_CONTENT_BASE_URL:https://generativelanguage.googleapis.com/v1beta}") String geminiBaseUrl,
             @Value("${GEMINI_AUDIO_TRANSCRIPTION_PREFERRED:false}") boolean geminiPreferred) {
         this(
-                meta,
-                accessTokens,
-                openAi,
-                gemini,
-                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build(),
-                model,
-                endpoint,
-                geminiModel,
-                geminiFallbackModel,
-                geminiBaseUrl,
-                geminiPreferred);
+                new MetaWhatsAppAudioMediaService(meta, accessTokens),
+                buildProductionTranscriber(
+                        openAi,
+                        gemini,
+                        audioProperties,
+                        HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build(),
+                        model,
+                        endpoint,
+                        geminiModel,
+                        geminiFallbackModel,
+                        geminiBaseUrl));
     }
 
     MetaWhatsAppAudioTranscriptionService(
@@ -185,6 +188,35 @@ public class MetaWhatsAppAudioTranscriptionService {
                 result.text().length(),
                 result.attemptCount());
         return result.text();
+    }
+
+    private static AudioTranscriber buildProductionTranscriber(
+            OpenAiRealtimeProperties openAi,
+            GeminiLiveProperties gemini,
+            WhatsAppAudioTranscriptionProperties audioProperties,
+            HttpClient http,
+            String model,
+            String endpoint,
+            String geminiModel,
+            String geminiFallbackModel,
+            String geminiBaseUrl) {
+        AudioTranscriptionProvider deepgramProvider = new DeepgramAudioTranscriptionProvider(
+                audioProperties,
+                http);
+        AudioTranscriptionProvider geminiProvider = new GeminiAudioTranscriptionProvider(
+                gemini,
+                http,
+                geminiModel,
+                geminiFallbackModel,
+                geminiBaseUrl);
+        AudioTranscriptionProvider openAiProvider = new OpenAiAudioTranscriptionProvider(
+                openAi,
+                http,
+                model,
+                endpoint);
+        return new RoutedAudioTranscriber(
+                List.of(deepgramProvider, geminiProvider, openAiProvider),
+                audioProperties);
     }
 
     private static AudioTranscriber buildTranscriber(

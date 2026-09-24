@@ -88,6 +88,18 @@ app:
     enabled: ${TWILIO_WHATSAPP_ENABLED:false}
     webhook-validation-enabled: ${TWILIO_WHATSAPP_WEBHOOK_VALIDATION_ENABLED:true}
     session-hours: ${TWILIO_WHATSAPP_SESSION_HOURS:24}
+    audio-transcription:
+      provider-order: ${HELVOCA_AUDIO_TRANSCRIPTION_PROVIDER_ORDER:deepgram,gemini,openai}
+      immediate-retry-min-millis: ${HELVOCA_AUDIO_TRANSCRIPTION_RETRY_MIN_MS:250}
+      immediate-retry-max-millis: ${HELVOCA_AUDIO_TRANSCRIPTION_RETRY_MAX_MS:500}
+      circuit-failure-threshold: ${HELVOCA_AUDIO_TRANSCRIPTION_CIRCUIT_FAILURE_THRESHOLD:3}
+      circuit-cooldown-seconds: ${HELVOCA_AUDIO_TRANSCRIPTION_CIRCUIT_COOLDOWN_SECONDS:60}
+      deepgram-enabled: ${DEEPGRAM_TRANSCRIPTION_ENABLED:false}
+      deepgram-api-key: ${DEEPGRAM_API_KEY:}
+      deepgram-endpoint: ${DEEPGRAM_TRANSCRIPTION_ENDPOINT:https://api.deepgram.com/v1/listen}
+      deepgram-model: ${DEEPGRAM_TRANSCRIPTION_MODEL:nova-3}
+      deepgram-language: ${DEEPGRAM_TRANSCRIPTION_LANGUAGE:multi}
+      deepgram-timeout-seconds: ${DEEPGRAM_TRANSCRIPTION_TIMEOUT_SECONDS:15}
   meta:
     whatsapp:
       enabled: ${META_WHATSAPP_ENABLED:false}

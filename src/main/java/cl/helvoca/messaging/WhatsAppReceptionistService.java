@@ -58,6 +58,8 @@ public class WhatsAppReceptionistService {
     @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
 
+    public record ResolvedSystemReply(UUID messageId, String recipient, String replyProviderId) {}
+
     public WhatsAppReceptionistService(PhoneNumberRepository phones,
                                        CustomerRepository customers,
                                        MessagingConversationRepository conversations,
@@ -111,6 +113,81 @@ public class WhatsAppReceptionistService {
                 .filter(PhoneNumber::isWhatsappEnabled)
                 .orElseThrow(() -> new IllegalArgumentException("Resolved WhatsApp destination is not registered or enabled"));
         return process(messageId, rawFrom, phone, body, MetaWhatsAppMessagingProvider.ID);
+    }
+
+    @Transactional
+    public ResolvedSystemReply recordResolvedSystemReply(
+            String messageId,
+            UUID businessId,
+            UUID phoneNumberId,
+            String rawFrom,
+            String sourceContent,
+            String reply,
+            String failureCode,
+            String replyProviderId) {
+        acquireMessageProcessingLock(messageId);
+        if (businessId == null || phoneNumberId == null) {
+            throw new IllegalArgumentException("Resolved WhatsApp tenant route is required");
+        }
+        if (sourceContent == null || sourceContent.isBlank()
+                || reply == null || reply.isBlank()
+                || failureCode == null || failureCode.isBlank()
+                || replyProviderId == null || replyProviderId.isBlank()) {
+            throw new IllegalArgumentException("Resolved WhatsApp system reply is incomplete");
+        }
+
+        String from = normalizeAddress(rawFrom);
+        if (from.isBlank()) throw new IllegalArgumentException("Invalid WhatsApp sender");
+
+        MessagingMessage prior = messages.findByExternalMessageId(messageId).orElse(null);
+        if (prior != null) {
+            if (!reply.equals(prior.getReplyText()) || !failureCode.equals(prior.getFailureCode())) {
+                throw new IllegalStateException("WhatsApp message already has a different persisted result");
+            }
+            MessagingConversation existingConversation = conversations
+                    .findByIdAndBusinessId(prior.getConversationId(), businessId)
+                    .orElseThrow(() -> new IllegalStateException("Persisted WhatsApp recovery conversation was not found"));
+            return new ResolvedSystemReply(prior.getId(), existingConversation.getSender(), replyProviderId);
+        }
+
+        PhoneNumber phone = phones.findByIdAndBusinessId(phoneNumberId, businessId)
+                .filter(PhoneNumber::isActive)
+                .filter(PhoneNumber::isWhatsappEnabled)
+                .orElseThrow(() -> new IllegalArgumentException("Resolved WhatsApp destination is not registered or enabled"));
+        String to = normalizeAddress(phone.getPhoneNumber());
+        if (to.isBlank()) throw new IllegalArgumentException("Invalid WhatsApp destination");
+
+        Instant now = Instant.now();
+        Instant after = now.minus(Duration.ofHours(properties.getSessionHours()));
+        MessagingConversation conversation = conversations
+                .findFirstByBusinessIdAndChannelAndSenderAndRecipientAndLastMessageAtAfterOrderByLastMessageAtDesc(
+                        businessId, CHANNEL, from, to, after)
+                .orElseGet(() -> newConversation(phone, from, to, now));
+
+        attachVerifiedCustomer(conversation, businessId, from);
+        conversation.setLastMessageAt(now);
+        conversations.saveAndFlush(conversation);
+
+        MessagingMessage inbound = new MessagingMessage();
+        inbound.setConversationId(conversation.getId());
+        inbound.setExternalMessageId(messageId);
+        inbound.setDirection("INBOUND");
+        inbound.setRole("USER");
+        inbound.setContent(sourceContent.trim());
+        inbound.setReplyText(reply.trim());
+        inbound.setFailureCode(failureCode.trim());
+        inbound = messages.saveAndFlush(inbound);
+
+        MessagingMessage outbound = new MessagingMessage();
+        outbound.setConversationId(conversation.getId());
+        outbound.setDirection("OUTBOUND");
+        outbound.setRole("ASSISTANT");
+        outbound.setContent(reply.trim());
+        messages.save(outbound);
+
+        conversation.setLastMessageAt(Instant.now());
+        conversations.save(conversation);
+        return new ResolvedSystemReply(inbound.getId(), from, replyProviderId.trim());
     }
 
     private void acquireMessageProcessingLock(String messageId) {
