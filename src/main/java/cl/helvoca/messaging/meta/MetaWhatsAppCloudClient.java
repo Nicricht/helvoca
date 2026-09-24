@@ -219,6 +219,44 @@ public class MetaWhatsAppCloudClient {
                         .put("preview_url", false)
                         .put("body", text));
 
+        return sendPayload(senderId, token, payload);
+    }
+
+    public String sendMediaLink(String phoneNumberId,
+                                String accessToken,
+                                String recipient,
+                                String mediaType,
+                                String mediaUrl,
+                                String caption) {
+        String senderId = normalizePhoneNumberId(phoneNumberId);
+        String token = require(accessToken, "Meta WhatsApp access token is required");
+        String to = normalizeRecipient(recipient);
+        String type = require(mediaType, "Meta media type is required").toLowerCase();
+        if (!type.equals("image") && !type.equals("video") && !type.equals("document")) {
+            throw new IllegalArgumentException("Unsupported Meta WhatsApp media type");
+        }
+        String link = normalizeHttpsMediaUrl(mediaUrl);
+
+        JSONObject media = new JSONObject().put("link", link);
+        if (caption != null && !caption.isBlank()) {
+            String cleanCaption = caption.trim();
+            if (cleanCaption.length() > 1024) {
+                throw new IllegalArgumentException("Meta WhatsApp media caption is too long");
+            }
+            media.put("caption", cleanCaption);
+        }
+
+        JSONObject payload = new JSONObject()
+                .put("messaging_product", "whatsapp")
+                .put("recipient_type", "individual")
+                .put("to", to)
+                .put("type", type)
+                .put(type, media);
+
+        return sendPayload(senderId, token, payload);
+    }
+
+    private String sendPayload(String senderId, String token, JSONObject payload) {
         URI uri = URI.create(properties.graphApiRoot() + "/" + senderId + "/messages");
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(12))
@@ -252,6 +290,22 @@ public class MetaWhatsAppCloudClient {
             throw e;
         } catch (Exception e) {
             throw new IllegalStateException("Meta WhatsApp send failed", e);
+        }
+    }
+
+    private static String normalizeHttpsMediaUrl(String value) {
+        String clean = require(value, "Meta media URL is required");
+        try {
+            URI uri = URI.create(clean);
+            if (!"https".equalsIgnoreCase(uri.getScheme())
+                    || uri.getHost() == null
+                    || uri.getHost().isBlank()
+                    || uri.getUserInfo() != null) {
+                throw new IllegalArgumentException("Meta media URL must use HTTPS");
+            }
+            return uri.toString();
+        } catch (IllegalArgumentException failure) {
+            throw new IllegalArgumentException("Meta media URL must use HTTPS");
         }
     }
 
