@@ -26,6 +26,7 @@ public class AutomationPolicyToolGate {
             Map.entry("cancel_delivery", BusinessOperation.Type.DELIVERY),
             Map.entry("create_quote", BusinessOperation.Type.QUOTE),
             Map.entry("create_lead", BusinessOperation.Type.LEAD),
+            Map.entry(CommercialOperationToolService.SHOWCASE_SELECTION_TOOL, BusinessOperation.Type.REQUEST),
             Map.entry("create_request", BusinessOperation.Type.REQUEST),
             Map.entry("create_booking", BusinessOperation.Type.BOOKING),
             Map.entry("reschedule_booking", BusinessOperation.Type.BOOKING),
