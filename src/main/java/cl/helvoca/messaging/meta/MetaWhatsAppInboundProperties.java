@@ -9,7 +9,7 @@ public class MetaWhatsAppInboundProperties {
     private boolean asyncTextEnabled = false;
     private boolean asyncAudioEnabled = false;
     private int textMaxAttempts = 5;
-    private int audioMaxAttempts = 5;
+    private int audioMaxAttempts = 6;
 
     public boolean isAsyncTextEnabled() { return asyncTextEnabled; }
     public void setAsyncTextEnabled(boolean asyncTextEnabled) { this.asyncTextEnabled = asyncTextEnabled; }
