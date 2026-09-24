@@ -100,7 +100,8 @@ public class PersistentJobService {
             outcome = "dead_letter";
         } catch (PersistentJobHandler.RetryableJobException e) {
             failureCode = failureCode(e);
-            store.markFailed(job, workerId, failureCode, safeMessage(e), true, backoff(job.attemptCount()));
+            store.markFailed(job, workerId, failureCode, safeMessage(e), true,
+                    retryDelay(job.attemptCount(), e.retryDelay()));
             outcome = job.attemptCount() >= job.maxAttempts() ? "dead_letter" : "retry";
         } catch (RuntimeException e) {
             // Unknown runtime failures are retried within the bounded attempt budget.
@@ -138,6 +139,14 @@ public class PersistentJobService {
 
     public List<PersistentJob> recent(UUID businessId) {
         return store.recent(businessId);
+    }
+
+    static Duration retryDelay(int attemptCount, Duration requestedMinimum) {
+        Duration standard = backoff(attemptCount);
+        if (requestedMinimum == null || requestedMinimum.isZero() || requestedMinimum.isNegative()) {
+            return standard;
+        }
+        return requestedMinimum.compareTo(standard) > 0 ? requestedMinimum : standard;
     }
 
     private static Duration backoff(int attemptCount) {

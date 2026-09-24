@@ -12,10 +12,13 @@ import org.json.JSONObject;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.UUID;
 
 @Component
 public class MetaWhatsAppInboundAudioJobHandler implements PersistentJobHandler {
+    private static final Duration RATE_LIMIT_RETRY_DELAY = Duration.ofSeconds(60);
+
     private final MetaWhatsAppAudioMediaService media;
     private final AudioTranscriber transcriber;
     private final WhatsAppReceptionistService receptionist;
@@ -65,6 +68,14 @@ public class MetaWhatsAppInboundAudioJobHandler implements PersistentJobHandler 
         } catch (MetaWhatsAppAudioMediaService.AudioMediaException failure) {
             classify(job, payload, failure.retryable(), "WhatsApp audio media download failed", failure);
         } catch (AudioTranscriptionException failure) {
+            if (failure.retryable()
+                    && containsRateLimit(failure)
+                    && job.attemptCount() < job.maxAttempts()) {
+                throw new RetryableJobException(
+                        "WhatsApp audio transcription rate limited",
+                        failure,
+                        RATE_LIMIT_RETRY_DELAY);
+            }
             classify(job, payload, failure.retryable(), "WhatsApp audio transcription failed", failure);
         } catch (PermanentJobException failure) {
             throw failure;
@@ -73,6 +84,19 @@ public class MetaWhatsAppInboundAudioJobHandler implements PersistentJobHandler 
         } catch (RuntimeException failure) {
             classify(job, payload, true, "WhatsApp audio processing failed", failure);
         }
+    }
+
+    private static boolean containsRateLimit(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof AudioTranscriptionException audio
+                    && audio.httpStatus() != null
+                    && audio.httpStatus() == 429) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private void classify(
