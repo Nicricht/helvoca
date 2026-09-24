@@ -16,6 +16,7 @@ import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.operations.CommercialOperationToolService;
 import cl.helvoca.operations.CommercialToolDefinitions;
 import cl.helvoca.operations.SafeOperationRetryEngine;
+import cl.helvoca.operations.ShowcaseSelectionContextService;
 import cl.helvoca.request.BusinessRequest;
 import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.request.RequestPriority;
@@ -56,6 +57,9 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
 
     @Autowired(required = false)
     private SafeOperationRetryEngine retryEngine;
+
+    @Autowired(required = false)
+    private ShowcaseSelectionContextService showcaseSelectionContext;
 
     public UniversalWhatsAppToolService(BusinessRepository businesses,
                                         CustomerRepository customers,
@@ -178,10 +182,14 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public String buildInstructions(MessagingConversation conversation) {
+        String showcaseContext = showcaseSelectionContext == null
+                ? ""
+                : showcaseSelectionContext.instructions(conversation);
         return super.buildInstructions(conversation)
                 + CommercialToolDefinitions.instructions(capabilities.enabled(conversation.getBusinessId()))
+                + showcaseContext
                 + "\nNunca uses create_request para reservar, agendar una cita o pedir una reserva de un servicio reservable. En esos casos usa las herramientas de disponibilidad y después create_booking en sus dos fases. create_request es solo para solicitudes no reservables."
                 + "\nAntes de la FASE 1 de create_booking pregunta siempre a nombre de quién va la reserva, incluso si find_caller ya devolvió un nombre guardado. No reutilices silenciosamente el nombre del perfil. Si el usuario ya indicó el nombre en su mensaje actual, no lo preguntes de nuevo. Envía ese nombre exacto como customerName en la FASE 1."
                 + "\nCuando el cliente indique una fecha/hora local, por ejemplo mañana a las 11:30, usa check_booking_availability con localDate YYYY-MM-DD y localTime HH:mm. No calcules UTC ni offsets por tu cuenta. Copia literalmente el startAt que devuelva el backend."
