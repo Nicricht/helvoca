@@ -33,4 +33,30 @@ class OpenAiMessagingAiClientProviderPreferenceTest {
         verify(gemini).respond(any(), any(), anySet(), any());
         verify(openAi, never()).hasApiKey();
     }
+    @Test
+    void preferredGeminiFallsBackToOpenAiWhenProviderIsUnavailableBeforeTools() {
+        OpenAiRealtimeProperties openAi = mock(OpenAiRealtimeProperties.class);
+        when(openAi.hasApiKey()).thenReturn(true);
+
+        GeminiMessagingAiFallback gemini = mock(GeminiMessagingAiFallback.class);
+        when(gemini.configured()).thenReturn(true);
+        when(gemini.respond(any(), any(), anySet(), any()))
+                .thenThrow(new GeminiMessagingAiFallback.ProviderUnavailableException("HTTP 429"));
+
+        OpenAiMessagingAiClient client = spy(new OpenAiMessagingAiClient(openAi, gemini, true));
+        doReturn("Respuesta de OpenAI")
+                .when(client)
+                .respondWithOpenAi(any(), any(), anySet(), any());
+
+        String answer = client.respond(
+                "Responde en español.",
+                List.of(new MessagingAiClient.Turn("user", "Sí")),
+                Set.of(),
+                (name, args) -> "{}");
+
+        assertEquals("Respuesta de OpenAI", answer);
+        verify(gemini).respond(any(), any(), anySet(), any());
+        verify(client).respondWithOpenAi(any(), any(), anySet(), any());
+    }
+
 }
