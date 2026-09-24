@@ -112,7 +112,7 @@ app:
         async-text-enabled: ${HELVOCA_META_WHATSAPP_ASYNC_TEXT_ENABLED:false}
         async-audio-enabled: ${HELVOCA_META_WHATSAPP_ASYNC_AUDIO_ENABLED:false}
         text-max-attempts: ${HELVOCA_META_WHATSAPP_TEXT_MAX_ATTEMPTS:5}
-        audio-max-attempts: ${HELVOCA_META_WHATSAPP_AUDIO_MAX_ATTEMPTS:5}
+        audio-max-attempts: ${HELVOCA_META_WHATSAPP_AUDIO_MAX_ATTEMPTS:6}
       embedded-signup-enabled: ${META_WHATSAPP_EMBEDDED_SIGNUP_ENABLED:false}
       embedded-signup-app-id: ${META_WHATSAPP_EMBEDDED_SIGNUP_APP_ID:}
       embedded-signup-config-id: ${META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID:}
