@@ -95,6 +95,13 @@ public final class CommercialToolDefinitions {
                 .put(function("list_catalog",
                         "Lista el catálogo universal activo del negocio con productos, servicios, precios, moneda y media comercial disponible. Cada ítem indica hasMedia y media[]. Usa los UUID exactos devueltos; nunca inventes productos, precios ni media.",
                         object()))
+                .put(function(CommercialOperationToolService.SHOWCASE_SELECTION_TOOL,
+                        "Resuelve y guarda en backend qué producto eligió el cliente del último PRODUCT_SHOWCASE de la misma operación. Usa selectionIndex 1, 2 o 3 para referencias ordinales, o catalogItemId solo si ese UUID fue mostrado. El backend valida tenant, cliente, operación y escaparate; no inventes selecciones.",
+                        object().put("properties", new JSONObject()
+                                        .put("operationId", string("UUID exacto de la operación que produjo el último PRODUCT_SHOWCASE"))
+                                        .put("selectionIndex", integer("Posición 1-based dentro del último escaparate: 1, 2 o 3"))
+                                        .put("catalogItemId", string("UUID opcional del producto, únicamente si formó parte del último escaparate")))
+                                .put("required", new JSONArray().put("operationId"))))
                 .put(function("list_delivery_zones",
                         "Lista las zonas de despacho configuradas, su costo y compra mínima. No inventes cobertura ni costo de despacho.",
                         object()))
@@ -191,7 +198,8 @@ public final class CommercialToolDefinitions {
             out.append("Usa list_catalog como fuente oficial de productos, servicios, precios y media comercial. No inventes ítems, precios, imágenes ni videos. ")
                     .append("Si el cliente pide ver productos por WhatsApp, elige como máximo 3 ítems con hasMedia=true. Asegura primero que el cliente esté identificado en el contexto; en voz usa find_caller y, si hace falta, register_caller. ")
                     .append("Luego crea una solicitud create_request de tipo product_showcase para obtener un operationId y usa send_whatsapp_operation con purpose PRODUCT_SHOWCASE y esos catalogItemIds exactos. ")
-                    .append("La llamada y WhatsApp deben conservar ese mismo operationId.\n");
+                    .append("La llamada y WhatsApp deben conservar ese mismo operationId. ")
+                    .append("Cuando el cliente elija primero/segundo/tercero o 1/2/3, llama select_showcase_product con ese mismo operationId y selectionIndex 1-based. No afirmes qué producto quedó seleccionado hasta que success=true; nunca deduzcas ni persistas la selección solo desde el texto del modelo.\n");
         }
         if (enabled.contains(BusinessOperationCapability.ORDER)) {
             out.append("Para pedidos: usa quote_order para crear el borrador y obtener el total real. ")
