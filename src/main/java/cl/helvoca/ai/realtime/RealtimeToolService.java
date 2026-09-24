@@ -475,6 +475,7 @@ public class RealtimeToolService {
 
         return success(new JSONObject()
                 .put("requestId", request.getId().toString())
+                .put("operationId", request.getOperationId().toString())
                 .put("status", request.getStatus().name())
                 .put("requestType", request.getRequestType())
                 .put("title", request.getTitle())
