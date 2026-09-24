@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -46,17 +47,30 @@ public class BusinessOperationCapabilityService {
 
     @Transactional(readOnly = true)
     public Set<String> allowedToolNames(UUID businessId) {
-        return aiAgents.allowedToolNames(businessId).stream()
+        LinkedHashSet<String> allowed = aiAgents.allowedToolNames(businessId).stream()
                 .filter(toolName -> CrossChannelMessagingToolService.TOOL_NAME.equals(toolName)
                         || BusinessOperationCapability.isCommercialToolName(toolName))
                 .filter(toolName -> automationAllowsTool(businessId, toolName))
-                .collect(Collectors.toUnmodifiableSet());
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        // Product selection is a derived catalog action, not a separately
+        // persisted tenant grant. Any tenant that can list its catalog may
+        // resolve a selection only against backend-owned showcase state.
+        if (aiAgents.toolAllowed(businessId, "list_catalog")
+                && automationAllowsTool(businessId, CommercialOperationToolService.SHOWCASE_SELECTION_TOOL)) {
+            allowed.add(CommercialOperationToolService.SHOWCASE_SELECTION_TOOL);
+        }
+        return Set.copyOf(allowed);
     }
 
     @Transactional(readOnly = true)
     public boolean isToolAllowed(UUID businessId, String toolName) {
         if (CrossChannelMessagingToolService.TOOL_NAME.equals(toolName)) {
             return aiAgents.toolAllowed(businessId, toolName);
+        }
+        if (CommercialOperationToolService.SHOWCASE_SELECTION_TOOL.equals(toolName)) {
+            return aiAgents.toolAllowed(businessId, "list_catalog")
+                    && automationAllowsTool(businessId, toolName);
         }
         return BusinessOperationCapability.isCommercialToolName(toolName)
                 && aiAgents.toolAllowed(businessId, toolName)
@@ -104,6 +118,7 @@ public class BusinessOperationCapabilityService {
             case "quote_delivery", "update_delivery", "create_delivery", "cancel_delivery" -> BusinessOperation.Type.DELIVERY;
             case "create_quote" -> BusinessOperation.Type.QUOTE;
             case "create_lead" -> BusinessOperation.Type.LEAD;
+            case CommercialOperationToolService.SHOWCASE_SELECTION_TOOL -> BusinessOperation.Type.REQUEST;
             case "quote_payment", "update_payment", "create_payment", "cancel_payment" -> BusinessOperation.Type.PAYMENT;
             default -> null;
         };
