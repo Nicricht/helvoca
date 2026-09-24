@@ -7,6 +7,8 @@ import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationRepository;
 import cl.helvoca.operations.BusinessOrder;
+import cl.helvoca.operations.ConversationOperationState;
+import cl.helvoca.operations.ConversationStateService;
 import cl.helvoca.operations.OperationConfirmation;
 import cl.helvoca.operations.OperationConfirmationRepository;
 import cl.helvoca.servicecatalog.ServiceItem;
@@ -55,6 +57,7 @@ class BookingConfirmationWorkflowIntegrationTest {
     @Autowired BusinessOperationRepository operations;
     @Autowired OperationConfirmationRepository confirmations;
     @Autowired BookingConfirmationWorkflowService workflow;
+    @Autowired ConversationStateService conversationState;
     @Autowired EntityManager entityManager;
 
     @Test
@@ -140,6 +143,76 @@ class BookingConfirmationWorkflowIntegrationTest {
         assertTrue(replay.getBoolean("success"));
         assertTrue(replay.getJSONObject("data").getBoolean("idempotentReplay"));
         assertEquals(bookingId.toString(), replay.getJSONObject("data").getString("bookingId"));
+        assertEquals(1, bookings.count());
+    }
+
+    @Test
+    void newBookingProposalReplacesTerminalConversationOperationState() {
+        Fixture fixture = fixture();
+        UUID source = UUID.randomUUID();
+        Instant firstStart = futureBusinessTime(3);
+
+        JSONObject firstProposal = workflow.execute(
+                fixture.business().getId(),
+                fixture.customer().getId(),
+                source,
+                "+56911111111",
+                BusinessOrder.Source.WHATSAPP,
+                BookingSource.AI_WHATSAPP,
+                new JSONObject()
+                        .put("serviceId", fixture.service().getId().toString())
+                        .put("startAt", firstStart.toString()));
+
+        UUID firstOperationId = UUID.fromString(
+                firstProposal.getJSONObject("data").getString("operationId"));
+        UUID firstToken = UUID.fromString(
+                firstProposal.getJSONObject("data").getString("confirmationToken"));
+
+        JSONObject firstConfirmation = workflow.execute(
+                fixture.business().getId(),
+                fixture.customer().getId(),
+                source,
+                "+56911111111",
+                BusinessOrder.Source.WHATSAPP,
+                BookingSource.AI_WHATSAPP,
+                new JSONObject()
+                        .put("operationId", firstOperationId.toString())
+                        .put("confirmationToken", firstToken.toString()));
+
+        assertTrue(firstConfirmation.getBoolean("success"));
+        ConversationOperationState confirmed = conversationState.find(
+                fixture.business().getId(), source, BusinessOrder.Source.WHATSAPP);
+        assertNotNull(confirmed);
+        assertEquals(firstOperationId, confirmed.getActiveOperationId());
+        assertEquals("CONFIRMED", confirmed.getState().get("bookingFlowStage"));
+        assertNotNull(confirmed.getState().get("bookingId"));
+
+        Instant secondStart = futureBusinessTime(4);
+        JSONObject secondProposal = workflow.execute(
+                fixture.business().getId(),
+                fixture.customer().getId(),
+                source,
+                "+56911111111",
+                BusinessOrder.Source.WHATSAPP,
+                BookingSource.AI_WHATSAPP,
+                new JSONObject()
+                        .put("serviceId", fixture.service().getId().toString())
+                        .put("startAt", secondStart.toString()));
+
+        assertTrue(secondProposal.getBoolean("success"));
+        UUID secondOperationId = UUID.fromString(
+                secondProposal.getJSONObject("data").getString("operationId"));
+        assertNotEquals(firstOperationId, secondOperationId);
+
+        ConversationOperationState awaiting = conversationState.find(
+                fixture.business().getId(), source, BusinessOrder.Source.WHATSAPP);
+        assertNotNull(awaiting);
+        assertEquals(secondOperationId, awaiting.getActiveOperationId());
+        assertEquals("AWAITING_CONFIRMATION", awaiting.getState().get("operationStatus"));
+        assertEquals("WAITING_CONFIRMATION", awaiting.getState().get("bookingFlowStage"));
+        assertEquals(Boolean.TRUE, awaiting.getState().get("confirmationPending"));
+        assertFalse(awaiting.getState().containsKey("bookingId"));
+        assertFalse(awaiting.getState().containsKey("bookingStatus"));
         assertEquals(1, bookings.count());
     }
 

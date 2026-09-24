@@ -315,8 +315,20 @@ public class BookingConfirmationWorkflowService {
         patch.put("operationType", "BOOKING");
         patch.put("operationStatus", operation.getStatus().name());
         patch.put("operationRevision", operation.getRevision());
-        patch.put("confirmationPending", operation.getStatus() == BusinessOperation.Status.AWAITING_CONFIRMATION);
+        boolean awaitingConfirmation = operation.getStatus() == BusinessOperation.Status.AWAITING_CONFIRMATION;
+        patch.put("confirmationPending", awaitingConfirmation);
         patch.put("confirmationToken", operation.getConfirmationToken() == null ? null : operation.getConfirmationToken().toString());
+        patch.put("bookingFlowStage", awaitingConfirmation
+                ? "WAITING_CONFIRMATION"
+                : operation.getStatus() == BusinessOperation.Status.CONFIRMED ? "CONFIRMED" : operation.getStatus().name());
+
+        // A new proposal is a new booking operation. Remove terminal projection
+        // fields from the previous booking so the conversation state cannot
+        // accidentally look both CONFIRMED and AWAITING_CONFIRMATION.
+        if (booking == null && awaitingConfirmation) {
+            patch.put("bookingId", null);
+            patch.put("bookingStatus", null);
+        }
         if (operation.getMetadata() != null) {
             copy(operation.getMetadata(), patch, "serviceId");
             copy(operation.getMetadata(), patch, "serviceName");
