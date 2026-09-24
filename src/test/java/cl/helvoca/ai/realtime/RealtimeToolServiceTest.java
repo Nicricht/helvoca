@@ -108,8 +108,10 @@ class RealtimeToolServiceTest {
                 businesses, customers, services, knowledge, bookings, calls, schedule,
                 requests, mock(UnansweredQuestionService.class));
 
+        CallSession handoffCall = trustedCall(businessId, null, streamSid);
+        setId(handoffCall, callId);
         when(calls.findByIdAndBusinessId(callId, businessId))
-                .thenReturn(Optional.of(trustedCall(businessId, null, streamSid)));
+                .thenReturn(Optional.of(handoffCall));
         when(customers.findFirstByBusinessIdAndPhone(businessId, "+56911111111"))
                 .thenReturn(Optional.empty());
 
