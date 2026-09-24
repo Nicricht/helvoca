@@ -2,6 +2,8 @@ package cl.helvoca.operations;
 
 import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
+import cl.helvoca.catalog.CatalogMedia;
+import cl.helvoca.catalog.CatalogMediaRepository;
 import cl.helvoca.delivery.DeliveryCoverageService;
 import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZone;
@@ -50,6 +52,7 @@ public class CommercialOperationToolService {
             "cancel_order");
 
     private final CatalogItemRepository catalog;
+    private final CatalogMediaRepository catalogMedia;
     private final DeliveryZoneRepository deliveryZones;
     private final DeliveryCoverageService deliveryCoverage;
     private final BusinessOrderRepository orders;
@@ -63,6 +66,7 @@ public class CommercialOperationToolService {
     private final ConversationStateService conversationState;
 
     public CommercialOperationToolService(CatalogItemRepository catalog,
+                                          CatalogMediaRepository catalogMedia,
                                           DeliveryZoneRepository deliveryZones,
                                           DeliveryCoverageService deliveryCoverage,
                                           BusinessOrderRepository orders,
@@ -75,6 +79,7 @@ public class CommercialOperationToolService {
                                           PaymentWorkflowService paymentWorkflow,
                                           ConversationStateService conversationState) {
         this.catalog = catalog;
+        this.catalogMedia = catalogMedia;
         this.deliveryZones = deliveryZones;
         this.deliveryCoverage = deliveryCoverage;
         this.orders = orders;
@@ -166,7 +171,10 @@ public class CommercialOperationToolService {
     private JSONObject listCatalog(UUID businessId) {
         JSONArray items = new JSONArray();
         for (CatalogItem item : catalog.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId)) {
-            items.put(catalogData(item));
+            items.put(catalogData(
+                    item,
+                    catalogMedia.findAllByBusinessIdAndCatalogItemIdAndActiveTrueOrderBySortOrderAscCreatedAtAsc(
+                            businessId, item.getId())));
         }
         return success(new JSONObject().put("items", items));
     }
@@ -348,7 +356,15 @@ public class CommercialOperationToolService {
                 .put("deliveryAddress", nullable(order.getDeliveryAddress()));
     }
 
-    private static JSONObject catalogData(CatalogItem item) {
+    private static JSONObject catalogData(CatalogItem item, List<CatalogMedia> media) {
+        JSONArray mediaItems = new JSONArray();
+        for (CatalogMedia value : media == null ? List.<CatalogMedia>of() : media) {
+            mediaItems.put(new JSONObject()
+                    .put("mediaId", value.getId().toString())
+                    .put("type", value.getMediaType().name())
+                    .put("mimeType", nullable(value.getMimeType()))
+                    .put("caption", nullable(value.getCaption())));
+        }
         return new JSONObject()
                 .put("id", item.getId().toString())
                 .put("kind", item.getKind().name())
@@ -356,7 +372,9 @@ public class CommercialOperationToolService {
                 .put("description", nullable(item.getDescription()))
                 .put("price", nullable(item.getPrice()))
                 .put("currency", item.getCurrency())
-                .put("durationMinutes", nullable(item.getDurationMinutes()));
+                .put("durationMinutes", nullable(item.getDurationMinutes()))
+                .put("media", mediaItems)
+                .put("hasMedia", !mediaItems.isEmpty());
     }
 
     private static boolean ownedBy(BusinessOrder order, UUID customerId, String trustedPhone) {
