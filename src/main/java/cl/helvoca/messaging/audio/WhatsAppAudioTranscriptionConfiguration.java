@@ -19,6 +19,7 @@ public class WhatsAppAudioTranscriptionConfiguration {
             GeminiLiveProperties gemini,
             WhatsAppAudioTranscriptionProperties properties,
             @Value("${OPENAI_WHATSAPP_TRANSCRIPTION_MODEL:gpt-transcribe}") String openAiModel,
+            @Value("${OPENAI_WHATSAPP_TRANSCRIPTION_FALLBACK_MODEL:whisper-1}") String openAiFallbackModel,
             @Value("${OPENAI_AUDIO_TRANSCRIPTIONS_URL:https://api.openai.com/v1/audio/transcriptions}") String openAiEndpoint,
             @Value("${GEMINI_AUDIO_TRANSCRIPTION_MODEL:gemini-3.8-flash}") String geminiModel,
             @Value("${GEMINI_AUDIO_TRANSCRIPTION_FALLBACK_MODEL:gemini-3.6-flash}") String geminiFallbackModel,
@@ -39,6 +40,7 @@ public class WhatsAppAudioTranscriptionConfiguration {
                                 openAi,
                                 http,
                                 openAiModel,
+                                openAiFallbackModel,
                                 openAiEndpoint)),
                 properties);
     }

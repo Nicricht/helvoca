@@ -73,6 +73,40 @@ class OpenAiAudioTranscriptionProviderTest {
         verify(http, times(1)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
     }
 
+    @Test
+    void primaryRateLimitUsesFallbackModel() throws Exception {
+        OpenAiRealtimeProperties openAi = mock(OpenAiRealtimeProperties.class);
+        when(openAi.getApiKey()).thenReturn("openai-key");
+        HttpClient http = mock(HttpClient.class);
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> limited = mock(HttpResponse.class);
+        when(limited.statusCode()).thenReturn(429);
+        when(limited.body()).thenReturn("{}");
+
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> success = mock(HttpResponse.class);
+        when(success.statusCode()).thenReturn(200);
+        when(success.body()).thenReturn("{\"text\":\"Hola desde whisper\"}");
+
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(limited, success);
+
+        OpenAiAudioTranscriptionProvider provider = new OpenAiAudioTranscriptionProvider(
+                openAi,
+                http,
+                "gpt-transcribe",
+                "whisper-1",
+                "https://api.openai.test/v1/audio/transcriptions");
+
+        TranscriptionResult result = provider.transcribe(input());
+
+        assertEquals("Hola desde whisper", result.text());
+        assertEquals("whisper-1", result.modelId());
+        assertEquals(2, result.attemptCount());
+        verify(http, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
     private static AudioInput input() {
         return new AudioInput(
                 new byte[]{1, 2, 3},
