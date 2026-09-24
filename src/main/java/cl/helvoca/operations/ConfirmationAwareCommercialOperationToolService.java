@@ -1,6 +1,7 @@
 package cl.helvoca.operations;
 
 import cl.helvoca.catalog.CatalogItemRepository;
+import cl.helvoca.catalog.CatalogMediaRepository;
 import cl.helvoca.delivery.DeliveryCoverageService;
 import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZoneRepository;
@@ -24,6 +25,7 @@ public class ConfirmationAwareCommercialOperationToolService extends CommercialO
 
     public ConfirmationAwareCommercialOperationToolService(
             CatalogItemRepository catalog,
+            CatalogMediaRepository catalogMedia,
             DeliveryZoneRepository deliveryZones,
             DeliveryCoverageService deliveryCoverage,
             BusinessOrderRepository orders,
@@ -38,7 +40,7 @@ public class ConfirmationAwareCommercialOperationToolService extends CommercialO
             UniversalConfirmationService confirmations,
             OperationExecutionLockService executionLocks,
             CrossChannelMessagingToolService crossChannelMessaging) {
-        super(catalog, deliveryZones, deliveryCoverage, orders, orderLines, operations, capabilities,
+        super(catalog, catalogMedia, deliveryZones, deliveryCoverage, orders, orderLines, operations, capabilities,
                 orderWorkflow, deliveryWorkflow, universalOperations, paymentWorkflow, conversationState);
         this.confirmations = confirmations;
         this.executionLocks = executionLocks;
