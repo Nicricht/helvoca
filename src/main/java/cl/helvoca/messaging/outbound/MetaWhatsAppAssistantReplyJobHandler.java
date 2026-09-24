@@ -62,7 +62,7 @@ public class MetaWhatsAppAssistantReplyJobHandler implements PersistentJobHandle
             throw new PermanentJobException("Meta AI reply idempotency key does not match source message");
         }
 
-        sender.send(job, inbound);
+        sender.send(job, inbound, true);
     }
 
     private static UUID messageId(PersistentJob job) {
