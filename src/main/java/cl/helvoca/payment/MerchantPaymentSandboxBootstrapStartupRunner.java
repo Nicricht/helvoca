@@ -78,23 +78,16 @@ public class MerchantPaymentSandboxBootstrapStartupRunner implements Application
 
     BootstrapResult bootstrap(UUID businessId) {
         boolean credentialsConfigured = credentials.resolve(credentialRef).isPresent();
-        if (!credentialsConfigured) {
-            return new BootstrapResult(
-                    false,
-                    "mercadopago",
-                    PaymentProviderConfig.Mode.SANDBOX,
-                    false,
-                    false,
-                    null);
-        }
-
         PaymentProviderConfig config = configs.findById(businessId).orElse(null);
         boolean changed = false;
+        boolean created = false;
 
         if (config == null) {
             config = new PaymentProviderConfig();
             config.setBusinessId(businessId);
+            config.setEnabled(false);
             changed = true;
+            created = true;
         }
         if (!"mercadopago".equalsIgnoreCase(config.getProvider())) {
             config.setProvider("mercadopago");
@@ -108,22 +101,27 @@ public class MerchantPaymentSandboxBootstrapStartupRunner implements Application
             config.setCredentialRef(credentialRef);
             changed = true;
         }
-        if (!config.isEnabled()) {
+
+        if (credentialsConfigured && !config.isEnabled()) {
             config.setEnabled(true);
             changed = true;
+        } else if (!credentialsConfigured && created) {
+            config.setEnabled(false);
         }
 
         if (changed) {
             config = configs.saveAndFlush(config);
         }
 
-        String webhookPath = "/webhooks/v1/payments/mercadopago/" + config.getWebhookKey();
+        String webhookPath = config.getWebhookKey() == null
+                ? null
+                : "/webhooks/v1/payments/mercadopago/" + config.getWebhookKey();
         return new BootstrapResult(
                 changed,
                 config.getProvider(),
                 config.getMode(),
                 config.isEnabled(),
-                true,
+                credentialsConfigured,
                 webhookPath);
     }
 
