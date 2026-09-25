@@ -13,12 +13,19 @@ import static org.mockito.Mockito.*;
 class MerchantPaymentSandboxBootstrapStartupRunnerTest {
 
     @Test
-    void doesNotEnableProviderWhenSecretsAreMissing() {
+    void provisionsDisabledWebhookConfigWhenSecretsAreMissing() {
         UUID businessId = UUID.randomUUID();
+        UUID webhookKey = UUID.randomUUID();
         PaymentProviderConfigRepository configs = mock(PaymentProviderConfigRepository.class);
         PaymentProviderCredentialResolver credentials = mock(PaymentProviderCredentialResolver.class);
 
         when(credentials.resolve("RECEPVOZ_MP_SANDBOX")).thenReturn(Optional.empty());
+        when(configs.findById(businessId)).thenReturn(Optional.empty());
+        when(configs.saveAndFlush(any())).thenAnswer(invocation -> {
+            PaymentProviderConfig value = invocation.getArgument(0);
+            value.setWebhookKey(webhookKey);
+            return value;
+        });
 
         MerchantPaymentSandboxBootstrapStartupRunner runner =
                 new MerchantPaymentSandboxBootstrapStartupRunner(
@@ -32,11 +39,18 @@ class MerchantPaymentSandboxBootstrapStartupRunnerTest {
 
         var result = runner.bootstrap(businessId);
 
-        assertFalse(result.changed());
+        assertTrue(result.changed());
         assertFalse(result.enabled());
         assertFalse(result.credentialsConfigured());
-        assertNull(result.webhookPath());
-        verifyNoInteractions(configs);
+        assertEquals(
+                "/webhooks/v1/payments/mercadopago/" + webhookKey,
+                result.webhookPath());
+        verify(configs).saveAndFlush(argThat(value ->
+                businessId.equals(value.getBusinessId())
+                        && !value.isEnabled()
+                        && value.getMode() == PaymentProviderConfig.Mode.SANDBOX
+                        && "mercadopago".equals(value.getProvider())
+                        && "RECEPVOZ_MP_SANDBOX".equals(value.getCredentialRef())));
     }
 
     @Test
