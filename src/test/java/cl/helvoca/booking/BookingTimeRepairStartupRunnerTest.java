@@ -10,7 +10,10 @@ import cl.helvoca.security.TenantDatabaseContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,18 +36,25 @@ class BookingTimeRepairStartupRunnerTest {
         BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
         BookingOperationSyncService operationSync = mock(BookingOperationSyncService.class);
 
+        ZoneId zone = ZoneId.of("America/Santiago");
+        LocalDate targetDate = LocalDate.now(zone).plusDays(2);
+        Instant targetStart = targetDate.atTime(11, 30).atZone(zone).toInstant();
+        Instant targetEnd = targetStart.plus(Duration.ofMinutes(30));
+        Instant previousStart = targetStart.minus(Duration.ofHours(2));
+        Instant previousEnd = previousStart.plus(Duration.ofMinutes(30));
+
         Booking booking = mock(Booking.class);
         when(booking.getId()).thenReturn(bookingId);
         when(booking.getServiceId()).thenReturn(serviceId);
         when(booking.getOperationId()).thenReturn(operationId);
-        when(booking.getStartAt()).thenReturn(Instant.parse("2026-09-24T12:30:00Z"));
-        when(booking.getEndAt()).thenReturn(Instant.parse("2026-09-24T13:00:00Z"));
+        when(booking.getStartAt()).thenReturn(previousStart);
+        when(booking.getEndAt()).thenReturn(previousEnd);
         when(bookings.findByIdAndBusinessId(bookingId, businessId)).thenReturn(Optional.of(booking));
         when(bookings.countOverlaps(
                 eq(businessId),
                 eq(serviceId),
-                eq(Instant.parse("2026-09-24T14:30:00Z")),
-                eq(Instant.parse("2026-09-24T15:00:00Z")),
+                eq(targetStart),
+                eq(targetEnd),
                 eq(BookingStatus.CANCELLED),
                 eq(bookingId))).thenReturn(0L);
 
@@ -53,8 +63,8 @@ class BookingTimeRepairStartupRunnerTest {
         when(businesses.findById(businessId)).thenReturn(Optional.of(business));
         when(schedule.isWithinBusinessHours(
                 businessId,
-                Instant.parse("2026-09-24T14:30:00Z"),
-                Instant.parse("2026-09-24T15:00:00Z"))).thenReturn(true);
+                targetStart,
+                targetEnd)).thenReturn(true);
 
         BusinessOperation operation = mock(BusinessOperation.class);
         when(operation.getSourceReferenceId()).thenReturn(conversationId);
@@ -74,17 +84,17 @@ class BookingTimeRepairStartupRunnerTest {
         BookingTimeRepairStartupRunner.RepairResult result = runner.repair(
                 businessId,
                 bookingId,
-                "2026-09-24T12:30:00Z",
-                "2026-09-24",
+                previousStart.toString(),
+                targetDate.toString(),
                 "11:30");
 
         assertEquals("REPAIRED", result.status());
-        assertEquals(Instant.parse("2026-09-24T12:30:00Z"), result.previousStartAt());
-        assertEquals(Instant.parse("2026-09-24T14:30:00Z"), result.targetStartAt());
+        assertEquals(previousStart, result.previousStartAt());
+        assertEquals(targetStart, result.targetStartAt());
         assertEquals("America/Santiago", result.timezone());
 
-        verify(booking).setStartAt(Instant.parse("2026-09-24T14:30:00Z"));
-        verify(booking).setEndAt(Instant.parse("2026-09-24T15:00:00Z"));
+        verify(booking).setStartAt(targetStart);
+        verify(booking).setEndAt(targetEnd);
         verify(bookings).saveAndFlush(booking);
         verify(operationSync).synchronize(
                 businessId,
@@ -102,8 +112,13 @@ class BookingTimeRepairStartupRunnerTest {
         BookingRepository bookings = mock(BookingRepository.class);
         BusinessRepository businesses = mock(BusinessRepository.class);
 
+        ZoneId zone = ZoneId.of("America/Santiago");
+        LocalDate targetDate = LocalDate.now(zone).plusDays(2);
+        Instant expectedCurrentStart = targetDate.atTime(9, 30).atZone(zone).toInstant();
+        Instant actualCurrentStart = expectedCurrentStart.plus(Duration.ofHours(1));
+
         Booking booking = mock(Booking.class);
-        when(booking.getStartAt()).thenReturn(Instant.parse("2026-09-24T13:30:00Z"));
+        when(booking.getStartAt()).thenReturn(actualCurrentStart);
         when(bookings.findByIdAndBusinessId(bookingId, businessId)).thenReturn(Optional.of(booking));
 
         Business business = new Business();
@@ -123,8 +138,8 @@ class BookingTimeRepairStartupRunnerTest {
         BookingTimeRepairStartupRunner.RepairResult result = runner.repair(
                 businessId,
                 bookingId,
-                "2026-09-24T12:30:00Z",
-                "2026-09-24",
+                expectedCurrentStart.toString(),
+                targetDate.toString(),
                 "11:30");
 
         assertEquals("SKIPPED_UNEXPECTED_CURRENT_START", result.status());
