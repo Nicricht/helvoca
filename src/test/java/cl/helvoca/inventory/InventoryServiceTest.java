@@ -9,6 +9,7 @@ import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -26,6 +27,7 @@ class InventoryServiceTest {
     private CatalogItemRepository catalog;
     private TenantProvider tenant;
     private BusinessPaymentRepository payments;
+    private InventoryProductVariantRepository variants;
     private InventoryService service;
 
     private UUID businessId;
@@ -40,7 +42,11 @@ class InventoryServiceTest {
         catalog = mock(CatalogItemRepository.class);
         tenant = mock(TenantProvider.class);
         payments = mock(BusinessPaymentRepository.class);
+        variants = mock(InventoryProductVariantRepository.class);
         service = new InventoryService(stocks, reservations, movements, catalog, tenant, payments);
+        ReflectionTestUtils.setField(service, "variants", variants);
+        when(variants.saveAndFlush(any(InventoryProductVariant.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         businessId = UUID.randomUUID();
         productId = UUID.randomUUID();
@@ -238,6 +244,90 @@ class InventoryServiceTest {
         assertEquals(0, stock.getReserved());
         assertEquals(InventoryReservation.Status.CONSUMED, reservation.getStatus());
         verify(movements, times(1)).save(any(InventoryMovement.class));
+    }
+
+    @Test
+    void variantOrderReservationAndPaymentConsumeExactVariantOnly() {
+        UUID orderOperationId = UUID.randomUUID();
+        UUID variantId = UUID.randomUUID();
+        UUID reservationId = UUID.randomUUID();
+
+        InventoryProductVariant variant = new InventoryProductVariant();
+        variant.setId(variantId);
+        variant.setBusinessId(businessId);
+        variant.setCatalogItemId(productId);
+        variant.setName("Negro / 42");
+        variant.setSku("SHAMPOO-N42");
+        variant.setTrackingEnabled(true);
+        variant.setOnHand(5);
+        variant.setReserved(0);
+        variant.setReorderThreshold(1);
+        variant.setActive(true);
+
+        when(reservations.lockAllByBusinessAndReferenceAndStatus(
+                businessId, "ORDER_OPERATION", orderOperationId, InventoryReservation.Status.ACTIVE))
+                .thenReturn(List.of());
+        when(variants.lockByIdAndBusinessId(variantId, businessId))
+                .thenReturn(Optional.of(variant));
+
+        InventoryService.OrderReservationResult held = service.reserveOrder(
+                businessId,
+                orderOperationId,
+                List.of(new InventoryService.OrderItem(productId, variantId, 2)));
+
+        assertTrue(held.success());
+        assertEquals(2, variant.getReserved());
+        assertEquals(3, variant.available());
+
+        ArgumentCaptor<InventoryReservation> saved =
+                ArgumentCaptor.forClass(InventoryReservation.class);
+        verify(reservations).saveAndFlush(saved.capture());
+        InventoryReservation reservation = saved.getValue();
+        reservation.setId(reservationId);
+        assertEquals(variantId, reservation.getVariantId());
+
+        when(reservations.findAllByBusinessIdAndReferenceTypeAndReferenceIdAndStatusOrderByCreatedAtAsc(
+                businessId, "ORDER_OPERATION", orderOperationId, InventoryReservation.Status.ACTIVE))
+                .thenReturn(List.of(reservation));
+        when(reservations.lockByIdAndBusinessId(reservationId, businessId))
+                .thenReturn(Optional.of(reservation));
+
+        service.consumeOrder(businessId, orderOperationId, "paid");
+
+        assertEquals(3, variant.getOnHand());
+        assertEquals(0, variant.getReserved());
+        assertEquals(InventoryReservation.Status.CONSUMED, reservation.getStatus());
+        verify(stocks, never()).saveAndFlush(any(InventoryStock.class));
+    }
+
+    @Test
+    void variantLookupBySkuReturnsExactBackendVariant() {
+        UUID variantId = UUID.randomUUID();
+        InventoryProductVariant variant = new InventoryProductVariant();
+        variant.setId(variantId);
+        variant.setBusinessId(businessId);
+        variant.setCatalogItemId(productId);
+        variant.setName("Negro / 42");
+        variant.setSku("SHAMPOO-N42");
+        variant.setTrackingEnabled(true);
+        variant.setOnHand(4);
+        variant.setReserved(1);
+        variant.setReorderThreshold(1);
+        variant.setOptionValuesJson("{\"color\":\"Negro\",\"talla\":\"42\"}");
+        variant.setActive(true);
+
+        when(stocks.findByBusinessIdAndSkuIgnoreCase(businessId, "SHAMPOO-N42"))
+                .thenReturn(Optional.empty());
+        when(variants.findByBusinessIdAndSkuIgnoreCase(businessId, "SHAMPOO-N42"))
+                .thenReturn(Optional.of(variant));
+
+        InventoryService.StockLookupView view =
+                service.lookupForBusiness(businessId, null, null, "SHAMPOO-N42");
+
+        assertEquals(variantId, view.variantId());
+        assertEquals("Negro / 42", view.variantName());
+        assertEquals(3, view.available());
+        assertTrue(view.optionValuesJson().contains("talla"));
     }
 
     @Test
