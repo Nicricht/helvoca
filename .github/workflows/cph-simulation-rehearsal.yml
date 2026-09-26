@@ -1,0 +1,93 @@
+name: CPH Simulation Rehearsal
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  cph-simulation:
+    if: github.head_ref == 'ops/cph-simulation-rehearsal-20260926'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Create and configure simulated CPH tenant
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE="https://recepvoz.cl"
+          EMAIL="cph-simulacion-20260926@example.com"
+          PASSWORD="$(openssl rand -hex 24)"
+
+          REGISTER_PAYLOAD="$(jq -nc             --arg adminName "Admin Simulacion CPH"             --arg email "$EMAIL"             --arg password "$PASSWORD"             --arg businessName "CPH Salud Providencia [SIMULACION RECEPVOZ]"             --arg timezone "America/Santiago"             --arg language "es"             '{adminName:$adminName,email:$email,password:$password,businessName:$businessName,timezone:$timezone,language:$language,humanTransferPhone:null}')"
+
+          REGISTER_RESPONSE="$(curl --fail-with-body -sS             -X POST "$BASE/api/v1/auth/register"             -H 'Content-Type: application/json'             --data-binary "$REGISTER_PAYLOAD")"
+
+          TOKEN="$(jq -er '.accessToken' <<<"$REGISTER_RESPONSE")"
+          BUSINESS_ID="$(jq -er '.user.businessId' <<<"$REGISTER_RESPONSE")"
+
+          PROFILE_PAYLOAD="$(jq -nc             --arg presetKey "clinic"             --arg publicDescription "Clínica dental de odontología avanzada con atención integral y especializada. Configuración de simulación RecepVoz; no implica autorización real de CPH Salud."             --arg publicPhone "+56975856664"             --arg publicEmail "Contacto@cphsalud.cl"             --arg websiteUrl "https://www.cphsalud.cl/"             --arg addressLine "Mardoqueo Fernández 128, Oficina 203"             --arg commune "Providencia"             --arg city "Santiago"             --arg region "Región Metropolitana"             --arg countryCode "CL"             --arg defaultCurrency "CLP"             '{presetKey:$presetKey,publicDescription:$publicDescription,publicPhone:$publicPhone,publicEmail:$publicEmail,websiteUrl:$websiteUrl,addressLine:$addressLine,commune:$commune,city:$city,region:$region,countryCode:$countryCode,defaultCurrency:$defaultCurrency,sellsProducts:false,sellsServices:true,usesReservations:true}')"
+
+          curl --fail-with-body -sS             -X PUT "$BASE/api/v1/business/profile"             -H "Authorization: Bearer $TOKEN"             -H 'Content-Type: application/json'             --data-binary "$PROFILE_PAYLOAD" >/dev/null
+
+          SETUP_PAYLOAD="$(cat <<'JSON'
+          {
+            "businessName": "CPH Salud Providencia [SIMULACION RECEPVOZ]",
+            "timezone": "America/Santiago",
+            "language": "es",
+            "humanTransferPhone": null,
+            "services": [
+              {"id":null,"name":"Odontología General","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null},
+              {"id":null,"name":"Estética Dental","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null},
+              {"id":null,"name":"Implantes Dentales","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null},
+              {"id":null,"name":"Ortodoncia","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null},
+              {"id":null,"name":"Periodoncia","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null},
+              {"id":null,"name":"Endodoncia","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null},
+              {"id":null,"name":"Rehabilitación Oral","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null},
+              {"id":null,"name":"Cirugía Dental","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null},
+              {"id":null,"name":"Estética Facial","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null}
+            ],
+            "hours": [
+              {"dayOfWeek":1,"openTime":"09:30:00","closeTime":"18:00:00"},
+              {"dayOfWeek":2,"openTime":"09:30:00","closeTime":"18:00:00"},
+              {"dayOfWeek":3,"openTime":"09:30:00","closeTime":"18:00:00"},
+              {"dayOfWeek":4,"openTime":"09:30:00","closeTime":"18:00:00"},
+              {"dayOfWeek":5,"openTime":"09:30:00","closeTime":"17:00:00"}
+            ],
+            "knowledge": [
+              {"id":null,"title":"Contacto y sucursal Providencia","category":"CONTACTO","content":"Sucursal Providencia: Mardoqueo Fernández 128, Oficina 203, Providencia. Teléfono publicado: +56 9 7585 6664. Email: Contacto@cphsalud.cl."},
+              {"id":null,"title":"Cómo reservar una evaluación","category":"AGENDA","content":"La clínica publica que una evaluación puede coordinarse por WhatsApp o mediante su formulario de contacto. La disponibilidad debe ser confirmada por la clínica."},
+              {"id":null,"title":"Horario de atención publicado","category":"HORARIO","content":"Lunes a jueves de 09:30 a 18:00. Viernes de 09:30 a 17:00."},
+              {"id":null,"title":"Primera visita","category":"FAQ","content":"La clínica describe la primera visita como una evaluación clínica con diagnóstico por imágenes y un plan de tratamiento con presupuesto detallado antes de iniciar procedimientos."},
+              {"id":null,"title":"Urgencias dentales","category":"FAQ","content":"La clínica informa atención dental de urgencia para situaciones como dolor agudo, infecciones, fracturas dentales y otras complicaciones. La disponibilidad concreta debe confirmarse con la clínica."},
+              {"id":null,"title":"Métodos de pago publicados","category":"PAGOS","content":"La clínica publica transferencia bancaria, tarjetas de crédito y débito, efectivo y cheque al día como métodos de pago."},
+              {"id":null,"title":"Límite clínico del asistente","category":"POLITICA","content":"El asistente entrega información administrativa y pública. No diagnostica, prescribe ni reemplaza una evaluación clínica profesional. Cada caso debe ser evaluado por un profesional de salud."}
+            ]
+          }
+          JSON
+          )"
+
+          curl --fail-with-body -sS             -X PUT "$BASE/api/v1/onboarding/setup"             -H "Authorization: Bearer $TOKEN"             -H 'Content-Type: application/json'             --data-binary "$SETUP_PAYLOAD" >/dev/null
+
+          ME="$(curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/auth/me")"
+          BUSINESS="$(curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/business")"
+          PROFILE="$(curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/business/profile")"
+          STATUS="$(curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/onboarding/status")"
+          GUIDE="$(curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/onboarding/guide")"
+          KNOWLEDGE="$(curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/knowledge?activeOnly=true")"
+          SERVICES="$(curl --fail-with-body -sS -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/services")"
+
+          jq -n             --arg businessId "$BUSINESS_ID"             --arg email "$EMAIL"             --argjson me "$ME"             --argjson business "$BUSINESS"             --argjson profile "$PROFILE"             --argjson status "$STATUS"             --argjson guide "$GUIDE"             --argjson knowledge "$KNOWLEDGE"             --argjson services "$SERVICES"             '{
+              simulation:true,
+              businessId:$businessId,
+              adminEmail:$email,
+              auth:{roles:$me.roles,businessId:$me.businessId},
+              business:{name:$business.name,timezone:$business.timezone,language:$business.language,humanTransferPhone:$business.humanTransferPhone},
+              profile:{presetKey:$profile.presetKey,addressLine:$profile.addressLine,commune:$profile.commune,city:$profile.city,defaultCurrency:$profile.defaultCurrency,sellsServices:$profile.sellsServices,usesReservations:$profile.usesReservations},
+              onboarding:$status,
+              guide:{readyForPilot:$guide.readyForPilot,completed:$guide.completed,total:$guide.total,progressPercent:$guide.progressPercent,nextStep:$guide.nextStep},
+              counts:{knowledge:($knowledge|length),services:($services|length)}
+            }'
