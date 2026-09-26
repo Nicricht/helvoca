@@ -44,8 +44,8 @@ class TeamInvitationServiceTest {
     void setUp() {
         businessId = UUID.randomUUID();
         business = mock(Business.class);
-        when(business.getId()).thenReturn(businessId);
-        when(business.getName()).thenReturn("Negocio Piloto");
+        lenient().when(business.getId()).thenReturn(businessId);
+        lenient().when(business.getName()).thenReturn("Negocio Piloto");
         lenient().when(tenantProvider.requireBusinessId()).thenReturn(businessId);
         service = new TeamInvitationService(
                 invitations, users, roles, businesses, passwordEncoder,
