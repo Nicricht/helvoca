@@ -4,7 +4,10 @@ import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
+import cl.helvoca.payment.BusinessPayment;
+import cl.helvoca.payment.BusinessPaymentRepository;
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,17 +31,29 @@ public class InventoryService {
     private final InventoryMovementRepository movements;
     private final CatalogItemRepository catalog;
     private final TenantProvider tenant;
+    private final BusinessPaymentRepository payments;
 
+    @Autowired
     public InventoryService(InventoryStockRepository stocks,
                             InventoryReservationRepository reservations,
                             InventoryMovementRepository movements,
                             CatalogItemRepository catalog,
-                            TenantProvider tenant) {
+                            TenantProvider tenant,
+                            BusinessPaymentRepository payments) {
         this.stocks = stocks;
         this.reservations = reservations;
         this.movements = movements;
         this.catalog = catalog;
         this.tenant = tenant;
+        this.payments = payments;
+    }
+
+    InventoryService(InventoryStockRepository stocks,
+                     InventoryReservationRepository reservations,
+                     InventoryMovementRepository movements,
+                     CatalogItemRepository catalog,
+                     TenantProvider tenant) {
+        this(stocks, reservations, movements, catalog, tenant, null);
     }
 
     @Transactional(readOnly = true)
@@ -290,7 +305,7 @@ public class InventoryService {
         }
 
         List<InventoryReservation> existing = reservations
-                .findAllByBusinessIdAndReferenceTypeAndReferenceIdAndStatusOrderByCreatedAtAsc(
+                .lockAllByBusinessAndReferenceAndStatus(
                         businessId, ORDER_REFERENCE, orderOperationId, InventoryReservation.Status.ACTIVE);
         if (!existing.isEmpty()) {
             return new OrderReservationResult(
@@ -346,6 +361,83 @@ public class InventoryService {
         }
 
         return new OrderReservationResult(true, null, null, List.copyOf(reservationIds));
+    }
+
+    @Transactional
+    public ExpiryResult expireReservationForBusiness(UUID businessId,
+                                                     UUID reservationId,
+                                                     Instant now) {
+        if (businessId == null || reservationId == null) return ExpiryResult.NOOP;
+        Instant cutoff = now == null ? Instant.now() : now;
+
+        InventoryReservation reservation = reservations
+                .lockByIdAndBusinessId(reservationId, businessId)
+                .orElse(null);
+        if (reservation == null
+                || reservation.getStatus() != InventoryReservation.Status.ACTIVE
+                || reservation.getExpiresAt() == null
+                || reservation.getExpiresAt().isAfter(cutoff)) {
+            return ExpiryResult.NOOP;
+        }
+
+        if (ORDER_REFERENCE.equals(reservation.getReferenceType())
+                && reservation.getReferenceId() != null) {
+            if (payments == null) return ExpiryResult.PAYMENT_STATE_UNAVAILABLE;
+
+            List<BusinessPayment> related = payments
+                    .findAllByBusinessIdAndTargetOperationIdOrderByCreatedAtAsc(
+                            businessId, reservation.getReferenceId());
+
+            boolean paid = related.stream()
+                    .anyMatch(payment -> payment.getStatus() == BusinessPayment.Status.SUCCEEDED);
+            if (paid) {
+                settleExpiredReservation(
+                        reservation,
+                        true,
+                        "Recovered paid order while processing expired inventory hold");
+                return ExpiryResult.PAID_RECOVERED;
+            }
+
+            boolean pending = related.stream().anyMatch(payment ->
+                    payment.getStatus() == BusinessPayment.Status.REQUIRES_ACTION
+                            || payment.getStatus() == BusinessPayment.Status.PENDING);
+            if (pending) return ExpiryResult.PAYMENT_PENDING;
+        }
+
+        settleExpiredReservation(reservation, false, "Inventory reservation expired");
+        return ExpiryResult.EXPIRED;
+    }
+
+    private void settleExpiredReservation(InventoryReservation reservation,
+                                          boolean consume,
+                                          String note) {
+        InventoryStock stock = requireLockedStock(
+                reservation.getBusinessId(), reservation.getCatalogItemId());
+        int quantity = reservation.getQuantity();
+        if (stock.getReserved() < quantity) {
+            throw new ConflictException("Inventory state is inconsistent with the expiring reservation");
+        }
+
+        if (consume) {
+            if (stock.getOnHand() < quantity) {
+                throw new ConflictException("Inventory state is inconsistent with the paid reservation");
+            }
+            stock.setOnHand(stock.getOnHand() - quantity);
+            stock.setReserved(stock.getReserved() - quantity);
+            reservation.setStatus(InventoryReservation.Status.CONSUMED);
+            stocks.saveAndFlush(stock);
+            reservations.saveAndFlush(reservation);
+            record(stock, InventoryMovement.Type.CONSUMPTION, -quantity, -quantity,
+                    reservation.getReferenceType(), reservation.getReferenceId(), note);
+            return;
+        }
+
+        stock.setReserved(stock.getReserved() - quantity);
+        reservation.setStatus(InventoryReservation.Status.EXPIRED);
+        stocks.saveAndFlush(stock);
+        reservations.saveAndFlush(reservation);
+        record(stock, InventoryMovement.Type.RELEASE, 0, -quantity,
+                reservation.getReferenceType(), reservation.getReferenceId(), note);
     }
 
     @Transactional
@@ -573,6 +665,14 @@ public class InventoryService {
                                          String code,
                                          String message,
                                          List<UUID> reservationIds) {}
+
+    public enum ExpiryResult {
+        EXPIRED,
+        PAYMENT_PENDING,
+        PAID_RECOVERED,
+        PAYMENT_STATE_UNAVAILABLE,
+        NOOP
+    }
 
     private record LockedRequest(InventoryStock stock, int quantity) {}
 

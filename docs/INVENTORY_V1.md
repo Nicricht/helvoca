@@ -38,10 +38,12 @@ Catalog product
 - `reserved >= 0`;
 - `reserved <= on_hand`;
 - `available = on_hand - reserved`;
-- stock reservation and consumption use pessimistic row locking;
+- stock reservation, payment protection and expiry use pessimistic row locking;
 - an active reservation cannot oversell available stock;
 - consuming a reservation decrements both `on_hand` and `reserved`;
-- releasing a reservation decrements only `reserved`;
+- releasing or expiring a reservation decrements only `reserved`;
+- expired order reservations are not released while a payment remains `REQUIRES_ACTION` or `PENDING`;
+- if an expired ACTIVE hold belongs to an already `SUCCEEDED` payment, the expiry worker repairs it by consuming the stock instead of releasing it;
 - every stock mutation creates a movement record;
 - SKU is unique inside a business;
 - no AI provider is allowed to invent stock.
@@ -57,12 +59,20 @@ Catalog product
 - `POST /api/v1/inventory/reservations/{reservationId}/consume`
 - `GET /api/v1/inventory/{catalogItemId}/movements`
 
+## Reservation expiry
+
+A scheduled worker scans expired ACTIVE holds in batches of 100. Discovery runs with system database scope, while every mutation is re-entered under the reservation's tenant scope.
+
+Default schedule:
+
+- enabled: `HELVOCA_INVENTORY_RESERVATION_EXPIRY_ENABLED=true`;
+- initial delay: 15 seconds;
+- poll delay: 30 seconds.
+
+This worker is intentionally independent from `APP_JOBS_ENABLED` because releasing abandoned database stock is an internal consistency action, not an outbound delivery action.
+
 ## Next isolated steps
 
-1. add unit/integration tests, including concurrency and tenant isolation;
-2. add reservation expiry;
-3. connect order confirmation to stock reservation;
-4. connect payment success to reservation consumption and cancellation/failure to release;
-5. expose safe AI tools: `get_stock`, `reserve_stock`, `release_stock`;
-6. add inventory management UI and low-stock dashboard;
-7. add product variants (size/color) after the base stock model is certified.
+1. add PostgreSQL concurrency and tenant-isolation integration certification;
+2. add inventory management UI and low-stock dashboard;
+3. add product variants (size/color) after the base stock model is certified.

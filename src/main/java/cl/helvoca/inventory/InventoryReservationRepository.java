@@ -20,9 +20,27 @@ public interface InventoryReservationRepository extends JpaRepository<InventoryR
     List<InventoryReservation> findAllByBusinessIdAndStatusAndExpiresAtBefore(
             UUID businessId, InventoryReservation.Status status, Instant expiresAt);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select r from InventoryReservation r
+            where r.businessId = :businessId
+              and r.referenceType = :referenceType
+              and r.referenceId = :referenceId
+              and r.status = :status
+            order by r.createdAt asc
+            """)
+    List<InventoryReservation> lockAllByBusinessAndReferenceAndStatus(
+            @Param("businessId") UUID businessId,
+            @Param("referenceType") String referenceType,
+            @Param("referenceId") UUID referenceId,
+            @Param("status") InventoryReservation.Status status);
+
     List<InventoryReservation> findAllByBusinessIdAndReferenceTypeAndReferenceIdAndStatusOrderByCreatedAtAsc(
             UUID businessId,
             String referenceType,
             UUID referenceId,
             InventoryReservation.Status status);
+
+    List<InventoryReservation> findTop100ByStatusAndExpiresAtBeforeOrderByExpiresAtAsc(
+            InventoryReservation.Status status, Instant expiresAt);
 }

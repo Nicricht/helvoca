@@ -3,11 +3,14 @@ package cl.helvoca.inventory;
 import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
 import cl.helvoca.common.ConflictException;
+import cl.helvoca.payment.BusinessPayment;
+import cl.helvoca.payment.BusinessPaymentRepository;
 import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +25,7 @@ class InventoryServiceTest {
     private InventoryMovementRepository movements;
     private CatalogItemRepository catalog;
     private TenantProvider tenant;
+    private BusinessPaymentRepository payments;
     private InventoryService service;
 
     private UUID businessId;
@@ -35,7 +39,8 @@ class InventoryServiceTest {
         movements = mock(InventoryMovementRepository.class);
         catalog = mock(CatalogItemRepository.class);
         tenant = mock(TenantProvider.class);
-        service = new InventoryService(stocks, reservations, movements, catalog, tenant);
+        payments = mock(BusinessPaymentRepository.class);
+        service = new InventoryService(stocks, reservations, movements, catalog, tenant, payments);
 
         businessId = UUID.randomUUID();
         productId = UUID.randomUUID();
@@ -245,6 +250,104 @@ class InventoryServiceTest {
         assertFalse(view.trackingEnabled());
         assertNull(view.available());
         assertEquals("Shampoo", view.productName());
+    }
+
+    @Test
+    void expiredReservationReleasesHeldStock() {
+        UUID reservationId = UUID.randomUUID();
+        UUID orderOperationId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-09-26T21:00:00Z");
+        InventoryStock stock = stock(5, 2, true);
+        InventoryReservation reservation = reservation(
+                reservationId, orderOperationId, 2, now.minusSeconds(1));
+
+        when(reservations.lockByIdAndBusinessId(reservationId, businessId))
+                .thenReturn(Optional.of(reservation));
+        when(payments.findAllByBusinessIdAndTargetOperationIdOrderByCreatedAtAsc(
+                businessId, orderOperationId)).thenReturn(List.of());
+        when(stocks.lockByBusinessAndCatalogItem(businessId, productId))
+                .thenReturn(Optional.of(stock));
+
+        InventoryService.ExpiryResult result =
+                service.expireReservationForBusiness(businessId, reservationId, now);
+
+        assertEquals(InventoryService.ExpiryResult.EXPIRED, result);
+        assertEquals(5, stock.getOnHand());
+        assertEquals(0, stock.getReserved());
+        assertEquals(InventoryReservation.Status.EXPIRED, reservation.getStatus());
+
+        ArgumentCaptor<InventoryMovement> movement =
+                ArgumentCaptor.forClass(InventoryMovement.class);
+        verify(movements).save(movement.capture());
+        assertEquals(InventoryMovement.Type.RELEASE, movement.getValue().getType());
+        assertEquals(-2, movement.getValue().getReservedDelta());
+    }
+
+    @Test
+    void pendingPaymentProtectsExpiredOrderReservation() {
+        UUID reservationId = UUID.randomUUID();
+        UUID orderOperationId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-09-26T21:00:00Z");
+        InventoryReservation reservation = reservation(
+                reservationId, orderOperationId, 2, now.minusSeconds(60));
+        BusinessPayment payment = new BusinessPayment();
+        payment.setStatus(BusinessPayment.Status.PENDING);
+
+        when(reservations.lockByIdAndBusinessId(reservationId, businessId))
+                .thenReturn(Optional.of(reservation));
+        when(payments.findAllByBusinessIdAndTargetOperationIdOrderByCreatedAtAsc(
+                businessId, orderOperationId)).thenReturn(List.of(payment));
+
+        InventoryService.ExpiryResult result =
+                service.expireReservationForBusiness(businessId, reservationId, now);
+
+        assertEquals(InventoryService.ExpiryResult.PAYMENT_PENDING, result);
+        assertEquals(InventoryReservation.Status.ACTIVE, reservation.getStatus());
+        verify(stocks, never()).saveAndFlush(any());
+        verify(movements, never()).save(any());
+    }
+
+    @Test
+    void succeededPaymentRepairsExpiredActiveReservationByConsumingIt() {
+        UUID reservationId = UUID.randomUUID();
+        UUID orderOperationId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-09-26T21:00:00Z");
+        InventoryStock stock = stock(5, 2, true);
+        InventoryReservation reservation = reservation(
+                reservationId, orderOperationId, 2, now.minusSeconds(60));
+        BusinessPayment payment = new BusinessPayment();
+        payment.setStatus(BusinessPayment.Status.SUCCEEDED);
+
+        when(reservations.lockByIdAndBusinessId(reservationId, businessId))
+                .thenReturn(Optional.of(reservation));
+        when(payments.findAllByBusinessIdAndTargetOperationIdOrderByCreatedAtAsc(
+                businessId, orderOperationId)).thenReturn(List.of(payment));
+        when(stocks.lockByBusinessAndCatalogItem(businessId, productId))
+                .thenReturn(Optional.of(stock));
+
+        InventoryService.ExpiryResult result =
+                service.expireReservationForBusiness(businessId, reservationId, now);
+
+        assertEquals(InventoryService.ExpiryResult.PAID_RECOVERED, result);
+        assertEquals(3, stock.getOnHand());
+        assertEquals(0, stock.getReserved());
+        assertEquals(InventoryReservation.Status.CONSUMED, reservation.getStatus());
+    }
+
+    private InventoryReservation reservation(UUID id,
+                                             UUID orderOperationId,
+                                             int quantity,
+                                             Instant expiresAt) {
+        InventoryReservation reservation = new InventoryReservation();
+        reservation.setId(id);
+        reservation.setBusinessId(businessId);
+        reservation.setCatalogItemId(productId);
+        reservation.setQuantity(quantity);
+        reservation.setStatus(InventoryReservation.Status.ACTIVE);
+        reservation.setReferenceType("ORDER_OPERATION");
+        reservation.setReferenceId(orderOperationId);
+        reservation.setExpiresAt(expiresAt);
+        return reservation;
     }
 
     private InventoryStock stock(int onHand, int reserved, boolean tracking) {
