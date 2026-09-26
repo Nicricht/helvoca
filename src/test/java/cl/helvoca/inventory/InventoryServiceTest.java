@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,7 +50,11 @@ class InventoryServiceTest {
         when(tenant.requireBusinessId()).thenReturn(businessId);
         when(catalog.findByIdAndBusinessId(productId, businessId)).thenReturn(Optional.of(product));
         when(stocks.saveAndFlush(any(InventoryStock.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(reservations.saveAndFlush(any(InventoryReservation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reservations.saveAndFlush(any(InventoryReservation.class))).thenAnswer(invocation -> {
+            InventoryReservation reservation = invocation.getArgument(0);
+            if (reservation.getId() == null) reservation.setId(UUID.randomUUID());
+            return reservation;
+        });
         when(movements.save(any(InventoryMovement.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -150,6 +155,96 @@ class InventoryServiceTest {
         assertEquals(2, view.reorderThreshold());
         assertFalse(view.lowStock());
         verify(movements).save(any(InventoryMovement.class));
+    }
+
+    @Test
+    void orderReservationHoldsTrackedStockAgainstOrderOperation() {
+        UUID orderOperationId = UUID.randomUUID();
+        InventoryStock stock = stock(5, 0, true);
+        when(reservations.findAllByBusinessIdAndReferenceTypeAndReferenceIdAndStatusOrderByCreatedAtAsc(
+                businessId, "ORDER_OPERATION", orderOperationId, InventoryReservation.Status.ACTIVE))
+                .thenReturn(List.of());
+        when(stocks.lockByBusinessAndCatalogItem(businessId, productId)).thenReturn(Optional.of(stock));
+
+        InventoryService.OrderReservationResult result = service.reserveOrder(
+                businessId,
+                orderOperationId,
+                List.of(new InventoryService.OrderItem(productId, 2))
+        );
+
+        assertTrue(result.success());
+        assertEquals(2, stock.getReserved());
+        assertEquals(3, stock.available());
+        assertEquals(1, result.reservationIds().size());
+
+        ArgumentCaptor<InventoryReservation> reservation = ArgumentCaptor.forClass(InventoryReservation.class);
+        verify(reservations).saveAndFlush(reservation.capture());
+        assertEquals("ORDER_OPERATION", reservation.getValue().getReferenceType());
+        assertEquals(orderOperationId, reservation.getValue().getReferenceId());
+        assertEquals(2, reservation.getValue().getQuantity());
+    }
+
+    @Test
+    void orderReservationRejectsOversellingBeforeWritingAnything() {
+        UUID orderOperationId = UUID.randomUUID();
+        InventoryStock stock = stock(2, 1, true);
+        when(reservations.findAllByBusinessIdAndReferenceTypeAndReferenceIdAndStatusOrderByCreatedAtAsc(
+                businessId, "ORDER_OPERATION", orderOperationId, InventoryReservation.Status.ACTIVE))
+                .thenReturn(List.of());
+        when(stocks.lockByBusinessAndCatalogItem(businessId, productId)).thenReturn(Optional.of(stock));
+
+        InventoryService.OrderReservationResult result = service.reserveOrder(
+                businessId,
+                orderOperationId,
+                List.of(new InventoryService.OrderItem(productId, 2))
+        );
+
+        assertFalse(result.success());
+        assertEquals("INSUFFICIENT_STOCK", result.code());
+        assertEquals(1, stock.getReserved());
+        verify(reservations, never()).saveAndFlush(any());
+        verify(movements, never()).save(any());
+    }
+
+    @Test
+    void successfulPaymentConsumesOrderReservationIdempotently() {
+        UUID orderOperationId = UUID.randomUUID();
+        UUID reservationId = UUID.randomUUID();
+        InventoryStock stock = stock(5, 2, true);
+        InventoryReservation reservation = new InventoryReservation();
+        reservation.setId(reservationId);
+        reservation.setBusinessId(businessId);
+        reservation.setCatalogItemId(productId);
+        reservation.setQuantity(2);
+        reservation.setStatus(InventoryReservation.Status.ACTIVE);
+        reservation.setReferenceType("ORDER_OPERATION");
+        reservation.setReferenceId(orderOperationId);
+
+        when(reservations.findAllByBusinessIdAndReferenceTypeAndReferenceIdAndStatusOrderByCreatedAtAsc(
+                businessId, "ORDER_OPERATION", orderOperationId, InventoryReservation.Status.ACTIVE))
+                .thenReturn(List.of(reservation), List.of());
+        when(reservations.lockByIdAndBusinessId(reservationId, businessId)).thenReturn(Optional.of(reservation));
+        when(stocks.lockByBusinessAndCatalogItem(businessId, productId)).thenReturn(Optional.of(stock));
+
+        service.consumeOrder(businessId, orderOperationId, "paid");
+        service.consumeOrder(businessId, orderOperationId, "webhook replay");
+
+        assertEquals(3, stock.getOnHand());
+        assertEquals(0, stock.getReserved());
+        assertEquals(InventoryReservation.Status.CONSUMED, reservation.getStatus());
+        verify(movements, times(1)).save(any(InventoryMovement.class));
+    }
+
+    @Test
+    void stockLookupDoesNotInventAvailabilityWhenUnconfigured() {
+        when(stocks.findByBusinessIdAndCatalogItemId(businessId, productId)).thenReturn(Optional.empty());
+
+        InventoryService.StockLookupView view = service.lookupForBusiness(businessId, productId, null);
+
+        assertFalse(view.configured());
+        assertFalse(view.trackingEnabled());
+        assertNull(view.available());
+        assertEquals("Shampoo", view.productName());
     }
 
     private InventoryStock stock(int onHand, int reserved, boolean tracking) {
