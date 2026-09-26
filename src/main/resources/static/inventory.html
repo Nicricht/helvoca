@@ -88,6 +88,25 @@
                 </div>
             </section>
 
+            <section class="card inventory-restock-panel" aria-label="Clientes esperando reposición">
+                <div class="inventory-restock-head">
+                    <div>
+                        <div class="eyebrow">Oportunidades</div>
+                        <h2>Esperando reposición</h2>
+                        <p>Clientes que pidieron aviso cuando vuelva el stock. Los avisos quedan preparados, pero este módulo no los envía por WhatsApp automáticamente.</p>
+                    </div>
+                    <div class="inventory-restock-metrics">
+                        <span id="inventoryRestockCount" class="badge muted">0 esperando</span>
+                        <span id="inventoryPendingNotificationCount" class="badge muted">0 avisos listos</span>
+                    </div>
+                </div>
+                <div id="inventoryRestockList" class="inventory-restock-list"></div>
+                <div id="inventoryRestockEmpty" class="inventory-alerts-empty hidden">
+                    <strong>Sin clientes esperando stock.</strong>
+                    <span>Cuando alguien acepte recibir un aviso de reposición aparecerá aquí.</span>
+                </div>
+            </section>
+
             <section class="card inventory-workspace">
                 <div class="inventory-toolbar">
                     <div class="inventory-search">
@@ -100,6 +119,8 @@
                             <option value="ALL">Todos</option>
                             <option value="TRACKED">Con seguimiento</option>
                             <option value="LOW">Stock bajo</option>
+                            <option value="OUT">Agotados</option>
+                            <option value="RESTOCKED">Repuestos</option>
                             <option value="UNCONFIGURED">Sin configurar</option>
                         </select>
                     </label>

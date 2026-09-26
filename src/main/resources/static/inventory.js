@@ -34,6 +34,8 @@
         catalog: [],
         inventory: [],
         alerts: [],
+        restockSubscriptions: [],
+        restockNotifications: [],
         products: [],
         currentVariantProductId: null,
         variants: []
@@ -168,11 +170,19 @@
                 ? `Disponible nuevamente: ${Number(alert.available)}.`
                 : `Disponible: ${Number(alert.available)} · mínimo: ${Number(alert.reorderThreshold)}.`;
             const sku = alert.sku ? ` · SKU ${alert.sku}` : "";
-            const action = state.canManage && !alert.acknowledged
+            const restockAction = state.canManage
+                && !alert.acknowledged
+                && (alert.type === "LOW_STOCK" || alert.type === "OUT_OF_STOCK")
+                ? `<button class="button secondary inventory-alert-restock" type="button"
+                           data-product-id="${escapeHtml(alert.catalogItemId)}"
+                           data-variant-id="${escapeHtml(alert.variantId || "")}">Reponer stock</button>`
+                : "";
+            const acknowledgeAction = state.canManage && !alert.acknowledged
                 ? `<button class="button ghost inventory-alert-ack" type="button" data-id="${escapeHtml(alert.id)}">Marcar atendida</button>`
                 : alert.acknowledged
                     ? '<span class="inventory-sku missing">Atendida</span>'
                     : "";
+            const action = restockAction + acknowledgeAction;
             return `
                 <article class="inventory-alert-card ${typeClass} ${alert.acknowledged ? "acknowledged" : ""}"
                          data-inventory-alert-id="${escapeHtml(alert.id)}">
@@ -185,7 +195,22 @@
                 </article>`;
         }).join("");
 
-        $$(".inventory-alert-ack", list).forEach(button => {
+        $(".inventory-alert-restock", list).forEach(button => {
+            button.addEventListener("click", async () => {
+                button.disabled = true;
+                try {
+                    await openRestock(
+                        button.dataset.productId,
+                        button.dataset.variantId || null);
+                } catch (error) {
+                    showMessage(message, error.message);
+                } finally {
+                    button.disabled = false;
+                }
+            });
+        });
+
+        $(".inventory-alert-ack", list).forEach(button => {
             button.addEventListener("click", async () => {
                 button.disabled = true;
                 try {
@@ -208,12 +233,113 @@
         renderAlerts();
     }
 
+    function productHasAlert(item, type) {
+        return state.alerts.some(alert =>
+            String(alert.catalogItemId) === String(item.id) && alert.type === type);
+    }
+
+    function restockProductName(subscription) {
+        return product(subscription.catalogItemId)?.name || "Producto";
+    }
+
+    function formatRestockChannel(channel) {
+        if (channel === "WHATSAPP") return "WhatsApp";
+        if (channel === "SMS") return "SMS";
+        if (channel === "EMAIL") return "Email";
+        return channel || "Canal";
+    }
+
+    function renderRestockQueue() {
+        const subscriptions = Array.isArray(state.restockSubscriptions)
+            ? state.restockSubscriptions
+            : [];
+        const notifications = Array.isArray(state.restockNotifications)
+            ? state.restockNotifications
+            : [];
+        $("#inventoryRestockCount").textContent =
+            `${subscriptions.length} esperando`;
+        $("#inventoryRestockCount").className =
+            `badge ${subscriptions.length ? "online" : "muted"}`;
+        $("#inventoryPendingNotificationCount").textContent =
+            `${notifications.length} aviso${notifications.length === 1 ? "" : "s"} listo${notifications.length === 1 ? "" : "s"}`;
+        $("#inventoryPendingNotificationCount").className =
+            `badge ${notifications.length ? "warning" : "muted"}`;
+
+        const list = $("#inventoryRestockList");
+        const emptyRestock = $("#inventoryRestockEmpty");
+        emptyRestock.classList.toggle("hidden", subscriptions.length > 0 || notifications.length > 0);
+
+        const waiting = subscriptions.map(subscription => {
+            const productName = restockProductName(subscription);
+            const subject = subscription.variantId
+                ? `${productName} · variante específica`
+                : productName;
+            const cancel = state.canManage
+                ? `<button class="button ghost inventory-restock-cancel" type="button"
+                           data-id="${escapeHtml(subscription.id)}">Cancelar aviso</button>`
+                : "";
+            return `
+                <article class="inventory-restock-card" data-restock-subscription-id="${escapeHtml(subscription.id)}">
+                    <div class="inventory-restock-status waiting">Esperando</div>
+                    <div class="inventory-restock-main">
+                        <strong>${escapeHtml(subject)}</strong>
+                        <small>${escapeHtml(formatRestockChannel(subscription.preferredChannel))} · ${escapeHtml(subscription.contact)}</small>
+                    </div>
+                    <div class="inventory-restock-action">${cancel}</div>
+                </article>`;
+        });
+
+        const queued = notifications.map(notification => `
+            <article class="inventory-restock-card queued" data-restock-notification-id="${escapeHtml(notification.id)}">
+                <div class="inventory-restock-status ready">Aviso listo</div>
+                <div class="inventory-restock-main">
+                    <strong>${escapeHtml(notification.subjectName || restockProductName(notification))}</strong>
+                    <small>${escapeHtml(formatRestockChannel(notification.preferredChannel))} · ${escapeHtml(notification.contact)} · disponible: ${Number(notification.available || 0)}</small>
+                </div>
+                <div class="inventory-restock-action"><span class="inventory-sku missing">Pendiente de envío</span></div>
+            </article>`);
+
+        list.innerHTML = waiting.concat(queued).join("");
+
+        $(".inventory-restock-cancel", list).forEach(button => {
+            button.addEventListener("click", async () => {
+                button.disabled = true;
+                try {
+                    await api(
+                        `/api/v1/inventory/restock-subscriptions/${encodeURIComponent(button.dataset.id)}/cancel`,
+                        { method: "POST" });
+                    await reloadRestockQueue();
+                    showMessage(message, "Aviso de reposición cancelado.", "success");
+                    setTimeout(() => clearMessage(message), 2200);
+                } catch (error) {
+                    showMessage(message, error.message);
+                } finally {
+                    button.disabled = false;
+                }
+            });
+        });
+    }
+
+    async function reloadRestockQueue() {
+        const [subscriptions, notifications] = await Promise.all([
+            api("/api/v1/inventory/restock-subscriptions"),
+            api("/api/v1/inventory/restock-subscriptions/notifications")
+        ]);
+        state.restockSubscriptions = Array.isArray(subscriptions) ? subscriptions : [];
+        state.restockNotifications = Array.isArray(notifications) ? notifications : [];
+        renderRestockQueue();
+    }
+
     function productMatches(item) {
         const query = search.value.trim().toLowerCase();
         if (query && !`${item.name} ${item.sku}`.toLowerCase().includes(query)) return false;
         switch (filter.value) {
             case "TRACKED": return item.configured && item.trackingEnabled;
-            case "LOW": return item.configured && item.trackingEnabled && item.lowStock;
+            case "LOW": return item.configured && item.trackingEnabled
+                && (item.lowStock || productHasAlert(item, "LOW_STOCK"));
+            case "OUT": return item.configured && item.trackingEnabled
+                && (Number(item.available) === 0 || productHasAlert(item, "OUT_OF_STOCK"));
+            case "RESTOCKED": return productHasAlert(item, "RESTOCKED");
             case "UNCONFIGURED": return !item.configured || !item.trackingEnabled;
             default: return true;
         }
@@ -223,6 +349,7 @@
         if (!item.configured || !item.trackingEnabled) {
             return '<span class="inventory-state off">Sin seguimiento</span>';
         }
+        if (Number(item.available) === 0) return '<span class="inventory-state out">Agotado</span>';
         if (item.lowStock) return '<span class="inventory-state low">Stock bajo</span>';
         return '<span class="inventory-state ok">Disponible</span>';
     }
@@ -240,8 +367,10 @@
         if (!state.canManage) return variants + history;
         const configureLabel = item.configured ? "Editar" : "Configurar";
         const configure = `<button class="button ghost inventory-config-btn" type="button" data-id="${item.id}">${configureLabel}</button>`;
+        const needsRestock = item.configured && item.trackingEnabled
+            && Number(item.available) <= Number(item.reorderThreshold || 0);
         const adjust = item.configured && item.trackingEnabled
-            ? `<button class="button secondary inventory-adjust-btn" type="button" data-id="${item.id}">Ajustar</button>`
+            ? `<button class="button ${needsRestock ? "primary" : "secondary"} inventory-adjust-btn" type="button" data-id="${item.id}">${needsRestock ? "Reponer" : "Ajustar"}</button>`
             : "";
         return variants + configure + adjust + history;
     }
@@ -285,6 +414,7 @@
     function render() {
         renderSummary();
         renderAlerts();
+        renderRestockQueue();
         renderRows();
     }
 
@@ -304,6 +434,18 @@
         configForm.elements.trackingEnabled.checked = item.configured ? item.trackingEnabled : true;
         configForm.elements.note.value = "";
         configDialog.showModal();
+    }
+
+    async function openRestock(productId, variantId = null) {
+        if (!state.canManage) return;
+        if (variantId) {
+            await openVariants(productId);
+            const variant = findVariant(variantId);
+            if (!variant) throw new Error("La variante ya no está disponible.");
+            openVariantAdjust(variantId);
+            return;
+        }
+        openAdjust(productId);
     }
 
     function openAdjust(id) {
@@ -466,7 +608,7 @@
             });
             variantEditDialog.close();
             await openVariants(productId);
-            await reloadAlerts();
+            await Promise.all([reloadAlerts(), reloadRestockQueue()]);
         } catch (error) {
             showMessage(variantMessage, error.message);
         } finally {
@@ -615,7 +757,7 @@
             adjustDialog.close();
             if (variantId) {
                 await openVariants(id);
-                await reloadAlerts();
+                await Promise.all([reloadAlerts(), reloadRestockQueue()]);
             } else {
                 await reloadInventory("Movimiento registrado.");
             }
@@ -627,14 +769,18 @@
     }
 
     async function reloadInventory(successText = "") {
-        const [catalog, inventory, alerts] = await Promise.all([
+        const [catalog, inventory, alerts, subscriptions, notifications] = await Promise.all([
             api("/api/v1/catalog"),
             api("/api/v1/inventory"),
-            api("/api/v1/inventory/alerts")
+            api("/api/v1/inventory/alerts"),
+            api("/api/v1/inventory/restock-subscriptions"),
+            api("/api/v1/inventory/restock-subscriptions/notifications")
         ]);
         state.catalog = Array.isArray(catalog) ? catalog : [];
         state.inventory = Array.isArray(inventory) ? inventory : [];
         state.alerts = Array.isArray(alerts) ? alerts : [];
+        state.restockSubscriptions = Array.isArray(subscriptions) ? subscriptions : [];
+        state.restockNotifications = Array.isArray(notifications) ? notifications : [];
         mergeProducts();
         render();
         if (successText) {
@@ -649,12 +795,14 @@
             return;
         }
         try {
-            const [me, business, catalog, inventory, alerts] = await Promise.all([
+            const [me, business, catalog, inventory, alerts, subscriptions, notifications] = await Promise.all([
                 api("/api/v1/auth/me"),
                 api("/api/v1/business"),
                 api("/api/v1/catalog"),
                 api("/api/v1/inventory"),
-                api("/api/v1/inventory/alerts")
+                api("/api/v1/inventory/alerts"),
+                api("/api/v1/inventory/restock-subscriptions"),
+                api("/api/v1/inventory/restock-subscriptions/notifications")
             ]);
             state.roles = Array.isArray(me?.roles) ? me.roles.map(String) : [];
             state.canManage = state.roles.includes("BUSINESS_ADMIN");
@@ -662,6 +810,8 @@
             state.catalog = Array.isArray(catalog) ? catalog : [];
             state.inventory = Array.isArray(inventory) ? inventory : [];
             state.alerts = Array.isArray(alerts) ? alerts : [];
+            state.restockSubscriptions = Array.isArray(subscriptions) ? subscriptions : [];
+            state.restockNotifications = Array.isArray(notifications) ? notifications : [];
 
             const businessName = String(state.business?.name || "RecepVoz").trim() || "RecepVoz";
             $("#inventoryBrand").textContent = businessName.toUpperCase();

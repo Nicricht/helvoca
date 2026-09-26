@@ -64,6 +64,23 @@ test('inventory UI merges catalog with stock and allows an admin adjustment', as
     return route.continue();
   });
 
+  let restockSubscriptions = [{
+    id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    customerId: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    catalogItemId: '11111111-1111-1111-1111-111111111111',
+    variantId: null,
+    preferredChannel: 'WHATSAPP',
+    contact: '+56911112222',
+    consentGranted: true,
+    consentGrantedAt: '2026-09-26T17:55:00Z',
+    consentSource: 'VOICE',
+    status: 'ACTIVE',
+    notifiedAt: null,
+    cancelledAt: null,
+    createdAt: '2026-09-26T17:55:00Z'
+  }];
+  let pendingRestockNotifications = [];
+
   let alerts = [{
     id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     catalogItemId: '11111111-1111-1111-1111-111111111111',
@@ -93,6 +110,13 @@ test('inventory UI merges catalog with stock and allows an admin adjustment', as
       acknowledgedAt: '2026-09-26T18:10:00Z'
     }));
     await route.fulfill(json(alerts[0]));
+  });
+
+  await page.route('**/api/v1/inventory/restock-subscriptions/notifications', route => {
+    return route.fulfill(json(pendingRestockNotifications));
+  });
+  await page.route('**/api/v1/inventory/restock-subscriptions', route => {
+    return route.fulfill(json(restockSubscriptions));
   });
 
   let variants = [{
@@ -137,6 +161,22 @@ test('inventory UI merges catalog with stock and allows an admin adjustment', as
       onHand: 11,
       available: 9
     }];
+    restockSubscriptions = [];
+    pendingRestockNotifications = [{
+      id: '99999999-9999-9999-9999-999999999999',
+      subscriptionId: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+      customerId: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      catalogItemId: '11111111-1111-1111-1111-111111111111',
+      variantId: null,
+      preferredChannel: 'WHATSAPP',
+      contact: '+56911112222',
+      subjectName: 'Shampoo',
+      sku: 'SH-01',
+      available: 9,
+      status: 'PENDING',
+      idempotencyKey: 'inventory-restock:eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+      createdAt: '2026-09-26T18:12:00Z'
+    }];
     await route.fulfill(json(inventory[0]));
   });
 
@@ -146,9 +186,18 @@ test('inventory UI merges catalog with stock and allows an admin adjustment', as
   await expect(page.locator('#inventoryProductsCount')).toHaveText('2');
   await expect(page.locator('#inventoryConfiguredCount')).toHaveText('1 con seguimiento');
   await expect(page.locator('#inventoryAlertsCount')).toHaveText('1 pendiente');
+  await expect(page.locator('#inventoryRestockCount')).toHaveText('1 esperando');
+  await expect(page.locator('#inventoryPendingNotificationCount')).toHaveText('0 avisos listos');
+  await expect(page.locator('[data-restock-subscription-id="eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"]'))
+    .toContainText('+56911112222');
   const stockAlert = page.locator('[data-inventory-alert-id="cccccccc-cccc-cccc-cccc-cccccccccccc"]');
   await expect(stockAlert).toContainText('Agotado');
   await expect(stockAlert).toContainText('Shampoo');
+  await expect(stockAlert.getByRole('button', { name: 'Reponer stock' })).toBeVisible();
+  await page.locator('#inventoryFilter').selectOption('OUT');
+  await expect(page.locator('[data-inventory-product-id="11111111-1111-1111-1111-111111111111"]')).toBeVisible();
+  await expect(page.locator('[data-inventory-product-id="22222222-2222-2222-2222-222222222222"]')).toHaveCount(0);
+  await page.locator('#inventoryFilter').selectOption('ALL');
   await stockAlert.getByRole('button', { name: 'Marcar atendida' }).click();
   await expect(page.locator('#inventoryAlertsCount')).toHaveText('0 pendientes');
   await expect(stockAlert).toContainText('Atendida');
@@ -168,6 +217,10 @@ test('inventory UI merges catalog with stock and allows an admin adjustment', as
 
   await expect(shampoo).toContainText('9');
   await expect(page.locator('#inventoryOnHandTotal')).toHaveText('11');
+  await expect(page.locator('#inventoryRestockCount')).toHaveText('0 esperando');
+  await expect(page.locator('#inventoryPendingNotificationCount')).toHaveText('1 aviso listo');
+  await expect(page.locator('[data-restock-notification-id="99999999-9999-9999-9999-999999999999"]'))
+    .toContainText('Pendiente de envío');
 
   await shampoo.getByRole('button', { name: 'Variantes' }).click();
   const variantCard = page.locator('[data-inventory-variant-id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]');
@@ -207,6 +260,9 @@ test('operator inventory is read only', async ({ page }) => {
     reorderThreshold: 1,
     lowStock: false
   }])));
+
+  await page.route('**/api/v1/inventory/restock-subscriptions/notifications', route => route.fulfill(json([])));
+  await page.route('**/api/v1/inventory/restock-subscriptions', route => route.fulfill(json([])));
 
   await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([{
     id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',

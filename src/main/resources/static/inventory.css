@@ -224,3 +224,48 @@
     .inventory-alert-card { grid-template-columns:auto 1fr; }
     .inventory-alert-action { grid-column:1/-1; justify-content:flex-end; }
 }
+
+
+.inventory-state.out {
+    color:#ff9b9b; border-color:rgba(255,120,120,.30); background:rgba(255,120,120,.07);
+}
+.inventory-restock-panel { margin:0 0 18px; padding:18px; }
+.inventory-restock-head {
+    display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:12px;
+}
+.inventory-restock-head h2 { margin:4px 0; font-size:18px; letter-spacing:-.02em; }
+.inventory-restock-head p { max-width:760px; margin:0; color:var(--muted); font-size:11px; line-height:1.45; }
+.inventory-restock-metrics { display:flex; gap:7px; flex-wrap:wrap; justify-content:flex-end; }
+.inventory-restock-metrics .badge.warning {
+    color:var(--warning); border-color:rgba(255,191,105,.28); background:rgba(255,191,105,.07);
+}
+.inventory-restock-list { display:flex; flex-direction:column; gap:8px; }
+.inventory-restock-card {
+    display:grid; grid-template-columns:92px minmax(0,1fr) auto; gap:12px; align-items:center;
+    padding:11px 12px; border:1px solid rgba(255,255,255,.07); border-radius:13px;
+    background:rgba(255,255,255,.018);
+}
+.inventory-restock-card.queued { border-color:rgba(56,217,150,.18); }
+.inventory-restock-status {
+    display:inline-flex; align-items:center; justify-content:center; min-height:25px;
+    padding:0 8px; border-radius:999px; font-size:9px; font-weight:850; white-space:nowrap;
+}
+.inventory-restock-status.waiting {
+    color:#ddd6ff; border:1px solid rgba(124,92,255,.28); background:rgba(124,92,255,.10);
+}
+.inventory-restock-status.ready {
+    color:var(--success); border:1px solid rgba(56,217,150,.28); background:rgba(56,217,150,.07);
+}
+.inventory-restock-main strong,.inventory-restock-main small { display:block; }
+.inventory-restock-main strong { font-size:12px; }
+.inventory-restock-main small { margin-top:3px; color:var(--muted); font-size:10px; }
+.inventory-restock-action { display:flex; justify-content:flex-end; align-items:center; }
+.inventory-restock-action .button { min-height:29px; padding:0 9px; font-size:9px; }
+
+@media (max-width:680px) {
+    .inventory-restock-head { flex-direction:column; }
+    .inventory-restock-metrics { justify-content:flex-start; }
+    .inventory-restock-card { grid-template-columns:1fr; }
+    .inventory-restock-status { justify-self:start; }
+    .inventory-restock-action { justify-content:flex-start; }
+}
