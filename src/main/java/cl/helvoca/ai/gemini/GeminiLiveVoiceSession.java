@@ -557,7 +557,6 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 .put("realtimeInputConfig", new JSONObject()
                         .put("automaticActivityDetection", activityDetection)
                         .put("activityHandling", "START_OF_ACTIVITY_INTERRUPTS"))
-                .put("proactivity", new JSONObject().put("proactiveAudio", true))
                 .put("systemInstruction", new JSONObject()
                         .put("parts", new JSONArray().put(new JSONObject()
                                 .put("text", systemInstructions()))))
