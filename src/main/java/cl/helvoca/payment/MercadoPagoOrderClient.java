@@ -72,10 +72,14 @@ public class MercadoPagoOrderClient {
             }
 
             HttpResponse<String> response = http.send(request.build(), HttpResponse.BodyHandlers.ofString());
-            JSONObject json = parse(response.body());
+            String responseBody = response.body();
+            JSONObject json = parse(responseBody);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 String code = providerErrorCode(json);
                 String detail = providerErrorDetail(json);
+                if (detail == null) {
+                    detail = safeRawProviderDetail(responseBody);
+                }
                 throw new IllegalStateException("Mercado Pago Orders API returned HTTP "
                         + response.statusCode() + " (" + code + ")"
                         + (detail == null ? "." : " detail=" + detail + "."));
@@ -145,6 +149,19 @@ public class MercadoPagoOrderClient {
                 detail.optString("description", null),
                 detail.optString("field", null));
         return nested == null ? null : safeDetail(nested);
+    }
+
+    static String safeRawProviderDetail(String body) {
+        if (body == null || body.isBlank()) return null;
+        String normalized = body.replaceAll("[\\r\\n\\t]+", " ").trim();
+        normalized = normalized.replaceAll(
+                "(?i)Bearer\\s+[A-Za-z0-9._-]{16,}",
+                "Bearer <redacted>");
+        normalized = normalized.replaceAll(
+                "(?i)(access_token|client_secret|webhook_secret)\\s*[:=]\\s*[^\\s,}]+",
+                "$1=<redacted>");
+        if (normalized.isBlank()) return null;
+        return normalized.length() <= 240 ? normalized : normalized.substring(0, 240);
     }
 
     private static JSONObject firstObject(JSONArray array) {
