@@ -65,7 +65,7 @@ class GeminiLiveVoiceSessionTest {
         assertEquals("es-CL", inputTranscription.getJSONArray("languageCodes").getString(0));
         assertEquals("VERBATIM", inputTranscription.getString("mode"));
         assertTrue(inputTranscription.getJSONArray("customVocabulary").toList().contains("RecepVoz"));
-        assertTrue(setup.getJSONObject("proactivity").getBoolean("proactiveAudio"));
+        assertFalse(setup.has("proactivity"));
 
         String instructions = setup.getJSONObject("systemInstruction")
                 .getJSONArray("parts").getJSONObject(0).getString("text");
