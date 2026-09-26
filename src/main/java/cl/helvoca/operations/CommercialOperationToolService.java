@@ -570,6 +570,33 @@ public class CommercialOperationToolService {
             return;
         }
 
+        if ("update_payment".equals(toolName) && success && data != null) {
+            UUID targetOperationId = uuidOrNull(data.optString("targetOperationId", null));
+            BusinessOperation target = findOwnedOperation(
+                    businessId, customerId, targetOperationId, BusinessOperation.Type.ORDER);
+            UUID journeyId = journeyOperationId(target);
+            BusinessOperation journey = findOwnedJourney(businessId, customerId, journeyId);
+            if (journey == null) return;
+
+            UUID paymentOperationId = uuidOrNull(data.optString("operationId", null));
+            BusinessOperation paymentOperation = findOwnedOperation(
+                    businessId, customerId, paymentOperationId, BusinessOperation.Type.PAYMENT);
+            if (paymentOperation == null) return;
+
+            Map<String, Object> paymentMetadata = paymentOperation.getMetadata() == null
+                    ? new LinkedHashMap<>()
+                    : new LinkedHashMap<>(paymentOperation.getMetadata());
+            paymentMetadata.put("commercialJourneyOperationId", journeyId.toString());
+            paymentOperation.setMetadata(paymentMetadata);
+            operations.saveAndFlush(paymentOperation);
+
+            updateJourneyMetadata(journey, Map.of(
+                    "paymentOperationId", paymentOperationId.toString(),
+                    "commercialStage", "PAYMENT_PENDING",
+                    "lastAction", "PAYMENT_REQUOTED"));
+            return;
+        }
+
         if ("quote_payment".equals(toolName) && success && data != null) {
             UUID targetOperationId = uuidOrNull(data.optString("targetOperationId", null));
             BusinessOperation target = findOwnedOperation(
