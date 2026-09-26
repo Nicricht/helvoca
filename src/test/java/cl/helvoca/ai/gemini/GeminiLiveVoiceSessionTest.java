@@ -73,7 +73,7 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("RecepVoz"));
         assertTrue(instructions.contains("[RECEPVOZ_CALL_CONNECTED]"));
         assertTrue(instructions.contains("ESPAÑOL DE CHILE"));
-        assertTrue(instructions.contains("no como locutora"));
+        assertTrue(instructions.contains("No suenes como locutora"));
         assertTrue(instructions.contains("NO vuelvas a ejecutar la misma herramienta"));
         assertTrue(instructions.contains("entonación chilena urbana neutra"));
         assertTrue(instructions.contains("a las nueve y media"));
