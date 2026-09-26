@@ -338,11 +338,15 @@ public class PaymentWorkflowService {
         int changed = 0;
         for (BusinessPayment payment : pending) {
             BusinessPayment.Status before = payment.getStatus();
+            String beforeExternalId = payment.getExternalId();
             refreshFromProvider(payment, businessId);
             BusinessPayment refreshed = payments.findByIdAndBusinessId(payment.getId(), businessId)
                     .orElse(payment);
             syncOperation(refreshed, businessId);
-            if (refreshed.getStatus() != before) changed++;
+            if (refreshed.getStatus() != before
+                    || !Objects.equals(beforeExternalId, refreshed.getExternalId())) {
+                changed++;
+            }
         }
         return changed;
     }
@@ -417,9 +421,113 @@ public class PaymentWorkflowService {
                 payment.setMetadata(mergeMetadata(payment.getMetadata(), result.metadata()));
                 payments.saveAndFlush(payment);
             }
-        } catch (Exception ignored) {
-            // A status read degrades to the last provider-verified state persisted locally.
+        } catch (Exception e) {
+            if (providerOrderMissing(e)) {
+                recoverMissingProviderOrder(payment, businessId, provider);
+            }
+            // Other status read failures degrade to the last provider-verified state persisted locally.
         }
+    }
+
+    private void recoverMissingProviderOrder(BusinessPayment payment,
+                                             UUID businessId,
+                                             PaymentProviderAdapter provider) {
+        if (payment == null
+                || (payment.getStatus() != BusinessPayment.Status.REQUIRES_ACTION
+                && payment.getStatus() != BusinessPayment.Status.PENDING)
+                || payment.getOperationId() == null
+                || payment.getTargetOperationId() == null
+                || payment.getAmount() == null
+                || payment.getAmount().compareTo(BigDecimal.ZERO) <= 0
+                || blank(payment.getCurrency())
+                || blank(payment.getExternalId())) {
+            return;
+        }
+
+        String previousExternalId = payment.getExternalId();
+        String recoveryKey = providerRecoveryIdempotencyKey(payment);
+        try {
+            PaymentProviderAdapter.CreateResult recovered = provider.create(
+                    new PaymentProviderAdapter.CreateCommand(
+                            businessId,
+                            payment.getOperationId(),
+                            payment.getTargetOperationId(),
+                            payment.getAmount(),
+                            payment.getCurrency(),
+                            recoveryKey,
+                            payment.getContactPhone(),
+                            Map.of(
+                                    "paymentOperationId", payment.getOperationId().toString(),
+                                    "targetOperationId", payment.getTargetOperationId().toString(),
+                                    "providerRecovery", true,
+                                    "previousExternalId", previousExternalId)));
+
+            if (recovered == null
+                    || recovered.status() == null
+                    || blank(recovered.externalId())) {
+                log.warn(
+                        "PAYMENT_PROVIDER_RECOVERY_INCOMPLETE businessId={} paymentId={} operationId={} provider={}",
+                        businessId,
+                        payment.getId(),
+                        payment.getOperationId(),
+                        provider.providerCode());
+                return;
+            }
+
+            payment.setExternalId(recovered.externalId().trim());
+            payment.setCheckoutUrl(blank(recovered.checkoutUrl()) ? null : recovered.checkoutUrl());
+            payment.setIdempotencyKey(recoveryKey);
+            payment.setStatus(recovered.status());
+
+            Map<String, Object> recoveryMetadata = new LinkedHashMap<>();
+            if (recovered.metadata() != null) recoveryMetadata.putAll(recovered.metadata());
+            recoveryMetadata.put("recoveredFromExternalId", previousExternalId);
+            recoveryMetadata.put("providerRecovery", true);
+            payment.setMetadata(mergeMetadata(payment.getMetadata(), recoveryMetadata));
+            payments.saveAndFlush(payment);
+
+            log.info(
+                    "PAYMENT_PROVIDER_ORDER_RECOVERED businessId={} paymentId={} operationId={} provider={} previousExternalId={} externalId={} status={}",
+                    businessId,
+                    payment.getId(),
+                    payment.getOperationId(),
+                    provider.providerCode(),
+                    previousExternalId,
+                    payment.getExternalId(),
+                    payment.getStatus());
+        } catch (Exception recoveryError) {
+            log.warn(
+                    "PAYMENT_PROVIDER_RECOVERY_FAILED businessId={} paymentId={} operationId={} provider={} reason={} message={}",
+                    businessId,
+                    payment.getId(),
+                    payment.getOperationId(),
+                    provider.providerCode(),
+                    recoveryError.getClass().getSimpleName(),
+                    recoveryError.getMessage() == null ? "" : recoveryError.getMessage());
+        }
+    }
+
+    static boolean providerOrderMissing(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.toLowerCase(java.util.Locale.ROOT).contains("order_not_found")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    static String providerRecoveryIdempotencyKey(BusinessPayment payment) {
+        if (payment == null || payment.getId() == null || blank(payment.getExternalId())) {
+            throw new IllegalArgumentException("Payment id and external id are required for provider recovery.");
+        }
+        String material = "payment-provider-recovery:"
+                + payment.getId()
+                + ":"
+                + payment.getExternalId().trim();
+        return UUID.nameUUIDFromBytes(material.getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     private void syncOperation(BusinessPayment payment, UUID businessId) {

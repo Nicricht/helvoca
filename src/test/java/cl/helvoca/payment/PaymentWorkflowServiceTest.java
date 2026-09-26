@@ -304,6 +304,152 @@ class PaymentWorkflowServiceTest {
     }
 
     @Test
+    void missingProviderOrderIsRecoveredOnSamePaymentProjection() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID sourceReferenceId = UUID.randomUUID();
+        UUID paymentOperationId = UUID.randomUUID();
+        UUID targetOperationId = UUID.randomUUID();
+
+        BusinessPayment payment = new BusinessPayment();
+        payment.setId(UUID.randomUUID());
+        payment.setOperationId(paymentOperationId);
+        payment.setBusinessId(businessId);
+        payment.setCustomerId(customerId);
+        payment.setSourceReferenceId(sourceReferenceId);
+        payment.setTargetOperationId(targetOperationId);
+        payment.setContactPhone("+56911111111");
+        payment.setProvider("mercadopago");
+        payment.setExternalId("ORDTST-MISSING");
+        payment.setIdempotencyKey("old-key");
+        payment.setAmount(new BigDecimal("1000"));
+        payment.setCurrency("CLP");
+        payment.setStatus(BusinessPayment.Status.REQUIRES_ACTION);
+        payment.setCheckoutUrl("https://www.mercadopago.cl/checkout/old");
+        payment.setSource(BusinessOrder.Source.WHATSAPP);
+
+        BusinessOperation paymentOperation = new BusinessOperation();
+        paymentOperation.setId(paymentOperationId);
+        paymentOperation.setBusinessId(businessId);
+        paymentOperation.setCustomerId(customerId);
+        paymentOperation.setType(BusinessOperation.Type.PAYMENT);
+        paymentOperation.setStatus(BusinessOperation.Status.CONFIRMED);
+        paymentOperation.setRevision(1);
+        paymentOperation.setSource(BusinessOrder.Source.WHATSAPP);
+        paymentOperation.setMetadata(new java.util.LinkedHashMap<>(Map.of(
+                "targetOperationId", targetOperationId.toString(),
+                "paymentStatus", "REQUIRES_ACTION")));
+
+        when(payments.findByIdAndBusinessId(payment.getId(), businessId))
+                .thenReturn(Optional.of(payment));
+        when(providers.byCode(businessId, "mercadopago")).thenReturn(Optional.of(provider));
+        when(provider.providerCode()).thenReturn("mercadopago");
+        when(provider.getStatus(any())).thenThrow(
+                new IllegalStateException(
+                        "Mercado Pago Orders API returned HTTP 404 (order_not_found) detail=Order not found."));
+        when(provider.create(any())).thenReturn(new PaymentProviderAdapter.CreateResult(
+                "ORDTST-RECOVERED",
+                "https://www.mercadopago.cl/checkout/recovered",
+                BusinessPayment.Status.REQUIRES_ACTION,
+                Map.of("remoteStatus", "action_required", "remoteStatusDetail", "waiting_payment")));
+        when(operations.findByIdAndBusinessId(paymentOperationId, businessId))
+                .thenReturn(Optional.of(paymentOperation));
+
+        JSONObject result = service.status(
+                businessId,
+                customerId,
+                sourceReferenceId,
+                "+56911111111",
+                BusinessOrder.Source.WHATSAPP,
+                new JSONObject().put("paymentId", payment.getId().toString()));
+
+        assertTrue(result.getBoolean("success"), result::toString);
+        assertEquals(payment.getId().toString(), result.getJSONObject("data").getString("paymentId"));
+        assertEquals("ORDTST-RECOVERED", payment.getExternalId());
+        assertEquals("https://www.mercadopago.cl/checkout/recovered", payment.getCheckoutUrl());
+        assertEquals(BusinessPayment.Status.REQUIRES_ACTION, payment.getStatus());
+        assertEquals("ORDTST-MISSING", payment.getMetadata().get("recoveredFromExternalId"));
+        assertEquals(Boolean.TRUE, payment.getMetadata().get("providerRecovery"));
+
+        ArgumentCaptor<PaymentProviderAdapter.CreateCommand> command =
+                ArgumentCaptor.forClass(PaymentProviderAdapter.CreateCommand.class);
+        verify(provider).create(command.capture());
+        assertEquals(paymentOperationId, command.getValue().paymentOperationId());
+        assertEquals(targetOperationId, command.getValue().targetOperationId());
+        assertEquals(
+                PaymentWorkflowService.providerRecoveryIdempotencyKey(paymentWithExternalId(
+                        payment.getId(), "ORDTST-MISSING")),
+                command.getValue().idempotencyKey());
+        verify(payments, atLeastOnce()).saveAndFlush(same(payment));
+    }
+
+    @Test
+    void unrelatedProviderStatusFailureDoesNotCreateReplacementOrder() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID sourceReferenceId = UUID.randomUUID();
+
+        BusinessPayment payment = new BusinessPayment();
+        payment.setId(UUID.randomUUID());
+        payment.setOperationId(UUID.randomUUID());
+        payment.setBusinessId(businessId);
+        payment.setCustomerId(customerId);
+        payment.setSourceReferenceId(sourceReferenceId);
+        payment.setTargetOperationId(UUID.randomUUID());
+        payment.setProvider("mercadopago");
+        payment.setExternalId("ORDTST-KEEP");
+        payment.setIdempotencyKey("existing-key");
+        payment.setAmount(new BigDecimal("1000"));
+        payment.setCurrency("CLP");
+        payment.setStatus(BusinessPayment.Status.REQUIRES_ACTION);
+        payment.setSource(BusinessOrder.Source.WHATSAPP);
+
+        BusinessOperation paymentOperation = new BusinessOperation();
+        paymentOperation.setId(payment.getOperationId());
+        paymentOperation.setBusinessId(businessId);
+        paymentOperation.setCustomerId(customerId);
+        paymentOperation.setType(BusinessOperation.Type.PAYMENT);
+        paymentOperation.setStatus(BusinessOperation.Status.CONFIRMED);
+        paymentOperation.setRevision(1);
+        paymentOperation.setSource(BusinessOrder.Source.WHATSAPP);
+
+        when(payments.findByIdAndBusinessId(payment.getId(), businessId))
+                .thenReturn(Optional.of(payment));
+        when(providers.byCode(businessId, "mercadopago")).thenReturn(Optional.of(provider));
+        when(provider.getStatus(any())).thenThrow(
+                new IllegalStateException("Mercado Pago Orders API returned HTTP 503 (provider_error)."));
+        when(operations.findByIdAndBusinessId(payment.getOperationId(), businessId))
+                .thenReturn(Optional.of(paymentOperation));
+
+        JSONObject result = service.status(
+                businessId,
+                customerId,
+                sourceReferenceId,
+                "+56911111111",
+                BusinessOrder.Source.WHATSAPP,
+                new JSONObject().put("paymentId", payment.getId().toString()));
+
+        assertTrue(result.getBoolean("success"), result::toString);
+        assertEquals("ORDTST-KEEP", payment.getExternalId());
+        verify(provider, never()).create(any());
+    }
+
+    @Test
+    void providerRecoveryKeyIsStableForSameMissingExternalOrder() {
+        UUID paymentId = UUID.randomUUID();
+        BusinessPayment payment = paymentWithExternalId(paymentId, "ORDTST-MISSING");
+
+        String first = PaymentWorkflowService.providerRecoveryIdempotencyKey(payment);
+        String second = PaymentWorkflowService.providerRecoveryIdempotencyKey(payment);
+
+        assertEquals(first, second);
+        assertDoesNotThrow(() -> UUID.fromString(first));
+
+        payment.setExternalId("ORDTST-OTHER");
+        assertNotEquals(first, PaymentWorkflowService.providerRecoveryIdempotencyKey(payment));
+    }
+
+    @Test
     void providerStatusRefreshPropagatesSucceededToCommercialJourney() {
         UUID businessId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
@@ -424,6 +570,13 @@ class PaymentWorkflowServiceTest {
                 "confirmationPending", true,
                 "paymentPending", true));
         return operation;
+    }
+
+    private static BusinessPayment paymentWithExternalId(UUID paymentId, String externalId) {
+        BusinessPayment payment = new BusinessPayment();
+        payment.setId(paymentId);
+        payment.setExternalId(externalId);
+        return payment;
     }
 
     private static JSONObject confirmArgs(BusinessOperation operation) {
