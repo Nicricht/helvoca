@@ -19,7 +19,7 @@ jobs:
           set -euo pipefail
 
           BASE="https://recepvoz.cl"
-          EMAIL="cph-simulacion-20260926@example.com"
+          EMAIL="cph-simulacion-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.com"
           PASSWORD="$(openssl rand -hex 24)"
 
           REGISTER_PAYLOAD="$(jq -nc             --arg adminName "Admin Simulacion CPH"             --arg email "$EMAIL"             --arg password "$PASSWORD"             --arg businessName "CPH Salud Providencia [SIMULACION RECEPVOZ]"             --arg timezone "America/Santiago"             --arg language "es"             '{adminName:$adminName,email:$email,password:$password,businessName:$businessName,timezone:$timezone,language:$language,humanTransferPhone:null}')"
