@@ -111,7 +111,7 @@ public class CommercialSandboxExistingPaymentStartupRunner implements Applicatio
         requireMetadataUuid(journey, "orderOperationId", orderId);
         requireMetadataUuid(journey, "paymentOperationId", paymentOperationId);
         requireMetadataUuid(paymentOperation, "targetOperationId", orderId);
-        requireMetadataUuid(paymentOperation, "commercialJourneyOperationId", journeyId);
+        ensureCommercialJourneyLinkage(paymentOperation, journeyId);
 
         BusinessPayment existing = payments
                 .findByOperationIdAndBusinessId(paymentOperationId, businessId)
@@ -247,6 +247,23 @@ public class CommercialSandboxExistingPaymentStartupRunner implements Applicatio
                     "Commercial sandbox " + label + " operation has unexpected type");
         }
         return operation;
+    }
+
+    private void ensureCommercialJourneyLinkage(BusinessOperation paymentOperation,
+                                                UUID expectedJourneyId) {
+        Map<String, Object> metadata = paymentOperation.getMetadata();
+        Object raw = metadata == null ? null : metadata.get("commercialJourneyOperationId");
+        if (raw == null || String.valueOf(raw).isBlank()) {
+            Map<String, Object> repaired = new java.util.LinkedHashMap<>();
+            if (metadata != null) repaired.putAll(metadata);
+            repaired.put("commercialJourneyOperationId", expectedJourneyId.toString());
+            paymentOperation.setMetadata(repaired);
+            paymentOperation.setRevision(
+                    paymentOperation.getRevision() == null ? 1 : paymentOperation.getRevision() + 1);
+            operations.saveAndFlush(paymentOperation);
+            return;
+        }
+        requireMetadataUuid(paymentOperation, "commercialJourneyOperationId", expectedJourneyId);
     }
 
     private static void requireMetadataUuid(BusinessOperation operation,
