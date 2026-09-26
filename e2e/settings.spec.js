@@ -12,6 +12,26 @@ async function mockSettings(page, state = {}) {
   state.profilePayloads = [];
   state.scheduleExceptionPuts = [];
   state.scheduleExceptionDeletes = [];
+  state.activationPayloads = [];
+  state.activation = state.activation || {
+    ready: false,
+    completed: 6,
+    total: 10,
+    progressPercent: 60,
+    blockers: ['FAQ_REVIEW_REQUIRED', 'CONVERSATION_TEST_REQUIRED', 'MUTATION_TESTS_REQUIRED', 'HUMAN_HANDOFF_TEST_REQUIRED'],
+    steps: [
+      { code: 'CORE_SETUP', label: 'Negocio configurado', complete: true, automatic: true, required: true, actionHref: '/settings.html#configuration' },
+      { code: 'TECHNICAL_READINESS', label: 'Canales y operación listos', complete: true, automatic: true, required: true, actionHref: '/' },
+      { code: 'PRICES_CONFIRMED', label: 'Precios confirmados', complete: true, automatic: false, required: true, actionHref: '/settings.html#configuration' },
+      { code: 'FAQ_REVIEWED', label: 'FAQ revisada', complete: false, automatic: false, required: true, actionHref: '/settings.html#configuration' },
+      { code: 'POLICIES_APPROVED', label: 'Políticas aprobadas', complete: true, automatic: false, required: true, actionHref: '/settings.html#configuration' },
+      { code: 'AGENT_INSTRUCTIONS_APPROVED', label: 'Recepcionista aprobada', complete: true, automatic: false, required: true, actionHref: '/settings.html#configuration' },
+      { code: 'PILOT_SCOPE_APPROVED', label: 'Alcance del piloto aprobado', complete: true, automatic: false, required: true, actionHref: '/settings.html' },
+      { code: 'CONVERSATION_TEST_COMPLETED', label: 'Conversación de prueba completada', complete: false, automatic: false, required: true, actionHref: '/' },
+      { code: 'MUTATION_TESTS_COMPLETED', label: 'Reservas / pedidos / pagos probados', complete: false, automatic: false, required: true, actionHref: '/' },
+      { code: 'HUMAN_HANDOFF_TESTED', label: 'Derivación humana probada', complete: false, automatic: false, required: true, actionHref: '/settings.html#configuration' }
+    ]
+  };
   state.scheduleExceptions = state.scheduleExceptions || [
     {
       id: 'exception-1',
@@ -57,6 +77,33 @@ async function mockSettings(page, state = {}) {
     knowledgeConfigured: true, humanTransferConfigured: true, phoneConfigured: true,
     readyForCalls: true, nextStep: 'READY'
   })));
+  await page.route('**/api/v1/onboarding/activation', async route => {
+    if (route.request().method() === 'PUT') {
+      const payload = route.request().postDataJSON();
+      state.activationPayloads.push(payload);
+      state.activation = {
+        ...state.activation,
+        ready: Object.values(payload).every(Boolean),
+        completed: Object.values(payload).filter(Boolean).length + 2,
+        progressPercent: Math.round((Object.values(payload).filter(Boolean).length + 2) * 10),
+        steps: state.activation.steps.map(step => {
+          const fieldByCode = {
+            PRICES_CONFIRMED: 'pricesConfirmed',
+            FAQ_REVIEWED: 'faqReviewed',
+            POLICIES_APPROVED: 'policiesApproved',
+            AGENT_INSTRUCTIONS_APPROVED: 'agentInstructionsApproved',
+            PILOT_SCOPE_APPROVED: 'pilotScopeApproved',
+            CONVERSATION_TEST_COMPLETED: 'conversationTestCompleted',
+            MUTATION_TESTS_COMPLETED: 'mutationTestsCompleted',
+            HUMAN_HANDOFF_TESTED: 'humanHandoffTested'
+          };
+          const field = fieldByCode[step.code];
+          return field ? { ...step, complete: Boolean(payload[field]) } : step;
+        })
+      };
+    }
+    await route.fulfill(json(state.activation));
+  });
   await page.route('**/api/v1/onboarding/setup', async route => {
     if (route.request().method() === 'PUT') {
       state.setupPayloads.push(route.request().postDataJSON());
@@ -195,6 +242,40 @@ test('settings exposes the Mi negocio sections with simple navigation', async ({
   await expect(page.locator('#configAgentPanel')).toBeVisible();
   await expect(page.locator('#configBusinessPanel')).toBeHidden();
   await expect(page.locator('#agentCapabilities')).toBeHidden();
+});
+
+test('settings turns first customer onboarding into an operational activation checklist', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const state = {};
+  await mockSettings(page, state);
+  await page.goto('/settings.html');
+
+  const card = page.locator('#pilotActivationCard');
+  await expect(card).toBeVisible();
+  await expect(page.locator('#pilotActivationScore')).toHaveText('6/10');
+  await expect(card.locator('[data-code="CORE_SETUP"]')).toHaveClass(/complete/);
+  await expect(card.locator('[data-code="CORE_SETUP"] input')).toHaveCount(0);
+  await expect(card.locator('[data-code="FAQ_REVIEWED"] input')).not.toBeChecked();
+
+  await card.locator('[data-code="FAQ_REVIEWED"] input').check();
+  await card.locator('[data-code="CONVERSATION_TEST_COMPLETED"] input').check();
+  await card.locator('[data-code="MUTATION_TESTS_COMPLETED"] input').check();
+  await card.locator('[data-code="HUMAN_HANDOFF_TESTED"] input').check();
+  await page.locator('#pilotActivationSave').click();
+
+  await expect.poll(() => state.activationPayloads.length).toBe(1);
+  expect(state.activationPayloads[0]).toMatchObject({
+    pricesConfirmed: true,
+    faqReviewed: true,
+    policiesApproved: true,
+    agentInstructionsApproved: true,
+    pilotScopeApproved: true,
+    conversationTestCompleted: true,
+    mutationTestsCompleted: true,
+    humanHandoffTested: true
+  });
+  await expect(page.locator('#pilotActivationScore')).toHaveText('10/10');
+  await expect(page.locator('#pilotActivationMessage')).toContainText('Checklist completo');
 });
 
 test('settings uses selectors for timezone language and voice', async ({ page }) => {
