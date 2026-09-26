@@ -2,6 +2,8 @@ package cl.helvoca.payment;
 
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationRepository;
+import cl.helvoca.operations.BusinessOperationItem;
+import cl.helvoca.operations.BusinessOperationItemRepository;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.operations.ConversationStateService;
 import cl.helvoca.operations.OperationPolicyService;
@@ -33,6 +35,9 @@ public class PaymentWorkflowService {
 
     @Autowired(required = false)
     private InventoryService inventory;
+
+    @Autowired(required = false)
+    private BusinessOperationItemRepository operationItems;
 
     public PaymentWorkflowService(BusinessOperationRepository operations,
                                   BusinessPaymentRepository payments,
@@ -225,6 +230,9 @@ public class PaymentWorkflowService {
             return error("PAYMENT_PROVIDER_UNAVAILABLE",
                     "Este negocio todavía no tiene un proveedor de pagos comerciales configurado.");
         }
+
+        JSONObject inventoryBlock = ensureInventoryReservedForPayment(businessId, recalculated.target());
+        if (inventoryBlock != null) return inventoryBlock;
 
         String idempotencyKey = providerIdempotencyKey(operation);
         PaymentProviderAdapter.CreateResult providerResult;
@@ -576,6 +584,32 @@ public class PaymentWorkflowService {
         }
         syncCommercialJourney(payment, businessId, operation);
         settleInventory(payment);
+    }
+
+    private JSONObject ensureInventoryReservedForPayment(UUID businessId, BusinessOperation target) {
+        if (inventory == null
+                || operationItems == null
+                || target == null
+                || target.getType() != BusinessOperation.Type.ORDER) {
+            return null;
+        }
+
+        List<BusinessOperationItem> items =
+                operationItems.findAllByOperationIdOrderByCreatedAtAsc(target.getId());
+        InventoryService.OrderReservationResult reservation = inventory.reserveOrder(
+                businessId,
+                target.getId(),
+                items.stream()
+                        .map(item -> new InventoryService.OrderItem(
+                                item.getCatalogItemId(), item.getQuantity()))
+                        .toList());
+        if (reservation.success()) return null;
+
+        return error(
+                reservation.code() == null ? "INSUFFICIENT_STOCK" : reservation.code(),
+                reservation.message() == null
+                        ? "El stock cambió y ya no permite iniciar este pago."
+                        : reservation.message());
     }
 
     private void settleInventory(BusinessPayment payment) {
