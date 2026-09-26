@@ -150,7 +150,6 @@ public class AiAgentService {
         // backend gates: verified identity, tenant operation, provider and
         // delivery switches. It does not grant any business-operation mutation.
         allowed.add(CrossChannelMessagingToolService.TOOL_NAME);
-        allowed.add("verify_caller_whatsapp");
         return Set.copyOf(allowed);
     }
 
