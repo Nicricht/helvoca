@@ -106,6 +106,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
             instructions += CommercialToolDefinitions.instructions(operationCapabilities.enabled(context.businessId()));
         }
         instructions += "\nPara create_booking usa siempre dos fases: primero llama con serviceId/startAt para obtener una propuesta, presenta esas condiciones y pide confirmación explícita; solo después vuelve a llamar create_booking con el operationId y confirmationToken devueltos. Una respuesta sin bookingId es solo una propuesta y NO significa que exista una reserva.";
+        instructions += "\nSi el cliente pide que continúes o envíes contenido al WhatsApp del MISMO número desde el que llama, confirma verbalmente que ese número es su WhatsApp y solo después usa verify_caller_whatsapp con confirmedSameNumber=true. Luego usa send_whatsapp_operation con el mismo operationId. Nunca marques el número como verificado por inferencia.";
         return instructions;
     }
 
@@ -123,6 +124,9 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
             }
         }
 
+        if (!containsTool(definitions, "verify_caller_whatsapp")) {
+            definitions.put(RealtimeToolDefinitions.callerWhatsappVerification());
+        }
         if (!containsTool(definitions, "end_call")) definitions.put(RealtimeToolDefinitions.endCall());
         return definitions;
     }
