@@ -71,7 +71,7 @@ class InventoryVariantServiceTest {
                 productId,
                 new InventoryVariantService.VariantInput(
                         "Negro / 42",
-                        "{"color":"Negro","talla":"42"}",
+                        "{\"color\":\"Negro\",\"talla\":\"42\"}",
                         "nike-n42",
                         true,
                         5,
@@ -83,7 +83,7 @@ class InventoryVariantServiceTest {
         assertEquals(5, view.onHand());
         assertEquals(5, view.available());
         assertFalse(view.lowStock());
-        assertTrue(view.optionValuesJson().contains(""color":"Negro""));
+        assertTrue(view.optionValuesJson().contains("\"color\":\"Negro\""));
 
         ArgumentCaptor<InventoryMovement> movement =
                 ArgumentCaptor.forClass(InventoryMovement.class);
@@ -164,7 +164,7 @@ class InventoryVariantServiceTest {
         variant.setCatalogItemId(productId);
         variant.setName("Negro / 42");
         variant.setSku("NIKE-N42");
-        variant.setOptionValuesJson("{"color":"Negro","talla":"42"}");
+        variant.setOptionValuesJson("{\"color\":\"Negro\",\"talla\":\"42\"}");
         variant.setTrackingEnabled(true);
         variant.setOnHand(onHand);
         variant.setReserved(reserved);
