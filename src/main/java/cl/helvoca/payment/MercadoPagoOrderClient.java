@@ -1,5 +1,6 @@
 package cl.helvoca.payment;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.stereotype.Component;
 
@@ -73,9 +74,11 @@ public class MercadoPagoOrderClient {
             HttpResponse<String> response = http.send(request.build(), HttpResponse.BodyHandlers.ofString());
             JSONObject json = parse(response.body());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                String code = json.optString("code", json.optString("error", "provider_error"));
+                String code = providerErrorCode(json);
+                String detail = providerErrorDetail(json);
                 throw new IllegalStateException("Mercado Pago Orders API returned HTTP "
-                        + response.statusCode() + " (" + code + ").");
+                        + response.statusCode() + " (" + code + ")"
+                        + (detail == null ? "." : " detail=" + detail + "."));
             }
             String id = json.optString("id", "").trim();
             if (id.isBlank()) throw new IllegalStateException("Mercado Pago order response has no id.");
@@ -95,6 +98,60 @@ public class MercadoPagoOrderClient {
         } catch (Exception e) {
             throw new IllegalStateException("Mercado Pago request failed.", e);
         }
+    }
+
+    static String providerErrorCode(JSONObject json) {
+        if (json == null) return "provider_error";
+        String direct = firstNonBlank(
+                json.optString("code", null),
+                json.optString("error", null));
+        if (direct != null) return direct;
+
+        JSONObject detail = firstObject(json.optJSONArray("details"));
+        if (detail == null) detail = firstObject(json.optJSONArray("errors"));
+        if (detail != null) {
+            String nested = firstNonBlank(
+                    detail.optString("code", null),
+                    detail.optString("error", null));
+            if (nested != null) return nested;
+        }
+        return "provider_error";
+    }
+
+    static String providerErrorDetail(JSONObject json) {
+        if (json == null) return null;
+        String direct = firstNonBlank(
+                json.optString("message", null),
+                json.optString("cause", null));
+        if (direct != null) return safeDetail(direct);
+
+        JSONObject detail = firstObject(json.optJSONArray("details"));
+        if (detail == null) detail = firstObject(json.optJSONArray("errors"));
+        if (detail == null) return null;
+
+        String nested = firstNonBlank(
+                detail.optString("message", null),
+                detail.optString("description", null),
+                detail.optString("field", null));
+        return nested == null ? null : safeDetail(nested);
+    }
+
+    private static JSONObject firstObject(JSONArray array) {
+        return array == null || array.length() == 0 ? null : array.optJSONObject(0);
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) return null;
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value.trim();
+        }
+        return null;
+    }
+
+    private static String safeDetail(String value) {
+        String normalized = value == null ? "" : value.replaceAll("[\\r\\n\\t]+", " ").trim();
+        if (normalized.isBlank()) return null;
+        return normalized.length() <= 240 ? normalized : normalized.substring(0, 240);
     }
 
     private static JSONObject parse(String body) {
