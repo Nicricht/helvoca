@@ -33,6 +33,7 @@
         business: null,
         catalog: [],
         inventory: [],
+        alerts: [],
         products: [],
         currentVariantProductId: null,
         variants: []
@@ -44,6 +45,12 @@
         RESERVATION: "Reserva",
         RELEASE: "Liberación",
         CONSUMPTION: "Consumo"
+    };
+
+    const alertLabels = {
+        LOW_STOCK: "Stock bajo",
+        OUT_OF_STOCK: "Agotado",
+        RESTOCKED: "Repuesto"
     };
 
     function escapeHtml(value) {
@@ -139,6 +146,68 @@
         $("#inventoryLowStockKpi").classList.toggle("alert", low > 0);
     }
 
+    function renderAlerts() {
+        const list = $("#inventoryAlertsList");
+        const emptyAlerts = $("#inventoryAlertsEmpty");
+        const alerts = Array.isArray(state.alerts) ? state.alerts : [];
+        const pending = alerts.filter(alert => !alert.acknowledged).length;
+        $("#inventoryAlertsCount").textContent =
+            `${pending} pendiente${pending === 1 ? "" : "s"}`;
+        $("#inventoryAlertsCount").className =
+            `badge ${pending > 0 ? "online" : "muted"}`;
+
+        emptyAlerts.classList.toggle("hidden", alerts.length > 0);
+        list.innerHTML = alerts.map(alert => {
+            const typeClass = alert.type === "OUT_OF_STOCK"
+                ? "out"
+                : alert.type === "RESTOCKED" ? "restocked" : "low";
+            const icon = alert.type === "OUT_OF_STOCK"
+                ? "0"
+                : alert.type === "RESTOCKED" ? "↥" : "!";
+            const detail = alert.type === "RESTOCKED"
+                ? `Disponible nuevamente: ${Number(alert.available)}.`
+                : `Disponible: ${Number(alert.available)} · mínimo: ${Number(alert.reorderThreshold)}.`;
+            const sku = alert.sku ? ` · SKU ${alert.sku}` : "";
+            const action = state.canManage && !alert.acknowledged
+                ? `<button class="button ghost inventory-alert-ack" type="button" data-id="${escapeHtml(alert.id)}">Marcar atendida</button>`
+                : alert.acknowledged
+                    ? '<span class="inventory-sku missing">Atendida</span>'
+                    : "";
+            return `
+                <article class="inventory-alert-card ${typeClass} ${alert.acknowledged ? "acknowledged" : ""}"
+                         data-inventory-alert-id="${escapeHtml(alert.id)}">
+                    <div class="inventory-alert-icon">${icon}</div>
+                    <div class="inventory-alert-main">
+                        <strong>${escapeHtml(alertLabels[alert.type] || alert.type)} · ${escapeHtml(alert.subjectName)}</strong>
+                        <small>${escapeHtml(detail + sku)}</small>
+                    </div>
+                    <div class="inventory-alert-action">${action}</div>
+                </article>`;
+        }).join("");
+
+        $(".inventory-alert-ack", list).forEach(button => {
+            button.addEventListener("click", async () => {
+                button.disabled = true;
+                try {
+                    await api(
+                        `/api/v1/inventory/alerts/${encodeURIComponent(button.dataset.id)}/acknowledge`,
+                        { method: "POST" });
+                    await reloadAlerts();
+                } catch (error) {
+                    showMessage(message, error.message);
+                } finally {
+                    button.disabled = false;
+                }
+            });
+        });
+    }
+
+    async function reloadAlerts() {
+        const alerts = await api("/api/v1/inventory/alerts");
+        state.alerts = Array.isArray(alerts) ? alerts : [];
+        renderAlerts();
+    }
+
     function productMatches(item) {
         const query = search.value.trim().toLowerCase();
         if (query && !`${item.name} ${item.sku}`.toLowerCase().includes(query)) return false;
@@ -215,6 +284,7 @@
 
     function render() {
         renderSummary();
+        renderAlerts();
         renderRows();
     }
 
@@ -396,6 +466,7 @@
             });
             variantEditDialog.close();
             await openVariants(productId);
+            await reloadAlerts();
         } catch (error) {
             showMessage(variantMessage, error.message);
         } finally {
@@ -544,6 +615,7 @@
             adjustDialog.close();
             if (variantId) {
                 await openVariants(id);
+                await reloadAlerts();
             } else {
                 await reloadInventory("Movimiento registrado.");
             }
@@ -555,12 +627,14 @@
     }
 
     async function reloadInventory(successText = "") {
-        const [catalog, inventory] = await Promise.all([
+        const [catalog, inventory, alerts] = await Promise.all([
             api("/api/v1/catalog"),
-            api("/api/v1/inventory")
+            api("/api/v1/inventory"),
+            api("/api/v1/inventory/alerts")
         ]);
         state.catalog = Array.isArray(catalog) ? catalog : [];
         state.inventory = Array.isArray(inventory) ? inventory : [];
+        state.alerts = Array.isArray(alerts) ? alerts : [];
         mergeProducts();
         render();
         if (successText) {
@@ -575,17 +649,19 @@
             return;
         }
         try {
-            const [me, business, catalog, inventory] = await Promise.all([
+            const [me, business, catalog, inventory, alerts] = await Promise.all([
                 api("/api/v1/auth/me"),
                 api("/api/v1/business"),
                 api("/api/v1/catalog"),
-                api("/api/v1/inventory")
+                api("/api/v1/inventory"),
+                api("/api/v1/inventory/alerts")
             ]);
             state.roles = Array.isArray(me?.roles) ? me.roles.map(String) : [];
             state.canManage = state.roles.includes("BUSINESS_ADMIN");
             state.business = business || {};
             state.catalog = Array.isArray(catalog) ? catalog : [];
             state.inventory = Array.isArray(inventory) ? inventory : [];
+            state.alerts = Array.isArray(alerts) ? alerts : [];
 
             const businessName = String(state.business?.name || "RecepVoz").trim() || "RecepVoz";
             $("#inventoryBrand").textContent = businessName.toUpperCase();
