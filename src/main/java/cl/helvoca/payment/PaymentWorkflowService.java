@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -216,7 +217,7 @@ public class PaymentWorkflowService {
                     "Este negocio todavía no tiene un proveedor de pagos comerciales configurado.");
         }
 
-        String idempotencyKey = operation.getId().toString();
+        String idempotencyKey = providerIdempotencyKey(operation);
         PaymentProviderAdapter.CreateResult providerResult;
         try {
             providerResult = provider.create(new PaymentProviderAdapter.CreateCommand(
@@ -706,6 +707,15 @@ public class PaymentWorkflowService {
                 || status == BusinessPayment.Status.CANCELLED
                 || status == BusinessPayment.Status.EXPIRED
                 || status == BusinessPayment.Status.REFUNDED;
+    }
+
+    static String providerIdempotencyKey(BusinessOperation operation) {
+        if (operation == null || operation.getId() == null) {
+            throw new IllegalArgumentException("Payment operation id is required.");
+        }
+        int revision = operation.getRevision() == null ? 1 : operation.getRevision();
+        String material = operation.getId() + ":" + revision;
+        return UUID.nameUUIDFromBytes(material.getBytes(StandardCharsets.UTF_8)).toString();
     }
 
     private static String required(JSONObject args, String key) {
