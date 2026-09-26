@@ -9,6 +9,17 @@ import static org.junit.jupiter.api.Assertions.*;
 class MercadoPagoOrderClientErrorTest {
 
     @Test
+    void normalizesScaledClpAmountToWholeNumberString() {
+        assertEquals("1000", MercadoPagoOrderClient.normalizeIntegerAmount(
+                new java.math.BigDecimal("1000.00")));
+        assertEquals("1500", MercadoPagoOrderClient.normalizeIntegerAmount(
+                new java.math.BigDecimal("1500")));
+        assertThrows(IllegalArgumentException.class, () ->
+                MercadoPagoOrderClient.normalizeIntegerAmount(
+                        new java.math.BigDecimal("1000.50")));
+    }
+
+    @Test
     void extractsNestedDetailsWithoutDumpingWholeProviderBody() {
         JSONObject body = new JSONObject()
                 .put("details", new JSONArray().put(new JSONObject()
