@@ -356,6 +356,18 @@ public class PaymentWorkflowService {
     }
 
     @Transactional
+    public BusinessPayment reconcileOne(UUID businessId, UUID paymentId) {
+        if (businessId == null || paymentId == null) return null;
+        BusinessPayment payment = payments.findByIdAndBusinessId(paymentId, businessId).orElse(null);
+        if (payment == null) return null;
+
+        refreshFromProvider(payment, businessId);
+        BusinessPayment refreshed = payments.findByIdAndBusinessId(paymentId, businessId).orElse(payment);
+        syncOperation(refreshed, businessId);
+        return refreshed;
+    }
+
+    @Transactional
     public JSONObject cancel(UUID businessId,
                              UUID customerId,
                              UUID sourceReferenceId,
