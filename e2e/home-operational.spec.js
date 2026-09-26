@@ -197,6 +197,51 @@ async function mockReadyHome(page, roles = ['BUSINESS_ADMIN'], options = {}) {
     recentRequests: [],
     unanswered: []
   })));
+  let pilotControlState = {
+    status: 'READY',
+    launchDecision: 'GO',
+    technicalReady: true,
+    configurationComplete: true,
+    blockers: [],
+    responsibleName: 'Carla Pérez',
+    responsibleContact: '+56911112222',
+    goal: 'Reducir llamadas perdidas y convertir reservas',
+    plannedEndAt: '2026-10-10T03:00:00Z',
+    startedAt: null,
+    completedAt: null,
+    canStart: true,
+    canPause: false,
+    canResume: false,
+    canComplete: false
+  };
+  await page.route('**/api/v1/operations/pilot-control', async route => {
+    const request = route.request();
+    if (request.method() === 'PUT') {
+      const body = request.postDataJSON();
+      pilotControlState = {
+        ...pilotControlState,
+        ...body,
+        status: 'READY',
+        launchDecision: 'GO',
+        canStart: true
+      };
+    }
+    await route.fulfill(json(pilotControlState));
+  });
+  await page.route('**/api/v1/operations/pilot-control/start', route => {
+    pilotControlState = {
+      ...pilotControlState,
+      status: 'RUNNING',
+      launchDecision: 'RUNNING',
+      startedAt: '2026-09-26T14:20:00Z',
+      canStart: false,
+      canPause: true,
+      canResume: false,
+      canComplete: true
+    };
+    route.fulfill(json(pilotControlState));
+  });
+
   await page.route('**/api/v1/operations/pilot-metrics', route => route.fulfill(json({
     businessName: 'Negocio E2E',
     timezone: 'America/Santiago',
@@ -375,6 +420,13 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#pilotReadinessScore')).toHaveText('5/5');
   await expect(page.locator('#pilotReadinessCard')).toContainText('Todo el circuito crítico está listo');
   await expect(page.locator('#pilotReadinessCard .pilot-readiness-item.ready')).toHaveCount(5);
+  await expect(page.locator('#pilotControlCard')).toBeVisible();
+  await expect(page.locator('#pilotControlBadge')).toHaveText('GO');
+  await expect(page.locator('#pilotStart')).toBeVisible();
+  await page.locator('#pilotStart').click();
+  await expect(page.locator('#pilotControlBadge')).toHaveText('RUNNING');
+  await expect(page.locator('#pilotPause')).toBeVisible();
+
   await expect(page.locator('#pilotMetricsCard')).toBeVisible();
   await expect(page.locator('#pilotMetricConversations')).toHaveText('7');
   await expect(page.locator('#pilotMetricOrders')).toHaveText('2');
