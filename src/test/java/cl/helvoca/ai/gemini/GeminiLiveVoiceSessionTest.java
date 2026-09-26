@@ -260,12 +260,17 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(sent.getAllValues().stream()
                 .map(CharSequence::toString)
                 .map(JSONObject::new)
-                .anyMatch(message -> message.optJSONObject("realtimeInput") != null
-                        && message.getJSONObject("realtimeInput").optString("text", "")
-                        .contains("Ejecuta ahora create_booking")));
-        assertTrue(sent.getAllValues().stream()
-                .map(CharSequence::toString)
-                .noneMatch(message -> message.contains("\"clientContent\"")));
+                .anyMatch(message -> {
+                    JSONObject client = message.optJSONObject("clientContent");
+                    if (client == null || !client.optBoolean("turnComplete", false)) return false;
+                    JSONArray turns = client.optJSONArray("turns");
+                    if (turns == null || turns.isEmpty()) return false;
+                    JSONArray parts = turns.getJSONObject(0).optJSONArray("parts");
+                    return parts != null
+                            && !parts.isEmpty()
+                            && parts.getJSONObject(0).optString("text", "")
+                            .contains("Ejecuta ahora create_booking");
+                }));
     }
 
     @Test
