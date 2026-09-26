@@ -22,6 +22,10 @@
     const adjustForm = $("#inventoryAdjustForm");
     const adjustMessage = $("#inventoryAdjustMessage");
     const historyDialog = $("#inventoryHistoryDialog");
+    const variantsDialog = $("#inventoryVariantsDialog");
+    const variantEditDialog = $("#inventoryVariantEditDialog");
+    const variantForm = $("#inventoryVariantForm");
+    const variantMessage = $("#inventoryVariantMessage");
 
     const state = {
         roles: [],
@@ -29,7 +33,9 @@
         business: null,
         catalog: [],
         inventory: [],
-        products: []
+        products: [],
+        currentVariantProductId: null,
+        variants: []
     };
 
     const movementLabels = {
@@ -158,16 +164,17 @@
     }
 
     function actionButtons(item) {
+        const variants = `<button class="button ghost inventory-variants-btn" type="button" data-id="${item.id}">Variantes</button>`;
         const history = item.configured
             ? `<button class="button ghost inventory-history-btn" type="button" data-id="${item.id}">Historial</button>`
             : "";
-        if (!state.canManage) return history || '<span class="inventory-sku missing">Solo lectura</span>';
+        if (!state.canManage) return variants + history;
         const configureLabel = item.configured ? "Editar" : "Configurar";
         const configure = `<button class="button ghost inventory-config-btn" type="button" data-id="${item.id}">${configureLabel}</button>`;
         const adjust = item.configured && item.trackingEnabled
             ? `<button class="button secondary inventory-adjust-btn" type="button" data-id="${item.id}">Ajustar</button>`
             : "";
-        return configure + adjust + history;
+        return variants + configure + adjust + history;
     }
 
     function renderRows() {
@@ -192,7 +199,10 @@
     }
 
     function bindRowActions() {
-        $$(".inventory-config-btn", rows).forEach(button => {
+        $(".inventory-variants-btn", rows).forEach(button => {
+            button.addEventListener("click", () => openVariants(button.dataset.id));
+        });
+        $(".inventory-config-btn", rows).forEach(button => {
             button.addEventListener("click", () => openConfig(button.dataset.id));
         });
         $$(".inventory-adjust-btn", rows).forEach(button => {
@@ -233,10 +243,198 @@
         $("#inventoryAdjustTitle").textContent = item.name;
         $("#inventoryAdjustAvailable").textContent = item.available ?? 0;
         adjustForm.elements.catalogItemId.value = item.id;
+        adjustForm.elements.variantId.value = "";
         adjustForm.elements.delta.value = "";
         adjustForm.elements.note.value = "";
         adjustDialog.showModal();
         setTimeout(() => adjustForm.elements.delta.focus(), 0);
+    }
+
+    function optionText(json) {
+        if (!json) return "";
+        try {
+            const value = typeof json === "string" ? JSON.parse(json) : json;
+            return Object.entries(value || {})
+                .map(([key, item]) => `${key}=${item}`)
+                .join(", ");
+        } catch (_) {
+            return "";
+        }
+    }
+
+    function optionJson(text) {
+        const out = {};
+        String(text || "").split(",").forEach(part => {
+            const [rawKey, ...rawValue] = part.split("=");
+            const key = String(rawKey || "").trim();
+            const value = rawValue.join("=").trim();
+            if (key && value) out[key] = value;
+        });
+        return JSON.stringify(out);
+    }
+
+    function variantState(variant) {
+        if (!variant.active) return '<span class="inventory-state off">Inactiva</span>';
+        if (!variant.trackingEnabled) return '<span class="inventory-state off">Sin seguimiento</span>';
+        if (variant.lowStock) return '<span class="inventory-state low">Stock bajo</span>';
+        return '<span class="inventory-state ok">Disponible</span>';
+    }
+
+    async function openVariants(productId) {
+        const item = product(productId);
+        if (!item) return;
+        state.currentVariantProductId = item.id;
+        state.variants = [];
+        $("#inventoryVariantsTitle").textContent = `Variantes · ${item.name}`;
+        $("#inventoryVariantsList").innerHTML = "";
+        $("#inventoryVariantsEmpty").classList.add("hidden");
+        $("#inventoryVariantsLoading").classList.remove("hidden");
+        $("#inventoryAddVariantBtn").classList.toggle("hidden", !state.canManage);
+        variantsDialog.showModal();
+        try {
+            const values = await api(
+                `/api/v1/inventory/${encodeURIComponent(item.id)}/variants`);
+            state.variants = Array.isArray(values) ? values : [];
+            renderVariants();
+        } catch (error) {
+            $("#inventoryVariantsLoading").classList.add("hidden");
+            $("#inventoryVariantsList").innerHTML =
+                `<div class="message error">${escapeHtml(error.message)}</div>`;
+        }
+    }
+
+    function renderVariants() {
+        $("#inventoryVariantsLoading").classList.add("hidden");
+        const active = state.variants;
+        $("#inventoryVariantsEmpty").classList.toggle("hidden", active.length > 0);
+        $("#inventoryVariantsList").innerHTML = active.map(variant => {
+            const actions = [
+                state.canManage
+                    ? `<button class="button ghost variant-edit-btn" data-id="${variant.id}" type="button">Editar</button>`
+                    : "",
+                state.canManage && variant.active && variant.trackingEnabled
+                    ? `<button class="button secondary variant-adjust-btn" data-id="${variant.id}" type="button">Ajustar</button>`
+                    : "",
+                `<button class="button ghost variant-history-btn" data-id="${variant.id}" type="button">Historial</button>`
+            ].join("");
+            return `
+                <article class="inventory-variant-card ${variant.active ? "" : "inactive"}"
+                         data-inventory-variant-id="${escapeHtml(variant.id)}">
+                    <div class="inventory-variant-name">
+                        <strong>${escapeHtml(variant.name)}</strong>
+                        <small class="inventory-sku">${escapeHtml(variant.sku)}</small>
+                        <small class="inventory-variant-options">${escapeHtml(optionText(variant.optionValuesJson) || "Sin opciones")}</small>
+                    </div>
+                    <div>${variantState(variant)}</div>
+                    <div class="inventory-variant-metric"><span>Físico</span><strong>${Number(variant.onHand)}</strong></div>
+                    <div class="inventory-variant-metric"><span>Reservado</span><strong>${Number(variant.reserved)}</strong></div>
+                    <div class="inventory-variant-metric"><span>Disponible</span><strong>${Number(variant.available)}</strong></div>
+                    <div class="inventory-variant-actions">${actions}</div>
+                </article>`;
+        }).join("");
+
+        $(".variant-edit-btn", $("#inventoryVariantsList")).forEach(button => {
+            button.addEventListener("click", () => openVariantForm(button.dataset.id));
+        });
+        $(".variant-adjust-btn", $("#inventoryVariantsList")).forEach(button => {
+            button.addEventListener("click", () => openVariantAdjust(button.dataset.id));
+        });
+        $(".variant-history-btn", $("#inventoryVariantsList")).forEach(button => {
+            button.addEventListener("click", () => openVariantHistory(button.dataset.id));
+        });
+    }
+
+    function findVariant(id) {
+        return state.variants.find(value => String(value.id) === String(id));
+    }
+
+    function openVariantForm(variantId = null) {
+        if (!state.canManage || !state.currentVariantProductId) return;
+        const variant = variantId ? findVariant(variantId) : null;
+        clearMessage(variantMessage);
+        $("#inventoryVariantFormTitle").textContent =
+            variant ? `Editar · ${variant.name}` : "Nueva variante";
+        variantForm.elements.catalogItemId.value = state.currentVariantProductId;
+        variantForm.elements.variantId.value = variant?.id || "";
+        variantForm.elements.name.value = variant?.name || "";
+        variantForm.elements.sku.value = variant?.sku || "";
+        variantForm.elements.onHand.value = variant?.onHand ?? 0;
+        variantForm.elements.reorderThreshold.value = variant?.reorderThreshold ?? 0;
+        variantForm.elements.options.value = optionText(variant?.optionValuesJson);
+        variantForm.elements.trackingEnabled.checked =
+            variant ? Boolean(variant.trackingEnabled) : true;
+        variantForm.elements.active.checked = variant ? Boolean(variant.active) : true;
+        variantForm.elements.note.value = "";
+        variantEditDialog.showModal();
+    }
+
+    async function saveVariant(event) {
+        event.preventDefault();
+        if (!state.canManage) return;
+        clearMessage(variantMessage);
+        const productId = variantForm.elements.catalogItemId.value;
+        const variantId = variantForm.elements.variantId.value;
+        const button = $("#inventoryVariantSave");
+        button.disabled = true;
+        try {
+            const payload = {
+                name: variantForm.elements.name.value.trim(),
+                optionValuesJson: optionJson(variantForm.elements.options.value),
+                sku: variantForm.elements.sku.value.trim(),
+                trackingEnabled: variantForm.elements.trackingEnabled.checked,
+                onHand: Number(variantForm.elements.onHand.value || 0),
+                reorderThreshold: Number(variantForm.elements.reorderThreshold.value || 0),
+                active: variantForm.elements.active.checked,
+                note: variantForm.elements.note.value.trim() || null
+            };
+            const path = variantId
+                ? `/api/v1/inventory/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}`
+                : `/api/v1/inventory/${encodeURIComponent(productId)}/variants`;
+            await api(path, {
+                method: variantId ? "PUT" : "POST",
+                body: JSON.stringify(payload)
+            });
+            variantEditDialog.close();
+            await openVariants(productId);
+        } catch (error) {
+            showMessage(variantMessage, error.message);
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    function openVariantAdjust(variantId) {
+        const variant = findVariant(variantId);
+        if (!variant || !state.canManage || !variant.trackingEnabled) return;
+        clearMessage(adjustMessage);
+        $("#inventoryAdjustTitle").textContent = variant.name;
+        $("#inventoryAdjustAvailable").textContent = variant.available ?? 0;
+        adjustForm.elements.catalogItemId.value = state.currentVariantProductId;
+        adjustForm.elements.variantId.value = variant.id;
+        adjustForm.elements.delta.value = "";
+        adjustForm.elements.note.value = "";
+        adjustDialog.showModal();
+        setTimeout(() => adjustForm.elements.delta.focus(), 0);
+    }
+
+    async function openVariantHistory(variantId) {
+        const variant = findVariant(variantId);
+        if (!variant || !state.currentVariantProductId) return;
+        const productId = state.currentVariantProductId;
+        $("#inventoryHistoryTitle").textContent = `Movimientos · ${variant.name}`;
+        $("#inventoryHistoryList").innerHTML = "";
+        $("#inventoryHistoryEmpty").classList.add("hidden");
+        $("#inventoryHistoryLoading").classList.remove("hidden");
+        historyDialog.showModal();
+        try {
+            const movements = await api(
+                `/api/v1/inventory/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variant.id)}/movements`);
+            renderMovementHistory(movements);
+        } catch (error) {
+            $("#inventoryHistoryLoading").classList.add("hidden");
+            $("#inventoryHistoryList").innerHTML =
+                `<div class="message error">${escapeHtml(error.message)}</div>`;
+        }
     }
 
     function formatMovementDelta(value) {
@@ -254,34 +452,39 @@
         historyDialog.showModal();
         try {
             const movements = await api(`/api/v1/inventory/${encodeURIComponent(id)}/movements`);
-            $("#inventoryHistoryLoading").classList.add("hidden");
-            if (!Array.isArray(movements) || movements.length === 0) {
-                $("#inventoryHistoryEmpty").classList.remove("hidden");
-                return;
-            }
-            $("#inventoryHistoryList").innerHTML = movements.map(movement => {
-                const when = movement.createdAt
-                    ? new Intl.DateTimeFormat("es-CL", { dateStyle:"short", timeStyle:"short" }).format(new Date(movement.createdAt))
-                    : "";
-                const title = movement.note || movementLabels[movement.type] || movement.type;
-                return `
-                    <article class="inventory-history-item">
-                        <div class="inventory-history-type">${escapeHtml(movementLabels[movement.type] || movement.type)}</div>
-                        <div class="inventory-history-main">
-                            <strong>${escapeHtml(title)}</strong>
-                            <small>${escapeHtml(when)} · físico ${formatMovementDelta(movement.quantityDelta)} · reservado ${formatMovementDelta(movement.reservedDelta)}</small>
-                        </div>
-                        <div class="inventory-history-after">
-                            Después
-                            <strong>${Number(movement.onHandAfter)} / ${Number(movement.reservedAfter)} res.</strong>
-                        </div>
-                    </article>
-                `;
-            }).join("");
+            renderMovementHistory(movements);
         } catch (error) {
             $("#inventoryHistoryLoading").classList.add("hidden");
             $("#inventoryHistoryList").innerHTML = `<div class="message error">${escapeHtml(error.message)}</div>`;
         }
+    }
+
+    function renderMovementHistory(movements) {
+        $("#inventoryHistoryLoading").classList.add("hidden");
+        if (!Array.isArray(movements) || movements.length === 0) {
+            $("#inventoryHistoryEmpty").classList.remove("hidden");
+            return;
+        }
+        $("#inventoryHistoryList").innerHTML = movements.map(movement => {
+            const when = movement.createdAt
+                ? new Intl.DateTimeFormat(
+                        "es-CL", { dateStyle:"short", timeStyle:"short" })
+                        .format(new Date(movement.createdAt))
+                : "";
+            const title = movement.note || movementLabels[movement.type] || movement.type;
+            return `
+                <article class="inventory-history-item">
+                    <div class="inventory-history-type">${escapeHtml(movementLabels[movement.type] || movement.type)}</div>
+                    <div class="inventory-history-main">
+                        <strong>${escapeHtml(title)}</strong>
+                        <small>${escapeHtml(when)} · físico ${formatMovementDelta(movement.quantityDelta)} · reservado ${formatMovementDelta(movement.reservedDelta)}</small>
+                    </div>
+                    <div class="inventory-history-after">
+                        Después
+                        <strong>${Number(movement.onHandAfter)} / ${Number(movement.reservedAfter)} res.</strong>
+                    </div>
+                </article>`;
+        }).join("");
     }
 
     async function saveConfig(event) {
@@ -314,6 +517,7 @@
         event.preventDefault();
         clearMessage(adjustMessage);
         const id = adjustForm.elements.catalogItemId.value;
+        const variantId = adjustForm.elements.variantId.value;
         const delta = Number(adjustForm.elements.delta.value || 0);
         if (!Number.isInteger(delta) || delta === 0) {
             showMessage(adjustMessage, "El ajuste debe ser un número entero distinto de cero.");
@@ -322,17 +526,27 @@
         const button = $("#inventoryAdjustSave");
         button.disabled = true;
         try {
-            await api(`/api/v1/inventory/${encodeURIComponent(id)}/adjustments`, {
-                method: "POST",
-                body: JSON.stringify({
+            const path = variantId
+                ? `/api/v1/inventory/${encodeURIComponent(id)}/variants/${encodeURIComponent(variantId)}/adjustments`
+                : `/api/v1/inventory/${encodeURIComponent(id)}/adjustments`;
+            const payload = variantId
+                ? { delta, note: adjustForm.elements.note.value.trim() }
+                : {
                     delta,
                     referenceType: "MANUAL",
                     referenceId: null,
                     note: adjustForm.elements.note.value.trim()
-                })
+                };
+            await api(path, {
+                method: "POST",
+                body: JSON.stringify(payload)
             });
             adjustDialog.close();
-            await reloadInventory("Movimiento registrado.");
+            if (variantId) {
+                await openVariants(id);
+            } else {
+                await reloadInventory("Movimiento registrado.");
+            }
         } catch (error) {
             showMessage(adjustMessage, error.message);
         } finally {
@@ -404,11 +618,13 @@
 
     configForm.addEventListener("submit", saveConfig);
     adjustForm.addEventListener("submit", saveAdjustment);
+    variantForm.addEventListener("submit", saveVariant);
+    $("#inventoryAddVariantBtn").addEventListener("click", () => openVariantForm());
 
     $$("[data-close-dialog]").forEach(button => {
         button.addEventListener("click", () => button.closest("dialog")?.close());
     });
-    [configDialog, adjustDialog, historyDialog].forEach(dialog => {
+    [configDialog, adjustDialog, historyDialog, variantsDialog, variantEditDialog].forEach(dialog => {
         dialog.addEventListener("click", event => {
             if (event.target === dialog) dialog.close();
         });
