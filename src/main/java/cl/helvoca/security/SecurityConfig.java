@@ -23,6 +23,7 @@ public class SecurityConfig {
             "/voice-selector.js", "/ux-simplification.js", "/styles.css", "/home-business.js", "/home-business.css",
             "/business-activation-guide.js", "/pilot-readiness.js", "/pilot-control.js", "/pilot-metrics.js",
             "/pilot-activation.js", "/schedule-exceptions.js", "/payment-sandbox-onboarding.js",
+            "/invite.html", "/invite.js",
             "/sales.html", "/sales.css",
             "/privacy.html", "/terms.html",
             "/pricing.html", "/pricing.js", "/pricing.css",
@@ -90,6 +91,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_CONSOLE_ASSETS).permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register",
+                                "/api/v1/auth/invitations/**",
                                 "/api/v1/public/pricing", "/actuator/health").permitAll()
                         .requestMatchers("/webhooks/v1/twilio/**", "/webhooks/v1/meta/**", "/webhooks/v1/openai/**",
                                 "/webhooks/v1/mercadopago", "/webhooks/v1/payments/**").permitAll()
