@@ -79,6 +79,24 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void removesUnsupportedFieldsFromNestedGeminiToolSchemas() {
+        JSONObject schema = new JSONObject()
+                .put("type", "object")
+                .put("additionalProperties", false)
+                .put("$schema", "https://json-schema.org/draft/2020-12/schema")
+                .put("properties", new JSONObject()
+                        .put("metadata", new JSONObject()
+                                .put("type", "object")
+                                .put("additionalProperties", true)));
+
+        JSONObject sanitized = GeminiLiveVoiceSession.sanitizeGeminiSchema(schema);
+
+        assertFalse(sanitized.toString().contains("\"additionalProperties\""));
+        assertFalse(sanitized.toString().contains("\"$schema\""));
+        assertTrue(sanitized.getJSONObject("properties").has("metadata"));
+    }
+
+    @Test
     void setupPublishesOnlyTenantAllowedTools() {
         GeminiLiveProperties properties = properties();
         RealtimeCallContext context = context();
