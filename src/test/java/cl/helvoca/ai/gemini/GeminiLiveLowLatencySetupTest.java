@@ -17,7 +17,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -60,6 +59,6 @@ class GeminiLiveLowLatencySetupTest {
         assertEquals("END_SENSITIVITY_LOW", activity.getString("endOfSpeechSensitivity"));
         assertEquals(450, activity.getInt("silenceDurationMs"));
         assertEquals("START_OF_ACTIVITY_INTERRUPTS", realtimeInput.getString("activityHandling"));
-        assertTrue(setup.getJSONObject("proactivity").getBoolean("proactiveAudio"));
+        assertFalse(setup.has("proactivity"));
     }
 }
