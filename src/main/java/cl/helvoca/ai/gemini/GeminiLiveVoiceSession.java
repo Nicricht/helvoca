@@ -327,7 +327,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         if (!certificationStep.compareAndSet(step, nextStep)) return;
         transcripts.append(context.callId(), "USER", "[SIMULATED_CERTIFICATION] " + text);
         log.info("RECEPVOZ_CERTIFICATION_SCENARIO step={} call={}", nextStep, context.callId());
-        sendRealtimeText(text);
+        sendCertificationTurn(text);
     }
 
     private void recordCertificationToolOutcome(String name, boolean success, JSONObject data) {
@@ -356,6 +356,14 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     private void sendRealtimeText(String text) {
         send(new JSONObject().put("realtimeInput", new JSONObject().put("text", text)));
+    }
+
+    private void sendCertificationTurn(String text) {
+        send(new JSONObject().put("clientContent", new JSONObject()
+                .put("turns", new JSONArray().put(new JSONObject()
+                        .put("role", "user")
+                        .put("parts", new JSONArray().put(new JSONObject().put("text", text)))))
+                .put("turnComplete", true)));
     }
 
     private void handleToolCall(JSONObject toolCall) {
