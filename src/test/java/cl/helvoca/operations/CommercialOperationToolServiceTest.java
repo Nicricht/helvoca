@@ -8,6 +8,7 @@ import cl.helvoca.delivery.DeliveryCoverageService;
 import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZone;
 import cl.helvoca.delivery.DeliveryZoneRepository;
+import cl.helvoca.inventory.InventoryService;
 import cl.helvoca.payment.PaymentWorkflowService;
 import org.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -92,6 +94,33 @@ class CommercialOperationToolServiceTest {
         assertEquals(mediaId.toString(), product.getJSONArray("media").getJSONObject(0).getString("mediaId"));
         assertEquals("IMAGE", product.getJSONArray("media").getJSONObject(0).getString("type"));
         assertFalse(product.toString().contains("https://cdn.example.test"));
+    }
+
+    @Test
+    void getStockReturnsBackendAuthoritativeAvailability() {
+        UUID businessId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        InventoryService inventory = mock(InventoryService.class);
+        ReflectionTestUtils.setField(service, "inventory", inventory);
+
+        when(capabilities.isToolAllowed(businessId, CommercialOperationToolService.GET_STOCK_TOOL))
+                .thenReturn(true);
+        when(inventory.lookupForBusiness(businessId, itemId, null))
+                .thenReturn(new InventoryService.StockLookupView(
+                        itemId, "Shampoo", "SHAMPOO-01", true, true,
+                        5, 2, 3, 1, false));
+
+        JSONObject result = new JSONObject(service.execute(
+                businessId, null, null, null, BusinessOrder.Source.VOICE,
+                CommercialOperationToolService.GET_STOCK_TOOL,
+                new JSONObject().put("catalogItemId", itemId.toString()).toString()));
+
+        assertTrue(result.getBoolean("success"));
+        JSONObject data = result.getJSONObject("data");
+        assertTrue(data.getBoolean("availabilityKnown"));
+        assertEquals(3, data.getInt("available"));
+        assertEquals("SHAMPOO-01", data.getString("sku"));
+        verify(inventory).lookupForBusiness(businessId, itemId, null);
     }
 
     @Test
@@ -197,6 +226,7 @@ class CommercialOperationToolServiceTest {
 
     @Test
     void updateOrderDeliveryAndPaymentAreFirstClassSupportedTools() {
+        assertTrue(service.supports(CommercialOperationToolService.GET_STOCK_TOOL));
         assertTrue(service.supports("update_order"));
         assertTrue(service.supports("quote_order"));
         assertTrue(service.supports("create_order"));
