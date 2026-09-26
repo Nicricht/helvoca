@@ -80,6 +80,9 @@ public class InventoryVariantService {
         if (input.onHand() < variant.getReserved()) {
             throw new ConflictException("On-hand stock cannot be lower than reserved variant stock");
         }
+        if (!input.active() && variant.getReserved() > 0) {
+            throw new ConflictException("A variant with reserved stock cannot be deactivated");
+        }
 
         int delta = input.onHand() - variant.getOnHand();
         apply(variant, input, sku);
