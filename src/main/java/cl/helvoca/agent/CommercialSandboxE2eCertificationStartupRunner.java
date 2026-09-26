@@ -363,9 +363,12 @@ public class CommercialSandboxE2eCertificationStartupRunner implements Applicati
     }
 
     private static JSONObject requireSuccess(String raw) {
-        JSONObject result = new JSONObject(raw);
-        if (!result.optBoolean("success", false)) {
-            JSONObject error = result.optJSONObject("error");
+        return requireSuccess(new JSONObject(raw));
+    }
+
+    private static JSONObject requireSuccess(JSONObject result) {
+        if (result == null || !result.optBoolean("success", false)) {
+            JSONObject error = result == null ? null : result.optJSONObject("error");
             String code = error == null ? "UNKNOWN" : error.optString("code", "UNKNOWN");
             String message = error == null ? "Commercial tool failed" : error.optString("message", "");
             throw new IllegalStateException(code + ": " + message);
