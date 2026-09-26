@@ -291,15 +291,57 @@ class CommercialSandboxExistingPaymentStartupRunnerTest {
                 .thenReturn(Optional.of(order));
         when(operations.findByIdAndBusinessId(paymentOperationId, businessId))
                 .thenReturn(Optional.of(paymentOperation));
+        BusinessPayment refreshed = new BusinessPayment();
+        refreshed.setId(payment.getId());
+        refreshed.setOperationId(paymentOperationId);
+        refreshed.setBusinessId(businessId);
+        refreshed.setCustomerId(customerId);
+        refreshed.setTargetOperationId(orderId);
+        refreshed.setProvider("mercadopago");
+        refreshed.setExternalId("ORDTST-RECOVERED");
+        refreshed.setAmount(new BigDecimal("1000"));
+        refreshed.setCurrency("CLP");
+        refreshed.setStatus(BusinessPayment.Status.REQUIRES_ACTION);
+        refreshed.setCheckoutUrl("https://www.mercadopago.cl/checkout/recovered");
+        refreshed.setSource(BusinessOrder.Source.WHATSAPP);
+
+        paymentOperation.setCustomerId(customerId);
+        paymentOperation.setContactPhone("+56900009999");
+
         when(payments.findByOperationIdAndBusinessId(paymentOperationId, businessId))
-                .thenReturn(Optional.of(payment));
+                .thenReturn(Optional.of(payment), Optional.of(refreshed));
+        when(commercial.execute(
+                eq(businessId),
+                eq(customerId),
+                isNull(),
+                eq("+56900009999"),
+                eq(BusinessOrder.Source.WHATSAPP),
+                eq("get_payment_status"),
+                anyString()))
+                .thenAnswer(invocation -> {
+                    JSONObject args = new JSONObject(invocation.getArgument(6, String.class));
+                    assertEquals(payment.getId().toString(), args.getString("paymentId"));
+                    return new JSONObject()
+                            .put("success", true)
+                            .put("data", new JSONObject()
+                                    .put("paymentId", payment.getId().toString())
+                                    .put("status", "REQUIRES_ACTION"))
+                            .put("error", JSONObject.NULL)
+                            .toString();
+                });
 
         var result = runner(operations, payments, commercial)
                 .activate(businessId, journeyId, orderId, paymentOperationId);
 
         assertTrue(result.idempotentReplay());
-        assertEquals("ORDTST-EXISTING", result.externalId());
-        verifyNoInteractions(commercial);
+        assertEquals("ORDTST-RECOVERED", result.externalId());
+        assertEquals("https://www.mercadopago.cl/checkout/recovered", result.checkoutUrl());
+        verify(commercial, times(1)).execute(
+                eq(businessId), eq(customerId), isNull(), eq("+56900009999"),
+                eq(BusinessOrder.Source.WHATSAPP), eq("get_payment_status"), anyString());
+        verify(commercial, never()).execute(
+                eq(businessId), eq(customerId), isNull(), eq("+56900009999"),
+                eq(BusinessOrder.Source.WHATSAPP), eq("create_payment"), anyString());
     }
 
     @Test
