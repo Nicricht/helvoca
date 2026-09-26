@@ -51,7 +51,6 @@ class RealtimeWhatsappIdentityVerificationTest {
 
         CallSession call = new CallSession();
         call.setBusinessId(businessId);
-        call.setCustomerId(customerId);
         call.setCallerNumber("+56911112222");
         call.setStreamSid("MZ-live");
 
@@ -62,7 +61,8 @@ class RealtimeWhatsappIdentityVerificationTest {
         when(identity.getId()).thenReturn(identityId);
 
         when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
-        when(customers.findByIdAndBusinessId(customerId, businessId)).thenReturn(Optional.of(customer));
+        when(customers.findFirstByBusinessIdAndPhone(businessId, "+56911112222"))
+                .thenReturn(Optional.of(customer));
         when(identities.verifyPhone(
                 eq(businessId),
                 eq(customerId),
@@ -83,6 +83,8 @@ class RealtimeWhatsappIdentityVerificationTest {
         assertTrue(result.getBoolean("success"), result::toString);
         assertTrue(result.getJSONObject("data").getBoolean("verified"));
         assertEquals(identityId.toString(), result.getJSONObject("data").getString("identityId"));
+        assertEquals(customerId, call.getCustomerId());
+        verify(calls).save(same(call));
         verify(identities).verifyPhone(
                 businessId,
                 customerId,
