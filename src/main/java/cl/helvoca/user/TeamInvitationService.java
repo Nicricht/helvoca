@@ -70,6 +70,18 @@ public class TeamInvitationService {
     @Transactional
     public TeamInvitationResponse create(InviteUserRequest request) {
         UUID businessId = tenantProvider.requireBusinessId();
+        return createForBusiness(businessId, request, false);
+    }
+
+    @Transactional
+    public TeamInvitationResponse createForPlatform(UUID businessId, InviteUserRequest request) {
+        if (businessId == null) throw new IllegalArgumentException("businessId is required");
+        return createForBusiness(businessId, request, true);
+    }
+
+    private TeamInvitationResponse createForBusiness(UUID businessId,
+                                                     InviteUserRequest request,
+                                                     boolean platformAudit) {
         String email = normalizeEmail(request.email());
         if (!INVITABLE_ROLES.contains(request.role())) {
             throw new IllegalArgumentException("Only BUSINESS_ADMIN or OPERATOR may be invited");
@@ -98,11 +110,23 @@ public class TeamInvitationService {
         invitation.setExpiresAt(now.plus(EXPIRY_HOURS, ChronoUnit.HOURS));
         invitation = invitations.saveAndFlush(invitation);
 
-        auditService.humanSuccess(
-                businessId,
-                "TEAM_INVITATION_CREATE",
-                "TEAM_INVITATION",
-                invitation.getId());
+        if (platformAudit) {
+            auditService.platformHumanSuccess(
+                    businessId,
+                    "TEAM_INVITATION_CREATE",
+                    "TEAM_INVITATION",
+                    invitation.getId(),
+                    null,
+                    java.util.Map.of(
+                            "email", email,
+                            "role", request.role().name()));
+        } else {
+            auditService.humanSuccess(
+                    businessId,
+                    "TEAM_INVITATION_CREATE",
+                    "TEAM_INVITATION",
+                    invitation.getId());
+        }
 
         String path = "/invite.html?businessId=" + businessId + "&token=" + rawToken;
         return response(invitation, path);
