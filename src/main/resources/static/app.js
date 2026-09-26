@@ -75,6 +75,16 @@ function switchAuth(mode) {
     clearMessage(authMessage);
 }
 
+function isPlatformAdmin(roles) {
+    return Array.isArray(roles) && roles.includes("PLATFORM_ADMIN");
+}
+
+function redirectPlatformAdmin(roles) {
+    if (!isPlatformAdmin(roles)) return false;
+    location.replace("/platform.html");
+    return true;
+}
+
 function showAuth() {
     authView.classList.remove("hidden");
     dashboardView.classList.add("hidden");
@@ -634,6 +644,7 @@ loginForm.addEventListener("submit", async event => {
             body: JSON.stringify({ email: String(f.get("email") || "").trim(), password: String(f.get("password") || "") })
         }, false);
         setToken(result.accessToken);
+        if (redirectPlatformAdmin(result?.user?.roles)) return;
         await loadDashboard();
     } catch (error) {
         showMessage(authMessage, error.message || "Credenciales inválidas.");
@@ -738,7 +749,8 @@ $("#logoutBtn").addEventListener("click", () => {
     switchAuth("register");
     if (!token) { showAuth(); return; }
     try {
-        await api("/api/v1/auth/me");
+        const me = await api("/api/v1/auth/me");
+        if (redirectPlatformAdmin(me?.roles)) return;
         await loadDashboard();
     } catch (_) {
         if (token) handleExpiredSession();
