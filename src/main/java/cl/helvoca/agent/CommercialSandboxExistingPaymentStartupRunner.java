@@ -130,26 +130,54 @@ public class CommercialSandboxExistingPaymentStartupRunner implements Applicatio
                     "Commercial sandbox payment has no customer");
         }
 
-        JSONObject response = new JSONObject(commercial.execute(
+        JSONObject response = executePayment(
                 businessId,
-                paymentOperation.getCustomerId(),
-                paymentOperation.getSourceReferenceId(),
-                paymentOperation.getContactPhone(),
-                paymentOperation.getSource() == null
-                        ? BusinessOrder.Source.WHATSAPP
-                        : paymentOperation.getSource(),
+                paymentOperation,
                 "create_payment",
                 new JSONObject()
                         .put("operationId", paymentOperationId.toString())
-                        .put("confirmationToken", paymentOperation.getConfirmationToken().toString())
-                        .toString()));
+                        .put("confirmationToken", paymentOperation.getConfirmationToken().toString()));
 
         if (!response.optBoolean("success", false)) {
-            JSONObject error = response.optJSONObject("error");
-            String code = error == null ? "UNKNOWN" : error.optString("code", "UNKNOWN");
-            String message = error == null ? "" : error.optString("message", "");
-            throw new IllegalStateException(code + ": " + message);
+            String code = errorCode(response);
+            if ("CONFIRMATION_EXPIRED".equals(code)
+                    || "STALE_PAYMENT_CONFIRMATION".equals(code)) {
+                JSONObject refreshed = executePayment(
+                        businessId,
+                        paymentOperation,
+                        "update_payment",
+                        new JSONObject()
+                                .put("operationId", paymentOperationId.toString())
+                                .put("targetOperationId", orderId.toString()));
+                JSONObject refreshedData = requireSuccess(refreshed);
+                String newToken = refreshedData.optString("confirmationToken", "");
+                if (newToken.isBlank()) {
+                    throw new IllegalStateException(
+                            "Payment refresh returned no confirmation token");
+                }
+                response = executePayment(
+                        businessId,
+                        paymentOperation,
+                        "create_payment",
+                        new JSONObject()
+                                .put("operationId", paymentOperationId.toString())
+                                .put("confirmationToken", newToken));
+            } else if ("PAYMENT_TERMS_CHANGED".equals(code)) {
+                JSONObject data = response.optJSONObject("data");
+                String newToken = data == null ? "" : data.optString("confirmationToken", "");
+                if (!newToken.isBlank()) {
+                    response = executePayment(
+                            businessId,
+                            paymentOperation,
+                            "create_payment",
+                            new JSONObject()
+                                    .put("operationId", paymentOperationId.toString())
+                                    .put("confirmationToken", newToken));
+                }
+            }
         }
+
+        requireSuccess(response);
 
         BusinessPayment created = payments
                 .findByOperationIdAndBusinessId(paymentOperationId, businessId)
@@ -157,6 +185,41 @@ public class CommercialSandboxExistingPaymentStartupRunner implements Applicatio
                         "Provider returned success but payment projection was not persisted"));
 
         return result(journeyId, orderId, created, false);
+    }
+
+    private JSONObject executePayment(UUID businessId,
+                                      BusinessOperation paymentOperation,
+                                      String toolName,
+                                      JSONObject args) {
+        return new JSONObject(commercial.execute(
+                businessId,
+                paymentOperation.getCustomerId(),
+                paymentOperation.getSourceReferenceId(),
+                paymentOperation.getContactPhone(),
+                paymentOperation.getSource() == null
+                        ? BusinessOrder.Source.WHATSAPP
+                        : paymentOperation.getSource(),
+                toolName,
+                args.toString()));
+    }
+
+    private static JSONObject requireSuccess(JSONObject response) {
+        if (response != null && response.optBoolean("success", false)) {
+            JSONObject data = response.optJSONObject("data");
+            if (data == null) {
+                throw new IllegalStateException("Commercial payment tool returned no data");
+            }
+            return data;
+        }
+        JSONObject error = response == null ? null : response.optJSONObject("error");
+        String code = error == null ? "UNKNOWN" : error.optString("code", "UNKNOWN");
+        String message = error == null ? "" : error.optString("message", "");
+        throw new IllegalStateException(code + ": " + message);
+    }
+
+    private static String errorCode(JSONObject response) {
+        JSONObject error = response == null ? null : response.optJSONObject("error");
+        return error == null ? "UNKNOWN" : error.optString("code", "UNKNOWN");
     }
 
     private BusinessOperation requireOperation(UUID businessId,
