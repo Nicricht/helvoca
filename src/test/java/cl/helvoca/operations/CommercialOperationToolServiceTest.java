@@ -8,6 +8,8 @@ import cl.helvoca.delivery.DeliveryCoverageService;
 import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZone;
 import cl.helvoca.delivery.DeliveryZoneRepository;
+import cl.helvoca.inventory.InventoryProductVariant;
+import cl.helvoca.inventory.InventoryProductVariantRepository;
 import cl.helvoca.inventory.InventoryService;
 import cl.helvoca.payment.PaymentWorkflowService;
 import org.json.JSONObject;
@@ -97,6 +99,89 @@ class CommercialOperationToolServiceTest {
     }
 
     @Test
+    void listCatalogExposesBackendOwnedVariantsWithoutQuantities() {
+        UUID businessId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID variantId = UUID.randomUUID();
+
+        CatalogItem item = new CatalogItem();
+        item.setId(itemId);
+        item.setBusinessId(businessId);
+        item.setKind(CatalogItem.Kind.PRODUCT);
+        item.setName("Zapatilla");
+        item.setPrice(new BigDecimal("34990"));
+        item.setCurrency("CLP");
+        item.setActive(true);
+
+        InventoryProductVariant variant = new InventoryProductVariant();
+        variant.setId(variantId);
+        variant.setBusinessId(businessId);
+        variant.setCatalogItemId(itemId);
+        variant.setName("Negro / 42");
+        variant.setSku("SHOE-BLK-42");
+        variant.setOptionValuesJson("{\"color\":\"Negro\",\"talla\":\"42\"}");
+        variant.setTrackingEnabled(true);
+        variant.setOnHand(99);
+        variant.setReserved(20);
+        variant.setActive(true);
+
+        InventoryProductVariantRepository variants = mock(InventoryProductVariantRepository.class);
+        ReflectionTestUtils.setField(service, "inventoryVariants", variants);
+
+        when(capabilities.isToolAllowed(businessId, "list_catalog")).thenReturn(true);
+        when(catalog.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId))
+                .thenReturn(List.of(item));
+        when(catalogMedia.findAllByBusinessIdAndCatalogItemIdAndActiveTrueOrderBySortOrderAscCreatedAtAsc(
+                businessId, itemId)).thenReturn(List.of());
+        when(variants.findAllByBusinessIdAndCatalogItemIdOrderByNameAsc(businessId, itemId))
+                .thenReturn(List.of(variant));
+
+        JSONObject result = new JSONObject(service.execute(
+                businessId, null, null, null, BusinessOrder.Source.VOICE, "list_catalog", "{}"));
+
+        JSONObject product = result.getJSONObject("data").getJSONArray("items").getJSONObject(0);
+        assertTrue(product.getBoolean("hasVariants"));
+        JSONObject exposed = product.getJSONArray("variants").getJSONObject(0);
+        assertEquals(variantId.toString(), exposed.getString("variantId"));
+        assertEquals("SHOE-BLK-42", exposed.getString("sku"));
+        assertEquals("42", exposed.getJSONObject("options").getString("talla"));
+        assertFalse(exposed.has("onHand"));
+        assertFalse(exposed.has("available"));
+    }
+
+    @Test
+    void getStockCanResolveExactVariant() {
+        UUID businessId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID variantId = UUID.randomUUID();
+        InventoryService inventory = mock(InventoryService.class);
+        ReflectionTestUtils.setField(service, "inventory", inventory);
+
+        when(capabilities.isToolAllowed(
+                businessId, CommercialOperationToolService.GET_STOCK_TOOL)).thenReturn(true);
+        when(inventory.lookupForBusiness(businessId, itemId, variantId, null))
+                .thenReturn(new InventoryService.StockLookupView(
+                        itemId, "Zapatilla", "SHOE-BLK-42", true, true,
+                        4, 1, 3, 1, false,
+                        variantId, "Negro / 42",
+                        "{\"color\":\"Negro\",\"talla\":\"42\"}"));
+
+        JSONObject result = new JSONObject(service.execute(
+                businessId, null, null, null, BusinessOrder.Source.WHATSAPP,
+                CommercialOperationToolService.GET_STOCK_TOOL,
+                new JSONObject()
+                        .put("catalogItemId", itemId.toString())
+                        .put("variantId", variantId.toString())
+                        .toString()));
+
+        JSONObject data = result.getJSONObject("data");
+        assertEquals(variantId.toString(), data.getString("variantId"));
+        assertEquals("Negro / 42", data.getString("variantName"));
+        assertEquals(3, data.getInt("available"));
+        assertEquals("42", data.getJSONObject("variantOptions").getString("talla"));
+    }
+
+    @Test
     void getStockReturnsBackendAuthoritativeAvailability() {
         UUID businessId = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
@@ -105,7 +190,7 @@ class CommercialOperationToolServiceTest {
 
         when(capabilities.isToolAllowed(businessId, CommercialOperationToolService.GET_STOCK_TOOL))
                 .thenReturn(true);
-        when(inventory.lookupForBusiness(businessId, itemId, null))
+        when(inventory.lookupForBusiness(businessId, itemId, null, null))
                 .thenReturn(new InventoryService.StockLookupView(
                         itemId, "Shampoo", "SHAMPOO-01", true, true,
                         5, 2, 3, 1, false));
@@ -120,7 +205,7 @@ class CommercialOperationToolServiceTest {
         assertTrue(data.getBoolean("availabilityKnown"));
         assertEquals(3, data.getInt("available"));
         assertEquals("SHAMPOO-01", data.getString("sku"));
-        verify(inventory).lookupForBusiness(businessId, itemId, null);
+        verify(inventory).lookupForBusiness(businessId, itemId, null, null);
     }
 
     @Test
