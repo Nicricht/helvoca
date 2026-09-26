@@ -257,15 +257,19 @@ class GeminiLiveVoiceSessionTest {
 
         ArgumentCaptor<CharSequence> sent = ArgumentCaptor.forClass(CharSequence.class);
         verify(socket, atLeast(5)).sendText(sent.capture(), eq(true));
-        assertTrue(sent.getAllValues().stream()
+        JSONObject bookingTurn = sent.getAllValues().stream()
                 .map(CharSequence::toString)
                 .map(JSONObject::new)
-                .anyMatch(message -> message.optJSONObject("realtimeInput") != null
-                        && message.getJSONObject("realtimeInput").optString("text", "")
-                        .contains("Ejecuta ahora create_booking")));
-        assertTrue(sent.getAllValues().stream()
-                .map(CharSequence::toString)
-                .noneMatch(message -> message.contains("\"clientContent\"")));
+                .filter(message -> message.optJSONObject("clientContent") != null)
+                .filter(message -> message.getJSONObject("clientContent")
+                        .getJSONArray("turns").getJSONObject(0)
+                        .getJSONArray("parts").getJSONObject(0)
+                        .optString("text", "").contains("Ejecuta ahora create_booking"))
+                .findFirst()
+                .orElseThrow();
+        JSONObject clientContent = bookingTurn.getJSONObject("clientContent");
+        assertTrue(clientContent.getBoolean("turnComplete"));
+        assertEquals("user", clientContent.getJSONArray("turns").getJSONObject(0).getString("role"));
     }
 
     @Test
