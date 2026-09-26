@@ -19,4 +19,10 @@ public interface InventoryReservationRepository extends JpaRepository<InventoryR
 
     List<InventoryReservation> findAllByBusinessIdAndStatusAndExpiresAtBefore(
             UUID businessId, InventoryReservation.Status status, Instant expiresAt);
+
+    List<InventoryReservation> findAllByBusinessIdAndReferenceTypeAndReferenceIdAndStatusOrderByCreatedAtAsc(
+            UUID businessId,
+            String referenceType,
+            UUID referenceId,
+            InventoryReservation.Status status);
 }
