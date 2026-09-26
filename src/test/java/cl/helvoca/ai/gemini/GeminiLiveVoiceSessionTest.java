@@ -241,18 +241,18 @@ class GeminiLiveVoiceSessionTest {
         verify(transcripts, times(1)).append(eq(context.callId()), eq("USER"), anyString());
 
         session.onText(socket, toolCall("slot-1", "list_available_slots"), true);
-        session.onText(socket, turnComplete(), true);
         verify(transcripts).append(eq(context.callId()), eq("USER"), contains("Ejecuta ahora create_booking"));
+        session.onText(socket, turnComplete(), true);
         verify(transcripts, times(2)).append(eq(context.callId()), eq("USER"), anyString());
 
         session.onText(socket, toolCall("book-1", "create_booking"), true);
-        session.onText(socket, turnComplete(), true);
         verify(transcripts).append(eq(context.callId()), eq("USER"), contains("ejecuta cancel_booking ahora"));
+        session.onText(socket, turnComplete(), true);
         verify(transcripts, times(3)).append(eq(context.callId()), eq("USER"), anyString());
 
         session.onText(socket, toolCall("cancel-1", "cancel_booking"), true);
-        session.onText(socket, turnComplete(), true);
         verify(transcripts).append(eq(context.callId()), eq("USER"), contains("La cancelación ya devolvió success=true"));
+        session.onText(socket, turnComplete(), true);
         verify(transcripts, times(4)).append(eq(context.callId()), eq("USER"), anyString());
 
         ArgumentCaptor<CharSequence> sent = ArgumentCaptor.forClass(CharSequence.class);
