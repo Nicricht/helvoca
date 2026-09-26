@@ -436,7 +436,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         if (!DEDUPED_READ_TOOLS.contains(name)) return executeTool(name, args);
 
         long now = System.currentTimeMillis();
-        String key = name + "|" + args.toString();
+        String key = name + "|" + canonicalJson(args);
         CachedToolResult cached = recentReadToolResults.get(key);
         if (cached != null && now - cached.createdAtMillis() <= READ_TOOL_DEDUPE_WINDOW_MS) {
             log.info("tool_call_deduplicated call_id={} tool_name={}", context.callId(), name);
@@ -450,6 +450,30 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         recentReadToolResults.entrySet().removeIf(entry ->
                 now - entry.getValue().createdAtMillis() > READ_TOOL_DEDUPE_WINDOW_MS);
         return result;
+    }
+
+    private static String canonicalJson(Object value) {
+        if (value == null || value == JSONObject.NULL) return "null";
+        if (value instanceof JSONObject object) {
+            StringBuilder out = new StringBuilder("{");
+            boolean first = true;
+            for (String key : object.keySet().stream().sorted().toList()) {
+                if (!first) out.append(',');
+                first = false;
+                out.append(JSONObject.quote(key)).append(':').append(canonicalJson(object.opt(key)));
+            }
+            return out.append('}').toString();
+        }
+        if (value instanceof JSONArray array) {
+            StringBuilder out = new StringBuilder("[");
+            for (int i = 0; i < array.length(); i++) {
+                if (i > 0) out.append(',');
+                out.append(canonicalJson(array.opt(i)));
+            }
+            return out.append(']').toString();
+        }
+        if (value instanceof String text) return JSONObject.quote(text);
+        return String.valueOf(value);
     }
 
     private JSONObject executeTool(String name, JSONObject args) {
