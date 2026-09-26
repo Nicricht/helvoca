@@ -290,7 +290,7 @@
         $("#inventoryVariantsEmpty").classList.add("hidden");
         $("#inventoryVariantsLoading").classList.remove("hidden");
         $("#inventoryAddVariantBtn").classList.toggle("hidden", !state.canManage);
-        variantsDialog.showModal();
+        if (!variantsDialog.open) variantsDialog.showModal();
         try {
             const values = await api(
                 `/api/v1/inventory/${encodeURIComponent(item.id)}/variants`);

@@ -81,9 +81,23 @@ Default schedule:
 
 This worker is intentionally independent from `APP_JOBS_ENABLED` because releasing abandoned database stock is an internal consistency action, not an outbound delivery action.
 
+## Current variant integration
+
+Product variants now carry an exact backend-owned identity through the full commercial lifecycle:
+
+- `list_catalog` exposes active variants with `variantId`, SKU and structured options;
+- `get_stock` can resolve exact variant stock by `variantId` or variant SKU;
+- draft order lines persist `variant_id`;
+- final immutable order lines persist `variant_id`;
+- inventory reservations persist `variant_id`;
+- order confirmation reserves the exact variant;
+- payment retry re-reserves the exact variant;
+- payment success consumes the exact variant;
+- cancellation, failure and expiry release the exact variant;
+- the visual inventory workspace can create, edit, adjust and inspect variant history;
+- BUSINESS_ADMIN can mutate variants while OPERATOR remains read-only.
+
 ## Next isolated steps
 
-1. add PostgreSQL concurrency and tenant-isolation integration certification;
-2. add inventory management UI and low-stock dashboard;
-3. connect variant selection to order lines and AI stock lookup;
-4. add variant management to the inventory UI.
+1. add PostgreSQL concurrency and tenant-isolation integration certification for mixed base-product + variant orders;
+2. add low-stock automation/notifications for products and variants.
