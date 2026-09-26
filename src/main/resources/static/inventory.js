@@ -185,7 +185,7 @@
                 </article>`;
         }).join("");
 
-        $(".inventory-alert-ack", list).forEach(button => {
+        $$(".inventory-alert-ack", list).forEach(button => {
             button.addEventListener("click", async () => {
                 button.disabled = true;
                 try {
