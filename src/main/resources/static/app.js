@@ -615,7 +615,7 @@ registerForm.addEventListener("submit", async event => {
         const result = await api("/api/v1/auth/register", { method: "POST", body: JSON.stringify(payload) }, false);
         setToken(result.accessToken);
         await loadDashboard();
-        showMessage(aiMessage, "Cuenta creada. Ahora pega la web, Instagram o Google Maps del negocio para preparar la configuración.", "success");
+        showMessage(aiMessage, "Cuenta creada. Sigue la ruta de activación: RecepVoz te mostrará un solo siguiente paso a la vez.", "success");
     } catch (error) {
         showMessage(authMessage, error.message || "No fue posible crear la empresa.");
     } finally {
