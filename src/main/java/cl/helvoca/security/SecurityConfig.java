@@ -23,7 +23,7 @@ public class SecurityConfig {
             "/voice-selector.js", "/ux-simplification.js", "/styles.css", "/home-business.js", "/home-business.css",
             "/business-activation-guide.js", "/pilot-readiness.js", "/pilot-control.js", "/pilot-metrics.js",
             "/pilot-activation.js", "/schedule-exceptions.js", "/payment-sandbox-onboarding.js",
-            "/invite.html", "/invite.js",
+            "/invite.html", "/invite.js", "/team-invitations.js",
             "/sales.html", "/sales.css",
             "/privacy.html", "/terms.html",
             "/pricing.html", "/pricing.js", "/pricing.css",
