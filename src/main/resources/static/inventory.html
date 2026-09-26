@@ -72,6 +72,22 @@
                 </article>
             </section>
 
+            <section class="card inventory-alerts-panel" aria-label="Alertas automáticas de inventario">
+                <div class="inventory-alerts-head">
+                    <div>
+                        <div class="eyebrow">Automatización</div>
+                        <h2>Alertas de inventario</h2>
+                        <p>Se generan solo cuando cambia el estado: stock bajo, agotado o repuesto.</p>
+                    </div>
+                    <span id="inventoryAlertsCount" class="badge muted">0 pendientes</span>
+                </div>
+                <div id="inventoryAlertsList" class="inventory-alerts-list"></div>
+                <div id="inventoryAlertsEmpty" class="inventory-alerts-empty hidden">
+                    <strong>Todo bajo control.</strong>
+                    <span>No hay alertas abiertas de inventario.</span>
+                </div>
+            </section>
+
             <section class="card inventory-workspace">
                 <div class="inventory-toolbar">
                     <div class="inventory-search">
