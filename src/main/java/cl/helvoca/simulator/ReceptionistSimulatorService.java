@@ -16,6 +16,8 @@ import cl.helvoca.call.CallTranscript;
 import cl.helvoca.call.CallTranscriptRepository;
 import cl.helvoca.call.CallTranscriptService;
 import cl.helvoca.common.NotFoundException;
+import cl.helvoca.messaging.GeminiMessagingAiFallback;
+import cl.helvoca.messaging.MessagingAiClient;
 import cl.helvoca.security.TenantProvider;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -35,7 +37,9 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -56,6 +60,7 @@ public class ReceptionistSimulatorService {
     private final SimulatorToolExecutor simulatorTools;
     private final SimulatorStateService state;
     private final OpenAiRealtimeProperties openAi;
+    private final GeminiMessagingAiFallback geminiFallback;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
 
     public ReceptionistSimulatorService(TenantProvider tenantProvider,
@@ -68,7 +73,8 @@ public class ReceptionistSimulatorService {
                                         RealtimeToolService realTools,
                                         SimulatorToolExecutor simulatorTools,
                                         SimulatorStateService state,
-                                        OpenAiRealtimeProperties openAi) {
+                                        OpenAiRealtimeProperties openAi,
+                                        GeminiMessagingAiFallback geminiFallback) {
         this.tenantProvider = tenantProvider;
         this.businesses = businesses;
         this.calls = calls;
@@ -80,6 +86,7 @@ public class ReceptionistSimulatorService {
         this.simulatorTools = simulatorTools;
         this.state = state;
         this.openAi = openAi;
+        this.geminiFallback = geminiFallback;
     }
 
     @Transactional
@@ -87,7 +94,9 @@ public class ReceptionistSimulatorService {
         UUID businessId = tenantProvider.requireBusinessId();
         Business business = businesses.findById(businessId)
                 .orElseThrow(() -> new NotFoundException("Business not found"));
-        if (!openAi.hasApiKey()) throw new IllegalStateException("OpenAI is not configured");
+        if (!openAi.hasApiKey() && (geminiFallback == null || !geminiFallback.configured())) {
+            throw new IllegalStateException("No simulator AI provider is configured");
+        }
 
         UUID token = UUID.randomUUID();
         Instant now = Instant.now();
@@ -137,49 +146,112 @@ public class ReceptionistSimulatorService {
         }
 
         String reply;
+        String instructions = buildSimulatorInstructions(context, sessionId);
         try {
-            String instructions = realTools.buildInstructions(context)
-                    + state.promptContext(sessionId)
-                    + "\n" + """
-                    Estás en el simulador web seguro de Helvoca.
-                    Actúa exactamente como la recepcionista del negocio, no como un asistente técnico.
-                    Las consultas usan la configuración real del negocio, pero toda acción de escritura es una simulación aislada.
-                    Nunca afirmes que una reserva, solicitud, cliente o pregunta fue guardada realmente.
-                    Cuando una acción simulada tenga éxito, dilo como algo que ocurriría en una llamada real.
-                    No menciones nombres de herramientas, UUID, backend, base de datos ni detalles técnicos.
-                    Responde en español natural, breve y sin markdown, con un máximo de 55 palabras.
-                    Si el cliente quiere reservar y aún no está identificado en la simulación, pregunta su nombre de forma natural.
-                    Si pide horarios de un día usa list_available_slots. Si entrega una hora exacta usa check_booking_availability.
-                    Para crear, reprogramar o cancelar usa las herramientas correspondientes y confía solo en su resultado.
-                    Para necesidades de seguimiento no reservables usa create_request.
-                    Si no conoces una respuesta, busca primero en search_knowledge y luego usa record_unanswered_question si sigue sin respuesta.
-                    Si pide hablar con una persona usa transfer_to_human; en esta prueba solo debes explicar que la transferencia ocurriría en una llamada real.
-                    """;
-            JSONObject body = new JSONObject()
-                    .put("model", openAi.getTrialModel())
-                    .put("instructions", instructions)
-                    .put("tools", responseTools())
-                    .put("tool_choice", "auto")
-                    .put("input", buildHistory(sessionId))
-                    .put("max_output_tokens", 180);
-            JSONObject first = send(body);
-            JSONArray functionCalls = functionCalls(first);
-            String text = extractOutputText(first);
-            if (!functionCalls.isEmpty()) {
-                List<ToolExecution> executions = executeTools(context, functionCalls);
-                reply = summarize(context, executions);
-            } else if (text != null && !text.isBlank()) {
-                reply = sanitize(text);
+            reply = respondWithOpenAi(context, sessionId, instructions);
+        } catch (Exception openAiError) {
+            if (openAiProviderFailure(openAiError) && geminiFallback != null && geminiFallback.configured()) {
+                log.warn("Receptionist simulator OpenAI unavailable call={}; switching provider=gemini: {}",
+                        sessionId, openAiError.getMessage());
+                try {
+                    reply = geminiFallback.respond(
+                            instructions,
+                            buildMessagingHistory(sessionId),
+                            simulatorToolNames(),
+                            (name, arguments) -> simulatorTools.execute(context, name, arguments));
+                    call.setAiProvider("gemini");
+                    calls.save(call);
+                    log.info("Receptionist simulator provider fallback=gemini call={}", sessionId);
+                } catch (Exception geminiError) {
+                    log.warn("Receptionist simulator Gemini fallback failed call={}: {}",
+                            sessionId, geminiError.getMessage());
+                    reply = simulatorFailureReply();
+                }
             } else {
-                reply = "No entendí del todo. ¿Puedes decírmelo de otra forma?";
+                log.warn("Receptionist simulator failed call={}: {}", sessionId, openAiError.getMessage());
+                reply = simulatorFailureReply();
             }
-        } catch (Exception e) {
-            log.warn("Receptionist simulator failed call={}: {}", sessionId, e.getMessage());
-            reply = "No pude completar esa parte de la prueba ahora. Puedes intentarlo nuevamente sin que se haya modificado ningún dato real.";
         }
 
         transcriptWriter.append(sessionId, "ASSISTANT", reply);
         return response(call, reply, false);
+    }
+
+    private String buildSimulatorInstructions(RealtimeCallContext context, UUID sessionId) {
+        return realTools.buildInstructions(context)
+                + state.promptContext(sessionId)
+                + "\n" + """
+                Estás en el simulador web seguro de Helvoca.
+                Actúa exactamente como la recepcionista del negocio, no como un asistente técnico.
+                Las consultas usan la configuración real del negocio, pero toda acción de escritura es una simulación aislada.
+                Nunca afirmes que una reserva, solicitud, cliente o pregunta fue guardada realmente.
+                Cuando una acción simulada tenga éxito, dilo como algo que ocurriría en una llamada real.
+                No menciones nombres de herramientas, UUID, backend, base de datos ni detalles técnicos.
+                Responde en español natural, breve y sin markdown, con un máximo de 55 palabras.
+                Si el cliente quiere reservar y aún no está identificado en la simulación, pregunta su nombre de forma natural.
+                Si pide horarios de un día usa list_available_slots. Si entrega una hora exacta usa check_booking_availability.
+                Para crear, reprogramar o cancelar usa las herramientas correspondientes y confía solo en su resultado.
+                Para necesidades de seguimiento no reservables usa create_request.
+                Si no conoces una respuesta, busca primero en search_knowledge y luego usa record_unanswered_question si sigue sin respuesta.
+                Si pide hablar con una persona usa transfer_to_human; en esta prueba solo debes explicar que la transferencia ocurriría en una llamada real.
+                """;
+    }
+
+    private String respondWithOpenAi(RealtimeCallContext context, UUID sessionId, String instructions) throws Exception {
+        if (!openAi.hasApiKey()) {
+            throw new IllegalStateException("OpenAI simulator request failed because provider is not configured");
+        }
+        JSONObject body = new JSONObject()
+                .put("model", openAi.getTrialModel())
+                .put("instructions", instructions)
+                .put("tools", responseTools())
+                .put("tool_choice", "auto")
+                .put("input", buildHistory(sessionId))
+                .put("max_output_tokens", 180);
+        JSONObject first = send(body);
+        JSONArray functionCalls = functionCalls(first);
+        String text = extractOutputText(first);
+        if (!functionCalls.isEmpty()) {
+            return summarize(context, executeTools(context, functionCalls));
+        }
+        if (text != null && !text.isBlank()) return sanitize(text);
+        return "No entendí del todo. ¿Puedes decírmelo de otra forma?";
+    }
+
+    private List<MessagingAiClient.Turn> buildMessagingHistory(UUID callId) {
+        List<CallTranscript> items = transcriptRepository.findAllByCallIdOrderBySequenceNumberAsc(callId);
+        int start = Math.max(0, items.size() - 16);
+        List<MessagingAiClient.Turn> history = new ArrayList<>();
+        for (int i = start; i < items.size(); i++) {
+            CallTranscript item = items.get(i);
+            String role = "ASSISTANT".equalsIgnoreCase(item.getSpeaker()) ? "assistant" : "user";
+            history.add(new MessagingAiClient.Turn(role, item.getContent()));
+        }
+        return history;
+    }
+
+    private static Set<String> simulatorToolNames() {
+        JSONArray definitions = RealtimeToolDefinitions.all();
+        Set<String> names = new HashSet<>();
+        for (int i = 0; i < definitions.length(); i++) {
+            String name = definitions.getJSONObject(i).optString("name", "");
+            if (!name.isBlank()) names.add(name);
+        }
+        return Set.copyOf(names);
+    }
+
+    static boolean openAiProviderFailure(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.startsWith("OpenAI simulator request failed")) return true;
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private static String simulatorFailureReply() {
+        return "No pude completar esa parte de la prueba ahora. Puedes intentarlo nuevamente sin que se haya modificado ningún dato real.";
     }
 
     @Transactional

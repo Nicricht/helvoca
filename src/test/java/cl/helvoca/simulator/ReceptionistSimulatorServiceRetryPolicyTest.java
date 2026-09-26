@@ -28,6 +28,15 @@ class ReceptionistSimulatorServiceRetryPolicyTest {
     }
 
     @Test
+    void recognizesOpenAiProviderFailureForGeminiFallback() {
+        assertTrue(ReceptionistSimulatorService.openAiProviderFailure(
+                new IllegalStateException(
+                        "OpenAI simulator request failed with HTTP 429 type=insufficient_quota code=credit_balance_exhausted")));
+        assertFalse(ReceptionistSimulatorService.openAiProviderFailure(
+                new IllegalStateException("unrelated simulator error")));
+    }
+
+    @Test
     void providerFailureSummaryDoesNotExposeProviderMessage() {
         String body = """
                 {"error":{"type":"requests","code":"rate_limit_exceeded","message":"secret-ish provider detail"}}
