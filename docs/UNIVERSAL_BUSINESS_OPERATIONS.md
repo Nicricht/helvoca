@@ -231,7 +231,7 @@ Solo pueden pagarse operaciones:
 4. `create_payment` solo debe llamarse después de un sí explícito sobre el monto y moneda más recientes.
 5. Antes de contactar un provider se recalcula el target. Si cambió saldo, moneda u objetivo, responde `PAYMENT_TERMS_CHANGED` con nueva revisión/token y no crea ninguna intención externa.
 6. El provider se resuelve por tenant mediante `PaymentProviderRegistry`. Cero o múltiples adapters compatibles fallan cerrado con `PAYMENT_PROVIDER_UNAVAILABLE`.
-7. El adapter recibe una idempotency key estable: `payment-operation:<operationId>`.
+7. El adapter recibe una idempotency key estable: `<operationId>` (UUID estable de la operación PAYMENT).
 8. Solo después de una respuesta válida del adapter se materializa `business_payment`.
 9. Un retry secuencial devuelve la misma proyección como `idempotentReplay=true` y no vuelve a invocar el provider.
 10. `get_payment_status` puede refrescar estados no terminales usando el adapter y conserva el último estado verificado si el provider temporalmente no responde.
