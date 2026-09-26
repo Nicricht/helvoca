@@ -124,7 +124,6 @@ public class CommercialSandboxE2eCertificationStartupRunner implements Applicati
                 .findFirst()
                 .orElseGet(() -> {
                     CatalogItem created = new CatalogItem();
-                    created.setId(deterministicUuid("catalog", businessId, "shared"));
                     created.setBusinessId(businessId);
                     created.setKind(CatalogItem.Kind.PRODUCT);
                     created.setName(TEST_PRODUCT_NAME);
