@@ -66,6 +66,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final AtomicBoolean certificationBookingProposalReady = new AtomicBoolean(false);
     private final AtomicBoolean certificationBookingCreated = new AtomicBoolean(false);
     private final AtomicBoolean certificationBookingCancelled = new AtomicBoolean(false);
+    private final AtomicBoolean certificationAwaitingPostToolBoundary = new AtomicBoolean(false);
+    private final AtomicBoolean certificationPostToolOutputSeen = new AtomicBoolean(false);
     private final GeminiWebSocketJsonFrames inboundFrames = new GeminiWebSocketJsonFrames();
     private final StringBuilder userTranscript = new StringBuilder();
     private final StringBuilder assistantTranscript = new StringBuilder();
@@ -270,8 +272,25 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
         boolean turnComplete = content.optBoolean("turnComplete", false);
         boolean generationComplete = content.optBoolean("generationComplete", false);
-        if (turnComplete || (generationComplete && properties.isCertificationSimulation())) {
+        boolean waitingForInput = content.optBoolean("waitingForInput", false);
+        if (properties.isCertificationSimulation()
+                && certificationAwaitingPostToolBoundary.get()
+                && (modelTurn != null || (output != null && !output.optString("text", "").isBlank())
+                || waitingForInput)) {
+            certificationPostToolOutputSeen.set(true);
+        }
+
+        if (turnComplete) {
             flushTranscripts();
+            certificationAwaitingPostToolBoundary.set(false);
+            certificationPostToolOutputSeen.set(false);
+            advanceCertificationSimulation();
+        } else if (generationComplete && properties.isCertificationSimulation()
+                && (!certificationAwaitingPostToolBoundary.get()
+                || certificationPostToolOutputSeen.get())) {
+            flushTranscripts();
+            certificationAwaitingPostToolBoundary.set(false);
+            certificationPostToolOutputSeen.set(false);
             advanceCertificationSimulation();
         }
     }
@@ -396,6 +415,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                     .put("response", new JSONObject().put("result", result)));
         }
         if (!responses.isEmpty()) {
+            if (properties.isCertificationSimulation()) {
+                certificationAwaitingPostToolBoundary.set(true);
+                certificationPostToolOutputSeen.set(false);
+            }
             send(new JSONObject().put("toolResponse",
                     new JSONObject().put("functionResponses", responses)));
         }
