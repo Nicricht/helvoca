@@ -3,6 +3,8 @@ package cl.helvoca.payment;
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationRepository;
 import cl.helvoca.operations.ConversationStateService;
+import cl.helvoca.inventory.InventoryService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,9 @@ public class PaymentWebhookService {
     private final BusinessOperationRepository operations;
     private final PaymentProviderRegistry providers;
     private final ConversationStateService conversationState;
+
+    @Autowired(required = false)
+    private InventoryService inventory;
 
     public PaymentWebhookService(PaymentWebhookEventRepository events,
                                  BusinessPaymentRepository payments,
@@ -112,6 +117,7 @@ public class PaymentWebhookService {
             payment.setStatus(result.status());
             payment.setMetadata(merge(payment.getMetadata(), result.metadata()));
             payment = payments.saveAndFlush(payment);
+            settleInventory(payment);
             syncUniversalOperation(payment);
             syncCommercialJourney(payment);
             syncConversation(payment);
@@ -125,6 +131,20 @@ public class PaymentWebhookService {
             event.setProcessedAt(Instant.now());
             events.saveAndFlush(event);
             return Result.FAILED;
+        }
+    }
+
+    private void settleInventory(BusinessPayment payment) {
+        if (inventory == null || payment == null || payment.getTargetOperationId() == null) return;
+        switch (payment.getStatus()) {
+            case SUCCEEDED -> inventory.consumeOrder(
+                    payment.getBusinessId(), payment.getTargetOperationId(), "Verified payment webhook succeeded");
+            case FAILED, CANCELLED, EXPIRED -> inventory.releaseOrder(
+                    payment.getBusinessId(), payment.getTargetOperationId(),
+                    "Verified payment webhook " + payment.getStatus().name().toLowerCase(java.util.Locale.ROOT));
+            case REQUIRES_ACTION, PENDING, REFUNDED -> {
+                // Pending keeps the hold. Refund does not prove the physical item returned.
+            }
         }
     }
 
