@@ -82,6 +82,35 @@ class TeamInvitationServiceTest {
     }
 
     @Test
+    void platformProvisioningCreatesInitialBusinessAdminInvitationWithoutTenantJwt() {
+        when(users.existsByEmailIgnoreCase("admin@negocio.cl")).thenReturn(false);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business));
+        when(invitations.findAllByBusinessIdAndEmailIgnoreCaseAndAcceptedAtIsNullAndRevokedAtIsNull(
+                businessId, "admin@negocio.cl")).thenReturn(List.of());
+        when(invitations.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TeamInvitationResponse result = service.createForPlatform(
+                businessId,
+                new InviteUserRequest("Admin Inicial", "ADMIN@NEGOCIO.CL", RoleCode.BUSINESS_ADMIN));
+
+        assertEquals(businessId, result.businessId());
+        assertEquals("BUSINESS_ADMIN", result.role());
+        assertEquals("admin@negocio.cl", result.email());
+        assertNotNull(result.invitePath());
+        verify(tenantProvider, never()).requireBusinessId();
+        verify(auditService).platformHumanSuccess(
+                eq(businessId),
+                eq("TEAM_INVITATION_CREATE"),
+                eq("TEAM_INVITATION"),
+                any(),
+                isNull(),
+                argThat(after -> "admin@negocio.cl".equals(after.get("email"))
+                        && "BUSINESS_ADMIN".equals(after.get("role"))));
+        verify(auditService, never()).humanSuccess(
+                any(), anyString(), anyString(), any());
+    }
+
+    @Test
     void platformAdminCannotBeInvitedIntoBusiness() {
         assertThrows(IllegalArgumentException.class, () -> service.create(
                 new InviteUserRequest("Root", "root@example.cl", RoleCode.PLATFORM_ADMIN)));

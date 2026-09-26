@@ -23,6 +23,30 @@ public class AuditService {
         humanSuccess(businessId, action, resourceType, resourceId, null, null);
     }
 
+    public void platformHumanSuccess(
+            UUID businessId,
+            String action,
+            String resourceType,
+            UUID resourceId,
+            Map<String, Object> beforeState,
+            Map<String, Object> afterState) {
+        Jwt jwt = requireAuthenticatedJwt();
+        List<String> roles = jwt.getClaimAsStringList("roles");
+        if (roles == null || !roles.contains("PLATFORM_ADMIN")) {
+            throw new AccessDeniedException("Authenticated user is not a platform administrator");
+        }
+
+        AuditLog log = successLog(businessId, action, resourceType, resourceId);
+        log.setActorType("HUMAN");
+        log.setActorUserId(requireUuid(jwt.getSubject(), "Token has invalid subject"));
+        log.setActorName(requireClaim(jwt, "name"));
+        log.setActorEmail(requireClaim(jwt, "email"));
+        log.setActorRole("PLATFORM_ADMIN");
+        log.setBeforeState(beforeState);
+        log.setAfterState(afterState);
+        repository.save(log);
+    }
+
     public void humanSuccess(
             UUID businessId,
             String action,

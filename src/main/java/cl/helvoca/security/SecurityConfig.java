@@ -24,6 +24,7 @@ public class SecurityConfig {
             "/business-activation-guide.js", "/pilot-readiness.js", "/pilot-control.js", "/pilot-metrics.js",
             "/pilot-activation.js", "/schedule-exceptions.js", "/payment-sandbox-onboarding.js",
             "/invite.html", "/invite.js", "/team-invitations.js",
+            "/platform.html", "/platform.js",
             "/sales.html", "/sales.css",
             "/privacy.html", "/terms.html",
             "/pricing.html", "/pricing.js", "/pricing.css",
