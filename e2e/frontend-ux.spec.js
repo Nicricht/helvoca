@@ -108,6 +108,33 @@ async function mockReadyTenant(page, options = {}) {
     { code: 'PRO', name: 'Pro', monthlyPriceClp: 69990, includedMinutes: 500, maxConcurrentCalls: 10, overagePerMinuteClp: 109, customPricing: false, recommended: false },
     { code: 'ENTERPRISE', name: 'Enterprise', monthlyPriceClp: 119990, includedMinutes: 1000, maxConcurrentCalls: 10, overagePerMinuteClp: null, customPricing: true, recommended: false }
   ])));
+
+  const teamState = options.teamState || {
+    users: [{ id: 'user-admin', name: 'Administrador Inicial', email: 'admin@demo.cl', active: true, roles: ['BUSINESS_ADMIN'] }],
+    invitations: []
+  };
+  await page.route('**/api/v1/admin/users', route => route.fulfill(json(teamState.users)));
+  await page.route('**/api/v1/admin/invitations', async route => {
+    const request = route.request();
+    if (request.method() === 'POST') {
+      const payload = request.postDataJSON();
+      const invitation = {
+        id: `invite-${teamState.invitations.length + 1}`,
+        businessId: '11111111-1111-1111-1111-111111111111',
+        businessName: 'Negocio E2E',
+        name: payload.name,
+        email: payload.email,
+        role: payload.role,
+        expiresAt: '2026-09-29T12:00:00Z',
+        status: 'PENDING',
+        invitePath: '/invite.html?businessId=11111111-1111-1111-1111-111111111111&token=e2e-invite-token'
+      };
+      teamState.invitations.unshift(invitation);
+      await route.fulfill({ status: 201, ...json(invitation) });
+      return;
+    }
+    await route.fulfill(json(teamState.invitations));
+  });
 }
 
 test('auth tabs and simplified registration controls are usable', async ({ page }) => {
@@ -323,6 +350,84 @@ test('ready customer sees operations on home and configuration on settings', asy
     .toHaveText('Autorización completada. Encontramos 1 cuenta de WhatsApp Business.');
   await expect(page.locator('#metaWhatsAppWabaCandidates')).toContainText('Negocio E2E WhatsApp');
   await expect(page.locator('#metaWhatsAppConnectMessage')).not.toContainText('temporary-code-for-e2e');
+});
+
+test('assisted onboarding hands the same business to an invited administrator', async ({ page }) => {
+  const teamState = {
+    users: [{ id: 'user-admin', name: 'Administrador Inicial', email: 'admin@demo.cl', active: true, roles: ['BUSINESS_ADMIN'] }],
+    invitations: []
+  };
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyTenant(page, { teamState });
+
+  await page.route('**/api/v1/auth/invitations/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    if (request.method() === 'POST' && url.pathname.endsWith('/accept')) {
+      const invitation = teamState.invitations[0];
+      invitation.status = 'ACCEPTED';
+      teamState.users.push({
+        id: 'user-owner',
+        name: invitation.name,
+        email: invitation.email,
+        active: true,
+        roles: [invitation.role]
+      });
+      await route.fulfill(json({
+        accessToken: 'owner-token',
+        tokenType: 'Bearer',
+        expiresIn: 3600,
+        user: {
+          id: 'user-owner',
+          businessId: invitation.businessId,
+          name: invitation.name,
+          email: invitation.email,
+          roles: [invitation.role]
+        }
+      }));
+      return;
+    }
+
+    const invitation = teamState.invitations[0];
+    await route.fulfill(json({
+      ...invitation,
+      invitePath: null
+    }));
+  });
+
+  await page.goto('/settings.html');
+
+  const teamCard = page.locator('#teamInvitationsCard');
+  await expect(teamCard).toBeVisible();
+  await expect(page.locator('#teamMembersList')).toContainText('Administrador Inicial');
+  await expect(page.locator('#teamMembersList')).toContainText('admin@demo.cl');
+
+  await page.locator('#teamInviteForm [name="name"]').fill('Dueña Negocio');
+  await page.locator('#teamInviteForm [name="email"]').fill('duena@negocio.cl');
+  await page.locator('#teamInviteForm [name="role"]').selectOption('BUSINESS_ADMIN');
+  await page.locator('#teamInviteForm button[type="submit"]').click();
+
+  await expect(page.locator('#teamInviteUrl')).toHaveValue(/invite\.html\?businessId=.*token=e2e-invite-token/);
+  await expect(page.locator('#teamInviteList')).toContainText('Dueña Negocio');
+  await expect(page.locator('#teamInviteList')).toContainText('Pendiente');
+
+  const inviteUrl = await page.locator('#teamInviteUrl').inputValue();
+  await page.goto(inviteUrl);
+
+  await expect(page.locator('#inviteTitle')).toHaveText('Únete a Negocio E2E');
+  await expect(page.locator('#inviteMeta')).toContainText('duena@negocio.cl');
+  await page.locator('#inviteAcceptForm [name="password"]').fill('ClaveSeguraPiloto123');
+  await page.locator('#inviteAcceptForm [name="confirmPassword"]').fill('ClaveSeguraPiloto123');
+  await page.locator('#inviteAcceptForm button[type="submit"]').click();
+
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBe('owner-token');
+  await expect(page).toHaveURL(/\/$/);
+
+  await page.goto('/settings.html');
+  await expect(page.locator('#teamMembersList')).toContainText('Dueña Negocio');
+  await expect(page.locator('#teamMembersList')).toContainText('duena@negocio.cl');
+  await expect(page.locator('#teamMembersList')).toContainText('ACTIVO');
+  await expect(page.locator('#teamInviteList')).toContainText('Aceptada');
 });
 
 test('primary and public navigation fit desktop tablet and mobile viewports', async ({ page }) => {
