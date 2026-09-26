@@ -13,15 +13,18 @@ public class OperationsDashboardController {
     private final OperationsDashboardService service;
     private final CommercialReadinessService readiness;
     private final PilotReadinessService pilotReadiness;
+    private final PilotMetricsService pilotMetrics;
     private final VoiceCallRouter voiceRouter;
 
     public OperationsDashboardController(OperationsDashboardService service,
                                          CommercialReadinessService readiness,
                                          PilotReadinessService pilotReadiness,
+                                         PilotMetricsService pilotMetrics,
                                          VoiceCallRouter voiceRouter) {
         this.service = service;
         this.readiness = readiness;
         this.pilotReadiness = pilotReadiness;
+        this.pilotMetrics = pilotMetrics;
         this.voiceRouter = voiceRouter;
     }
 
@@ -33,6 +36,9 @@ public class OperationsDashboardController {
 
     @GetMapping("/pilot-readiness")
     public PilotReadinessService.Readiness pilotReadiness() { return pilotReadiness.readiness(); }
+
+    @GetMapping("/pilot-metrics")
+    public PilotMetricsService.Metrics pilotMetrics() { return pilotMetrics.metrics(); }
 
     @GetMapping("/voice-readiness")
     public VoiceCallRouter.VoiceReadiness voiceReadiness() { return voiceRouter.readiness(); }
