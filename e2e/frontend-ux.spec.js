@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 const json = body => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 
-async function mockReadyTenant(page) {
+async function mockReadyTenant(page, options = {}) {
   await page.route('**/api/v1/auth/me', route => route.fulfill(json({
     email: 'admin@demo.cl',
     roles: ['BUSINESS_ADMIN']
@@ -10,6 +10,24 @@ async function mockReadyTenant(page) {
   await page.route('**/api/v1/business', route => route.fulfill(json({
     name: 'Negocio E2E', timezone: 'America/Santiago', language: 'es', humanTransferPhone: null
   })));
+  await page.route('**/api/v1/onboarding/guide', route => route.fulfill(json(
+    options.activationGuide || {
+      readyForPilot: true,
+      completed: 7,
+      total: 7,
+      progressPercent: 100,
+      nextStep: null,
+      steps: [
+        { code: 'ACCOUNT', label: 'Cuenta y administrador', complete: true, detail: 'OK' },
+        { code: 'BUSINESS_SETUP', label: 'Datos, oferta y horarios', complete: true, detail: 'OK' },
+        { code: 'PHONE', label: 'Teléfono y voz', complete: true, detail: 'OK' },
+        { code: 'WHATSAPP', label: 'WhatsApp', complete: true, detail: 'OK' },
+        { code: 'COMMERCIAL', label: 'Catálogo, venta y pagos', complete: true, detail: 'OK' },
+        { code: 'ACTIVATION', label: 'Validación del negocio', complete: true, detail: 'OK' },
+        { code: 'PILOT', label: 'Control del piloto', complete: true, detail: 'OK' }
+      ]
+    }
+  )));
   await page.route('**/api/v1/onboarding/status', route => route.fulfill(json({
     businessProfileConfigured: true,
     servicesConfigured: true,
@@ -115,7 +133,31 @@ test('auth tabs and simplified registration controls are usable', async ({ page 
 });
 
 test('registration validates fields and enters the dashboard with the expected payload', async ({ page }) => {
-  await mockReadyTenant(page);
+  await mockReadyTenant(page, {
+    activationGuide: {
+      readyForPilot: false,
+      completed: 1,
+      total: 7,
+      progressPercent: 14,
+      nextStep: {
+        code: 'BUSINESS_SETUP',
+        label: 'Datos, oferta y horarios',
+        complete: false,
+        detail: 'Completa o importa los datos públicos, servicios y horarios que correspondan.',
+        actionLabel: 'Preparar negocio',
+        actionHref: '/#aiForm'
+      },
+      steps: [
+        { code: 'ACCOUNT', label: 'Cuenta y administrador', complete: true, detail: 'Tu negocio y su administrador ya existen.' },
+        { code: 'BUSINESS_SETUP', label: 'Datos, oferta y horarios', complete: false, detail: 'Pendiente', actionLabel: 'Preparar negocio', actionHref: '/#aiForm' },
+        { code: 'PHONE', label: 'Teléfono y voz', complete: false, detail: 'Pendiente' },
+        { code: 'WHATSAPP', label: 'WhatsApp', complete: false, detail: 'Pendiente' },
+        { code: 'COMMERCIAL', label: 'Catálogo, venta y pagos', complete: false, detail: 'Pendiente' },
+        { code: 'ACTIVATION', label: 'Validación del negocio', complete: false, detail: 'Pendiente' },
+        { code: 'PILOT', label: 'Control del piloto', complete: false, detail: 'Pendiente' }
+      ]
+    }
+  });
 
   let registerCalls = 0;
   let registerPayload = null;
@@ -150,6 +192,15 @@ test('registration validates fields and enters the dashboard with the expected p
   await expect(page.locator('#authView')).toBeHidden();
   await expect(page.locator('#sessionBadge')).toHaveText('Sesión activa');
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBe('register-token');
+  await expect(page.locator('#businessActivationGuide')).toBeVisible();
+  await expect(page.locator('#activationGuideScore')).toHaveText('1/7');
+  await expect(page.locator('#businessActivationGuide [data-code="ACCOUNT"]')).toHaveClass(/complete/);
+  await expect(page.locator('#businessActivationGuide [data-code="BUSINESS_SETUP"]')).toHaveClass(/next/);
+  await expect(page.locator('#activationGuideNext')).toContainText('Siguiente: Datos, oferta y horarios');
+  await expect(page.locator('#activationGuideNext a')).toHaveText('Preparar negocio');
+  await expect(page.locator('#activationGuideNext a')).toHaveAttribute('href', '/#aiForm');
+  await expect(page.locator('#businessActivationGuide')).not.toContainText('Railway');
+  await expect(page.locator('#businessActivationGuide')).not.toContainText('webhook');
 });
 
 test('login keeps errors visible and enters the dashboard after valid credentials', async ({ page }) => {
