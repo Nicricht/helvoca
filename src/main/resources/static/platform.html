@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RecepVoz · Alta de negocios</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { min-height:100vh; }
+    .platform-shell { width:min(980px,calc(100% - 32px)); margin:0 auto; padding:28px 0 48px; }
+    .platform-top { display:flex; justify-content:space-between; gap:16px; align-items:center; margin-bottom:18px; }
+    .platform-top h1 { margin:2px 0 4px; font-size:24px; }
+    .platform-top p { margin:0; color:var(--muted); font-size:12px; }
+    .platform-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:16px; }
+    .platform-card { padding:18px; }
+    .platform-card h2 { margin:0 0 5px; font-size:17px; }
+    .platform-card > p { margin:0 0 14px; color:var(--muted); font-size:11px; line-height:1.5; }
+    .platform-form { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .platform-form label { display:grid; gap:5px; color:var(--muted); font-size:10px; font-weight:800; }
+    .platform-form label.wide { grid-column:1/-1; }
+    .platform-form input,.platform-form select { width:100%; box-sizing:border-box; }
+    .platform-actions { grid-column:1/-1; display:flex; justify-content:flex-end; margin-top:4px; }
+    .platform-result { display:grid; gap:10px; }
+    .platform-result-row { padding:10px 11px; border:1px solid var(--border); border-radius:10px; }
+    .platform-result-row span { display:block; color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.04em; }
+    .platform-result-row strong { display:block; margin-top:4px; font-size:12px; overflow-wrap:anywhere; }
+    .platform-link { display:grid; grid-template-columns:1fr auto; gap:7px; }
+    .platform-link input { min-width:0; width:100%; box-sizing:border-box; font-size:10px; }
+    .platform-message { margin-top:10px; font-size:11px; }
+    .platform-message.error { color:#f28d8d; }
+    .platform-message.success { color:#37cd91; }
+    .platform-empty { color:var(--muted); font-size:11px; line-height:1.6; }
+    @media(max-width:760px){ .platform-grid{grid-template-columns:1fr;} .platform-form{grid-template-columns:1fr;} .platform-form label.wide,.platform-actions{grid-column:auto;} .platform-top{align-items:flex-start;} }
+  </style>
+</head>
+<body>
+  <main class="platform-shell">
+    <header class="platform-top">
+      <div>
+        <div class="eyebrow">Plataforma</div>
+        <h1>Alta asistida de negocios</h1>
+        <p>Crea el tenant y entrega el acceso al administrador sin tocar infraestructura.</p>
+      </div>
+      <button id="platformLogout" class="button small ghost" type="button">Salir</button>
+    </header>
+
+    <section class="platform-grid">
+      <article class="card platform-card">
+        <h2>Nuevo negocio</h2>
+        <p>Se crea un trial BASIC y una invitación de administrador. La contraseña la define el cliente al aceptar.</p>
+        <form id="platformProvisionForm" class="platform-form">
+          <label class="wide">Nombre del negocio
+            <input name="businessName" maxlength="150" required placeholder="Clínica Norte">
+          </label>
+          <label>Zona horaria
+            <input name="timezone" maxlength="60" required value="America/Santiago">
+          </label>
+          <label>Idioma
+            <select name="language" required>
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <label class="wide">Teléfono de transferencia humana <span style="font-weight:400">(opcional)</span>
+            <input name="humanTransferPhone" maxlength="20" placeholder="+56911112222">
+          </label>
+          <label>Nombre del administrador
+            <input name="adminName" maxlength="150" required placeholder="Ana Pérez">
+          </label>
+          <label>Email del administrador
+            <input name="adminEmail" type="email" maxlength="180" required placeholder="ana@negocio.cl">
+          </label>
+          <div class="platform-actions">
+            <button id="platformProvisionSubmit" class="button primary" type="submit">Crear negocio e invitación</button>
+          </div>
+        </form>
+        <div id="platformProvisionMessage" class="platform-message hidden"></div>
+      </article>
+
+      <article class="card platform-card">
+        <h2>Entrega al cliente</h2>
+        <p>Comparte el enlace una sola vez. Al aceptarlo, el administrador entra al mismo tenant y continúa la ruta de activación.</p>
+        <div id="platformProvisionEmpty" class="platform-empty">
+          Crea un negocio para generar su acceso inicial.
+        </div>
+        <div id="platformProvisionResult" class="platform-result hidden">
+          <div class="platform-result-row"><span>Negocio</span><strong id="platformResultBusiness"></strong></div>
+          <div class="platform-result-row"><span>Administrador</span><strong id="platformResultAdmin"></strong></div>
+          <div class="platform-result-row"><span>Estado</span><strong id="platformResultStatus"></strong></div>
+          <div class="platform-result-row">
+            <span>Invitación de un solo uso</span>
+            <div class="platform-link">
+              <input id="platformInviteUrl" readonly aria-label="Enlace de invitación del administrador">
+              <button id="platformCopyInvite" class="button small secondary" type="button">Copiar</button>
+            </div>
+          </div>
+          <div class="platform-result-row">
+            <span>Siguiente paso</span>
+            <strong>El administrador acepta la invitación y continúa el onboarding dentro de RecepVoz.</strong>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+  <script src="/platform.js?v=20260926-1" defer></script>
+</body>
+</html>
