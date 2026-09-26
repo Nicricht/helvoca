@@ -36,6 +36,9 @@ public class InventoryService {
     @Autowired(required = false)
     private InventoryProductVariantRepository variants;
 
+    @Autowired(required = false)
+    private InventoryAlertService inventoryAlerts;
+
     @Autowired
     public InventoryService(InventoryStockRepository stocks,
                             InventoryReservationRepository reservations,
@@ -662,6 +665,7 @@ public class InventoryService {
         movement.setReferenceId(referenceId);
         movement.setNote(blankToNull(note));
         movements.save(movement);
+        if (inventoryAlerts != null) inventoryAlerts.evaluateBase(stock);
     }
 
     private InventoryProductVariant requireLockedVariant(UUID businessId,
@@ -695,6 +699,7 @@ public class InventoryService {
         movement.setReferenceId(referenceId);
         movement.setNote(blankToNull(note));
         movements.save(movement);
+        if (inventoryAlerts != null) inventoryAlerts.evaluateVariant(variant);
     }
 
     private InventoryStock requireLockedStock(UUID businessId, UUID catalogItemId) {
@@ -743,6 +748,7 @@ public class InventoryService {
         movement.setReferenceId(referenceId);
         movement.setNote(blankToNull(note));
         movements.save(movement);
+        if (inventoryAlerts != null) inventoryAlerts.evaluateBase(stock);
     }
 
     private static int nonNegative(Integer value, String field) {
