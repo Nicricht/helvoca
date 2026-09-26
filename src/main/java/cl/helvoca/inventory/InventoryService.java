@@ -10,13 +10,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 public class InventoryService {
     private static final Duration DEFAULT_RESERVATION_TTL = Duration.ofMinutes(15);
+    private static final String ORDER_REFERENCE = "ORDER_OPERATION";
 
     private final InventoryStockRepository stocks;
     private final InventoryReservationRepository reservations;
@@ -228,6 +233,190 @@ public class InventoryService {
                 .stream().map(MovementView::from).toList();
     }
 
+    @Transactional(readOnly = true)
+    public StockLookupView lookupForBusiness(UUID businessId, UUID catalogItemId, String sku) {
+        if (businessId == null) throw new IllegalArgumentException("Business id is required");
+        InventoryStock stock = null;
+        CatalogItem product = null;
+
+        if (catalogItemId != null) {
+            product = requireProduct(businessId, catalogItemId);
+            stock = stocks.findByBusinessIdAndCatalogItemId(businessId, catalogItemId).orElse(null);
+        } else if (sku != null && !sku.isBlank()) {
+            String normalizedSku = normalizeSku(sku);
+            stock = stocks.findByBusinessIdAndSkuIgnoreCase(businessId, normalizedSku).orElse(null);
+            if (stock != null) product = requireProduct(businessId, stock.getCatalogItemId());
+        } else {
+            throw new IllegalArgumentException("catalogItemId or sku is required");
+        }
+
+        if (stock == null) {
+            return new StockLookupView(
+                    product == null ? null : product.getId(),
+                    product == null ? null : product.getName(),
+                    normalizeSku(sku),
+                    false,
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    false);
+        }
+
+        boolean known = stock.isTrackingEnabled();
+        return new StockLookupView(
+                stock.getCatalogItemId(),
+                product == null ? productName(businessId, stock.getCatalogItemId()) : product.getName(),
+                stock.getSku(),
+                true,
+                stock.isTrackingEnabled(),
+                known ? stock.getOnHand() : null,
+                known ? stock.getReserved() : null,
+                known ? stock.available() : null,
+                stock.getReorderThreshold(),
+                known && stock.available() <= stock.getReorderThreshold());
+    }
+
+    @Transactional
+    public OrderReservationResult reserveOrder(UUID businessId,
+                                               UUID orderOperationId,
+                                               List<OrderItem> items) {
+        if (businessId == null || orderOperationId == null) {
+            throw new IllegalArgumentException("Business and order operation are required");
+        }
+        if (items == null || items.isEmpty()) {
+            return new OrderReservationResult(true, null, null, List.of());
+        }
+
+        List<InventoryReservation> existing = reservations
+                .findAllByBusinessIdAndReferenceTypeAndReferenceIdAndStatusOrderByCreatedAtAsc(
+                        businessId, ORDER_REFERENCE, orderOperationId, InventoryReservation.Status.ACTIVE);
+        if (!existing.isEmpty()) {
+            return new OrderReservationResult(
+                    true, null, null, existing.stream().map(InventoryReservation::getId).toList());
+        }
+
+        Map<UUID, Integer> quantities = new LinkedHashMap<>();
+        for (OrderItem item : items) {
+            if (item == null || item.catalogItemId() == null || item.quantity() <= 0) {
+                throw new IllegalArgumentException("Order inventory items must have a product and positive quantity");
+            }
+            quantities.merge(item.catalogItemId(), item.quantity(), Math::addExact);
+        }
+
+        List<Map.Entry<UUID, Integer>> ordered = new ArrayList<>(quantities.entrySet());
+        ordered.sort(Comparator.comparing(entry -> entry.getKey().toString()));
+
+        List<LockedRequest> tracked = new ArrayList<>();
+        for (Map.Entry<UUID, Integer> entry : ordered) {
+            InventoryStock stock = stocks.lockByBusinessAndCatalogItem(businessId, entry.getKey()).orElse(null);
+            if (stock == null || !stock.isTrackingEnabled()) continue;
+            if (stock.available() < entry.getValue()) {
+                String name = productName(businessId, entry.getKey());
+                return new OrderReservationResult(
+                        false,
+                        "INSUFFICIENT_STOCK",
+                        "No hay stock suficiente para " + name + ". Disponible: " + stock.available() + ".",
+                        List.of());
+            }
+            tracked.add(new LockedRequest(stock, entry.getValue()));
+        }
+
+        List<UUID> reservationIds = new ArrayList<>();
+        Instant expiresAt = Instant.now().plus(DEFAULT_RESERVATION_TTL);
+        for (LockedRequest request : tracked) {
+            InventoryStock stock = request.stock();
+            stock.setReserved(stock.getReserved() + request.quantity());
+            stock = stocks.saveAndFlush(stock);
+
+            InventoryReservation reservation = new InventoryReservation();
+            reservation.setBusinessId(businessId);
+            reservation.setCatalogItemId(stock.getCatalogItemId());
+            reservation.setQuantity(request.quantity());
+            reservation.setStatus(InventoryReservation.Status.ACTIVE);
+            reservation.setReferenceType(ORDER_REFERENCE);
+            reservation.setReferenceId(orderOperationId);
+            reservation.setExpiresAt(expiresAt);
+            reservation = reservations.saveAndFlush(reservation);
+            reservationIds.add(reservation.getId());
+
+            record(stock, InventoryMovement.Type.RESERVATION, 0, request.quantity(),
+                    ORDER_REFERENCE, orderOperationId, "Order stock reservation");
+        }
+
+        return new OrderReservationResult(true, null, null, List.copyOf(reservationIds));
+    }
+
+    @Transactional
+    public void consumeOrder(UUID businessId, UUID orderOperationId, String note) {
+        settleOrder(businessId, orderOperationId, true, note);
+    }
+
+    @Transactional
+    public void releaseOrder(UUID businessId, UUID orderOperationId, String note) {
+        settleOrder(businessId, orderOperationId, false, note);
+    }
+
+    private void settleOrder(UUID businessId, UUID orderOperationId, boolean consume, String note) {
+        if (businessId == null || orderOperationId == null) return;
+        List<InventoryReservation> active = reservations
+                .findAllByBusinessIdAndReferenceTypeAndReferenceIdAndStatusOrderByCreatedAtAsc(
+                        businessId, ORDER_REFERENCE, orderOperationId, InventoryReservation.Status.ACTIVE);
+        for (InventoryReservation candidate : active) {
+            InventoryReservation reservation = reservations
+                    .lockByIdAndBusinessId(candidate.getId(), businessId)
+                    .orElse(null);
+            if (reservation == null || reservation.getStatus() != InventoryReservation.Status.ACTIVE) continue;
+
+            InventoryStock stock = requireLockedStock(businessId, reservation.getCatalogItemId());
+            int quantity = reservation.getQuantity();
+
+            if (consume) {
+                if (stock.getReserved() < quantity || stock.getOnHand() < quantity) {
+                    throw new ConflictException("Inventory state is inconsistent with the order reservation");
+                }
+                stock.setReserved(stock.getReserved() - quantity);
+                stock.setOnHand(stock.getOnHand() - quantity);
+                reservation.setStatus(InventoryReservation.Status.CONSUMED);
+                recordAfterSave(stock, InventoryMovement.Type.CONSUMPTION, -quantity, -quantity,
+                        ORDER_REFERENCE, orderOperationId, note);
+            } else {
+                if (stock.getReserved() < quantity) {
+                    throw new ConflictException("Inventory state is inconsistent with the order reservation");
+                }
+                stock.setReserved(stock.getReserved() - quantity);
+                reservation.setStatus(InventoryReservation.Status.RELEASED);
+                recordAfterSave(stock, InventoryMovement.Type.RELEASE, 0, -quantity,
+                        ORDER_REFERENCE, orderOperationId, note);
+            }
+
+            stocks.saveAndFlush(stock);
+            reservations.saveAndFlush(reservation);
+        }
+    }
+
+    private void recordAfterSave(InventoryStock stock,
+                                 InventoryMovement.Type type,
+                                 int quantityDelta,
+                                 int reservedDelta,
+                                 String referenceType,
+                                 UUID referenceId,
+                                 String note) {
+        InventoryMovement movement = new InventoryMovement();
+        movement.setBusinessId(stock.getBusinessId());
+        movement.setCatalogItemId(stock.getCatalogItemId());
+        movement.setType(type);
+        movement.setQuantityDelta(quantityDelta);
+        movement.setReservedDelta(reservedDelta);
+        movement.setOnHandAfter(stock.getOnHand());
+        movement.setReservedAfter(stock.getReserved());
+        movement.setReferenceType(referenceType);
+        movement.setReferenceId(referenceId);
+        movement.setNote(blankToNull(note));
+        movements.save(movement);
+    }
+
     private InventoryStock requireLockedStock(UUID businessId, UUID catalogItemId) {
         return stocks.lockByBusinessAndCatalogItem(businessId, catalogItemId)
                 .orElseThrow(() -> new NotFoundException("Inventory is not configured for this product"));
@@ -366,6 +555,26 @@ public class InventoryService {
             );
         }
     }
+
+    public record StockLookupView(UUID catalogItemId,
+                                  String productName,
+                                  String sku,
+                                  boolean configured,
+                                  boolean trackingEnabled,
+                                  Integer onHand,
+                                  Integer reserved,
+                                  Integer available,
+                                  Integer reorderThreshold,
+                                  boolean lowStock) {}
+
+    public record OrderItem(UUID catalogItemId, int quantity) {}
+
+    public record OrderReservationResult(boolean success,
+                                         String code,
+                                         String message,
+                                         List<UUID> reservationIds) {}
+
+    private record LockedRequest(InventoryStock stock, int quantity) {}
 
     public record MovementView(UUID id,
                                InventoryMovement.Type type,
