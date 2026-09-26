@@ -317,6 +317,11 @@ class GeminiLiveVoiceSessionTest {
 
         session.onText(socket, generationComplete(), true);
 
+        verify(transcripts, never()).append(eq(context.callId()), eq("USER"),
+                contains("Ejecuta ahora create_booking"));
+
+        session.onText(socket, generationCompleteWithOutput("Ya revisé los horarios disponibles."), true);
+
         verify(transcripts).append(eq(context.callId()), eq("USER"),
                 contains("Ejecuta ahora create_booking"));
         verify(transcripts, times(2)).append(eq(context.callId()), eq("USER"), anyString());
@@ -536,6 +541,14 @@ class GeminiLiveVoiceSessionTest {
     private static String generationComplete() {
         return new JSONObject()
                 .put("serverContent", new JSONObject().put("generationComplete", true))
+                .toString();
+    }
+
+    private static String generationCompleteWithOutput(String text) {
+        return new JSONObject()
+                .put("serverContent", new JSONObject()
+                        .put("outputTranscription", new JSONObject().put("text", text))
+                        .put("generationComplete", true))
                 .toString();
     }
 
