@@ -345,6 +345,131 @@ class CommercialSandboxExistingPaymentStartupRunnerTest {
     }
 
     @Test
+    void missingCommercialJourneyLinkageIsRepairedBeforeExistingPaymentReplay() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID journeyId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        UUID paymentOperationId = UUID.randomUUID();
+
+        BusinessOperation journey = operation(
+                businessId, customerId, journeyId, BusinessOperation.Type.REQUEST,
+                BusinessOperation.Status.CONFIRMED);
+        journey.setMetadata(new LinkedHashMap<>(Map.of(
+                "orderOperationId", orderId.toString(),
+                "paymentOperationId", paymentOperationId.toString())));
+
+        BusinessOperation order = operation(
+                businessId, customerId, orderId, BusinessOperation.Type.ORDER,
+                BusinessOperation.Status.CONFIRMED);
+
+        BusinessOperation paymentOperation = operation(
+                businessId, customerId, paymentOperationId, BusinessOperation.Type.PAYMENT,
+                BusinessOperation.Status.CONFIRMED);
+        paymentOperation.setContactPhone("+56900009999");
+        paymentOperation.setMetadata(new LinkedHashMap<>(Map.of(
+                "targetOperationId", orderId.toString())));
+
+        BusinessPayment payment = new BusinessPayment();
+        payment.setId(UUID.randomUUID());
+        payment.setOperationId(paymentOperationId);
+        payment.setBusinessId(businessId);
+        payment.setCustomerId(customerId);
+        payment.setTargetOperationId(orderId);
+        payment.setProvider("mercadopago");
+        payment.setExternalId("ORDTST-RECOVERED");
+        payment.setAmount(new BigDecimal("1000"));
+        payment.setCurrency("CLP");
+        payment.setStatus(BusinessPayment.Status.REQUIRES_ACTION);
+        payment.setCheckoutUrl("https://www.mercadopago.cl/checkout/recovered");
+        payment.setSource(BusinessOrder.Source.WHATSAPP);
+
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        BusinessPaymentRepository payments = mock(BusinessPaymentRepository.class);
+        CommercialOperationToolService commercial = mock(CommercialOperationToolService.class);
+
+        when(operations.findByIdAndBusinessId(journeyId, businessId))
+                .thenReturn(Optional.of(journey));
+        when(operations.findByIdAndBusinessId(orderId, businessId))
+                .thenReturn(Optional.of(order));
+        when(operations.findByIdAndBusinessId(paymentOperationId, businessId))
+                .thenReturn(Optional.of(paymentOperation));
+        when(payments.findByOperationIdAndBusinessId(paymentOperationId, businessId))
+                .thenReturn(Optional.of(payment), Optional.of(payment));
+        when(commercial.execute(
+                eq(businessId),
+                eq(customerId),
+                isNull(),
+                eq("+56900009999"),
+                eq(BusinessOrder.Source.WHATSAPP),
+                eq("get_payment_status"),
+                anyString()))
+                .thenReturn(new JSONObject()
+                        .put("success", true)
+                        .put("data", new JSONObject()
+                                .put("paymentId", payment.getId().toString())
+                                .put("status", "REQUIRES_ACTION"))
+                        .put("error", JSONObject.NULL)
+                        .toString());
+
+        var result = runner(operations, payments, commercial)
+                .activate(businessId, journeyId, orderId, paymentOperationId);
+
+        assertTrue(result.idempotentReplay());
+        assertEquals(
+                journeyId.toString(),
+                paymentOperation.getMetadata().get("commercialJourneyOperationId"));
+        assertEquals(2, paymentOperation.getRevision());
+        verify(operations).saveAndFlush(same(paymentOperation));
+    }
+
+    @Test
+    void conflictingCommercialJourneyLinkageStillFailsClosed() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID journeyId = UUID.randomUUID();
+        UUID wrongJourneyId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        UUID paymentOperationId = UUID.randomUUID();
+
+        BusinessOperation journey = operation(
+                businessId, customerId, journeyId, BusinessOperation.Type.REQUEST,
+                BusinessOperation.Status.CONFIRMED);
+        journey.setMetadata(new LinkedHashMap<>(Map.of(
+                "orderOperationId", orderId.toString(),
+                "paymentOperationId", paymentOperationId.toString())));
+        BusinessOperation order = operation(
+                businessId, customerId, orderId, BusinessOperation.Type.ORDER,
+                BusinessOperation.Status.CONFIRMED);
+        BusinessOperation paymentOperation = operation(
+                businessId, customerId, paymentOperationId, BusinessOperation.Type.PAYMENT,
+                BusinessOperation.Status.CONFIRMED);
+        paymentOperation.setMetadata(new LinkedHashMap<>(Map.of(
+                "targetOperationId", orderId.toString(),
+                "commercialJourneyOperationId", wrongJourneyId.toString())));
+
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        BusinessPaymentRepository payments = mock(BusinessPaymentRepository.class);
+        CommercialOperationToolService commercial = mock(CommercialOperationToolService.class);
+
+        when(operations.findByIdAndBusinessId(journeyId, businessId))
+                .thenReturn(Optional.of(journey));
+        when(operations.findByIdAndBusinessId(orderId, businessId))
+                .thenReturn(Optional.of(order));
+        when(operations.findByIdAndBusinessId(paymentOperationId, businessId))
+                .thenReturn(Optional.of(paymentOperation));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> runner(operations, payments, commercial)
+                        .activate(businessId, journeyId, orderId, paymentOperationId));
+
+        assertTrue(error.getMessage().contains("commercialJourneyOperationId"));
+        verify(operations, never()).saveAndFlush(any());
+        verifyNoInteractions(commercial);
+    }
+
+    @Test
     void linkageMismatchFailsBeforeCallingCreatePayment() {
         UUID businessId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
