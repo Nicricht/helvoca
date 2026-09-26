@@ -67,6 +67,9 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("Reglas oficiales del negocio"));
         assertTrue(instructions.contains("RecepVoz"));
         assertTrue(instructions.contains("[RECEPVOZ_CALL_CONNECTED]"));
+        assertTrue(instructions.contains("ESPAÑOL DE CHILE"));
+        assertTrue(instructions.contains("no como locutora"));
+        assertTrue(instructions.contains("NO vuelvas a ejecutar la misma herramienta"));
 
         JSONArray declarations = setup.getJSONArray("tools")
                 .getJSONObject(0).getJSONArray("functionDeclarations");
@@ -499,6 +502,89 @@ class GeminiLiveVoiceSessionTest {
         session.acceptInboundAudio(Base64.getEncoder().encodeToString(new byte[160]));
 
         verify(socket, never()).sendText(any(CharSequence.class), anyBoolean());
+    }
+
+    @Test
+    void defaultLiveVoiceUsesNaturalProfileInsteadOfFirmKore() {
+        assertEquals("Aoede", new GeminiLiveProperties().getVoice());
+    }
+
+    @Test
+    void repeatedIdenticalReadToolCallIsDeduplicatedWithinShortWindow() {
+        GeminiLiveProperties properties = properties();
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.execute(eq(context), eq("list_available_slots"), anyString())).thenReturn(
+                new JSONObject()
+                        .put("success", true)
+                        .put("data", new JSONObject().put("slots", new JSONArray()))
+                        .put("error", JSONObject.NULL)
+                        .toString());
+
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        JSONObject args = new JSONObject()
+                .put("serviceId", UUID.randomUUID().toString())
+                .put("date", "2026-09-27");
+
+        session.onOpen(socket);
+        session.onText(socket, toolCall("slot-duplicate-1", "list_available_slots", args), true);
+        session.onText(socket, toolCall("slot-duplicate-2", "list_available_slots", args), true);
+
+        verify(tools, times(1)).execute(eq(context), eq("list_available_slots"), anyString());
+    }
+
+    @Test
+    void sideEffectingToolCallsAreNeverDeduplicated() {
+        GeminiLiveProperties properties = properties();
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.execute(eq(context), eq("create_booking"), anyString())).thenReturn(
+                new JSONObject()
+                        .put("success", true)
+                        .put("data", new JSONObject().put("requiresConfirmation", true))
+                        .put("error", JSONObject.NULL)
+                        .toString());
+
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        JSONObject args = new JSONObject().put("serviceId", UUID.randomUUID().toString());
+
+        session.onOpen(socket);
+        session.onText(socket, toolCall("booking-1", "create_booking", args), true);
+        session.onText(socket, toolCall("booking-2", "create_booking", args), true);
+
+        verify(tools, times(2)).execute(eq(context), eq("create_booking"), anyString());
     }
 
     @Test
