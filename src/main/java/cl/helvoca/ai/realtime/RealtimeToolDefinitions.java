@@ -19,7 +19,7 @@ public final class RealtimeToolDefinitions {
                                         .put("name", string("Nombre del cliente"))
                                         .put("email", string("Correo opcional")))
                                 .put("required", new JSONArray().put("name"))))
-                .put(function("list_available_slots", "Lista horarios realmente disponibles para un servicio en una fecha local del negocio. Si no tienes un serviceId devuelto literalmente por list_services, llama list_services primero. Nunca inventes UUID. Si el horario solicitado no está disponible, usa literalmente uno de los startAt devueltos. No ejecutes create_booking con una alternativa que no haya sido devuelta por esta herramienta.",
+                .put(function("list_available_slots", "Lista horarios realmente disponibles para un servicio en una fecha local del negocio. Si no tienes un serviceId devuelto literalmente por list_services, llama list_services primero. Nunca inventes UUID. Si esa fecha no tiene cupos, la misma respuesta puede incluir nextAvailableDate y nextAvailableSlots con las primeras alternativas reales de los próximos 7 días; usa esas alternativas y NO vuelvas a consultar día por día. Si el horario solicitado no está disponible, usa literalmente uno de los startAt devueltos. No ejecutes create_booking con una alternativa que no haya sido devuelta por esta herramienta.",
                         object().put("properties", new JSONObject()
                                         .put("serviceId", string("UUID exacto del servicio devuelto por list_services; nunca inventarlo"))
                                         .put("date", string("Fecha local del negocio en formato YYYY-MM-DD")))
