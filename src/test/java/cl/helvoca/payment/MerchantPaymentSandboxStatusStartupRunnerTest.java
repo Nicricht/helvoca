@@ -44,6 +44,46 @@ class MerchantPaymentSandboxStatusStartupRunnerTest {
     }
 
     @Test
+    void providerFailureDoesNotAbortApplicationStartup() {
+        UUID businessId = UUID.randomUUID();
+        TenantDatabaseContext databaseContext = mock(TenantDatabaseContext.class);
+        PaymentProviderRegistry providers = mock(PaymentProviderRegistry.class);
+        PaymentProviderAdapter provider = mock(PaymentProviderAdapter.class);
+
+        doAnswer(invocation -> {
+            Runnable work = invocation.getArgument(1);
+            work.run();
+            return null;
+        }).when(databaseContext).runAsTenant(eq(businessId), any(Runnable.class));
+
+        when(providers.byCode(businessId, "mercadopago")).thenReturn(Optional.of(provider));
+        when(provider.getStatus(any())).thenThrow(
+                new IllegalStateException("Mercado Pago Orders API returned HTTP 403 (forbidden)."));
+
+        MerchantPaymentSandboxStatusStartupRunner runner =
+                new MerchantPaymentSandboxStatusStartupRunner(
+                        true,
+                        businessId.toString(),
+                        "ORDTST123",
+                        databaseContext,
+                        providers);
+
+        assertDoesNotThrow(() -> runner.run(mock(org.springframework.boot.ApplicationArguments.class)));
+        verify(provider).getStatus(any());
+    }
+
+    @Test
+    void sanitizesStatusProbeFailureMessage() {
+        String longMessage = "forbidden\\nprovider\\t" + "x".repeat(600);
+
+        String safe = MerchantPaymentSandboxStatusStartupRunner.safeLogMessage(longMessage);
+
+        assertFalse(safe.contains("\\n"));
+        assertFalse(safe.contains("\\t"));
+        assertTrue(safe.length() <= 500);
+    }
+
+    @Test
     void failsClosedWhenProviderIsUnavailable() {
         UUID businessId = UUID.randomUUID();
         PaymentProviderRegistry providers = mock(PaymentProviderRegistry.class);

@@ -51,13 +51,22 @@ public class MerchantPaymentSandboxStatusStartupRunner implements ApplicationRun
         }
 
         databaseContext.runAsTenant(tenantId, () -> {
-            StatusCheck result = check(tenantId, externalId);
-            log.info(
-                    "MERCHANT_PAYMENT_SANDBOX_STATUS_CHECKED businessId={} provider={} externalId={} status={}",
-                    tenantId,
-                    result.provider(),
-                    result.externalId(),
-                    result.status());
+            try {
+                StatusCheck result = check(tenantId, externalId);
+                log.info(
+                        "MERCHANT_PAYMENT_SANDBOX_STATUS_CHECKED businessId={} provider={} externalId={} status={}",
+                        tenantId,
+                        result.provider(),
+                        result.externalId(),
+                        result.status());
+            } catch (Exception e) {
+                log.error(
+                        "MERCHANT_PAYMENT_SANDBOX_STATUS_CHECK_FAILED businessId={} externalId={} reason={} message={}",
+                        tenantId,
+                        externalId,
+                        e.getClass().getSimpleName(),
+                        safeLogMessage(e.getMessage()));
+            }
         });
     }
 
@@ -74,6 +83,17 @@ public class MerchantPaymentSandboxStatusStartupRunner implements ApplicationRun
             throw new IllegalStateException("Mercado Pago sandbox returned no verified status");
         }
         return new StatusCheck(provider.providerCode(), externalId, status.status());
+    }
+
+    static String safeLogMessage(String message) {
+        if (message == null || message.isBlank()) return "";
+        String normalized = message
+                .replace("\\r", " ")
+                .replace("\\n", " ")
+                .replace("\\t", " ")
+                .replaceAll("[\\r\\n\\t]+", " ")
+                .trim();
+        return normalized.length() <= 500 ? normalized : normalized.substring(0, 500);
     }
 
     record StatusCheck(String provider,
