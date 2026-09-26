@@ -44,6 +44,12 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private static final Logger log = LoggerFactory.getLogger(GeminiLiveVoiceSession.class);
     private static final int MAX_QUEUED_AUDIO_FRAMES = 250;
     private static final int MAX_PENDING_MESSAGES = 600;
+    private static final long READ_TOOL_DEDUPE_WINDOW_MS = 5_000L;
+    private static final Set<String> DEDUPED_READ_TOOLS = Set.of(
+            "list_services",
+            "find_caller",
+            "list_available_slots",
+            "check_booking_availability");
 
     private final RealtimeCallContext context;
     private final VoiceTransportSession transport;
@@ -57,6 +63,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final HttpClient http;
     private final Queue<String> pendingAudio = new ConcurrentLinkedQueue<>();
     private final Set<String> completedToolCalls = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<String, CachedToolResult> recentReadToolResults = new ConcurrentHashMap<>();
     private final AtomicBoolean setupComplete = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean finalized = new AtomicBoolean(false);
@@ -401,8 +408,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             JSONObject args = function.optJSONObject("args");
             if (id == null || name == null || !completedToolCalls.add(id)) continue;
 
+            JSONObject safeArgs = args == null ? new JSONObject() : args;
             log.info("tool_call_started call_id={} tool_name={}", context.callId(), name);
-            JSONObject result = executeTool(name, args == null ? new JSONObject() : args);
+            JSONObject result = executeToolWithShortDedupe(name, safeArgs);
             boolean success = result.optBoolean("success", false);
             JSONObject data = result.optJSONObject("data");
             String entityId = data == null ? null : firstEntityId(data);
@@ -422,6 +430,26 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             send(new JSONObject().put("toolResponse",
                     new JSONObject().put("functionResponses", responses)));
         }
+    }
+
+    private JSONObject executeToolWithShortDedupe(String name, JSONObject args) {
+        if (!DEDUPED_READ_TOOLS.contains(name)) return executeTool(name, args);
+
+        long now = System.currentTimeMillis();
+        String key = name + "|" + args.toString();
+        CachedToolResult cached = recentReadToolResults.get(key);
+        if (cached != null && now - cached.createdAtMillis() <= READ_TOOL_DEDUPE_WINDOW_MS) {
+            log.info("tool_call_deduplicated call_id={} tool_name={}", context.callId(), name);
+            return new JSONObject(cached.payload());
+        }
+
+        JSONObject result = executeTool(name, args);
+        if (result.optBoolean("success", false)) {
+            recentReadToolResults.put(key, new CachedToolResult(result.toString(), now));
+        }
+        recentReadToolResults.entrySet().removeIf(entry ->
+                now - entry.getValue().createdAtMillis() > READ_TOOL_DEDUPE_WINDOW_MS);
+        return result;
     }
 
     private JSONObject executeTool(String name, JSONObject args) {
@@ -547,12 +575,20 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         return tools.buildInstructions(context) + "\n" + """
                 REGLAS DE VOZ DE RECEPVOZ:
                 Tu nombre de producto es RecepVoz. Nunca te presentes como Helvoca.
-                Habla como una recepcionista humana, cálida, natural y breve. Haz una sola pregunta a la vez.
+                RESPONDE SIEMPRE EN ESPAÑOL DE CHILE, salvo que el cliente pida explícitamente otro idioma.
+                Habla como una recepcionista chilena adulta, cercana, profesional y espontánea. Debes sonar conversacional, no como locutora, IVR ni asistente robótica.
+                Usa frases cortas y ritmo natural. Alterna la entonación y deja micro-pausas naturales antes de datos que estés consultando.
+                Puedes usar expresiones chilenas neutras y profesionales como "ya", "sí, claro", "déjame revisar", "te cuento" o "¿te sirve ese horario?" cuando encajen, sin repetirlas mecánicamente.
+                No fuerces modismos como "po", "cachái" o "weón" y no caricaturices el acento chileno.
+                Evita lenguaje burocrático o artificial como "procederé a", "he verificado su solicitud", "según los parámetros indicados" o respuestas excesivamente formales.
+                No repitas la misma introducción, muletilla o estructura en turnos consecutivos. Haz una sola pregunta a la vez.
+                Si una consulta de lectura ya devolvió success=true con los mismos datos y el cliente no cambió su solicitud, usa ese resultado y NO vuelvas a ejecutar la misma herramienta.
                 Permite interrupciones y usa el contexto previo; no repitas preguntas ya contestadas.
                 Nunca inventes disponibilidad ni confirmes acciones antes de que una herramienta devuelva success=true.
-                Si recibes exactamente el mensaje técnico [RECEPVOZ_CALL_CONNECTED], no lo menciones ni lo trates como palabras del cliente. Saluda brevemente, menciona el nombre del negocio y pregunta en qué puedes ayudar.
+                Si recibes exactamente el mensaje técnico [RECEPVOZ_CALL_CONNECTED], no lo menciones ni lo trates como palabras del cliente. Saluda brevemente, menciona el nombre del negocio y pregunta en qué puedes ayudar con una frase natural.
                 Si el cliente empieza a hablar mientras tú respondes, detente y atiende su nueva intervención.
                 Evita usar "Perfecto" de manera repetitiva.
+                Si te preguntan si eres una IA o asistente virtual, responde con honestidad y continúa ayudando.
                 """;
     }
 
@@ -644,6 +680,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             }
         }
     }
+
+    private record CachedToolResult(String payload, long createdAtMillis) {}
 
     @Override
     public void close() {
