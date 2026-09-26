@@ -268,7 +268,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             }
         }
 
-        if (content.optBoolean("turnComplete", false)) {
+        boolean turnComplete = content.optBoolean("turnComplete", false);
+        boolean generationComplete = content.optBoolean("generationComplete", false);
+        if (turnComplete || (generationComplete && properties.isCertificationSimulation())) {
             flushTranscripts();
             advanceCertificationSimulation();
         }
