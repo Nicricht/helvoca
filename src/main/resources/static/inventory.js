@@ -199,10 +199,10 @@
     }
 
     function bindRowActions() {
-        $(".inventory-variants-btn", rows).forEach(button => {
+        $$(".inventory-variants-btn", rows).forEach(button => {
             button.addEventListener("click", () => openVariants(button.dataset.id));
         });
-        $(".inventory-config-btn", rows).forEach(button => {
+        $$(".inventory-config-btn", rows).forEach(button => {
             button.addEventListener("click", () => openConfig(button.dataset.id));
         });
         $$(".inventory-adjust-btn", rows).forEach(button => {
@@ -333,13 +333,13 @@
                 </article>`;
         }).join("");
 
-        $(".variant-edit-btn", $("#inventoryVariantsList")).forEach(button => {
+        $$(".variant-edit-btn", $("#inventoryVariantsList")).forEach(button => {
             button.addEventListener("click", () => openVariantForm(button.dataset.id));
         });
-        $(".variant-adjust-btn", $("#inventoryVariantsList")).forEach(button => {
+        $$(".variant-adjust-btn", $("#inventoryVariantsList")).forEach(button => {
             button.addEventListener("click", () => openVariantAdjust(button.dataset.id));
         });
-        $(".variant-history-btn", $("#inventoryVariantsList")).forEach(button => {
+        $$(".variant-history-btn", $("#inventoryVariantsList")).forEach(button => {
             button.addEventListener("click", () => openVariantHistory(button.dataset.id));
         });
     }
