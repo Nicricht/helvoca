@@ -280,6 +280,81 @@ class PaymentWorkflowServiceTest {
         verifyNoInteractions(providers);
     }
 
+    @Test
+    void providerStatusRefreshPropagatesSucceededToCommercialJourney() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID sourceReferenceId = UUID.randomUUID();
+        UUID paymentOperationId = UUID.randomUUID();
+        UUID journeyId = UUID.randomUUID();
+
+        BusinessPayment payment = new BusinessPayment();
+        payment.setId(UUID.randomUUID());
+        payment.setOperationId(paymentOperationId);
+        payment.setBusinessId(businessId);
+        payment.setCustomerId(customerId);
+        payment.setSourceReferenceId(sourceReferenceId);
+        payment.setTargetOperationId(UUID.randomUUID());
+        payment.setProvider("mercadopago");
+        payment.setExternalId("ORDTST123");
+        payment.setIdempotencyKey("payment-operation:" + paymentOperationId);
+        payment.setAmount(new BigDecimal("1000"));
+        payment.setCurrency("CLP");
+        payment.setStatus(BusinessPayment.Status.REQUIRES_ACTION);
+        payment.setSource(BusinessOrder.Source.WHATSAPP);
+
+        BusinessOperation paymentOperation = new BusinessOperation();
+        paymentOperation.setId(paymentOperationId);
+        paymentOperation.setBusinessId(businessId);
+        paymentOperation.setCustomerId(customerId);
+        paymentOperation.setType(BusinessOperation.Type.PAYMENT);
+        paymentOperation.setStatus(BusinessOperation.Status.CONFIRMED);
+        paymentOperation.setRevision(1);
+        paymentOperation.setSource(BusinessOrder.Source.WHATSAPP);
+        paymentOperation.setMetadata(new java.util.LinkedHashMap<>(Map.of(
+                "commercialJourneyOperationId", journeyId.toString(),
+                "paymentStatus", "REQUIRES_ACTION")));
+
+        BusinessOperation journey = new BusinessOperation();
+        journey.setId(journeyId);
+        journey.setBusinessId(businessId);
+        journey.setCustomerId(customerId);
+        journey.setType(BusinessOperation.Type.REQUEST);
+        journey.setStatus(BusinessOperation.Status.CONFIRMED);
+        journey.setRevision(4);
+        journey.setSource(BusinessOrder.Source.WHATSAPP);
+        journey.setMetadata(new java.util.LinkedHashMap<>(Map.of(
+                "commercialStage", "PAYMENT_LINK_SENT")));
+
+        when(payments.findByIdAndBusinessId(payment.getId(), businessId))
+                .thenReturn(Optional.of(payment));
+        when(providers.byCode(businessId, "mercadopago")).thenReturn(Optional.of(provider));
+        when(provider.getStatus(any())).thenReturn(new PaymentProviderAdapter.StatusResult(
+                BusinessPayment.Status.SUCCEEDED,
+                Map.of("remoteStatus", "processed", "remoteStatusDetail", "accredited")));
+        when(operations.findByIdAndBusinessId(paymentOperationId, businessId))
+                .thenReturn(Optional.of(paymentOperation));
+        when(operations.findByIdAndBusinessId(journeyId, businessId))
+                .thenReturn(Optional.of(journey));
+
+        JSONObject result = service.status(
+                businessId,
+                customerId,
+                sourceReferenceId,
+                "+56911111111",
+                BusinessOrder.Source.WHATSAPP,
+                new JSONObject().put("paymentId", payment.getId().toString()));
+
+        assertTrue(result.getBoolean("success"), result::toString);
+        assertEquals("SUCCEEDED", result.getJSONObject("data").getString("status"));
+        assertEquals(BusinessPayment.Status.SUCCEEDED, payment.getStatus());
+        assertEquals("SUCCEEDED", paymentOperation.getMetadata().get("paymentStatus"));
+        assertEquals("PAID", journey.getMetadata().get("commercialStage"));
+        assertEquals("SUCCEEDED", journey.getMetadata().get("paymentStatus"));
+        assertEquals("PAYMENT_STATUS_VERIFIED", journey.getMetadata().get("lastAction"));
+        assertEquals(5, journey.getRevision());
+    }
+
     private static BusinessOperation payableTarget(UUID businessId,
                                                    UUID customerId,
                                                    UUID sourceReferenceId,
