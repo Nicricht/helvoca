@@ -21,6 +21,13 @@ Catalog product
           |- available
           |- reorder threshold
           |
+          +--> Product variants
+          |      |- name (for example Negro / 42)
+          |      |- option values JSON (color, size, etc.)
+          |      |- unique SKU
+          |      |- own on-hand / reserved / available
+          |      `- own reorder threshold
+          |
           +--> Reservations
           |      |- ACTIVE
           |      |- CONSUMED
@@ -45,7 +52,10 @@ Catalog product
 - expired order reservations are not released while a payment remains `REQUIRES_ACTION` or `PENDING`;
 - if an expired ACTIVE hold belongs to an already `SUCCEEDED` payment, the expiry worker repairs it by consuming the stock instead of releasing it;
 - every stock mutation creates a movement record;
-- SKU is unique inside a business;
+- base inventory SKU is unique inside a business;
+- every product variant has its own required SKU and stock balance;
+- variant creation refuses a SKU already used by base product inventory or another variant;
+- a variant with reserved units cannot be deactivated;
 - no AI provider is allowed to invent stock.
 
 ## Initial API
@@ -75,4 +85,5 @@ This worker is intentionally independent from `APP_JOBS_ENABLED` because releasi
 
 1. add PostgreSQL concurrency and tenant-isolation integration certification;
 2. add inventory management UI and low-stock dashboard;
-3. add product variants (size/color) after the base stock model is certified.
+3. connect variant selection to order lines and AI stock lookup;
+4. add variant management to the inventory UI.

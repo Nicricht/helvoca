@@ -20,6 +20,9 @@ public class InventoryMovement {
     @Column(name = "catalog_item_id", nullable = false)
     private UUID catalogItemId;
 
+    @Column(name = "variant_id")
+    private UUID variantId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "movement_type", nullable = false, length = 30)
     private Type type;
@@ -58,6 +61,8 @@ public class InventoryMovement {
     public void setBusinessId(UUID businessId) { this.businessId = businessId; }
     public UUID getCatalogItemId() { return catalogItemId; }
     public void setCatalogItemId(UUID catalogItemId) { this.catalogItemId = catalogItemId; }
+    public UUID getVariantId() { return variantId; }
+    public void setVariantId(UUID variantId) { this.variantId = variantId; }
     public Type getType() { return type; }
     public void setType(Type type) { this.type = type; }
     public int getQuantityDelta() { return quantityDelta; }
