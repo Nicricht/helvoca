@@ -360,7 +360,8 @@ public class CommercialOperationToolService {
                 .put("selectedCatalogItemId", item.getId().toString())
                 .put("commercialStage", commercialStage)
                 .put("idempotent", idempotent)
-                .put("product", catalogData(item, media));
+                .put("product", catalogData(
+                        item, media, variantsForItem(operation.getBusinessId(), item)));
     }
 
     private JSONObject quoteSelectedProduct(UUID businessId,
@@ -470,7 +471,8 @@ public class CommercialOperationToolService {
                 .put("currency", currency)
                 .put("commercialStage", "QUOTE_PENDING")
                 .put("idempotent", idempotent)
-                .put("product", catalogData(item, media)));
+                .put("product", catalogData(
+                        item, media, variantsForItem(businessId, item))));
     }
 
     private JSONObject quoteSelectedProductOrder(UUID businessId,
@@ -1019,6 +1021,19 @@ public class CommercialOperationToolService {
                 .put("total", order.getTotal())
                 .put("currency", order.getCurrency())
                 .put("deliveryAddress", nullable(order.getDeliveryAddress()));
+    }
+
+    private List<InventoryProductVariant> variantsForItem(UUID businessId, CatalogItem item) {
+        if (inventoryVariants == null
+                || item == null
+                || item.getKind() != CatalogItem.Kind.PRODUCT) {
+            return List.of();
+        }
+        return inventoryVariants
+                .findAllByBusinessIdAndCatalogItemIdOrderByNameAsc(businessId, item.getId())
+                .stream()
+                .filter(InventoryProductVariant::isActive)
+                .toList();
     }
 
     private static JSONObject catalogData(CatalogItem item,
