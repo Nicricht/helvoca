@@ -74,11 +74,15 @@ jobs:
           r5="$(ask "Sí, quiero reservar Odontología General el lunes 28 de septiembre de 2026 a las 10:30.")"
           finish="$(curl --fail-with-body -sS -X POST "$BASE/api/v1/simulator/sessions/$sid/finish"             -H "Authorization: Bearer $token")"
 
+          index=0
           for response in "$r1" "$r2" "$r3" "$r4" "$r5"; do
+            index=$((index + 1))
             reply="$(jq -er '.reply' <<<"$response")"
+            echo "TURN_$index=$reply"
+            echo "TURN_${index}_ACTIONS=$(jq -r '.actionCount' <<<"$response")"
             test -n "$reply"
             if grep -Fq "No pude completar esa parte de la prueba ahora" <<<"$reply"; then
-              echo "SIMULATOR_GENERIC_FAILURE"
+              echo "SIMULATOR_GENERIC_FAILURE_TURN_$index"
               exit 1
             fi
           done
