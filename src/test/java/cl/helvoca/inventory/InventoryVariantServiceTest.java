@@ -7,6 +7,7 @@ import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,6 +23,7 @@ class InventoryVariantServiceTest {
     private InventoryMovementRepository movements;
     private CatalogItemRepository catalog;
     private TenantProvider tenant;
+    private InventoryAlertService inventoryAlerts;
     private InventoryVariantService service;
 
     private UUID businessId;
@@ -34,7 +36,9 @@ class InventoryVariantServiceTest {
         movements = mock(InventoryMovementRepository.class);
         catalog = mock(CatalogItemRepository.class);
         tenant = mock(TenantProvider.class);
+        inventoryAlerts = mock(InventoryAlertService.class);
         service = new InventoryVariantService(variants, baseStocks, movements, catalog, tenant);
+        ReflectionTestUtils.setField(service, "inventoryAlerts", inventoryAlerts);
 
         businessId = UUID.randomUUID();
         productId = UUID.randomUUID();
@@ -90,6 +94,7 @@ class InventoryVariantServiceTest {
         verify(movements).save(movement.capture());
         assertEquals(view.id(), movement.getValue().getVariantId());
         assertEquals(InventoryMovement.Type.CONFIGURE, movement.getValue().getType());
+        verify(inventoryAlerts).evaluateVariant(any(InventoryProductVariant.class));
     }
 
     @Test
