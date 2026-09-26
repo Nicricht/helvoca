@@ -1,6 +1,8 @@
 package cl.helvoca.agent;
 
+import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
+import cl.helvoca.customer.Customer;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationRepository;
@@ -25,6 +27,70 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class CommercialSandboxE2eCertificationStartupRunnerTest {
+
+    @Test
+    void prepareSeedLetsJpaGenerateNewJourneyIdAndUsesRunIdLookup() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID generatedJourneyId = UUID.randomUUID();
+
+        Customer customer = mock(Customer.class);
+        when(customer.getId()).thenReturn(customerId);
+
+        CatalogItem item = new CatalogItem();
+        item.setId(itemId);
+        item.setBusinessId(businessId);
+        item.setKind(CatalogItem.Kind.PRODUCT);
+        item.setName("RecepVoz Sandbox E2E Product");
+        item.setPrice(new BigDecimal("1000"));
+        item.setCurrency("CLP");
+        item.setActive(true);
+
+        CustomerRepository customers = mock(CustomerRepository.class);
+        CatalogItemRepository catalog = mock(CatalogItemRepository.class);
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        BusinessPaymentRepository payments = mock(BusinessPaymentRepository.class);
+        CommercialOperationToolService commercial = mock(CommercialOperationToolService.class);
+        CommercialCheckoutCapabilityActivationStartupRunner activation =
+                mock(CommercialCheckoutCapabilityActivationStartupRunner.class);
+
+        when(customers.findFirstRawByBusinessIdAndPhone(businessId, "+56900009999"))
+                .thenReturn(Optional.of(customer));
+        when(catalog.findAllByBusinessIdOrderByNameAsc(businessId))
+                .thenReturn(java.util.List.of(item));
+        when(operations.findFirstSandboxCertificationJourney(businessId, "run-generated"))
+                .thenReturn(Optional.empty());
+        when(operations.saveAndFlush(any(BusinessOperation.class))).thenAnswer(invocation -> {
+            BusinessOperation operation = invocation.getArgument(0);
+            assertNull(operation.getId(), "A new @GeneratedValue journey must not have a preassigned id");
+            operation.setId(generatedJourneyId);
+            return operation;
+        });
+
+        CommercialSandboxE2eCertificationStartupRunner runner =
+                new CommercialSandboxE2eCertificationStartupRunner(
+                        false,
+                        "",
+                        "",
+                        "1000",
+                        mock(TenantDatabaseContext.class),
+                        mock(PlatformTransactionManager.class),
+                        activation,
+                        customers,
+                        catalog,
+                        operations,
+                        payments,
+                        commercial);
+
+        var seed = runner.prepareSeed(businessId, "run-generated", new BigDecimal("1000"));
+
+        assertEquals(generatedJourneyId, seed.journeyOperationId());
+        assertEquals(customerId, seed.customerId());
+        assertEquals(itemId, seed.catalogItemId());
+        verify(activation).activate(businessId);
+        verify(operations).findFirstSandboxCertificationJourney(businessId, "run-generated");
+    }
 
     @Test
     void fullJourneyCreatesOneLinkedCheckout() {

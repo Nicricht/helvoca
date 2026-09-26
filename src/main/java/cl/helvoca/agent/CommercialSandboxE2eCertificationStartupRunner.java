@@ -22,7 +22,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -149,12 +148,11 @@ public class CommercialSandboxE2eCertificationStartupRunner implements Applicati
             item = catalog.saveAndFlush(item);
         }
 
-        UUID journeyId = deterministicUuid("journey", businessId, runId);
-        BusinessOperation journey = operations.findByIdAndBusinessId(journeyId, businessId)
+        BusinessOperation journey = operations
+                .findFirstSandboxCertificationJourney(businessId, runId)
                 .orElse(null);
         if (journey == null) {
             journey = new BusinessOperation();
-            journey.setId(journeyId);
             journey.setBusinessId(businessId);
             journey.setCustomerId(customer.getId());
             journey.setType(BusinessOperation.Type.REQUEST);
@@ -388,11 +386,6 @@ public class CommercialSandboxE2eCertificationStartupRunner implements Applicati
         } catch (Exception e) {
             return null;
         }
-    }
-
-    private static UUID deterministicUuid(String kind, UUID businessId, String value) {
-        String raw = "recepvoz-commercial-sandbox:" + kind + ":" + businessId + ":" + value;
-        return UUID.nameUUIDFromBytes(raw.getBytes(StandardCharsets.UTF_8));
     }
 
     private static UUID parseTenant(String raw) {
