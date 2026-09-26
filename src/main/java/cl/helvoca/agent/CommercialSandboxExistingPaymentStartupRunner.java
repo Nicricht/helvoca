@@ -117,7 +117,19 @@ public class CommercialSandboxExistingPaymentStartupRunner implements Applicatio
                 .findByOperationIdAndBusinessId(paymentOperationId, businessId)
                 .orElse(null);
         if (existing != null) {
-            return result(journeyId, orderId, existing, true);
+            if (paymentOperation.getCustomerId() == null) {
+                throw new IllegalStateException(
+                        "Commercial sandbox payment has no customer");
+            }
+            requireSuccess(executePayment(
+                    businessId,
+                    paymentOperation,
+                    "get_payment_status",
+                    new JSONObject().put("paymentId", existing.getId().toString())));
+            BusinessPayment refreshed = payments
+                    .findByOperationIdAndBusinessId(paymentOperationId, businessId)
+                    .orElse(existing);
+            return result(journeyId, orderId, refreshed, true);
         }
 
         if (paymentOperation.getStatus() != BusinessOperation.Status.AWAITING_CONFIRMATION
