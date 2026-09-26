@@ -87,6 +87,26 @@ class PostgresRowLevelSecurityIntegrationTest {
     }
 
     @Test
+    void businessProfilePhoneConstraintAcceptsApiValidE164Phone() {
+        ownerJdbc.update(
+                "INSERT INTO business_profile(business_id, public_phone) VALUES (?, ?)",
+                businessA,
+                "+56975856664");
+
+        assertEquals(
+                "+56975856664",
+                ownerJdbc.queryForObject(
+                        "SELECT public_phone FROM business_profile WHERE business_id = ?",
+                        String.class,
+                        businessA));
+
+        assertThrows(DataAccessException.class, () -> ownerJdbc.update(
+                "INSERT INTO business_profile(business_id, public_phone) VALUES (?, ?)",
+                businessB,
+                "56975856664"));
+    }
+
+    @Test
     void auditLogIsTenantIsolatedAndApplicationAppendOnly() {
         UUID auditA = UUID.randomUUID();
         UUID auditB = UUID.randomUUID();
