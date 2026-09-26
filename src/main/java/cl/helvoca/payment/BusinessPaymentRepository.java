@@ -2,6 +2,7 @@ package cl.helvoca.payment;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,4 +24,6 @@ public interface BusinessPaymentRepository extends JpaRepository<BusinessPayment
             UUID businessId, UUID sourceReferenceId);
     List<BusinessPayment> findTop50ByBusinessIdAndStatusInOrderByUpdatedAtAsc(
             UUID businessId, List<BusinessPayment.Status> statuses);
+    List<BusinessPayment> findAllByBusinessIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+            UUID businessId, Instant start, Instant end);
 }
