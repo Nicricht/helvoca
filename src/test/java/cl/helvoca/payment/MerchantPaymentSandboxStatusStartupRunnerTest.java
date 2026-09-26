@@ -22,7 +22,9 @@ class MerchantPaymentSandboxStatusStartupRunnerTest {
         when(provider.providerCode()).thenReturn("mercadopago");
         when(provider.getStatus(any())).thenReturn(new PaymentProviderAdapter.StatusResult(
                 BusinessPayment.Status.SUCCEEDED,
-                java.util.Map.of("remoteStatus", "processed")));
+                java.util.Map.of(
+                        "remoteStatus", "processed",
+                        "remoteStatusDetail", "accredited")));
 
         MerchantPaymentSandboxStatusStartupRunner runner =
                 new MerchantPaymentSandboxStatusStartupRunner(
@@ -37,6 +39,8 @@ class MerchantPaymentSandboxStatusStartupRunnerTest {
         assertEquals("mercadopago", result.provider());
         assertEquals("ORDTST123", result.externalId());
         assertEquals(BusinessPayment.Status.SUCCEEDED, result.status());
+        assertEquals("processed", result.remoteStatus());
+        assertEquals("accredited", result.remoteStatusDetail());
         verify(provider).getStatus(argThat(command ->
                 businessId.equals(command.businessId())
                         && "ORDTST123".equals(command.externalId())));
