@@ -90,6 +90,47 @@ class PaymentWorkflowServiceTest {
     }
 
     @Test
+    void updatePreservesCommercialJourneyLinkageMetadata() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID sourceReferenceId = UUID.randomUUID();
+        UUID journeyId = UUID.randomUUID();
+        BusinessOperation target = payableTarget(
+                businessId, customerId, sourceReferenceId, new BigDecimal("1000"));
+        BusinessOperation paymentDraft = paymentDraft(
+                businessId, customerId, sourceReferenceId, target, new BigDecimal("1000"));
+
+        Map<String, Object> metadata = new java.util.LinkedHashMap<>(paymentDraft.getMetadata());
+        metadata.put("commercialJourneyOperationId", journeyId.toString());
+        paymentDraft.setMetadata(metadata);
+
+        when(operations.findByIdAndBusinessId(paymentDraft.getId(), businessId))
+                .thenReturn(Optional.of(paymentDraft));
+        when(payments.findByOperationIdAndBusinessId(paymentDraft.getId(), businessId))
+                .thenReturn(Optional.empty());
+        when(operations.findByIdAndBusinessId(target.getId(), businessId))
+                .thenReturn(Optional.of(target));
+        when(payments.findAllByBusinessIdAndTargetOperationIdOrderByCreatedAtAsc(
+                businessId, target.getId())).thenReturn(List.of());
+
+        JSONObject result = service.update(
+                businessId,
+                customerId,
+                sourceReferenceId,
+                "+56911111111",
+                BusinessOrder.Source.WHATSAPP,
+                new JSONObject()
+                        .put("operationId", paymentDraft.getId().toString())
+                        .put("targetOperationId", target.getId().toString()));
+
+        assertTrue(result.getBoolean("success"), result::toString);
+        assertEquals(
+                journeyId.toString(),
+                paymentDraft.getMetadata().get("commercialJourneyOperationId"));
+        assertEquals(target.getId().toString(), paymentDraft.getMetadata().get("targetOperationId"));
+    }
+
+    @Test
     void staleConfirmationTokenIsRejectedBeforeProviderCall() {
         UUID businessId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
