@@ -119,13 +119,13 @@ public class CallCertificationService {
                                              List<CallAction> persistedActions,
                                              List<String> reasons) {
         int cleanupCount = 0;
+        boolean createdBookingEntityFound = false;
         for (CallAction action : persistedActions) {
             if (!action.isSuccess() || !"BOOKING_CREATED".equals(action.getActionType())) continue;
             UUID bookingId = action.getEntityId();
-            if (bookingId == null) {
-                reasons.add("created_booking_entity_missing");
-                continue;
-            }
+            if (bookingId == null) continue;
+
+            createdBookingEntityFound = true;
             Booking booking = bookings.findByIdAndBusinessId(bookingId, call.getBusinessId()).orElse(null);
             if (booking == null) {
                 reasons.add("created_booking_not_found");
@@ -139,6 +139,9 @@ public class CallCertificationService {
                 log.warn("RECEPVOZ_CALL_CERTIFICATION CLEANUP call={} entity_id={} action=cancel_booking",
                         call.getId(), bookingId);
             }
+        }
+        if (!createdBookingEntityFound && hasSuccessful(persistedActions, "BOOKING_CREATED")) {
+            reasons.add("created_booking_entity_missing");
         }
         return cleanupCount;
     }
