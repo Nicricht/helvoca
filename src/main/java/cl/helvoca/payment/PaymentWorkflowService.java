@@ -7,6 +7,8 @@ import cl.helvoca.operations.ConversationStateService;
 import cl.helvoca.operations.OperationPolicyService;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +21,7 @@ import java.util.UUID;
 
 @Service
 public class PaymentWorkflowService {
+    private static final Logger log = LoggerFactory.getLogger(PaymentWorkflowService.class);
     private final BusinessOperationRepository operations;
     private final BusinessPaymentRepository payments;
     private final PaymentProviderRegistry providers;
@@ -228,6 +231,13 @@ public class PaymentWorkflowService {
                             "paymentOperationId", operation.getId().toString(),
                             "targetOperationId", recalculated.target().getId().toString())));
         } catch (Exception e) {
+            log.warn(
+                    "PAYMENT_PROVIDER_CREATE_FAILED businessId={} operationId={} provider={} reason={} message={}",
+                    businessId,
+                    operation.getId(),
+                    provider.providerCode(),
+                    e.getClass().getSimpleName(),
+                    e.getMessage() == null ? "" : e.getMessage());
             return error("PAYMENT_PROVIDER_FAILED",
                     "El proveedor de pagos no pudo crear la intención. No se confirmó ningún cobro.");
         }
