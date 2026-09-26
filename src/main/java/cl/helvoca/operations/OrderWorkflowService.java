@@ -4,9 +4,12 @@ import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
 import cl.helvoca.delivery.DeliveryZone;
 import cl.helvoca.delivery.DeliveryZoneRepository;
+import cl.helvoca.inventory.InventoryService;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
@@ -27,6 +30,9 @@ public class OrderWorkflowService {
     private final BusinessOrderRepository orders;
     private final BusinessOrderLineRepository orderLines;
     private final BusinessOperationCapabilityService capabilities;
+
+    @Autowired(required = false)
+    private InventoryService inventory;
 
     public OrderWorkflowService(CatalogItemRepository catalog,
                                 DeliveryZoneRepository deliveryZones,
@@ -94,6 +100,7 @@ public class OrderWorkflowService {
         return success(quoteData(operation, calculation));
     }
 
+    @Transactional
     public JSONObject confirm(UUID businessId,
                               UUID customerId,
                               UUID sourceReferenceId,
@@ -149,6 +156,22 @@ public class OrderWorkflowService {
                     quoteData(operation, recalculated));
         }
 
+        InventoryService.OrderReservationResult inventoryReservation = inventory == null
+                ? new InventoryService.OrderReservationResult(true, null, null, List.of())
+                : inventory.reserveOrder(
+                        businessId,
+                        operationId,
+                        recalculated.lines().stream()
+                                .map(line -> new InventoryService.OrderItem(line.item().getId(), line.quantity()))
+                                .toList());
+        if (!inventoryReservation.success()) {
+            return error(
+                    inventoryReservation.code() == null ? "INSUFFICIENT_STOCK" : inventoryReservation.code(),
+                    inventoryReservation.message() == null
+                            ? "No hay stock suficiente para confirmar el pedido."
+                            : inventoryReservation.message());
+        }
+
         BusinessOrder order = new BusinessOrder();
         order.setOperationId(operation.getId());
         order.setBusinessId(businessId);
@@ -190,6 +213,8 @@ public class OrderWorkflowService {
 
         JSONObject data = orderData(order, persisted);
         data.put("operationId", operationId.toString());
+        data.put("inventoryReservationIds",
+                new JSONArray(inventoryReservation.reservationIds().stream().map(UUID::toString).toList()));
         data.put("idempotentReplay", false);
         return success(data);
     }
