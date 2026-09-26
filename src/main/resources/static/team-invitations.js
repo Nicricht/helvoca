@@ -180,7 +180,7 @@
       }
       card.classList.remove('hidden');
       const [users, invitations] = await Promise.all([
-        api('/api/v1/admin/users'),
+        api('/api/v1/admin/users').catch(() => []),
         api('/api/v1/admin/invitations')
       ]);
       renderMembers(users);
@@ -213,7 +213,7 @@
       setMessage('Invitación creada. Comparte este enlace con la persona invitada.', 'success');
       form.reset();
       const [users, invitations] = await Promise.all([
-        api('/api/v1/admin/users'),
+        api('/api/v1/admin/users').catch(() => []),
         api('/api/v1/admin/invitations')
       ]);
       renderMembers(users);
