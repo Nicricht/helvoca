@@ -66,6 +66,7 @@ public class TenantDatabaseContextFilter extends OncePerRequestFilter {
         if (path == null) return false;
         return path.equals("/api/v1/auth/login")
                 || path.equals("/api/v1/auth/register")
+                || path.startsWith("/api/v1/auth/invitations/")
                 || path.startsWith("/webhooks/")
                 || path.startsWith("/ws/");
     }
