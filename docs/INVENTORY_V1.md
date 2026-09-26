@@ -56,7 +56,11 @@ Catalog product
 - every product variant has its own required SKU and stock balance;
 - variant creation refuses a SKU already used by base product inventory or another variant;
 - a variant with reserved units cannot be deactivated;
-- no AI provider is allowed to invent stock.
+- no AI provider is allowed to invent stock;
+- inventory alerts are tenant-scoped and deduplicated per product or variant;
+- alert transitions are state-based: normal → low stock → out of stock → restocked;
+- acknowledging an alert does not cause the same state to notify again;
+- external WhatsApp/provider delivery is not triggered by inventory alerts unless a separate authorized delivery path is explicitly enabled.
 
 ## Initial API
 
@@ -68,6 +72,9 @@ Catalog product
 - `POST /api/v1/inventory/reservations/{reservationId}/release`
 - `POST /api/v1/inventory/reservations/{reservationId}/consume`
 - `GET /api/v1/inventory/{catalogItemId}/movements`
+- `GET /api/v1/inventory/alerts`
+- `GET /api/v1/inventory/alerts/history`
+- `POST /api/v1/inventory/alerts/{alertId}/acknowledge`
 
 ## Reservation expiry
 
@@ -97,7 +104,21 @@ Product variants now carry an exact backend-owned identity through the full comm
 - the visual inventory workspace can create, edit, adjust and inspect variant history;
 - BUSINESS_ADMIN can mutate variants while OPERATOR remains read-only.
 
+## Automatic inventory alerts
+
+V70 adds an internal alert state machine for base products and variants.
+
+- `LOW_STOCK`: available stock is positive and at or below the configured minimum;
+- `OUT_OF_STOCK`: available stock reaches zero;
+- `RESTOCKED`: a previously low/out-of-stock item returns above its threshold;
+- one open alert exists per product/variant, preventing repeated duplicate notifications;
+- BUSINESS_ADMIN can acknowledge alerts from `/inventory.html`;
+- OPERATOR can view alerts but cannot acknowledge them;
+- PostgreSQL RLS protects alert rows by tenant;
+- the inventory console refreshes alerts after product and variant changes;
+- this layer is deliberately in-app only. It does not create outbound WhatsApp traffic.
+
 ## Next isolated steps
 
-1. add PostgreSQL concurrency and tenant-isolation integration certification for mixed base-product + variant orders;
-2. add low-stock automation/notifications for products and variants.
+1. add PostgreSQL concurrency certification for mixed base-product + variant orders;
+2. add an opt-in customer restock-watch queue that can later connect to authorized outbound WhatsApp delivery.
