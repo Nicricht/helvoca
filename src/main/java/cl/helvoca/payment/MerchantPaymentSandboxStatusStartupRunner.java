@@ -54,11 +54,13 @@ public class MerchantPaymentSandboxStatusStartupRunner implements ApplicationRun
             try {
                 StatusCheck result = check(tenantId, externalId);
                 log.info(
-                        "MERCHANT_PAYMENT_SANDBOX_STATUS_CHECKED businessId={} provider={} externalId={} status={}",
+                        "MERCHANT_PAYMENT_SANDBOX_STATUS_CHECKED businessId={} provider={} externalId={} status={} remoteStatus={} remoteStatusDetail={}",
                         tenantId,
                         result.provider(),
                         result.externalId(),
-                        result.status());
+                        result.status(),
+                        safeLogMessage(result.remoteStatus()),
+                        safeLogMessage(result.remoteStatusDetail()));
             } catch (Exception e) {
                 log.error(
                         "MERCHANT_PAYMENT_SANDBOX_STATUS_CHECK_FAILED businessId={} externalId={} reason={} message={}",
@@ -82,7 +84,18 @@ public class MerchantPaymentSandboxStatusStartupRunner implements ApplicationRun
         if (status == null || status.status() == null) {
             throw new IllegalStateException("Mercado Pago sandbox returned no verified status");
         }
-        return new StatusCheck(provider.providerCode(), externalId, status.status());
+        return new StatusCheck(
+                provider.providerCode(),
+                externalId,
+                status.status(),
+                metadataString(status.metadata(), "remoteStatus"),
+                metadataString(status.metadata(), "remoteStatusDetail"));
+    }
+
+    private static String metadataString(java.util.Map<String, Object> metadata, String key) {
+        if (metadata == null || key == null) return null;
+        Object value = metadata.get(key);
+        return value == null ? null : String.valueOf(value);
     }
 
     static String safeLogMessage(String message) {
@@ -98,5 +111,7 @@ public class MerchantPaymentSandboxStatusStartupRunner implements ApplicationRun
 
     record StatusCheck(String provider,
                        String externalId,
-                       BusinessPayment.Status status) {}
+                       BusinessPayment.Status status,
+                       String remoteStatus,
+                       String remoteStatusDetail) {}
 }
