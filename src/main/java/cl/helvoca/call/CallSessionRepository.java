@@ -33,6 +33,8 @@ public interface CallSessionRepository extends JpaRepository<CallSession, UUID> 
             UUID businessId, String excludedProvider, Instant start, Instant end);
     long countByBusinessIdAndCertificationFalseAndTelephonyProviderNotAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
             UUID businessId, String excludedProvider, Collection<CallStatus> statuses, Instant start, Instant end);
+    long countByBusinessIdAndCertificationFalseAndTelephonyProviderNotAndResolutionAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+            UUID businessId, String excludedProvider, String resolution, Instant start, Instant end);
 
     @Query("""
         select coalesce(sum(c.estimatedTotalCostUsd), 0) from CallSession c
