@@ -137,7 +137,7 @@ public class MercadoPagoOrderClient {
     }
 
     private static JSONObject firstObject(JSONArray array) {
-        return array == null || array.isEmpty() ? null : array.optJSONObject(0);
+        return array == null || array.length() == 0 ? null : array.optJSONObject(0);
     }
 
     private static String firstNonBlank(String... values) {
