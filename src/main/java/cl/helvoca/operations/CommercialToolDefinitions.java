@@ -95,6 +95,12 @@ public final class CommercialToolDefinitions {
                 .put(function("list_catalog",
                         "Lista el catálogo universal activo del negocio con productos, servicios, precios, moneda y media comercial disponible. Cada ítem indica hasMedia y media[]. Usa los UUID exactos devueltos; nunca inventes productos, precios ni media.",
                         object()))
+                .put(function(CommercialOperationToolService.GET_STOCK_TOOL,
+                        "Consulta stock backend-autoritativo de un producto por catalogItemId o SKU. Si availabilityKnown=false, no afirmes que hay o no hay unidades; indica que la disponibilidad no está confirmada.",
+                        object().put("properties", new JSONObject()
+                                        .put("catalogItemId", string("UUID exacto del producto devuelto por list_catalog"))
+                                        .put("sku", string("SKU exacto del producto, si el cliente lo entrega")))
+                                ))
                 .put(function(CommercialOperationToolService.SHOWCASE_SELECTION_TOOL,
                         "Resuelve y guarda en backend qué producto eligió el cliente del último PRODUCT_SHOWCASE de la misma operación. Usa selectionIndex 1, 2 o 3 para referencias ordinales, o catalogItemId solo si ese UUID fue mostrado. El backend valida tenant, cliente, operación y escaparate; no inventes selecciones.",
                         object().put("properties", new JSONObject()
@@ -212,6 +218,7 @@ public final class CommercialToolDefinitions {
                 .append(enabled).append(".\n");
         if (enabled.contains(BusinessOperationCapability.CATALOG)) {
             out.append("Usa list_catalog como fuente oficial de productos, servicios, precios y media comercial. No inventes ítems, precios, imágenes ni videos. ")
+                    .append("Cuando el cliente pregunte por existencia o cantidad disponible usa get_stock. Solo afirma una cantidad cuando availabilityKnown=true; si es false, explica que el stock no está confirmado. ")
                     .append("Si el cliente pide ver productos por WhatsApp, elige como máximo 3 ítems con hasMedia=true. Asegura primero que el cliente esté identificado en el contexto; en voz usa find_caller y, si hace falta, register_caller. ")
                     .append("Luego crea una solicitud create_request de tipo product_showcase para obtener un operationId y usa send_whatsapp_operation con purpose PRODUCT_SHOWCASE y esos catalogItemIds exactos. ")
                     .append("La llamada y WhatsApp deben conservar ese mismo operationId. ")

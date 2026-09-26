@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RecepVoz · Inventario</title>
+    <meta name="description" content="Control de stock, reservas y movimientos de inventario de RecepVoz.">
+    <meta name="theme-color" content="#0b0e14">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/inventory.css">
+</head>
+<body class="inventory-page">
+<div class="shell">
+    <header class="topbar">
+        <div>
+            <div id="inventoryBrand" class="brand">RECEPVOZ</div>
+            <div class="subtitle">Inventario conectado a ventas e IA</div>
+        </div>
+        <nav class="inventory-nav" aria-label="Navegación principal">
+            <a href="/">Inicio</a>
+            <a class="active" href="/inventory.html" aria-current="page">Inventario</a>
+            <a href="/settings.html">Configuración</a>
+        </nav>
+        <div class="top-actions">
+            <span id="inventoryRoleBadge" class="badge muted">Cargando</span>
+            <button id="inventoryLogoutBtn" class="button ghost" type="button">Salir</button>
+        </div>
+    </header>
+
+    <main class="inventory-main">
+        <section id="inventoryLoading" class="card inventory-loading">
+            <div class="inventory-spinner" aria-hidden="true"></div>
+            <div>
+                <strong>Cargando inventario</strong>
+                <p>Consultando catálogo y stock autoritativo.</p>
+            </div>
+        </section>
+
+        <section id="inventoryApp" class="hidden">
+            <div class="inventory-heading">
+                <div>
+                    <div class="eyebrow">Operación</div>
+                    <h1>Inventario</h1>
+                    <p>Lo que la IA puede prometer depende de estos números. El stock disponible se calcula como físico menos reservado.</p>
+                </div>
+                <button id="inventoryRefreshBtn" class="button ghost" type="button">Actualizar</button>
+            </div>
+
+            <div id="inventoryMessage" class="message hidden" role="status"></div>
+
+            <section class="inventory-kpis" aria-label="Resumen de inventario">
+                <article class="inventory-kpi">
+                    <span>Productos</span>
+                    <strong id="inventoryProductsCount">0</strong>
+                    <small id="inventoryConfiguredCount">0 con seguimiento</small>
+                </article>
+                <article class="inventory-kpi">
+                    <span>Stock físico</span>
+                    <strong id="inventoryOnHandTotal">0</strong>
+                    <small>Unidades registradas</small>
+                </article>
+                <article class="inventory-kpi">
+                    <span>Reservado</span>
+                    <strong id="inventoryReservedTotal">0</strong>
+                    <small>Pedidos y operaciones activas</small>
+                </article>
+                <article id="inventoryLowStockKpi" class="inventory-kpi">
+                    <span>Stock bajo</span>
+                    <strong id="inventoryLowStockCount">0</strong>
+                    <small>Productos que requieren atención</small>
+                </article>
+            </section>
+
+            <section class="card inventory-workspace">
+                <div class="inventory-toolbar">
+                    <div class="inventory-search">
+                        <label for="inventorySearch">Buscar</label>
+                        <input id="inventorySearch" type="search" placeholder="Producto o SKU" autocomplete="off">
+                    </div>
+                    <label class="inventory-filter">
+                        Estado
+                        <select id="inventoryFilter">
+                            <option value="ALL">Todos</option>
+                            <option value="TRACKED">Con seguimiento</option>
+                            <option value="LOW">Stock bajo</option>
+                            <option value="UNCONFIGURED">Sin configurar</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="inventory-table-wrap">
+                    <table class="inventory-table">
+                        <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>SKU</th>
+                            <th>Físico</th>
+                            <th>Reservado</th>
+                            <th>Disponible</th>
+                            <th>Mínimo</th>
+                            <th>Estado</th>
+                            <th class="inventory-actions-head">Acciones</th>
+                        </tr>
+                        </thead>
+                        <tbody id="inventoryRows"></tbody>
+                    </table>
+                </div>
+
+                <div id="inventoryEmpty" class="inventory-empty hidden">
+                    <strong>No hay productos para mostrar.</strong>
+                    <span>Ajusta el filtro o agrega productos al catálogo del negocio.</span>
+                </div>
+            </section>
+        </section>
+
+        <section id="inventoryAuthRequired" class="card inventory-auth-required hidden">
+            <div class="eyebrow">Sesión requerida</div>
+            <h1>Ingresa a RecepVoz para administrar el inventario.</h1>
+            <p>El inventario siempre se abre dentro del negocio autenticado y nunca acepta un businessId desde el navegador.</p>
+            <a class="button primary inventory-login-link" href="/">Ir a iniciar sesión</a>
+        </section>
+    </main>
+</div>
+
+<dialog id="inventoryConfigDialog" class="inventory-dialog">
+    <form id="inventoryConfigForm" method="dialog">
+        <div class="inventory-dialog-head">
+            <div>
+                <div class="eyebrow">Configuración de stock</div>
+                <h2 id="inventoryConfigTitle">Producto</h2>
+            </div>
+            <button class="inventory-dialog-close" type="button" data-close-dialog aria-label="Cerrar">×</button>
+        </div>
+        <input name="catalogItemId" type="hidden">
+        <div class="inventory-form-grid">
+            <label>SKU
+                <input name="sku" maxlength="80" placeholder="PROD-001">
+            </label>
+            <label>Stock físico
+                <input name="onHand" type="number" min="0" step="1" required>
+            </label>
+            <label>Stock mínimo
+                <input name="reorderThreshold" type="number" min="0" step="1" required>
+            </label>
+            <label class="inventory-switch">
+                <span>Seguimiento activo</span>
+                <input name="trackingEnabled" type="checkbox">
+            </label>
+            <label class="inventory-form-wide">Nota
+                <input name="note" maxlength="240" placeholder="Conteo inicial o motivo del cambio">
+            </label>
+        </div>
+        <p class="inventory-form-help">No puedes bajar el stock físico por debajo de las unidades ya reservadas.</p>
+        <div id="inventoryConfigMessage" class="message hidden"></div>
+        <div class="inventory-dialog-actions">
+            <button class="button ghost" type="button" data-close-dialog>Cancelar</button>
+            <button id="inventoryConfigSave" class="button primary" type="submit">Guardar</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="inventoryAdjustDialog" class="inventory-dialog">
+    <form id="inventoryAdjustForm" method="dialog">
+        <div class="inventory-dialog-head">
+            <div>
+                <div class="eyebrow">Movimiento manual</div>
+                <h2 id="inventoryAdjustTitle">Ajustar stock</h2>
+            </div>
+            <button class="inventory-dialog-close" type="button" data-close-dialog aria-label="Cerrar">×</button>
+        </div>
+        <input name="catalogItemId" type="hidden">
+        <div class="inventory-adjust-current">
+            <span>Disponible ahora</span>
+            <strong id="inventoryAdjustAvailable">0</strong>
+        </div>
+        <div class="inventory-form-grid">
+            <label>Cambio de unidades
+                <input name="delta" type="number" step="1" required placeholder="+5 o -2">
+            </label>
+            <label class="inventory-form-wide">Motivo
+                <input name="note" maxlength="240" required placeholder="Reposición, conteo físico, merma...">
+            </label>
+        </div>
+        <div id="inventoryAdjustMessage" class="message hidden"></div>
+        <div class="inventory-dialog-actions">
+            <button class="button ghost" type="button" data-close-dialog>Cancelar</button>
+            <button id="inventoryAdjustSave" class="button primary" type="submit">Aplicar ajuste</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="inventoryHistoryDialog" class="inventory-dialog inventory-history-dialog">
+    <div class="inventory-dialog-head">
+        <div>
+            <div class="eyebrow">Trazabilidad</div>
+            <h2 id="inventoryHistoryTitle">Movimientos</h2>
+        </div>
+        <button class="inventory-dialog-close" type="button" data-close-dialog aria-label="Cerrar">×</button>
+    </div>
+    <div id="inventoryHistoryLoading" class="inventory-history-loading hidden">Cargando movimientos…</div>
+    <div id="inventoryHistoryList" class="inventory-history-list"></div>
+    <div id="inventoryHistoryEmpty" class="inventory-empty hidden">
+        <strong>Sin movimientos todavía.</strong>
+        <span>Los cambios de stock aparecerán aquí.</span>
+    </div>
+    <div class="inventory-dialog-actions">
+        <button class="button ghost" type="button" data-close-dialog>Cerrar</button>
+    </div>
+</dialog>
+
+<script src="/inventory.js" defer></script>
+</body>
+</html>

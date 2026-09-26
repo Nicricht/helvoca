@@ -8,9 +8,11 @@ import cl.helvoca.delivery.DeliveryCoverageService;
 import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZone;
 import cl.helvoca.delivery.DeliveryZoneRepository;
+import cl.helvoca.inventory.InventoryService;
 import cl.helvoca.payment.PaymentWorkflowService;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,9 +30,11 @@ public class CommercialOperationToolService {
     public static final String SHOWCASE_SELECTION_TOOL = "select_showcase_product";
     public static final String SHOWCASE_QUOTE_TOOL = "quote_selected_product";
     public static final String SHOWCASE_ORDER_TOOL = "quote_selected_product_order";
+    public static final String GET_STOCK_TOOL = "get_stock";
 
     private static final Set<String> SUPPORTED = Set.of(
             "list_catalog",
+            GET_STOCK_TOOL,
             SHOWCASE_SELECTION_TOOL,
             SHOWCASE_QUOTE_TOOL,
             SHOWCASE_ORDER_TOOL,
@@ -74,6 +78,9 @@ public class CommercialOperationToolService {
     private final UniversalOperationWorkflowService universalOperations;
     private final PaymentWorkflowService paymentWorkflow;
     private final ConversationStateService conversationState;
+
+    @Autowired(required = false)
+    private InventoryService inventory;
 
     public CommercialOperationToolService(CatalogItemRepository catalog,
                                           CatalogMediaRepository catalogMedia,
@@ -127,6 +134,7 @@ public class CommercialOperationToolService {
                     : new JSONObject(rawArguments);
             result = switch (toolName) {
                 case "list_catalog" -> listCatalog(businessId);
+                case GET_STOCK_TOOL -> getStock(businessId, args);
                 case SHOWCASE_SELECTION_TOOL -> selectShowcaseProduct(businessId, customerId, args);
                 case SHOWCASE_QUOTE_TOOL -> quoteSelectedProduct(businessId, customerId, args);
                 case SHOWCASE_ORDER_TOOL -> quoteSelectedProductOrder(
@@ -183,6 +191,29 @@ public class CommercialOperationToolService {
             result = error("COMMERCIAL_OPERATION_FAILED", "La operación comercial no pudo completarse.");
         }
         return result.toString();
+    }
+
+    private JSONObject getStock(UUID businessId, JSONObject args) {
+        if (inventory == null) {
+            return error("INVENTORY_UNAVAILABLE", "El inventario todavía no está disponible.");
+        }
+        String catalogItemIdRaw = optional(args, "catalogItemId");
+        String sku = optional(args, "sku");
+        UUID catalogItemId = blank(catalogItemIdRaw) ? null : uuid(catalogItemIdRaw);
+        InventoryService.StockLookupView stock = inventory.lookupForBusiness(businessId, catalogItemId, sku);
+        JSONObject data = new JSONObject()
+                .put("catalogItemId", nullable(stock.catalogItemId()))
+                .put("productName", nullable(stock.productName()))
+                .put("sku", nullable(stock.sku()))
+                .put("configured", stock.configured())
+                .put("trackingEnabled", stock.trackingEnabled())
+                .put("availabilityKnown", stock.trackingEnabled() && stock.configured())
+                .put("onHand", nullable(stock.onHand()))
+                .put("reserved", nullable(stock.reserved()))
+                .put("available", nullable(stock.available()))
+                .put("reorderThreshold", nullable(stock.reorderThreshold()))
+                .put("lowStock", stock.lowStock());
+        return success(data);
     }
 
     private JSONObject listCatalog(UUID businessId) {
@@ -856,6 +887,9 @@ public class CommercialOperationToolService {
         }
         order.setStatus(BusinessOrder.Status.CANCELLED);
         order = orders.saveAndFlush(order);
+        if (inventory != null) {
+            inventory.releaseOrder(businessId, order.getOperationId(), "Order cancelled");
+        }
         operations.findByIdAndBusinessId(order.getOperationId(), businessId).ifPresent(operation -> {
             operation.setStatus(BusinessOperation.Status.CANCELLED);
             operation.setConfirmationToken(null);

@@ -2,9 +2,12 @@ package cl.helvoca.payment;
 
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationRepository;
+import cl.helvoca.operations.BusinessOperationItem;
+import cl.helvoca.operations.BusinessOperationItemRepository;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.operations.ConversationStateService;
 import cl.helvoca.operations.OperationPolicyService;
+import cl.helvoca.inventory.InventoryService;
 import org.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -274,6 +278,63 @@ class PaymentWorkflowServiceTest {
         assertEquals(
                 PaymentWorkflowService.providerIdempotencyKey(paymentDraft),
                 payment.getValue().getIdempotencyKey());
+    }
+
+    @Test
+    void paymentRetryReReservesOrderAndBlocksCheckoutWhenStockWasTaken() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID sourceReferenceId = UUID.randomUUID();
+        BusinessOperation target = payableTarget(
+                businessId, customerId, sourceReferenceId, new BigDecimal("22000.00"));
+        BusinessOperation paymentDraft = paymentDraft(
+                businessId, customerId, sourceReferenceId, target, new BigDecimal("22000.00"));
+
+        BusinessOperationItem item = new BusinessOperationItem();
+        item.setOperationId(target.getId());
+        item.setCatalogItemId(UUID.randomUUID());
+        item.setItemName("Shampoo");
+        item.setQuantity(1);
+        item.setUnitPrice(new BigDecimal("22000.00"));
+        item.setLineTotal(new BigDecimal("22000.00"));
+
+        InventoryService inventory = mock(InventoryService.class);
+        BusinessOperationItemRepository operationItems = mock(BusinessOperationItemRepository.class);
+        ReflectionTestUtils.setField(service, "inventory", inventory);
+        ReflectionTestUtils.setField(service, "operationItems", operationItems);
+
+        when(payments.findByOperationIdAndBusinessId(paymentDraft.getId(), businessId))
+                .thenReturn(Optional.empty());
+        when(operations.findByIdAndBusinessId(paymentDraft.getId(), businessId))
+                .thenReturn(Optional.of(paymentDraft));
+        when(operations.findByIdAndBusinessId(target.getId(), businessId))
+                .thenReturn(Optional.of(target));
+        when(payments.findAllByBusinessIdAndTargetOperationIdOrderByCreatedAtAsc(
+                businessId, target.getId())).thenReturn(List.of());
+        when(providers.resolve(businessId)).thenReturn(Optional.of(provider));
+        when(provider.providerCode()).thenReturn("sandbox");
+        when(operationItems.findAllByOperationIdOrderByCreatedAtAsc(target.getId()))
+                .thenReturn(List.of(item));
+        when(inventory.reserveOrder(eq(businessId), eq(target.getId()), anyList()))
+                .thenReturn(new InventoryService.OrderReservationResult(
+                        false,
+                        "INSUFFICIENT_STOCK",
+                        "No hay stock suficiente para Shampoo. Disponible: 0.",
+                        List.of()));
+
+        JSONObject result = service.confirm(
+                businessId,
+                customerId,
+                sourceReferenceId,
+                "+56911111111",
+                BusinessOrder.Source.WHATSAPP,
+                confirmArgs(paymentDraft));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("INSUFFICIENT_STOCK", result.getJSONObject("error").getString("code"));
+        verify(inventory).reserveOrder(eq(businessId), eq(target.getId()), anyList());
+        verify(provider, never()).create(any());
+        verify(payments, never()).saveAndFlush(any());
     }
 
     @Test
