@@ -6,13 +6,44 @@ Helvoca can be sold now as an assisted pilot. The immediate commercial objective
 
 Engineering must support sales, not postpone them. New product work should be driven by recurring evidence from prospects and customers unless it closes a production reliability or security gap.
 
+## Sellable MVP freeze — 2026-09-26
+
+The sellable assisted-pilot MVP is now **feature-frozen**.
+
+The production baseline is main revision `cb8618a4acbbf882a356e08bba8f69e6ab37de57`, which includes PR #451 secure one-time team invitations. Railway deployed that exact revision successfully, Flyway advanced production to V65, Spring started, and the configured `/actuator/health` gate passed.
+
+Until the first paying pilot is running with real customer usage, new product work is accepted only when it is one of these:
+
+- a production bug that blocks a real pilot;
+- a security, privacy or tenant-isolation issue;
+- a reliability problem demonstrated by real traffic;
+- a provider/integration defect required by an already-agreed pilot scope;
+- a repeated customer/prospect need supported by concrete evidence.
+
+The following are explicitly **not** launch blockers and must not reopen the MVP by themselves:
+
+- additional AI, telephony, messaging or payment providers;
+- another CRM/dashboard/redesign;
+- speculative automation;
+- extra analytics not needed to operate the first pilots;
+- new channels or broad self-service expansion;
+- cosmetic refactors that do not remove an operational risk.
+
+The next product milestone is not another feature. It is:
+
+```text
+REAL BUSINESS -> CONFIGURED -> GO -> LIVE PILOT -> PAYMENT -> CUSTOMER
+```
+
 ## Production baseline
 
-- Stable production baseline: V42 Plans / Entitlements / Billing.
+- Stable commercial core: V42 Plans / Entitlements / Billing.
 - V41 `usage_meter_event` remains the measured-usage source of truth.
 - V42 commercial plans and entitlements are PostgreSQL-backed and enforced fail-closed.
+- V65 adds tenant-scoped, one-time team invitations.
 - Billing providers remain adapters; they do not own plan rules, prices, usage or service eligibility.
-- V42 release gate was completed on main revision `e41bdeebf9cf6413fde01a6fe815549a3f7dcb76`: PR CI green, main CI green, Railway deployed the exact SHA, Flyway advanced production from v41 to v42, Spring started and Railway accepted the configured `/actuator/health` gate.
+- Current sellable deployment: `cb8618a4acbbf882a356e08bba8f69e6ab37de57`.
+- Railway production status: successful deployment with `/actuator/health` passing.
 
 ## Ready to sell now
 
@@ -31,7 +62,9 @@ Engineering must support sales, not postpone them. New product work should be dr
 - usage metering;
 - database-backed plans, usage entitlements and concurrent-call capacity;
 - public pricing and subscription commercial views;
-- voice/WhatsApp shared domain behavior when those channels are configured for the tenant.
+- voice/WhatsApp shared domain behavior when those channels are configured for the tenant;
+- self-guided business activation path with assisted launch control;
+- secure one-time team invitations.
 
 ## Available in the core but activation-dependent
 
