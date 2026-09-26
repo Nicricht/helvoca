@@ -28,6 +28,7 @@ class InventoryServiceTest {
     private TenantProvider tenant;
     private BusinessPaymentRepository payments;
     private InventoryProductVariantRepository variants;
+    private InventoryAlertService inventoryAlerts;
     private InventoryService service;
 
     private UUID businessId;
@@ -43,8 +44,10 @@ class InventoryServiceTest {
         tenant = mock(TenantProvider.class);
         payments = mock(BusinessPaymentRepository.class);
         variants = mock(InventoryProductVariantRepository.class);
+        inventoryAlerts = mock(InventoryAlertService.class);
         service = new InventoryService(stocks, reservations, movements, catalog, tenant, payments);
         ReflectionTestUtils.setField(service, "variants", variants);
+        ReflectionTestUtils.setField(service, "inventoryAlerts", inventoryAlerts);
         when(variants.saveAndFlush(any(InventoryProductVariant.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -166,6 +169,7 @@ class InventoryServiceTest {
         assertEquals(2, view.reorderThreshold());
         assertFalse(view.lowStock());
         verify(movements).save(any(InventoryMovement.class));
+        verify(inventoryAlerts).evaluateBase(any(InventoryStock.class));
     }
 
     @Test
