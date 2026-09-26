@@ -6,7 +6,7 @@ V37 adds a durable, tenant-scoped work queue backed by PostgreSQL. It replaces t
 
 The engine is intentionally **at-least-once**. A worker may die after an external side effect succeeds but before the local job is marked `SUCCEEDED`. After the lease expires another worker is allowed to retry the job. Therefore every side-effecting handler must use its own stable idempotency boundary.
 
-For outbound messaging, the existing V34 message idempotency key is passed through to the provider. V36 uses the same principle for payment provider creation with `payment-operation:<operationId>`.
+For outbound messaging, the existing V34 message idempotency key is passed through to the provider. V36 uses the same principle for payment provider creation with `<operationId> (UUID)`.
 
 This avoids claiming impossible cross-network exactly-once semantics while still guaranteeing durable recovery and duplicate-safe execution when downstream providers honor idempotency.
 

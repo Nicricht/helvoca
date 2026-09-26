@@ -221,14 +221,14 @@ class PaymentWorkflowServiceTest {
         ArgumentCaptor<PaymentProviderAdapter.CreateCommand> command =
                 ArgumentCaptor.forClass(PaymentProviderAdapter.CreateCommand.class);
         verify(provider).create(command.capture());
-        assertEquals("payment-operation:" + paymentDraft.getId(), command.getValue().idempotencyKey());
+        assertEquals(paymentDraft.getId().toString(), command.getValue().idempotencyKey());
         assertEquals(0, command.getValue().amount().compareTo(new BigDecimal("22000.00")));
 
         ArgumentCaptor<BusinessPayment> payment = ArgumentCaptor.forClass(BusinessPayment.class);
         verify(payments).saveAndFlush(payment.capture());
         assertEquals(target.getId(), payment.getValue().getTargetOperationId());
         assertEquals(BusinessPayment.Status.REQUIRES_ACTION, payment.getValue().getStatus());
-        assertEquals("payment-operation:" + paymentDraft.getId(), payment.getValue().getIdempotencyKey());
+        assertEquals(paymentDraft.getId().toString(), payment.getValue().getIdempotencyKey());
     }
 
     @Test
