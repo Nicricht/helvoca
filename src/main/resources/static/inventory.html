@@ -170,6 +170,7 @@
             <button class="inventory-dialog-close" type="button" data-close-dialog aria-label="Cerrar">×</button>
         </div>
         <input name="catalogItemId" type="hidden">
+        <input name="variantId" type="hidden">
         <div class="inventory-adjust-current">
             <span>Disponible ahora</span>
             <strong id="inventoryAdjustAvailable">0</strong>
@@ -186,6 +187,77 @@
         <div class="inventory-dialog-actions">
             <button class="button ghost" type="button" data-close-dialog>Cancelar</button>
             <button id="inventoryAdjustSave" class="button primary" type="submit">Aplicar ajuste</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="inventoryVariantsDialog" class="inventory-dialog inventory-variants-dialog">
+    <div class="inventory-dialog-head">
+        <div>
+            <div class="eyebrow">Variantes</div>
+            <h2 id="inventoryVariantsTitle">Variantes del producto</h2>
+        </div>
+        <button class="inventory-dialog-close" type="button" data-close-dialog aria-label="Cerrar">×</button>
+    </div>
+    <div class="inventory-variants-toolbar">
+        <p>Talla, color, modelo u otra opción con SKU y stock independiente.</p>
+        <button id="inventoryAddVariantBtn" class="button primary small" type="button">+ Variante</button>
+    </div>
+    <div id="inventoryVariantsLoading" class="inventory-history-loading hidden">Cargando variantes…</div>
+    <div id="inventoryVariantsList" class="inventory-variants-list"></div>
+    <div id="inventoryVariantsEmpty" class="inventory-empty hidden">
+        <strong>Este producto todavía no tiene variantes.</strong>
+        <span>Puedes mantener stock general o crear variantes como Negro / 42.</span>
+    </div>
+    <div class="inventory-dialog-actions">
+        <button class="button ghost" type="button" data-close-dialog>Cerrar</button>
+    </div>
+</dialog>
+
+<dialog id="inventoryVariantEditDialog" class="inventory-dialog">
+    <form id="inventoryVariantForm" method="dialog">
+        <div class="inventory-dialog-head">
+            <div>
+                <div class="eyebrow">Variante de producto</div>
+                <h2 id="inventoryVariantFormTitle">Nueva variante</h2>
+            </div>
+            <button class="inventory-dialog-close" type="button" data-close-dialog aria-label="Cerrar">×</button>
+        </div>
+        <input name="catalogItemId" type="hidden">
+        <input name="variantId" type="hidden">
+        <div class="inventory-form-grid">
+            <label>Nombre
+                <input name="name" maxlength="150" required placeholder="Negro / 42">
+            </label>
+            <label>SKU
+                <input name="sku" maxlength="80" required placeholder="SHOE-BLK-42">
+            </label>
+            <label>Stock físico
+                <input name="onHand" type="number" min="0" step="1" required>
+            </label>
+            <label>Stock mínimo
+                <input name="reorderThreshold" type="number" min="0" step="1" required>
+            </label>
+            <label class="inventory-form-wide">Opciones
+                <input name="options" maxlength="500" placeholder="color=Negro, talla=42">
+            </label>
+            <label class="inventory-switch">
+                <span>Seguimiento activo</span>
+                <input name="trackingEnabled" type="checkbox" checked>
+            </label>
+            <label class="inventory-switch">
+                <span>Variante activa</span>
+                <input name="active" type="checkbox" checked>
+            </label>
+            <label class="inventory-form-wide">Nota
+                <input name="note" maxlength="240" placeholder="Alta inicial o corrección">
+            </label>
+        </div>
+        <p class="inventory-form-help">Las opciones se guardan como atributos estructurados y la IA recibe el variantId exacto.</p>
+        <div id="inventoryVariantMessage" class="message hidden"></div>
+        <div class="inventory-dialog-actions">
+            <button class="button ghost" type="button" data-close-dialog>Cancelar</button>
+            <button id="inventoryVariantSave" class="button primary" type="submit">Guardar variante</button>
         </div>
     </form>
 </dialog>
