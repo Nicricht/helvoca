@@ -301,6 +301,64 @@ class ShowcaseCommercialJourneyToolTest {
                 journey.getMetadata().get("checkoutUrl"));
     }
 
+    @Test
+    void refreshedPaymentKeepsCommercialJourneyLinkage() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID journeyId = UUID.randomUUID();
+        UUID orderOperationId = UUID.randomUUID();
+        UUID paymentOperationId = UUID.randomUUID();
+
+        BusinessOperation journey = bareJourney(businessId, customerId, journeyId);
+        journey.getMetadata().put("orderOperationId", orderOperationId.toString());
+        journey.getMetadata().put("paymentOperationId", paymentOperationId.toString());
+
+        BusinessOperation orderOperation = orderOperation(
+                businessId, customerId, orderOperationId, journeyId);
+        orderOperation.setStatus(BusinessOperation.Status.CONFIRMED);
+
+        BusinessOperation paymentOperation = new BusinessOperation();
+        paymentOperation.setId(paymentOperationId);
+        paymentOperation.setBusinessId(businessId);
+        paymentOperation.setCustomerId(customerId);
+        paymentOperation.setType(BusinessOperation.Type.PAYMENT);
+        paymentOperation.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
+        paymentOperation.setMetadata(new LinkedHashMap<>(java.util.Map.of(
+                "targetOperationId", orderOperationId.toString())));
+
+        when(capabilities.isToolAllowed(businessId, "update_payment")).thenReturn(true);
+        when(paymentWorkflow.update(any(), any(), any(), any(), any(), any()))
+                .thenReturn(success(new JSONObject()
+                        .put("operationId", paymentOperationId.toString())
+                        .put("targetOperationId", orderOperationId.toString())
+                        .put("amount", 12990)
+                        .put("currency", "CLP")
+                        .put("status", "AWAITING_CONFIRMATION")
+                        .put("confirmationToken", UUID.randomUUID().toString())));
+        when(operations.findByIdAndBusinessId(orderOperationId, businessId))
+                .thenReturn(Optional.of(orderOperation));
+        when(operations.findByIdAndBusinessId(journeyId, businessId))
+                .thenReturn(Optional.of(journey));
+        when(operations.findByIdAndBusinessId(paymentOperationId, businessId))
+                .thenReturn(Optional.of(paymentOperation));
+
+        JSONObject result = execute(
+                businessId,
+                customerId,
+                "update_payment",
+                new JSONObject()
+                        .put("operationId", paymentOperationId.toString())
+                        .put("targetOperationId", orderOperationId.toString()));
+
+        assertTrue(result.getBoolean("success"), result::toString);
+        assertEquals(journeyId.toString(),
+                paymentOperation.getMetadata().get("commercialJourneyOperationId"));
+        assertEquals(paymentOperationId.toString(),
+                journey.getMetadata().get("paymentOperationId"));
+        assertEquals("PAYMENT_PENDING", journey.getMetadata().get("commercialStage"));
+        assertEquals("PAYMENT_REQUOTED", journey.getMetadata().get("lastAction"));
+    }
+
     private JSONObject execute(UUID businessId,
                                UUID customerId,
                                String toolName,
