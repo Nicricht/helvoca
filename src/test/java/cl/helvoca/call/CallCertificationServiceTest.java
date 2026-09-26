@@ -44,6 +44,59 @@ class CallCertificationServiceTest {
     }
 
     @Test
+    void intermediateSuccessfulCreateWithoutEntityDoesNotHidePersistedBooking() {
+        Fixture fixture = new Fixture();
+        UUID callId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        CallSession call = certifiedCall();
+        Booking booking = booking(BookingStatus.CANCELLED);
+
+        when(fixture.calls.findById(callId)).thenReturn(Optional.of(call));
+        when(fixture.transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId))
+                .thenReturn(List.of(mock(CallTranscript.class)));
+        when(fixture.summaries.findByCallId(callId)).thenReturn(Optional.of(mock(CallSummary.class)));
+        when(fixture.actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(List.of(
+                action("SERVICES_LISTED", true, null),
+                action("AVAILABILITY_LISTED", true, null),
+                action("BOOKING_CREATED", true, null),
+                action("BOOKING_CREATED", true, bookingId),
+                action("BOOKING_CANCELLED", true, bookingId)));
+        when(fixture.bookings.findByIdAndBusinessId(bookingId, call.getBusinessId()))
+                .thenReturn(Optional.of(booking));
+
+        var result = fixture.service.verifyAndCleanup(callId);
+
+        assertTrue(result.success());
+        assertNull(result.reason());
+        assertEquals(0, result.cleanupCancelled());
+        verify(fixture.bookings).findByIdAndBusinessId(bookingId, call.getBusinessId());
+        verify(fixture.bookings, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void allSuccessfulCreatesWithoutEntityStillFailCertification() {
+        Fixture fixture = new Fixture();
+        UUID callId = UUID.randomUUID();
+        CallSession call = certifiedCall();
+
+        when(fixture.calls.findById(callId)).thenReturn(Optional.of(call));
+        when(fixture.transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId))
+                .thenReturn(List.of(mock(CallTranscript.class)));
+        when(fixture.summaries.findByCallId(callId)).thenReturn(Optional.of(mock(CallSummary.class)));
+        when(fixture.actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(List.of(
+                action("SERVICES_LISTED", true, null),
+                action("AVAILABILITY_LISTED", true, null),
+                action("BOOKING_CREATED", true, null),
+                action("BOOKING_CANCELLED", true, null)));
+
+        var result = fixture.service.verifyAndCleanup(callId);
+
+        assertFalse(result.success());
+        assertTrue(result.reason().contains("created_booking_entity_missing"));
+        verifyNoInteractions(fixture.bookings);
+    }
+
+    @Test
     void uncancelledCertificationBookingIsSafelyCancelledAndCertificationFails() {
         Fixture fixture = new Fixture();
         UUID callId = UUID.randomUUID();
