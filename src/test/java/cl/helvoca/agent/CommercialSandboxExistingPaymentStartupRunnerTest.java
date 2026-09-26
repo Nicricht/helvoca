@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -120,6 +121,126 @@ class CommercialSandboxExistingPaymentStartupRunnerTest {
         verify(commercial, times(1)).execute(
                 eq(businessId), eq(customerId), isNull(), eq("+56900009999"),
                 eq(BusinessOrder.Source.WHATSAPP), eq("create_payment"), anyString());
+    }
+
+    @Test
+    void expiredConfirmationIsRefreshedAndSamePaymentDraftIsConfirmed() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID journeyId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        UUID paymentOperationId = UUID.randomUUID();
+        UUID paymentId = UUID.randomUUID();
+        UUID oldToken = UUID.randomUUID();
+        UUID newToken = UUID.randomUUID();
+
+        BusinessOperation journey = operation(
+                businessId, customerId, journeyId, BusinessOperation.Type.REQUEST,
+                BusinessOperation.Status.CONFIRMED);
+        journey.setMetadata(new LinkedHashMap<>(Map.of(
+                "orderOperationId", orderId.toString(),
+                "paymentOperationId", paymentOperationId.toString())));
+
+        BusinessOperation order = operation(
+                businessId, customerId, orderId, BusinessOperation.Type.ORDER,
+                BusinessOperation.Status.CONFIRMED);
+
+        BusinessOperation paymentOperation = operation(
+                businessId, customerId, paymentOperationId, BusinessOperation.Type.PAYMENT,
+                BusinessOperation.Status.AWAITING_CONFIRMATION);
+        paymentOperation.setConfirmationToken(oldToken);
+        paymentOperation.setContactPhone("+56900009999");
+        paymentOperation.setSource(BusinessOrder.Source.WHATSAPP);
+        paymentOperation.setMetadata(new LinkedHashMap<>(Map.of(
+                "targetOperationId", orderId.toString(),
+                "commercialJourneyOperationId", journeyId.toString())));
+
+        BusinessPayment payment = new BusinessPayment();
+        payment.setId(paymentId);
+        payment.setOperationId(paymentOperationId);
+        payment.setBusinessId(businessId);
+        payment.setCustomerId(customerId);
+        payment.setTargetOperationId(orderId);
+        payment.setProvider("mercadopago");
+        payment.setExternalId("ORDTST-REFRESHED");
+        payment.setAmount(new BigDecimal("1000"));
+        payment.setCurrency("CLP");
+        payment.setStatus(BusinessPayment.Status.REQUIRES_ACTION);
+        payment.setCheckoutUrl("https://www.mercadopago.cl/checkout/refreshed");
+        payment.setSource(BusinessOrder.Source.WHATSAPP);
+
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        BusinessPaymentRepository payments = mock(BusinessPaymentRepository.class);
+        CommercialOperationToolService commercial = mock(CommercialOperationToolService.class);
+
+        when(operations.findByIdAndBusinessId(journeyId, businessId))
+                .thenReturn(Optional.of(journey));
+        when(operations.findByIdAndBusinessId(orderId, businessId))
+                .thenReturn(Optional.of(order));
+        when(operations.findByIdAndBusinessId(paymentOperationId, businessId))
+                .thenReturn(Optional.of(paymentOperation));
+        when(payments.findByOperationIdAndBusinessId(paymentOperationId, businessId))
+                .thenReturn(Optional.empty(), Optional.of(payment));
+
+        AtomicInteger createCalls = new AtomicInteger();
+        when(commercial.execute(
+                eq(businessId),
+                eq(customerId),
+                isNull(),
+                eq("+56900009999"),
+                eq(BusinessOrder.Source.WHATSAPP),
+                anyString(),
+                anyString()))
+                .thenAnswer(invocation -> {
+                    String tool = invocation.getArgument(5, String.class);
+                    JSONObject args = new JSONObject(invocation.getArgument(6, String.class));
+                    if ("update_payment".equals(tool)) {
+                        assertEquals(paymentOperationId.toString(), args.getString("operationId"));
+                        assertEquals(orderId.toString(), args.getString("targetOperationId"));
+                        return new JSONObject()
+                                .put("success", true)
+                                .put("data", new JSONObject()
+                                        .put("operationId", paymentOperationId.toString())
+                                        .put("targetOperationId", orderId.toString())
+                                        .put("confirmationToken", newToken.toString()))
+                                .put("error", JSONObject.NULL)
+                                .toString();
+                    }
+                    if ("create_payment".equals(tool)) {
+                        int call = createCalls.incrementAndGet();
+                        if (call == 1) {
+                            assertEquals(oldToken.toString(), args.getString("confirmationToken"));
+                            return new JSONObject()
+                                    .put("success", false)
+                                    .put("data", JSONObject.NULL)
+                                    .put("error", new JSONObject()
+                                            .put("code", "CONFIRMATION_EXPIRED")
+                                            .put("message", "expired"))
+                                    .toString();
+                        }
+                        assertEquals(newToken.toString(), args.getString("confirmationToken"));
+                        return new JSONObject()
+                                .put("success", true)
+                                .put("data", new JSONObject()
+                                        .put("operationId", paymentOperationId.toString())
+                                        .put("paymentId", paymentId.toString())
+                                        .put("status", "REQUIRES_ACTION")
+                                        .put("checkoutUrl", payment.getCheckoutUrl()))
+                                .put("error", JSONObject.NULL)
+                                .toString();
+                    }
+                    throw new AssertionError("Unexpected tool " + tool);
+                });
+
+        var result = runner(operations, payments, commercial)
+                .activate(businessId, journeyId, orderId, paymentOperationId);
+
+        assertEquals(paymentId, result.paymentId());
+        assertEquals("ORDTST-REFRESHED", result.externalId());
+        assertEquals(2, createCalls.get());
+        verify(commercial).execute(
+                eq(businessId), eq(customerId), isNull(), eq("+56900009999"),
+                eq(BusinessOrder.Source.WHATSAPP), eq("update_payment"), anyString());
     }
 
     @Test
