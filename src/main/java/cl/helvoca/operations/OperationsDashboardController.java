@@ -12,13 +12,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class OperationsDashboardController {
     private final OperationsDashboardService service;
     private final CommercialReadinessService readiness;
+    private final PilotReadinessService pilotReadiness;
     private final VoiceCallRouter voiceRouter;
 
     public OperationsDashboardController(OperationsDashboardService service,
                                          CommercialReadinessService readiness,
+                                         PilotReadinessService pilotReadiness,
                                          VoiceCallRouter voiceRouter) {
         this.service = service;
         this.readiness = readiness;
+        this.pilotReadiness = pilotReadiness;
         this.voiceRouter = voiceRouter;
     }
 
@@ -27,6 +30,9 @@ public class OperationsDashboardController {
 
     @GetMapping("/readiness")
     public CommercialReadinessService.Readiness readiness() { return readiness.readiness(); }
+
+    @GetMapping("/pilot-readiness")
+    public PilotReadinessService.Readiness pilotReadiness() { return pilotReadiness.readiness(); }
 
     @GetMapping("/voice-readiness")
     public VoiceCallRouter.VoiceReadiness voiceReadiness() { return voiceRouter.readiness(); }

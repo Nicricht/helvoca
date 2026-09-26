@@ -197,6 +197,23 @@ async function mockReadyHome(page, roles = ['BUSINESS_ADMIN'], options = {}) {
     recentRequests: [],
     unanswered: []
   })));
+  await page.route('**/api/v1/operations/pilot-readiness', route => route.fulfill(json({
+    ready: true,
+    passed: 5,
+    total: 5,
+    blockers: [],
+    voiceProvider: 'gemini',
+    paymentProvider: 'mercadopago',
+    paymentMode: 'SANDBOX',
+    checks: [
+      { code: 'VOICE', label: 'Llamadas con IA', ready: true, detail: 'Telefonía y proveedor de voz están operativos.' },
+      { code: 'WHATSAPP', label: 'WhatsApp bidireccional', ready: true, detail: 'Entrada, validación y salida real de WhatsApp están habilitadas.' },
+      { code: 'CATALOG', label: 'Catálogo multimedia', ready: true, detail: '3 ítems activos; 3 con multimedia.' },
+      { code: 'COMMERCIAL_FLOW', label: 'Venta conversacional', ready: true, detail: 'Catálogo, pedidos y pagos están habilitados para la IA.' },
+      { code: 'PAYMENTS', label: 'Mercado Pago', ready: true, detail: 'Proveedor de pago habilitado con credenciales configuradas.' }
+    ]
+  })));
+
   await page.route('**/api/v1/messaging/conversations', route => route.fulfill(json([
     {
       id: 'wa-today', channel: 'whatsapp', sender: '+56922222222', recipient: '+56933333333',
@@ -332,6 +349,10 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Negocio E2E está atendiendo 🟢');
   await expect(page.locator('#operationalOverview')).toBeVisible();
   await expect(page.locator('#operationalOverview')).toHaveCount(1);
+  await expect(page.locator('#pilotReadinessCard')).toBeVisible();
+  await expect(page.locator('#pilotReadinessScore')).toHaveText('5/5');
+  await expect(page.locator('#pilotReadinessCard')).toContainText('Todo el circuito crítico está listo');
+  await expect(page.locator('#pilotReadinessCard .pilot-readiness-item.ready')).toHaveCount(5);
   await expect(page.locator('#homeRecentActivity')).toHaveCount(0);
   await expect(page.locator('#statusGrid')).toBeHidden();
   await expect(page.locator('#homeCallsToday')).toHaveText('3');
