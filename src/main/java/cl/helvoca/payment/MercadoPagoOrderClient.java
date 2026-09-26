@@ -32,7 +32,7 @@ public class MercadoPagoOrderClient {
         JSONObject payload = new JSONObject()
                 .put("type", "online")
                 .put("processing_mode", "manual")
-                .put("total_amount", amount.toPlainString())
+                .put("total_amount", normalizeIntegerAmount(amount))
                 .put("external_reference", paymentOperationId.toString());
         return send("POST", BASE_URL, accessToken, idempotencyKey, payload.toString());
     }
@@ -98,6 +98,17 @@ public class MercadoPagoOrderClient {
         } catch (Exception e) {
             throw new IllegalStateException("Mercado Pago request failed.", e);
         }
+    }
+
+    static String normalizeIntegerAmount(BigDecimal amount) {
+        if (amount == null) {
+            throw new IllegalArgumentException("Mercado Pago total amount is missing.");
+        }
+        BigDecimal normalized = amount.stripTrailingZeros();
+        if (normalized.scale() > 0) {
+            throw new IllegalArgumentException("Mercado Pago total amount must be an integer.");
+        }
+        return normalized.toPlainString();
     }
 
     static String providerErrorCode(JSONObject json) {
