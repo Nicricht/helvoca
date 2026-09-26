@@ -65,6 +65,7 @@ public final class RealtimeToolDefinitions {
                         object().put("properties", new JSONObject()
                                         .put("question", string("Pregunta exacta o fielmente resumida del cliente")))
                                 .put("required", new JSONArray().put("question"))))
+                .put(callerWhatsappVerification())
                 .put(function("send_whatsapp_operation",
                         "Continúa por WhatsApp una operación backend ya existente del cliente actual. Para PRODUCT_SHOWCASE envía hasta 3 productos reales seleccionados desde list_catalog; el backend toma su media configurada y nunca acepta URLs inventadas. Usa literalmente un operationId devuelto por create_request, create_quote, quote_order, create_booking u otra herramienta backend. Solo di que el contenido quedó enviado o en cola cuando success=true. Si success=false, no afirmes que se envió.",
                         object().put("properties", new JSONObject()
@@ -78,6 +79,16 @@ public final class RealtimeToolDefinitions {
                                 .put("required", new JSONArray().put("operationId").put("purpose"))))
                 .put(function("transfer_to_human", "Solicita transferir la llamada a una persona del negocio cuando el cliente lo pida o la atención automática no pueda resolver su necesidad. El destino se obtiene de la configuración segura del negocio, nunca de argumentos del modelo.", object()))
                 .put(endCall());
+    }
+
+    public static JSONObject callerWhatsappVerification() {
+        return function("verify_caller_whatsapp",
+                "Verifica explícitamente que el número telefónico de la llamada actual es también el WhatsApp del cliente identificado. Úsala SOLO después de que el cliente lo confirme claramente. No la uses por inferencia ni para otro número.",
+                object().put("properties", new JSONObject()
+                                .put("confirmedSameNumber", new JSONObject()
+                                        .put("type", "boolean")
+                                        .put("description", "Debe ser true únicamente cuando el cliente confirmó explícitamente que el número actual de la llamada es su WhatsApp")))
+                        .put("required", new JSONArray().put("confirmedSameNumber")));
     }
 
     public static JSONObject endCall() {

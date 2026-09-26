@@ -14,6 +14,8 @@ import cl.helvoca.knowledge.KnowledgeItem;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.learning.UnansweredQuestion;
 import cl.helvoca.learning.UnansweredQuestionService;
+import cl.helvoca.omnichannel.CustomerIdentity;
+import cl.helvoca.omnichannel.CustomerIdentityService;
 import cl.helvoca.request.BusinessRequest;
 import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.request.RequestPriority;
@@ -55,6 +57,9 @@ public class RealtimeToolService {
     @Autowired(required = false)
     private AiAgentService aiAgents;
 
+    @Autowired(required = false)
+    private CustomerIdentityService customerIdentities;
+
     public RealtimeToolService(BusinessRepository businesses,
                                CustomerRepository customers,
                                ServiceItemRepository services,
@@ -91,6 +96,7 @@ public class RealtimeToolService {
                     case "search_knowledge" -> searchKnowledge(context, args);
                     case "find_caller" -> findCaller(context);
                     case "register_caller" -> registerCaller(context, args);
+                    case "verify_caller_whatsapp" -> verifyCallerWhatsapp(context, args);
                     case "list_available_slots" -> listAvailableSlots(context, args);
                     case "check_booking_availability" -> checkAvailability(context, args);
                     case "create_booking" -> createBooking(context, args);
@@ -287,11 +293,64 @@ public class RealtimeToolService {
         CallSession call = requireTrustedCall(context);
         call.setCustomerId(customer.getId());
         calls.save(call);
+        if (customerIdentities != null) {
+            customerIdentities.recordProviderAssertedPhone(
+                    context.businessId(),
+                    customer.getId(),
+                    context.callerNumber(),
+                    "VOICE_CALLER_ID");
+        }
 
         return success(new JSONObject()
                 .put("customerId", customer.getId().toString())
                 .put("name", customer.getName())
                 .put("phone", customer.getPhone()));
+    }
+
+    private JSONObject verifyCallerWhatsapp(RealtimeCallContext context, JSONObject args) {
+        if (!args.optBoolean("confirmedSameNumber", false)) {
+            return error("WHATSAPP_CONFIRMATION_REQUIRED",
+                    "El cliente debe confirmar explícitamente que el número de esta llamada es su WhatsApp.");
+        }
+        if (customerIdentities == null) {
+            return error("WHATSAPP_IDENTITY_UNAVAILABLE",
+                    "La verificación de identidad de WhatsApp no está disponible.");
+        }
+
+        CallSession call = requireTrustedCall(context);
+        Customer customer = currentCustomer(context);
+        if (customer == null) {
+            return error("CUSTOMER_NOT_REGISTERED",
+                    "Primero necesito identificar al cliente antes de verificar su WhatsApp.");
+        }
+        if (call.getCustomerId() == null) {
+            call.setCustomerId(customer.getId());
+            calls.save(call);
+        }
+
+        String callerNumber = context.callerNumber();
+        if (callerNumber == null || callerNumber.isBlank()) {
+            callerNumber = call.getCallerNumber();
+        }
+        String normalized = CustomerIdentityService.normalizePhone(callerNumber);
+        if (normalized == null) {
+            return error("WHATSAPP_PHONE_INVALID",
+                    "El número de la llamada no tiene un formato internacional válido para WhatsApp.");
+        }
+
+        CustomerIdentity identity = customerIdentities.verifyPhone(
+                context.businessId(),
+                customer.getId(),
+                normalized,
+                CustomerIdentity.VerificationStatus.CUSTOMER_VERIFIED,
+                "VOICE_EXPLICIT_WHATSAPP_CONFIRMATION");
+
+        return success(new JSONObject()
+                .put("verified", true)
+                .put("customerId", customer.getId().toString())
+                .put("identityId", identity.getId().toString())
+                .put("channel", "WHATSAPP")
+                .put("sameAsCallerNumber", true));
     }
 
     private JSONObject listAvailableSlots(RealtimeCallContext context, JSONObject args) {

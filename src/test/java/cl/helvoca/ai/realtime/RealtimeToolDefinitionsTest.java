@@ -27,6 +27,26 @@ class RealtimeToolDefinitionsTest {
     }
 
     @Test
+    void whatsappVerificationRequiresExplicitSameNumberConfirmation() {
+        JSONArray tools = RealtimeToolDefinitions.all();
+        for (int i = 0; i < tools.length(); i++) {
+            JSONObject tool = tools.getJSONObject(i);
+            if (!"verify_caller_whatsapp".equals(tool.getString("name"))) continue;
+
+            String description = tool.getString("description");
+            JSONObject params = tool.getJSONObject("parameters");
+            assertTrue(description.contains("SOLO después"));
+            assertTrue(params.getJSONArray("required").toList().contains("confirmedSameNumber"));
+            assertTrue(params.getJSONObject("properties")
+                    .getJSONObject("confirmedSameNumber")
+                    .getString("description")
+                    .contains("explícitamente"));
+            return;
+        }
+        throw new AssertionError("Tool not found: verify_caller_whatsapp");
+    }
+
+    @Test
     void endCallRequiresClearClosingIntentAndFarewellFirst() {
         JSONArray tools = RealtimeToolDefinitions.all();
         assertDescriptionContains(tools, "end_call", "despídete");
