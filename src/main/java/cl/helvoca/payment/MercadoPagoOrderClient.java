@@ -153,7 +153,12 @@ public class MercadoPagoOrderClient {
 
     static String safeRawProviderDetail(String body) {
         if (body == null || body.isBlank()) return null;
-        String normalized = body.replaceAll("[\\r\\n\\t]+", " ").trim();
+        String normalized = body
+                .replace("\\r", " ")
+                .replace("\\n", " ")
+                .replace("\\t", " ")
+                .replaceAll("[\\r\\n\\t]+", " ")
+                .trim();
         normalized = normalized.replaceAll(
                 "(?i)Bearer\\s+[A-Za-z0-9._-]{16,}",
                 "Bearer <redacted>");
