@@ -31,4 +31,11 @@ class TwilioCertificationStartupRunnerTest {
     void inboundCertificationKeepsSafetyHangup() {
         assertTrue(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("inbound-certification"));
     }
+
+    @Test
+    void blocksExplicitlyForbiddenCertificationTarget() {
+        assertTrue(TwilioCertificationStartupRunner.isForbiddenTarget("+56975856664", "+56975856664"));
+        assertFalse(TwilioCertificationStartupRunner.isForbiddenTarget("+56911111111", "+56975856664"));
+        assertFalse(TwilioCertificationStartupRunner.isForbiddenTarget("+56911111111", ""));
+    }
 }

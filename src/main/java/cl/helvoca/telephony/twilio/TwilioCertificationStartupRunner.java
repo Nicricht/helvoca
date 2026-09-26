@@ -47,6 +47,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     private final String from;
     private final String to;
     private final String publicBaseUrl;
+    private final String forbiddenTo;
     private final int maxSeconds;
     private final String direction;
     private final TwilioCallControl callControl;
@@ -61,6 +62,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
             @Value("${TWILIO_TEST_FROM:}") String from,
             @Value("${TWILIO_TEST_TO:}") String to,
             @Value("${TWILIO_PUBLIC_BASE_URL:}") String publicBaseUrl,
+            @Value("${TWILIO_CERTIFICATION_FORBIDDEN_TO:}") String forbiddenTo,
             @Value("${TWILIO_CERTIFICATION_MAX_SECONDS:75}") int maxSeconds,
             @Value("${TWILIO_CERTIFICATION_DIRECTION:outbound-test}") String direction,
             TwilioCallControl callControl) {
@@ -70,6 +72,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         this.from = from;
         this.to = to;
         this.publicBaseUrl = publicBaseUrl;
+        this.forbiddenTo = forbiddenTo;
         this.maxSeconds = Math.max(20, Math.min(maxSeconds, 180));
         this.direction = normalizeDirection(direction);
         this.callControl = callControl;
@@ -81,6 +84,10 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         if (!validConfiguration()) {
             log.error("TWILIO_CERTIFICATION_CALL blocked: invalid/missing Twilio certification configuration direction={}",
                     direction);
+            return;
+        }
+        if (isForbiddenTarget(to, forbiddenTo)) {
+            log.error("TWILIO_CERTIFICATION_CALL blocked: configured test target is forbidden");
             return;
         }
 
@@ -180,6 +187,13 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
 
     static boolean shouldScheduleSafetyHangup(String direction) {
         return INBOUND_CERTIFICATION.equals(normalizeDirection(direction));
+    }
+
+    static boolean isForbiddenTarget(String target, String forbiddenTarget) {
+        return target != null
+                && forbiddenTarget != null
+                && !forbiddenTarget.isBlank()
+                && target.trim().equals(forbiddenTarget.trim());
     }
 
     private static String form(String key, String value) {
