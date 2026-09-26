@@ -21,6 +21,8 @@ public class SecurityConfig {
     static final String[] PUBLIC_CONSOLE_ASSETS = {
             "/", "/index.html", "/app.js", "/phone-provisioning.js", "/commercial-status.js",
             "/voice-selector.js", "/ux-simplification.js", "/styles.css", "/home-business.js", "/home-business.css",
+            "/pilot-readiness.js", "/pilot-control.js", "/pilot-metrics.js",
+            "/pilot-activation.js", "/schedule-exceptions.js", "/payment-sandbox-onboarding.js",
             "/sales.html", "/sales.css",
             "/privacy.html", "/terms.html",
             "/pricing.html", "/pricing.js", "/pricing.css",

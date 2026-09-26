@@ -19,6 +19,24 @@ public class PaymentProviderConfigController {
         return ResponseEntity.ok(service.current());
     }
 
+    @GetMapping("/managed-sandbox")
+    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    public ResponseEntity<PaymentProviderConfigService.ManagedSandboxView> managedSandbox() {
+        return ResponseEntity.ok(service.managedSandbox());
+    }
+
+    @PostMapping("/managed-sandbox/enable")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public ResponseEntity<PaymentProviderConfigService.ManagedSandboxView> enableManagedSandbox() {
+        return ResponseEntity.ok(service.enableManagedSandbox());
+    }
+
+    @PostMapping("/managed-sandbox/disable")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public ResponseEntity<PaymentProviderConfigService.ManagedSandboxView> disableManagedSandbox() {
+        return ResponseEntity.ok(service.disableManagedSandbox());
+    }
+
     @PutMapping
     @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public ResponseEntity<PaymentProviderConfigService.View> replace(

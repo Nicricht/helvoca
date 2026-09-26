@@ -13,6 +13,16 @@ async function mockSettings(page, state = {}) {
   state.scheduleExceptionPuts = [];
   state.scheduleExceptionDeletes = [];
   state.activationPayloads = [];
+  state.managedPaymentActions = [];
+  state.managedPayment = state.managedPayment || {
+    available: true,
+    configured: false,
+    enabled: false,
+    blockedByCustomConfiguration: false,
+    provider: null,
+    mode: null,
+    webhookPath: null
+  };
   state.activation = state.activation || {
     ready: false,
     completed: 6,
@@ -61,6 +71,30 @@ async function mockSettings(page, state = {}) {
   };
 
   await page.route('**/api/v1/auth/me', route => route.fulfill(json({ email: 'admin@demo.cl', roles: state.roles || ['BUSINESS_ADMIN'] })));
+  await page.route('**/api/v1/payment-provider/managed-sandbox/enable', route => {
+    state.managedPaymentActions.push('enable');
+    state.managedPayment = {
+      available: true,
+      configured: true,
+      enabled: true,
+      blockedByCustomConfiguration: false,
+      provider: 'mercadopago',
+      mode: 'SANDBOX',
+      webhookPath: '/webhooks/v1/payments/mercadopago/demo-key'
+    };
+    route.fulfill(json(state.managedPayment));
+  });
+  await page.route('**/api/v1/payment-provider/managed-sandbox/disable', route => {
+    state.managedPaymentActions.push('disable');
+    state.managedPayment = {
+      ...state.managedPayment,
+      configured: true,
+      enabled: false
+    };
+    route.fulfill(json(state.managedPayment));
+  });
+  await page.route('**/api/v1/payment-provider/managed-sandbox', route =>
+    route.fulfill(json(state.managedPayment)));
   await page.route('**/api/v1/business/profile', async route => {
     if (route.request().method() === 'PUT') {
       const payload = route.request().postDataJSON();
@@ -323,6 +357,30 @@ test('settings preset changes guidance only and never rewrites capability choice
 
   await preset.selectOption('clinic');
   await expect(suggestion).toHaveText('Prioriza servicios y reservas.');
+});
+
+test('settings activates managed Mercado Pago sandbox without exposing credentials', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const state = {};
+  await mockSettings(page, state);
+  await page.goto('/settings.html');
+
+  await page.getByRole('button', { name: '📞 Canales', exact: true }).click();
+
+  const card = page.locator('#managedPaymentSandbox');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('Pagos de prueba disponibles');
+  await expect(page.locator('#managedPaymentSandboxEnable')).toBeVisible();
+  await expect(card.locator('input[type="password"]')).toHaveCount(0);
+  await expect(card).not.toContainText('credentialRef');
+  await expect(card).not.toContainText('ACCESS_TOKEN');
+
+  await page.locator('#managedPaymentSandboxEnable').click();
+
+  await expect.poll(() => state.managedPaymentActions).toEqual(['enable']);
+  await expect(card).toContainText('Mercado Pago Sandbox activo');
+  await expect(page.locator('#managedPaymentSandboxDisable')).toBeVisible();
+  await expect(page.locator('#managedPaymentSandboxMessage')).toContainText('Pagos de prueba activados');
 });
 
 test('settings exposes WhatsApp state and changes it only after an explicit click', async ({ page }) => {
