@@ -183,3 +183,44 @@
     .inventory-variant-actions { grid-column:1/-1; justify-content:flex-start; }
     .inventory-variants-toolbar { align-items:flex-start; flex-direction:column; }
 }
+
+.inventory-alerts-panel { margin:0 0 18px; padding:18px; }
+.inventory-alerts-head {
+    display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:12px;
+}
+.inventory-alerts-head h2 { margin:4px 0 4px; font-size:18px; letter-spacing:-.02em; }
+.inventory-alerts-head p { margin:0; color:var(--muted); font-size:11px; line-height:1.45; }
+.inventory-alerts-list { display:flex; flex-direction:column; gap:8px; }
+.inventory-alert-card {
+    display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:center;
+    padding:12px 13px; border:1px solid rgba(255,255,255,.07); border-radius:13px;
+    background:rgba(255,255,255,.018);
+}
+.inventory-alert-card.acknowledged { opacity:.62; }
+.inventory-alert-icon {
+    width:34px; height:34px; display:grid; place-items:center; border-radius:10px;
+    font-weight:900; font-size:14px; border:1px solid var(--border);
+}
+.inventory-alert-card.low .inventory-alert-icon {
+    color:var(--warning); border-color:rgba(255,191,105,.28); background:rgba(255,191,105,.07);
+}
+.inventory-alert-card.out .inventory-alert-icon {
+    color:#ff9b9b; border-color:rgba(255,120,120,.28); background:rgba(255,120,120,.07);
+}
+.inventory-alert-card.restocked .inventory-alert-icon {
+    color:var(--success); border-color:rgba(56,217,150,.28); background:rgba(56,217,150,.07);
+}
+.inventory-alert-main strong,.inventory-alert-main small { display:block; }
+.inventory-alert-main strong { font-size:12px; }
+.inventory-alert-main small { margin-top:3px; color:var(--muted); font-size:10px; line-height:1.45; }
+.inventory-alert-action { display:flex; align-items:center; gap:8px; }
+.inventory-alert-action .button { min-height:29px; padding:0 9px; font-size:9px; }
+.inventory-alerts-empty { padding:14px 4px 2px; color:var(--muted); }
+.inventory-alerts-empty strong,.inventory-alerts-empty span { display:block; }
+.inventory-alerts-empty strong { color:var(--text); font-size:12px; }
+.inventory-alerts-empty span { margin-top:3px; font-size:10px; }
+@media (max-width:680px) {
+    .inventory-alerts-head { flex-direction:column; }
+    .inventory-alert-card { grid-template-columns:auto 1fr; }
+    .inventory-alert-action { grid-column:1/-1; justify-content:flex-end; }
+}
