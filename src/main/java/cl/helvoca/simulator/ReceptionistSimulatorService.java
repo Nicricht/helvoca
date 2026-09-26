@@ -43,6 +43,7 @@ public class ReceptionistSimulatorService {
     public static final String PROVIDER_ID = "simulator";
     private static final Logger log = LoggerFactory.getLogger(ReceptionistSimulatorService.class);
     private static final int MAX_TURNS = 24;
+    private static final int MAX_OPENAI_ATTEMPTS = 3;
 
     private final TenantProvider tenantProvider;
     private final BusinessRepository businesses;
@@ -196,11 +197,71 @@ public class ReceptionistSimulatorService {
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
-        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() / 100 != 2) {
-            throw new IllegalStateException("OpenAI simulator request failed with HTTP " + response.statusCode());
+
+        HttpResponse<String> response = null;
+        for (int attempt = 1; attempt <= MAX_OPENAI_ATTEMPTS; attempt++) {
+            response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() / 100 == 2) {
+                return new JSONObject(response.body());
+            }
+
+            boolean retry = response.statusCode() == 429
+                    && retryableOpenAi429(response.body())
+                    && attempt < MAX_OPENAI_ATTEMPTS;
+            if (!retry) {
+                throw new IllegalStateException(openAiFailureSummary(response.statusCode(), response.body()));
+            }
+
+            Thread.sleep(openAiRetryDelayMillis(response, attempt));
         }
-        return new JSONObject(response.body());
+
+        throw new IllegalStateException(openAiFailureSummary(
+                response == null ? 0 : response.statusCode(),
+                response == null ? "" : response.body()));
+    }
+
+    static boolean retryableOpenAi429(String body) {
+        JSONObject error = openAiError(body);
+        String code = error.optString("code", "");
+        String type = error.optString("type", "");
+        return !"insufficient_quota".equalsIgnoreCase(code)
+                && !"insufficient_quota".equalsIgnoreCase(type);
+    }
+
+    static String openAiFailureSummary(int statusCode, String body) {
+        JSONObject error = openAiError(body);
+        return "OpenAI simulator request failed with HTTP " + statusCode
+                + " type=" + safeProviderField(error.optString("type", "unknown"))
+                + " code=" + safeProviderField(error.optString("code", "unknown"));
+    }
+
+    private static JSONObject openAiError(String body) {
+        try {
+            JSONObject root = new JSONObject(body == null ? "" : body);
+            JSONObject error = root.optJSONObject("error");
+            return error == null ? new JSONObject() : error;
+        } catch (Exception ignored) {
+            return new JSONObject();
+        }
+    }
+
+    private static long openAiRetryDelayMillis(HttpResponse<?> response, int attempt) {
+        try {
+            String retryAfter = response.headers().firstValue("retry-after").orElse("");
+            if (!retryAfter.isBlank()) {
+                double seconds = Double.parseDouble(retryAfter.trim());
+                return Math.max(250L, Math.min(5_000L, Math.round(seconds * 1_000d)));
+            }
+        } catch (Exception ignored) {
+        }
+        return attempt == 1 ? 750L : 1_500L;
+    }
+
+    private static String safeProviderField(String value) {
+        if (value == null || value.isBlank()) return "unknown";
+        String clean = value.replaceAll("[^A-Za-z0-9_.:-]", "");
+        if (clean.isBlank()) return "unknown";
+        return clean.length() <= 80 ? clean : clean.substring(0, 80);
     }
 
     private JSONArray responseTools() {
