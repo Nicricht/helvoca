@@ -481,9 +481,31 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             out.put(new JSONObject()
                     .put("name", tool.getString("name"))
                     .put("description", tool.optString("description", ""))
-                    .put("parameters", tool.getJSONObject("parameters")));
+                    .put("parameters", sanitizeGeminiSchema(tool.getJSONObject("parameters"))));
         }
         return out;
+    }
+
+    static JSONObject sanitizeGeminiSchema(JSONObject schema) {
+        JSONObject copy = new JSONObject(schema.toString());
+        removeUnsupportedSchemaFields(copy);
+        return copy;
+    }
+
+    private static void removeUnsupportedSchemaFields(Object node) {
+        if (node instanceof JSONObject object) {
+            object.remove("additionalProperties");
+            object.remove("$schema");
+            for (String key : List.copyOf(object.keySet())) {
+                removeUnsupportedSchemaFields(object.opt(key));
+            }
+            return;
+        }
+        if (node instanceof JSONArray array) {
+            for (int i = 0; i < array.length(); i++) {
+                removeUnsupportedSchemaFields(array.opt(i));
+            }
+        }
     }
 
     private String systemInstructions() {
