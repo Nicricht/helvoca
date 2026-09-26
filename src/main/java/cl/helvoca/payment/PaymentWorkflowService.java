@@ -119,7 +119,9 @@ public class PaymentWorkflowService {
         operation.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
         operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
         operation.setConfirmationToken(UUID.randomUUID());
-        operation.setMetadata(operationMetadata(calculation, true, null));
+        operation.setMetadata(mergeMetadata(
+                operation.getMetadata(),
+                operationMetadata(calculation, true, null)));
         operation = operations.saveAndFlush(operation);
 
         recordConversation(
@@ -196,7 +198,9 @@ public class PaymentWorkflowService {
             operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
             operation.setConfirmationToken(UUID.randomUUID());
             operation.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
-            operation.setMetadata(operationMetadata(recalculated, true, null));
+            operation.setMetadata(mergeMetadata(
+                    operation.getMetadata(),
+                    operationMetadata(recalculated, true, null)));
             operation = operations.saveAndFlush(operation);
             recordConversation(
                     businessId,
