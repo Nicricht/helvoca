@@ -1,0 +1,86 @@
+name: CPH Receptionist Simulation
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    if: github.head_ref == 'ops/cph-receptionist-simulation-20260926'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Exercise simulated CPH receptionist
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://recepvoz.cl"
+          EMAIL="cph-recepcionista-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.com"
+          PASSWORD="$(openssl rand -hex 24)"
+
+          register="$(jq -nc             --arg adminName "Admin Simulacion CPH"             --arg email "$EMAIL"             --arg password "$PASSWORD"             --arg businessName "CPH Salud Providencia [SIMULACION RECEPVOZ]"             --arg timezone "America/Santiago"             --arg language "es"             '{adminName:$adminName,email:$email,password:$password,businessName:$businessName,timezone:$timezone,language:$language,humanTransferPhone:null}')"
+
+          auth="$(curl --fail-with-body -sS -X POST "$BASE/api/v1/auth/register"             -H 'Content-Type: application/json' --data-binary "$register")"
+          token="$(jq -er '.accessToken' <<<"$auth")"
+          business_id="$(jq -er '.user.businessId' <<<"$auth")"
+
+          profile='{"presetKey":"clinic","publicDescription":"SIMULACIÓN RECEPVOZ basada en información pública de CPH Salud. No implica autorización real de la clínica.","publicPhone":"+56975856664","publicEmail":"Contacto@cphsalud.cl","websiteUrl":"https://www.cphsalud.cl/","addressLine":"Mardoqueo Fernández 128, Oficina 203","commune":"Providencia","city":"Santiago","region":"Región Metropolitana","countryCode":"CL","defaultCurrency":"CLP","sellsProducts":false,"sellsServices":true,"usesReservations":true}'
+          curl --fail-with-body -sS -X PUT "$BASE/api/v1/business/profile"             -H "Authorization: Bearer $token" -H 'Content-Type: application/json'             --data-binary "$profile" >/dev/null
+
+          setup='{
+            "businessName":"CPH Salud Providencia [SIMULACION RECEPVOZ]",
+            "timezone":"America/Santiago",
+            "language":"es",
+            "humanTransferPhone":null,
+            "services":[
+              {"id":null,"name":"Odontología General","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null},
+              {"id":null,"name":"Estética Dental","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null},
+              {"id":null,"name":"Implantes Dentales","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null},
+              {"id":null,"name":"Ortodoncia","description":"SIMULACIÓN: duración no confirmada por la clínica.","durationMinutes":60,"price":null}
+            ],
+            "hours":[
+              {"dayOfWeek":1,"openTime":"09:30:00","closeTime":"18:00:00"},
+              {"dayOfWeek":2,"openTime":"09:30:00","closeTime":"18:00:00"},
+              {"dayOfWeek":3,"openTime":"09:30:00","closeTime":"18:00:00"},
+              {"dayOfWeek":4,"openTime":"09:30:00","closeTime":"18:00:00"},
+              {"dayOfWeek":5,"openTime":"09:30:00","closeTime":"17:00:00"}
+            ],
+            "knowledge":[
+              {"id":null,"title":"Horario de atención","category":"HORARIO","content":"Lunes a jueves de 09:30 a 18:00. Viernes de 09:30 a 17:00."},
+              {"id":null,"title":"Contacto Providencia","category":"CONTACTO","content":"Mardoqueo Fernández 128, Oficina 203, Providencia. Teléfono publicado +56 9 7585 6664. Email Contacto@cphsalud.cl."},
+              {"id":null,"title":"Primera visita","category":"FAQ","content":"La primera visita contempla evaluación clínica, diagnóstico por imágenes y un plan de tratamiento con presupuesto detallado antes de iniciar procedimientos."},
+              {"id":null,"title":"Límite clínico","category":"POLITICA","content":"El asistente entrega información administrativa y pública. No diagnostica ni prescribe. Cada caso requiere evaluación profesional."}
+            ]
+          }'
+          curl --fail-with-body -sS -X PUT "$BASE/api/v1/onboarding/setup"             -H "Authorization: Bearer $token" -H 'Content-Type: application/json'             --data-binary "$setup" >/dev/null
+
+          session="$(curl --fail-with-body -sS -X POST "$BASE/api/v1/simulator/sessions"             -H "Authorization: Bearer $token")"
+          sid="$(jq -er '.sessionId' <<<"$session")"
+
+          ask() {
+            local text="$1"
+            local body
+            body="$(jq -nc --arg message "$text" '{message:$message}')"
+            curl --fail-with-body -sS -X POST "$BASE/api/v1/simulator/sessions/$sid/messages"               -H "Authorization: Bearer $token" -H 'Content-Type: application/json'               --data-binary "$body"
+          }
+
+          r1="$(ask "Hola. ¿Cuál es el horario de atención?")"
+          r2="$(ask "¿Qué tratamientos o servicios ofrecen?")"
+          r3="$(ask "Quiero reservar Odontología General para el lunes 28 de septiembre de 2026 a las 10:30.")"
+          r4="$(ask "Me llamo Cliente Prueba.")"
+          r5="$(ask "Sí, quiero reservar Odontología General el lunes 28 de septiembre de 2026 a las 10:30.")"
+          finish="$(curl --fail-with-body -sS -X POST "$BASE/api/v1/simulator/sessions/$sid/finish"             -H "Authorization: Bearer $token")"
+
+          for response in "$r1" "$r2" "$r3" "$r4" "$r5"; do
+            reply="$(jq -er '.reply' <<<"$response")"
+            test -n "$reply"
+            if grep -Fq "No pude completar esa parte de la prueba ahora" <<<"$reply"; then
+              echo "SIMULATOR_GENERIC_FAILURE"
+              exit 1
+            fi
+          done
+
+          jq -n             --arg businessId "$business_id"             --arg greeting "$(jq -r '.greeting' <<<"$session")"             --arg hours "$(jq -r '.reply' <<<"$r1")"             --arg services "$(jq -r '.reply' <<<"$r2")"             --arg firstBooking "$(jq -r '.reply' <<<"$r3")"             --arg identity "$(jq -r '.reply' <<<"$r4")"             --arg booking "$(jq -r '.reply' <<<"$r5")"             --argjson bookingActions "$(jq '.actionCount' <<<"$r5")"             --argjson finished "$(jq '.ended' <<<"$finish")"             '{simulation:true,businessId:$businessId,greeting:$greeting,hoursReply:$hours,servicesReply:$services,firstBookingReply:$firstBooking,identityReply:$identity,bookingReply:$booking,bookingActionCount:$bookingActions,finished:$finished}'
