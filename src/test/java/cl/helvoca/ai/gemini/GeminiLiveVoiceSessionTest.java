@@ -538,13 +538,17 @@ class GeminiLiveVoiceSessionTest {
                 new VoiceProviderHealthRegistry(),
                 HttpClient.newHttpClient());
 
-        JSONObject args = new JSONObject()
-                .put("serviceId", UUID.randomUUID().toString())
+        String serviceId = UUID.randomUUID().toString();
+        JSONObject firstArgs = new JSONObject()
+                .put("serviceId", serviceId)
                 .put("date", "2026-09-27");
+        JSONObject sameSemanticArgsDifferentOrder = new JSONObject()
+                .put("date", "2026-09-27")
+                .put("serviceId", serviceId);
 
         session.onOpen(socket);
-        session.onText(socket, toolCall("slot-duplicate-1", "list_available_slots", args), true);
-        session.onText(socket, toolCall("slot-duplicate-2", "list_available_slots", args), true);
+        session.onText(socket, toolCall("slot-duplicate-1", "list_available_slots", firstArgs), true);
+        session.onText(socket, toolCall("slot-duplicate-2", "list_available_slots", sameSemanticArgsDifferentOrder), true);
 
         verify(tools, times(1)).execute(eq(context), eq("list_available_slots"), anyString());
     }
