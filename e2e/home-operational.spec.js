@@ -197,6 +197,28 @@ async function mockReadyHome(page, roles = ['BUSINESS_ADMIN'], options = {}) {
     recentRequests: [],
     unanswered: []
   })));
+  await page.route('**/api/v1/operations/pilot-metrics', route => route.fulfill(json({
+    businessName: 'Negocio E2E',
+    timezone: 'America/Santiago',
+    localNow: '2026-09-26T09:57:00-04:00',
+    today: {
+      code: 'TODAY', label: 'Hoy', calls: 4, whatsappConversations: 3, bookings: 2, orders: 2,
+      paymentAttempts: 2, successfulPayments: 1, pendingPayments: 1, failedPayments: 0,
+      refundedPayments: 0, humanTransfers: 1, callFailures: 1,
+      confirmedRevenueByCurrency: { CLP: 18990 },
+      paidOrderConversionPct: 50.0, paymentSuccessRatePct: 50.0,
+      callFailureRatePct: 25.0, humanTransferRatePct: 25.0
+    },
+    last7Days: {
+      code: 'LAST_7_DAYS', label: 'Últimos 7 días', calls: 30, whatsappConversations: 20, bookings: 12, orders: 10,
+      paymentAttempts: 9, successfulPayments: 8, pendingPayments: 1, failedPayments: 0,
+      refundedPayments: 0, humanTransfers: 3, callFailures: 2,
+      confirmedRevenueByCurrency: { CLP: 145000 },
+      paidOrderConversionPct: 80.0, paymentSuccessRatePct: 88.9,
+      callFailureRatePct: 6.7, humanTransferRatePct: 10.0
+    }
+  })));
+
   await page.route('**/api/v1/operations/pilot-readiness', route => route.fulfill(json({
     ready: true,
     passed: 5,
@@ -353,6 +375,16 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#pilotReadinessScore')).toHaveText('5/5');
   await expect(page.locator('#pilotReadinessCard')).toContainText('Todo el circuito crítico está listo');
   await expect(page.locator('#pilotReadinessCard .pilot-readiness-item.ready')).toHaveCount(5);
+  await expect(page.locator('#pilotMetricsCard')).toBeVisible();
+  await expect(page.locator('#pilotMetricConversations')).toHaveText('7');
+  await expect(page.locator('#pilotMetricOrders')).toHaveText('2');
+  await expect(page.locator('#pilotMetricPaid')).toHaveText('1');
+  await expect(page.locator('#pilotMetricRevenue')).toContainText('$18.990');
+  await expect(page.locator('#pilotMetricConversion')).toContainText('50');
+  await page.locator('[data-pilot-period="last7Days"]').click();
+  await expect(page.locator('#pilotMetricConversations')).toHaveText('50');
+  await expect(page.locator('#pilotMetricPaid')).toHaveText('8');
+  await expect(page.locator('#pilotMetricRevenue')).toContainText('$145.000');
   await expect(page.locator('#homeRecentActivity')).toHaveCount(0);
   await expect(page.locator('#statusGrid')).toBeHidden();
   await expect(page.locator('#homeCallsToday')).toHaveText('3');
