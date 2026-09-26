@@ -61,6 +61,11 @@ class GeminiLiveVoiceSessionTest {
                 .getString("voiceName"));
         assertTrue(setup.has("inputAudioTranscription"));
         assertTrue(setup.has("outputAudioTranscription"));
+        JSONObject inputTranscription = setup.getJSONObject("inputAudioTranscription");
+        assertEquals("es-CL", inputTranscription.getJSONArray("languageCodes").getString(0));
+        assertEquals("VERBATIM", inputTranscription.getString("mode"));
+        assertTrue(inputTranscription.getJSONArray("customVocabulary").toList().contains("RecepVoz"));
+        assertTrue(setup.getJSONObject("proactivity").getBoolean("proactiveAudio"));
 
         String instructions = setup.getJSONObject("systemInstruction")
                 .getJSONArray("parts").getJSONObject(0).getString("text");
@@ -68,8 +73,11 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("RecepVoz"));
         assertTrue(instructions.contains("[RECEPVOZ_CALL_CONNECTED]"));
         assertTrue(instructions.contains("ESPAÑOL DE CHILE"));
-        assertTrue(instructions.contains("no como locutora"));
+        assertTrue(instructions.contains("No suenes como locutora"));
         assertTrue(instructions.contains("NO vuelvas a ejecutar la misma herramienta"));
+        assertTrue(instructions.contains("entonación chilena urbana neutra"));
+        assertTrue(instructions.contains("a las nueve y media"));
+        assertTrue(instructions.contains("nunca menciones UUID"));
 
         JSONArray declarations = setup.getJSONArray("tools")
                 .getJSONObject(0).getJSONArray("functionDeclarations");
