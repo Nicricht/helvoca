@@ -216,7 +216,7 @@ public class PaymentWorkflowService {
                     "Este negocio todavía no tiene un proveedor de pagos comerciales configurado.");
         }
 
-        String idempotencyKey = "payment-operation:" + operation.getId();
+        String idempotencyKey = operation.getId().toString();
         PaymentProviderAdapter.CreateResult providerResult;
         try {
             providerResult = provider.create(new PaymentProviderAdapter.CreateCommand(

@@ -16,7 +16,7 @@ PAYMENT is the critical case because provider creation happens before the local 
 
 The provider request still uses the stable key:
 
-`payment-operation:<operationId>`
+`<operationId>` (UUID estable de la operación PAYMENT)
 
 That key remains the crash/retry idempotency boundary for providers that honor idempotency keys. The V36 execution fence protects concurrent in-flight attempts inside Helvoca; the provider key protects retried remote creation after uncertain network outcomes.
 

@@ -73,7 +73,7 @@ Para crear una Order:
 - la moneda actual soportada es `CLP`;
 - el monto CLP debe ser entero;
 - `external_reference` es el UUID de la operación PAYMENT;
-- la idempotency key estable es `payment-operation:<operationId>`;
+- la idempotency key estable es `<operationId>` (UUID estable de la operación PAYMENT);
 - el adapter devuelve el `checkout_url` del provider.
 
 Un `checkout_url` no significa que el pago haya sido completado. Solo un estado remoto verificado y traducido a `SUCCEEDED` cuenta como pago exitoso.
