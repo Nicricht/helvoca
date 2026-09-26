@@ -5,10 +5,12 @@ import cl.helvoca.operations.BusinessOperationRepository;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.operations.ConversationStateService;
 import cl.helvoca.operations.OperationPolicyService;
+import cl.helvoca.inventory.InventoryService;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,9 @@ public class PaymentWorkflowService {
     private final PaymentProviderRegistry providers;
     private final OperationPolicyService policies;
     private final ConversationStateService conversationState;
+
+    @Autowired(required = false)
+    private InventoryService inventory;
 
     public PaymentWorkflowService(BusinessOperationRepository operations,
                                   BusinessPaymentRepository payments,
@@ -269,6 +274,7 @@ public class PaymentWorkflowService {
         payment.setSource(source == null ? operation.getSource() : source);
         payment.setMetadata(providerResult.metadata());
         payment = payments.saveAndFlush(payment);
+        settleInventory(payment);
 
         operation.setStatus(operationStatus(payment.getStatus()));
         operation.setConfirmationToken(null);
@@ -569,6 +575,21 @@ public class PaymentWorkflowService {
             operations.saveAndFlush(operation);
         }
         syncCommercialJourney(payment, businessId, operation);
+        settleInventory(payment);
+    }
+
+    private void settleInventory(BusinessPayment payment) {
+        if (inventory == null || payment == null || payment.getTargetOperationId() == null) return;
+        switch (payment.getStatus()) {
+            case SUCCEEDED -> inventory.consumeOrder(
+                    payment.getBusinessId(), payment.getTargetOperationId(), "Payment succeeded");
+            case FAILED, CANCELLED, EXPIRED -> inventory.releaseOrder(
+                    payment.getBusinessId(), payment.getTargetOperationId(),
+                    "Payment " + payment.getStatus().name().toLowerCase(java.util.Locale.ROOT));
+            case REQUIRES_ACTION, PENDING, REFUNDED -> {
+                // Pending keeps the hold. Refund does not imply a physical return to stock.
+            }
+        }
     }
 
     private void syncCommercialJourney(BusinessPayment payment,
