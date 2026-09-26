@@ -21,6 +21,7 @@ class InventoryAlertServiceTest {
     private CatalogItemRepository catalog;
     private TenantProvider tenant;
     private JdbcTemplate jdbc;
+    private InventoryRestockSubscriptionService restockSubscriptions;
     private InventoryAlertService service;
     private UUID businessId;
     private UUID productId;
@@ -31,7 +32,8 @@ class InventoryAlertServiceTest {
         catalog = mock(CatalogItemRepository.class);
         tenant = mock(TenantProvider.class);
         jdbc = mock(JdbcTemplate.class);
-        service = new InventoryAlertService(alerts, catalog, tenant, jdbc);
+        restockSubscriptions = mock(InventoryRestockSubscriptionService.class);
+        service = new InventoryAlertService(alerts, catalog, tenant, jdbc, restockSubscriptions);
 
         businessId = UUID.randomUUID();
         productId = UUID.randomUUID();
@@ -110,6 +112,8 @@ class InventoryAlertServiceTest {
         assertEquals(InventoryAlert.Type.RESTOCKED, restored.getType());
         assertEquals(7, restored.getAvailable());
         assertEquals(InventoryAlert.Status.OPEN, restored.getStatus());
+        verify(restockSubscriptions).onRestocked(
+                businessId, productId, null, "Zapatilla", "SHOE-01", 7);
     }
 
     @Test

@@ -17,15 +17,18 @@ public class InventoryAlertService {
     private final CatalogItemRepository catalog;
     private final TenantProvider tenant;
     private final JdbcTemplate jdbc;
+    private final InventoryRestockSubscriptionService restockSubscriptions;
 
     public InventoryAlertService(InventoryAlertRepository alerts,
                                  CatalogItemRepository catalog,
                                  TenantProvider tenant,
-                                 JdbcTemplate jdbc) {
+                                 JdbcTemplate jdbc,
+                                 InventoryRestockSubscriptionService restockSubscriptions) {
         this.alerts = alerts;
         this.catalog = catalog;
         this.tenant = tenant;
         this.jdbc = jdbc;
+        this.restockSubscriptions = restockSubscriptions;
     }
 
     @Transactional(readOnly = true)
@@ -124,6 +127,8 @@ public class InventoryAlertService {
                     businessId, catalogItemId, variantId,
                     InventoryAlert.Type.RESTOCKED,
                     subjectName, sku, available, threshold);
+            restockSubscriptions.onRestocked(
+                    businessId, catalogItemId, variantId, subjectName, sku, available);
             return;
         }
 

@@ -60,6 +60,8 @@ class PostgresRowLevelSecurityIntegrationTest {
         ownerJdbc.update("DELETE FROM audit_log");
         ownerJdbc.update("DELETE FROM user_role");
         ownerJdbc.update("DELETE FROM app_user");
+        ownerJdbc.update("DELETE FROM inventory_restock_notification");
+        ownerJdbc.update("DELETE FROM inventory_restock_subscription");
         ownerJdbc.update("DELETE FROM customer");
         ownerJdbc.update("DELETE FROM business");
 
@@ -353,6 +355,101 @@ class PostgresRowLevelSecurityIntegrationTest {
                 businessB,
                 () -> runtimeJdbc.queryForObject(
                         "SELECT COUNT(*) FROM inventory_alert",
+                        Long.class)));
+    }
+
+    @Test
+    void inventoryRestockSubscriptionsAndNotificationsAreTenantIsolated() {
+        UUID customerA = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessA);
+        UUID customerB = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessB);
+        UUID itemA = UUID.randomUUID();
+        UUID itemB = UUID.randomUUID();
+        UUID subscriptionA = UUID.randomUUID();
+        UUID subscriptionB = UUID.randomUUID();
+
+        ownerJdbc.update(
+                "INSERT INTO catalog_item(id, business_id, kind, name) VALUES (?, ?, 'PRODUCT', ?)",
+                itemA, businessA, "Restock A");
+        ownerJdbc.update(
+                "INSERT INTO catalog_item(id, business_id, kind, name) VALUES (?, ?, 'PRODUCT', ?)",
+                itemB, businessB, "Restock B");
+
+        ownerJdbc.update("""
+                INSERT INTO inventory_restock_subscription(
+                    id, business_id, customer_id, catalog_item_id,
+                    preferred_channel, contact, normalized_contact,
+                    consent_granted, consent_granted_at, consent_source, status
+                ) VALUES (?, ?, ?, ?, 'WHATSAPP', ?, ?, TRUE, NOW(), 'VOICE', 'ACTIVE')
+                """, subscriptionA, businessA, customerA, itemA,
+                "+56911111111", "+56911111111");
+        ownerJdbc.update("""
+                INSERT INTO inventory_restock_subscription(
+                    id, business_id, customer_id, catalog_item_id,
+                    preferred_channel, contact, normalized_contact,
+                    consent_granted, consent_granted_at, consent_source, status
+                ) VALUES (?, ?, ?, ?, 'WHATSAPP', ?, ?, TRUE, NOW(), 'VOICE', 'ACTIVE')
+                """, subscriptionB, businessB, customerB, itemB,
+                "+56922222222", "+56922222222");
+
+        ownerJdbc.update("""
+                INSERT INTO inventory_restock_notification(
+                    business_id, subscription_id, customer_id, catalog_item_id,
+                    preferred_channel, contact, subject_name, available,
+                    status, idempotency_key
+                ) VALUES (?, ?, ?, ?, 'WHATSAPP', ?, ?, 4, 'PENDING', ?)
+                """, businessA, subscriptionA, customerA, itemA,
+                "+56911111111", "Restock A", "inventory-restock:" + subscriptionA);
+        ownerJdbc.update("""
+                INSERT INTO inventory_restock_notification(
+                    business_id, subscription_id, customer_id, catalog_item_id,
+                    preferred_channel, contact, subject_name, available,
+                    status, idempotency_key
+                ) VALUES (?, ?, ?, ?, 'WHATSAPP', ?, ?, 5, 'PENDING', ?)
+                """, businessB, subscriptionB, customerB, itemB,
+                "+56922222222", "Restock B", "inventory-restock:" + subscriptionB);
+
+        assertEquals(1L, databaseContext.callAsTenant(
+                businessA,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM inventory_restock_subscription",
+                        Long.class)));
+        assertEquals(1L, databaseContext.callAsTenant(
+                businessB,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM inventory_restock_subscription",
+                        Long.class)));
+        assertEquals(1L, databaseContext.callAsTenant(
+                businessA,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM inventory_restock_notification",
+                        Long.class)));
+        assertEquals(1L, databaseContext.callAsTenant(
+                businessB,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM inventory_restock_notification",
+                        Long.class)));
+
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(
+                businessA,
+                () -> runtimeJdbc.update("""
+                        INSERT INTO inventory_restock_subscription(
+                            business_id, customer_id, catalog_item_id,
+                            preferred_channel, contact, normalized_contact,
+                            consent_granted, consent_granted_at, consent_source, status
+                        ) VALUES (?, ?, ?, 'WHATSAPP', ?, ?, TRUE, NOW(), 'VOICE', 'ACTIVE')
+                        """, businessB, customerB, itemB,
+                        "+56929999999", "+56929999999")));
+
+        assertEquals(1L, databaseContext.callAsTenant(
+                businessB,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM inventory_restock_subscription",
                         Long.class)));
     }
 
