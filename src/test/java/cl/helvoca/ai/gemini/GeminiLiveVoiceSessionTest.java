@@ -277,6 +277,56 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void certificationScenarioAdvancesOnGenerationCompleteWithoutWaitingForPlaybackTurnComplete() {
+        GeminiLiveProperties properties = properties();
+        properties.setCertificationSimulation(true);
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.execute(eq(context), eq("list_available_slots"), anyString())).thenReturn(
+                new JSONObject().put("success", true)
+                        .put("data", new JSONObject().put("slots", new JSONArray().put(
+                                new JSONObject().put("startAt", "2026-09-14T22:00:00Z"))))
+                        .put("error", JSONObject.NULL)
+                        .toString());
+
+        CallTranscriptService transcripts = mock(CallTranscriptService.class);
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                transcripts,
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        session.onOpen(socket);
+        session.onText(socket, "{\"setupComplete\":{}}", true);
+        session.onText(socket, turnComplete(), true);
+        session.onText(socket, toolCall("slot-generation-complete", "list_available_slots"), true);
+
+        verify(transcripts, never()).append(eq(context.callId()), eq("USER"),
+                contains("Ejecuta ahora create_booking"));
+
+        session.onText(socket, generationComplete(), true);
+
+        verify(transcripts).append(eq(context.callId()), eq("USER"),
+                contains("Ejecuta ahora create_booking"));
+        verify(transcripts, times(2)).append(eq(context.callId()), eq("USER"), anyString());
+
+        session.onText(socket, turnComplete(), true);
+
+        verify(transcripts, times(2)).append(eq(context.callId()), eq("USER"), anyString());
+    }
+
+    @Test
     void certificationScenarioConfirmsTwoPhaseBookingProposalBeforeTreatingItAsCreated() {
         GeminiLiveProperties properties = properties();
         properties.setCertificationSimulation(true);
@@ -480,6 +530,12 @@ class GeminiLiveVoiceSessionTest {
     private static String turnComplete() {
         return new JSONObject()
                 .put("serverContent", new JSONObject().put("turnComplete", true))
+                .toString();
+    }
+
+    private static String generationComplete() {
+        return new JSONObject()
+                .put("serverContent", new JSONObject().put("generationComplete", true))
                 .toString();
     }
 
