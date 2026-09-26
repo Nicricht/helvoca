@@ -16,6 +16,7 @@ public final class CommercialToolDefinitions {
                 .put("additionalProperties", true);
         JSONObject itemProperties = new JSONObject()
                 .put("catalogItemId", string("UUID exacto del producto o servicio devuelto por list_catalog"))
+                .put("variantId", string("UUID exacto de la variante devuelta dentro de variants[] por list_catalog, obligatorio cuando el cliente eligió una talla/color/variante concreta"))
                 .put("quantity", integer("Cantidad solicitada, entre 1 y 100"))
                 .put("modifiers", modifiers)
                 .put("notes", string("Observaciones libres adicionales del ítem"));
@@ -96,10 +97,11 @@ public final class CommercialToolDefinitions {
                         "Lista el catálogo universal activo del negocio con productos, servicios, precios, moneda y media comercial disponible. Cada ítem indica hasMedia y media[]. Usa los UUID exactos devueltos; nunca inventes productos, precios ni media.",
                         object()))
                 .put(function(CommercialOperationToolService.GET_STOCK_TOOL,
-                        "Consulta stock backend-autoritativo de un producto por catalogItemId o SKU. Si availabilityKnown=false, no afirmes que hay o no hay unidades; indica que la disponibilidad no está confirmada.",
+                        "Consulta stock backend-autoritativo de un producto o variante por catalogItemId, variantId o SKU. Cuando el cliente especifique talla, color u otra variante usa el variantId exacto devuelto por list_catalog. Si availabilityKnown=false, no afirmes disponibilidad.",
                         object().put("properties", new JSONObject()
                                         .put("catalogItemId", string("UUID exacto del producto devuelto por list_catalog"))
-                                        .put("sku", string("SKU exacto del producto, si el cliente lo entrega")))
+                                        .put("variantId", string("UUID exacto de la variante devuelta en variants[]"))
+                                        .put("sku", string("SKU exacto del producto o variante, si el cliente lo entrega")))
                                 ))
                 .put(function(CommercialOperationToolService.SHOWCASE_SELECTION_TOOL,
                         "Resuelve y guarda en backend qué producto eligió el cliente del último PRODUCT_SHOWCASE de la misma operación. Usa selectionIndex 1, 2 o 3 para referencias ordinales, o catalogItemId solo si ese UUID fue mostrado. El backend valida tenant, cliente, operación y escaparate; no inventes selecciones.",
