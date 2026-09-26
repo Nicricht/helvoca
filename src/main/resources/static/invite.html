@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Invitación · RecepVoz</title>
+  <link rel="icon" href="/recepvoz-icon.svg">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { min-height:100vh; display:grid; place-items:center; padding:24px; }
+    .invite-shell { width:min(520px,100%); }
+    .invite-card { padding:24px; }
+    .invite-card h1 { margin:8px 0 6px; font-size:24px; }
+    .invite-card p { color:var(--muted); line-height:1.55; }
+    .invite-meta { margin:16px 0; padding:12px 14px; border:1px solid var(--border); border-radius:12px; background:rgba(255,255,255,.025); }
+    .invite-meta strong { display:block; font-size:13px; }
+    .invite-meta span { display:block; margin-top:4px; color:var(--muted); font-size:11px; }
+    .invite-form { display:grid; gap:12px; }
+    .invite-form label { display:grid; gap:5px; font-size:11px; color:var(--muted); }
+    .invite-form input { width:100%; box-sizing:border-box; }
+    #inviteMessage { margin-top:12px; font-size:12px; }
+    #inviteMessage.error { color:#f28d8d; }
+    #inviteMessage.success { color:#37cd91; }
+  </style>
+</head>
+<body>
+  <main class="invite-shell">
+    <section class="card invite-card">
+      <div class="eyebrow">Invitación de equipo</div>
+      <h1 id="inviteTitle">Cargando invitación…</h1>
+      <p id="inviteSubtitle">Estamos verificando que este enlace siga vigente.</p>
+      <div id="inviteMeta" class="invite-meta hidden"></div>
+      <form id="inviteAcceptForm" class="invite-form hidden">
+        <label>Nueva contraseña
+          <input name="password" type="password" minlength="10" maxlength="72" autocomplete="new-password" required>
+        </label>
+        <label>Repite la contraseña
+          <input name="confirmPassword" type="password" minlength="10" maxlength="72" autocomplete="new-password" required>
+        </label>
+        <button class="button primary" type="submit">Aceptar invitación</button>
+      </form>
+      <div id="inviteMessage" class="hidden"></div>
+    </section>
+  </main>
+  <script src="/invite.js?v=20260926-1" defer></script>
+</body>
+</html>
