@@ -19,4 +19,6 @@ public interface BusinessPaymentRepository extends JpaRepository<BusinessPayment
             UUID businessId, String contactPhone);
     List<BusinessPayment> findTop5ByBusinessIdAndSourceReferenceIdOrderByCreatedAtDesc(
             UUID businessId, UUID sourceReferenceId);
+    List<BusinessPayment> findTop50ByBusinessIdAndStatusInOrderByUpdatedAtAsc(
+            UUID businessId, List<BusinessPayment.Status> statuses);
 }

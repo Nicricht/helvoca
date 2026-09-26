@@ -319,6 +319,24 @@ public class PaymentWorkflowService {
     }
 
     @Transactional
+    public int reconcilePending(UUID businessId) {
+        if (businessId == null) return 0;
+        List<BusinessPayment> pending = payments.findTop50ByBusinessIdAndStatusInOrderByUpdatedAtAsc(
+                businessId,
+                List.of(BusinessPayment.Status.REQUIRES_ACTION, BusinessPayment.Status.PENDING));
+        int changed = 0;
+        for (BusinessPayment payment : pending) {
+            BusinessPayment.Status before = payment.getStatus();
+            refreshFromProvider(payment, businessId);
+            BusinessPayment refreshed = payments.findByIdAndBusinessId(payment.getId(), businessId)
+                    .orElse(payment);
+            syncOperation(refreshed, businessId);
+            if (refreshed.getStatus() != before) changed++;
+        }
+        return changed;
+    }
+
+    @Transactional
     public JSONObject cancel(UUID businessId,
                              UUID customerId,
                              UUID sourceReferenceId,
@@ -398,20 +416,66 @@ public class PaymentWorkflowService {
         if (operation == null || operation.getType() != BusinessOperation.Type.PAYMENT) return;
 
         BusinessOperation.Status next = operationStatus(payment.getStatus());
-        if (operation.getStatus() != next) {
+        boolean changed = operation.getStatus() != next;
+        if (changed) {
             operation.setStatus(next);
-            operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
         }
         operation.setConfirmationToken(null);
         Map<String, Object> metadata = new LinkedHashMap<>();
         if (operation.getMetadata() != null) metadata.putAll(operation.getMetadata());
-        metadata.put("paymentStatus", payment.getStatus().name());
-        metadata.put("paymentId", payment.getId().toString());
-        metadata.put("provider", payment.getProvider());
-        metadata.put("paymentPending", paymentPending(payment.getStatus()));
-        metadata.put("confirmationPending", false);
+        changed |= putIfChanged(metadata, "paymentStatus", payment.getStatus().name());
+        changed |= putIfChanged(metadata, "paymentId", payment.getId().toString());
+        changed |= putIfChanged(metadata, "provider", payment.getProvider());
+        changed |= putIfChanged(metadata, "paymentPending", paymentPending(payment.getStatus()));
+        changed |= putIfChanged(metadata, "confirmationPending", false);
         operation.setMetadata(metadata);
-        operations.saveAndFlush(operation);
+        if (changed) {
+            operation.setRevision(operation.getRevision() == null ? 1 : operation.getRevision() + 1);
+            operations.saveAndFlush(operation);
+        }
+        syncCommercialJourney(payment, businessId, operation);
+    }
+
+    private void syncCommercialJourney(BusinessPayment payment,
+                                       UUID businessId,
+                                       BusinessOperation paymentOperation) {
+        if (payment == null || paymentOperation == null || paymentOperation.getMetadata() == null) return;
+        UUID journeyId = metadataUuid(paymentOperation, "commercialJourneyOperationId");
+        if (journeyId == null) return;
+
+        BusinessOperation journey = operations.findByIdAndBusinessId(journeyId, businessId).orElse(null);
+        if (journey == null) return;
+        if (payment.getCustomerId() != null
+                && journey.getCustomerId() != null
+                && !payment.getCustomerId().equals(journey.getCustomerId())) return;
+
+        String stage = switch (payment.getStatus()) {
+            case SUCCEEDED -> "PAID";
+            case REQUIRES_ACTION, PENDING -> "PAYMENT_LINK_SENT";
+            case REFUNDED -> "PAYMENT_REFUNDED";
+            case FAILED, CANCELLED, EXPIRED -> "PAYMENT_FAILED";
+        };
+
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        if (journey.getMetadata() != null) metadata.putAll(journey.getMetadata());
+        boolean changed = false;
+        changed |= putIfChanged(metadata, "paymentOperationId", payment.getOperationId().toString());
+        changed |= putIfChanged(metadata, "paymentId", payment.getId().toString());
+        changed |= putIfChanged(metadata, "paymentStatus", payment.getStatus().name());
+        changed |= putIfChanged(metadata, "commercialStage", stage);
+        changed |= putIfChanged(metadata, "lastAction", "PAYMENT_STATUS_VERIFIED");
+        if (!changed) return;
+
+        journey.setMetadata(metadata);
+        journey.setRevision(journey.getRevision() == null ? 1 : journey.getRevision() + 1);
+        operations.saveAndFlush(journey);
+    }
+
+    private static boolean putIfChanged(Map<String, Object> metadata, String key, Object value) {
+        Object previous = metadata.get(key);
+        if (Objects.equals(previous, value)) return false;
+        metadata.put(key, value);
+        return true;
     }
 
     private Calculation calculate(UUID businessId,
