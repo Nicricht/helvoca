@@ -87,7 +87,12 @@ public class MerchantPaymentSandboxStatusStartupRunner implements ApplicationRun
 
     static String safeLogMessage(String message) {
         if (message == null || message.isBlank()) return "";
-        String normalized = message.replaceAll("[\\r\\n\\t]+", " ").trim();
+        String normalized = message
+                .replace("\\r", " ")
+                .replace("\\n", " ")
+                .replace("\\t", " ")
+                .replaceAll("[\\r\\n\\t]+", " ")
+                .trim();
         return normalized.length() <= 500 ? normalized : normalized.substring(0, 500);
     }
 
