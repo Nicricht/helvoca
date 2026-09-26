@@ -323,6 +323,10 @@ public class RealtimeToolService {
             return error("CUSTOMER_NOT_REGISTERED",
                     "Primero necesito identificar al cliente antes de verificar su WhatsApp.");
         }
+        if (call.getCustomerId() == null) {
+            call.setCustomerId(customer.getId());
+            calls.save(call);
+        }
 
         String callerNumber = context.callerNumber();
         if (callerNumber == null || callerNumber.isBlank()) {
