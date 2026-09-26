@@ -183,6 +183,10 @@
     }
   });
 
+  new MutationObserver(() => {
+    if (!dashboard.classList.contains('hidden')) load();
+  }).observe(dashboard, { attributes: true, attributeFilter: ['class'] });
+
   document.querySelector('#refreshBtn')?.addEventListener('click', load);
   load();
 })();
