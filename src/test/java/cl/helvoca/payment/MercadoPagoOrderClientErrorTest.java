@@ -43,6 +43,24 @@ class MercadoPagoOrderClientErrorTest {
     }
 
     @Test
+    void preservesSafeNonJsonProviderErrorDetail() {
+        String detail = MercadoPagoOrderClient.safeRawProviderDetail(
+                "<html>\\nForbidden: access denied\\tby provider</html>");
+
+        assertEquals(
+                "<html> Forbidden: access denied by provider</html>",
+                detail);
+    }
+
+    @Test
+    void redactsBearerTokensFromRawProviderErrorDetail() {
+        String detail = MercadoPagoOrderClient.safeRawProviderDetail(
+                "Forbidden Bearer abcdefghijklmnopqrstuvwxyz123456");
+
+        assertEquals("Forbidden Bearer <redacted>", detail);
+    }
+
+    @Test
     void sanitizesAndBoundsProviderDetail() {
         String longMessage = "bad\nvalue\t" + "x".repeat(400);
         JSONObject body = new JSONObject().put("message", longMessage);
