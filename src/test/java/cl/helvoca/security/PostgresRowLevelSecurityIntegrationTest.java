@@ -300,6 +300,63 @@ class PostgresRowLevelSecurityIntegrationTest {
     }
 
     @Test
+    void inventoryAlertsAreTenantIsolatedAndCrossTenantWritesFail() {
+        UUID itemA = UUID.randomUUID();
+        UUID itemB = UUID.randomUUID();
+        UUID alertA = UUID.randomUUID();
+        UUID alertB = UUID.randomUUID();
+
+        ownerJdbc.update(
+                "INSERT INTO catalog_item(id, business_id, kind, name) VALUES (?, ?, 'PRODUCT', ?)",
+                itemA, businessA, "Inventory A");
+        ownerJdbc.update(
+                "INSERT INTO catalog_item(id, business_id, kind, name) VALUES (?, ?, 'PRODUCT', ?)",
+                itemB, businessB, "Inventory B");
+
+        ownerJdbc.update("""
+                INSERT INTO inventory_alert(
+                    id, business_id, catalog_item_id, alert_type, status,
+                    subject_name, available, reorder_threshold
+                ) VALUES (?, ?, ?, 'LOW_STOCK', 'OPEN', ?, 1, 2)
+                """, alertA, businessA, itemA, "Inventory A");
+        ownerJdbc.update("""
+                INSERT INTO inventory_alert(
+                    id, business_id, catalog_item_id, alert_type, status,
+                    subject_name, available, reorder_threshold
+                ) VALUES (?, ?, ?, 'OUT_OF_STOCK', 'OPEN', ?, 0, 2)
+                """, alertB, businessB, itemB, "Inventory B");
+
+        long visibleA = databaseContext.callAsTenant(
+                businessA,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM inventory_alert",
+                        Long.class));
+        long visibleB = databaseContext.callAsTenant(
+                businessB,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM inventory_alert",
+                        Long.class));
+
+        assertEquals(1L, visibleA);
+        assertEquals(1L, visibleB);
+
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(
+                businessA,
+                () -> runtimeJdbc.update("""
+                        INSERT INTO inventory_alert(
+                            id, business_id, catalog_item_id, alert_type, status,
+                            subject_name, available, reorder_threshold
+                        ) VALUES (?, ?, ?, 'LOW_STOCK', 'OPEN', ?, 1, 2)
+                        """, UUID.randomUUID(), businessB, itemB, "Cross tenant")));
+
+        assertEquals(1L, databaseContext.callAsTenant(
+                businessB,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM inventory_alert",
+                        Long.class)));
+    }
+
+    @Test
     void tenantReadWithoutBusinessPredicateCannotSeeAnotherTenant() {
         long visibleA = databaseContext.callAsTenant(businessA,
                 () -> runtimeJdbc.queryForObject("SELECT COUNT(*) FROM customer", Long.class));
