@@ -387,6 +387,12 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         if (!responses.isEmpty()) {
             send(new JSONObject().put("toolResponse",
                     new JSONObject().put("functionResponses", responses)));
+            // Certification must not depend on Gemini emitting another
+            // turnComplete after a successful tool call. Tool responses and
+            // the next synthetic customer turn are serialized by send(), so
+            // advancing here is deterministic and later turnComplete events
+            // remain harmless because certificationStep is monotonic.
+            advanceCertificationSimulation();
         }
     }
 
