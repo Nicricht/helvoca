@@ -186,18 +186,8 @@ public class CommercialSandboxE2eCertificationStartupRunner implements Applicati
         return new Seed(businessId, runId, customer.getId(), item.getId(), journey.getId());
     }
 
-    CertificationResult certify(Seed seed) {
+    OrderReadyResult prepareOrderReady(Seed seed) {
         BusinessOperation journey = requireJourney(seed);
-
-        UUID existingPaymentOperationId = metadataUuid(journey, "paymentOperationId");
-        if (existingPaymentOperationId != null) {
-            BusinessPayment existing = payments
-                    .findByOperationIdAndBusinessId(existingPaymentOperationId, seed.businessId())
-                    .orElse(null);
-            if (existing != null) {
-                return result(seed.journeyOperationId(), journey, existing);
-            }
-        }
 
         if (metadataUuid(journey, "selectedCatalogItemId") == null) {
             requireSuccess(execute(seed, CommercialOperationToolService.SHOWCASE_SELECTION_TOOL,
@@ -272,15 +262,36 @@ public class CommercialSandboxE2eCertificationStartupRunner implements Applicati
         BusinessPayment existing = payments
                 .findByOperationIdAndBusinessId(paymentOperationId, seed.businessId())
                 .orElse(null);
+        if (existing == null
+                && (paymentOperation.getStatus() != BusinessOperation.Status.AWAITING_CONFIRMATION
+                || paymentOperation.getConfirmationToken() == null)) {
+            throw new IllegalStateException(
+                    "Commercial certification payment is not awaiting confirmation");
+        }
+
+        return new OrderReadyResult(
+                seed.journeyOperationId(),
+                orderOperationId,
+                paymentOperationId,
+                orderOperation.getStatus(),
+                paymentOperation.getStatus(),
+                existing != null);
+    }
+
+    CertificationResult certify(Seed seed) {
+        OrderReadyResult ready = prepareOrderReady(seed);
+
+        BusinessPayment existing = payments
+                .findByOperationIdAndBusinessId(ready.paymentOperationId(), seed.businessId())
+                .orElse(null);
         if (existing != null) {
             return result(seed.journeyOperationId(), requireJourney(seed), existing);
         }
 
-        if (paymentOperation.getStatus() != BusinessOperation.Status.AWAITING_CONFIRMATION
-                || paymentOperation.getConfirmationToken() == null) {
-            throw new IllegalStateException(
-                    "Commercial certification payment is not awaiting confirmation");
-        }
+        BusinessOperation paymentOperation = operations
+                .findByIdAndBusinessId(ready.paymentOperationId(), seed.businessId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Commercial certification payment operation disappeared"));
 
         JSONObject createdPayment = confirmWithOneRequote(
                 seed,
@@ -291,7 +302,7 @@ public class CommercialSandboxE2eCertificationStartupRunner implements Applicati
         requireSuccess(createdPayment);
 
         BusinessPayment payment = payments
-                .findByOperationIdAndBusinessId(paymentOperationId, seed.businessId())
+                .findByOperationIdAndBusinessId(ready.paymentOperationId(), seed.businessId())
                 .orElseThrow(() -> new IllegalStateException(
                         "Commercial certification payment projection was not persisted"));
 
@@ -429,6 +440,13 @@ public class CommercialSandboxE2eCertificationStartupRunner implements Applicati
                 UUID customerId,
                 UUID catalogItemId,
                 UUID journeyOperationId) {}
+
+    record OrderReadyResult(UUID journeyOperationId,
+                            UUID orderOperationId,
+                            UUID paymentOperationId,
+                            BusinessOperation.Status orderStatus,
+                            BusinessOperation.Status paymentOperationStatus,
+                            boolean paymentProjectionExists) {}
 
     record CertificationResult(UUID journeyOperationId,
                                UUID orderOperationId,
