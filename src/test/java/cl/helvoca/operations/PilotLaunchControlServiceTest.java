@@ -1,5 +1,6 @@
 package cl.helvoca.operations;
 
+import cl.helvoca.onboarding.PilotActivationChecklistService;
 import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import static org.mockito.Mockito.*;
 class PilotLaunchControlServiceTest {
     @Mock PilotLaunchControlRepository controls;
     @Mock PilotReadinessService readiness;
+    @Mock PilotActivationChecklistService activationChecklist;
     @Mock TenantProvider tenantProvider;
 
     private PilotLaunchControlService service;
@@ -29,7 +31,8 @@ class PilotLaunchControlServiceTest {
     void setUp() {
         businessId = UUID.randomUUID();
         when(tenantProvider.requireBusinessId()).thenReturn(businessId);
-        service = new PilotLaunchControlService(controls, readiness, tenantProvider);
+        lenient().when(activationChecklist.current()).thenReturn(activation(true));
+        service = new PilotLaunchControlService(controls, readiness, activationChecklist, tenantProvider);
     }
 
     @Test
@@ -74,6 +77,55 @@ class PilotLaunchControlServiceTest {
     }
 
     @Test
+    void startFailsClosedWhenExternalPilotActivationChecklistIsIncomplete() {
+        PilotLaunchControl control = configured(PilotLaunchControl.Status.READY);
+        when(controls.findById(businessId)).thenReturn(Optional.of(control));
+        when(readiness.readiness()).thenReturn(new PilotReadinessService.Readiness(
+                true, 5, 5, List.of(), List.of(), "gemini", "mercadopago", "SANDBOX"));
+        when(activationChecklist.current()).thenReturn(activation(false));
+
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
+                service::start);
+
+        assertEquals(409, error.getStatusCode().value());
+        assertEquals(PilotLaunchControl.Status.READY, control.getStatus());
+        verify(controls, never()).save(any());
+    }
+
+    @Test
+    void currentHidesStartAndReportsActivationBlockerUntilChecklistIsComplete() {
+        PilotLaunchControl control = configured(PilotLaunchControl.Status.READY);
+        when(controls.findById(businessId)).thenReturn(Optional.of(control));
+        when(readiness.readiness()).thenReturn(new PilotReadinessService.Readiness(
+                true, 5, 5, List.of(), List.of(), "gemini", "mercadopago", "SANDBOX"));
+        when(activationChecklist.current()).thenReturn(activation(false));
+
+        PilotLaunchControlService.View result = service.current();
+
+        assertEquals("NO_GO", result.launchDecision());
+        assertFalse(result.canStart());
+        assertTrue(result.blockers().contains("Checklist de activación del piloto"));
+    }
+
+    @Test
+    void resumeFailsClosedWhenActivationChecklistIsNoLongerComplete() {
+        PilotLaunchControl control = configured(PilotLaunchControl.Status.PAUSED);
+        when(controls.findById(businessId)).thenReturn(Optional.of(control));
+        when(readiness.readiness()).thenReturn(new PilotReadinessService.Readiness(
+                true, 5, 5, List.of(), List.of(), "gemini", "mercadopago", "SANDBOX"));
+        when(activationChecklist.current()).thenReturn(activation(false));
+
+        ResponseStatusException error = assertThrows(
+                ResponseStatusException.class,
+                service::resume);
+
+        assertEquals(409, error.getStatusCode().value());
+        assertEquals(PilotLaunchControl.Status.PAUSED, control.getStatus());
+        verify(controls, never()).save(any());
+    }
+
+    @Test
     void startPauseResumeAndCompletePreserveSinglePilotRecord() {
         PilotLaunchControl control = configured(PilotLaunchControl.Status.READY);
         when(controls.findById(businessId)).thenReturn(Optional.of(control));
@@ -96,6 +148,16 @@ class PilotLaunchControlServiceTest {
         assertNotNull(control.getCompletedAt());
         assertFalse(completed.canStart());
         verify(controls, times(4)).save(same(control));
+    }
+
+    private static PilotActivationChecklistService.View activation(boolean ready) {
+        return new PilotActivationChecklistService.View(
+                ready,
+                ready ? 10 : 9,
+                10,
+                ready ? 100 : 90,
+                ready ? List.of() : List.of("CONVERSATION_TEST_REQUIRED"),
+                List.of());
     }
 
     private PilotLaunchControl configured(PilotLaunchControl.Status status) {
