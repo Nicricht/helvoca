@@ -129,7 +129,8 @@ public class AiAgentService {
     @Transactional(readOnly = true)
     public boolean toolAllowed(UUID businessId, String toolName) {
         AiAgent agent = runtime(businessId);
-        if (CrossChannelMessagingToolService.TOOL_NAME.equals(toolName)) return agent.isActive();
+        if (CrossChannelMessagingToolService.TOOL_NAME.equals(toolName)
+                || "verify_caller_whatsapp".equals(toolName)) return agent.isActive();
         AiCapability capability = AiCapability.fromToolName(toolName).orElse(null);
         if (capability == null) return true;
         return agent.isActive()
@@ -149,6 +150,7 @@ public class AiAgentService {
         // backend gates: verified identity, tenant operation, provider and
         // delivery switches. It does not grant any business-operation mutation.
         allowed.add(CrossChannelMessagingToolService.TOOL_NAME);
+        allowed.add("verify_caller_whatsapp");
         return Set.copyOf(allowed);
     }
 
