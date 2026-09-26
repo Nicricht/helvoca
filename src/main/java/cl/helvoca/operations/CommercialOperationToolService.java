@@ -8,6 +8,8 @@ import cl.helvoca.delivery.DeliveryCoverageService;
 import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZone;
 import cl.helvoca.delivery.DeliveryZoneRepository;
+import cl.helvoca.inventory.InventoryProductVariant;
+import cl.helvoca.inventory.InventoryProductVariantRepository;
 import cl.helvoca.inventory.InventoryService;
 import cl.helvoca.payment.PaymentWorkflowService;
 import org.json.JSONArray;
@@ -81,6 +83,9 @@ public class CommercialOperationToolService {
 
     @Autowired(required = false)
     private InventoryService inventory;
+
+    @Autowired(required = false)
+    private InventoryProductVariantRepository inventoryVariants;
 
     public CommercialOperationToolService(CatalogItemRepository catalog,
                                           CatalogMediaRepository catalogMedia,
@@ -198,13 +203,21 @@ public class CommercialOperationToolService {
             return error("INVENTORY_UNAVAILABLE", "El inventario todavía no está disponible.");
         }
         String catalogItemIdRaw = optional(args, "catalogItemId");
+        String variantIdRaw = optional(args, "variantId");
         String sku = optional(args, "sku");
         UUID catalogItemId = blank(catalogItemIdRaw) ? null : uuid(catalogItemIdRaw);
-        InventoryService.StockLookupView stock = inventory.lookupForBusiness(businessId, catalogItemId, sku);
+        UUID variantId = blank(variantIdRaw) ? null : uuid(variantIdRaw);
+        InventoryService.StockLookupView stock =
+                inventory.lookupForBusiness(businessId, catalogItemId, variantId, sku);
         JSONObject data = new JSONObject()
                 .put("catalogItemId", nullable(stock.catalogItemId()))
                 .put("productName", nullable(stock.productName()))
                 .put("sku", nullable(stock.sku()))
+                .put("variantId", nullable(stock.variantId()))
+                .put("variantName", nullable(stock.variantName()))
+                .put("variantOptions", stock.optionValuesJson() == null
+                        ? JSONObject.NULL
+                        : new JSONObject(stock.optionValuesJson()))
                 .put("configured", stock.configured())
                 .put("trackingEnabled", stock.trackingEnabled())
                 .put("availabilityKnown", stock.trackingEnabled() && stock.configured())
@@ -219,10 +232,20 @@ public class CommercialOperationToolService {
     private JSONObject listCatalog(UUID businessId) {
         JSONArray items = new JSONArray();
         for (CatalogItem item : catalog.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId)) {
+            List<InventoryProductVariant> variantsForItem =
+                    inventoryVariants == null || item.getKind() != CatalogItem.Kind.PRODUCT
+                            ? List.of()
+                            : inventoryVariants
+                                    .findAllByBusinessIdAndCatalogItemIdOrderByNameAsc(
+                                            businessId, item.getId())
+                                    .stream()
+                                    .filter(InventoryProductVariant::isActive)
+                                    .toList();
             items.put(catalogData(
                     item,
                     catalogMedia.findAllByBusinessIdAndCatalogItemIdAndActiveTrueOrderBySortOrderAscCreatedAtAsc(
-                            businessId, item.getId())));
+                            businessId, item.getId()),
+                    variantsForItem));
         }
         return success(new JSONObject().put("items", items));
     }
@@ -974,6 +997,9 @@ public class CommercialOperationToolService {
         for (BusinessOrderLine line : lines) {
             JSONObject item = new JSONObject()
                     .put("catalogItemId", line.getCatalogItemId().toString())
+                    .put("variantId", line.getVariantId() == null
+                            ? JSONObject.NULL
+                            : line.getVariantId().toString())
                     .put("name", line.getItemName())
                     .put("quantity", line.getQuantity())
                     .put("unitPrice", line.getUnitPrice())
@@ -995,7 +1021,9 @@ public class CommercialOperationToolService {
                 .put("deliveryAddress", nullable(order.getDeliveryAddress()));
     }
 
-    private static JSONObject catalogData(CatalogItem item, List<CatalogMedia> media) {
+    private static JSONObject catalogData(CatalogItem item,
+                                          List<CatalogMedia> media,
+                                          List<InventoryProductVariant> variants) {
         JSONArray mediaItems = new JSONArray();
         for (CatalogMedia value : media == null ? List.<CatalogMedia>of() : media) {
             mediaItems.put(new JSONObject()
@@ -1004,6 +1032,17 @@ public class CommercialOperationToolService {
                     .put("mimeType", nullable(value.getMimeType()))
                     .put("caption", nullable(value.getCaption())));
         }
+        JSONArray variantItems = new JSONArray();
+        for (InventoryProductVariant variant
+                : variants == null ? List.<InventoryProductVariant>of() : variants) {
+            variantItems.put(new JSONObject()
+                    .put("variantId", variant.getId().toString())
+                    .put("name", variant.getName())
+                    .put("sku", variant.getSku())
+                    .put("options", new JSONObject(variant.getOptionValuesJson()))
+                    .put("trackingEnabled", variant.isTrackingEnabled()));
+        }
+
         return new JSONObject()
                 .put("id", item.getId().toString())
                 .put("kind", item.getKind().name())
@@ -1013,7 +1052,9 @@ public class CommercialOperationToolService {
                 .put("currency", item.getCurrency())
                 .put("durationMinutes", nullable(item.getDurationMinutes()))
                 .put("media", mediaItems)
-                .put("hasMedia", !mediaItems.isEmpty());
+                .put("hasMedia", !mediaItems.isEmpty())
+                .put("variants", variantItems)
+                .put("hasVariants", !variantItems.isEmpty());
     }
 
     private static boolean ownedBy(BusinessOrder order, UUID customerId, String trustedPhone) {
