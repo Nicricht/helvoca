@@ -221,14 +221,37 @@ class PaymentWorkflowServiceTest {
         ArgumentCaptor<PaymentProviderAdapter.CreateCommand> command =
                 ArgumentCaptor.forClass(PaymentProviderAdapter.CreateCommand.class);
         verify(provider).create(command.capture());
-        assertEquals(paymentDraft.getId().toString(), command.getValue().idempotencyKey());
+        assertEquals(
+                PaymentWorkflowService.providerIdempotencyKey(paymentDraft),
+                command.getValue().idempotencyKey());
         assertEquals(0, command.getValue().amount().compareTo(new BigDecimal("22000.00")));
 
         ArgumentCaptor<BusinessPayment> payment = ArgumentCaptor.forClass(BusinessPayment.class);
         verify(payments).saveAndFlush(payment.capture());
         assertEquals(target.getId(), payment.getValue().getTargetOperationId());
         assertEquals(BusinessPayment.Status.REQUIRES_ACTION, payment.getValue().getStatus());
-        assertEquals(paymentDraft.getId().toString(), payment.getValue().getIdempotencyKey());
+        assertEquals(
+                PaymentWorkflowService.providerIdempotencyKey(paymentDraft),
+                payment.getValue().getIdempotencyKey());
+    }
+
+    @Test
+    void providerIdempotencyKeyIsStablePerRevisionAndRotatesOnNewRevision() {
+        BusinessOperation operation = new BusinessOperation();
+        operation.setId(UUID.randomUUID());
+        operation.setRevision(3);
+
+        String revision3First = PaymentWorkflowService.providerIdempotencyKey(operation);
+        String revision3Second = PaymentWorkflowService.providerIdempotencyKey(operation);
+
+        assertEquals(revision3First, revision3Second);
+        assertDoesNotThrow(() -> UUID.fromString(revision3First));
+
+        operation.setRevision(4);
+        String revision4 = PaymentWorkflowService.providerIdempotencyKey(operation);
+
+        assertNotEquals(revision3First, revision4);
+        assertDoesNotThrow(() -> UUID.fromString(revision4));
     }
 
     @Test
