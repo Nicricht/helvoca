@@ -14,7 +14,12 @@
     .team-invite-form input,.team-invite-form select { width:100%; box-sizing:border-box; }
     .team-invite-link { display:grid; grid-template-columns:1fr auto; gap:7px; margin-top:10px; }
     .team-invite-link input { width:100%; box-sizing:border-box; font-size:11px; }
-    .team-invite-list { display:grid; gap:7px; margin-top:12px; }
+    .team-members-title { margin-top:14px; font-size:10px; color:var(--muted); font-weight:850; letter-spacing:.04em; text-transform:uppercase; }
+    .team-members-list, .team-invite-list { display:grid; gap:7px; margin-top:8px; }
+    .team-member-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:9px; align-items:center; padding:9px 10px; border:1px solid var(--border); border-radius:10px; background:rgba(55,205,145,.035); }
+    .team-member-row strong { display:block; font-size:11px; }
+    .team-member-row small { display:block; margin-top:2px; color:var(--muted); font-size:9px; }
+    .team-member-state { font-size:9px; font-weight:850; color:#37cd91; }
     .team-invite-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:9px; align-items:center; padding:9px 10px; border:1px solid var(--border); border-radius:10px; }
     .team-invite-row strong { display:block; font-size:11px; }
     .team-invite-row small { display:block; margin-top:2px; color:var(--muted); font-size:9px; }
@@ -50,12 +55,16 @@
       <button id="teamInviteCopy" class="button small secondary" type="button">Copiar enlace</button>
     </div>
     <div id="teamInviteMessage" class="hidden"></div>
+    <div class="team-members-title">Miembros activos</div>
+    <div id="teamMembersList" class="team-members-list"></div>
+    <div class="team-members-title">Invitaciones</div>
     <div id="teamInviteList" class="team-invite-list"></div>
   `;
 
   (activation || document.querySelector('#nextStepBanner'))?.insertAdjacentElement('afterend', card);
 
   const form = card.querySelector('#teamInviteForm');
+  const members = card.querySelector('#teamMembersList');
   const list = card.querySelector('#teamInviteList');
   const linkWrap = card.querySelector('#teamInviteLink');
   const linkInput = card.querySelector('#teamInviteUrl');
@@ -75,6 +84,39 @@
       EXPIRED:'Expirada',
       REVOKED:'Revocada'
     }[status] || status || '';
+  }
+
+  function renderMembers(items) {
+    members.replaceChildren();
+    if (!Array.isArray(items) || !items.length) {
+      const empty = document.createElement('span');
+      empty.className = 'muted-text';
+      empty.textContent = 'Aún no hay miembros activos.';
+      members.appendChild(empty);
+      return;
+    }
+
+    items.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'team-member-row';
+      row.dataset.userId = item.id || '';
+
+      const info = document.createElement('div');
+      const name = document.createElement('strong');
+      name.textContent = item.name || item.email || 'Miembro';
+      const detail = document.createElement('small');
+      const roles = Array.isArray(item.roles) ? item.roles : [];
+      detail.textContent = `${item.email || ''} · ${roles.includes('BUSINESS_ADMIN') ? 'Administrador' : 'Operador'}`;
+      info.append(name, detail);
+
+      const state = document.createElement('span');
+      state.className = 'team-member-state';
+      state.textContent = item.active === false ? 'INACTIVO' : 'ACTIVO';
+      if (item.active === false) state.style.color = '#f4a636';
+
+      row.append(info, state);
+      members.appendChild(row);
+    });
   }
 
   function render(items) {
@@ -137,7 +179,12 @@
         return;
       }
       card.classList.remove('hidden');
-      render(await api('/api/v1/admin/invitations'));
+      const [users, invitations] = await Promise.all([
+        api('/api/v1/admin/users'),
+        api('/api/v1/admin/invitations')
+      ]);
+      renderMembers(users);
+      render(invitations);
     } catch (error) {
       if (error.status === 401 || error.status === 403) card.classList.add('hidden');
     } finally {
@@ -165,7 +212,12 @@
       linkWrap.classList.remove('hidden');
       setMessage('Invitación creada. Comparte este enlace con la persona invitada.', 'success');
       form.reset();
-      render(await api('/api/v1/admin/invitations'));
+      const [users, invitations] = await Promise.all([
+        api('/api/v1/admin/users'),
+        api('/api/v1/admin/invitations')
+      ]);
+      renderMembers(users);
+      render(invitations);
     } catch (error) {
       setMessage(error.message || 'No fue posible crear la invitación.', 'error');
     } finally {
