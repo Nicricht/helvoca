@@ -279,6 +279,17 @@ public class CommercialSandboxE2eCertificationStartupRunner implements Applicati
     }
 
     CertificationResult certify(Seed seed) {
+        BusinessOperation journey = requireJourney(seed);
+        UUID existingPaymentOperationId = metadataUuid(journey, "paymentOperationId");
+        if (existingPaymentOperationId != null) {
+            BusinessPayment existing = payments
+                    .findByOperationIdAndBusinessId(existingPaymentOperationId, seed.businessId())
+                    .orElse(null);
+            if (existing != null) {
+                return result(seed.journeyOperationId(), journey, existing);
+            }
+        }
+
         OrderReadyResult ready = prepareOrderReady(seed);
 
         BusinessPayment existing = payments
