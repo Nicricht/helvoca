@@ -64,6 +64,37 @@ test('inventory UI merges catalog with stock and allows an admin adjustment', as
     return route.continue();
   });
 
+  let alerts = [{
+    id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    catalogItemId: '11111111-1111-1111-1111-111111111111',
+    variantId: null,
+    type: 'OUT_OF_STOCK',
+    subjectName: 'Shampoo',
+    sku: 'SH-01',
+    available: 0,
+    reorderThreshold: 2,
+    acknowledged: false,
+    acknowledgedAt: null,
+    createdAt: '2026-09-26T18:00:00Z'
+  }];
+
+  await page.route('**/api/v1/inventory/alerts', async route => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill(json(alerts));
+    }
+    return route.continue();
+  });
+
+  await page.route('**/api/v1/inventory/alerts/cccccccc-cccc-cccc-cccc-cccccccccccc/acknowledge', async route => {
+    expect(route.request().method()).toBe('POST');
+    alerts = alerts.map(alert => ({
+      ...alert,
+      acknowledged: true,
+      acknowledgedAt: '2026-09-26T18:10:00Z'
+    }));
+    await route.fulfill(json(alerts[0]));
+  });
+
   let variants = [{
     id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
     catalogItemId: '11111111-1111-1111-1111-111111111111',
@@ -114,6 +145,13 @@ test('inventory UI merges catalog with stock and allows an admin adjustment', as
   await expect(page.locator('#inventoryBrand')).toHaveText('BARBERÍA NORTE');
   await expect(page.locator('#inventoryProductsCount')).toHaveText('2');
   await expect(page.locator('#inventoryConfiguredCount')).toHaveText('1 con seguimiento');
+  await expect(page.locator('#inventoryAlertsCount')).toHaveText('1 pendiente');
+  const stockAlert = page.locator('[data-inventory-alert-id="cccccccc-cccc-cccc-cccc-cccccccccccc"]');
+  await expect(stockAlert).toContainText('Agotado');
+  await expect(stockAlert).toContainText('Shampoo');
+  await stockAlert.getByRole('button', { name: 'Marcar atendida' }).click();
+  await expect(page.locator('#inventoryAlertsCount')).toHaveText('0 pendientes');
+  await expect(stockAlert).toContainText('Atendida');
 
   const shampoo = page.locator('[data-inventory-product-id="11111111-1111-1111-1111-111111111111"]');
   await expect(shampoo).toContainText('SH-01');
@@ -170,6 +208,20 @@ test('operator inventory is read only', async ({ page }) => {
     lowStock: false
   }])));
 
+  await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([{
+    id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    catalogItemId: '11111111-1111-1111-1111-111111111111',
+    variantId: null,
+    type: 'LOW_STOCK',
+    subjectName: 'Producto',
+    sku: 'P-1',
+    available: 1,
+    reorderThreshold: 1,
+    acknowledged: false,
+    acknowledgedAt: null,
+    createdAt: '2026-09-26T18:00:00Z'
+  }])));
+
   await page.route('**/api/v1/inventory/11111111-1111-1111-1111-111111111111/variants', route => route.fulfill(json([{
     id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     catalogItemId: '11111111-1111-1111-1111-111111111111',
@@ -190,6 +242,10 @@ test('operator inventory is read only', async ({ page }) => {
   await expect(page.locator('#inventoryRoleBadge')).toHaveText('Solo lectura');
   await expect(page.getByRole('button', { name: 'Ajustar' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Editar' })).toHaveCount(0);
+  await expect(page.locator('#inventoryAlertsCount')).toHaveText('1 pendiente');
+  await expect(page.locator('[data-inventory-alert-id="dddddddd-dddd-dddd-dddd-dddddddddddd"]'))
+    .toContainText('Stock bajo');
+  await expect(page.getByRole('button', { name: 'Marcar atendida' })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Variantes' }).click();
   await expect(page.locator('[data-inventory-variant-id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"]'))
