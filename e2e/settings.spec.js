@@ -13,6 +13,9 @@ async function mockSettings(page, state = {}) {
   state.scheduleExceptionPuts = [];
   state.scheduleExceptionDeletes = [];
   state.activationPayloads = [];
+  state.invitationCreates = [];
+  state.invitationRevokes = [];
+  state.invitations = state.invitations || [];
   state.managedPaymentActions = [];
   state.managedPayment = state.managedPayment || {
     available: true,
@@ -71,6 +74,38 @@ async function mockSettings(page, state = {}) {
   };
 
   await page.route('**/api/v1/auth/me', route => route.fulfill(json({ email: 'admin@demo.cl', roles: state.roles || ['BUSINESS_ADMIN'] })));
+  await page.route('**/api/v1/admin/invitations/*', async route => {
+    if (route.request().method() === 'DELETE') {
+      const id = route.request().url().split('/').pop();
+      state.invitationRevokes.push(id);
+      state.invitations = state.invitations.map(item =>
+        item.id === id ? { ...item, status: 'REVOKED' } : item);
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    await route.fulfill({ status: 405, body: '' });
+  });
+  await page.route('**/api/v1/admin/invitations', async route => {
+    if (route.request().method() === 'POST') {
+      const payload = route.request().postDataJSON();
+      state.invitationCreates.push(payload);
+      const created = {
+        id: 'invite-' + (state.invitations.length + 1),
+        businessId: '11111111-1111-1111-1111-111111111111',
+        businessName: 'Negocio E2E',
+        name: payload.name,
+        email: payload.email,
+        role: payload.role,
+        expiresAt: '2026-09-29T12:00:00Z',
+        status: 'PENDING',
+        invitePath: '/invite.html?businessId=11111111-1111-1111-1111-111111111111&token=test-token'
+      };
+      state.invitations.unshift({ ...created, invitePath: null });
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(created) });
+      return;
+    }
+    await route.fulfill(json(state.invitations));
+  });
   await page.route('**/api/v1/payment-provider/managed-sandbox/enable', route => {
     state.managedPaymentActions.push('enable');
     state.managedPayment = {
@@ -276,6 +311,31 @@ test('settings exposes the Mi negocio sections with simple navigation', async ({
   await expect(page.locator('#configAgentPanel')).toBeVisible();
   await expect(page.locator('#configBusinessPanel')).toBeHidden();
   await expect(page.locator('#agentCapabilities')).toBeHidden();
+});
+
+test('business admin creates a one-time team invitation without choosing another user password', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const state = {};
+  await mockSettings(page, state);
+  await page.goto('/settings.html');
+
+  const card = page.locator('#teamInvitationsCard');
+  await expect(card).toBeVisible();
+  await card.locator('input[name="name"]').fill('Camila Soto');
+  await card.locator('input[name="email"]').fill('camila@negocio.cl');
+  await card.locator('select[name="role"]').selectOption('OPERATOR');
+  await card.getByRole('button', { name: 'Generar invitación' }).click();
+
+  await expect.poll(() => state.invitationCreates.length).toBe(1);
+  expect(state.invitationCreates[0]).toEqual({
+    name: 'Camila Soto',
+    email: 'camila@negocio.cl',
+    role: 'OPERATOR'
+  });
+  await expect(page.locator('#teamInviteUrl')).toHaveValue(/invite\.html\?businessId=.*&token=test-token/);
+  await expect(page.locator('#teamInviteMessage')).toContainText('Comparte este enlace');
+  await expect(card).toContainText('Camila Soto');
+  await expect(card).toContainText('Pendiente');
 });
 
 test('settings turns first customer onboarding into an operational activation checklist', async ({ page }) => {
