@@ -6,6 +6,7 @@ import cl.helvoca.voice.VoiceAiProvider;
 import cl.helvoca.voice.VoiceAiProviderRegistry;
 import cl.helvoca.voice.VoiceAiSession;
 import cl.helvoca.voice.VoiceProviderHealthRegistry;
+import cl.helvoca.voice.VoiceTransportSession;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
