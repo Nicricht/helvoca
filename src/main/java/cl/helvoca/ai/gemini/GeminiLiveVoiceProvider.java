@@ -59,7 +59,8 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
 
     @Override
     public boolean certificationSession(RealtimeCallContext context) {
-        return context != null && properties.certificationSimulationAllowedFor(context.callerNumber());
+        return context != null && (context.voiceBakeOff()
+                || properties.certificationSimulationAllowedFor(context.callerNumber()));
     }
 
     @Override
