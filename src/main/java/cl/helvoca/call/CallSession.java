@@ -27,6 +27,9 @@ public class CallSession {
     @Column(name = "ai_provider", length = 30)
     private String aiProvider;
 
+    @Column(name = "ai_model", length = 120)
+    private String aiModel;
+
     @Column(name = "provider_call_id", nullable = false, unique = true, length = 100)
     private String providerCallId;
 
@@ -110,6 +113,8 @@ public class CallSession {
     public void setTelephonyProvider(String telephonyProvider) { this.telephonyProvider = telephonyProvider; }
     public String getAiProvider() { return aiProvider; }
     public void setAiProvider(String aiProvider) { this.aiProvider = aiProvider; }
+    public String getAiModel() { return aiModel; }
+    public void setAiModel(String aiModel) { this.aiModel = aiModel; }
     public String getProviderCallId() { return providerCallId; }
     public void setProviderCallId(String providerCallId) { this.providerCallId = providerCallId; }
     public String getCallerNumber() { return callerNumber; }

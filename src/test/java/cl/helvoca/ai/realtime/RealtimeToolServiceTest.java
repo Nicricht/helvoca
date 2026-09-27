@@ -6,6 +6,7 @@ import cl.helvoca.booking.BookingStatus;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallSession;
+import cl.helvoca.call.CallTraceService;
 import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
@@ -35,6 +36,64 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class RealtimeToolServiceTest {
+    @Test
+    void tracePersistenceFailureDoesNotBreakRealtimeToolResult() throws Exception {
+        RealtimeToolService tools = service();
+        CallTraceService trace = mock(CallTraceService.class);
+        doThrow(new IllegalStateException("trace unavailable"))
+                .when(trace).recordTool(any(UUID.class), any(UUID.class), anyString(), any(JSONObject.class), anyLong());
+
+        Field traceField = RealtimeToolService.class.getDeclaredField("trace");
+        traceField.setAccessible(true);
+        traceField.set(tools, trace);
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), UUID.randomUUID(), null, "+56911111111", "+56222222222", "MZtrace");
+
+        JSONObject result = new JSONObject(tools.execute(context, "unknown_tool", "{}"));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("UNKNOWN_TOOL", result.getJSONObject("error").getString("code"));
+        verify(trace).recordTool(eq(context.businessId()), eq(context.callId()), eq("unknown_tool"),
+                any(JSONObject.class), anyLong());
+    }
+
+    @Test
+    void openAiProviderReportsTheExactConfiguredRealtimeModel() {
+        OpenAiRealtimeProperties properties = new OpenAiRealtimeProperties();
+        properties.setRealtimeModel("gpt-realtime-commercial-cert");
+
+        OpenAiRealtimeBridgeFactory provider = new OpenAiRealtimeBridgeFactory(
+                properties,
+                mock(RealtimeToolService.class),
+                mock(cl.helvoca.call.CallTranscriptService.class),
+                mock(cl.helvoca.call.CallSummaryService.class));
+
+        assertEquals("gpt-realtime-commercial-cert", provider.modelId());
+    }
+
+    @Test
+    void executePersistsMeasuredLatencyWhenTraceIsAvailable() throws Exception {
+        UUID businessId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        RealtimeToolService tools = service();
+        ServiceItemRepository serviceItems = services(tools);
+        CallTraceService trace = mock(CallTraceService.class);
+        Field traceField = RealtimeToolService.class.getDeclaredField("trace");
+        traceField.setAccessible(true);
+        traceField.set(tools, trace);
+        when(serviceItems.findAllByBusinessIdOrderByNameAsc(businessId)).thenReturn(List.of());
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                callId, businessId, null, "+56911111111", "+56222222222", "MZ-observability");
+
+        JSONObject result = new JSONObject(tools.execute(context, "list_services", "{}"));
+
+        assertTrue(result.getBoolean("success"));
+        verify(trace).recordTool(
+                eq(businessId), eq(callId), eq("list_services"), any(JSONObject.class), longThat(value -> value >= 0L));
+    }
+
     @Test
     void buildInstructionsKeepsChileanStyleFromInitialGreeting() {
         UUID businessId = UUID.randomUUID();
