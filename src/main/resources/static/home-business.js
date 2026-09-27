@@ -1099,7 +1099,7 @@
         ["En curso", summary.active ?? 0],
         ["Pagadas", summary.paid ?? 0],
         ["Requieren atención", summary.needsAction ?? 0]
-      ].map(([label,value]) => \`<article><strong>\${esc(value)}</strong><span>\${esc(label)}</span></article>\`).join("");
+      ].map(([label,value]) => `<article><strong>${esc(value)}</strong><span>${esc(label)}</span></article>`).join("");
     }
 
     const stageSelect = document.querySelector("#homeSalesStage");
@@ -1107,7 +1107,7 @@
       const current = salesFilters.stage;
       const stages = [...new Set(allItems.map(item => item.commercialStage).filter(Boolean))];
       stageSelect.innerHTML = '<option value="all">Todas</option>' + stages
-        .map(stage => \`<option value="\${esc(stage)}">\${esc(salesStageLabel(stage))}</option>\`).join("");
+        .map(stage => `<option value="${esc(stage)}">${esc(salesStageLabel(stage))}</option>`).join("");
       stageSelect.value = stages.includes(current) ? current : "all";
     }
 
@@ -1122,18 +1122,18 @@
       const customer = item.customerName || item.customerPhone || "Cliente";
       const product = [item.product, item.variant].filter(Boolean).join(" · ") || "Sin producto";
       const moneyText = item.total == null ? "Sin total" : money(item.total, item.currency);
-      const stateText = [salesStageLabel(item.commercialStage), item.paymentStatus ? \`Pago \${salesStageLabel(item.paymentStatus)}\` : null].filter(Boolean).join(" · ");
+      const stateText = [salesStageLabel(item.commercialStage), item.paymentStatus ? `Pago ${salesStageLabel(item.paymentStatus)}` : null].filter(Boolean).join(" · ");
       return {customer, product, moneyText, stateText};
     };
 
-    host.innerHTML = \`<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Cliente</th><th>Producto</th><th>Etapa</th><th>Total</th><th>Canal</th><th>Inventario</th></tr></thead><tbody>\${items.map(item => {
+    host.innerHTML = `<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Cliente</th><th>Producto</th><th>Etapa</th><th>Total</th><th>Canal</th><th>Inventario</th></tr></thead><tbody>${items.map(item => {
       const data = row(item);
-      return \`<tr tabindex="0" data-home-sale-customer-id="\${esc(item.customerId || "")}"><td><strong>\${esc(data.customer)}</strong></td><td>\${esc(data.product)}</td><td><span class="home-pill">\${esc(data.stateText)}</span></td><td>\${esc(data.moneyText)}</td><td>\${esc(source(item.channel))}</td><td>\${esc(salesStageLabel(item.inventoryStatus))}</td></tr>\`;
+      return `<tr tabindex="0" data-home-sale-customer-id="${esc(item.customerId || "")}"><td><strong>${esc(data.customer)}</strong></td><td>${esc(data.product)}</td><td><span class="home-pill">${esc(data.stateText)}</span></td><td>${esc(data.moneyText)}</td><td>${esc(source(item.channel))}</td><td>${esc(salesStageLabel(item.inventoryStatus))}</td></tr>`;
     }).join("")}</tbody></table></div>
-    <div class="home-business-mobile-list">\${items.map(item => {
+    <div class="home-business-mobile-list">${items.map(item => {
       const data = row(item);
-      return \`<article class="home-business-mobile-card" tabindex="0" data-home-sale-customer-id="\${esc(item.customerId || "")}"><strong>\${esc(data.customer)}</strong><span>\${esc(data.product)} · \${esc(data.stateText)} · \${esc(data.moneyText)}</span></article>\`;
-    }).join("")}</div>\`;
+      return `<article class="home-business-mobile-card" tabindex="0" data-home-sale-customer-id="${esc(item.customerId || "")}"><strong>${esc(data.customer)}</strong><span>${esc(data.product)} · ${esc(data.stateText)} · ${esc(data.moneyText)}</span></article>`;
+    }).join("")}</div>`;
 
     document.querySelectorAll("[data-home-sale-customer-id]").forEach(node => {
       const open = () => {
