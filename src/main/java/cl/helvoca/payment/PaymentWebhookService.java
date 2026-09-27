@@ -23,17 +23,20 @@ public class PaymentWebhookService {
     private final BusinessOperationRepository operations;
     private final PaymentProviderRegistry providers;
     private final ConversationStateService conversationState;
+    private final PaymentSuccessNotificationService successNotifications;
 
     public PaymentWebhookService(PaymentWebhookEventRepository events,
                                  BusinessPaymentRepository payments,
                                  BusinessOperationRepository operations,
                                  PaymentProviderRegistry providers,
-                                 ConversationStateService conversationState) {
+                                 ConversationStateService conversationState,
+                                 PaymentSuccessNotificationService successNotifications) {
         this.events = events;
         this.payments = payments;
         this.operations = operations;
         this.providers = providers;
         this.conversationState = conversationState;
+        this.successNotifications = successNotifications;
     }
 
     @Transactional
@@ -115,6 +118,14 @@ public class PaymentWebhookService {
             syncUniversalOperation(payment);
             syncCommercialJourney(payment);
             syncConversation(payment);
+            if (payment.getStatus() == BusinessPayment.Status.SUCCEEDED) {
+                try {
+                    successNotifications.onVerifiedSuccess(payment);
+                } catch (RuntimeException ignored) {
+                    // Payment state is authoritative. A WhatsApp preparation
+                    // failure must never turn a verified payment into a failed webhook.
+                }
+            }
 
             event.setStatus(PaymentWebhookEvent.Status.PROCESSED);
             event.setProcessedAt(Instant.now());
