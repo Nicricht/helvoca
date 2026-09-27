@@ -178,6 +178,27 @@ class BookingConfirmationWorkflowIntegrationTest {
     }
 
     @Test
+    void malformedConfirmationWithoutProposalDataFailsClosed() {
+        Fixture fixture = fixture();
+
+        JSONObject result = workflow.execute(
+                fixture.business().getId(),
+                fixture.customer().getId(),
+                UUID.randomUUID(),
+                "+56911111111",
+                BusinessOrder.Source.VOICE,
+                BookingSource.AI_CALL,
+                new JSONObject()
+                        .put("operationId", "not-a-uuid")
+                        .put("confirmationToken", "also-not-a-uuid"));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("INVALID_CONFIRMATION",
+                result.getJSONObject("error").getString("code"));
+        assertEquals(0, bookings.count());
+    }
+
+    @Test
     void newBookingProposalReplacesTerminalConversationOperationState() {
         Fixture fixture = fixture();
         UUID source = UUID.randomUUID();
