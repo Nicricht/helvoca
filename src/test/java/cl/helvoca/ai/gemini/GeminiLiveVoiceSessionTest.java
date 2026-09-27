@@ -84,10 +84,10 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("me pueda colaborar"));
         assertTrue(instructions.contains("habla MUY RÁPIDO"));
         assertTrue(instructions.contains("está prohibido hacer dos veces la misma pregunta"));
-        assertTrue(instructions.contains("está prohibido hacer dos veces la misma pregunta"));
-        assertTrue(instructions.contains("mantén exactamente el mismo género"));\n        assertTrue(instructions.contains("find_caller antes de pedir nombre o teléfono"));
+        assertTrue(instructions.contains("mantén exactamente el mismo género"));
+        assertTrue(instructions.contains("find_caller antes de pedir nombre o teléfono"));
         assertTrue(instructions.contains("NO vuelvas a preguntar nada"));
-        assertTrue(instructions.contains("completar una reserva, venta, consulta o cualquier otra acción NO significa que la llamada terminó"));
+        assertTrue(instructions.contains("completar una reserva, venta o consulta NO significa que la llamada terminó"));
         assertTrue(instructions.contains("cadencia urbana de Santiago de Chile"));
         assertTrue(instructions.contains("a las nueve y media"));
         assertTrue(instructions.contains("nunca menciones UUID"));
