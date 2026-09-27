@@ -1,0 +1,70 @@
+name: SaaS Billing Sandbox Provider Certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      payer_email:
+        description: "Mercado Pago TEST payer email (@testuser.com)"
+        required: true
+        default: "test@testuser.com"
+        type: string
+      confirm_sandbox:
+        description: "I confirm this run uses Mercado Pago TEST credentials only"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: saas-billing-sandbox-provider-certification
+  cancel-in-progress: false
+
+jobs:
+  sandbox-provider:
+    name: mercadopago-sandbox-provider
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CONFIRM_SANDBOX: ${{ inputs.confirm_sandbox }}
+      HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST: "true"
+      MERCADOPAGO_TEST_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
+      MERCADOPAGO_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
+      MERCADOPAGO_TEST_PAYER_EMAIL: ${{ inputs.payer_email }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Fail closed unless this is an explicit TEST run
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIRM_SANDBOX" != "true" ]]; then
+            echo "confirm_sandbox must be true"
+            exit 1
+          fi
+          if [[ -z "${MERCADOPAGO_TEST_ACCESS_TOKEN:-}" ]]; then
+            echo "Missing repository secret MERCADOPAGO_TEST_ACCESS_TOKEN"
+            exit 1
+          fi
+          if [[ "$MERCADOPAGO_TEST_ACCESS_TOKEN" != APP_USR* ]]; then
+            echo "Refusing to run: TEST token must start with APP_USR"
+            exit 1
+          fi
+          if [[ "$MERCADOPAGO_TEST_PAYER_EMAIL" != *@testuser.com ]]; then
+            echo "Refusing to run: payer must be a Mercado Pago testuser.com account"
+            exit 1
+          fi
+
+      - name: Run real Mercado Pago sandbox provider certification
+        run: |
+          mvn -B -Dtest=MercadoPagoSaasSandboxProviderIT test
