@@ -97,9 +97,11 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
 
     @Override
     public void closeOnUpstreamFailure() {
-        outputClosed.set(true);
         pendingHangupMark.set(null);
-        control.hangup(accountSid, callSid);
+        synchronized (sendLock) {
+            outputClosed.set(true);
+            control.hangup(accountSid, callSid);
+        }
         try {
             if (socket.isOpen()) socket.close(CloseStatus.SERVER_ERROR);
         } catch (IOException e) {
