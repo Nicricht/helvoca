@@ -15,7 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -70,7 +69,14 @@ public class BookingConfirmationWorkflowService {
         this.jdbc = jdbc;
     }
 
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    /*
+     * PostgreSQL advisory transaction locks below are the serialization boundary.
+     * READ_COMMITTED is intentional: a waiter must take a fresh statement snapshot
+     * after the lock holder commits so the second confirmation can observe the
+     * consumed token and resolve as an idempotent replay instead of failing with a
+     * stale SERIALIZABLE snapshot.
+     */
+    @Transactional
     public JSONObject execute(UUID businessId,
                               UUID customerId,
                               UUID sourceReferenceId,
