@@ -24,6 +24,76 @@ import static org.mockito.Mockito.*;
 class TwilioMediaStreamHandlerTest {
 
     @Test
+    void signedBakeOffVoiceIsPropagatedAndTamperingIsRejected() throws Exception {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setAuthToken("twilio-test-secret");
+        TwilioMediaRouteSigner signer = new TwilioMediaRouteSigner(properties);
+        VoiceAiProviderRegistry providers = mock(VoiceAiProviderRegistry.class);
+        VoiceProviderHealthRegistry health = new VoiceProviderHealthRegistry();
+        CallLifecycleService lifecycle = mock(CallLifecycleService.class);
+        TwilioCallControl control = mock(TwilioCallControl.class);
+        VoiceAiProvider provider = mock(VoiceAiProvider.class);
+        VoiceAiSession ai = mock(VoiceAiSession.class);
+        WebSocketSession socket = mock(WebSocketSession.class);
+
+        String streamSid = "MZ-bakeoff";
+        String callSid = "CA-bakeoff";
+        String accountSid = "AC-bakeoff";
+        String business = "+14355652512";
+        String caller = "+56966939611";
+        long issuedAt = Instant.now().getEpochSecond();
+        String route = signer.sign(business, caller, callSid, "gemini", "Sadachbia", issuedAt);
+        UUID callId = UUID.randomUUID();
+        RealtimeCallContext baseContext = new RealtimeCallContext(
+                callId, UUID.randomUUID(), null, caller, business, streamSid);
+
+        when(socket.getId()).thenReturn("socket-bakeoff");
+        when(socket.isOpen()).thenReturn(true);
+        when(providers.require("gemini")).thenReturn(provider);
+        when(provider.id()).thenReturn("gemini");
+        when(provider.configured()).thenReturn(true);
+        when(lifecycle.startInboundCall("twilio", callSid, caller, business)).thenReturn(callId);
+        when(lifecycle.markStreamStarted(callId, callSid, streamSid, "gemini")).thenReturn(baseContext);
+        when(provider.createSession(any(RealtimeCallContext.class), any(VoiceTransportSession.class))).thenReturn(ai);
+
+        TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
+                signer, providers, health, lifecycle, control);
+        handler.afterConnectionEstablished(socket);
+
+        JSONObject start = new JSONObject()
+                .put("event", "start")
+                .put("streamSid", streamSid)
+                .put("start", new JSONObject()
+                        .put("streamSid", streamSid)
+                        .put("accountSid", accountSid)
+                        .put("callSid", callSid)
+                        .put("customParameters", new JSONObject()
+                                .put("business", business)
+                                .put("caller", caller)
+                                .put("callSid", callSid)
+                                .put("provider", "gemini")
+                                .put("voiceOverride", "Sadachbia")
+                                .put("issuedAt", String.valueOf(issuedAt))
+                                .put("route", route)));
+        handler.handleTextMessage(socket, new TextMessage(start.toString()));
+
+        ArgumentCaptor<RealtimeCallContext> contextCaptor = ArgumentCaptor.forClass(RealtimeCallContext.class);
+        verify(provider).createSession(contextCaptor.capture(), any(VoiceTransportSession.class));
+        assertEquals("Sadachbia", contextCaptor.getValue().voiceOverride());
+        assertTrue(contextCaptor.getValue().voiceBakeOff());
+
+        WebSocketSession tamperedSocket = mock(WebSocketSession.class);
+        when(tamperedSocket.getId()).thenReturn("socket-tampered");
+        handler.afterConnectionEstablished(tamperedSocket);
+        JSONObject tampered = new JSONObject(start.toString());
+        tampered.getJSONObject("start").getJSONObject("customParameters")
+                .put("voiceOverride", "Leda");
+        handler.handleTextMessage(tamperedSocket, new TextMessage(tampered.toString()));
+
+        verify(tamperedSocket).close(org.springframework.web.socket.CloseStatus.POLICY_VIOLATION);
+    }
+
+    @Test
     void signedStartCreatesProviderSessionAndForwardsInboundAudio() throws Exception {
         TwilioProperties properties = new TwilioProperties();
         properties.setAuthToken("twilio-test-secret");

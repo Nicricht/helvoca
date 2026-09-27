@@ -53,6 +53,30 @@ class TwilioMediaStreamTwimlFactoryTest {
         assertFalse(xml.toLowerCase().contains("polly"));
     }
 
+    @Test
+    void bakeOffTwimlCarriesSignedVoiceOverrideAsCustomParameter() throws Exception {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setAuthToken("twilio-test-secret");
+        properties.setPublicBaseUrl("https://helvoca.example");
+        TwilioMediaRouteSigner signer = new TwilioMediaRouteSigner(properties);
+        TwilioMediaStreamTwimlFactory factory = new TwilioMediaStreamTwimlFactory(properties, signer);
+
+        String xml = factory.twiml(
+                "+14355652512",
+                "+56911111111",
+                "CA0123456789abcdef0123456789abcdef",
+                "gemini",
+                "Sadachbia");
+
+        Document document = DocumentBuilderFactory.newInstance().newDocumentBuilder()
+                .parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+        NodeList parameters = document.getElementsByTagName("Parameter");
+
+        assertEquals(7, parameters.getLength());
+        assertTrue(hasParameter(parameters, "voiceOverride", "Sadachbia"));
+        assertTrue(hasNonBlankParameter(parameters, "route"));
+    }
+
     private static boolean hasParameter(NodeList list, String name, String value) {
         for (int i = 0; i < list.getLength(); i++) {
             Element item = (Element) list.item(i);

@@ -37,6 +37,33 @@ class VoiceCallRouterTest {
     }
 
     @Test
+    void bakeOffPinsCallToGeminiAndPassesVoiceCandidate() {
+        VoiceProviderProperties properties = new VoiceProviderProperties();
+        properties.setProviderOrder(List.of("openai-live", "gemini"));
+        VoiceAiProviderRegistry providers = mock(VoiceAiProviderRegistry.class);
+        VoiceAiProvider gemini = mock(VoiceAiProvider.class);
+        VoiceProviderHealthRegistry health = new VoiceProviderHealthRegistry();
+        TwilioMediaStreamTwimlFactory media = mock(TwilioMediaStreamTwimlFactory.class);
+        OpenAiLiveSipService openAi = mock(OpenAiLiveSipService.class);
+
+        when(providers.require("gemini")).thenReturn(gemini);
+        when(gemini.id()).thenReturn("gemini");
+        when(gemini.configured()).thenReturn(true);
+        when(media.twiml(
+                "+14355652512", "+56966939611", CALL_SID, "gemini", "Sadachbia"))
+                .thenReturn("<Response><Connect><Stream/></Connect></Response>");
+
+        VoiceCallRouter router = new VoiceCallRouter(properties, providers, health, media, openAi);
+        var decision = router.route(
+                "+14355652512", "+56966939611", CALL_SID, "Sadachbia").orElseThrow();
+
+        assertEquals("gemini", decision.providerId());
+        verify(media).twiml(
+                "+14355652512", "+56966939611", CALL_SID, "gemini", "Sadachbia");
+        verifyNoInteractions(openAi);
+    }
+
+    @Test
     void openGeminiCircuitFallsBackToOpenAiLiveSip() {
         VoiceProviderProperties properties = new VoiceProviderProperties();
         properties.setProviderOrder(List.of("gemini", "openai-live"));

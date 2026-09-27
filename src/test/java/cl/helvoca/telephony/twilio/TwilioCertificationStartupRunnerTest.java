@@ -22,6 +22,15 @@ class TwilioCertificationStartupRunnerTest {
     }
 
     @Test
+    void bakeOffVoiceMustBeCuratedAndOutboundOnly() {
+        assertTrue(TwilioCertificationStartupRunner.validVoiceOverride("", "outbound-test"));
+        assertTrue(TwilioCertificationStartupRunner.validVoiceOverride("Sadachbia", "outbound-test"));
+        assertTrue(TwilioCertificationStartupRunner.validVoiceOverride(" leda ", "outbound-test"));
+        assertFalse(TwilioCertificationStartupRunner.validVoiceOverride("Despina", "outbound-test"));
+        assertFalse(TwilioCertificationStartupRunner.validVoiceOverride("Sadachbia", "inbound-certification"));
+    }
+
+    @Test
     void outboundTestAlwaysKeepsSafetyHangup() {
         assertTrue(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("outbound-test"));
         assertTrue(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("unexpected"));

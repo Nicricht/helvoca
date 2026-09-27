@@ -1,6 +1,7 @@
 package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.ai.realtime.RealtimeCallContext;
+import cl.helvoca.ai.gemini.VoiceBakeOffCatalog;
 import cl.helvoca.telephony.CallLifecycleService;
 import cl.helvoca.voice.VoiceAiProvider;
 import cl.helvoca.voice.VoiceAiProviderRegistry;
@@ -96,13 +97,18 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         String callerPhone = parameters.optString("caller", null);
         String routedCallSid = parameters.optString("callSid", null);
         String providerId = parameters.optString("provider", null);
+        String voiceOverrideRaw = parameters.optString("voiceOverride", null);
+        String voiceOverride = VoiceBakeOffCatalog.normalize(voiceOverrideRaw);
         String issuedAt = parameters.optString("issuedAt", null);
         String route = parameters.optString("route", null);
 
+        boolean voiceOverrideValid = !notBlank(voiceOverrideRaw) || voiceOverride != null;
         boolean valid = notBlank(streamSid)
                 && notBlank(callSid)
                 && callSid.equals(routedCallSid)
-                && routeSigner.verify(businessPhone, callerPhone, callSid, providerId, issuedAt, route);
+                && voiceOverrideValid
+                && routeSigner.verify(
+                        businessPhone, callerPhone, callSid, providerId, voiceOverride, issuedAt, route);
         if (!valid) {
             log.warn("Rejected invalid Twilio media route socket={} call={}", socket.getId(), callSid);
             socket.close(CloseStatus.POLICY_VIOLATION);
@@ -125,6 +131,10 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
 
         UUID callId = lifecycle.startInboundCall("twilio", callSid, callerPhone, businessPhone);
         RealtimeCallContext context = lifecycle.markStreamStarted(callId, callSid, streamSid, provider.id());
+        if (voiceOverride != null) {
+            context = context.withVoiceOverride(voiceOverride);
+            log.info("VOICE_BAKEOFF_ROUTE call={} voice={}", callId, voiceOverride);
+        }
         if (provider.certificationSession(context)) {
             lifecycle.markCertification(callId);
             log.info("RECEPVOZ_CALL_CERTIFICATION armed call={} provider={}", callId, provider.id());
