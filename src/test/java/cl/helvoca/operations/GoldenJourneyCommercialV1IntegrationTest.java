@@ -32,8 +32,6 @@ import cl.helvoca.schedule.BusinessHourRepository;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import cl.helvoca.telephony.CallLifecycleService;
-import cl.helvoca.telephony.twilio.TwilioCallControl;
-import cl.helvoca.telephony.twilio.TwilioProperties;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
@@ -45,7 +43,6 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -56,10 +53,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 @Testcontainers
 @SpringBootTest(properties = {
@@ -329,6 +331,247 @@ class GoldenJourneyCommercialV1IntegrationTest {
         assertEquals(1, bookings.findAllByBusinessIdOrderByStartAtDesc(business.getId()).size());
         assertEquals("BOOKING_RESCHEDULED",
                 calls.findByIdAndBusinessId(call.getId(), business.getId()).orElseThrow().getResolution());
+    }
+
+    @Test
+    void confirmationFailsClosedWhenSlotBecomesOccupiedAfterProposal() {
+        Business business = business("Golden Conflict Spa");
+        ServiceItem service = service(business.getId(), "Masaje conflicto");
+        LocalDate bookingDate = LocalDate.now(ZONE).plusDays(3);
+        businessHours(business.getId(), bookingDate);
+        Instant startAt = bookingDate.atTime(10, 0).atZone(ZONE).toInstant();
+
+        Customer customer = customer(business.getId(), "Camila Conflicto", "+56911113333");
+        CallSession call = call(
+                business.getId(),
+                customer.getPhone(),
+                DESTINATION_PHONE,
+                "CA44444444444444444444444444444444",
+                "MZ-slot-race");
+        attachCustomer(call, customer);
+
+        JSONObject proposal = bookingWorkflow.execute(
+                business.getId(),
+                customer.getId(),
+                call.getId(),
+                customer.getPhone(),
+                BusinessOrder.Source.VOICE,
+                BookingSource.AI_CALL,
+                new JSONObject()
+                        .put("serviceId", service.getId().toString())
+                        .put("startAt", startAt.toString()));
+        assertTrue(proposal.getBoolean("success"), proposal::toString);
+
+        JSONObject proposalData = data(proposal);
+        UUID operationId = UUID.fromString(proposalData.getString("operationId"));
+        String token = proposalData.getString("confirmationToken");
+
+        Customer blocker = customer(business.getId(), "Cliente Bloqueo", "+56911114444");
+        confirmedBooking(business.getId(), blocker.getId(), service.getId(), startAt);
+
+        JSONObject confirmed = bookingWorkflow.execute(
+                business.getId(),
+                customer.getId(),
+                call.getId(),
+                customer.getPhone(),
+                BusinessOrder.Source.VOICE,
+                BookingSource.AI_CALL,
+                new JSONObject()
+                        .put("operationId", operationId.toString())
+                        .put("confirmationToken", token));
+
+        assertFalse(confirmed.getBoolean("success"));
+        assertEquals("BOOKING_SLOT_UNAVAILABLE", confirmed.getJSONObject("error").getString("code"));
+        assertTrue(bookings.findByOperationIdAndBusinessId(operationId, business.getId()).isEmpty(),
+                "A proposal that lost its slot must not create a booking");
+        assertEquals(1, bookings.findAllByBusinessIdOrderByStartAtDesc(business.getId()).size(),
+                "Only the competing booking may remain");
+    }
+
+    @Test
+    void simultaneousConfirmationRetriesCreateExactlyOneBooking() throws Exception {
+        Business business = business("Golden Retry Spa");
+        ServiceItem service = service(business.getId(), "Masaje retry");
+        LocalDate bookingDate = LocalDate.now(ZONE).plusDays(4);
+        businessHours(business.getId(), bookingDate);
+        Instant startAt = bookingDate.atTime(11, 0).atZone(ZONE).toInstant();
+
+        Customer customer = customer(business.getId(), "Camila Retry", "+56911115555");
+        CallSession call = call(
+                business.getId(),
+                customer.getPhone(),
+                DESTINATION_PHONE,
+                "CA55555555555555555555555555555555",
+                "MZ-confirm-retry");
+        attachCustomer(call, customer);
+
+        JSONObject proposal = bookingWorkflow.execute(
+                business.getId(),
+                customer.getId(),
+                call.getId(),
+                customer.getPhone(),
+                BusinessOrder.Source.VOICE,
+                BookingSource.AI_CALL,
+                new JSONObject()
+                        .put("serviceId", service.getId().toString())
+                        .put("startAt", startAt.toString()));
+        assertTrue(proposal.getBoolean("success"), proposal::toString);
+
+        JSONObject proposalData = data(proposal);
+        String operationId = proposalData.getString("operationId");
+        String token = proposalData.getString("confirmationToken");
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Callable<JSONObject> confirmation = () -> {
+                ready.countDown();
+                if (!start.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Concurrent confirmation did not start in time");
+                }
+                return bookingWorkflow.execute(
+                        business.getId(),
+                        customer.getId(),
+                        call.getId(),
+                        customer.getPhone(),
+                        BusinessOrder.Source.VOICE,
+                        BookingSource.AI_CALL,
+                        new JSONObject()
+                                .put("operationId", operationId)
+                                .put("confirmationToken", token));
+            };
+
+            Future<JSONObject> first = executor.submit(confirmation);
+            Future<JSONObject> second = executor.submit(confirmation);
+            assertTrue(ready.await(10, TimeUnit.SECONDS), "Both confirmation retries must be ready");
+            start.countDown();
+
+            JSONObject firstResult = first.get(20, TimeUnit.SECONDS);
+            JSONObject secondResult = second.get(20, TimeUnit.SECONDS);
+            assertTrue(firstResult.getBoolean("success"), firstResult::toString);
+            assertTrue(secondResult.getBoolean("success"), secondResult::toString);
+
+            JSONObject firstData = data(firstResult);
+            JSONObject secondData = data(secondResult);
+            assertEquals(firstData.getString("bookingId"), secondData.getString("bookingId"),
+                    "Both retries must resolve to the same booking");
+
+            long replays = List.of(firstData, secondData).stream()
+                    .filter(item -> item.getBoolean("idempotentReplay"))
+                    .count();
+            assertEquals(1, replays, "Exactly one concurrent retry must be the idempotent replay");
+            assertEquals(1, bookings.findAllByBusinessIdOrderByStartAtDesc(business.getId()).size(),
+                    "Concurrent confirmation retries must create exactly one booking");
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void failedRescheduleKeepsOriginalBookingIntact() {
+        Business business = business("Golden Reschedule Spa");
+        ServiceItem service = service(business.getId(), "Masaje reprogramación");
+        LocalDate bookingDate = LocalDate.now(ZONE).plusDays(5);
+        businessHours(business.getId(), bookingDate);
+        Instant originalStart = bookingDate.atTime(10, 0).atZone(ZONE).toInstant();
+        Instant occupiedStart = bookingDate.atTime(11, 0).atZone(ZONE).toInstant();
+
+        Customer customer = customer(business.getId(), "Camila Reagenda", "+56911116666");
+        Customer blocker = customer(business.getId(), "Cliente Ocupado", "+56911117777");
+        Booking original = confirmedBooking(business.getId(), customer.getId(), service.getId(), originalStart);
+        confirmedBooking(business.getId(), blocker.getId(), service.getId(), occupiedStart);
+
+        CallSession call = call(
+                business.getId(),
+                customer.getPhone(),
+                DESTINATION_PHONE,
+                "CA66666666666666666666666666666666",
+                "MZ-reschedule-conflict");
+        attachCustomer(call, customer);
+
+        JSONObject result = rawExecute(
+                context(call),
+                "reschedule_booking",
+                new JSONObject()
+                        .put("bookingId", original.getId().toString())
+                        .put("newStartAt", occupiedStart.toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("BOOKING_SLOT_UNAVAILABLE", result.getJSONObject("error").getString("code"));
+
+        Booking persisted = bookings.findByIdAndBusinessIdAndCustomerId(
+                original.getId(), business.getId(), customer.getId()).orElseThrow();
+        assertEquals(originalStart, persisted.getStartAt(),
+                "A failed reschedule must preserve the original slot");
+        assertEquals(BookingStatus.CONFIRMED, persisted.getStatus());
+        assertEquals(2, bookings.findAllByBusinessIdOrderByStartAtDesc(business.getId()).size());
+    }
+
+    @Test
+    void crossTenantBookingMutationFailsClosedWithoutLeakingState() {
+        Business ownerBusiness = business("Golden Owner Tenant");
+        ServiceItem ownerService = service(ownerBusiness.getId(), "Masaje privado");
+        LocalDate bookingDate = LocalDate.now(ZONE).plusDays(6);
+        businessHours(ownerBusiness.getId(), bookingDate);
+        Instant ownerStart = bookingDate.atTime(10, 0).atZone(ZONE).toInstant();
+
+        Customer ownerCustomer = customer(ownerBusiness.getId(), "Cliente Dueño", "+56911118888");
+        Booking ownerBooking = confirmedBooking(
+                ownerBusiness.getId(), ownerCustomer.getId(), ownerService.getId(), ownerStart);
+
+        Business foreignBusiness = business("Golden Foreign Tenant");
+        ServiceItem foreignService = service(foreignBusiness.getId(), "Servicio ajeno");
+        businessHours(foreignBusiness.getId(), bookingDate);
+        Customer foreignCustomer = customer(foreignBusiness.getId(), "Cliente Ajeno", "+56911119999");
+        CallSession foreignCall = call(
+                foreignBusiness.getId(),
+                foreignCustomer.getPhone(),
+                "+56299990000",
+                "CA77777777777777777777777777777777",
+                "MZ-cross-tenant-contract");
+        attachCustomer(foreignCall, foreignCustomer);
+
+        JSONObject result = rawExecute(
+                context(foreignCall),
+                "reschedule_booking",
+                new JSONObject()
+                        .put("bookingId", ownerBooking.getId().toString())
+                        .put("newStartAt", ownerStart.plusSeconds(3600).toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("BOOKING_NOT_FOUND", result.getJSONObject("error").getString("code"));
+        assertTrue(bookings.findByIdAndBusinessId(ownerBooking.getId(), foreignBusiness.getId()).isEmpty());
+        assertEquals(ownerStart, bookings.findById(ownerBooking.getId()).orElseThrow().getStartAt());
+        assertEquals(0, bookings.findAllByBusinessIdOrderByStartAtDesc(foreignBusiness.getId()).size());
+        assertNotNull(foreignService.getId());
+    }
+
+    private Customer customer(UUID businessId, String name, String phone) {
+        Customer customer = new Customer();
+        customer.setBusinessId(businessId);
+        customer.setName(name);
+        customer.setPhone(phone);
+        return customers.saveAndFlush(customer);
+    }
+
+    private void attachCustomer(CallSession call, Customer customer) {
+        call.setCustomerId(customer.getId());
+        calls.saveAndFlush(call);
+    }
+
+    private Booking confirmedBooking(UUID businessId, UUID customerId, UUID serviceId, Instant startAt) {
+        Booking booking = new Booking();
+        booking.setBusinessId(businessId);
+        booking.setCustomerId(customerId);
+        booking.setServiceId(serviceId);
+        booking.setStartAt(startAt);
+        booking.setEndAt(startAt.plusSeconds(30 * 60L));
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setSource(BookingSource.AI_CALL);
+        return bookings.saveAndFlush(booking);
     }
 
     private void certifyTenantIsolation(UUID bookingId, Instant expectedStart, UUID primaryCallId) {
