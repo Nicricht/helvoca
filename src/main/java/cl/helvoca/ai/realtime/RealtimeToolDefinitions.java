@@ -93,7 +93,7 @@ public final class RealtimeToolDefinitions {
 
     public static JSONObject endCall() {
         return function("end_call",
-                "Termina físicamente la llamada actual. Úsala solo cuando el cliente se despida claramente, diga que no necesita nada más, pida cortar/terminar la llamada o confirme que la atención terminó. Primero despídete de forma breve y luego invoca esta herramienta. No la uses por un silencio breve.",
+                "Termina físicamente la llamada actual. Úsala solo cuando el cliente se despida claramente, diga que no necesita nada más, pida cortar/terminar la llamada o confirme que la atención terminó. Antes de invocarla debes pronunciar una despedida completa y natural y terminar todas sus palabras. Nunca invoques end_call a mitad de una frase ni mientras todavía estés hablando. Después de completar la despedida, invoca end_call una sola vez. No la uses por un silencio breve.",
                 object());
     }
 
