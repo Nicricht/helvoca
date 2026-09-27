@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "name": "healthy-single-confirmation-booking",
+  "sourceFingerprint": "fixture000000001",
+  "turns": [
+    {
+      "speaker": "USER",
+      "text": "Quiero reservar mañana a las cuatro."
+    },
+    {
+      "speaker": "ASSISTANT",
+      "text": "Perfecto. ¿A nombre de quién sería?"
+    },
+    {
+      "speaker": "USER",
+      "text": "[CUSTOMER_NAME]."
+    },
+    {
+      "speaker": "ASSISTANT",
+      "text": "Mañana a las cuatro. ¿Confirmo?"
+    },
+    {
+      "speaker": "USER",
+      "text": "Sí."
+    },
+    {
+      "speaker": "ASSISTANT",
+      "text": "Listo, quedó reservada. Que estés muy bien."
+    }
+  ],
+  "actions": [
+    {
+      "type": "BOOKING_CREATED",
+      "success": true,
+      "entityType": "BOOKING",
+      "entityRef": "ENTITY_1",
+      "detail": "created"
+    }
+  ],
+  "expected": {
+    "passed": true,
+    "findingCodes": []
+  }
+}
