@@ -106,6 +106,7 @@ class BusinessOperationCapabilityServiceTest {
 
         assertEquals(Set.of(
                 "list_catalog",
+                CommercialOperationToolService.GET_STOCK_TOOL,
                 CommercialOperationToolService.SHOWCASE_SELECTION_TOOL), tools);
         assertTrue(service.isToolAllowed(
                 businessId, CommercialOperationToolService.SHOWCASE_SELECTION_TOOL));
