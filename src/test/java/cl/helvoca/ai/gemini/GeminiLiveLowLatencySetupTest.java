@@ -73,8 +73,8 @@ class GeminiLiveLowLatencySetupTest {
         assertFalse(activity.getBoolean("disabled"));
         assertEquals("START_SENSITIVITY_HIGH", activity.getString("startOfSpeechSensitivity"));
         assertEquals(60, activity.getInt("prefixPaddingMs"));
-        assertEquals("END_SENSITIVITY_LOW", activity.getString("endOfSpeechSensitivity"));
-        assertEquals(300, activity.getInt("silenceDurationMs"));
+        assertEquals("END_SENSITIVITY_HIGH", activity.getString("endOfSpeechSensitivity"));
+        assertEquals(500, activity.getInt("silenceDurationMs"));
         assertEquals("START_OF_ACTIVITY_INTERRUPTS", realtimeInput.getString("activityHandling"));
         assertFalse(setup.has("proactivity"));
     }
