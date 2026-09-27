@@ -1,0 +1,64 @@
+# RecepVoz Voice Bake-Off
+
+This harness compares provider-native Gemini voices without changing the tenant's production voice.
+
+## Curated candidates
+
+| Voice | Google trait |
+| --- | --- |
+| Leda | Youthful |
+| Sadachbia | Lively |
+| Laomedeia | Upbeat |
+| Achird | Friendly |
+| Aoede | Breezy |
+| Sulafat | Warm |
+
+## Safety and isolation
+
+- The harness runs only through the explicit one-shot outbound certification path.
+- The destination must match `TWILIO_CERTIFICATION_ALLOWED_TO`.
+- The forbidden target check remains active.
+- Every call keeps the automatic safety hangup.
+- The candidate is signed into the Twilio Media Stream route, so changing it in transit invalidates the route.
+- A bake-off call is pinned to Gemini and cannot fall back to another voice provider.
+- Normal inbound calls keep the tenant's configured production voice.
+- Phone microphone audio is ignored during the sample so every candidate receives the same input.
+- Only `end_call` is published to the model; business tools are unavailable, so the sample cannot create bookings, orders, payments or messages.
+
+## Fixed sample
+
+Every candidate receives exactly the same three lines:
+
+1. "Hola, gracias por llamar. Ya, cuéntame, ¿en qué te ayudo?"
+2. "Sí, obvio. Tengo una hora mañana a las diez y media y otra a las doce. ¿Cuál te acomoda más?"
+3. "Ya, súper. Quedó clarito. Gracias por llamar, que estés súper. Chao."
+
+The model must finish the third line and then invoke `end_call`.
+
+## Running one candidate
+
+Keep normal production flags disabled, then set:
+
+```text
+TWILIO_CERTIFICATION_VOICE_OVERRIDE=Sadachbia
+TWILIO_CERTIFICATION_CALL_ON_STARTUP=true
+TWILIO_CERTIFICATION_DIRECTION=outbound-test
+TWILIO_CERTIFICATION_MAX_SECONDS=35
+```
+
+After Twilio creates the call, immediately return `TWILIO_CERTIFICATION_CALL_ON_STARTUP=false`.
+
+## Human scorecard
+
+Score each candidate from 1 to 5 on:
+
+- young-adult feminine impression;
+- Chilean/Santiago feel;
+- happiness and audible smile;
+- naturalness;
+- premium/commercial appeal;
+- absence of call-center/IVR tone;
+- clarity at fast-natural speed;
+- "I would pay for this receptionist" overall reaction.
+
+Provider labels are discovery hints only. The final production choice is made from real-call listening.
