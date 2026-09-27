@@ -132,7 +132,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public String prepareDeferredEndCall(RealtimeCallContext context) {
         JSONObject result;
         CallSession call = calls.findByIdAndBusinessId(context.callId(), context.businessId()).orElse(null);
