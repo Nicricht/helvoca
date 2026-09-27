@@ -40,6 +40,19 @@ class PcmuAudioCodecTest {
     }
 
     @Test
+    void meanAmplitudeSeparatesSilenceFromSpeech() {
+        byte[] silence = new byte[160];
+        Arrays.fill(silence, (byte) 0xff);
+        byte[] speech = new byte[160];
+        Arrays.fill(speech, PcmuAudioCodec.encodeMulaw((short) 8_000));
+
+        assertEquals(0, PcmuAudioCodec.meanAbsoluteMulawAmplitude(
+                Base64.getEncoder().encodeToString(silence)));
+        assertTrue(PcmuAudioCodec.meanAbsoluteMulawAmplitude(
+                Base64.getEncoder().encodeToString(speech)) > 900);
+    }
+
+    @Test
     void mulawEncodeDecodePreservesSpeechPolarity() {
         short positive = 8_000;
         short negative = -8_000;

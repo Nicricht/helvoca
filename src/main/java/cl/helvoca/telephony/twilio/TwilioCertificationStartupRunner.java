@@ -28,8 +28,8 @@ import java.util.regex.Pattern;
  *
  * It exists so a deliberately authorized production test can be initiated
  * from Railway without requiring a human to click Twilio Console. Outbound
- * human tests are ended by the human caller. The automatic safety hangup is
- * reserved for inbound certification runs only.
+ * Every real certification call is bounded by an automatic safety hangup.
+ * The target must also match the explicitly configured allowlist value.
  */
 @Component
 public class TwilioCertificationStartupRunner implements ApplicationRunner {
@@ -47,6 +47,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     private final String from;
     private final String to;
     private final String publicBaseUrl;
+    private final String allowedTo;
     private final String forbiddenTo;
     private final int maxSeconds;
     private final String direction;
@@ -62,6 +63,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
             @Value("${TWILIO_TEST_FROM:}") String from,
             @Value("${TWILIO_TEST_TO:}") String to,
             @Value("${TWILIO_PUBLIC_BASE_URL:}") String publicBaseUrl,
+            @Value("${TWILIO_CERTIFICATION_ALLOWED_TO:}") String allowedTo,
             @Value("${TWILIO_CERTIFICATION_FORBIDDEN_TO:}") String forbiddenTo,
             @Value("${TWILIO_CERTIFICATION_MAX_SECONDS:75}") int maxSeconds,
             @Value("${TWILIO_CERTIFICATION_DIRECTION:outbound-test}") String direction,
@@ -72,6 +74,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         this.from = from;
         this.to = to;
         this.publicBaseUrl = publicBaseUrl;
+        this.allowedTo = allowedTo;
         this.forbiddenTo = forbiddenTo;
         this.maxSeconds = Math.max(20, Math.min(maxSeconds, 180));
         this.direction = normalizeDirection(direction);
@@ -84,6 +87,10 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         if (!validConfiguration()) {
             log.error("TWILIO_CERTIFICATION_CALL blocked: invalid/missing Twilio certification configuration direction={}",
                     direction);
+            return;
+        }
+        if (!isAllowedTarget(to, allowedTo)) {
+            log.error("TWILIO_CERTIFICATION_CALL blocked: configured test target is not explicitly allowed");
             return;
         }
         if (isForbiddenTarget(to, forbiddenTo)) {
@@ -103,12 +110,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 String callSid = createCall();
                 log.info("TWILIO_CERTIFICATION_CALL CREATED call={} direction={} from={} to={} max_seconds={}",
                         callSid, direction, mask(from), mask(to), maxSeconds);
-                if (shouldScheduleSafetyHangup(direction)) {
-                    scheduleSafetyHangup(callSid);
-                } else {
-                    log.info("TWILIO_CERTIFICATION_CALL SAFETY_HANGUP disabled direction={} call={}; human controls hangup",
-                            direction, callSid);
-                }
+                scheduleSafetyHangup(callSid);
             } catch (Exception e) {
                 log.error("TWILIO_CERTIFICATION_CALL FAILED direction={} reason={}", direction, rootMessage(e));
             } finally {
@@ -176,6 +178,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 && from != null && E164.matcher(from.trim()).matches()
                 && to != null && E164.matcher(to.trim()).matches()
                 && publicBaseUrl != null && publicBaseUrl.trim().startsWith("https://")
+                && isAllowedTarget(to, allowedTo)
                 && (OUTBOUND_TEST.equals(direction) || INBOUND_CERTIFICATION.equals(direction));
     }
 
@@ -186,7 +189,15 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     }
 
     static boolean shouldScheduleSafetyHangup(String direction) {
-        return INBOUND_CERTIFICATION.equals(normalizeDirection(direction));
+        String normalized = normalizeDirection(direction);
+        return OUTBOUND_TEST.equals(normalized) || INBOUND_CERTIFICATION.equals(normalized);
+    }
+
+    static boolean isAllowedTarget(String target, String allowedTarget) {
+        return target != null
+                && allowedTarget != null
+                && !allowedTarget.isBlank()
+                && target.trim().equals(allowedTarget.trim());
     }
 
     static boolean isForbiddenTarget(String target, String forbiddenTarget) {

@@ -22,14 +22,21 @@ class TwilioCertificationStartupRunnerTest {
     }
 
     @Test
-    void outboundTestLetsHumanControlHangup() {
-        assertFalse(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("outbound-test"));
-        assertFalse(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("unexpected"));
+    void outboundTestAlwaysKeepsSafetyHangup() {
+        assertTrue(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("outbound-test"));
+        assertTrue(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("unexpected"));
     }
 
     @Test
     void inboundCertificationKeepsSafetyHangup() {
         assertTrue(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("inbound-certification"));
+    }
+
+    @Test
+    void certificationTargetMustMatchExplicitAllowlist() {
+        assertTrue(TwilioCertificationStartupRunner.isAllowedTarget("+56911111111", "+56911111111"));
+        assertFalse(TwilioCertificationStartupRunner.isAllowedTarget("+56922222222", "+56911111111"));
+        assertFalse(TwilioCertificationStartupRunner.isAllowedTarget("+56911111111", ""));
     }
 
     @Test

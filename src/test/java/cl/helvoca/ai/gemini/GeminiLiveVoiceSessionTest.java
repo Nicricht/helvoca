@@ -83,6 +83,9 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("Ya, cuéntame, ¿en qué te ayudo?"));
         assertTrue(instructions.contains("me pueda colaborar"));
         assertTrue(instructions.contains("habla MUY RÁPIDO"));
+        assertTrue(instructions.contains("LATENCIA VOCAL"));
+        assertTrue(instructions.contains("No uses suspiros teatrales"));
+        assertTrue(instructions.contains("La sensualidad está en el timbre y la entonación, nunca en hacer más lenta la conversación"));
         assertTrue(instructions.contains("está prohibido hacer dos veces la misma pregunta"));
         assertTrue(instructions.contains("mantén exactamente el mismo género"));
         assertTrue(instructions.contains("find_caller antes de pedir nombre o teléfono"));
@@ -186,6 +189,72 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(hasFunction(declarations, "end_call"));
         assertFalse(hasFunction(declarations, "create_booking"));
         verify(tools).toolDefinitions(context);
+    }
+
+    @Test
+    void localBargeInClearsCarrierPlaybackAfterTwoSpeechFrames() {
+        GeminiLiveProperties properties = properties();
+        properties.setLocalBargeInEnabled(true);
+        properties.setLocalBargeInMeanAmplitudeThreshold(900);
+        properties.setLocalBargeInSpeechFrames(2);
+        properties.setLocalBargeInReleaseFrames(5);
+
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        CallLifecycleService lifecycle = mock(CallLifecycleService.class);
+
+        WebSocket providerSocket = mock(WebSocket.class);
+        when(providerSocket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(providerSocket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                transport,
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                lifecycle,
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        session.onOpen(providerSocket);
+        session.onText(providerSocket, new JSONObject().put("setupComplete", new JSONObject()).toString(), true);
+
+        ByteBuffer pcm24 = ByteBuffer.allocate(480 * 2).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        for (int i = 0; i < 480; i++) pcm24.putShort((short) 0);
+        String modelAudio = Base64.getEncoder().encodeToString(pcm24.array());
+        JSONObject assistantAudio = new JSONObject().put("serverContent", new JSONObject()
+                .put("modelTurn", new JSONObject()
+                        .put("parts", new JSONArray().put(new JSONObject()
+                                .put("inlineData", new JSONObject()
+                                        .put("data", modelAudio)
+                                        .put("mimeType", "audio/pcm;rate=24000"))))));
+        session.onText(providerSocket, assistantAudio.toString(), true);
+
+        byte[] loud = new byte[160];
+        Arrays.fill(loud, PcmuAudioCodec.encodeMulaw((short) 8_000));
+        String loudBase64 = Base64.getEncoder().encodeToString(loud);
+
+        session.acceptInboundAudio(loudBase64);
+        verify(transport, never()).clearPlayback(context.streamSid());
+
+        session.acceptInboundAudio(loudBase64);
+        verify(transport, times(1)).clearPlayback(context.streamSid());
+
+        byte[] silence = new byte[160];
+        Arrays.fill(silence, (byte) 0xff);
+        String silenceBase64 = Base64.getEncoder().encodeToString(silence);
+        for (int i = 0; i < 5; i++) {
+            session.acceptInboundAudio(silenceBase64);
+        }
+
+        session.onText(providerSocket, assistantAudio.toString(), true);
+        verify(transport, times(2)).sendAudio(eq(context.streamSid()), anyString());
     }
 
     @Test

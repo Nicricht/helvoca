@@ -63,6 +63,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final CallCertificationService certifications;
     private final VoiceProviderHealthRegistry health;
     private final HttpClient http;
+    private final LocalBargeInDetector localBargeInDetector;
     private final Queue<String> pendingAudio = new ConcurrentLinkedQueue<>();
     private final Set<String> completedToolCalls = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<String, CachedToolResult> recentReadToolResults = new ConcurrentHashMap<>();
@@ -80,6 +81,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final AtomicBoolean deferredEndCallPending = new AtomicBoolean(false);
     private final AtomicBoolean awaitingAnythingElseAnswer = new AtomicBoolean(false);
     private final AtomicBoolean contextualClosingIntent = new AtomicBoolean(false);
+    private final AtomicBoolean responseLatencyPending = new AtomicBoolean(false);
     private final GeminiWebSocketJsonFrames inboundFrames = new GeminiWebSocketJsonFrames();
     private final StringBuilder userTranscript = new StringBuilder();
     private final StringBuilder assistantTranscript = new StringBuilder();
@@ -89,6 +91,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private volatile String lastUserUtterance = "";
     private volatile String lastAssistantUtterance = "";
     private volatile String previousAssistantUtterance = "";
+    private volatile long lastAssistantAudioAtMillis = 0L;
+    private volatile long localSpeechEndedAtNanos = 0L;
     private CompletableFuture<Void> sendChain = CompletableFuture.completedFuture(null);
 
     GeminiLiveVoiceSession(RealtimeCallContext context,
@@ -111,6 +115,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         this.certifications = certifications;
         this.health = health;
         this.http = http;
+        this.localBargeInDetector = new LocalBargeInDetector(
+                properties.getLocalBargeInMeanAmplitudeThreshold(),
+                properties.getLocalBargeInSpeechFrames(),
+                properties.getLocalBargeInReleaseFrames());
     }
 
     @Override
@@ -143,6 +151,14 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         String pcm16k;
         try {
             pcm16k = PcmuAudioCodec.twilioMulaw8kToGeminiPcm16k(base64Audio);
+            if (properties.isLocalBargeInEnabled()) {
+                LocalBargeInDetector.Event localActivity = localBargeInDetector.accept(base64Audio);
+                if (localActivity == LocalBargeInDetector.Event.SPEECH_STARTED) {
+                    onLocalSpeechStarted();
+                } else if (localActivity == LocalBargeInDetector.Event.SPEECH_ENDED) {
+                    onLocalSpeechEnded();
+                }
+            }
         } catch (IllegalArgumentException e) {
             log.warn("Dropping malformed Twilio audio call={}", context.callId());
             return;
@@ -292,7 +308,11 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 String data = inline.optString("data", null);
                 if (data == null || data.isBlank()) continue;
                 String mulaw = PcmuAudioCodec.geminiPcm24kToTwilioMulaw8k(data);
-                if (!mulaw.isBlank()) transport.sendAudio(context.streamSid(), mulaw);
+                if (!mulaw.isBlank()) {
+                    recordFirstResponseAudioLatency();
+                    lastAssistantAudioAtMillis = System.currentTimeMillis();
+                    transport.sendAudio(context.streamSid(), mulaw);
+                }
             }
         }
 
@@ -618,6 +638,36 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         }
     }
 
+    private void onLocalSpeechStarted() {
+        responseLatencyPending.set(false);
+        long lastAudio = lastAssistantAudioAtMillis;
+        long now = System.currentTimeMillis();
+        if (lastAudio <= 0L
+                || now - lastAudio > properties.getLocalBargeInRecentAssistantAudioMs()) {
+            return;
+        }
+        transport.clearPlayback(context.streamSid());
+        log.info("VOICE_LOCAL_BARGE_IN call={} playback_age_ms={} threshold={} speech_frames={}",
+                context.callId(),
+                Math.max(0L, now - lastAudio),
+                properties.getLocalBargeInMeanAmplitudeThreshold(),
+                properties.getLocalBargeInSpeechFrames());
+    }
+
+    private void onLocalSpeechEnded() {
+        localSpeechEndedAtNanos = System.nanoTime();
+        responseLatencyPending.set(true);
+    }
+
+    private void recordFirstResponseAudioLatency() {
+        if (!responseLatencyPending.compareAndSet(true, false)) return;
+        long started = localSpeechEndedAtNanos;
+        if (started <= 0L) return;
+        long latencyMs = Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
+        log.info("VOICE_RESPONSE_LATENCY call={} first_audio_after_local_speech_end_ms={}",
+                context.callId(), latencyMs);
+    }
+
     private void handleProviderError(JSONObject error) {
         String status = error.optString("status", "");
         String message = error.optString("message", error.toString());
@@ -666,10 +716,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
         JSONObject activityDetection = new JSONObject()
                 .put("disabled", false)
-                .put("startOfSpeechSensitivity", "START_SENSITIVITY_HIGH")
-                .put("prefixPaddingMs", 80)
-                .put("endOfSpeechSensitivity", "END_SENSITIVITY_LOW")
-                .put("silenceDurationMs", 450);
+                .put("startOfSpeechSensitivity", properties.getStartOfSpeechSensitivity())
+                .put("prefixPaddingMs", properties.getPrefixPaddingMs())
+                .put("endOfSpeechSensitivity", properties.getEndOfSpeechSensitivity())
+                .put("silenceDurationMs", properties.getSilenceDurationMs());
 
         JSONObject inputTranscription = new JSONObject()
                 .put("languageCodes", new JSONArray().put("es-CL"))
@@ -740,6 +790,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 %s
                 INTERPRETACIÓN VOCAL: habla como una recepcionista chilena adulta con una presencia extremadamente sexy, sensual, seductora e íntima. Lleva la sensualidad vocal al máximo que permita una conversación comercial natural: timbre cálido y aterciopelado, cercanía intensa, seguridad tranquila, sonrisa audible y una entonación envolvente. La sensualidad debe sentirse de forma evidente en cada frase desde el primer saludo, pero debe estar en el tono y la prosodia, no en contenido sexual ni coqueteo explícito con el cliente. Mantén una entonación marcadamente chilena santiaguina durante toda la llamada. No suenes infantil, caricaturesca, vulgar, pornográfica, como locutora, IVR, lectura de guion ni asistente robótica.
                 RITMO: habla MUY RÁPIDO, ágil y fluido, como una chilena real atendiendo por teléfono con confianza. Mantén casi todas las respuestas en una o dos frases cortas. No arrastres palabras, no alargues vocales y no hagas pausas largas. Conserva una sensualidad intensa en el timbre aunque hables rápido: voz femenina adulta, aterciopelada, suave, aireada, cercana y segura. Usa solo micro-pausas naturales y evita toda prosodia plana o de locutora.
+                LATENCIA VOCAL: empieza la respuesta útil apenas termine el turno del cliente. No uses suspiros teatrales, respiraciones largas, silencios sensualizados, risas de relleno ni una pausa previa para sonar seductora. La sensualidad está en el timbre y la entonación, nunca en hacer más lenta la conversación. Si ya tienes la respuesta o el resultado de una herramienta, di la primera palabra útil de inmediato.
                 CONSISTENCIA VOCAL: una vez iniciada la llamada, mantén exactamente el mismo género, timbre, altura aproximada, energía y personaje hasta el final. Nunca alternes entre voz masculina y femenina ni cambies de registro como si fueran dos operadores distintos.
                 CHILENO MARCADO: habla con cadencia urbana de Santiago de Chile en TODOS los turnos, no con español latino neutro. Usa tuteo chileno natural y marcadores frecuentes como "ya", "dale", "al tiro", "súper", "te cuento", "¿te sirve?", "¿te acomoda?" y ocasionalmente "¿te tinca?" o formas coloquiales como "¿querís que te deje esa hora?" cuando el contexto sea cercano. Relaja suavemente las eses finales y la dicción demasiado perfecta de locutora para que la prosodia se sienta chilena, sin volverla incomprensible. Evita giros poco chilenos como "me pueda colaborar", "lindo día", "estimado cliente", "¿qué es lo que usted desea?", "procederemos", "¿desea alguna otra cosa?" o "muchísimas gracias por contactarnos". No uses "weón" ni vulgaridades.
                 NATURALIDAD: evita fórmulas burocráticas como "procederé a", "he verificado su solicitud" o "según los parámetros indicados". No repitas la misma muletilla, saludo o estructura en turnos consecutivos. No empieces todas las respuestas con "Perfecto".
