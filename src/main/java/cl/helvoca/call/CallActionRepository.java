@@ -8,6 +8,8 @@ import java.util.UUID;
 public interface CallActionRepository extends JpaRepository<CallAction, UUID> {
     List<CallAction> findAllByCallIdOrderByCreatedAtAsc(UUID callId);
 
+    List<CallAction> findAllByBusinessIdAndCallIdOrderByCreatedAtAsc(UUID businessId, UUID callId);
+
     java.util.Optional<CallAction> findTopByBusinessIdAndEntityTypeAndEntityIdAndSuccessTrueOrderByCreatedAtDesc(
             UUID businessId, String entityType, UUID entityId);
 }
