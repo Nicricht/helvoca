@@ -1,0 +1,34 @@
+name: Mercado Pago User Read Probe
+
+on:
+  push:
+    branches:
+      - cert/saas-billing-sandbox-provider-run-1
+    paths:
+      - ".github/workflows/mercadopago-user-read-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      MERCADOPAGO_TEST_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
+    steps:
+      - name: Probe seller and buyer metadata read-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in me 3714748473; do
+            body="$(mktemp)"
+            code="$(curl -sS -o "$body" -w "%{http_code}"               -H "Authorization: Bearer $MERCADOPAGO_TEST_ACCESS_TOKEN"               "https://api.mercadopago.com/users/$target")"
+            echo "TARGET=$target HTTP=$code"
+            if [[ "$code" == "200" ]]; then
+              jq '{id, nickname, email, site_id, site_status}' "$body"
+            else
+              jq '{message, error, status, cause}' "$body" 2>/dev/null || cat "$body"
+            fi
+            rm -f "$body"
+          done
