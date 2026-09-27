@@ -35,6 +35,11 @@ public interface InventoryReservationRepository extends JpaRepository<InventoryR
             @Param("referenceId") UUID referenceId,
             @Param("status") InventoryReservation.Status status);
 
+    List<InventoryReservation> findAllByBusinessIdAndReferenceTypeAndReferenceIdOrderByCreatedAtAsc(
+            UUID businessId,
+            String referenceType,
+            UUID referenceId);
+
     List<InventoryReservation> findAllByBusinessIdAndReferenceTypeAndReferenceIdAndStatusOrderByCreatedAtAsc(
             UUID businessId,
             String referenceType,
