@@ -4,11 +4,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface BusinessOperationRepository extends JpaRepository<BusinessOperation, UUID> {
     Optional<BusinessOperation> findByIdAndBusinessId(UUID id, UUID businessId);
+    List<BusinessOperation> findTop50ByBusinessIdAndCustomerIdOrderByUpdatedAtDesc(
+            UUID businessId, UUID customerId);
+    List<BusinessOperation> findTop100ByBusinessIdAndTypeOrderByUpdatedAtDesc(
+            UUID businessId, BusinessOperation.Type type);
 
     @Query(value = """
             SELECT * FROM business_operation

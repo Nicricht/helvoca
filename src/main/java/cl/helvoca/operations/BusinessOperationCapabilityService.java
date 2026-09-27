@@ -53,9 +53,12 @@ public class BusinessOperationCapabilityService {
                 .filter(toolName -> automationAllowsTool(businessId, toolName))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        // Product selection is a derived catalog action, not a separately
-        // persisted tenant grant. Any tenant that can list its catalog may
-        // resolve a selection only against backend-owned showcase state.
+        // Stock lookup and product selection are derived catalog actions, not
+        // separately persisted tenant grants.
+        if (aiAgents.toolAllowed(businessId, "list_catalog")
+                && automationAllowsTool(businessId, CommercialOperationToolService.GET_STOCK_TOOL)) {
+            allowed.add(CommercialOperationToolService.GET_STOCK_TOOL);
+        }
         if (aiAgents.toolAllowed(businessId, "list_catalog")
                 && automationAllowsTool(businessId, CommercialOperationToolService.SHOWCASE_SELECTION_TOOL)) {
             allowed.add(CommercialOperationToolService.SHOWCASE_SELECTION_TOOL);
@@ -78,6 +81,10 @@ public class BusinessOperationCapabilityService {
     public boolean isToolAllowed(UUID businessId, String toolName) {
         if (CrossChannelMessagingToolService.TOOL_NAME.equals(toolName)) {
             return aiAgents.toolAllowed(businessId, toolName);
+        }
+        if (CommercialOperationToolService.GET_STOCK_TOOL.equals(toolName)) {
+            return aiAgents.toolAllowed(businessId, "list_catalog")
+                    && automationAllowsTool(businessId, toolName);
         }
         if (CommercialOperationToolService.SHOWCASE_SELECTION_TOOL.equals(toolName)) {
             return aiAgents.toolAllowed(businessId, "list_catalog")

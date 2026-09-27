@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "name": "regression-duplicate-payment",
+  "sourceFingerprint": "fixture000000003",
+  "turns": [],
+  "actions": [
+    {
+      "type": "PAYMENT_CONFIRMED",
+      "success": true,
+      "entityType": "PAYMENT",
+      "entityRef": "ENTITY_1",
+      "detail": "verified success"
+    },
+    {
+      "type": "PAYMENT_CONFIRMED",
+      "success": true,
+      "entityType": "PAYMENT",
+      "entityRef": "ENTITY_1",
+      "detail": "retry verified success"
+    }
+  ],
+  "expected": {
+    "passed": false,
+    "findingCodes": [
+      "DUPLICATE_SUCCESSFUL_EFFECT"
+    ]
+  }
+}

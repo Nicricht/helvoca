@@ -83,7 +83,9 @@ public class OutboundMessagingService {
 
         CustomerIdentity identity = resolveRecipient(businessId, customerId, recipientIdentityId);
         String rendered = content.render(businessId, customerId, purpose, operation);
-        String key = purpose.name() + ":" + operationId + ":" + identity.getId() + ":r" + safeRevision(operation.getRevision());
+        String key = purpose == OutboundMessage.Purpose.PAYMENT_CONFIRMATION
+                ? purpose.name() + ":" + operationId + ":" + identity.getId()
+                : purpose.name() + ":" + operationId + ":" + identity.getId() + ":r" + safeRevision(operation.getRevision());
 
         // Serialize the logical idempotency key before lookup+insert. The unique
         // constraint remains the final database guard; the advisory lock avoids

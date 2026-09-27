@@ -106,6 +106,7 @@ class BusinessOperationCapabilityServiceTest {
 
         assertEquals(Set.of(
                 "list_catalog",
+                CommercialOperationToolService.GET_STOCK_TOOL,
                 CommercialOperationToolService.SHOWCASE_SELECTION_TOOL), tools);
         assertTrue(service.isToolAllowed(
                 businessId, CommercialOperationToolService.SHOWCASE_SELECTION_TOOL));
@@ -239,4 +240,90 @@ class BusinessOperationCapabilityServiceTest {
         assertFalse(service.enabled(businessId).contains(BusinessOperationCapability.PAYMENT));
         assertFalse(service.isEnabled(businessId, BusinessOperationCapability.PAYMENT));
     }
+    @Test
+    void inactiveAgentAndNullCapabilityFailClosedAndCurrentUsesTenant() {
+        UUID businessId = UUID.randomUUID();
+        AiAgent inactive = new AiAgent();
+        inactive.setBusinessId(businessId);
+        inactive.setActive(false);
+        inactive.setCapabilities(Set.of());
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(aiAgents.runtime(businessId)).thenReturn(inactive);
+
+        BusinessOperationCapabilityService service =
+                new BusinessOperationCapabilityService(aiAgents, tenantProvider, policies);
+
+        assertTrue(service.current().isEmpty());
+        assertFalse(service.isEnabled(businessId, null));
+    }
+
+    @Test
+    void completeCatalogCapabilityIsEnabledForActiveAgent() {
+        UUID businessId = UUID.randomUUID();
+        AiAgent agent = new AiAgent();
+        agent.setBusinessId(businessId);
+        agent.setActive(true);
+        agent.setCapabilities(Set.of(AiCapability.LIST_CATALOG));
+        when(aiAgents.runtime(businessId)).thenReturn(agent);
+
+        BusinessOperationCapabilityService service =
+                new BusinessOperationCapabilityService(aiAgents, tenantProvider, policies);
+
+        assertTrue(service.isEnabled(businessId, BusinessOperationCapability.CATALOG));
+        assertEquals(Set.of(BusinessOperationCapability.CATALOG), service.enabled(businessId));
+    }
+
+    @Test
+    void replaceCurrentHandlesNullEmptyAndOrderDependencyNormalization() {
+        BusinessOperationCapabilityService service =
+                new BusinessOperationCapabilityService(aiAgents, tenantProvider);
+
+        assertTrue(service.replaceCurrent(null).isEmpty());
+        assertTrue(service.replaceCurrent(Set.of()).isEmpty());
+
+        Set<BusinessOperationCapability> result =
+                service.replaceCurrent(Set.of(BusinessOperationCapability.ORDER));
+
+        assertEquals(Set.of(
+                BusinessOperationCapability.ORDER,
+                BusinessOperationCapability.CATALOG), result);
+        verify(aiAgents, times(3)).replaceCommercialCapabilities(anySet());
+    }
+
+    @Test
+    void crossChannelAndReadOnlyToolsBypassMutationPolicyButStillRequireGrant() {
+        UUID businessId = UUID.randomUUID();
+        String crossChannel = CrossChannelMessagingToolService.TOOL_NAME;
+
+        when(aiAgents.toolAllowed(businessId, crossChannel)).thenReturn(true);
+        when(aiAgents.toolAllowed(businessId, "get_order_status")).thenReturn(true);
+
+        BusinessOperationCapabilityService service =
+                new BusinessOperationCapabilityService(aiAgents, tenantProvider, policies);
+
+        assertTrue(service.isToolAllowed(businessId, crossChannel));
+        assertTrue(service.isToolAllowed(businessId, "get_order_status"));
+        assertFalse(service.isToolAllowed(businessId, "not-a-tool"));
+        verifyNoInteractions(policies);
+    }
+
+    @Test
+    void derivedCatalogToolsFailWhenCatalogGrantIsMissing() {
+        UUID businessId = UUID.randomUUID();
+        when(aiAgents.toolAllowed(businessId, "list_catalog")).thenReturn(false);
+
+        BusinessOperationCapabilityService service =
+                new BusinessOperationCapabilityService(aiAgents, tenantProvider, policies);
+
+        assertFalse(service.isToolAllowed(
+                businessId, CommercialOperationToolService.GET_STOCK_TOOL));
+        assertFalse(service.isToolAllowed(
+                businessId, CommercialOperationToolService.SHOWCASE_SELECTION_TOOL));
+        assertFalse(service.isToolAllowed(
+                businessId, CommercialOperationToolService.SHOWCASE_QUOTE_TOOL));
+        assertFalse(service.isToolAllowed(
+                businessId, CommercialOperationToolService.SHOWCASE_ORDER_TOOL));
+        verifyNoInteractions(policies);
+    }
+
 }
