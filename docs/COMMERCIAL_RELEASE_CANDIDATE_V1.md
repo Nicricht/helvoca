@@ -17,7 +17,7 @@ Este documento registra el baseline comercial integrado y la evidencia canónica
 - #602 está integrado: elimina la carrera concurrente de confirmación de bookings y agrega V79
 - #604 está integrado: certifica `stock 2 -> 1 -> 0 -> INSUFFICIENT_STOCK` contra PostgreSQL Testcontainers
 - #601 está integrado: rollback del primer cliente y gates externos explícitos
-- `main` continúa sin branch protection/ruleset obligatorio
+- `main` está protegido por el ruleset activo `Protect main` (ID `24088016`)
 - no se ha creado tag comercial
 - no se ha desplegado este RC
 
@@ -166,16 +166,18 @@ No confundir este gate con merchant payments de los clientes de nuestros cliente
 
 ### G6. Seguridad del repositorio
 
-Antes de declarar un tag/deploy comercial definitivo:
+Ruleset activo verificado: **`Protect main` / ID `24088016`**.
 
-- [ ] proteger `main`
-- [ ] exigir PR para merge
-- [ ] exigir `fast-gate`
-- [ ] exigir Full Gate / `test`
-- [ ] bloquear direct push normal
-- [ ] bloquear force push
+- [x] proteger `main`
+- [x] exigir pull request antes de merge
+- [x] exigir `fast-gate`
+- [x] exigir Full Gate / `test`
+- [x] exigir que la rama esté actualizada antes de merge
+- [x] bloquear non-fast-forward / force push
+- [x] bloquear eliminación de `main`
+- [x] sin bypass para el usuario actual
 
-La rama `main` sigue reportándose sin protección obligatoria. La conexión disponible confirmó además que el endpoint administrativo de branch protection responde `403 Resource not accessible by integration`; no existe una operación de escritura de rulesets/branch protection en este conector. Este gate requiere GitHub Settings o una credencial administrativa fuera del conector y no debe marcarse como resuelto artificialmente.
+El ruleset está en enforcement `active`, aplica a la rama por defecto y usa los checks de GitHub Actions `fast-gate` y `test`. No exige aprobación humana adicional (`required_approving_review_count=0`). La propia PR #603 fue bloqueada al intentar mergear con checks de un HEAD desactualizado, confirmando que la política estricta está siendo aplicada.
 
 ### G7. Primer cliente
 
@@ -197,9 +199,8 @@ Antes de declarar un cliente real activo:
 El lanzamiento comercial real permanece deliberadamente bloqueado por gates que no pueden sustituirse con mocks internos:
 
 1. checkout + webhook sandbox con una cuenta/proveedor SaaS autorizado, antes de cobrar RecepVoz a un cliente;
-2. protección obligatoria de `main` y required checks desde GitHub Settings/credencial administrativa;
-3. onboarding aprobado del primer cliente real, con sus datos, canales, responsables y soporte;
-4. autorización explícita para activar proveedor/deploy/cobro real.
+2. onboarding aprobado del primer cliente real, con sus datos, canales, responsables y soporte;
+3. autorización explícita para activar proveedor/deploy/cobro real.
 
 Hasta completar esos puntos, el estado correcto es **TECHNICALLY READY / EXTERNAL GATES PENDING**, no “producción activada”.
 
