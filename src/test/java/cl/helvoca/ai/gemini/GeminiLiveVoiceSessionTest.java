@@ -84,6 +84,8 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("Evita \"¿Qué es lo que usted desea?\""));
         assertTrue(instructions.contains("a las nueve y media"));
         assertTrue(instructions.contains("nunca menciones UUID"));
+        assertTrue(instructions.contains("success=true sin bookingId es solo una propuesta pendiente de confirmación"));
+        assertTrue(instructions.contains("Solo puedes afirmar que la reserva existe"));
 
         JSONArray declarations = setup.getJSONArray("tools")
                 .getJSONObject(0).getJSONArray("functionDeclarations");
