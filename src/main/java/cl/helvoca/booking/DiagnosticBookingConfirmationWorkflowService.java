@@ -12,6 +12,7 @@ import org.json.JSONObject;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
@@ -30,8 +31,9 @@ public class DiagnosticBookingConfirmationWorkflowService extends BookingConfirm
             ConversationStateService conversationState,
             BusinessRepository businesses,
             JdbcTemplate jdbc,
+            PlatformTransactionManager transactionManager,
             UnexpectedOperationFailureDiagnostic diagnostics) {
-        super(bookings, operations, services, schedule, confirmations, conversationState, businesses, jdbc);
+        super(bookings, operations, services, schedule, confirmations, conversationState, businesses, jdbc, transactionManager);
         this.diagnostics = diagnostics;
     }
 
