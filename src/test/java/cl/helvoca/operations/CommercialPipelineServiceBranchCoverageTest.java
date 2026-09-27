@@ -266,7 +266,7 @@ class CommercialPipelineServiceBranchCoverageTest {
         assertEquals(1, response.needsAction());
 
         CommercialPipelineService.PipelineItem first = response.items().get(0);
-        assertEquals("PENDING", first.paymentStatus());
+        assertEquals("SUCCEEDED", first.paymentStatus());
         assertEquals("SENT", first.outboundStatus());
 
         CommercialPipelineService.PipelineItem second = response.items().get(1);
