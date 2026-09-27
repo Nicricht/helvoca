@@ -17,15 +17,21 @@ public class GeminiLiveProperties {
     // Tuned for fast phone dialogue while preserving short natural pauses.
     private String startOfSpeechSensitivity = "START_SENSITIVITY_HIGH";
     private int prefixPaddingMs = 60;
-    private String endOfSpeechSensitivity = "END_SENSITIVITY_LOW";
-    private int silenceDurationMs = 300;
+    private String endOfSpeechSensitivity = "END_SENSITIVITY_HIGH";
+    private int silenceDurationMs = 500;
+
+    // Hybrid VAD keeps Gemini's automatic speech-start detection, then lets the
+    // local detector finalize a completed caller turn with audioStreamEnd. This
+    // avoids multi-second remote end-of-turn tails while preserving a natural
+    // pause window before the turn is committed.
+    private boolean hybridVadEnabled = true;
 
     // Local Twilio-side barge-in cuts queued playback before the provider round-trip
-    // confirms the interruption. Gemini VAD remains authoritative for model turns.
+    // confirms the interruption. The same local detector supplies Hybrid VAD end signals.
     private boolean localBargeInEnabled = true;
     private int localBargeInMeanAmplitudeThreshold = 900;
     private int localBargeInSpeechFrames = 2;
-    private int localBargeInReleaseFrames = 5;
+    private int localBargeInReleaseFrames = 25;
     private int localBargeInRecentAssistantAudioMs = 1800;
 
     // Observability budgets. Exceeding them emits structured warnings; it never
@@ -69,6 +75,9 @@ public class GeminiLiveProperties {
     }
     public int getSilenceDurationMs() { return clamp(silenceDurationMs, 100, 2000); }
     public void setSilenceDurationMs(int silenceDurationMs) { this.silenceDurationMs = silenceDurationMs; }
+
+    public boolean isHybridVadEnabled() { return hybridVadEnabled; }
+    public void setHybridVadEnabled(boolean hybridVadEnabled) { this.hybridVadEnabled = hybridVadEnabled; }
 
     public boolean isLocalBargeInEnabled() { return localBargeInEnabled; }
     public void setLocalBargeInEnabled(boolean localBargeInEnabled) { this.localBargeInEnabled = localBargeInEnabled; }
