@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.text.Normalizer;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
@@ -22,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -82,6 +84,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final Object sendLock = new Object();
 
     private volatile WebSocket socket;
+    private volatile String lastUserUtterance = "";
     private CompletableFuture<Void> sendChain = CompletableFuture.completedFuture(null);
 
     GeminiLiveVoiceSession(RealtimeCallContext context,
@@ -485,6 +488,12 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         try {
             JSONObject result;
             if ("end_call".equals(name)) {
+                if (!properties.isCertificationSimulation() && !hasExplicitClosingIntent(lastUserUtterance)) {
+                    log.info("Blocked premature end_call call={} last_user={}",
+                            context.callId(), truncate(lastUserUtterance));
+                    return toolFailure("END_CALL_REQUIRES_EXPLICIT_CLOSING",
+                            "El cliente todavía no expresó una intención clara de terminar. Pregunta si necesita algo más y no cierres la llamada todavía.");
+                }
                 result = new JSONObject(tools.prepareDeferredEndCall(context));
                 JSONObject data = result.optJSONObject("data");
                 if (result.optBoolean("success", false)
@@ -508,6 +517,33 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         } catch (Exception e) {
             return toolFailure("TOOL_EXECUTION_FAILED", "La operación no pudo completarse.");
         }
+    }
+
+    static boolean hasExplicitClosingIntent(String text) {
+        if (text == null || text.isBlank()) return false;
+        String normalized = Normalizer.normalize(text, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9 ]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        return normalized.contains("adios")
+                || normalized.contains("chao")
+                || normalized.contains("chau")
+                || normalized.contains("hasta luego")
+                || normalized.contains("hasta pronto")
+                || normalized.contains("eso es todo")
+                || normalized.contains("eso seria todo")
+                || normalized.contains("no necesito nada mas")
+                || normalized.contains("no quiero nada mas")
+                || normalized.contains("no necesito otra cosa")
+                || normalized.contains("nada mas gracias")
+                || normalized.equals("no gracias")
+                || normalized.contains("puedes cortar")
+                || normalized.contains("puede cortar")
+                || normalized.contains("corta la llamada")
+                || normalized.contains("cuelga")
+                || normalized.contains("terminemos la llamada");
     }
 
     private void finishCallAfterPlayback() {
@@ -658,8 +694,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 CONVERSACIÓN: haz una sola pregunta a la vez. Escucha la idea completa del cliente; si hace una pausa breve, no asumas automáticamente que terminó. Permite interrupciones y si el cliente empieza a hablar, detente y atiende su nueva intervención.
                 HERRAMIENTAS: si una consulta de lectura ya devolvió success=true con los mismos datos y el cliente no cambió su solicitud, usa ese resultado y NO vuelvas a ejecutar la misma herramienta. Después de una herramienta, responde con el resultado en lenguaje humano; nunca menciones UUID, nombres internos de herramientas ni detalles técnicos.
                 VERACIDAD: nunca inventes disponibilidad ni confirmes acciones antes de que una herramienta devuelva success=true. En create_booking, success=true sin bookingId es solo una propuesta pendiente de confirmación: no digas "te confirmo la reserva", "quedó reservado", "quedó agendado" ni equivalentes. Solo puedes afirmar que la reserva existe cuando create_booking devuelve success=true Y un bookingId.
-                APERTURA: si recibes exactamente [RECEPVOZ_CALL_CONNECTED], no lo menciones ni lo trates como palabras del cliente. La primera frase debe usar de inmediato una voz claramente femenina, extremadamente seductora, sexy, íntima y chilena; no empieces neutra para cambiar después. El saludo configurado define el contenido, no una frase que debas recitar literalmente: reformúlalo con naturalidad chilena y con una entrega lenta, cálida y envolvente. Saluda en una sola frase breve con el nombre del negocio y usa una pregunta cercana y profesional como "Cuéntame, ¿en qué te puedo ayudar?". Evita "¿Qué es lo que usted desea?" y otras fórmulas rígidas.
-                CIERRE: cuando el cliente se despida, diga que no necesita nada más o confirme que terminó, primero pronuncia una despedida completa y natural. Ejemplo de estructura: "Muchas gracias por llamar. Que estés muy bien. Hasta luego." Termina de decir todas las palabras de la despedida antes de invocar end_call. Nunca invoques end_call a mitad de una frase ni mientras todavía estés hablando.
+                APERTURA: si recibes exactamente [RECEPVOZ_CALL_CONNECTED], no lo menciones ni lo trates como palabras del cliente. La primera frase debe usar de inmediato la identidad vocal indicada arriba, con un estilo extremadamente seductor, sexy, íntimo y chileno; no empieces neutro para cambiar después. El saludo configurado define el contenido, no una frase que debas recitar literalmente: reformúlalo con naturalidad chilena y con una entrega rápida, cálida y envolvente. Saluda en una sola frase breve con el nombre del negocio y usa una pregunta cercana y profesional como "Cuéntame, ¿en qué te puedo ayudar?". Evita "¿Qué es lo que usted desea?" y otras fórmulas rígidas.
+                CIERRE: completar una reserva, venta, consulta o cualquier otra acción NO significa que la llamada terminó. Después de resolver la solicitud, pregunta brevemente si necesita algo más. Solo usa end_call cuando el cliente exprese claramente que terminó, por ejemplo "no, gracias", "eso es todo", "adiós", "chao" o pida cortar. Cuando exista esa intención explícita, primero pronuncia una despedida completa y natural. Ejemplo de estructura: "Muchas gracias por llamar. Que estés muy bien. Hasta luego." Termina de decir todas las palabras de la despedida antes de invocar end_call. Nunca invoques end_call a mitad de una frase ni mientras todavía estés hablando.
                 IDENTIDAD: si te preguntan si eres una IA o asistente virtual, responde con honestidad y continúa ayudando.
                 """.formatted(voiceIdentity);
     }
@@ -724,7 +760,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             text = buffer.toString().trim();
             buffer.setLength(0);
         }
-        if (!text.isBlank()) transcripts.append(context.callId(), speaker, text);
+        if (!text.isBlank()) {
+            if ("USER".equals(speaker)) lastUserUtterance = text;
+            transcripts.append(context.callId(), speaker, text);
+        }
     }
 
     private static void append(StringBuilder buffer, String value) {
