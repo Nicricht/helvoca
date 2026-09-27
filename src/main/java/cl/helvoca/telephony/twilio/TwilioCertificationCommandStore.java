@@ -4,6 +4,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +22,40 @@ public class TwilioCertificationCommandStore {
 
     public TwilioCertificationCommandStore(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    public boolean enqueue(String runId, String requestedBy) {
+        if (!validRunId(runId)) return false;
+        String actor = requestedBy == null || requestedBy.isBlank()
+                ? "unknown"
+                : requestedBy.trim().substring(0, Math.min(requestedBy.trim().length(), 180));
+        int inserted = jdbc.update("""
+                INSERT INTO twilio_certification_command (run_id, requested_by)
+                VALUES (?, ?)
+                ON CONFLICT (run_id) DO NOTHING
+                """, runId.trim(), actor);
+        return inserted == 1;
+    }
+
+    public Optional<CommandStatus> find(String runId) {
+        if (!validRunId(runId)) return Optional.empty();
+        List<CommandStatus> rows = jdbc.query("""
+                SELECT run_id, status, requested_by, requested_at, claimed_at,
+                       expires_at, provider_call_sid, completed_at, failure_reason
+                  FROM twilio_certification_command
+                 WHERE run_id = ?
+                """, (rs, rowNum) -> new CommandStatus(
+                        rs.getString("run_id"),
+                        rs.getString("status"),
+                        rs.getString("requested_by"),
+                        instant(rs.getTimestamp("requested_at")),
+                        instant(rs.getTimestamp("claimed_at")),
+                        instant(rs.getTimestamp("expires_at")),
+                        rs.getString("provider_call_sid"),
+                        instant(rs.getTimestamp("completed_at")),
+                        rs.getString("failure_reason")),
+                runId.trim());
+        return rows.stream().findFirst();
     }
 
     public Optional<ClaimedCommand> claimNext() {
@@ -89,7 +125,7 @@ public class TwilioCertificationCommandStore {
                 """, safeReason, runId);
     }
 
-    static boolean validRunId(String value) {
+    public static boolean validRunId(String value) {
         return value != null && RUN_ID.matcher(value.trim()).matches();
     }
 
@@ -101,5 +137,21 @@ public class TwilioCertificationCommandStore {
         return value != null && CALL_SID.matcher(value.trim()).matches();
     }
 
+    private static Instant instant(Timestamp value) {
+        return value == null ? null : value.toInstant();
+    }
+
     public record ClaimedCommand(String runId, String callbackToken) {}
+
+    public record CommandStatus(
+            String runId,
+            String status,
+            String requestedBy,
+            Instant requestedAt,
+            Instant claimedAt,
+            Instant expiresAt,
+            String providerCallSid,
+            Instant completedAt,
+            String failureReason
+    ) {}
 }

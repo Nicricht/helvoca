@@ -11,6 +11,7 @@ public class ApiRateLimitProperties {
     private Limit register = new Limit(5, 3600);
     private Limit publicApi = new Limit(120, 60);
     private Limit billing = new Limit(20, 60);
+    private Limit platformCertification = new Limit(5, 3600);
     private Limit authenticatedApi = new Limit(600, 60);
 
     public boolean isEnabled() { return enabled; }
@@ -23,6 +24,10 @@ public class ApiRateLimitProperties {
     public void setPublicApi(Limit publicApi) { this.publicApi = sane(publicApi, 120, 60); }
     public Limit getBilling() { return billing; }
     public void setBilling(Limit billing) { this.billing = sane(billing, 20, 60); }
+    public Limit getPlatformCertification() { return platformCertification; }
+    public void setPlatformCertification(Limit platformCertification) {
+        this.platformCertification = sane(platformCertification, 5, 3600);
+    }
     public Limit getAuthenticatedApi() { return authenticatedApi; }
     public void setAuthenticatedApi(Limit authenticatedApi) { this.authenticatedApi = sane(authenticatedApi, 600, 60); }
 

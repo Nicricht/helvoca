@@ -65,6 +65,9 @@ app:
       billing:
         requests: ${HELVOCA_RATE_LIMIT_BILLING_REQUESTS:20}
         window-seconds: ${HELVOCA_RATE_LIMIT_BILLING_WINDOW_SECONDS:60}
+      platform-certification:
+        requests: ${HELVOCA_RATE_LIMIT_PLATFORM_CERTIFICATION_REQUESTS:5}
+        window-seconds: ${HELVOCA_RATE_LIMIT_PLATFORM_CERTIFICATION_WINDOW_SECONDS:3600}
       authenticated-api:
         requests: ${HELVOCA_RATE_LIMIT_AUTHENTICATED_REQUESTS:600}
         window-seconds: ${HELVOCA_RATE_LIMIT_AUTHENTICATED_WINDOW_SECONDS:60}

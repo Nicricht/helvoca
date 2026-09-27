@@ -71,3 +71,29 @@ For a latency-only call, do not request a booking or other side effect. Use norm
 - first-audio timing
 
 Compare median, worst response and responses above 3 seconds against the previous certified baseline.
+
+
+## Platform API
+
+Normal certification requests no longer require direct SQL access.
+
+A `PLATFORM_ADMIN` can create a run with:
+
+```http
+POST /api/v1/platform/certification-runs
+Content-Type: application/json
+
+{"runId":"latency-api-20260927-001"}
+```
+
+The request accepts only `runId`. It cannot supply a destination phone number, voice, provider Call SID, callback token or certification flags.
+
+Inspect status with:
+
+```http
+GET /api/v1/platform/certification-runs/latency-api-20260927-001
+```
+
+The response intentionally excludes the callback token. Requests use a dedicated per-identity rate limit of five requests per hour by default.
+
+For the first controlled deployment smoke only, `TWILIO_CERTIFICATION_COMMAND_BOOTSTRAP_RUN_ID` may contain one unique run id. It is idempotent through the same primary key and should be cleared after the smoke test. Future runs should use the authenticated platform API.
