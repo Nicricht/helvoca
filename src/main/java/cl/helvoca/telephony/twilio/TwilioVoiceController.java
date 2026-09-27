@@ -103,7 +103,10 @@ public class TwilioVoiceController {
                                          String direction) {
         if (!"outbound-test".equals(direction)) {
             try {
-                calls.startInboundCall(callSid, callerPhone, businessPhone);
+                UUID callId = calls.startInboundCall(callSid, callerPhone, businessPhone);
+                if ("inbound-certification".equals(direction)) {
+                    calls.markCertification(callId);
+                }
             } catch (CallCapacityExceededException e) {
                 log.warn("Rejecting Twilio {} call={} because tenant capacity is full", direction, callSid);
                 return ResponseEntity.ok(BUSY_REJECT_TWIML);
