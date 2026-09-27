@@ -119,7 +119,9 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
     }
 
     private void completeDeferredHangup(String marker, String reason) {
-        if (!pendingHangupMark.compareAndSet(marker, null)) return;
+        String expected = pendingHangupMark.get();
+        if (expected == null || !expected.equals(marker)) return;
+        if (!pendingHangupMark.compareAndSet(expected, null)) return;
         boolean accepted = control.hangup(accountSid, callSid);
         log.info("Twilio deferred hangup call={} stream={} reason={} accepted={}",
                 callSid, streamSid, reason, accepted);
