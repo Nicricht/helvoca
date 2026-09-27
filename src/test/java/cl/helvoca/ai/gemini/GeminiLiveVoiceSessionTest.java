@@ -245,6 +245,16 @@ class GeminiLiveVoiceSessionTest {
 
         session.acceptInboundAudio(loudBase64);
         verify(transport, times(1)).clearPlayback(context.streamSid());
+
+        byte[] silence = new byte[160];
+        Arrays.fill(silence, (byte) 0xff);
+        String silenceBase64 = Base64.getEncoder().encodeToString(silence);
+        for (int i = 0; i < 5; i++) {
+            session.acceptInboundAudio(silenceBase64);
+        }
+
+        session.onText(providerSocket, assistantAudio.toString(), true);
+        verify(transport, times(2)).sendAudio(eq(context.streamSid()), anyString());
     }
 
     @Test
