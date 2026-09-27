@@ -20,6 +20,9 @@ public class InventoryReservation {
     @Column(name = "catalog_item_id", nullable = false)
     private UUID catalogItemId;
 
+    @Column(name = "variant_id")
+    private UUID variantId;
+
     @Column(nullable = false)
     private int quantity;
 
@@ -60,6 +63,8 @@ public class InventoryReservation {
     public void setBusinessId(UUID businessId) { this.businessId = businessId; }
     public UUID getCatalogItemId() { return catalogItemId; }
     public void setCatalogItemId(UUID catalogItemId) { this.catalogItemId = catalogItemId; }
+    public UUID getVariantId() { return variantId; }
+    public void setVariantId(UUID variantId) { this.variantId = variantId; }
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { this.quantity = quantity; }
     public Status getStatus() { return status; }

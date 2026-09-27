@@ -33,6 +33,9 @@ public class InventoryService {
     private final TenantProvider tenant;
     private final BusinessPaymentRepository payments;
 
+    @Autowired(required = false)
+    private InventoryProductVariantRepository variants;
+
     @Autowired
     public InventoryService(InventoryStockRepository stocks,
                             InventoryReservationRepository reservations,
@@ -250,19 +253,62 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public StockLookupView lookupForBusiness(UUID businessId, UUID catalogItemId, String sku) {
+        return lookupForBusiness(businessId, catalogItemId, null, sku);
+    }
+
+    @Transactional(readOnly = true)
+    public StockLookupView lookupForBusiness(UUID businessId,
+                                             UUID catalogItemId,
+                                             UUID variantId,
+                                             String sku) {
         if (businessId == null) throw new IllegalArgumentException("Business id is required");
         InventoryStock stock = null;
+        InventoryProductVariant variant = null;
         CatalogItem product = null;
 
-        if (catalogItemId != null) {
+        if (variantId != null) {
+            if (variants == null) throw new IllegalArgumentException("Variant inventory is unavailable");
+            variant = variants.findByIdAndBusinessId(variantId, businessId)
+                    .filter(InventoryProductVariant::isActive)
+                    .orElseThrow(() -> new NotFoundException("Inventory variant not found"));
+            if (catalogItemId != null && !catalogItemId.equals(variant.getCatalogItemId())) {
+                throw new ConflictException("The variant does not belong to that product");
+            }
+            product = requireProduct(businessId, variant.getCatalogItemId());
+        } else if (catalogItemId != null) {
             product = requireProduct(businessId, catalogItemId);
             stock = stocks.findByBusinessIdAndCatalogItemId(businessId, catalogItemId).orElse(null);
         } else if (sku != null && !sku.isBlank()) {
             String normalizedSku = normalizeSku(sku);
             stock = stocks.findByBusinessIdAndSkuIgnoreCase(businessId, normalizedSku).orElse(null);
-            if (stock != null) product = requireProduct(businessId, stock.getCatalogItemId());
+            if (stock != null) {
+                product = requireProduct(businessId, stock.getCatalogItemId());
+            } else if (variants != null) {
+                variant = variants.findByBusinessIdAndSkuIgnoreCase(businessId, normalizedSku)
+                        .filter(InventoryProductVariant::isActive)
+                        .orElse(null);
+                if (variant != null) product = requireProduct(businessId, variant.getCatalogItemId());
+            }
         } else {
-            throw new IllegalArgumentException("catalogItemId or sku is required");
+            throw new IllegalArgumentException("catalogItemId, variantId or sku is required");
+        }
+
+        if (variant != null) {
+            boolean known = variant.isTrackingEnabled();
+            return new StockLookupView(
+                    variant.getCatalogItemId(),
+                    product == null ? productName(businessId, variant.getCatalogItemId()) : product.getName(),
+                    variant.getSku(),
+                    true,
+                    variant.isTrackingEnabled(),
+                    known ? variant.getOnHand() : null,
+                    known ? variant.getReserved() : null,
+                    known ? variant.available() : null,
+                    variant.getReorderThreshold(),
+                    known && variant.available() <= variant.getReorderThreshold(),
+                    variant.getId(),
+                    variant.getName(),
+                    variant.getOptionValuesJson());
         }
 
         if (stock == null) {
@@ -276,7 +322,10 @@ public class InventoryService {
                     null,
                     null,
                     null,
-                    false);
+                    false,
+                    null,
+                    null,
+                    null);
         }
 
         boolean known = stock.isTrackingEnabled();
@@ -290,7 +339,10 @@ public class InventoryService {
                 known ? stock.getReserved() : null,
                 known ? stock.available() : null,
                 stock.getReorderThreshold(),
-                known && stock.available() <= stock.getReorderThreshold());
+                known && stock.available() <= stock.getReorderThreshold(),
+                null,
+                null,
+                null);
     }
 
     @Transactional
@@ -312,52 +364,101 @@ public class InventoryService {
                     true, null, null, existing.stream().map(InventoryReservation::getId).toList());
         }
 
-        Map<UUID, Integer> quantities = new LinkedHashMap<>();
+        Map<OrderStockKey, Integer> quantities = new LinkedHashMap<>();
         for (OrderItem item : items) {
             if (item == null || item.catalogItemId() == null || item.quantity() <= 0) {
-                throw new IllegalArgumentException("Order inventory items must have a product and positive quantity");
+                throw new IllegalArgumentException(
+                        "Order inventory items must have a product and positive quantity");
             }
-            quantities.merge(item.catalogItemId(), item.quantity(), Math::addExact);
+            quantities.merge(
+                    new OrderStockKey(item.catalogItemId(), item.variantId()),
+                    item.quantity(),
+                    Math::addExact);
         }
 
-        List<Map.Entry<UUID, Integer>> ordered = new ArrayList<>(quantities.entrySet());
-        ordered.sort(Comparator.comparing(entry -> entry.getKey().toString()));
+        List<Map.Entry<OrderStockKey, Integer>> ordered = new ArrayList<>(quantities.entrySet());
+        ordered.sort(Comparator.comparing(entry -> entry.getKey().lockKey()));
 
-        List<LockedRequest> tracked = new ArrayList<>();
-        for (Map.Entry<UUID, Integer> entry : ordered) {
-            InventoryStock stock = stocks.lockByBusinessAndCatalogItem(businessId, entry.getKey()).orElse(null);
+        List<LockedOrderRequest> tracked = new ArrayList<>();
+        for (Map.Entry<OrderStockKey, Integer> entry : ordered) {
+            OrderStockKey key = entry.getKey();
+            int quantity = entry.getValue();
+
+            if (key.variantId() != null) {
+                if (variants == null) {
+                    return new OrderReservationResult(
+                            false, "VARIANT_INVENTORY_UNAVAILABLE",
+                            "El inventario de variantes no está disponible.", List.of());
+                }
+                InventoryProductVariant variant = variants
+                        .lockByIdAndBusinessId(key.variantId(), businessId)
+                        .filter(value -> value.isActive()
+                                && value.getCatalogItemId().equals(key.catalogItemId()))
+                        .orElse(null);
+                if (variant == null) {
+                    return new OrderReservationResult(
+                            false, "VARIANT_NOT_FOUND",
+                            "La variante seleccionada ya no está disponible.", List.of());
+                }
+                if (!variant.isTrackingEnabled()) continue;
+                if (variant.available() < quantity) {
+                    String name = productName(businessId, key.catalogItemId())
+                            + " · " + variant.getName();
+                    return new OrderReservationResult(
+                            false, "INSUFFICIENT_STOCK",
+                            "No hay stock suficiente para " + name
+                                    + ". Disponible: " + variant.available() + ".",
+                            List.of());
+                }
+                tracked.add(LockedOrderRequest.variant(variant, quantity));
+                continue;
+            }
+
+            InventoryStock stock = stocks
+                    .lockByBusinessAndCatalogItem(businessId, key.catalogItemId())
+                    .orElse(null);
             if (stock == null || !stock.isTrackingEnabled()) continue;
-            if (stock.available() < entry.getValue()) {
-                String name = productName(businessId, entry.getKey());
+            if (stock.available() < quantity) {
+                String name = productName(businessId, key.catalogItemId());
                 return new OrderReservationResult(
-                        false,
-                        "INSUFFICIENT_STOCK",
-                        "No hay stock suficiente para " + name + ". Disponible: " + stock.available() + ".",
+                        false, "INSUFFICIENT_STOCK",
+                        "No hay stock suficiente para " + name
+                                + ". Disponible: " + stock.available() + ".",
                         List.of());
             }
-            tracked.add(new LockedRequest(stock, entry.getValue()));
+            tracked.add(LockedOrderRequest.base(stock, quantity));
         }
 
         List<UUID> reservationIds = new ArrayList<>();
         Instant expiresAt = Instant.now().plus(DEFAULT_RESERVATION_TTL);
-        for (LockedRequest request : tracked) {
-            InventoryStock stock = request.stock();
-            stock.setReserved(stock.getReserved() + request.quantity());
-            stock = stocks.saveAndFlush(stock);
-
+        for (LockedOrderRequest request : tracked) {
             InventoryReservation reservation = new InventoryReservation();
             reservation.setBusinessId(businessId);
-            reservation.setCatalogItemId(stock.getCatalogItemId());
+            reservation.setCatalogItemId(request.catalogItemId());
+            reservation.setVariantId(request.variantId());
             reservation.setQuantity(request.quantity());
             reservation.setStatus(InventoryReservation.Status.ACTIVE);
             reservation.setReferenceType(ORDER_REFERENCE);
             reservation.setReferenceId(orderOperationId);
             reservation.setExpiresAt(expiresAt);
-            reservation = reservations.saveAndFlush(reservation);
-            reservationIds.add(reservation.getId());
 
-            record(stock, InventoryMovement.Type.RESERVATION, 0, request.quantity(),
-                    ORDER_REFERENCE, orderOperationId, "Order stock reservation");
+            if (request.variant() != null) {
+                InventoryProductVariant variant = request.variant();
+                variant.setReserved(variant.getReserved() + request.quantity());
+                variant = variants.saveAndFlush(variant);
+                reservation = reservations.saveAndFlush(reservation);
+                reservationIds.add(reservation.getId());
+                recordVariant(variant, InventoryMovement.Type.RESERVATION, 0, request.quantity(),
+                        ORDER_REFERENCE, orderOperationId, "Order variant stock reservation");
+            } else {
+                InventoryStock stock = request.stock();
+                stock.setReserved(stock.getReserved() + request.quantity());
+                stock = stocks.saveAndFlush(stock);
+                reservation = reservations.saveAndFlush(reservation);
+                reservationIds.add(reservation.getId());
+                record(stock, InventoryMovement.Type.RESERVATION, 0, request.quantity(),
+                        ORDER_REFERENCE, orderOperationId, "Order stock reservation");
+            }
         }
 
         return new OrderReservationResult(true, null, null, List.copyOf(reservationIds));
@@ -411,9 +512,42 @@ public class InventoryService {
     private void settleExpiredReservation(InventoryReservation reservation,
                                           boolean consume,
                                           String note) {
+        int quantity = reservation.getQuantity();
+
+        if (reservation.getVariantId() != null) {
+            InventoryProductVariant variant = requireLockedVariant(
+                    reservation.getBusinessId(),
+                    reservation.getCatalogItemId(),
+                    reservation.getVariantId());
+            if (variant.getReserved() < quantity) {
+                throw new ConflictException(
+                        "Variant inventory is inconsistent with the expiring reservation");
+            }
+            if (consume) {
+                if (variant.getOnHand() < quantity) {
+                    throw new ConflictException(
+                            "Variant inventory is inconsistent with the paid reservation");
+                }
+                variant.setOnHand(variant.getOnHand() - quantity);
+                variant.setReserved(variant.getReserved() - quantity);
+                reservation.setStatus(InventoryReservation.Status.CONSUMED);
+                variants.saveAndFlush(variant);
+                reservations.saveAndFlush(reservation);
+                recordVariant(variant, InventoryMovement.Type.CONSUMPTION, -quantity, -quantity,
+                        reservation.getReferenceType(), reservation.getReferenceId(), note);
+            } else {
+                variant.setReserved(variant.getReserved() - quantity);
+                reservation.setStatus(InventoryReservation.Status.EXPIRED);
+                variants.saveAndFlush(variant);
+                reservations.saveAndFlush(reservation);
+                recordVariant(variant, InventoryMovement.Type.RELEASE, 0, -quantity,
+                        reservation.getReferenceType(), reservation.getReferenceId(), note);
+            }
+            return;
+        }
+
         InventoryStock stock = requireLockedStock(
                 reservation.getBusinessId(), reservation.getCatalogItemId());
-        int quantity = reservation.getQuantity();
         if (stock.getReserved() < quantity) {
             throw new ConflictException("Inventory state is inconsistent with the expiring reservation");
         }
@@ -459,30 +593,51 @@ public class InventoryService {
             InventoryReservation reservation = reservations
                     .lockByIdAndBusinessId(candidate.getId(), businessId)
                     .orElse(null);
-            if (reservation == null || reservation.getStatus() != InventoryReservation.Status.ACTIVE) continue;
+            if (reservation == null
+                    || reservation.getStatus() != InventoryReservation.Status.ACTIVE) continue;
+
+            int quantity = reservation.getQuantity();
+            if (reservation.getVariantId() != null) {
+                InventoryProductVariant variant = requireLockedVariant(
+                        businessId, reservation.getCatalogItemId(), reservation.getVariantId());
+                if (variant.getReserved() < quantity
+                        || (consume && variant.getOnHand() < quantity)) {
+                    throw new ConflictException(
+                            "Variant inventory state is inconsistent with the order reservation");
+                }
+                variant.setReserved(variant.getReserved() - quantity);
+                if (consume) {
+                    variant.setOnHand(variant.getOnHand() - quantity);
+                    reservation.setStatus(InventoryReservation.Status.CONSUMED);
+                    recordVariant(variant, InventoryMovement.Type.CONSUMPTION,
+                            -quantity, -quantity, ORDER_REFERENCE, orderOperationId, note);
+                } else {
+                    reservation.setStatus(InventoryReservation.Status.RELEASED);
+                    recordVariant(variant, InventoryMovement.Type.RELEASE,
+                            0, -quantity, ORDER_REFERENCE, orderOperationId, note);
+                }
+                variants.saveAndFlush(variant);
+                reservations.saveAndFlush(reservation);
+                continue;
+            }
 
             InventoryStock stock = requireLockedStock(businessId, reservation.getCatalogItemId());
-            int quantity = reservation.getQuantity();
-
+            if (stock.getReserved() < quantity
+                    || (consume && stock.getOnHand() < quantity)) {
+                throw new ConflictException(
+                        "Inventory state is inconsistent with the order reservation");
+            }
+            stock.setReserved(stock.getReserved() - quantity);
             if (consume) {
-                if (stock.getReserved() < quantity || stock.getOnHand() < quantity) {
-                    throw new ConflictException("Inventory state is inconsistent with the order reservation");
-                }
-                stock.setReserved(stock.getReserved() - quantity);
                 stock.setOnHand(stock.getOnHand() - quantity);
                 reservation.setStatus(InventoryReservation.Status.CONSUMED);
                 recordAfterSave(stock, InventoryMovement.Type.CONSUMPTION, -quantity, -quantity,
                         ORDER_REFERENCE, orderOperationId, note);
             } else {
-                if (stock.getReserved() < quantity) {
-                    throw new ConflictException("Inventory state is inconsistent with the order reservation");
-                }
-                stock.setReserved(stock.getReserved() - quantity);
                 reservation.setStatus(InventoryReservation.Status.RELEASED);
                 recordAfterSave(stock, InventoryMovement.Type.RELEASE, 0, -quantity,
                         ORDER_REFERENCE, orderOperationId, note);
             }
-
             stocks.saveAndFlush(stock);
             reservations.saveAndFlush(reservation);
         }
@@ -503,6 +658,39 @@ public class InventoryService {
         movement.setReservedDelta(reservedDelta);
         movement.setOnHandAfter(stock.getOnHand());
         movement.setReservedAfter(stock.getReserved());
+        movement.setReferenceType(referenceType);
+        movement.setReferenceId(referenceId);
+        movement.setNote(blankToNull(note));
+        movements.save(movement);
+    }
+
+    private InventoryProductVariant requireLockedVariant(UUID businessId,
+                                                             UUID catalogItemId,
+                                                             UUID variantId) {
+        if (variants == null) {
+            throw new ConflictException("Variant inventory is unavailable");
+        }
+        return variants.lockByIdAndBusinessId(variantId, businessId)
+                .filter(value -> value.getCatalogItemId().equals(catalogItemId))
+                .orElseThrow(() -> new NotFoundException("Inventory variant not found"));
+    }
+
+    private void recordVariant(InventoryProductVariant variant,
+                               InventoryMovement.Type type,
+                               int quantityDelta,
+                               int reservedDelta,
+                               String referenceType,
+                               UUID referenceId,
+                               String note) {
+        InventoryMovement movement = new InventoryMovement();
+        movement.setBusinessId(variant.getBusinessId());
+        movement.setCatalogItemId(variant.getCatalogItemId());
+        movement.setVariantId(variant.getId());
+        movement.setType(type);
+        movement.setQuantityDelta(quantityDelta);
+        movement.setReservedDelta(reservedDelta);
+        movement.setOnHandAfter(variant.getOnHand());
+        movement.setReservedAfter(variant.getReserved());
         movement.setReferenceType(referenceType);
         movement.setReferenceId(referenceId);
         movement.setNote(blankToNull(note));
@@ -657,9 +845,31 @@ public class InventoryService {
                                   Integer reserved,
                                   Integer available,
                                   Integer reorderThreshold,
-                                  boolean lowStock) {}
+                                  boolean lowStock,
+                                  UUID variantId,
+                                  String variantName,
+                                  String optionValuesJson) {
+        public StockLookupView(UUID catalogItemId,
+                               String productName,
+                               String sku,
+                               boolean configured,
+                               boolean trackingEnabled,
+                               Integer onHand,
+                               Integer reserved,
+                               Integer available,
+                               Integer reorderThreshold,
+                               boolean lowStock) {
+            this(catalogItemId, productName, sku, configured, trackingEnabled,
+                    onHand, reserved, available, reorderThreshold, lowStock,
+                    null, null, null);
+        }
+    }
 
-    public record OrderItem(UUID catalogItemId, int quantity) {}
+    public record OrderItem(UUID catalogItemId, UUID variantId, int quantity) {
+        public OrderItem(UUID catalogItemId, int quantity) {
+            this(catalogItemId, null, quantity);
+        }
+    }
 
     public record OrderReservationResult(boolean success,
                                          String code,
@@ -674,7 +884,28 @@ public class InventoryService {
         NOOP
     }
 
-    private record LockedRequest(InventoryStock stock, int quantity) {}
+    private record OrderStockKey(UUID catalogItemId, UUID variantId) {
+        String lockKey() {
+            return catalogItemId + ":" + (variantId == null ? "" : variantId);
+        }
+    }
+
+    private record LockedOrderRequest(InventoryStock stock,
+                                      InventoryProductVariant variant,
+                                      int quantity) {
+        static LockedOrderRequest base(InventoryStock stock, int quantity) {
+            return new LockedOrderRequest(stock, null, quantity);
+        }
+        static LockedOrderRequest variant(InventoryProductVariant variant, int quantity) {
+            return new LockedOrderRequest(null, variant, quantity);
+        }
+        UUID catalogItemId() {
+            return variant != null ? variant.getCatalogItemId() : stock.getCatalogItemId();
+        }
+        UUID variantId() {
+            return variant == null ? null : variant.getId();
+        }
+    }
 
     public record MovementView(UUID id,
                                InventoryMovement.Type type,
