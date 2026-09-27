@@ -372,7 +372,7 @@ class CustomerCommercialTimelineServiceTest {
         BusinessOrder order = mock(BusinessOrder.class);
         when(order.getId()).thenReturn(orderId);
         when(order.getOperationId()).thenReturn(orderOperationId);
-        when(order.getStatus()).thenReturn(BusinessOrder.Status.DRAFT);
+        when(order.getStatus()).thenReturn(BusinessOrder.Status.CONFIRMED);
         when(order.getSource()).thenReturn(BusinessOrder.Source.VOICE);
         when(order.getCreatedAt()).thenReturn(Instant.parse("2026-09-27T06:00:00Z"));
         when(orders.findTop5ByBusinessIdAndCustomerIdOrderByCreatedAtDesc(
@@ -414,7 +414,7 @@ class CustomerCommercialTimelineServiceTest {
 
         assertNull(result.summary().commercialStage());
         assertNull(result.summary().selectedProduct());
-        assertEquals("DRAFT", result.summary().orderStatus());
+        assertEquals("CONFIRMED", result.summary().orderStatus());
         assertNull(result.summary().paymentStatus());
         assertNull(result.summary().inventoryStatus());
         assertEquals("VOICE", result.summary().lastChannel());
