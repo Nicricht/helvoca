@@ -1,6 +1,7 @@
 package cl.helvoca.ai.realtime;
 
 import cl.helvoca.booking.BookingRepository;
+import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallAction;
 import cl.helvoca.call.CallActionRepository;
@@ -13,20 +14,108 @@ import cl.helvoca.learning.UnansweredQuestionService;
 import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
+import cl.helvoca.telephony.twilio.TwilioCertificationCommandStore;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class CertificationGuardedRealtimeToolServiceTest {
+
+    @Test
+    void latencyCertificationInstructionsEnterReadOnlyMode() {
+        Fixture f = new Fixture();
+        TwilioCertificationCommandStore commands = mock(TwilioCertificationCommandStore.class);
+        f.call.setProviderCallId("CA0123456789abcdef0123456789abcdef");
+        when(commands.isLatencyCertificationProviderCall(f.call.getProviderCallId())).thenReturn(true);
+        f.service.setCertificationCommands(commands);
+
+        Business business = new Business();
+        business.setName("Negocio Demo");
+        business.setTimezone("America/Santiago");
+        business.setLanguage("es-CL");
+        when(f.businesses.findById(f.businessId)).thenReturn(Optional.of(business));
+
+        String instructions = f.service.buildInstructions(f.context);
+
+        assertTrue(instructions.contains("MODO CERTIFICACIÓN DE LATENCIA READ-ONLY"));
+        assertTrue(instructions.contains("Usa como máximo una herramienta de solo lectura"));
+        assertTrue(instructions.contains("no intentes reservar")
+                || instructions.contains("No intentes reservar"));
+    }
+
+    @Test
+    void latencyCertificationExposesOnlyMinimalReadOnlyTools() {
+        Fixture f = new Fixture();
+        TwilioCertificationCommandStore commands = mock(TwilioCertificationCommandStore.class);
+        f.call.setProviderCallId("CA0123456789abcdef0123456789abcdef");
+        when(commands.isLatencyCertificationProviderCall(f.call.getProviderCallId())).thenReturn(true);
+        f.service.setCertificationCommands(commands);
+
+        JSONArray definitions = f.service.toolDefinitions(f.context);
+        Set<String> names = new HashSet<>();
+        for (int i = 0; i < definitions.length(); i++) {
+            names.add(definitions.getJSONObject(i).getString("name"));
+        }
+
+        assertEquals(Set.of(
+                "get_business_information",
+                "list_services",
+                "search_knowledge",
+                "find_caller",
+                "end_call"), names);
+        assertFalse(names.contains("create_booking"));
+        assertFalse(names.contains("reschedule_booking"));
+        assertFalse(names.contains("cancel_booking"));
+    }
+
+    @Test
+    void latencyCertificationBlocksHiddenMutationBeforeBackendExecution() {
+        Fixture f = new Fixture();
+        TwilioCertificationCommandStore commands = mock(TwilioCertificationCommandStore.class);
+        f.call.setProviderCallId("CA0123456789abcdef0123456789abcdef");
+        when(commands.isLatencyCertificationProviderCall(f.call.getProviderCallId())).thenReturn(true);
+        f.service.setCertificationCommands(commands);
+
+        JSONObject result = new JSONObject(f.service.execute(
+                f.context,
+                "create_booking",
+                new JSONObject().put("serviceId", UUID.randomUUID().toString()).toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("LATENCY_CERTIFICATION_READ_ONLY",
+                result.getJSONObject("error").getString("code"));
+        verifyNoInteractions(f.bookings);
+        verifyNoInteractions(f.jdbc);
+        verify(f.trace).recordTool(eq(f.businessId), eq(f.callId), eq("create_booking"), any(JSONObject.class), anyLong());
+    }
+
+    @Test
+    void latencyCertificationModeIsCachedPerCallAfterFirstLookup() {
+        Fixture f = new Fixture();
+        TwilioCertificationCommandStore commands = mock(TwilioCertificationCommandStore.class);
+        f.call.setProviderCallId("CA0123456789abcdef0123456789abcdef");
+        when(commands.isLatencyCertificationProviderCall(f.call.getProviderCallId())).thenReturn(true);
+        f.service.setCertificationCommands(commands);
+
+        f.service.toolDefinitions(f.context);
+        f.service.toolDefinitions(f.context);
+
+        verify(commands, times(1)).isLatencyCertificationProviderCall(f.call.getProviderCallId());
+    }
 
     @Test
     void certificationCreateRequiresCustomerBeforeTouchingBookingBackend() {
@@ -40,7 +129,7 @@ class CertificationGuardedRealtimeToolServiceTest {
         assertEquals("CERTIFICATION_CUSTOMER_REQUIRED", result.getJSONObject("error").getString("code"));
         verifyNoInteractions(f.bookings);
         verifyNoInteractions(f.jdbc);
-        verify(f.trace).recordTool(eq(f.businessId), eq(f.callId), eq("create_booking"), any(JSONObject.class), anyLong());
+        verify(f.trace).recordTool(eq(f.businessId), eq(f.callId), eq("create_booking"), any(JSONObject.class));
     }
 
     @Test
