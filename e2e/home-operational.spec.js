@@ -473,8 +473,8 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#pilotMetricsCard')).toBeHidden();
   await expect(page.locator('#ownerSevenDayRow')).toBeVisible();
   await expect(page.locator('#ownerSevenDaySummary')).toContainText('50 conversaciones');
-  await expect(page.locator('#ownerSevenDaySummary')).toContainText('9 reservas');
-  await expect(page.locator('#ownerSevenDaySummary')).toContainText('6 pedidos');
+  await expect(page.locator('#ownerSevenDaySummary')).toContainText('12 reservas');
+  await expect(page.locator('#ownerSevenDaySummary')).toContainText('10 pedidos');
   await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'ready');
   await expect(page.locator('#ownerDashboardState')).toHaveText('AL DÍA');
   await expect(page.locator('#homeRecentActivity')).toBeVisible();
