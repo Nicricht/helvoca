@@ -73,9 +73,14 @@ public class MercadoPagoSubscriptionGateway implements SubscriptionPaymentGatewa
     public RemoteInvoice getInvoice(String externalInvoiceId) {
         try {
             Invoice invoice = new InvoiceClient().get(Long.parseLong(externalInvoiceId), options());
-            String paymentStatus = invoice.getPayment() == null ? invoice.getStatus() : invoice.getPayment().getStatus();
-            return new RemoteInvoice(String.valueOf(invoice.getId()), invoice.getPreapprovalId(), paymentStatus,
-                    invoice.getSummarized(), invoice.getDebitDate());
+            String paymentStatus = invoice.getPayment() == null ? null : invoice.getPayment().getStatus();
+            return new RemoteInvoice(
+                    String.valueOf(invoice.getId()),
+                    invoice.getPreapprovalId(),
+                    invoice.getStatus(),
+                    paymentStatus,
+                    invoice.getSummarized(),
+                    invoice.getDebitDate());
         } catch (Exception e) {
             throw new IllegalStateException("Mercado Pago invoice lookup failed", e);
         }

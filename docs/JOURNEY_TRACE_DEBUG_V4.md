@@ -125,3 +125,15 @@ V4 debe pasar:
 5. Full CI con backend, JaCoCo differential coverage y Playwright.
 
 La PR permanece DRAFT hasta completar la certificación y no se hace merge automático.
+
+
+## Commercial observability V1 extension
+
+The commercial support pass keeps Journey Trace V4 as the correlation surface and adds only persisted evidence that was previously missing:
+
+- AI setup events expose the persisted voice model as `transition=model=<id>`.
+- TOOL events expose `durationMs` from `call_action.duration_ms`.
+- USAGE events reuse the append-only V41 `usage_meter_event` ledger and expose quantity/unit plus available estimated or actual cost.
+- No transcript text, phone number, provider response body, authorization header, token or credential is added to the trace.
+
+For the complete support workflow and privacy boundary, see `docs/COMMERCIAL_OBSERVABILITY_V1.md`.

@@ -10,5 +10,6 @@ public interface SubscriptionPaymentGateway {
 
     record Checkout(String subscriptionId, String checkoutUrl, String status, String externalReference) {}
     record RemoteSubscription(String id, String status, String externalReference, OffsetDateTime nextPaymentDate) {}
-    record RemoteInvoice(String id, String subscriptionId, String status, String summarized, OffsetDateTime debitDate) {}
+    record RemoteInvoice(String id, String subscriptionId, String invoiceStatus, String paymentStatus,
+                         String summarized, OffsetDateTime debitDate) {}
 }

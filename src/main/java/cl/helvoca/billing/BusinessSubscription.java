@@ -46,6 +46,12 @@ public class BusinessSubscription {
     @Column(name = "billing_checkout_url", columnDefinition = "text")
     private String billingCheckoutUrl;
 
+    @Column(name = "last_billing_invoice_id", length = 160)
+    private String lastBillingInvoiceId;
+
+    @Column(name = "last_billing_payment_status", length = 40)
+    private String lastBillingPaymentStatus;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -85,6 +91,10 @@ public class BusinessSubscription {
     public void setPendingPlanCode(String pendingPlanCode) { this.pendingPlanCode = pendingPlanCode; }
     public String getBillingCheckoutUrl() { return billingCheckoutUrl; }
     public void setBillingCheckoutUrl(String billingCheckoutUrl) { this.billingCheckoutUrl = billingCheckoutUrl; }
+    public String getLastBillingInvoiceId() { return lastBillingInvoiceId; }
+    public void setLastBillingInvoiceId(String lastBillingInvoiceId) { this.lastBillingInvoiceId = lastBillingInvoiceId; }
+    public String getLastBillingPaymentStatus() { return lastBillingPaymentStatus; }
+    public void setLastBillingPaymentStatus(String lastBillingPaymentStatus) { this.lastBillingPaymentStatus = lastBillingPaymentStatus; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

@@ -61,8 +61,8 @@ class JourneyTraceServiceIntegrationTest {
 
         jdbc.update("""
                 INSERT INTO call_action
-                    (id, business_id, call_id, action_type, success, error_code, created_at)
-                VALUES (?, ?, ?, 'ORDER_CREATED', true, NULL, ?)
+                    (id, business_id, call_id, action_type, success, error_code, duration_ms, created_at)
+                VALUES (?, ?, ?, 'ORDER_CREATED', true, NULL, 125, ?)
                 """, UUID.randomUUID(), businessId, callId, ts(base.plusSeconds(3)));
 
         jdbc.update("""
@@ -134,6 +134,14 @@ class JourneyTraceServiceIntegrationTest {
                 """, UUID.randomUUID(), businessId, operationId, ts(base.plusSeconds(8)),
                 ts(base.plusSeconds(8)), ts(base.plusSeconds(6)));
 
+        jdbc.update("""
+                INSERT INTO usage_meter_event
+                    (id, business_id, meter_key, quantity, unit, estimated_cost_usd,
+                     actual_cost_usd, source_type, source_id, provider, occurred_at, sequence_no)
+                VALUES (?, ?, 'VOICE_SECONDS', 10, 'SECONDS', 0.01500000,
+                        NULL, 'CALL_SESSION', ?, 'twilio', ?, 1)
+                """, UUID.randomUUID(), businessId, callId.toString(), ts(base.plusSeconds(10)));
+
         JourneyTraceService.TraceView trace = service.get(sharedProviderCallId);
 
         assertEquals(Set.of(callId), Set.copyOf(trace.callIds()));
@@ -151,7 +159,18 @@ class JourneyTraceServiceIntegrationTest {
                 .collect(Collectors.toSet());
         assertTrue(stages.containsAll(Set.of(
                 "CALL", "AI", "TOOL", "OPERATION", "RETRY",
-                "JOB", "PAYMENT", "WEBHOOK", "OUTBOUND")));
+                "JOB", "PAYMENT", "WEBHOOK", "OUTBOUND", "USAGE")));
+        assertTrue(trace.timeline().stream()
+                .anyMatch(event -> "AI_SETUP_COMPLETED".equals(event.event())
+                        && "model=gpt-realtime-2.1".equals(event.transition())));
+        assertTrue(trace.timeline().stream()
+                .anyMatch(event -> "ORDER_CREATED".equals(event.event())
+                        && Long.valueOf(125L).equals(event.durationMs())));
+        assertTrue(trace.timeline().stream()
+                .anyMatch(event -> "VOICE_SECONDS".equals(event.event())
+                        && event.transition() != null
+                        && event.transition().contains("quantity=10")
+                        && event.transition().contains("estimated_cost_usd=0.01500000")));
         assertTrue(trace.timeline().stream().noneMatch(event -> "SHOULD_NOT_LEAK".equals(event.event())));
         verify(tenantProvider).requireBusinessId();
     }
@@ -163,13 +182,22 @@ class JourneyTraceServiceIntegrationTest {
                     id uuid PRIMARY KEY, business_id uuid NOT NULL, provider_call_id text,
                     stream_sid text, started_at timestamptz NOT NULL, answered_at timestamptz,
                     ended_at timestamptz, ai_setup_completed_at timestamptz, status text,
-                    telephony_provider text, ai_provider text, resolution text
+                    telephony_provider text, ai_provider text, ai_model text, resolution text
                 )
                 """,
                 """
                 CREATE TABLE call_action (
                     id uuid PRIMARY KEY, business_id uuid NOT NULL, call_id uuid NOT NULL,
-                    action_type text, success boolean, error_code text, created_at timestamptz
+                    action_type text, success boolean, error_code text, duration_ms bigint,
+                    created_at timestamptz
+                )
+                """,
+                """
+                CREATE TABLE usage_meter_event (
+                    id uuid PRIMARY KEY, sequence_no bigint NOT NULL, business_id uuid NOT NULL,
+                    meter_key text NOT NULL, quantity numeric NOT NULL, unit text NOT NULL,
+                    estimated_cost_usd numeric, actual_cost_usd numeric, source_type text NOT NULL,
+                    source_id text NOT NULL, provider text, occurred_at timestamptz NOT NULL
                 )
                 """,
                 """
@@ -259,10 +287,11 @@ class JourneyTraceServiceIntegrationTest {
         jdbc.update("""
                 INSERT INTO call_session
                     (id, business_id, provider_call_id, stream_sid, started_at, answered_at,
-                     ended_at, ai_setup_completed_at, status, telephony_provider, ai_provider, resolution)
-                VALUES (?, ?, ?, NULL, ?, ?, ?, ?, 'COMPLETED', ?, ?, 'ORDER_CREATED')
+                     ended_at, ai_setup_completed_at, status, telephony_provider, ai_provider, ai_model, resolution)
+                VALUES (?, ?, ?, NULL, ?, ?, ?, ?, 'COMPLETED', ?, ?, ?, 'ORDER_CREATED')
                 """, callId, businessId, providerCallId, ts(start), ts(start.plusSeconds(1)),
-                ts(start.plusSeconds(10)), ts(start.plusSeconds(2)), telephonyProvider, aiProvider);
+                ts(start.plusSeconds(10)), ts(start.plusSeconds(2)), telephonyProvider, aiProvider,
+                "openai".equals(aiProvider) ? "gpt-realtime-2.1" : "other-model");
     }
 
     private void insertOperation(UUID businessId,
