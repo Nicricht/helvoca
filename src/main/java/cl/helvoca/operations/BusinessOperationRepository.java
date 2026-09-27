@@ -12,6 +12,8 @@ public interface BusinessOperationRepository extends JpaRepository<BusinessOpera
     Optional<BusinessOperation> findByIdAndBusinessId(UUID id, UUID businessId);
     List<BusinessOperation> findTop50ByBusinessIdAndCustomerIdOrderByUpdatedAtDesc(
             UUID businessId, UUID customerId);
+    List<BusinessOperation> findTop100ByBusinessIdAndTypeOrderByUpdatedAtDesc(
+            UUID businessId, BusinessOperation.Type type);
 
     @Query(value = """
             SELECT * FROM business_operation
