@@ -33,7 +33,7 @@ This block adds `PAYMENT_CONFIRMATION`:
 2. tenant and customer ownership are revalidated by the outbound engine;
 3. amount and currency come from the persisted payment, never from AI text;
 4. no checkout URL is included in the success confirmation;
-5. outbound preparation remains idempotent through the existing business/purpose/operation/recipient/revision key;
+5. payment-success preparation uses a stable business/purpose/payment-operation/recipient key, so a later operation revision or a second provider event cannot create another success confirmation;
 6. a duplicate processed webhook does not trigger the notification hook again;
 7. if WhatsApp delivery is disabled, the confirmation is only prepared and no provider/outbox action occurs;
 8. missing/ambiguous verified recipients or unavailable WhatsApp do not roll back an already verified payment.
