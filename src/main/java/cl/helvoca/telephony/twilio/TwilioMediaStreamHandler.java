@@ -6,6 +6,7 @@ import cl.helvoca.voice.VoiceAiProvider;
 import cl.helvoca.voice.VoiceAiProviderRegistry;
 import cl.helvoca.voice.VoiceAiSession;
 import cl.helvoca.voice.VoiceProviderHealthRegistry;
+import cl.helvoca.voice.VoiceTransportSession;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,8 +64,9 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
             case "connected" -> { }
             case "start" -> handleStart(session, state, event);
             case "media" -> handleMedia(state, event);
+            case "mark" -> handleMark(state, event);
             case "stop" -> closeState(state, false);
-            case "mark", "dtmf" -> { }
+            case "dtmf" -> { }
             default -> log.debug("Ignoring Twilio media event={} socket={}",
                     event.optString("event", ""), session.getId());
         }
@@ -137,6 +139,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         state.callId = callId;
         state.providerId = provider.id();
         state.ai = ai;
+        state.transport = transport;
         try {
             ai.start();
         } catch (RuntimeException e) {
@@ -156,6 +159,13 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         if (!"inbound".equalsIgnoreCase(track) && !"inbound_track".equalsIgnoreCase(track)) return;
         String payload = media.optString("payload", null);
         if (payload != null && !payload.isBlank()) state.ai.acceptInboundAudio(payload);
+    }
+
+    private void handleMark(StreamState state, JSONObject event) {
+        if (!state.started || state.transport == null) return;
+        JSONObject mark = event.optJSONObject("mark");
+        if (mark == null) return;
+        state.transport.onPlaybackMark(mark.optString("name", null));
     }
 
     @Override
@@ -182,6 +192,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     private void closeState(StreamState state, boolean failed) {
         VoiceAiSession ai = state.ai;
         state.ai = null;
+        state.transport = null;
         if (state.streamSid != null) {
             try { lifecycle.markStreamStopped(state.streamSid); }
             catch (Exception ignored) { }
@@ -211,5 +222,6 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         private UUID callId;
         private String providerId;
         private VoiceAiSession ai;
+        private VoiceTransportSession transport;
     }
 }

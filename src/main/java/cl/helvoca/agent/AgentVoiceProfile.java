@@ -24,7 +24,9 @@ public enum AgentVoiceProfile {
     SOFT("soft", "Suave", "Calmada y delicada", "ballad", "Achernar"),
     SMOOTH("smooth", "Serena", "Fluida y estable", "ash", "Algieba"),
     MATURE("mature", "Madura", "Sobria y con presencia", "echo", "Gacrux"),
-    NEUTRAL("neutral", "Neutra", "Balanceada para uso general", "alloy", "Schedar");
+    NEUTRAL("neutral", "Neutra", "Balanceada para uso general", "alloy", "Schedar"),
+    SEDUCTIVE_FEMALE("seductive_female", "Sensual femenina", "Femenina, chilena, rápida y extremadamente sensual", "coral", "Aoede"),
+    SEDUCTIVE_MALE("seductive_male", "Sensual masculina", "Masculina, chilena, rápida y extremadamente sensual", "cedar", "Enceladus");
 
     private static final Set<String> OPENAI_REALTIME_VOICES = Set.of(
             "alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar");
@@ -73,7 +75,9 @@ public enum AgentVoiceProfile {
     public static String normalizeForStorage(String value) {
         if (value == null || value.isBlank()) return null;
         return fromSelection(value)
-                .map(AgentVoiceProfile::openAiVoice)
+                .map(profile -> profile == SEDUCTIVE_FEMALE || profile == SEDUCTIVE_MALE
+                        ? profile.code()
+                        : profile.openAiVoice())
                 .orElseThrow(() -> new IllegalArgumentException("Unsupported agent voice"));
     }
 
