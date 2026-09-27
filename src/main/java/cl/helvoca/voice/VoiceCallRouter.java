@@ -40,10 +40,19 @@ public class VoiceCallRouter {
     public Optional<RouteDecision> route(String businessPhone,
                                          String callerPhone,
                                          String twilioCallSid) {
+        return route(businessPhone, callerPhone, twilioCallSid, null);
+    }
+
+    public Optional<RouteDecision> route(String businessPhone,
+                                         String callerPhone,
+                                         String twilioCallSid,
+                                         String voiceOverride) {
+        boolean bakeOff = voiceOverride != null && !voiceOverride.isBlank();
         for (String configuredId : providerOrder()) {
             String id = canonical(configuredId);
             try {
                 if (OPENAI_LIVE.equals(id)) {
+                    if (bakeOff) continue;
                     boolean configured = openAiLive.isReady();
                     if (!health.allow(id, configured)) continue;
                     String twiml = openAiLive.twiml(businessPhone, callerPhone, twilioCallSid);
@@ -52,16 +61,20 @@ public class VoiceCallRouter {
                 }
 
                 String mediaId = mediaProviderId(id);
+                if (bakeOff && !GeminiLiveVoiceProvider.ID.equals(mediaId)) continue;
                 VoiceAiProvider provider = mediaProviders.require(mediaId);
                 if (!health.allow(provider.id(), provider.configured())) continue;
-                String twiml = mediaTwiml.twiml(businessPhone, callerPhone, twilioCallSid, provider.id());
-                log.info("Voice router selected provider={} mode=MEDIA_STREAM call={}", provider.id(), twilioCallSid);
+                String twiml = mediaTwiml.twiml(
+                        businessPhone, callerPhone, twilioCallSid, provider.id(), voiceOverride);
+                log.info("Voice router selected provider={} mode=MEDIA_STREAM call={} voice_override={}",
+                        provider.id(), twilioCallSid, bakeOff ? voiceOverride : "none");
                 return Optional.of(new RouteDecision(provider.id(), RouteMode.MEDIA_STREAM, twiml));
             } catch (RuntimeException e) {
                 log.warn("Voice route candidate unavailable provider={} call={} reason={}", id, twilioCallSid, e.getMessage());
             }
         }
-        log.error("No healthy voice provider available call={} providers={}", twilioCallSid, providerOrder());
+        log.error("No healthy voice provider available call={} providers={} voice_override={}",
+                twilioCallSid, providerOrder(), bakeOff ? voiceOverride : "none");
         return Optional.empty();
     }
 
