@@ -1,5 +1,5 @@
 name: SaaS Billing Sandbox One-Shot Certification
-# hypothesis-rerun-underscore-buyer
+# verified-buyer-email-pattern
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
       HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST: "true"
       MERCADOPAGO_TEST_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
       MERCADOPAGO_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
-      MERCADOPAGO_TEST_PAYER_EMAIL: "test_user_3714748473@testuser.com"
+      MERCADOPAGO_TEST_PAYER_EMAIL: "test_user_428588714112970033@testuser.com"
 
     steps:
       - name: Checkout
