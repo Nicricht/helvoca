@@ -4,12 +4,25 @@ Usar esta ficha únicamente si el prospecto acepta avanzar a piloto o quiere una
 
 La guía operativa principal es `docs/FIRST_CUSTOMER_OPERATION.md`.
 
+Esta ficha corresponde a **clientes reales**. No reutilizar los datos ficticios de `docs/COMMERCIAL_DEMO_ONBOARDING.md` como configuración de producción. El tenant demo existe solo para demos y pruebas sin proveedores reales.
+
 ## 1. Negocio
 
 - Nombre comercial:
-- Rubro:
-- Ciudad/comuna:
+- Rubro / preset de referencia:
+- Descripción pública aprobada:
+- Dirección:
+- Comuna:
+- Ciudad:
+- Región:
+- País:
+- Teléfono público:
+- Email público:
 - Sitio web o redes públicas:
+- Moneda principal:
+- ¿Vende productos?: sí / no
+- ¿Vende servicios?: sí / no
+- ¿Usa reservas?: sí / no
 - Persona responsable del piloto:
 - Canal preferido de contacto:
 
@@ -87,6 +100,8 @@ Registrar las preguntas que más se repiten y la respuesta aprobada por el negoc
 - Pago futuro si corresponde:
 - Información que la IA nunca debe afirmar:
 - Casos que siempre deben ir a una persona:
+
+En el producto actual, las políticas explicativas pueden almacenarse en Knowledge/FAQ. No asumir que un plazo escrito en texto queda automáticamente aplicado como regla transaccional. La reserva sí valida en backend servicio activo, fecha futura, horario del negocio y solapamientos. Si el piloto requiere un plazo automático de cancelación/reprogramación u otra regla estructurada que todavía no esté configurada, debe quedar marcada como limitación del alcance en vez de prometerse como automatización.
 
 ## 8. Identidad del agente
 
@@ -188,6 +203,8 @@ Si un punto aplicable falla, registrar **PILOT pendiente**, no **CUSTOMER**.
 
 No activar hasta cumplir:
 
+- [ ] perfil público del negocio confirmado (descripción y ubicación cuando correspondan);
+- [ ] modalidad confirmada: productos / servicios / reservas;
 - [ ] precios confirmados;
 - [ ] servicios/productos confirmados;
 - [ ] horarios confirmados;
