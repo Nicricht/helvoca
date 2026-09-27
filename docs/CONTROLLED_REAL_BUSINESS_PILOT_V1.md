@@ -65,3 +65,14 @@ The response also reports the current traffic mode:
 The dashboard renders this as the **Launch cage** card alongside orders, payment state, inventory availability, stock alerts, and reconciliation anomalies.
 
 A `GO` is readiness evidence only. It never enables providers, changes the global switch, starts a pilot, or deploys code.
+
+## First-customer operations and rollback
+
+Before enrolling a real business, also complete:
+
+- `docs/FIRST_CUSTOMER_ONBOARDING_FORM.md`
+- `docs/FIRST_CUSTOMER_OPERATION.md`
+- `docs/FIRST_CUSTOMER_ROLLBACK_SUPPORT.md`
+- `docs/COMMERCIAL_EXTERNAL_GATES_V1.md`
+
+The launch cage is a technical safety boundary. It does not replace customer-specific approval, human voice certification, provider sandbox proof, repository protection, or an assigned incident owner.
