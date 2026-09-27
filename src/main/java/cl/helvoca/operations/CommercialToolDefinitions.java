@@ -111,13 +111,14 @@ public final class CommercialToolDefinitions {
                                         .put("catalogItemId", string("UUID opcional del producto, únicamente si formó parte del último escaparate")))
                                 .put("required", new JSONArray().put("operationId"))))
                 .put(function(CommercialOperationToolService.SHOWCASE_QUOTE_TOOL,
-                        "Cotiza el producto ya seleccionado dentro de la MISMA operación comercial. El backend obtiene producto, precio y moneda actuales desde el catálogo; no acepta montos enviados por la IA. quantity es opcional y vale 1 por defecto. No crea otra BusinessOperation.",
+                        "Cotiza el producto ya seleccionado dentro de la MISMA operación comercial. Si el producto tiene variantes, debes enviar el variantId exacto mostrado en product.variants[]. El backend obtiene producto, variante, precio y moneda; no acepta montos inventados. quantity es opcional y vale 1 por defecto.",
                         object().put("properties", new JSONObject()
                                         .put("operationId", string("UUID exacto de la operación donde select_showcase_product guardó la selección"))
+                                        .put("variantId", string("UUID exacto de la variante elegida dentro de product.variants[]; obligatorio cuando el producto tiene variantes"))
                                         .put("quantity", integer("Cantidad a cotizar entre 1 y 100; omitir equivale a 1")))
                                 .put("required", new JSONArray().put("operationId"))))
                 .put(function(CommercialOperationToolService.SHOWCASE_ORDER_TOOL,
-                        "Convierte la cotización del producto seleccionado en un borrador ORDER enlazado al mismo viaje comercial. El backend reutiliza el catalogItemId seleccionado y vuelve a calcular precios; la IA no envía montos. Devuelve orderOperationId y confirmationToken. Todavía NO confirma la compra.",
+                        "Convierte la cotización vigente del producto y su variante exacta en un borrador ORDER enlazado al mismo viaje comercial. El backend reutiliza catalogItemId y variantId ya persistidos y vuelve a validar identidad/precios; la IA no envía montos. Devuelve orderOperationId y confirmationToken. Todavía NO confirma la compra.",
                         object().put("properties", new JSONObject()
                                         .put("operationId", string("UUID de la operación comercial raíz que ya tiene PRODUCT_SELECTED y cotización"))
                                         .put("quantity", integer("Cantidad entre 1 y 100; si se omite se reutiliza la cantidad cotizada"))
