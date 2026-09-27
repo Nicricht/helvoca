@@ -166,6 +166,19 @@ public class CallLifecycleService {
     }
 
     @Transactional
+    public void markAiModel(UUID callId, String aiModel) {
+        if (aiModel == null || aiModel.isBlank()) return;
+        CallSession call = calls.findById(callId)
+                .orElseThrow(() -> new NotFoundException("Call not found"));
+        String normalized = aiModel.trim();
+        if (normalized.length() > 120) normalized = normalized.substring(0, 120);
+        if (!normalized.equals(call.getAiModel())) {
+            call.setAiModel(normalized);
+            calls.saveAndFlush(call);
+        }
+    }
+
+    @Transactional
     public void markCertification(UUID callId) {
         CallSession call = calls.findById(callId)
                 .orElseThrow(() -> new NotFoundException("Call not found"));
