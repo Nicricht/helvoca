@@ -54,18 +54,18 @@ Important: Enterprise is marked `custom_pricing = true`. `BillingSubscriptionSer
 | 1. Consult current plans | PASS | V42 database catalog + public pricing controller |
 | 2. Select a plan | PASS | authenticated billing checkout accepts public plan code |
 | 3. Start fake/mock checkout | PASS | service tests use `SubscriptionPaymentGateway` mock; no real provider call |
-| 4. Receive and authenticate webhook | PASS | official SDK signature validator is mandatory; invalid signatures are rejected before reconciliation |
+| 4. Receive and authenticate a simulated signed webhook | PASS (local) | official SDK signature validator is mandatory; invalid signatures are rejected before reconciliation |
 | 5. Bind provider event to expected tenant/plan | PASS | external reference is `helvoca:{businessId}:{planCode}`; checkout and reconciliation fail closed on mismatch |
 | 6. Activate subscription only after paid invoice | PASS | `authorized` preapproval keeps current plan; only approved/processed invoice activates |
 | 7. Assign correct entitlements | PASS | current plan resolves through V42; entitlement service evaluates plan rules |
-| 8. Avoid duplicate invoice webhook effects | PASS after PR #552 fix | V67 persists the last applied SaaS invoice id; duplicate invoice retries are no-op while provider reconciliation holds a pessimistic row lock |
+| 8. Avoid duplicate invoice webhook effects | PASS after PR #552 fix | V77 persists the last applied SaaS invoice id; duplicate invoice retries are no-op while provider reconciliation holds a pessimistic row lock |
 | 9. Handle rejected/cancelled invoice | PASS | subscription becomes `PAST_DUE` with 3-day grace; duplicate invoice cannot extend grace repeatedly |
 | 10. Handle subscription cancellation | PASS | remote `cancelled/canceled` becomes local `CANCELED`, clears pending plan and checkout URL |
 | 11. Handle renewal | PASS | approved recurring invoice moves the commercial period one month from provider debit date without changing the current plan |
 | 12. Meter usage | PASS | V41 `usage_meter_event` is the only period-usage source |
 | 13. Enforce minutes / overage | PASS | `VOICE_SECONDS` evaluates used, remaining and overage; current fixed plans have soft voice limits with priced overage |
 | 14. Enforce concurrent calls | PASS | `CONCURRENT_CALLS` is a hard capacity entitlement consumed by call lifecycle admission |
-| 15. Real Mercado Pago sandbox checkout + webhook round trip | FAIL / NOT EXECUTED | this task intentionally did not activate external credentials or perform a provider transaction |
+| 15. Real Mercado Pago sandbox checkout + provider webhook delivery | FAIL / NOT EXECUTED | no external test credentials/transaction were used, so provider-side delivery/configuration is not certified |
 | 16. Real production charge | FAIL / PROHIBITED IN THIS CERTIFICATION | live credentials and real charges were explicitly out of scope |
 
 The internal billing behavior can be certified with mocks and repository tests. The **external provider round trip is the remaining commercial gate** before using automatic billing for the first real payment.
@@ -122,12 +122,14 @@ Required for automated Mercado Pago SaaS billing:
 - `MERCADOPAGO_BACK_URL=https://<public-host>/<return-path>`
 - `MERCADOPAGO_WEBHOOK_TOLERANCE_SECONDS=300` unless an approved different tolerance is required
 
-Provider-side configuration:
+Provider-side configuration that must be resolved and verified in the Mercado Pago **test** account:
 
-- register the public Helvoca webhook URL: `https://<public-host>/webhooks/v1/mercadopago`;
-- enable subscription events `subscription_preapproval` and `subscription_authorized_payment`;
-- use **test credentials and test users first**;
-- keep live credentials disabled until the sandbox round trip passes.
+- Helvoca's intended receiver is `https://<public-host>/webhooks/v1/mercadopago`;
+- the receiver handles `subscription_preapproval` and `subscription_authorized_payment`;
+- the current Mercado Pago documentation lists those topics for Subscriptions and secret-signature validation, but its generic Webhooks guide also states that dashboard URL configuration is not available for Subscriptions and directs integrators to creation-time configuration;
+- the current `/preapproval` API reference and Java SDK `PreapprovalCreateRequest` used by Helvoca do not expose a `notification_url` field;
+- therefore **do not assume the provider-side webhook URL registration mechanism**: establish it in a real test application and prove delivery before enabling automatic billing;
+- use test credentials and test users first, and keep live credentials disabled until that round trip passes.
 
 The existing application also requires its normal database/JWT/runtime configuration, but those are not Mercado Pago billing secrets.
 
