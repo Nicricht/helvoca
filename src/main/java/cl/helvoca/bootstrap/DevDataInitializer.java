@@ -389,15 +389,40 @@ public class DevDataInitializer implements CommandLineRunner {
                                String fixtureKey) {
         String marker = DEMO_BOOKING_PREFIX + fixtureKey;
         if (customer == null || customer.getId() == null || service == null || service.getId() == null) return;
-        if (existing.stream().anyMatch(booking -> marker.equals(booking.getNotes()))) return;
 
         ZonedDateTime start = ZonedDateTime.of(date, time, ZoneId.of(DEMO_TIMEZONE));
+        Instant targetStart = start.toInstant();
+        Instant targetEnd = start.plusMinutes(service.getDurationMinutes()).toInstant();
+
+        Optional<Booking> existingFixture = existing.stream()
+                .filter(booking -> marker.equals(booking.getNotes()))
+                .findFirst();
+        if (existingFixture.isPresent()) {
+            Booking booking = existingFixture.get();
+            boolean changed = !customer.getId().equals(booking.getCustomerId())
+                    || !service.getId().equals(booking.getServiceId())
+                    || !targetStart.equals(booking.getStartAt())
+                    || !targetEnd.equals(booking.getEndAt())
+                    || booking.getStatus() != BookingStatus.CONFIRMED
+                    || booking.getSource() != BookingSource.ADMIN;
+            if (changed) {
+                booking.setCustomerId(customer.getId());
+                booking.setServiceId(service.getId());
+                booking.setStartAt(targetStart);
+                booking.setEndAt(targetEnd);
+                booking.setStatus(BookingStatus.CONFIRMED);
+                booking.setSource(BookingSource.ADMIN);
+                bookings.saveAndFlush(booking);
+            }
+            return;
+        }
+
         Booking booking = new Booking();
         booking.setBusinessId(businessId);
         booking.setCustomerId(customer.getId());
         booking.setServiceId(service.getId());
-        booking.setStartAt(start.toInstant());
-        booking.setEndAt(start.plusMinutes(service.getDurationMinutes()).toInstant());
+        booking.setStartAt(targetStart);
+        booking.setEndAt(targetEnd);
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setSource(BookingSource.ADMIN);
         booking.setNotes(marker);
