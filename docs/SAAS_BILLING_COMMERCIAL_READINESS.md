@@ -58,7 +58,7 @@ Important: Enterprise is marked `custom_pricing = true`. `BillingSubscriptionSer
 | 5. Bind provider event to expected tenant/plan | PASS | external reference is `helvoca:{businessId}:{planCode}`; checkout and reconciliation fail closed on mismatch |
 | 6. Activate subscription only after paid invoice | PASS | `authorized` preapproval keeps current plan; only approved/processed invoice activates |
 | 7. Assign correct entitlements | PASS | current plan resolves through V42; entitlement service evaluates plan rules |
-| 8. Avoid duplicate invoice webhook effects | PASS after PR #552 fix | V66 persists the last applied SaaS invoice id; duplicate invoice retries are no-op under tenant advisory lock |
+| 8. Avoid duplicate invoice webhook effects | PASS after PR #552 fix | V66 persists the last applied SaaS invoice id; duplicate invoice retries are no-op while provider reconciliation holds a pessimistic row lock |
 | 9. Handle rejected/cancelled invoice | PASS | subscription becomes `PAST_DUE` with 3-day grace; duplicate invoice cannot extend grace repeatedly |
 | 10. Handle subscription cancellation | PASS | remote `cancelled/canceled` becomes local `CANCELED`, clears pending plan and checkout URL |
 | 11. Handle renewal | PASS | approved recurring invoice moves the commercial period one month from provider debit date without changing the current plan |
@@ -77,7 +77,7 @@ Before this certification, approved/rejected invoice reconciliation had no durab
 PR #552 adds:
 
 - `business_subscription.last_billing_invoice_id`;
-- a tenant-scoped advisory lock during invoice reconciliation;
+- a pessimistic row lock on the matching `business_subscription` during provider reconciliation;
 - a no-op when the same provider invoice is received again;
 - invoice id equality validation;
 - checkout external-reference validation.
