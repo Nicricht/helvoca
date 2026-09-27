@@ -123,6 +123,118 @@ class RealCallCertificationCleanupRunnerTest {
         verify(bookings, never()).saveAndFlush(any());
     }
 
+    @Test
+    void disabledCleanupDoesNotReadProductionData() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallActionRepository actions = mock(CallActionRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+
+        RealCallCertificationCleanupRunner runner = new RealCallCertificationCleanupRunner(
+                false,
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                "+56966939611",
+                calls,
+                actions,
+                bookings,
+                new TenantDatabaseContext());
+
+        runner.run(mock(ApplicationArguments.class));
+
+        verifyNoInteractions(calls, actions, bookings);
+    }
+
+    @Test
+    void invalidCleanupIdentifiersFailClosedBeforeRepositories() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallActionRepository actions = mock(CallActionRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+
+        RealCallCertificationCleanupRunner runner = new RealCallCertificationCleanupRunner(
+                true,
+                "not-a-uuid",
+                "also-not-a-uuid",
+                "+56966939611",
+                calls,
+                actions,
+                bookings,
+                new TenantDatabaseContext());
+
+        runner.run(mock(ApplicationArguments.class));
+
+        verifyNoInteractions(calls, actions, bookings);
+    }
+
+    @Test
+    void alreadyCancelledBookingIsIdempotent() {
+        UUID callId = UUID.randomUUID();
+        UUID businessId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        String allowed = "+56966939611";
+
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallActionRepository actions = mock(CallActionRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSession call = safeCall(callId, businessId, allowed);
+
+        CallAction created = new CallAction();
+        created.setActionType("BOOKING_CREATED");
+        created.setSuccess(true);
+        created.setEntityId(bookingId);
+
+        Booking booking = new Booking();
+        booking.setBusinessId(businessId);
+        booking.setSource(BookingSource.AI_CALL);
+        booking.setStatus(BookingStatus.CANCELLED);
+
+        when(calls.findById(callId)).thenReturn(Optional.of(call));
+        when(actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(List.of(created));
+        when(bookings.findByIdAndBusinessId(bookingId, businessId)).thenReturn(Optional.of(booking));
+
+        RealCallCertificationCleanupRunner runner = new RealCallCertificationCleanupRunner(
+                true, callId.toString(), bookingId.toString(), allowed,
+                calls, actions, bookings, new TenantDatabaseContext());
+
+        runner.run(mock(ApplicationArguments.class));
+
+        verify(bookings, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void refusesNonAiCallBookingEvenWhenActionIdMatches() {
+        UUID callId = UUID.randomUUID();
+        UUID businessId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        String allowed = "+56966939611";
+
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallActionRepository actions = mock(CallActionRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSession call = safeCall(callId, businessId, allowed);
+
+        CallAction created = new CallAction();
+        created.setActionType("BOOKING_CREATED");
+        created.setSuccess(true);
+        created.setEntityId(bookingId);
+
+        Booking booking = new Booking();
+        booking.setBusinessId(businessId);
+        booking.setSource(BookingSource.ADMIN);
+        booking.setStatus(BookingStatus.CONFIRMED);
+
+        when(calls.findById(callId)).thenReturn(Optional.of(call));
+        when(actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(List.of(created));
+        when(bookings.findByIdAndBusinessId(bookingId, businessId)).thenReturn(Optional.of(booking));
+
+        RealCallCertificationCleanupRunner runner = new RealCallCertificationCleanupRunner(
+                true, callId.toString(), bookingId.toString(), allowed,
+                calls, actions, bookings, new TenantDatabaseContext());
+
+        runner.run(mock(ApplicationArguments.class));
+
+        verify(bookings, never()).saveAndFlush(any());
+    }
+
     private static CallSession safeCall(UUID callId, UUID businessId, String caller) {
         CallSession call = mock(CallSession.class);
         when(call.getId()).thenReturn(callId);
