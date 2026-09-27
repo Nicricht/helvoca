@@ -119,11 +119,19 @@ The demo seed is not a shortcut for production onboarding.
 
 ## Verification
 
-Focused test:
+Focused unit test:
 
 ```bash
 mvn --batch-mode --no-transfer-progress -Dtest=DevDataInitializerTest test
 ```
+
+PostgreSQL-backed certification with Flyway and the real booking-operation trigger:
+
+```bash
+mvn --batch-mode --no-transfer-progress -Dtest=DevDataInitializerPostgresIntegrationTest test
+```
+
+The PostgreSQL test boots the application with `SEED_ENABLED=true` against an isolated Testcontainers database. It verifies that the complete fixture is persisted, provider-facing delivery remains disabled, every demo booking receives its universal `business_operation` projection, the Basic trial has no external billing identifiers, and rerunning the initializer does not duplicate fixture rows.
 
 Pull requests also pass through the repository's normal fast gate, backend tests and differential coverage. The existing `demo-tenant-qa` workflow can be triggered by commits containing `[demo-tenant-verify]`.
 
