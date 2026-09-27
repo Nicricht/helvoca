@@ -85,8 +85,29 @@ public class BookingConfirmationWorkflowService {
         boolean hasOperation = !blank(safeArgs.optString("operationId", null));
         boolean hasToken = !blank(safeArgs.optString("confirmationToken", null));
         if (hasOperation || hasToken) {
-            if (!hasOperation || !hasToken) {
-                return error("INVALID_CONFIRMATION", "La confirmación requiere operationId y confirmationToken.");
+            boolean validConfirmationShape = hasOperation
+                    && hasToken
+                    && validUuid(safeArgs.optString("operationId", null))
+                    && validUuid(safeArgs.optString("confirmationToken", null));
+
+            if (!validConfirmationShape) {
+                // Realtime models occasionally try to "confirm" before phase 1 has
+                // produced durable backend identifiers. When the same call already
+                // includes a concrete service + slot, safely downgrade that attempt
+                // to a proposal instead of wasting a round trip on INVALID_CONFIRMATION.
+                // This can never create a booking because propose() is phase 1 only.
+                boolean hasProposalShape = !blank(safeArgs.optString("serviceId", null))
+                        && !blank(safeArgs.optString("startAt", null));
+                if (hasProposalShape) {
+                    JSONObject proposalArgs = new JSONObject(safeArgs.toString());
+                    proposalArgs.remove("operationId");
+                    proposalArgs.remove("confirmationToken");
+                    log.info("BOOKING_PHASE_NORMALIZED source={} source_reference={} from=premature_confirmation to=proposal",
+                            source, sourceReferenceId);
+                    return propose(businessId, customerId, sourceReferenceId, trustedPhone,
+                            source, proposalArgs);
+                }
+                return error("INVALID_CONFIRMATION", "La confirmación requiere operationId y confirmationToken válidos.");
             }
             return confirm(businessId, customerId, sourceReferenceId, trustedPhone,
                     source, bookingSource, safeArgs);
@@ -449,6 +470,16 @@ public class BookingConfirmationWorkflowService {
         if (!args.has(key) || args.isNull(key)) return null;
         String value = args.optString(key, null);
         return blank(value) ? null : value.trim();
+    }
+
+    private static boolean validUuid(String value) {
+        try {
+            if (blank(value)) return false;
+            UUID.fromString(value.trim());
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     private static boolean blank(String value) {

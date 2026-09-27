@@ -147,6 +147,58 @@ class BookingConfirmationWorkflowIntegrationTest {
     }
 
     @Test
+    void prematureConfirmationIdentifiersWithValidSlotBecomeProposalInsteadOfFailure() {
+        Fixture fixture = fixture();
+        Instant startAt = futureBusinessTime(3);
+        UUID voiceSource = UUID.randomUUID();
+
+        JSONObject result = workflow.execute(
+                fixture.business().getId(),
+                fixture.customer().getId(),
+                voiceSource,
+                "+56911111111",
+                BusinessOrder.Source.VOICE,
+                BookingSource.AI_CALL,
+                new JSONObject()
+                        .put("serviceId", fixture.service().getId().toString())
+                        .put("startAt", startAt.toString())
+                        .put("operationId", UUID.randomUUID().toString()));
+
+        assertTrue(result.getBoolean("success"));
+        JSONObject data = result.getJSONObject("data");
+        assertTrue(data.getBoolean("requiresConfirmation"));
+        assertFalse(data.has("bookingId"));
+        assertEquals(0, bookings.count());
+
+        ConversationOperationState state = conversationState.find(
+                fixture.business().getId(), voiceSource, BusinessOrder.Source.VOICE);
+        assertNotNull(state);
+        assertEquals(Boolean.TRUE, state.getState().get("confirmationPending"));
+        assertEquals("WAITING_CONFIRMATION", state.getState().get("bookingFlowStage"));
+    }
+
+    @Test
+    void malformedConfirmationWithoutProposalDataFailsClosed() {
+        Fixture fixture = fixture();
+
+        JSONObject result = workflow.execute(
+                fixture.business().getId(),
+                fixture.customer().getId(),
+                UUID.randomUUID(),
+                "+56911111111",
+                BusinessOrder.Source.VOICE,
+                BookingSource.AI_CALL,
+                new JSONObject()
+                        .put("operationId", "not-a-uuid")
+                        .put("confirmationToken", "also-not-a-uuid"));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("INVALID_CONFIRMATION",
+                result.getJSONObject("error").getString("code"));
+        assertEquals(0, bookings.count());
+    }
+
+    @Test
     void newBookingProposalReplacesTerminalConversationOperationState() {
         Fixture fixture = fixture();
         UUID source = UUID.randomUUID();
