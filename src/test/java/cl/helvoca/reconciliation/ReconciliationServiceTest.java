@@ -199,4 +199,107 @@ class ReconciliationServiceTest {
                 "suggested",
                 Map.of("evidence", "value"));
     }
+
+    @Test
+    void selectionSkipsWrongTypeAndSubjectAndExplicitTrueRemainsDryRun() {
+        UUID wantedSubject = UUID.randomUUID();
+        ReconciliationAnomaly wrongType = new ReconciliationAnomaly(
+                ReconciliationAnomaly.Type.JOB_STUCK,
+                ReconciliationAnomaly.Severity.MEDIUM,
+                "TEST",
+                wantedSubject,
+                UUID.randomUUID(),
+                now,
+                false,
+                "wrong",
+                Map.of());
+        ReconciliationAnomaly wrongSubject = new ReconciliationAnomaly(
+                ReconciliationAnomaly.Type.PAYMENT_SUCCEEDED_INVENTORY_RESERVED,
+                ReconciliationAnomaly.Severity.HIGH,
+                "TEST",
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                now,
+                true,
+                "wrong",
+                Map.of());
+        ReconciliationAnomaly wanted = new ReconciliationAnomaly(
+                ReconciliationAnomaly.Type.PAYMENT_SUCCEEDED_INVENTORY_RESERVED,
+                ReconciliationAnomaly.Severity.HIGH,
+                "TEST",
+                wantedSubject,
+                UUID.randomUUID(),
+                now,
+                true,
+                "wanted",
+                Map.of());
+        when(repository.detect(businessId, now))
+                .thenReturn(List.of(wrongType, wrongSubject, wanted));
+
+        ReconciliationService.RepairResult result = service.repair(
+                ReconciliationAnomaly.Type.PAYMENT_SUCCEEDED_INVENTORY_RESERVED,
+                wantedSubject,
+                Boolean.TRUE);
+
+        assertEquals(ReconciliationService.RepairStatus.DRY_RUN, result.status());
+        verify(repository, never()).claimRepair(any(), any(), anyString());
+        verifyNoInteractions(inventory);
+    }
+
+    @Test
+    void safeRepairWithoutOperationIdFailsClosedAndAuditsFailure() {
+        UUID subjectId = UUID.randomUUID();
+        ReconciliationAnomaly anomaly = new ReconciliationAnomaly(
+                ReconciliationAnomaly.Type.ORPHAN_RESERVATION,
+                ReconciliationAnomaly.Severity.HIGH,
+                "INVENTORY_RESERVATION",
+                subjectId,
+                null,
+                now,
+                true,
+                "release",
+                Map.of());
+        UUID actionId = UUID.randomUUID();
+        when(repository.detect(businessId, now)).thenReturn(List.of(anomaly));
+        when(repository.claimRepair(eq(businessId), eq(anomaly), anyString()))
+                .thenReturn(new ReconciliationRepository.ClaimResult(
+                        actionId, ReconciliationRepository.ClaimState.CLAIMED));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> service.repair(anomaly.type(), subjectId, false));
+
+        assertTrue(error.getMessage().contains("operation id"));
+        verify(repository).fail(businessId, actionId, error);
+        verifyNoInteractions(inventory);
+    }
+
+    @Test
+    void safeFlagCannotBypassAutomaticRepairAllowlist() {
+        UUID subjectId = UUID.randomUUID();
+        ReconciliationAnomaly anomaly = new ReconciliationAnomaly(
+                ReconciliationAnomaly.Type.JOB_STUCK,
+                ReconciliationAnomaly.Severity.MEDIUM,
+                "PERSISTENT_JOB",
+                subjectId,
+                UUID.randomUUID(),
+                now,
+                true,
+                "fabricated-safe",
+                Map.of());
+        UUID actionId = UUID.randomUUID();
+        when(repository.detect(businessId, now)).thenReturn(List.of(anomaly));
+        when(repository.claimRepair(eq(businessId), eq(anomaly), anyString()))
+                .thenReturn(new ReconciliationRepository.ClaimResult(
+                        actionId, ReconciliationRepository.ClaimState.CLAIMED));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> service.repair(anomaly.type(), subjectId, false));
+
+        assertTrue(error.getMessage().contains("not allowlisted"));
+        verify(repository).fail(businessId, actionId, error);
+        verifyNoInteractions(inventory);
+    }
+
 }
