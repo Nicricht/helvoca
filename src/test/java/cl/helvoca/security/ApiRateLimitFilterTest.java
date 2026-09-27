@@ -87,6 +87,29 @@ class ApiRateLimitFilterTest {
     }
 
     @Test
+    void platformCertificationUsesDedicatedPerUserThrottle() throws Exception {
+        ApiRateLimitProperties properties = new ApiRateLimitProperties();
+        DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
+        when(limiter.consume(startsWith("platform-certification:"), eq(5), eq(3600), any(Instant.class)))
+                .thenReturn(new DistributedRateLimiter.Result(true, 1, 4, Instant.now().getEpochSecond() + 3600));
+
+        Jwt jwt = new Jwt("token", Instant.now(), Instant.now().plusSeconds(300),
+                Map.of("alg", "none"), Map.of("sub", "platform-admin-1", "roles", java.util.List.of("PLATFORM_ADMIN")));
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+
+        ApiRateLimitFilter filter = new ApiRateLimitFilter(properties, limiter, new SimpleMeterRegistry());
+        HttpServletRequest request = request(
+                "POST", "/api/v1/platform/certification-runs", "203.0.113.15");
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        verify(limiter).consume(startsWith("platform-certification:"), eq(5), eq(3600), any(Instant.class));
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
     void clientAddressPrefersRailwayRealIpAndFallsBackToForwardedFor() {
         HttpServletRequest railway = mock(HttpServletRequest.class);
         when(railway.getHeader("X-Real-IP")).thenReturn("198.51.100.7");
