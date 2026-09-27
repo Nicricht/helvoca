@@ -2,6 +2,7 @@ package cl.helvoca.billing;
 
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import com.mercadopago.exceptions.MPApiException;
 
 import java.net.URI;
 import java.util.Locale;
@@ -36,8 +37,17 @@ class MercadoPagoSaasSandboxProviderIT {
         properties.setBackUrl("https://recepvoz.cl/pricing.html");
 
         MercadoPagoSubscriptionGateway gateway = new MercadoPagoSubscriptionGateway(properties);
-        SubscriptionPaymentGateway.Checkout checkout =
-                gateway.createCheckout(businessId, payerEmail, plan);
+        SubscriptionPaymentGateway.Checkout checkout;
+        try {
+            checkout = gateway.createCheckout(businessId, payerEmail, plan);
+        } catch (IllegalStateException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof MPApiException apiError && apiError.getApiResponse() != null) {
+                System.err.println("MERCADOPAGO_API_ERROR_STATUS=" + apiError.getStatusCode());
+                System.err.println("MERCADOPAGO_API_ERROR_BODY=" + apiError.getApiResponse().getContent());
+            }
+            throw error;
+        }
 
         assertNotNull(checkout);
         assertNotNull(checkout.subscriptionId());
