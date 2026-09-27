@@ -169,6 +169,9 @@ class OutboundMessagingIntegrationTest {
                 OutboundMessage.Purpose.PAYMENT_CONFIRMATION,
                 paymentOperation.getId(),
                 identity.getId());
+        paymentOperation.setRevision(paymentOperation.getRevision() + 1);
+        operations.saveAndFlush(paymentOperation);
+
         OutboundMessage second = outbound.prepare(
                 business.getId(),
                 customer.getId(),
@@ -177,7 +180,8 @@ class OutboundMessagingIntegrationTest {
                 paymentOperation.getId(),
                 identity.getId());
 
-        assertEquals(first.getId(), second.getId());
+        assertEquals(first.getId(), second.getId(),
+                "A second verified provider event must not create another confirmation after an operation revision change");
         assertEquals(OutboundMessage.Status.PREPARED, first.getStatus());
         assertTrue(first.getContentText().contains("Pago confirmado"));
         assertTrue(first.getContentText().contains("CLP 24990"));
