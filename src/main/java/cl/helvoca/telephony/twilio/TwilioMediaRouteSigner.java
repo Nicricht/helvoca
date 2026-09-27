@@ -26,6 +26,15 @@ public class TwilioMediaRouteSigner {
                        String callSid,
                        String providerId,
                        long issuedAtEpochSeconds) {
+        return sign(businessPhone, callerPhone, callSid, providerId, null, issuedAtEpochSeconds);
+    }
+
+    public String sign(String businessPhone,
+                       String callerPhone,
+                       String callSid,
+                       String providerId,
+                       String voiceOverride,
+                       long issuedAtEpochSeconds) {
         validateRequired(businessPhone, callerPhone, callSid, providerId);
         if (!properties.hasAuthToken()) {
             throw new IllegalStateException("TWILIO_AUTH_TOKEN is required for media route signing");
@@ -33,7 +42,8 @@ public class TwilioMediaRouteSigner {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(routeKey(), "HmacSHA256"));
-            byte[] digest = mac.doFinal(payload(businessPhone, callerPhone, callSid, providerId, issuedAtEpochSeconds)
+            byte[] digest = mac.doFinal(payload(
+                            businessPhone, callerPhone, callSid, providerId, voiceOverride, issuedAtEpochSeconds)
                     .getBytes(StandardCharsets.UTF_8));
             return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
         } catch (Exception e) {
@@ -45,6 +55,16 @@ public class TwilioMediaRouteSigner {
                           String callerPhone,
                           String callSid,
                           String providerId,
+                          String issuedAtValue,
+                          String token) {
+        return verify(businessPhone, callerPhone, callSid, providerId, null, issuedAtValue, token);
+    }
+
+    public boolean verify(String businessPhone,
+                          String callerPhone,
+                          String callSid,
+                          String providerId,
+                          String voiceOverride,
                           String issuedAtValue,
                           String token) {
         if (token == null || token.isBlank() || issuedAtValue == null || issuedAtValue.isBlank()) return false;
@@ -59,7 +79,7 @@ public class TwilioMediaRouteSigner {
         if (issuedAt < now - MAX_AGE_SECONDS || issuedAt > now + FUTURE_SKEW_SECONDS) return false;
 
         try {
-            byte[] expected = sign(businessPhone, callerPhone, callSid, providerId, issuedAt)
+            byte[] expected = sign(businessPhone, callerPhone, callSid, providerId, voiceOverride, issuedAt)
                     .getBytes(StandardCharsets.UTF_8);
             return MessageDigest.isEqual(expected, token.trim().getBytes(StandardCharsets.UTF_8));
         } catch (RuntimeException e) {
@@ -77,13 +97,16 @@ public class TwilioMediaRouteSigner {
                                   String callerPhone,
                                   String callSid,
                                   String providerId,
+                                  String voiceOverride,
                                   long issuedAtEpochSeconds) {
-        return DOMAIN + "\n"
+        String legacy = DOMAIN + "\n"
                 + businessPhone.trim() + "\n"
                 + callerPhone.trim() + "\n"
                 + callSid.trim() + "\n"
                 + providerId.trim().toLowerCase() + "\n"
                 + issuedAtEpochSeconds;
+        if (voiceOverride == null || voiceOverride.isBlank()) return legacy;
+        return legacy + "\nvoice=" + voiceOverride.trim().toLowerCase();
     }
 
     private static void validateRequired(String businessPhone,
