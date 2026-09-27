@@ -33,10 +33,10 @@ class ConversationQualityServiceTest {
 
         when(tenant.requireBusinessId()).thenReturn(businessId);
 
-        CallSession call = new CallSession();
-        call.setBusinessId(businessId);
-        call.setStatus(CallStatus.COMPLETED);
-        call.setResolution("BOOKING_CREATED");
+        CallSession call = mock(CallSession.class);
+        when(call.getId()).thenReturn(callId);
+        when(call.getStatus()).thenReturn(CallStatus.COMPLETED);
+        when(call.getResolution()).thenReturn("BOOKING_CREATED");
         when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
 
         CallTranscript user = mock(CallTranscript.class);
