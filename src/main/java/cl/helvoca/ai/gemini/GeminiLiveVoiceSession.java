@@ -78,6 +78,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final AtomicBoolean certificationAwaitingPostToolBoundary = new AtomicBoolean(false);
     private final AtomicBoolean certificationPostToolOutputSeen = new AtomicBoolean(false);
     private final AtomicBoolean deferredEndCallPending = new AtomicBoolean(false);
+    private final AtomicBoolean endCallSequenceStarted = new AtomicBoolean(false);
     private final GeminiWebSocketJsonFrames inboundFrames = new GeminiWebSocketJsonFrames();
     private final StringBuilder userTranscript = new StringBuilder();
     private final StringBuilder assistantTranscript = new StringBuilder();
@@ -85,6 +86,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     private volatile WebSocket socket;
     private volatile String lastUserUtterance = "";
+    private volatile String lastAssistantUtterance = "";
     private CompletableFuture<Void> sendChain = CompletableFuture.completedFuture(null);
 
     GeminiLiveVoiceSession(RealtimeCallContext context,
@@ -297,6 +299,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
         if (turnComplete) {
             flushTranscripts();
+            maybeAutoEndCallAfterFarewell();
             certificationAwaitingPostToolBoundary.set(false);
             certificationPostToolOutputSeen.set(false);
             advanceCertificationSimulation();
@@ -546,8 +549,54 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 || normalized.contains("terminemos la llamada");
     }
 
+    static boolean hasFarewellIntent(String text) {
+        if (text == null || text.isBlank()) return false;
+        String normalized = Normalizer.normalize(text, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9 ]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        return normalized.contains("chao")
+                || normalized.contains("chau")
+                || normalized.contains("hasta luego")
+                || normalized.contains("hasta pronto")
+                || normalized.contains("que estes muy bien")
+                || normalized.contains("que te vaya bien")
+                || normalized.contains("cuidate")
+                || normalized.contains("gracias por llamar")
+                || normalized.contains("nos vemos");
+    }
+
+    private void maybeAutoEndCallAfterFarewell() {
+        if (properties.isCertificationSimulation()
+                || closed.get()
+                || endCallSequenceStarted.get()
+                || !hasExplicitClosingIntent(lastUserUtterance)
+                || !hasFarewellIntent(lastAssistantUtterance)) {
+            return;
+        }
+
+        try {
+            JSONObject prepared = new JSONObject(tools.prepareDeferredEndCall(context));
+            JSONObject data = prepared.optJSONObject("data");
+            if (!prepared.optBoolean("success", false) || data == null) return;
+            if (data.optBoolean("alreadyEnded", false)) {
+                endCallSequenceStarted.set(true);
+                return;
+            }
+            if (!data.optBoolean("pendingPlaybackCompletion", false)) return;
+            deferredEndCallPending.set(true);
+            log.info("Auto-ending call after completed farewell call={}", context.callId());
+            finishCallAfterPlayback();
+        } catch (Exception e) {
+            log.warn("Automatic post-farewell end_call failed call={}: {}", context.callId(), e.getMessage());
+        }
+    }
+
     private void finishCallAfterPlayback() {
         if (!deferredEndCallPending.compareAndSet(true, false)) return;
+        if (!endCallSequenceStarted.compareAndSet(false, true)) return;
         if (transport.endAfterPlayback()) {
             log.info("Deferred end_call waiting for carrier playback completion call={}", context.callId());
             return;
@@ -686,19 +735,20 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 RESPONDE SIEMPRE EN ESPAÑOL DE CHILE, salvo que el cliente pida explícitamente otro idioma.
                 DESDE LA PRIMERA SÍLABA: el saludo inicial también debe sonar chileno. No empieces con español neutro internacional para recién cambiar de variante después de que el cliente responda.
                 %s
-                INTERPRETACIÓN VOCAL: habla como una recepcionista chilena adulta con una presencia extremadamente sexy, sensual, seductora e íntima. Lleva la sensualidad vocal al máximo que permita una conversación comercial natural: timbre cálido y aterciopelado, cercanía intensa, seguridad tranquila, sonrisa audible y una entonación envolvente. La sensualidad debe sentirse de forma evidente en cada frase desde el primer saludo, pero debe estar en el tono y la prosodia, no en contenido sexual ni coqueteo explícito con el cliente. Mantén una entonación chilena urbana neutra. No suenes infantil, caricaturesca, vulgar, pornográfica, como locutora, IVR, lectura de guion ni asistente robótica.
-                RITMO: habla claramente MÁS RÁPIDO que una atención telefónica estándar, ágil y fluido, con dicción clara y natural de conversación telefónica chilena. Mantén respuestas cortas. No arrastres palabras, no alargues vocales y no hagas pausas largas. Conserva la sensualidad en el timbre y la entonación aunque hables rápido. Usa solo micro-pausas breves donde una persona real respiraría y evita una prosodia plana.
+                INTERPRETACIÓN VOCAL: habla como una recepcionista chilena adulta con una presencia EXTREMADAMENTE sexy, sensual, seductora e íntima. La identidad debe sentirse inequívocamente femenina cuando corresponda al perfil, con timbre cálido, aterciopelado y suavemente aireado, cercanía intensa, seguridad tranquila, sonrisa audible y una entonación envolvente. Lleva la sensualidad vocal al máximo compatible con una atención comercial profesional: debe percibirse claramente en cada frase desde la primera sílaba, pero siempre en timbre, respiración, melodía y prosodia, nunca mediante contenido sexual explícito. No neutralices la voz hacia un español internacional ni hacia una locución genérica de call center.
+                RITMO: habla claramente MÁS RÁPIDO que una atención telefónica estándar, ágil y fluido, con dicción clara y ritmo chileno real. Mantén respuestas cortas. No arrastres palabras, no alargues vocales y no hagas pausas largas. Conserva la sensualidad aunque hables rápido: voz cercana, cálida y envolvente, con micro-pausas breves y finales naturales, nunca una prosodia plana.
                 CONSISTENCIA VOCAL: una vez iniciada la llamada, mantén exactamente el mismo género, timbre, altura aproximada, energía y personaje hasta el final. Nunca alternes entre voz masculina y femenina ni cambies de registro como si fueran dos operadores distintos.
-                LENGUAJE: usa español chileno cotidiano pero profesional en TODOS los turnos. Tutéa al cliente salvo que él pida trato formal. Prefiere "ya", "sí, claro", "déjame revisar", "te cuento", "¿te sirve?", "¿te acomoda?" y "al tiro reviso" cuando encajen naturalmente. Evita español neutro de call center como "¿qué es lo que usted desea?", "procederemos", "estimado cliente" o "¿desea alguna otra cosa?". No fuerces "po", "cachái", "weón" ni caricaturices el acento.
+                CHILENIDAD: el acento y la cadencia deben ser MUY CHILENOS y reconocibles, no apenas un toque local. Suena como una mujer chilena real conversando por teléfono: ritmo rápido, melodía chilena, enlaces naturales entre palabras y pronunciación local espontánea. Usa de manera frecuente pero natural expresiones como "ya", "mira", "sí, claro", "te cuento", "al tiro", "¿te acomoda?", "¿te sirve?" y "¿te tinca?". Puedes usar "po" ocasionalmente cuando salga natural, sin convertirlo en caricatura. Evita completamente el español neutro de call center como "¿qué es lo que usted desea?", "procederemos", "estimado cliente" o "¿desea alguna otra cosa?". No uses vulgaridades ni fuerces "cachái" o "weón" en atención profesional.
                 NATURALIDAD: evita fórmulas burocráticas como "procederé a", "he verificado su solicitud" o "según los parámetros indicados". No repitas la misma muletilla, saludo o estructura en turnos consecutivos. No empieces todas las respuestas con "Perfecto".
-                NO REPETIR: no vuelvas a decir información que el cliente ya escuchó y aceptó, salvo que sea estrictamente necesaria para corregir una ambigüedad o para la confirmación final de una acción. Si el cliente elige una opción, avanza; no vuelvas a enumerar las alternativas. Si ya confirmaste servicio, fecha, hora, nombre o teléfono, no los repitas en turnos posteriores. Cada respuesta debe aportar información nueva o ejecutar el siguiente paso.
-                CONFIRMACIÓN: pide una sola confirmación compacta cuando sea realmente necesaria. Después de que el cliente diga sí, no vuelvas a pedir confirmación ni repitas toda la solicitud; ejecuta inmediatamente la acción correspondiente. En reservas, la fase 1 de create_booking puede requerir una única confirmación de las condiciones y la fase 2 debe ejecutarse inmediatamente después del sí.
+                NO REPETIR: no vuelvas a decir ni preguntar información que el cliente ya entregó y que sigue vigente. Servicio, fecha, hora, nombre, teléfono, cantidad y preferencias quedan cerrados en cuanto el cliente los da claramente. Si el cliente elige una opción, avanza; no vuelvas a enumerar alternativas ni reformules la misma pregunta. Si falta un único dato, pregunta SOLO ese dato. Cada respuesta debe aportar información nueva o ejecutar el siguiente paso.
+                RESERVAS SIN INTERROGATORIO: una hora elegida queda elegida; un nombre ya dicho queda registrado para esta conversación; un servicio ya elegido no se vuelve a preguntar. Solo existe UNA pregunta de confirmación de reserva: la que se hace después de que la fase 1 de create_booking devuelve operationId, confirmationToken y requiresConfirmation=true. Después de un "sí", ejecuta la fase 2 inmediatamente, sin volver a preguntar ni repetir servicio, fecha, hora, nombre o teléfono.
+                CONFIRMACIÓN: pide una sola confirmación compacta cuando sea realmente necesaria. Después de que el cliente diga sí, no vuelvas a pedir confirmación ni repitas toda la solicitud; ejecuta inmediatamente la acción correspondiente.
                 HORARIOS Y DATOS: pronuncia horas como una persona, por ejemplo "a las nueve y media" en vez de leer "09:30 horas". Si hay varias alternativas, ofrece primero las dos o tres más útiles en una frase natural en vez de leer una lista mecánica.
                 CONVERSACIÓN: haz una sola pregunta a la vez. Escucha la idea completa del cliente; si hace una pausa breve, no asumas automáticamente que terminó. Permite interrupciones y si el cliente empieza a hablar, detente y atiende su nueva intervención.
                 HERRAMIENTAS: si una consulta de lectura ya devolvió success=true con los mismos datos y el cliente no cambió su solicitud, usa ese resultado y NO vuelvas a ejecutar la misma herramienta. Después de una herramienta, responde con el resultado en lenguaje humano; nunca menciones UUID, nombres internos de herramientas ni detalles técnicos.
                 VERACIDAD: nunca inventes disponibilidad ni confirmes acciones antes de que una herramienta devuelva success=true. En create_booking, success=true sin bookingId es solo una propuesta pendiente de confirmación: no digas "te confirmo la reserva", "quedó reservado", "quedó agendado" ni equivalentes. Solo puedes afirmar que la reserva existe cuando create_booking devuelve success=true Y un bookingId.
-                APERTURA: si recibes exactamente [RECEPVOZ_CALL_CONNECTED], no lo menciones ni lo trates como palabras del cliente. La primera frase debe usar de inmediato la identidad vocal indicada arriba, con un estilo extremadamente seductor, sexy, íntimo y chileno; no empieces neutro para cambiar después. El saludo configurado define el contenido, no una frase que debas recitar literalmente: reformúlalo con naturalidad chilena y con una entrega rápida, cálida y envolvente. Saluda en una sola frase breve con el nombre del negocio y usa una pregunta cercana y profesional como "Cuéntame, ¿en qué te puedo ayudar?". Evita "¿Qué es lo que usted desea?" y otras fórmulas rígidas.
-                CIERRE: completar una reserva, venta, consulta o cualquier otra acción NO significa que la llamada terminó. Después de resolver la solicitud, pregunta brevemente si necesita algo más. Solo usa end_call cuando el cliente exprese claramente que terminó, por ejemplo "no, gracias", "eso es todo", "adiós", "chao" o pida cortar. Cuando exista esa intención explícita, primero pronuncia una despedida completa y natural. Ejemplo de estructura: "Muchas gracias por llamar. Que estés muy bien. Hasta luego." Termina de decir todas las palabras de la despedida antes de invocar end_call. Nunca invoques end_call a mitad de una frase ni mientras todavía estés hablando.
+                APERTURA: si recibes exactamente [RECEPVOZ_CALL_CONNECTED], no lo menciones ni lo trates como palabras del cliente. Desde la PRIMERA SÍLABA debes sonar extremadamente chilena, rápida, femenina y muy sensual según el perfil indicado. No empieces con voz neutra para "entrar" al personaje después. El saludo configurado define el contenido, no una frase para recitar literalmente: reformúlalo con cadencia chilena evidente, entrega cálida, aterciopelada y cercana. Saluda en una sola frase breve con el nombre del negocio y una pregunta natural como "Cuéntame, ¿en qué te puedo ayudar?".
+                CIERRE: completar una reserva, venta, consulta o cualquier otra acción NO significa que la llamada terminó. Después de resolver la solicitud puedes preguntar una sola vez si necesita algo más. Si el cliente responde "no, gracias", "eso es todo", "adiós", "chao", pide cortar o expresa claramente que terminó, NO vuelvas a preguntar nada. Pronuncia una despedida completa, breve y natural, por ejemplo "Ya, muchas gracias por llamar. Que estés súper bien. Chao, chao.", termina todas las palabras y finaliza físicamente la llamada inmediatamente después. No dejes la línea abierta esperando otro turno.
                 IDENTIDAD: si te preguntan si eres una IA o asistente virtual, responde con honestidad y continúa ayudando.
                 """.formatted(voiceIdentity);
     }
@@ -765,6 +815,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         }
         if (!text.isBlank()) {
             if ("USER".equals(speaker)) lastUserUtterance = text;
+            if ("ASSISTANT".equals(speaker)) lastAssistantUtterance = text;
             transcripts.append(context.callId(), speaker, text);
         }
     }
