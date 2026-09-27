@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -26,6 +27,51 @@ class TwilioCertificationCommandStoreTest {
         assertTrue(TwilioCertificationCommandStore.validCallSid(
                 "CA0123456789abcdef0123456789abcdef"));
         assertFalse(TwilioCertificationCommandStore.validCallSid("CA-short"));
+    }
+
+    @Test
+    void enqueueStoresOnlyRunIdAndRequester() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+
+        assertTrue(store.enqueue("latency-api-20260927-001", "platform-user"));
+
+        verify(jdbc).update(anyString(), any(Object[].class));
+    }
+
+    @Test
+    void duplicateEnqueueReturnsFalse() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.update(anyString(), any(Object[].class))).thenReturn(0);
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+
+        assertFalse(store.enqueue("latency-api-20260927-002", "platform-user"));
+    }
+
+    @Test
+    void findReturnsSanitizedCommandStatusWithoutCallbackToken() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        Instant now = Instant.now();
+        var status = new TwilioCertificationCommandStore.CommandStatus(
+                "latency-api-20260927-003",
+                "PENDING",
+                "platform-user",
+                now,
+                null,
+                null,
+                null,
+                null,
+                null);
+        when(jdbc.query(anyString(),
+                org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.CommandStatus>>any(),
+                any(Object[].class))).thenReturn(List.of(status));
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+
+        var found = store.find("latency-api-20260927-003").orElseThrow();
+
+        assertEquals("platform-user", found.requestedBy());
+        assertNull(found.providerCallSid());
     }
 
     @Test
