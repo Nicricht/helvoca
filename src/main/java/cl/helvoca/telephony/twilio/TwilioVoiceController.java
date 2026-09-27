@@ -65,6 +65,10 @@ public class TwilioVoiceController {
         return route(from, to, callSid, "outbound-test", voiceOverride);
     }
 
+    public ResponseEntity<String> inboundCertification(String callSid, String from, String to) {
+        return inboundCertification(callSid, from, to, null);
+    }
+
     @PostMapping(value = "/inbound-certification", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> inboundCertification(@RequestParam("CallSid") String callSid,
