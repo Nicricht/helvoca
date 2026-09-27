@@ -181,4 +181,160 @@ class InventoryAlertServiceTest {
         alert.setReorderThreshold(threshold);
         return alert;
     }
+    @Test
+    void invalidOrUntrackedInventoryDoesNotCreateAlertsAndResolvesOpenOne() {
+        service.evaluateBase(null);
+
+        InventoryStock missingBusiness = new InventoryStock();
+        missingBusiness.setCatalogItemId(productId);
+        service.evaluateBase(missingBusiness);
+
+        InventoryStock missingProduct = new InventoryStock();
+        missingProduct.setBusinessId(businessId);
+        service.evaluateBase(missingProduct);
+
+        InventoryStock untracked = stock(5, 0, 2);
+        untracked.setTrackingEnabled(false);
+        InventoryAlert current = alert(InventoryAlert.Type.LOW_STOCK, 1, 2);
+        when(alerts.lockOpenBase(businessId, productId)).thenReturn(Optional.of(current));
+
+        service.evaluateBase(untracked);
+
+        assertEquals(InventoryAlert.Status.RESOLVED, current.getStatus());
+        assertNotNull(current.getResolvedAt());
+        verify(alerts).saveAndFlush(current);
+    }
+
+    @Test
+    void sameAlertTypeRefreshesChangedSnapshotButExactSnapshotIsIdempotent() {
+        InventoryStock stock = stock(3, 1, 2);
+        InventoryAlert changed = alert(InventoryAlert.Type.LOW_STOCK, 9, 7);
+        changed.setSubjectName("Nombre viejo");
+        changed.setSku("SKU-OLD");
+        when(alerts.lockOpenBase(businessId, productId)).thenReturn(Optional.of(changed));
+
+        service.evaluateBase(stock);
+
+        assertEquals(2, changed.getAvailable());
+        assertEquals(2, changed.getReorderThreshold());
+        assertEquals("Zapatilla", changed.getSubjectName());
+        assertEquals("SHOE-01", changed.getSku());
+        verify(alerts).saveAndFlush(changed);
+
+        clearInvocations(alerts);
+        when(alerts.lockOpenBase(businessId, productId)).thenReturn(Optional.of(changed));
+        service.evaluateBase(stock);
+        verify(alerts, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void healthyInventoryWithoutPriorAlertOrWithRestockedAlertDoesNothing() {
+        InventoryStock healthy = stock(10, 0, 2);
+        when(alerts.lockOpenBase(businessId, productId)).thenReturn(Optional.empty());
+        service.evaluateBase(healthy);
+        verify(alerts, never()).saveAndFlush(any());
+
+        clearInvocations(alerts);
+        InventoryAlert restocked = alert(InventoryAlert.Type.RESTOCKED, 10, 2);
+        when(alerts.lockOpenBase(businessId, productId)).thenReturn(Optional.of(restocked));
+        service.evaluateBase(healthy);
+        verify(alerts, never()).saveAndFlush(any());
+        verifyNoInteractions(restockSubscriptions);
+    }
+
+    @Test
+    void acknowledgeIsIdempotentAndListsExposeViews() {
+        UUID alertId = UUID.randomUUID();
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+
+        InventoryAlert open = alert(InventoryAlert.Type.LOW_STOCK, 1, 2);
+        open.setId(alertId);
+        when(alerts.findByIdAndBusinessId(alertId, businessId)).thenReturn(Optional.of(open));
+
+        InventoryAlertService.AlertView first = service.acknowledge(alertId);
+        assertTrue(first.acknowledged());
+        assertNotNull(first.acknowledgedAt());
+        verify(alerts).saveAndFlush(open);
+
+        clearInvocations(alerts);
+        InventoryAlertService.AlertView second = service.acknowledge(alertId);
+        assertTrue(second.acknowledged());
+        verify(alerts, never()).saveAndFlush(any());
+
+        when(alerts.findTop100ByBusinessIdAndStatusOrderByCreatedAtDesc(
+                businessId, InventoryAlert.Status.OPEN)).thenReturn(java.util.List.of(open));
+        when(alerts.findTop100ByBusinessIdOrderByCreatedAtDesc(businessId))
+                .thenReturn(java.util.List.of(open));
+        assertEquals(1, service.listOpen().size());
+        assertEquals(1, service.history().size());
+    }
+
+    @Test
+    void acknowledgeMissingAlertFailsTenantScopedAndVariantFallbackNameIsSafe() {
+        UUID missingId = UUID.randomUUID();
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(alerts.findByIdAndBusinessId(missingId, businessId)).thenReturn(Optional.empty());
+
+        assertThrows(cl.helvoca.common.NotFoundException.class,
+                () -> service.acknowledge(missingId));
+
+        UUID variantId = UUID.randomUUID();
+        UUID unknownProductId = UUID.randomUUID();
+        InventoryProductVariant variant = new InventoryProductVariant();
+        variant.setId(variantId);
+        variant.setBusinessId(businessId);
+        variant.setCatalogItemId(unknownProductId);
+        variant.setName("Azul");
+        variant.setSku(null);
+        variant.setTrackingEnabled(true);
+        variant.setActive(true);
+        variant.setOnHand(0);
+        variant.setReserved(0);
+        variant.setReorderThreshold(-3);
+
+        when(catalog.findByIdAndBusinessId(unknownProductId, businessId)).thenReturn(Optional.empty());
+        when(alerts.lockOpenVariant(businessId, unknownProductId, variantId))
+                .thenReturn(Optional.empty());
+
+        service.evaluateVariant(variant);
+
+        ArgumentCaptor<InventoryAlert> saved = ArgumentCaptor.forClass(InventoryAlert.class);
+        verify(alerts).saveAndFlush(saved.capture());
+        assertEquals("Producto · Azul", saved.getValue().getSubjectName());
+        assertEquals(0, saved.getValue().getReorderThreshold());
+        assertNull(saved.getValue().getSku());
+    }
+
+    @Test
+    void invalidAndInactiveVariantsAreIgnoredOrResolved() {
+        service.evaluateVariant(null);
+
+        InventoryProductVariant incomplete = new InventoryProductVariant();
+        incomplete.setBusinessId(businessId);
+        incomplete.setCatalogItemId(productId);
+        service.evaluateVariant(incomplete);
+
+        UUID variantId = UUID.randomUUID();
+        InventoryProductVariant inactive = new InventoryProductVariant();
+        inactive.setId(variantId);
+        inactive.setBusinessId(businessId);
+        inactive.setCatalogItemId(productId);
+        inactive.setName("Negro");
+        inactive.setTrackingEnabled(true);
+        inactive.setActive(false);
+        inactive.setOnHand(3);
+        inactive.setReserved(0);
+        inactive.setReorderThreshold(1);
+
+        InventoryAlert current = alert(InventoryAlert.Type.LOW_STOCK, 1, 1);
+        current.setVariantId(variantId);
+        when(alerts.lockOpenVariant(businessId, productId, variantId))
+                .thenReturn(Optional.of(current));
+
+        service.evaluateVariant(inactive);
+
+        assertEquals(InventoryAlert.Status.RESOLVED, current.getStatus());
+        verify(alerts).saveAndFlush(current);
+    }
+
 }
