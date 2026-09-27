@@ -1,6 +1,7 @@
 package cl.helvoca.telephony.twilio;
 
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -28,10 +29,9 @@ public class TwilioCertificationCommandCallLauncher {
     private final String forbiddenTo;
     private final int maxSeconds;
     private final TwilioCallControl callControl;
-    private final HttpClient http = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(8))
-            .build();
+    private final HttpClient http;
 
+    @Autowired
     public TwilioCertificationCommandCallLauncher(
             TwilioProperties twilio,
             @Value("${TWILIO_TEST_FROM:}") String from,
@@ -40,6 +40,19 @@ public class TwilioCertificationCommandCallLauncher {
             @Value("${TWILIO_CERTIFICATION_FORBIDDEN_TO:}") String forbiddenTo,
             @Value("${TWILIO_CERTIFICATION_MAX_SECONDS:150}") int maxSeconds,
             TwilioCallControl callControl) {
+        this(twilio, from, to, allowedTo, forbiddenTo, maxSeconds, callControl,
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
+    }
+
+    TwilioCertificationCommandCallLauncher(
+            TwilioProperties twilio,
+            String from,
+            String to,
+            String allowedTo,
+            String forbiddenTo,
+            int maxSeconds,
+            TwilioCallControl callControl,
+            HttpClient http) {
         this.twilio = twilio;
         this.from = from;
         this.to = to;
@@ -47,6 +60,7 @@ public class TwilioCertificationCommandCallLauncher {
         this.forbiddenTo = forbiddenTo;
         this.maxSeconds = Math.max(20, Math.min(maxSeconds, 180));
         this.callControl = callControl;
+        this.http = http;
     }
 
     public String launch(String callbackToken) throws Exception {
