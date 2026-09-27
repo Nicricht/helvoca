@@ -887,10 +887,12 @@ test('orders list drawer and conversation work', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.locator('#operationalOverview')).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
   const ownerDashboardBox = await page.locator('#operationalOverview').boundingBox();
   expect(ownerDashboardBox).not.toBeNull();
   expect(ownerDashboardBox.x).toBeGreaterThanOrEqual(0);
   expect(ownerDashboardBox.x + ownerDashboardBox.width).toBeLessThanOrEqual(390);
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   await page.getByRole('tab', { name: /Pedidos/ }).click();
   await expect(page.locator('#homeOrdersList')).toContainText('Juan Pedido');
