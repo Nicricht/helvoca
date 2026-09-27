@@ -13,11 +13,15 @@ import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -50,6 +54,7 @@ public class BookingConfirmationWorkflowService {
     private final ConversationStateService conversationState;
     private final BusinessRepository businesses;
     private final JdbcTemplate jdbc;
+    private final PlatformTransactionManager transactionManager;
 
     public BookingConfirmationWorkflowService(BookingRepository bookings,
                                               BusinessOperationRepository operations,
@@ -58,7 +63,8 @@ public class BookingConfirmationWorkflowService {
                                               UniversalConfirmationService confirmations,
                                               ConversationStateService conversationState,
                                               BusinessRepository businesses,
-                                              JdbcTemplate jdbc) {
+                                              JdbcTemplate jdbc,
+                                              PlatformTransactionManager transactionManager) {
         this.bookings = bookings;
         this.operations = operations;
         this.services = services;
@@ -67,6 +73,7 @@ public class BookingConfirmationWorkflowService {
         this.conversationState = conversationState;
         this.businesses = businesses;
         this.jdbc = jdbc;
+        this.transactionManager = transactionManager;
     }
 
     /*
@@ -115,7 +122,7 @@ public class BookingConfirmationWorkflowService {
                 }
                 return error("INVALID_CONFIRMATION", "La confirmación requiere operationId y confirmationToken válidos.");
             }
-            return confirm(businessId, customerId, sourceReferenceId, trustedPhone,
+            return confirmWithRetry(businessId, customerId, sourceReferenceId, trustedPhone,
                     source, bookingSource, safeArgs);
         }
         return propose(businessId, customerId, sourceReferenceId, trustedPhone,
@@ -176,6 +183,44 @@ public class BookingConfirmationWorkflowService {
 
         recordConversation(operation, sourceReferenceId, safeSource, null);
         return success(proposalData(operation, service, startAt, endAt));
+    }
+
+    private JSONObject confirmWithRetry(UUID businessId,
+                                        UUID customerId,
+                                        UUID sourceReferenceId,
+                                        String trustedPhone,
+                                        BusinessOrder.Source source,
+                                        BookingSource bookingSource,
+                                        JSONObject args) {
+        final int maxAttempts = 3;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            TransactionTemplate tx = new TransactionTemplate(transactionManager);
+            tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+            try {
+                JSONObject result = tx.execute(status -> confirm(
+                        businessId,
+                        customerId,
+                        sourceReferenceId,
+                        trustedPhone,
+                        source,
+                        bookingSource,
+                        args));
+                if (result == null) {
+                    throw new IllegalStateException("Booking confirmation transaction returned no result.");
+                }
+                return result;
+            } catch (TransientDataAccessException e) {
+                if (attempt >= maxAttempts) throw e;
+                log.warn(
+                        "BOOKING_CONFIRMATION_TX_RETRY businessId={} operationId={} attempt={} cause={}",
+                        businessId,
+                        args.optString("operationId", null),
+                        attempt,
+                        e.getClass().getSimpleName());
+            }
+        }
+        throw new IllegalStateException("Booking confirmation retry loop exhausted unexpectedly.");
     }
 
     private JSONObject confirm(UUID businessId,
