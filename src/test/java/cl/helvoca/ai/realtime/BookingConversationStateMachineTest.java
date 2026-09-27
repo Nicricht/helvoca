@@ -58,7 +58,7 @@ class BookingConversationStateMachineTest {
 
     @Test
     void resolvedServiceSlotAndIdentityGoStraightToProposal() {
-        ConversationOperationState state = state(new LinkedHashMap<>(Map.of(
+        LinkedHashMap<String, Object> values = new LinkedHashMap<>(Map.of(
                 "serviceId", UUID.randomUUID().toString(),
                 "serviceName", "Consulta",
                 "startAt", "2026-09-28T13:30:00Z",
@@ -69,7 +69,9 @@ class BookingConversationStateMachineTest {
                 "bookingCustomerPhone", "+56911111111",
                 "confirmationPending", false,
                 "bookingFlowStage", "SLOT_VALIDATED"
-        )), 5);
+        ));
+        values.put("intent", "BOOKING");
+        ConversationOperationState state = state(values, 5);
 
         JSONObject machine = BookingConversationStateMachine.snapshot(state);
 
@@ -82,7 +84,7 @@ class BookingConversationStateMachineTest {
 
     @Test
     void proposalRequiresExactlyOneConfirmationWithoutReaskingResolvedFields() {
-        ConversationOperationState state = state(new LinkedHashMap<>(Map.of(
+        LinkedHashMap<String, Object> values = new LinkedHashMap<>(Map.of(
                 "serviceId", UUID.randomUUID().toString(),
                 "serviceName", "Consulta",
                 "startAt", "2026-09-28T13:30:00Z",
@@ -91,7 +93,9 @@ class BookingConversationStateMachineTest {
                 "confirmationPending", true,
                 "bookingFlowStage", "WAITING_CONFIRMATION",
                 "operationId", UUID.randomUUID().toString()
-        )), 6);
+        ));
+        values.put("intent", "BOOKING");
+        ConversationOperationState state = state(values, 6);
 
         JSONObject machine = BookingConversationStateMachine.snapshot(state);
 
@@ -104,7 +108,7 @@ class BookingConversationStateMachineTest {
 
     @Test
     void confirmedBookingIsTerminalAndMustNotBeConfirmedAgain() {
-        ConversationOperationState state = state(new LinkedHashMap<>(Map.of(
+        LinkedHashMap<String, Object> values = new LinkedHashMap<>(Map.of(
                 "serviceId", UUID.randomUUID().toString(),
                 "startAt", "2026-09-28T13:30:00Z",
                 "bookingSlotValidated", true,
@@ -112,7 +116,9 @@ class BookingConversationStateMachineTest {
                 "confirmationPending", false,
                 "bookingFlowStage", "CONFIRMED",
                 "bookingId", UUID.randomUUID().toString()
-        )), 7);
+        ));
+        values.put("intent", "BOOKING");
+        ConversationOperationState state = state(values, 7);
 
         JSONObject machine = BookingConversationStateMachine.snapshot(state);
 
