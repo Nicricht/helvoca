@@ -32,6 +32,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -411,6 +412,13 @@ class DevDataInitializerTest {
                 IllegalStateException.class,
                 () -> ReflectionTestUtils.invokeMethod(initializer, "validateDemoReadiness", businessId));
         assertTrue(error.getMessage().contains(blocker));
+    }
+
+    @Test
+    void nextDemoBusinessDaySkipsTheWholeWeekend() {
+        assertEquals(
+                LocalDate.of(2026, 9, 28),
+                DevDataInitializer.nextDemoBusinessDay(LocalDate.of(2026, 9, 25)));
     }
 
     @Test
