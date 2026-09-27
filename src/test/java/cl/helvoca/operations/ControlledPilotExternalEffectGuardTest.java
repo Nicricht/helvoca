@@ -29,6 +29,18 @@ class ControlledPilotExternalEffectGuardTest {
     }
 
     @Test
+    void exposesGlobalSwitchWithoutChangingPilotState() {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+
+        assertFalse(new ControlledPilotExternalEffectGuard(controls, false)
+                .globalExternalEffectsEnabled());
+        assertTrue(new ControlledPilotExternalEffectGuard(controls, true)
+                .globalExternalEffectsEnabled());
+
+        verifyNoInteractions(controls);
+    }
+
+    @Test
     void runningPilotAllowsExternalEffectsOnlyAfterGlobalOptIn() {
         UUID businessId = UUID.randomUUID();
         PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
