@@ -237,8 +237,9 @@ class CommercialPipelineServiceBranchCoverageTest {
         when(reservations.findAllByBusinessIdAndReferenceTypeAndReferenceIdOrderByCreatedAtAsc(
                 businessId, "ORDER_OPERATION", orderOperationId)).thenReturn(List.of());
 
+        UUID paymentJourneyId = paymentJourney.getId();
         OutboundMessage journeyMessage = mock(OutboundMessage.class);
-        when(journeyMessage.getOperationId()).thenReturn(paymentJourney.getId());
+        when(journeyMessage.getOperationId()).thenReturn(paymentJourneyId);
         when(journeyMessage.getStatus()).thenReturn(OutboundMessage.Status.SENT);
 
         OutboundMessage paymentMessage = mock(OutboundMessage.class);
