@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "name": "regression-post-farewell-continuation",
+  "sourceFingerprint": "fixture000000004",
+  "turns": [
+    {
+      "speaker": "USER",
+      "text": "Eso sería todo, chao."
+    },
+    {
+      "speaker": "ASSISTANT",
+      "text": "Chao, que estés muy bien."
+    },
+    {
+      "speaker": "ASSISTANT",
+      "text": "¿Necesitas alguna otra cosa?"
+    }
+  ],
+  "actions": [],
+  "expected": {
+    "passed": false,
+    "findingCodes": [
+      "POST_FAREWELL_CONTINUATION"
+    ]
+  }
+}
