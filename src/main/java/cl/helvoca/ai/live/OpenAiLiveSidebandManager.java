@@ -306,8 +306,8 @@ public class OpenAiLiveSidebandManager {
             }
             HttpResponse<String> response = http.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() >= 200 && response.statusCode() < 300) return true;
-            log.warn("GPT-Live control action={} session={} status={} body={}",
-                    action, sessionId, response.statusCode(), truncate(response.body()));
+            log.warn("GPT-Live control action={} session={} status={}",
+                    action, sessionId, response.statusCode());
         } catch (Exception e) {
             log.warn("GPT-Live control action={} session={} failed: {}", action, sessionId, e.getMessage());
         }
