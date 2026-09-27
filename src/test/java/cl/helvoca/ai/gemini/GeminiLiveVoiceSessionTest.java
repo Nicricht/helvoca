@@ -195,6 +195,11 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(GeminiLiveVoiceSession.hasExplicitClosingIntent("No, gracias."));
         assertTrue(GeminiLiveVoiceSession.hasExplicitClosingIntent("Eso es todo, chao."));
         assertTrue(GeminiLiveVoiceSession.hasExplicitClosingIntent("Puedes cortar la llamada."));
+        assertFalse(GeminiLiveVoiceSession.hasClosingIntent("No.", "¿Quieres otro horario?", ""));
+        assertTrue(GeminiLiveVoiceSession.hasClosingIntent(
+                "No.", "¿Necesitas algo más?", ""));
+        assertTrue(GeminiLiveVoiceSession.hasClosingIntent(
+                "No.", "Muchas gracias por llamar. Que estés muy bien.", "¿Necesitas algo más?"));
     }
 
     @Test
@@ -232,6 +237,52 @@ class GeminiLiveVoiceSessionTest {
 
         verify(tools, never()).prepareDeferredEndCall(context);
         verify(transport, never()).endAfterPlayback();
+    }
+
+    @Test
+    void endCallAcceptsNoAfterAnythingElseQuestion() {
+        GeminiLiveProperties properties = properties();
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        when(tools.prepareDeferredEndCall(context)).thenReturn(new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("ended", false)
+                        .put("pendingPlaybackCompletion", true))
+                .put("error", JSONObject.NULL)
+                .toString());
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                transport,
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        WebSocket providerSocket = mock(WebSocket.class);
+        session.onText(providerSocket, generationCompleteWithOutput("¿Necesitas algo más?"), true);
+        session.onText(providerSocket, new JSONObject()
+                .put("serverContent", new JSONObject()
+                        .put("inputTranscription", new JSONObject().put("text", "No."))
+                        .put("turnComplete", true))
+                .toString(), true);
+        session.onText(providerSocket, generationCompleteWithOutput(
+                "Muchas gracias por llamar. Que estés muy bien. Hasta luego."), true);
+
+        session.onText(providerSocket, new JSONObject().put("toolCall", new JSONObject()
+                .put("functionCalls", new JSONArray().put(new JSONObject()
+                        .put("id", "end-after-no")
+                        .put("name", "end_call")
+                        .put("args", new JSONObject()))))
+                .toString(), true);
+
+        verify(tools).prepareDeferredEndCall(context);
     }
 
     @Test
