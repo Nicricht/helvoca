@@ -2,6 +2,8 @@
 
 Usar esta ficha únicamente si el prospecto acepta avanzar a piloto o quiere una configuración aplicada a su negocio.
 
+La guía operativa principal es `docs/FIRST_CUSTOMER_OPERATION.md`.
+
 ## 1. Negocio
 
 - Nombre comercial:
@@ -15,7 +17,7 @@ Usar esta ficha únicamente si el prospecto acepta avanzar a piloto o quiere una
 
 - ¿Qué ocurre hoy cuando no alcanzan a responder?
 - ¿Qué tipo de consultas reciben con mayor frecuencia?
-- ¿Qué acción debería lograr Helvoca después de atender?
+- ¿Qué acción debería lograr RecepVoz después de atender?
 - Valor aproximado de una reserva/pedido/lead:
 - Volumen aproximado de llamadas diarias:
 - Volumen aproximado de WhatsApp diarios:
@@ -33,10 +35,10 @@ Marcar solo lo necesario para el piloto inicial.
 - [ ] REQUEST
 - [ ] DELIVERY
 - [ ] PICKUP
-- [ ] PAYMENT
 - [ ] Human handoff
 - [ ] Outbound messaging
 - [ ] Calendar / meeting sync
+- [ ] PAYMENT — **requisito futuro; NO disponible como merchant LIVE en el piloto comercial actual**
 
 Una capacidad disponible en el core no implica que el proveedor externo correspondiente esté activo. Cada canal o integración debe quedar configurado y probado para este tenant antes de prometerlo como parte del piloto.
 
@@ -82,7 +84,7 @@ Registrar las preguntas que más se repiten y la respuesta aprobada por el negoc
 - Atrasos:
 - Delivery/pickup si corresponde:
 - Cotizaciones si corresponde:
-- Pago si corresponde:
+- Pago futuro si corresponde:
 - Información que la IA nunca debe afirmar:
 - Casos que siempre deben ir a una persona:
 
@@ -119,7 +121,7 @@ No activar voz comercial si el provider Live no está READY para el tenant.
 - Outbound requerido: sí / no
 - Outbound probado: sí / no
 
-El Outbound Messaging Engine existe, pero la entrega externa debe permanecer deshabilitada hasta que el proveedor, las credenciales y el alcance del tenant estén configurados y certificados. No prometer WhatsApp ilimitado ni campañas masivas como parte automática del piloto.
+La entrega externa debe permanecer deshabilitada hasta que proveedor, credenciales y alcance del tenant estén configurados y certificados. No prometer WhatsApp ilimitado ni campañas masivas como parte automática del piloto.
 
 ## 10. Integraciones existentes
 
@@ -127,7 +129,7 @@ El Outbound Messaging Engine existe, pero la entrega externa debe permanecer des
 - CRM:
 - POS/ERP:
 - Ecommerce:
-- Proveedor de pagos:
+- Proveedor de pagos actual del negocio:
 - Otras herramientas importantes:
 
 ### Calendar / meeting
@@ -139,15 +141,13 @@ El Outbound Messaging Engine existe, pero la entrega externa debe permanecer des
 
 El core de sincronización de calendario existe, pero una integración externa solo forma parte del piloto cuando el proveedor concreto está conectado y probado.
 
-### Pagos
+### Merchant payment
 
-- Merchant/proveedor:
-- Cuenta comercial disponible:
-- Checkout requerido:
-- Cobro real autorizado para el piloto: sí / no
-- Integración probada: sí / no
+- ¿El prospecto lo solicita como requisito futuro?: sí / no
+- Proveedor actual del negocio:
+- Notas/requisitos:
 
-No activar cobros reales sin cuenta merchant y autorización explícita del cliente.
+**Estado comercial actual:** merchant payment LIVE está intencionalmente deshabilitado. El flujo existente es SANDBOX y no debe incluirse en el alcance vendido ni utilizarse para cobrar a clientes finales.
 
 Registrar necesidades futuras aunque todavía no formen parte del piloto. No prometer fechas de integración no comprometidas.
 
@@ -156,16 +156,35 @@ Registrar necesidades futuras aunque todavía no formen parte del piloto. No pro
 - Plan sugerido:
 - Precio oficial:
 - Minutos incluidos:
+- Excedente:
 - Alcance WhatsApp acordado:
 - Integraciones incluidas:
 - Configuración inicial incluida: sí durante lanzamiento
 - Fecha objetivo de activación:
-- Responsable por parte de Helvoca:
+- Responsable por parte de Helvoca/RecepVoz:
 - Responsable por parte del cliente:
+- Medio autorizado para que el cliente pague a RecepVoz:
+- Datos de facturación/cobro confirmados: sí / no
 
-V42 Plans / Entitlements / Billing ya está certificado en producción. Los primeros clientes continúan con alta asistida para controlar el alcance del piloto, validar datos reales y aprender con uso real. Los límites, condiciones, capacidades e integraciones incluidas deben quedar documentados expresamente para cada tenant.
+Los valores vigentes deben contrastarse con `/api/v1/public/pricing`. Los límites, condiciones, capacidades e integraciones incluidas deben quedar documentados expresamente para cada tenant.
 
-## 12. Criterios para activar
+## 12. Checklist antes de aceptar dinero
+
+- [ ] prospecto aceptó un piloto con alcance escrito;
+- [ ] plan, precio, minutos/excedentes y condiciones confirmados;
+- [ ] responsable del cliente identificado;
+- [ ] responsable de RecepVoz identificado;
+- [ ] medio autorizado de pago a RecepVoz definido;
+- [ ] datos de facturación/cobro definidos;
+- [ ] términos y privacidad puestos a disposición;
+- [ ] criterio de éxito escrito;
+- [ ] canal externo incluido está certificado o queda explícitamente fuera;
+- [ ] merchant payment LIVE no fue prometido;
+- [ ] no existe un bloqueo P0 conocido para el alcance vendido.
+
+Si un punto aplicable falla, registrar **PILOT pendiente**, no **CUSTOMER**.
+
+## 13. Criterios para activar
 
 No activar hasta cumplir:
 
@@ -183,20 +202,34 @@ No activar hasta cumplir:
 - [ ] WhatsApp certificado si se habilita;
 - [ ] outbound certificado si se habilita;
 - [ ] calendario certificado si se habilita;
-- [ ] pagos certificados y autorizados si se habilitan.
+- [ ] merchant payment LIVE excluido del alcance mientras siga deshabilitado.
 
-## 13. Éxito del piloto
+## 14. Éxito del piloto
 
-Definir antes de activar qué se medirá. Ejemplos:
+Definir antes de activar qué se medirá y qué umbral se considera suficiente.
+
+Posibles métricas:
 
 - llamadas atendidas;
 - conversaciones resueltas;
 - reservas creadas;
+- reservas reprogramadas;
 - pedidos/cotizaciones/leads generados;
+- solicitudes;
 - oportunidades recuperadas;
 - derivaciones humanas;
+- preguntas sin respuesta;
 - errores de herramientas;
-- coste de voz/mensajería;
+- minutos usados;
+- coste de voz/mensajería cuando esté disponible;
 - valor estimado generado para el negocio.
 
-Evitar prometer ROI. Medirlo durante el piloto con datos reales.
+No prometer ROI. Medir con datos reales.
+
+Para cerrar el piloto como exitoso, revisar también:
+
+- acción principal funcionando de punta a punta dentro del alcance certificado;
+- resultados verificables;
+- ausencia de acciones críticas no autorizadas o duplicadas sin resolver;
+- fallos dentro del umbral acordado;
+- cliente dispuesto a continuar con un plan/alcance definido.
