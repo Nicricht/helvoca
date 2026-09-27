@@ -27,6 +27,10 @@ public class ControlledPilotExternalEffectGuard {
         this.externalEffectsEnabled = externalEffectsEnabled;
     }
 
+    public boolean globalExternalEffectsEnabled() {
+        return externalEffectsEnabled;
+    }
+
     @Transactional(readOnly = true)
     public Decision evaluate(UUID businessId, Effect effect) {
         if (businessId == null) throw new IllegalArgumentException("Business id is required");
