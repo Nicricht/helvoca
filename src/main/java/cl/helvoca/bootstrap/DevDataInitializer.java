@@ -445,7 +445,11 @@ public class DevDataInitializer implements CommandLineRunner {
     }
 
     private static LocalDate nextDemoBusinessDay() {
-        LocalDate date = LocalDate.now(ZoneId.of(DEMO_TIMEZONE)).plusDays(1);
+        return nextDemoBusinessDay(LocalDate.now(ZoneId.of(DEMO_TIMEZONE)));
+    }
+
+    static LocalDate nextDemoBusinessDay(LocalDate currentDate) {
+        LocalDate date = currentDate.plusDays(1);
         while (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
             date = date.plusDays(1);
         }
