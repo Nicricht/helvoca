@@ -114,19 +114,31 @@ public class BillingSubscriptionService {
         if (!externalInvoiceId.equals(invoice.id())) {
             throw new IllegalStateException("Mercado Pago invoice id mismatch");
         }
-        if (invoice.subscriptionId() == null || invoice.subscriptionId().isBlank()) {
+        if (!notBlank(invoice.subscriptionId())) {
             throw new IllegalArgumentException("Mercado Pago invoice has no subscription id");
         }
 
         BusinessSubscription local = subscriptions.findByExternalSubscriptionId(invoice.subscriptionId())
                 .orElseThrow(() -> new IllegalArgumentException("Unknown Mercado Pago subscription"));
 
-        if (externalInvoiceId.equals(local.getLastBillingInvoiceId())) {
+        String paymentStatus = normalized(invoice.paymentStatus());
+        if (!notBlank(paymentStatus)) {
+            throw new IllegalStateException("Mercado Pago authorized payment has no payment status");
+        }
+
+        if (externalInvoiceId.equals(local.getLastBillingInvoiceId())
+                && paymentStatus.equals(normalized(local.getLastBillingPaymentStatus()))) {
             return;
         }
 
-        String status = normalized(invoice.status());
-        if ("approved".equals(status) || "processed".equals(status)) {
+        if (invoice.debitDate() != null
+                && local.getPendingPlanCode() == null
+                && local.getCurrentPeriodStart() != null
+                && invoice.debitDate().toInstant().isBefore(local.getCurrentPeriodStart())) {
+            return;
+        }
+
+        if ("approved".equals(paymentStatus)) {
             Instant start = invoice.debitDate() == null ? Instant.now() : invoice.debitDate().toInstant();
             local.setStatus(SubscriptionStatus.ACTIVE);
             local.setCurrentPeriodStart(start);
@@ -139,15 +151,17 @@ public class BillingSubscriptionService {
                 local.setBillingCheckoutUrl(null);
             }
             local.setLastBillingInvoiceId(externalInvoiceId);
+            local.setLastBillingPaymentStatus(paymentStatus);
             subscriptions.saveAndFlush(local);
             return;
         }
 
-        if ("rejected".equals(status) || "cancelled".equals(status) || "canceled".equals(status)) {
+        if ("rejected".equals(paymentStatus) || "cancelled".equals(paymentStatus) || "canceled".equals(paymentStatus)) {
             Instant now = Instant.now();
             local.setStatus(SubscriptionStatus.PAST_DUE);
             local.setGraceUntil(now.plus(PAST_DUE_GRACE_DAYS, ChronoUnit.DAYS));
             local.setLastBillingInvoiceId(externalInvoiceId);
+            local.setLastBillingPaymentStatus(paymentStatus);
             subscriptions.saveAndFlush(local);
         }
     }
