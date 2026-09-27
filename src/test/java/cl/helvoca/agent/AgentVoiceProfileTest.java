@@ -31,7 +31,7 @@ class AgentVoiceProfileTest {
     @Test
     void sensualProfilesRemainDistinctAndResolvePerProvider() {
         assertEquals("seductive_female", AgentVoiceProfile.normalizeForStorage("seductive_female"));
-        assertEquals("Aoede", AgentVoiceProfile.resolveGemini("seductive_female", "Kore"));
+        assertEquals("Despina", AgentVoiceProfile.resolveGemini("seductive_female", "Kore"));
         assertEquals("coral", AgentVoiceProfile.resolveOpenAi("seductive_female", "alloy"));
 
         assertEquals("seductive_male", AgentVoiceProfile.normalizeForStorage("seductive_male"));
