@@ -77,7 +77,7 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
             return false;
         }
 
-        CompletableFuture.delayedExecutor(10, TimeUnit.SECONDS).execute(() ->
+        CompletableFuture.delayedExecutor(6, TimeUnit.SECONDS).execute(() ->
                 completeDeferredHangup(marker, "fallback_timeout"));
         return true;
     }
@@ -125,6 +125,13 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
         boolean accepted = control.hangup(accountSid, callSid);
         log.info("Twilio deferred hangup call={} stream={} reason={} accepted={}",
                 callSid, streamSid, reason, accepted);
+        if (!accepted) {
+            CompletableFuture.delayedExecutor(1, TimeUnit.SECONDS).execute(() -> {
+                boolean retryAccepted = control.hangup(accountSid, callSid);
+                log.info("Twilio deferred hangup retry call={} stream={} accepted={}",
+                        callSid, streamSid, retryAccepted);
+            });
+        }
     }
 
     private boolean matches(String streamId) {
