@@ -1,11 +1,13 @@
 package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.call.CallSummaryService;
+import cl.helvoca.ai.gemini.VoiceBakeOffCatalog;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.telephony.CallCapacityExceededException;
 import cl.helvoca.voice.VoiceCallRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +28,9 @@ public class TwilioVoiceController {
     private final CallSummaryService summaries;
     private final TwilioProperties properties;
 
+    @Value("${TWILIO_CERTIFICATION_VOICE_OVERRIDE:}")
+    private String certificationVoiceOverride;
+
     public TwilioVoiceController(TwilioCallService calls,
                                  VoiceCallRouter voiceRouter,
                                  CallSummaryService summaries,
@@ -41,7 +46,7 @@ public class TwilioVoiceController {
     public ResponseEntity<String> incoming(@RequestParam("CallSid") String callSid,
                                            @RequestParam("From") String from,
                                            @RequestParam("To") String to) {
-        return route(to, from, callSid, "inbound");
+        return route(to, from, callSid, "inbound", null);
     }
 
     @PostMapping(value = "/outbound-test", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
@@ -49,7 +54,8 @@ public class TwilioVoiceController {
     public ResponseEntity<String> outboundTest(@RequestParam("CallSid") String callSid,
                                                @RequestParam("From") String from,
                                                @RequestParam("To") String to) {
-        return route(from, to, callSid, "outbound-test");
+        String voiceOverride = VoiceBakeOffCatalog.normalize(certificationVoiceOverride);
+        return route(from, to, callSid, "outbound-test", voiceOverride);
     }
 
     @PostMapping(value = "/inbound-certification", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
@@ -61,7 +67,7 @@ public class TwilioVoiceController {
             log.warn("Blocked disabled Twilio certification ingress call={}", callSid);
             return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
-        return route(from, to, callSid, "inbound-certification");
+        return route(from, to, callSid, "inbound-certification", null);
     }
 
     @PostMapping(value = "/stream-status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -100,7 +106,8 @@ public class TwilioVoiceController {
     private ResponseEntity<String> route(String businessPhone,
                                          String callerPhone,
                                          String callSid,
-                                         String direction) {
+                                         String direction,
+                                         String voiceOverride) {
         if (!"outbound-test".equals(direction)) {
             try {
                 UUID callId = calls.startInboundCall(callSid, callerPhone, businessPhone);
@@ -116,7 +123,7 @@ public class TwilioVoiceController {
             }
         }
 
-        return voiceRouter.route(businessPhone, callerPhone, callSid)
+        return voiceRouter.route(businessPhone, callerPhone, callSid, voiceOverride)
                 .map(decision -> {
                     log.info("Routing Twilio {} call={} provider={} mode={}",
                             direction, callSid, decision.providerId(), decision.mode());
