@@ -91,8 +91,8 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         if (!enabled || !FIRED.compareAndSet(false, true)) return;
         if (!validConfiguration()) {
-            log.error("TWILIO_CERTIFICATION_CALL blocked: invalid/missing Twilio certification configuration direction={} voice_override={}",
-                    direction, voiceOverride == null ? "none" : voiceOverride);
+            log.error("TWILIO_CERTIFICATION_CALL blocked: invalid/missing Twilio certification configuration direction={}",
+                    direction);
             return;
         }
         if (!isAllowedTarget(to, allowedTo)) {
@@ -109,14 +109,13 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
             t.setDaemon(true);
             return t;
         });
-        log.info("TWILIO_CERTIFICATION_CALL armed; direction={} voice_override={} starting in {} seconds after deployment cutover",
-                direction, voiceOverride == null ? "none" : voiceOverride, START_DELAY_SECONDS);
+        log.info("TWILIO_CERTIFICATION_CALL armed; direction={} starting in {} seconds after deployment cutover",
+                direction, START_DELAY_SECONDS);
         kickoff.schedule(() -> {
             try {
                 String callSid = createCall();
-                log.info("TWILIO_CERTIFICATION_CALL CREATED call={} direction={} voice_override={} from={} to={} max_seconds={}",
-                        callSid, direction, voiceOverride == null ? "none" : voiceOverride,
-                        mask(from), mask(to), maxSeconds);
+                log.info("TWILIO_CERTIFICATION_CALL CREATED call={} direction={} from={} to={} max_seconds={}",
+                        callSid, direction, mask(from), mask(to), maxSeconds);
                 scheduleSafetyHangup(callSid);
             } catch (Exception e) {
                 log.error("TWILIO_CERTIFICATION_CALL FAILED direction={} reason={}", direction, rootMessage(e));
