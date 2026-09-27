@@ -27,6 +27,7 @@ class PaymentWebhookChaosCertificationTest {
         BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
         PaymentProviderRegistry providers = mock(PaymentProviderRegistry.class);
         ConversationStateService conversation = mock(ConversationStateService.class);
+        PaymentSuccessNotificationService notifications = mock(PaymentSuccessNotificationService.class);
         PaymentProviderAdapter adapter = mock(PaymentProviderAdapter.class);
 
         AtomicReference<PaymentWebhookEvent> eventState = new AtomicReference<>();
@@ -78,7 +79,7 @@ class PaymentWebhookChaosCertificationTest {
                         Map.of("remoteStatus", "processed")));
 
         PaymentWebhookService service = new PaymentWebhookService(
-                events, payments, operations, providers, conversation);
+                events, payments, operations, providers, conversation, notifications);
 
         PaymentWebhookService.Result first = service.processVerified(
                 businessId, "mercadopago", "evt-chaos", "ORDCHAOS123",
@@ -101,6 +102,7 @@ class PaymentWebhookChaosCertificationTest {
 
         verify(adapter, times(2)).getStatus(any());
         verify(payments, times(1)).saveAndFlush(payment);
+        verify(notifications, times(1)).onVerifiedSuccess(payment);
         verifyNoInteractions(conversation);
     }
 }
