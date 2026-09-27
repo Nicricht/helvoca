@@ -227,7 +227,9 @@ public class JourneyTraceService {
                        c.ai_provider::text, 'AI'::text, NULL::text,
                        NULL::integer, NULL::integer, NULL::text,
                        (EXTRACT(EPOCH FROM (c.ai_setup_completed_at - c.started_at)) * 1000)::bigint,
-                       NULL::integer, false, NULL::text
+                       NULL::integer, false,
+                       CASE WHEN c.ai_model IS NULL OR btrim(c.ai_model) = '' THEN NULL::text
+                            ELSE ('model=' || c.ai_model)::text END
                   FROM call_session c
                   JOIN journey_calls j ON j.id = c.id
                  WHERE c.business_id = :businessId
@@ -241,7 +243,7 @@ public class JourneyTraceService {
                        a.call_id, NULL::uuid, a.id, a.call_id,
                        NULL::text, 'AI'::text, NULL::text,
                        NULL::integer, NULL::integer, a.error_code::text,
-                       NULL::bigint, NULL::integer, false, NULL::text
+                       a.duration_ms, NULL::integer, false, NULL::text
                   FROM call_action a
                   JOIN journey_calls j ON j.id = a.call_id
                  WHERE a.business_id = :businessId
@@ -401,6 +403,37 @@ public class JourneyTraceService {
                        OR m.id = CAST(:uuidIdentifier AS uuid)
                        OR m.idempotency_key = :identifier
                        OR m.provider_message_id = :identifier
+                   )
+
+                UNION ALL
+
+                SELECT u.occurred_at,
+                       'USAGE', u.meter_key::text, u.unit::text,
+                       CASE WHEN u.source_type = 'CALL_SESSION'
+                                  AND u.source_id IN (SELECT id::text FROM journey_calls)
+                            THEN CAST(u.source_id AS uuid)
+                            ELSE NULL::uuid END,
+                       NULL::uuid, u.id,
+                       CASE WHEN u.source_type = 'CALL_SESSION'
+                                  AND u.source_id IN (SELECT id::text FROM journey_calls)
+                            THEN CAST(u.source_id AS uuid)
+                            ELSE NULL::uuid END,
+                       u.provider::text, 'SYSTEM'::text, NULL::text,
+                       NULL::integer, NULL::integer, NULL::text,
+                       NULL::bigint, NULL::integer, false,
+                       (
+                           'quantity=' || u.quantity::text || ' ' || u.unit::text
+                           || CASE WHEN u.estimated_cost_usd IS NULL THEN ''
+                                   ELSE ' estimated_cost_usd=' || u.estimated_cost_usd::text END
+                           || CASE WHEN u.actual_cost_usd IS NULL THEN ''
+                                   ELSE ' actual_cost_usd=' || u.actual_cost_usd::text END
+                       )::text
+                  FROM usage_meter_event u
+                 WHERE u.business_id = :businessId
+                   AND (
+                       (u.source_type = 'CALL_SESSION'
+                            AND u.source_id IN (SELECT id::text FROM journey_calls))
+                       OR u.source_id IN (SELECT id::text FROM ops)
                    )
 
                 UNION ALL

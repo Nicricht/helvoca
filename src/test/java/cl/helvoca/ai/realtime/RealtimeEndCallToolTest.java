@@ -79,7 +79,7 @@ class RealtimeEndCallToolTest {
         assertTrue(result.getJSONObject("data").getBoolean("ended"));
         assertFalse(result.getJSONObject("data").getBoolean("alreadyEnded"));
         verify(control).hangup(ACCOUNT_SID, CALL_SID);
-        verify(trace).recordTool(eq(businessId), eq(callId), eq("end_call"), any(JSONObject.class));
+        verify(trace).recordTool(eq(businessId), eq(callId), eq("end_call"), any(JSONObject.class), anyLong());
     }
 
     @Test
@@ -115,7 +115,7 @@ class RealtimeEndCallToolTest {
         assertTrue(result.getJSONObject("data").getBoolean("pendingPlaybackCompletion"));
         assertFalse(result.getJSONObject("data").getBoolean("ended"));
         verifyNoInteractions(control);
-        verify(trace).recordTool(eq(businessId), eq(callId), eq("end_call"), any(JSONObject.class));
+        verify(trace).recordTool(eq(businessId), eq(callId), eq("end_call"), any(JSONObject.class), anyLong());
     }
 
     @Test

@@ -124,6 +124,12 @@ class JourneyTraceServiceTest {
         assertFalse(sql.contains("payload_hash"));
         assertFalse(sql.contains("contact_phone"));
         assertTrue(sql.contains("payload ->> 'correlationid'"));
+        assertTrue(sql.contains("a.duration_ms"));
+        assertTrue(sql.contains("c.ai_model"));
+        assertTrue(sql.contains("usage_meter_event"));
+        assertFalse(sql.contains("access_token"));
+        assertFalse(sql.contains("api_key"));
+        assertFalse(sql.contains("authorization"));
         assertTrue(sql.contains("business_id = :businessid"));
     }
 
