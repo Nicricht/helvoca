@@ -80,15 +80,15 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("Debe sentirse inequívocamente como mujer"));
         assertTrue(instructions.contains("no en contenido sexual ni coqueteo explícito"));
         assertTrue(instructions.contains("DESDE LA PRIMERA SÍLABA"));
-        assertTrue(instructions.contains("Cuéntame, ¿en qué te puedo ayudar?"));
-        assertTrue(instructions.contains("Evita \"¿Qué es lo que usted desea?\""));
-        assertTrue(instructions.contains("MÁS RÁPIDO que una atención telefónica estándar"));
+        assertTrue(instructions.contains("Ya, cuéntame, ¿en qué te ayudo?"));
+        assertTrue(instructions.contains("me pueda colaborar"));
+        assertTrue(instructions.contains("habla MUY RÁPIDO"));
         assertTrue(instructions.contains("NO REPETIR"));
-        assertTrue(instructions.contains("pide una sola confirmación compacta"));
+        assertTrue(instructions.contains("está prohibido hacer dos veces la misma pregunta"));
         assertTrue(instructions.contains("mantén exactamente el mismo género"));
-        assertTrue(instructions.contains("Termina de decir todas las palabras de la despedida"));
+        assertTrue(instructions.contains("NO vuelvas a preguntar nada"));
         assertTrue(instructions.contains("completar una reserva, venta, consulta o cualquier otra acción NO significa que la llamada terminó"));
-        assertTrue(instructions.contains("entrega rápida, cálida y envolvente"));
+        assertTrue(instructions.contains("cadencia urbana de Santiago de Chile"));
         assertTrue(instructions.contains("a las nueve y media"));
         assertTrue(instructions.contains("nunca menciones UUID"));
         assertTrue(instructions.contains("success=true sin bookingId es solo una propuesta pendiente de confirmación"));
@@ -744,7 +744,7 @@ class GeminiLiveVoiceSessionTest {
 
     @Test
     void defaultLiveVoiceUsesFeminineProfileForSeductiveDelivery() {
-        assertEquals("Aoede", new GeminiLiveProperties().getVoice());
+        assertEquals("Despina", new GeminiLiveProperties().getVoice());
     }
 
     @Test
