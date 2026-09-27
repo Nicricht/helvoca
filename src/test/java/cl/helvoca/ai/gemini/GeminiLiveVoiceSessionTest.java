@@ -969,7 +969,7 @@ class GeminiLiveVoiceSessionTest {
 
     @Test
     void defaultLiveVoiceUsesYouthfulFemaleProfile() {
-        assertEquals("Leda", new GeminiLiveProperties().getVoice());
+        assertEquals("Sulafat", new GeminiLiveProperties().getVoice());
     }
 
     @Test
