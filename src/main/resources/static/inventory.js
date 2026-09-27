@@ -195,7 +195,7 @@
                 </article>`;
         }).join("");
 
-        $(".inventory-alert-restock", list).forEach(button => {
+        list.querySelectorAll(".inventory-alert-restock").forEach(button => {
             button.addEventListener("click", async () => {
                 button.disabled = true;
                 try {
@@ -210,7 +210,7 @@
             });
         });
 
-        $(".inventory-alert-ack", list).forEach(button => {
+        list.querySelectorAll(".inventory-alert-ack").forEach(button => {
             button.addEventListener("click", async () => {
                 button.disabled = true;
                 try {
@@ -301,7 +301,7 @@
 
         list.innerHTML = waiting.concat(queued).join("");
 
-        $(".inventory-restock-cancel", list).forEach(button => {
+        list.querySelectorAll(".inventory-restock-cancel").forEach(button => {
             button.addEventListener("click", async () => {
                 button.disabled = true;
                 try {
