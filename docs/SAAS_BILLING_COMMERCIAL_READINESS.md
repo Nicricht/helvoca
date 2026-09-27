@@ -1,7 +1,7 @@
 # SaaS Billing Commercial Readiness
 
 Date: 2026-09-27  
-Baseline reviewed: `main@67ca6bb78d1664dee139aeced17b779ebfcc6284`  
+Baseline reviewed and synchronized: `main@2bc4265a0c15498f6f6aa0363238d70b632cb4ae`  
 Certification branch: `test/saas-billing-commercial-readiness`  
 Draft PR: #552
 
@@ -43,7 +43,7 @@ Important: Enterprise is marked `custom_pricing = true`. `BillingSubscriptionSer
 9. Mercado Pago sends signed Webhooks to `POST /webhooks/v1/mercadopago`.
 10. The controller validates `x-signature` with the official Mercado Pago Java SDK and the configured webhook secret.
 11. `subscription_preapproval` reconciles subscription state.
-12. `subscription_authorized_payment` fetches the provider invoice and only `approved` / `processed` activates or renews service.
+12. `subscription_authorized_payment` fetches the provider invoice and only a provider payment with `payment.status=approved` activates or renews service; invoice lifecycle status such as `processed` is not payment proof.
 13. On the first approved invoice for a pending plan, `pending_plan_code` becomes `plan_code`.
 14. Entitlements are then read from V42 and usage from V41 `usage_meter_event`.
 
@@ -56,7 +56,7 @@ Important: Enterprise is marked `custom_pricing = true`. `BillingSubscriptionSer
 | 3. Start fake/mock checkout | PASS | service tests use `SubscriptionPaymentGateway` mock; no real provider call |
 | 4. Receive and authenticate a simulated signed webhook | PASS (local) | official SDK signature validator is mandatory; invalid signatures are rejected before reconciliation |
 | 5. Bind provider event to expected tenant/plan | PASS | external reference is `helvoca:{businessId}:{planCode}`; checkout and reconciliation fail closed on mismatch |
-| 6. Activate subscription only after paid invoice | PASS | `authorized` preapproval keeps current plan; only approved/processed invoice activates |
+| 6. Activate subscription only after paid invoice | PASS | `authorized` preapproval keeps current plan; only `payment.status=approved` activates; invoice status alone cannot activate |
 | 7. Assign correct entitlements | PASS | current plan resolves through V42; entitlement service evaluates plan rules |
 | 8. Avoid duplicate invoice webhook effects | PASS after PR #552 fix | V77 persists the last applied SaaS invoice id; duplicate invoice retries are no-op while provider reconciliation holds a pessimistic row lock |
 | 9. Handle rejected/cancelled invoice | PASS | subscription becomes `PAST_DUE` with 3-day grace; duplicate invoice cannot extend grace repeatedly |
@@ -77,8 +77,9 @@ Before this certification, approved/rejected invoice reconciliation had no durab
 PR #552 adds:
 
 - `business_subscription.last_billing_invoice_id`;
+- `business_subscription.last_billing_payment_status`;
 - a pessimistic row lock on the matching `business_subscription` during provider reconciliation;
-- a no-op when the same provider invoice is received again;
+- a no-op only when the same provider invoice **and payment status** are received again, allowing a legitimate `rejected -> approved` recovery for the same invoice;
 - invoice id equality validation;
 - checkout external-reference validation.
 
@@ -97,7 +98,21 @@ Primary certification tests:
   - duplicate approved invoice is applied once;
   - duplicate rejected invoice does not extend grace;
   - approved renewal advances period;
-  - cancelled subscription cancels local access and pending plan.
+  - cancelled subscription cancels local access and pending plan;
+  - processed invoice with missing payment status fails closed;
+  - same invoice can recover from rejected payment to approved payment;
+  - stale approved renewal cannot move the billing period backwards.
+- `BillingSubscriptionServiceEdgeCasesTest`
+  - blank/malformed invoice identity fails closed;
+  - missing/unknown subscription identity fails closed;
+  - mismatched external reference fails closed;
+  - approved payment without provider debit date receives a bounded current period;
+  - pending payment never activates or marks past due;
+  - both provider cancellation spellings are covered.
+- `MercadoPagoSubscriptionGatewayTest`
+  - keeps invoice lifecycle status separate from payment status;
+  - proves `processed` invoice + missing payment is **not** treated as approved;
+  - malformed numeric invoice identifiers fail closed.
 - `MercadoPagoWebhookControllerTest`
   - invalid signature -> 401, no reconciliation;
   - configured signed route -> authorized-payment reconciliation.
@@ -108,7 +123,7 @@ Primary certification tests:
   - `BusinessSubscriptionServiceTest`;
   - `CallLifecycleServiceTest` / call-capacity integration coverage.
 
-The draft PR CI is the executable certification gate for these tests.
+The draft PR CI is the executable certification gate for these tests. The branch is synchronized with the current `main` baseline above; certification is not complete unless the integrated HEAD is green.
 
 ## Production configuration required
 
@@ -165,7 +180,7 @@ BUSINESS_ADMIN
   -> customer authorizes/pays
   -> signed subscription_authorized_payment webhook
   -> backend fetches invoice from Mercado Pago
-  -> approved/processed invoice
+  -> provider payment.status == approved
   -> subscription ACTIVE
   -> pending plan becomes current plan
   -> V42 entitlements apply
