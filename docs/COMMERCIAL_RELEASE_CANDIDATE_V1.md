@@ -6,14 +6,15 @@ Fecha de coordinación: 2026-09-27
 
 Esta rama ensambla y certifica un único candidato comercial de RecepVoz sin tocar `main`, sin deploy y sin activar proveedores reales.
 
-**Estado actual: RC integrado, certificación final automatizada en curso. NO mergear a `main` todavía.**
+**Estado actual: RC integrado y certificación automatizada final PASS. El merge/deploy sigue bloqueado por gates administrativos/externos y por la regla de no desplegar sin autorización explícita.**
 
 ## Base y límites
 
 - repositorio: `Nicricht/helvoca`
 - rama: `chore/commercial-release-candidate-v1`
-- base de ensamblaje: `main@2bc4265a0c15498f6f6aa0363238d70b632cb4ae`
-- #548 ya forma parte de esa base y conserva la certificación de latencia read-only
+- base vigente del RC: `main@2adee4b06df1a52603824e52b5da3f7690a0fe52`
+- ese baseline incluye #541 (controlled real business launch safety v1)
+- #548 sigue preservado y conserva la certificación de latencia read-only
 - `main` continúa sin branch protection/ruleset obligatorio
 - no se ha creado tag comercial
 - no se ha desplegado este RC
@@ -92,19 +93,31 @@ La integración posterior de #550 no cambia voz, prompt ni VAD: únicamente endu
 
 ### G3. Certificación automatizada del HEAD integrado
 
-El HEAD definitivo del RC debe pasar como una sola unidad:
+Última certificación completa del RC antes de esta actualización documental:
 
-- [ ] Fast Gate
-- [ ] Full backend suite + JaCoCo
-- [ ] differential Java coverage
-- [ ] browser E2E
-- [ ] Meta webhook public smoke
-- [ ] Golden Journey incluido en el gate
-- [ ] voice commercial certification incluida en el gate
-- [ ] billing commercial certification incluida en el gate
-- [ ] demo/onboarding tests incluidos en el gate
+- HEAD certificado: `4949bb5b17421be31077372fef1a8b2478be4504`
+- baseline: `main@2adee4b06df1a52603824e52b5da3f7690a0fe52`
+- workflow: **RecepVoz CI #2286 — PASS**
+- backend: **1.319 tests, 0 failures, 0 errors**
+- differential executable line coverage: **287/287 = 100%**
+- differential branch coverage: **127/166 = 76,5%**
+- browser E2E: **74/74 passed**
+- Fast Gate: **PASS**
+- Meta webhook public smoke: **PASS**
 
-No se considera certificado por el mero hecho de que las ramas fuente estuvieran verdes.
+El HEAD integrado pasó como una sola unidad:
+
+- [x] Fast Gate
+- [x] Full backend suite + JaCoCo
+- [x] differential Java coverage
+- [x] browser E2E
+- [x] Meta webhook public smoke
+- [x] Golden Journey incluido en el gate
+- [x] voice commercial certification incluida en el gate
+- [x] billing commercial certification incluida en el gate
+- [x] demo/onboarding tests incluidos en el gate
+
+La certificación integrada es la evidencia canónica; no se depende sólo de los verdes individuales de las ramas fuente.
 
 ### G4. Voz humana
 
@@ -122,10 +135,10 @@ Antes de cobrar a un cliente mediante el flujo SaaS real:
 
 - [ ] checkout sandbox con cuenta/proveedor autorizado
 - [ ] webhook firmado sandbox
-- [ ] invoice approved activa entitlement correcto
-- [ ] invoice rejected/canceled aplica el estado esperado sin duplicar efectos
-- [ ] webhook repetido es idempotente
-- [ ] referencias e IDs inconsistentes fallan cerrados
+- [x] invoice approved activa entitlement correcto en la certificación interna
+- [x] invoice rejected/canceled aplica el estado esperado sin duplicar efectos en la certificación interna
+- [x] webhook repetido es idempotente en la certificación interna
+- [x] referencias e IDs inconsistentes fallan cerrados en la certificación interna
 - [ ] cancelación respeta la política de acceso
 - [ ] pricing público coincide con catálogo backend
 - [ ] cualquier prueba live requiere autorización explícita y queda fuera de esta certificación
@@ -160,7 +173,7 @@ Antes de declarar un cliente real activo:
 
 ## Condición de salida
 
-El RC queda técnicamente listo para una decisión de merge solo cuando G3 esté completamente verde.
+**G3 está completamente verde.** El RC queda técnicamente listo para una decisión de merge, sujeto a los gates externos/administrativos de G5–G7 y a autorización explícita para cualquier acción que dispare deploy.
 
 El lanzamiento comercial real sigue además condicionado a:
 
