@@ -2,6 +2,9 @@ package cl.helvoca.telephony.twilio;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -23,6 +26,29 @@ class TwilioCertificationCommandStoreTest {
         assertTrue(TwilioCertificationCommandStore.validCallSid(
                 "CA0123456789abcdef0123456789abcdef"));
         assertFalse(TwilioCertificationCommandStore.validCallSid("CA-short"));
+    }
+
+    @Test
+    void emptyQueueReturnsNoClaim() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<String>>any(), any(), any()))
+                .thenReturn(List.of());
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+
+        assertTrue(store.claimNext().isEmpty());
+    }
+
+    @Test
+    void pendingCommandIsClaimedWithGeneratedToken() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<String>>any(), any(), any()))
+                .thenReturn(List.of("latency-20260927-003"));
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+
+        var claimed = store.claimNext().orElseThrow();
+
+        assertEquals("latency-20260927-003", claimed.runId());
+        assertTrue(TwilioCertificationCommandStore.validToken(claimed.callbackToken()));
     }
 
     @Test
@@ -48,6 +74,20 @@ class TwilioCertificationCommandStoreTest {
                 "CA0123456789abcdef0123456789abcdef"));
 
         verify(jdbc, times(1)).update(anyString(), any(), any(), any());
+    }
+
+    @Test
+    void validProviderCallAndFailurePathsWriteExpectedRows() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+        String runId = "latency-20260927-004";
+        String token = "11111111-1111-1111-1111-111111111111";
+        String callSid = "CA0123456789abcdef0123456789abcdef";
+
+        store.recordProviderCall(runId, token, callSid);
+        store.markFailed(runId, "provider unavailable");
+
+        verify(jdbc, times(2)).update(anyString(), any(), any(), any());
     }
 
     @Test
