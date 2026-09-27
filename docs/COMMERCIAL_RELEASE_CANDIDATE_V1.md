@@ -4,17 +4,20 @@ Fecha de coordinación: 2026-09-27
 
 ## Objetivo
 
-Esta rama ensambla y certifica un único candidato comercial de RecepVoz sin tocar `main`, sin deploy y sin activar proveedores reales.
+Este documento registra el baseline comercial integrado y la evidencia canónica de cierre técnico de RecepVoz, sin activar proveedores reales ni ejecutar un deploy.
 
-**Estado actual: RC integrado, certificación final automatizada en curso. NO mergear a `main` todavía.**
+**Estado actual: CIERRE TÉCNICO AUTOMATIZADO PASS. `main` incluye el fix de concurrencia de reservas, la certificación de agotamiento de inventario y el runbook de rollback/gates externos. El lanzamiento comercial real sigue bloqueado únicamente por gates administrativos/externos explícitos.**
 
 ## Base y límites
 
 - repositorio: `Nicricht/helvoca`
-- rama: `chore/commercial-release-candidate-v1`
-- base de ensamblaje: `main@2bc4265a0c15498f6f6aa0363238d70b632cb4ae`
-- #548 ya forma parte de esa base y conserva la certificación de latencia read-only
-- `main` continúa sin branch protection/ruleset obligatorio
+- baseline canónico: `main@4244f5350f8049be00138c26a73a60db8026cfb4`
+- #541 sigue incluido (controlled real business launch safety v1)
+- #548 sigue preservado y conserva la certificación de latencia read-only
+- #602 está integrado: elimina la carrera concurrente de confirmación de bookings y agrega V79
+- #604 está integrado: certifica `stock 2 -> 1 -> 0 -> INSUFFICIENT_STOCK` contra PostgreSQL Testcontainers
+- #601 está integrado: rollback del primer cliente y gates externos explícitos
+- `main` está protegido por el ruleset activo `Protect main` (ID `24088016`)
 - no se ha creado tag comercial
 - no se ha desplegado este RC
 
@@ -33,6 +36,16 @@ Esta rama ensambla y certifica un único candidato comercial de RecepVoz sin toc
 | #559 | Separación owner / operations | #566 merged después de #554 |
 
 La integración temporal #564 fue cerrada como superseded por #571. La reconciliación conserva simultáneamente los requisitos comerciales de #553 y los requisitos de perfil/demo de #555.
+
+## Integraciones de cierre posteriores al RC
+
+- **#602**: fix productivo de concurrencia en confirmación de reservas; PR CI PASS antes de merge.
+- **#604**: certificación comercial de agotamiento de inventario; PR CI PASS antes de merge.
+- **#601**: documentación de rollback y gates externos; PR CI PASS antes de merge.
+- **#584**: cerrada como superseded; su rama histórica quedó detrás del baseline actual.
+- **#543**: cerrada como superseded; el preflight actual de `main` reemplaza esa rama apilada histórica.
+
+No quedan PRs funcionales pendientes después de esta convergencia; #603 es únicamente el cierre documental de la evidencia final.
 
 ## Evidencia de source PRs
 
@@ -88,23 +101,42 @@ La integración posterior de #550 no cambia voz, prompt ni VAD: únicamente endu
 - [x] #553 + #555 reconciliados sin descartar requisitos
 - [x] #554 integrado antes de la rama apilada #559
 - [x] sin force push
-- [x] `main` no fue modificado
+- [x] cambios de cierre integrados mediante PRs explícitamente autorizadas (#602, #604 y #601)
+- [x] PRs históricas #584 y #543 cerradas como superseded
 
-### G3. Certificación automatizada del HEAD integrado
+### G3. Certificación automatizada del `main` integrado
 
-El HEAD definitivo del RC debe pasar como una sola unidad:
+Evidencia canónica posterior a la convergencia:
 
-- [ ] Fast Gate
-- [ ] Full backend suite + JaCoCo
-- [ ] differential Java coverage
-- [ ] browser E2E
-- [ ] Meta webhook public smoke
-- [ ] Golden Journey incluido en el gate
-- [ ] voice commercial certification incluida en el gate
-- [ ] billing commercial certification incluida en el gate
-- [ ] demo/onboarding tests incluidos en el gate
+- baseline certificado: `main@4244f5350f8049be00138c26a73a60db8026cfb4`
+- workflow: **RecepVoz CI #2296 / run 36357933434 — SUCCESS**
+- Fast Gate: **PASS**
+- Golden Journey release contract: **PASS**
+- production-gate: **PASS**
+- backend + JaCoCo: **1.324 tests, 0 failures, 0 errors, 0 skipped**
+- Maven: **BUILD SUCCESS**
+- browser E2E / Playwright: **74/74 passed**
+- status canónico: **`helvoca/full-verification = success`**
 
-No se considera certificado por el mero hecho de que las ramas fuente estuvieran verdes.
+Además:
+
+- #602 pasó differential Java coverage antes del merge;
+- #604 pasó differential Java coverage y su suite PostgreSQL específica ejecutó 6/6 tests sin fallos antes del merge;
+- #601 no modificó Java productivo;
+- el push a `main` omite differential coverage por diseño del workflow, porque ese control se aplica en PR.
+
+Por tanto:
+
+- [x] Fast Gate
+- [x] Full backend suite + JaCoCo
+- [x] browser E2E
+- [x] Golden Journey release contract
+- [x] production-gate
+- [x] full-verification de `main`
+- [x] booking concurrency fix integrado y recertificado
+- [x] inventory depletion certification integrada y recertificada
+
+La evidencia canónica ya no es una rama RC: es el `main` integrado indicado arriba.
 
 ### G4. Voz humana
 
@@ -122,10 +154,10 @@ Antes de cobrar a un cliente mediante el flujo SaaS real:
 
 - [ ] checkout sandbox con cuenta/proveedor autorizado
 - [ ] webhook firmado sandbox
-- [ ] invoice approved activa entitlement correcto
-- [ ] invoice rejected/canceled aplica el estado esperado sin duplicar efectos
-- [ ] webhook repetido es idempotente
-- [ ] referencias e IDs inconsistentes fallan cerrados
+- [x] invoice approved activa entitlement correcto en la certificación interna
+- [x] invoice rejected/canceled aplica el estado esperado sin duplicar efectos en la certificación interna
+- [x] webhook repetido es idempotente en la certificación interna
+- [x] referencias e IDs inconsistentes fallan cerrados en la certificación interna
 - [ ] cancelación respeta la política de acceso
 - [ ] pricing público coincide con catálogo backend
 - [ ] cualquier prueba live requiere autorización explícita y queda fuera de esta certificación
@@ -134,16 +166,18 @@ No confundir este gate con merchant payments de los clientes de nuestros cliente
 
 ### G6. Seguridad del repositorio
 
-Antes de cualquier merge/tag comercial:
+Ruleset activo verificado: **`Protect main` / ID `24088016`**.
 
-- [ ] proteger `main`
-- [ ] exigir PR para merge
-- [ ] exigir `fast-gate`
-- [ ] exigir Full Gate / `test`
-- [ ] bloquear direct push normal
-- [ ] bloquear force push
+- [x] proteger `main`
+- [x] exigir pull request antes de merge
+- [x] exigir `fast-gate`
+- [x] exigir Full Gate / `test`
+- [x] exigir que la rama esté actualizada antes de merge
+- [x] bloquear non-fast-forward / force push
+- [x] bloquear eliminación de `main`
+- [x] sin bypass para el usuario actual
 
-La conexión GitHub disponible puede auditar el repositorio, pero no expone escritura administrativa de branch protection/rulesets. Este bloqueo no debe marcarse como resuelto hasta aplicarlo desde una credencial/canal autorizado.
+El ruleset está en enforcement `active`, aplica a la rama por defecto y usa los checks de GitHub Actions `fast-gate` y `test`. No exige aprobación humana adicional (`required_approving_review_count=0`). La propia PR #603 fue bloqueada al intentar mergear con checks de un HEAD desactualizado, confirmando que la política estricta está siendo aplicada.
 
 ### G7. Primer cliente
 
@@ -160,23 +194,23 @@ Antes de declarar un cliente real activo:
 
 ## Condición de salida
 
-El RC queda técnicamente listo para una decisión de merge solo cuando G3 esté completamente verde.
+**El cierre técnico automatizado está completo y verde.** No quedan bugs P0/P1 conocidos identificados por esta convergencia ni PRs funcionales pendientes de integración.
 
-El lanzamiento comercial real sigue además condicionado a:
+El lanzamiento comercial real permanece deliberadamente bloqueado por gates que no pueden sustituirse con mocks internos:
 
-1. billing sandbox autorizado, cuando el flujo de cobro SaaS vaya a activarse;
-2. protección obligatoria de `main`;
-3. onboarding y canales del primer cliente;
-4. autorización explícita antes de tag, merge a `main`, deploy o cobro real.
+1. checkout + webhook sandbox con una cuenta/proveedor SaaS autorizado, antes de cobrar RecepVoz a un cliente;
+2. onboarding aprobado del primer cliente real, con sus datos, canales, responsables y soporte;
+3. autorización explícita para activar proveedor/deploy/cobro real.
 
-## Prohibiciones durante esta coordinación
+Hasta completar esos puntos, el estado correcto es **TECHNICALLY READY / EXTERNAL GATES PENDING**, no “producción activada”.
 
-- no deploy
-- no merge a `main`
+## Prohibiciones después del cierre técnico
+
+- no direct push normal a `main`
 - no force push
-- no llamadas reales adicionales
-- no WhatsApp real
-- no cobro real
-- no credenciales live
+- no deploy comercial hasta cerrar gates externos
+- no llamadas reales adicionales sin una ventana de piloto autorizada
+- no WhatsApp real sin autorización del tenant/canal
+- no cobro real ni credenciales live durante certificaciones
 - no activar proveedores para hacer pasar una demo
 - no esconder fallos bajando umbrales de CI

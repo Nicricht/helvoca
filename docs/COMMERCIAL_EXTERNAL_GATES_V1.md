@@ -49,22 +49,21 @@ Live credentials are not part of this gate.
 
 ## Gate C — GitHub main protection
 
-Status: **ADMIN ACTION REQUIRED**
+Status: **COMPLETE / ENFORCED**
 
-The connected GitHub integration does not have repository administration permission for branch-protection APIs, so this cannot be truthfully applied from the current ChatGPT connection.
+Repository ruleset `Protect main` (ID `24088016`) is active for the default branch and was verified through the GitHub rulesets API.
 
-Required settings for `main`:
+Enforced controls:
 
-- require pull request before merge;
-- require successful `fast-gate`;
-- require successful full `test` job;
-- require branch to be up to date before merge when compatible with the team workflow;
-- block force pushes;
-- block branch deletion;
-- prevent normal direct pushes except explicitly approved administrators/break-glass policy;
-- keep required checks unchanged rather than bypassing them for a release.
+- pull request required before merge;
+- required GitHub Actions check `fast-gate`;
+- required GitHub Actions check `test`;
+- strict up-to-date required-status-check policy;
+- non-fast-forward / force pushes blocked;
+- branch deletion blocked;
+- no bypass for the current user.
 
-After an administrator applies the rule, verify by attempting policy inspection and by confirming a non-green PR cannot merge.
+The enforcement was also exercised during release convergence: PR #603 was rejected when its successful checks belonged to a branch that was behind the current `main`. The branch must be updated and the required checks must pass again before merge.
 
 ## Gate D — First real customer operational readiness
 
