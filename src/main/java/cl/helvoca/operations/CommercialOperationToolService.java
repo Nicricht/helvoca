@@ -420,6 +420,29 @@ public class CommercialOperationToolService {
                     "El producto seleccionado no tiene un precio backend disponible para cotizar.");
         }
 
+        List<InventoryProductVariant> activeVariants = variantsForItem(businessId, item);
+        InventoryProductVariant selectedVariant = null;
+        String requestedVariantRaw = optional(args, "variantId");
+        String storedVariantRaw = stringMetadata(currentMetadata, "selectedVariantId");
+        String variantRaw = !blank(requestedVariantRaw) ? requestedVariantRaw : storedVariantRaw;
+        if (!blank(variantRaw)) {
+            UUID variantId = uuid(variantRaw);
+            selectedVariant = inventoryVariants == null ? null
+                    : inventoryVariants.findByIdAndBusinessId(variantId, businessId)
+                            .filter(InventoryProductVariant::isActive)
+                            .filter(value -> value.getCatalogItemId().equals(selectedId))
+                            .orElse(null);
+            if (selectedVariant == null) {
+                return error("VARIANT_NOT_FOUND",
+                        "La variante seleccionada ya no existe, está inactiva o no pertenece al producto.");
+            }
+        } else if (!activeVariants.isEmpty()) {
+            return error("VARIANT_SELECTION_REQUIRED",
+                    "Este producto tiene variantes. Debes seleccionar una variante exacta antes de cotizar.");
+        }
+
+        String selectedVariantId = selectedVariant == null ? null : selectedVariant.getId().toString();
+
         Integer requestedQuantity = optionalInteger(args, "quantity");
         int quantity = requestedQuantity == null ? 1 : requestedQuantity;
         if (quantity < 1 || quantity > 100) {
@@ -432,6 +455,7 @@ public class CommercialOperationToolService {
         String currency = blank(item.getCurrency()) ? "CLP" : item.getCurrency().trim().toUpperCase();
 
         boolean idempotent = selectedId.toString().equals(stringMetadata(currentMetadata, "quotedCatalogItemId"))
+                && java.util.Objects.equals(selectedVariantId, stringMetadata(currentMetadata, "quotedVariantId"))
                 && quantity == integerMetadata(currentMetadata, "quotedQuantity")
                 && moneyMetadataEquals(currentMetadata, "quotedUnitPrice", unitPrice)
                 && moneyMetadataEquals(currentMetadata, "quotedTotal", total)
@@ -443,6 +467,13 @@ public class CommercialOperationToolService {
                     ? new LinkedHashMap<>()
                     : new LinkedHashMap<>(currentMetadata);
             metadata.put("quotedCatalogItemId", selectedId.toString());
+            if (selectedVariantId == null) {
+                metadata.remove("selectedVariantId");
+                metadata.remove("quotedVariantId");
+            } else {
+                metadata.put("selectedVariantId", selectedVariantId);
+                metadata.put("quotedVariantId", selectedVariantId);
+            }
             metadata.put("quotedQuantity", quantity);
             metadata.put("quotedUnitPrice", unitPrice);
             metadata.put("quotedTotal", total);
@@ -465,6 +496,15 @@ public class CommercialOperationToolService {
         return success(new JSONObject()
                 .put("operationId", operation.getId().toString())
                 .put("selectedCatalogItemId", item.getId().toString())
+                .put("selectedVariantId", selectedVariant == null
+                        ? JSONObject.NULL
+                        : selectedVariant.getId().toString())
+                .put("selectedVariantName", selectedVariant == null
+                        ? JSONObject.NULL
+                        : selectedVariant.getName())
+                .put("selectedVariantSku", selectedVariant == null
+                        ? JSONObject.NULL
+                        : selectedVariant.getSku())
                 .put("quantity", quantity)
                 .put("unitPrice", unitPrice)
                 .put("total", total)
@@ -522,6 +562,37 @@ public class CommercialOperationToolService {
                     "El producto seleccionado no pertenece al escaparate autoritativo.");
         }
 
+        CatalogItem selectedItem = catalog.findByIdAndBusinessId(selectedId, businessId)
+                .filter(CatalogItem::isActive)
+                .orElse(null);
+        if (selectedItem == null) {
+            return error("CATALOG_ITEM_UNAVAILABLE",
+                    "El producto seleccionado ya no está disponible en el catálogo activo.");
+        }
+        List<InventoryProductVariant> activeVariants = variantsForItem(businessId, selectedItem);
+        String selectedVariantRaw = stringMetadata(metadata, "selectedVariantId");
+        String quotedVariantRaw = stringMetadata(metadata, "quotedVariantId");
+        if (!java.util.Objects.equals(selectedVariantRaw, quotedVariantRaw)) {
+            return error("SELECTED_PRODUCT_QUOTE_REQUIRED",
+                    "La variante seleccionada no coincide con la última cotización.");
+        }
+        InventoryProductVariant selectedVariant = null;
+        if (!blank(selectedVariantRaw)) {
+            UUID variantId = uuid(selectedVariantRaw);
+            selectedVariant = inventoryVariants == null ? null
+                    : inventoryVariants.findByIdAndBusinessId(variantId, businessId)
+                            .filter(InventoryProductVariant::isActive)
+                            .filter(value -> value.getCatalogItemId().equals(selectedId))
+                            .orElse(null);
+            if (selectedVariant == null) {
+                return error("VARIANT_NOT_FOUND",
+                        "La variante cotizada ya no está disponible.");
+            }
+        } else if (!activeVariants.isEmpty()) {
+            return error("VARIANT_SELECTION_REQUIRED",
+                    "Este producto requiere una variante exacta antes de crear el pedido.");
+        }
+
         Integer requestedQuantity = optionalInteger(args, "quantity");
         int quotedQuantity = integerMetadata(metadata, "quotedQuantity");
         int quantity = requestedQuantity == null
@@ -531,10 +602,14 @@ public class CommercialOperationToolService {
             return error("INVALID_QUANTITY", "La cantidad debe estar entre 1 y 100.");
         }
 
+        JSONObject orderItem = new JSONObject()
+                .put("catalogItemId", selectedId.toString())
+                .put("quantity", quantity);
+        if (selectedVariant != null) {
+            orderItem.put("variantId", selectedVariant.getId().toString());
+        }
         JSONObject orderArgs = new JSONObject()
-                .put("items", new JSONArray().put(new JSONObject()
-                        .put("catalogItemId", selectedId.toString())
-                        .put("quantity", quantity)))
+                .put("items", new JSONArray().put(orderItem))
                 .put("fulfillmentType", required(args, "fulfillmentType"));
         copyArgument(args, orderArgs, "deliveryZoneId");
         copyArgument(args, orderArgs, "address");
@@ -576,6 +651,9 @@ public class CommercialOperationToolService {
                 : new LinkedHashMap<>(orderOperation.getMetadata());
         orderMetadata.put("commercialJourneyOperationId", journeyOperationId.toString());
         orderMetadata.put("selectedCatalogItemId", selectedId.toString());
+        if (selectedVariant != null) {
+            orderMetadata.put("selectedVariantId", selectedVariant.getId().toString());
+        }
         orderOperation.setMetadata(orderMetadata);
         operations.saveAndFlush(orderOperation);
 
@@ -587,6 +665,9 @@ public class CommercialOperationToolService {
         data.put("commercialJourneyOperationId", journeyOperationId.toString());
         data.put("orderOperationId", orderOperationId.toString());
         data.put("selectedCatalogItemId", selectedId.toString());
+        data.put("selectedVariantId", selectedVariant == null
+                ? JSONObject.NULL
+                : selectedVariant.getId().toString());
         return result;
     }
 
