@@ -9,6 +9,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class PilotGoNoGoControllerContractTest {
 
@@ -25,4 +26,13 @@ class PilotGoNoGoControllerContractTest {
         Method method = PilotGoNoGoController.class.getMethod("evaluate");
         assertNotNull(method.getAnnotation(GetMapping.class));
     }
+    @Test
+    void evaluateDelegatesToReadOnlyPreflightService() {
+        PilotGoNoGoService service = mock(PilotGoNoGoService.class);
+        PilotGoNoGoController controller = new PilotGoNoGoController(service);
+
+        assertNull(controller.evaluate());
+        verify(service).evaluate();
+    }
+
 }
