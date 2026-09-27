@@ -454,8 +454,10 @@ public class CommercialOperationToolService {
         java.math.BigDecimal total = unitPrice.multiply(java.math.BigDecimal.valueOf(quantity));
         String currency = blank(item.getCurrency()) ? "CLP" : item.getCurrency().trim().toUpperCase();
 
+        String quotedVariantId = stringMetadata(currentMetadata, "quotedVariantId");
+        if (blank(quotedVariantId)) quotedVariantId = null;
         boolean idempotent = selectedId.toString().equals(stringMetadata(currentMetadata, "quotedCatalogItemId"))
-                && java.util.Objects.equals(selectedVariantId, stringMetadata(currentMetadata, "quotedVariantId"))
+                && java.util.Objects.equals(selectedVariantId, quotedVariantId)
                 && quantity == integerMetadata(currentMetadata, "quotedQuantity")
                 && moneyMetadataEquals(currentMetadata, "quotedUnitPrice", unitPrice)
                 && moneyMetadataEquals(currentMetadata, "quotedTotal", total)
@@ -562,22 +564,22 @@ public class CommercialOperationToolService {
                     "El producto seleccionado no pertenece al escaparate autoritativo.");
         }
 
-        CatalogItem selectedItem = catalog.findByIdAndBusinessId(selectedId, businessId)
-                .filter(CatalogItem::isActive)
-                .orElse(null);
-        if (selectedItem == null) {
-            return error("CATALOG_ITEM_UNAVAILABLE",
-                    "El producto seleccionado ya no está disponible en el catálogo activo.");
-        }
-        List<InventoryProductVariant> activeVariants = variantsForItem(businessId, selectedItem);
         String selectedVariantRaw = stringMetadata(metadata, "selectedVariantId");
         String quotedVariantRaw = stringMetadata(metadata, "quotedVariantId");
+        if (blank(selectedVariantRaw)) selectedVariantRaw = null;
+        if (blank(quotedVariantRaw)) quotedVariantRaw = null;
         if (!java.util.Objects.equals(selectedVariantRaw, quotedVariantRaw)) {
             return error("SELECTED_PRODUCT_QUOTE_REQUIRED",
                     "La variante seleccionada no coincide con la última cotización.");
         }
+
+        // quote_selected_product is the authoritative boundary that validates
+        // whether the product requires a variant. At order creation we only
+        // revalidate the exact quoted variant when one exists. Re-reading the
+        // base catalog here would make an already-authoritative quote depend on
+        // an unrelated second lookup and breaks idempotent legacy/simple products.
         InventoryProductVariant selectedVariant = null;
-        if (!blank(selectedVariantRaw)) {
+        if (selectedVariantRaw != null) {
             UUID variantId = uuid(selectedVariantRaw);
             selectedVariant = inventoryVariants == null ? null
                     : inventoryVariants.findByIdAndBusinessId(variantId, businessId)
@@ -588,9 +590,6 @@ public class CommercialOperationToolService {
                 return error("VARIANT_NOT_FOUND",
                         "La variante cotizada ya no está disponible.");
             }
-        } else if (!activeVariants.isEmpty()) {
-            return error("VARIANT_SELECTION_REQUIRED",
-                    "Este producto requiere una variante exacta antes de crear el pedido.");
         }
 
         Integer requestedQuantity = optionalInteger(args, "quantity");
