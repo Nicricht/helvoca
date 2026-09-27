@@ -264,26 +264,14 @@ class GoldenJourneyCommercialV1IntegrationTest {
         say(dialogue, call.getId(), "USER", "Perfecto, eso sería todo. Chao.");
         say(dialogue, call.getId(), "ASSISTANT", "Chao, que estés muy bien.");
 
-        TwilioCallControl fakeCarrier = mock(TwilioCallControl.class);
-        when(fakeCarrier.hangup(ACCOUNT_SID, CALL_SID)).thenReturn(true);
-        TwilioProperties fakeProperties = new TwilioProperties();
-        fakeProperties.setAccountSid(ACCOUNT_SID);
+        JSONObject endResult = new JSONObject(tools.prepareDeferredEndCall(context));
+        assertTrue(endResult.getBoolean("success"), endResult::toString);
+        assertTrue(data(endResult).getBoolean("pendingPlaybackCompletion"));
+        assertFalse(data(endResult).getBoolean("ended"),
+                "Certification must not contact the real carrier before playback completes");
 
-        Object originalControl = getField(tools, "twilioCallControl");
-        Object originalProperties = getField(tools, "twilioProperties");
-        JSONObject endResult;
-        try {
-            setField(tools, "twilioCallControl", fakeCarrier);
-            setField(tools, "twilioProperties", fakeProperties);
-            endResult = execute(context, "end_call", new JSONObject());
-        } finally {
-            setField(tools, "twilioCallControl", originalControl);
-            setField(tools, "twilioProperties", originalProperties);
-        }
-        assertTrue(data(endResult).getBoolean("ended"));
-        assertFalse(data(endResult).getBoolean("alreadyEnded"));
-        verify(fakeCarrier, times(1)).hangup(ACCOUNT_SID, CALL_SID);
-
+        // Simulates the carrier's terminal callback after the single farewell has
+        // finished playing. No external telephony request is made by this test.
         lifecycle.updateStatus(call.getId(), "completed", 42);
         lifecycle.markStreamStopped(call.getStreamSid());
         CallSession closed = calls.findByIdAndBusinessId(call.getId(), business.getId()).orElseThrow();
@@ -495,15 +483,4 @@ class GoldenJourneyCommercialV1IntegrationTest {
         assertEquals(expected, actual, () -> "Unexpected tool/action count for " + type + ": " + trace);
     }
 
-    private static Object getField(Object target, String name) throws Exception {
-        Field field = CertificationGuardedRealtimeToolService.class.getDeclaredField(name);
-        field.setAccessible(true);
-        return field.get(target);
-    }
-
-    private static void setField(Object target, String name, Object value) throws Exception {
-        Field field = CertificationGuardedRealtimeToolService.class.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
 }
