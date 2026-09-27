@@ -102,6 +102,29 @@ class CallLifecycleServiceTest {
     }
 
     @Test
+    void aiModelMetadataHandlesNoopAndLengthGuardBranches() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallLifecycleService lifecycle = lifecycle(
+                mock(PhoneNumberRepository.class), mock(CustomerRepository.class), calls, new CallCommercialProperties());
+        UUID callId = UUID.randomUUID();
+
+        lifecycle.markAiModel(callId, null);
+        lifecycle.markAiModel(callId, "   ");
+        verifyNoInteractions(calls);
+
+        CallSession call = new CallSession();
+        when(calls.findById(callId)).thenReturn(Optional.of(call));
+        String oversized = "x".repeat(140);
+
+        lifecycle.markAiModel(callId, oversized);
+        assertEquals(120, call.getAiModel().length());
+        verify(calls, times(1)).saveAndFlush(call);
+
+        lifecycle.markAiModel(callId, oversized);
+        verify(calls, times(1)).saveAndFlush(call);
+    }
+
+    @Test
     void subscriptionCapacityRejectsCallBeforePersistingAnotherSession() {
         PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
         CustomerRepository customers = mock(CustomerRepository.class);
