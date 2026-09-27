@@ -36,6 +36,11 @@ public class OpenAiRealtimeBridgeFactory implements VoiceAiProvider {
     }
 
     @Override
+    public String modelId() {
+        return properties.getRealtimeModel();
+    }
+
+    @Override
     public VoiceAiSession createSession(RealtimeCallContext context, VoiceTransportSession transport) {
         return new OpenAiRealtimeBridge(context, transport, properties, tools, transcripts, summaries, httpClient);
     }
