@@ -145,6 +145,50 @@ class OutboundMessagingIntegrationTest {
     }
 
     @Test
+    void verifiedSucceededPaymentCanRenderIdempotentConfirmationWithoutCheckoutLink() {
+        Business business = business("Payment confirmation tenant");
+        Customer customer = customer(business, "+56911114444");
+        BusinessOperation targetOperation = operation(business, customer, BusinessOperation.Type.ORDER);
+        BusinessOperation paymentOperation = operation(business, customer, BusinessOperation.Type.PAYMENT);
+        BusinessPayment payment = payment(
+                paymentOperation,
+                targetOperation,
+                customer,
+                "https://sandbox.example.test/pay/confirmed");
+        payment.setStatus(BusinessPayment.Status.SUCCEEDED);
+        payments.saveAndFlush(payment);
+
+        CustomerIdentity identity = identities.verifyPhone(
+                business.getId(), customer.getId(), customer.getPhone(),
+                CustomerIdentity.VerificationStatus.CUSTOMER_VERIFIED, "TEST");
+
+        OutboundMessage first = outbound.prepare(
+                business.getId(),
+                customer.getId(),
+                OutboundMessage.Channel.WHATSAPP,
+                OutboundMessage.Purpose.PAYMENT_CONFIRMATION,
+                paymentOperation.getId(),
+                identity.getId());
+        paymentOperation.setRevision(paymentOperation.getRevision() + 1);
+        operations.saveAndFlush(paymentOperation);
+
+        OutboundMessage second = outbound.prepare(
+                business.getId(),
+                customer.getId(),
+                OutboundMessage.Channel.WHATSAPP,
+                OutboundMessage.Purpose.PAYMENT_CONFIRMATION,
+                paymentOperation.getId(),
+                identity.getId());
+
+        assertEquals(first.getId(), second.getId(),
+                "A second verified provider event must not create another confirmation after an operation revision change");
+        assertEquals(OutboundMessage.Status.PREPARED, first.getStatus());
+        assertTrue(first.getContentText().contains("Pago confirmado"));
+        assertTrue(first.getContentText().contains("CLP 24990"));
+        assertFalse(first.getContentText().contains("https://sandbox.example.test/pay/confirmed"));
+    }
+
+    @Test
     void multipleVerifiedRecipientsRequireExplicitIdentity() {
         Business business = business("Multiple phones");
         Customer customer = customer(business, "+56910000001");

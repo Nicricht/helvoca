@@ -4,9 +4,14 @@ import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
 import cl.helvoca.delivery.DeliveryZone;
 import cl.helvoca.delivery.DeliveryZoneRepository;
+import cl.helvoca.inventory.InventoryProductVariant;
+import cl.helvoca.inventory.InventoryProductVariantRepository;
+import cl.helvoca.inventory.InventoryService;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
@@ -27,6 +32,12 @@ public class OrderWorkflowService {
     private final BusinessOrderRepository orders;
     private final BusinessOrderLineRepository orderLines;
     private final BusinessOperationCapabilityService capabilities;
+
+    @Autowired(required = false)
+    private InventoryService inventory;
+
+    @Autowired(required = false)
+    private InventoryProductVariantRepository inventoryVariants;
 
     public OrderWorkflowService(CatalogItemRepository catalog,
                                 DeliveryZoneRepository deliveryZones,
@@ -94,6 +105,7 @@ public class OrderWorkflowService {
         return success(quoteData(operation, calculation));
     }
 
+    @Transactional
     public JSONObject confirm(UUID businessId,
                               UUID customerId,
                               UUID sourceReferenceId,
@@ -149,6 +161,25 @@ public class OrderWorkflowService {
                     quoteData(operation, recalculated));
         }
 
+        InventoryService.OrderReservationResult inventoryReservation = inventory == null
+                ? new InventoryService.OrderReservationResult(true, null, null, List.of())
+                : inventory.reserveOrder(
+                        businessId,
+                        operationId,
+                        recalculated.lines().stream()
+                                .map(line -> new InventoryService.OrderItem(
+                                        line.item().getId(),
+                                        line.variant() == null ? null : line.variant().getId(),
+                                        line.quantity()))
+                                .toList());
+        if (!inventoryReservation.success()) {
+            return error(
+                    inventoryReservation.code() == null ? "INSUFFICIENT_STOCK" : inventoryReservation.code(),
+                    inventoryReservation.message() == null
+                            ? "No hay stock suficiente para confirmar el pedido."
+                            : inventoryReservation.message());
+        }
+
         BusinessOrder order = new BusinessOrder();
         order.setOperationId(operation.getId());
         order.setBusinessId(businessId);
@@ -173,6 +204,7 @@ public class OrderWorkflowService {
             BusinessOrderLine entity = new BusinessOrderLine();
             entity.setOrderId(order.getId());
             entity.setCatalogItemId(line.item().getId());
+            entity.setVariantId(line.variant() == null ? null : line.variant().getId());
             entity.setItemName(line.item().getName());
             entity.setQuantity(line.quantity());
             entity.setUnitPrice(line.item().getPrice());
@@ -190,6 +222,8 @@ public class OrderWorkflowService {
 
         JSONObject data = orderData(order, persisted);
         data.put("operationId", operationId.toString());
+        data.put("inventoryReservationIds",
+                new JSONArray(inventoryReservation.reservationIds().stream().map(UUID::toString).toList()));
         data.put("idempotentReplay", false);
         return success(data);
     }
@@ -229,6 +263,21 @@ public class OrderWorkflowService {
             CatalogItem item = catalog.findByIdAndBusinessId(itemId, businessId)
                     .filter(CatalogItem::isActive)
                     .orElseThrow(() -> new IllegalArgumentException("Un ítem del catálogo no existe o no está activo."));
+
+            InventoryProductVariant variant = null;
+            String variantIdRaw = optional(requested, "variantId");
+            if (!blank(variantIdRaw)) {
+                if (inventoryVariants == null) {
+                    throw new IllegalArgumentException("El inventario de variantes no está disponible.");
+                }
+                UUID variantId = uuid(variantIdRaw);
+                variant = inventoryVariants.findByIdAndBusinessId(variantId, businessId)
+                        .filter(InventoryProductVariant::isActive)
+                        .filter(value -> value.getCatalogItemId().equals(itemId))
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "La variante indicada no existe, está inactiva o no pertenece al producto."));
+            }
+
             if (item.getPrice() == null) {
                 throw new IllegalArgumentException("Un ítem del pedido no tiene precio configurado y requiere cotización.");
             }
@@ -238,7 +287,8 @@ public class OrderWorkflowService {
             }
             Map<String, Object> modifiers = structuredModifiers(requested);
             BigDecimal lineTotal = item.getPrice().multiply(BigDecimal.valueOf(quantity));
-            lines.add(new Line(item, quantity, modifiers, optional(requested, "notes"), lineTotal));
+            lines.add(new Line(
+                    item, variant, quantity, modifiers, optional(requested, "notes"), lineTotal));
             subtotal = subtotal.add(lineTotal);
         }
 
@@ -309,6 +359,7 @@ public class OrderWorkflowService {
             BusinessOperationItem item = new BusinessOperationItem();
             item.setOperationId(operationId);
             item.setCatalogItemId(line.item().getId());
+            item.setVariantId(line.variant() == null ? null : line.variant().getId());
             item.setItemName(line.item().getName());
             item.setQuantity(line.quantity());
             item.setUnitPrice(line.item().getPrice());
@@ -327,6 +378,9 @@ public class OrderWorkflowService {
             JSONObject line = new JSONObject()
                     .put("catalogItemId", item.getCatalogItemId().toString())
                     .put("quantity", item.getQuantity());
+            if (item.getVariantId() != null) {
+                line.put("variantId", item.getVariantId().toString());
+            }
             if (!blank(item.getNotes())) line.put("notes", item.getNotes());
             if (item.getModifiers() != null && !item.getModifiers().isEmpty()) {
                 line.put("modifiers", new JSONObject(item.getModifiers()));
@@ -346,6 +400,15 @@ public class OrderWorkflowService {
         for (Line line : calculation.lines()) {
             JSONObject item = new JSONObject()
                     .put("catalogItemId", line.item().getId().toString())
+                    .put("variantId", line.variant() == null
+                            ? JSONObject.NULL
+                            : line.variant().getId().toString())
+                    .put("variantName", line.variant() == null
+                            ? JSONObject.NULL
+                            : line.variant().getName())
+                    .put("variantSku", line.variant() == null
+                            ? JSONObject.NULL
+                            : line.variant().getSku())
                     .put("name", line.item().getName())
                     .put("quantity", line.quantity())
                     .put("unitPrice", line.item().getPrice())
@@ -375,6 +438,9 @@ public class OrderWorkflowService {
         for (BusinessOrderLine line : lines) {
             JSONObject item = new JSONObject()
                     .put("catalogItemId", line.getCatalogItemId().toString())
+                    .put("variantId", line.getVariantId() == null
+                            ? JSONObject.NULL
+                            : line.getVariantId().toString())
                     .put("name", line.getItemName())
                     .put("quantity", line.getQuantity())
                     .put("unitPrice", line.getUnitPrice())
@@ -487,7 +553,12 @@ public class OrderWorkflowService {
                 .put("error", new JSONObject().put("code", code).put("message", message));
     }
 
-    private record Line(CatalogItem item, int quantity, Map<String, Object> modifiers, String notes, BigDecimal total) {}
+    private record Line(CatalogItem item,
+                        InventoryProductVariant variant,
+                        int quantity,
+                        Map<String, Object> modifiers,
+                        String notes,
+                        BigDecimal total) {}
     private record Calculation(List<Line> lines,
                                BigDecimal subtotal,
                                BigDecimal deliveryFee,

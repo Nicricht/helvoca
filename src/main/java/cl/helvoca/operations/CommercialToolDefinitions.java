@@ -16,6 +16,7 @@ public final class CommercialToolDefinitions {
                 .put("additionalProperties", true);
         JSONObject itemProperties = new JSONObject()
                 .put("catalogItemId", string("UUID exacto del producto o servicio devuelto por list_catalog"))
+                .put("variantId", string("UUID exacto de la variante devuelta dentro de variants[] por list_catalog, obligatorio cuando el cliente eligió una talla/color/variante concreta"))
                 .put("quantity", integer("Cantidad solicitada, entre 1 y 100"))
                 .put("modifiers", modifiers)
                 .put("notes", string("Observaciones libres adicionales del ítem"));
@@ -95,6 +96,13 @@ public final class CommercialToolDefinitions {
                 .put(function("list_catalog",
                         "Lista el catálogo universal activo del negocio con productos, servicios, precios, moneda y media comercial disponible. Cada ítem indica hasMedia y media[]. Usa los UUID exactos devueltos; nunca inventes productos, precios ni media.",
                         object()))
+                .put(function(CommercialOperationToolService.GET_STOCK_TOOL,
+                        "Consulta stock backend-autoritativo de un producto o variante por catalogItemId, variantId o SKU. Cuando el cliente especifique talla, color u otra variante usa el variantId exacto devuelto por list_catalog. Si availabilityKnown=false, no afirmes disponibilidad.",
+                        object().put("properties", new JSONObject()
+                                        .put("catalogItemId", string("UUID exacto del producto devuelto por list_catalog"))
+                                        .put("variantId", string("UUID exacto de la variante devuelta en variants[]"))
+                                        .put("sku", string("SKU exacto del producto o variante, si el cliente lo entrega")))
+                                ))
                 .put(function(CommercialOperationToolService.SHOWCASE_SELECTION_TOOL,
                         "Resuelve y guarda en backend qué producto eligió el cliente del último PRODUCT_SHOWCASE de la misma operación. Usa selectionIndex 1, 2 o 3 para referencias ordinales, o catalogItemId solo si ese UUID fue mostrado. El backend valida tenant, cliente, operación y escaparate; no inventes selecciones.",
                         object().put("properties", new JSONObject()
@@ -103,13 +111,14 @@ public final class CommercialToolDefinitions {
                                         .put("catalogItemId", string("UUID opcional del producto, únicamente si formó parte del último escaparate")))
                                 .put("required", new JSONArray().put("operationId"))))
                 .put(function(CommercialOperationToolService.SHOWCASE_QUOTE_TOOL,
-                        "Cotiza el producto ya seleccionado dentro de la MISMA operación comercial. El backend obtiene producto, precio y moneda actuales desde el catálogo; no acepta montos enviados por la IA. quantity es opcional y vale 1 por defecto. No crea otra BusinessOperation.",
+                        "Cotiza el producto ya seleccionado dentro de la MISMA operación comercial. Si el producto tiene variantes, debes enviar el variantId exacto mostrado en product.variants[]. El backend obtiene producto, variante, precio y moneda; no acepta montos inventados. quantity es opcional y vale 1 por defecto.",
                         object().put("properties", new JSONObject()
                                         .put("operationId", string("UUID exacto de la operación donde select_showcase_product guardó la selección"))
+                                        .put("variantId", string("UUID exacto de la variante elegida dentro de product.variants[]; obligatorio cuando el producto tiene variantes"))
                                         .put("quantity", integer("Cantidad a cotizar entre 1 y 100; omitir equivale a 1")))
                                 .put("required", new JSONArray().put("operationId"))))
                 .put(function(CommercialOperationToolService.SHOWCASE_ORDER_TOOL,
-                        "Convierte la cotización del producto seleccionado en un borrador ORDER enlazado al mismo viaje comercial. El backend reutiliza el catalogItemId seleccionado y vuelve a calcular precios; la IA no envía montos. Devuelve orderOperationId y confirmationToken. Todavía NO confirma la compra.",
+                        "Convierte la cotización vigente del producto y su variante exacta en un borrador ORDER enlazado al mismo viaje comercial. El backend reutiliza catalogItemId y variantId ya persistidos y vuelve a validar identidad/precios; la IA no envía montos. Devuelve orderOperationId y confirmationToken. Todavía NO confirma la compra.",
                         object().put("properties", new JSONObject()
                                         .put("operationId", string("UUID de la operación comercial raíz que ya tiene PRODUCT_SELECTED y cotización"))
                                         .put("quantity", integer("Cantidad entre 1 y 100; si se omite se reutiliza la cantidad cotizada"))
@@ -212,6 +221,7 @@ public final class CommercialToolDefinitions {
                 .append(enabled).append(".\n");
         if (enabled.contains(BusinessOperationCapability.CATALOG)) {
             out.append("Usa list_catalog como fuente oficial de productos, servicios, precios y media comercial. No inventes ítems, precios, imágenes ni videos. ")
+                    .append("Cuando el cliente pregunte por existencia o cantidad disponible usa get_stock. Solo afirma una cantidad cuando availabilityKnown=true; si es false, explica que el stock no está confirmado. ")
                     .append("Si el cliente pide ver productos por WhatsApp, elige como máximo 3 ítems con hasMedia=true. Asegura primero que el cliente esté identificado en el contexto; en voz usa find_caller y, si hace falta, register_caller. ")
                     .append("Luego crea una solicitud create_request de tipo product_showcase para obtener un operationId y usa send_whatsapp_operation con purpose PRODUCT_SHOWCASE y esos catalogItemIds exactos. ")
                     .append("La llamada y WhatsApp deben conservar ese mismo operationId. ")
