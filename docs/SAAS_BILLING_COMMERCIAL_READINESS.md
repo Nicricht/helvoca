@@ -1,9 +1,10 @@
 # SaaS Billing Commercial Readiness
 
 Date: 2026-09-27  
-Baseline reviewed and synchronized: `main@2bc4265a0c15498f6f6aa0363238d70b632cb4ae`  
-Certification branch: `test/saas-billing-commercial-readiness`  
-Draft PR: #552
+Billing hardening merged via PR #552.  
+Provider-certification baseline: `main@d630e4e58cfc0b0a44a201f1da9e230171b308f4`  
+Certification branch: `test/saas-billing-provider-sandbox-certification-v1`  
+Draft PR: #586
 
 ## Scope
 
@@ -65,8 +66,9 @@ Important: Enterprise is marked `custom_pricing = true`. `BillingSubscriptionSer
 | 12. Meter usage | PASS | V41 `usage_meter_event` is the only period-usage source |
 | 13. Enforce minutes / overage | PASS | `VOICE_SECONDS` evaluates used, remaining and overage; current fixed plans have soft voice limits with priced overage |
 | 14. Enforce concurrent calls | PASS | `CONCURRENT_CALLS` is a hard capacity entitlement consumed by call lifecycle admission |
-| 15. Real Mercado Pago sandbox checkout + provider webhook delivery | FAIL / NOT EXECUTED | no external test credentials/transaction were used, so provider-side delivery/configuration is not certified |
-| 16. Real production charge | FAIL / PROHIBITED IN THIS CERTIFICATION | live credentials and real charges were explicitly out of scope |
+| 15. Fail-closed external sandbox checkout runner | PASS (code/CI) | one-shot runner is disabled by default and requires explicit sandbox confirmation, non-production tenant, test payer and EMPRENDE/NEGOCIO |
+| 16. Real Mercado Pago sandbox checkout + provider webhook delivery | FAIL / NOT EXECUTED | no external test credentials/transaction were used, so provider-side delivery/configuration is not certified |
+| 17. Real production charge | FAIL / PROHIBITED IN THIS CERTIFICATION | live credentials and real charges were explicitly out of scope |
 
 The internal billing behavior can be certified with mocks and repository tests. The **external provider round trip is the remaining commercial gate** before using automatic billing for the first real payment.
 
@@ -116,6 +118,13 @@ Primary certification tests:
 - `MercadoPagoWebhookControllerTest`
   - invalid signature -> 401, no reconciliation;
   - configured signed route -> authorized-payment reconciliation.
+- `SaasBillingSandboxCertificationStartupRunnerTest`
+  - disabled-by-default means no provider call;
+  - explicit sandbox confirmation is mandatory;
+  - non-test payer is rejected before provider access;
+  - Enterprise/unknown plans are rejected;
+  - allowed test checkout runs in tenant context;
+  - non-HTTPS checkout and plan mismatch fail closed.
 - Existing plan/entitlement coverage:
   - `CommercialPlanCatalogServiceTest`;
   - `PublicPricingControllerTest`;
@@ -188,6 +197,39 @@ BUSINESS_ADMIN
 ```
 
 Enterprise remains assisted/custom and does not use self-service checkout.
+
+## Safe provider sandbox checkout harness
+
+PR #586 adds a one-shot startup runner dedicated to **Helvoca SaaS billing**, not merchant payments.
+
+It is inert unless all of the following are deliberately supplied:
+
+```text
+MERCADOPAGO_ENABLED=true
+MERCADOPAGO_ACCESS_TOKEN=<Mercado Pago TEST credential>
+MERCADOPAGO_WEBHOOK_SECRET=<Mercado Pago TEST webhook secret>
+MERCADOPAGO_BACK_URL=https://<non-production-public-host>/<return-path>
+
+HELVOCA_SAAS_BILLING_SANDBOX_CERTIFY_ON_STARTUP=true
+HELVOCA_SAAS_BILLING_SANDBOX_CONFIRMED=true
+HELVOCA_SAAS_BILLING_SANDBOX_BUSINESS_ID=<non-production tenant UUID>
+HELVOCA_SAAS_BILLING_SANDBOX_PAYER_EMAIL=<Mercado Pago test account @testuser.com>
+HELVOCA_SAAS_BILLING_SANDBOX_PLAN=EMPRENDE
+```
+
+Safety behavior:
+
+1. both certification switches are required; `MERCADOPAGO_ENABLED=true` alone is insufficient;
+2. the tenant id must be a UUID;
+3. payer email must be a Mercado Pago test-account email ending in `@testuser.com`;
+4. the certification plan is limited to `EMPRENDE` or `NEGOCIO`;
+5. the provider response must contain a subscription id, matching public plan, positive price and HTTPS checkout URL;
+6. the runner calls the existing `BillingSubscriptionService.createCheckout`, so production billing rules are exercised rather than duplicated;
+7. merchant-payment code under `cl.helvoca.payment` is not used.
+
+The runner only proves **creation of the external recurring sandbox checkout**. Completing the checkout as the test buyer and observing real provider-signed webhook delivery remain manual/external gates because no authorized Mercado Pago test credentials are stored in this repository.
+
+Official Mercado Pago documentation currently confirms that Subscriptions emits `subscription_preapproval` and `subscription_authorized_payment`. Its generic Webhooks documentation also treats Subscriptions as a special configuration case, so the exact test-application notification setup must be proven in the provider account rather than assumed from local code.
 
 ## Remaining external gate
 
