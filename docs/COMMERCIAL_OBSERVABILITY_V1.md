@@ -162,3 +162,8 @@ La PR debe demostrar:
 - CI del repositorio en verde.
 
 No se realizan llamadas reales, cobros, deploy, merge ni activación de credenciales live.
+
+
+## Recertificación de integración
+
+Baseline para recertificación integrada: `main@55a578d362658f892e5ef6ef2e04e19dfa0e4a16`, después de SaaS Billing (#552) y Golden Journey (#570). Esta actualización documental fuerza CI de la PR contra el baseline comercial vigente sin modificar comportamiento runtime.
