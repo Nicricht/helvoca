@@ -267,9 +267,20 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         }
 
         JSONObject input = content.optJSONObject("inputTranscription");
-        if (input != null) append(userTranscript, input.optString("text", ""));
+        if (input != null) {
+            append(userTranscript, input.optString("text", ""));
+            if (awaitingAnythingElseAnswer.get() && isNegativeClosingReply(bufferText(userTranscript))) {
+                contextualClosingIntent.set(true);
+            }
+        }
         JSONObject output = content.optJSONObject("outputTranscription");
-        if (output != null) append(assistantTranscript, output.optString("text", ""));
+        if (output != null) {
+            append(assistantTranscript, output.optString("text", ""));
+            if (asksIfAnythingElse(bufferText(assistantTranscript))) {
+                awaitingAnythingElseAnswer.set(true);
+                contextualClosingIntent.set(false);
+            }
+        }
 
         JSONObject modelTurn = content.optJSONObject("modelTurn");
         JSONArray parts = modelTurn == null ? null : modelTurn.optJSONArray("parts");
@@ -566,6 +577,17 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 || normalized.contains("puedo ayudarte con algo mas");
     }
 
+    private static boolean isNegativeClosingReply(String text) {
+        return Set.of("no", "nop", "nope", "no gracias", "nada mas")
+                .contains(normalizeSpeech(text));
+    }
+
+    private static String bufferText(StringBuilder buffer) {
+        synchronized (buffer) {
+            return buffer.toString().trim();
+        }
+    }
+
     private static String normalizeSpeech(String text) {
         if (text == null || text.isBlank()) return "";
         return Normalizer.normalize(text, Normalizer.Form.NFD)
@@ -796,8 +818,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         if (!text.isBlank()) {
             if ("USER".equals(speaker)) {
                 lastUserUtterance = text;
-                String normalizedUser = normalizeSpeech(text);
-                boolean negative = Set.of("no", "nop", "nope", "no gracias", "nada mas").contains(normalizedUser);
+                boolean negative = isNegativeClosingReply(text);
                 if (awaitingAnythingElseAnswer.getAndSet(false) && negative) {
                     contextualClosingIntent.set(true);
                 }
