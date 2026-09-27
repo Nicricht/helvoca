@@ -47,10 +47,47 @@ This block adds `PAYMENT_CONFIRMATION`:
 - It does not change Voice behavior.
 - It does not merge to `main`.
 
-## Next gap after this block
+## Block 2: complete structured journey certification
 
-Continue certification of the complete structured journey:
+The branch now includes `OmnichannelCommerceJourneyIntegrationTest`, a PostgreSQL/Testcontainers certification of the full structured journey:
 
-`conversation -> product/media -> WhatsApp -> selection -> quote -> order -> payment sandbox -> verified confirmation -> shared context`
+`Voice conversation -> product/media -> WhatsApp handoff -> selection -> quote -> order confirmation -> sandbox payment -> verified webhook -> WhatsApp payment confirmation -> shared Voice/WhatsApp context`
 
-The next implementation should harden the cross-channel E2E test around that entire sequence and then reconcile Inventory V1 only at the integration boundary required for stock reservation/consumption.
+The test deliberately keeps `app.outbound.delivery-enabled=false`. PRODUCT_SHOWCASE and PAYMENT_CONFIRMATION are persisted as PREPARED only, and the test asserts that no message becomes QUEUED or SENT.
+
+The payment provider used by this certification is an in-process test adapter. It performs no network request, returns a backend-owned HTTPS checkout URL, and transitions to SUCCEEDED only when the verified webhook path queries provider status.
+
+This certification exposed and fixed a real continuity defect: `PaymentWorkflowService.confirm` replaced payment-operation metadata and discarded `commercialJourneyOperationId`. Payment confirmation now merges backend payment metadata into the existing operation metadata, preserving the root journey linkage. A focused unit regression and the full E2E both cover this invariant.
+
+Verified invariants in Block 2:
+
+- Voice and WhatsApp for the same verified customer resolve the same omnichannel operational state;
+- the exact root commercial operation survives the channel handoff;
+- showcase selection is backend-authoritative;
+- quote, order and payment totals remain backend-owned;
+- order/payment confirmation tokens remain required;
+- payment creation preserves `commercialJourneyOperationId`;
+- provider webhook SUCCEEDED moves the root commercial journey to `PAID`;
+- the shared conversation state observes the verified payment status;
+- exactly one product showcase and one payment-success confirmation are prepared;
+- real WhatsApp dispatch remains disabled.
+
+## Inventory V1 integration boundary
+
+PR #465 remains isolated and is not merged into this branch.
+
+Inventory V1 currently integrates at the ORDER/PAYMENT lifecycle boundary:
+
+- order confirmation reserves stock;
+- order cancellation releases the reservation;
+- payment SUCCEEDED consumes the reservation;
+- payment FAILED/CANCELLED/EXPIRED releases it;
+- variants persist exact `variantId` through operation items and order lines.
+
+Those are the correct domain integration points for Omnichannel Commerce V1. The omnichannel layer should not independently mutate inventory.
+
+When Inventory V1 is eventually integrated, reconcile only the overlapping domain files (`OrderWorkflowService`, `PaymentWorkflowService`, `PaymentWebhookService`, commercial tool definitions/items/lines) while preserving the Block 1 and Block 2 invariants above. In particular, the payment-operation metadata merge introduced here must survive that reconciliation so inventory settlement and omnichannel journey completion can both execute from the same verified payment webhook.
+
+## Next gap after Block 2
+
+The remaining work is no longer basic journey continuity. The next useful block is a controlled integration/certification plan for Inventory V1 plus Omnichannel Commerce V1, followed by explicit operator/business-owner visibility for the complete commercial timeline. No branch should be merged into `main` until that combined contract is green and merge is explicitly authorized.
