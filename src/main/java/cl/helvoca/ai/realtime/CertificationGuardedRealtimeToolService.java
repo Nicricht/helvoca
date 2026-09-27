@@ -25,6 +25,7 @@ import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import cl.helvoca.telephony.twilio.TwilioCallControl;
+import cl.helvoca.telephony.twilio.TwilioCertificationCommandStore;
 import cl.helvoca.telephony.twilio.TwilioProperties;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -39,12 +40,19 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Primary
 public class CertificationGuardedRealtimeToolService extends RealtimeToolService {
     private static final Set<String> BOOKING_MUTATIONS = Set.of(
             "create_booking", "reschedule_booking", "cancel_booking");
+    private static final Set<String> LATENCY_CERTIFICATION_READ_ONLY_TOOLS = Set.of(
+            "get_business_information",
+            "list_services",
+            "search_knowledge",
+            "find_caller",
+            "end_call");
 
     private final CallSessionRepository calls;
     private final CallActionRepository actions;
@@ -52,6 +60,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     private final BookingRepository bookings;
     private final CallTraceService trace;
     private final JdbcTemplate jdbc;
+    private final ConcurrentHashMap<UUID, Boolean> latencyCertificationCache = new ConcurrentHashMap<>();
 
     @Autowired(required = false)
     private TwilioCallControl twilioCallControl;
@@ -80,6 +89,14 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     @Autowired(required = false)
     private BookingConversationStateMachine bookingConversationStateMachine;
 
+    @Autowired(required = false)
+    private TwilioCertificationCommandStore certificationCommands;
+
+    void setCertificationCommands(TwilioCertificationCommandStore certificationCommands) {
+        this.certificationCommands = certificationCommands;
+        latencyCertificationCache.clear();
+    }
+
     public CertificationGuardedRealtimeToolService(BusinessRepository businesses,
                                                     CustomerRepository customers,
                                                     ServiceItemRepository services,
@@ -105,6 +122,13 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     @Transactional(readOnly = true)
     public String buildInstructions(RealtimeCallContext context) {
         String instructions = RecepVozConversationPolicyService.appendTo(super.buildInstructions(context));
+        if (isLatencyCertification(context)) {
+            return instructions
+                    + "\nMODO CERTIFICACIÓN DE LATENCIA READ-ONLY: responde de forma directa y breve. "
+                    + "Usa como máximo una herramienta de solo lectura cuando sea imprescindible. "
+                    + "No intentes reservar, reprogramar, cancelar, registrar clientes, crear solicitudes, cobrar, "
+                    + "enviar mensajes, transferir ni ejecutar ninguna mutación. Cuando el cliente termine, despídete y usa end_call.";
+        }
         if (operationCapabilities != null) {
             instructions += CommercialToolDefinitions.instructions(operationCapabilities.enabled(context.businessId()));
         }
@@ -118,6 +142,17 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     @Transactional(readOnly = true)
     public JSONArray toolDefinitions(RealtimeCallContext context) {
         JSONArray definitions = super.toolDefinitions(context);
+        if (isLatencyCertification(context)) {
+            JSONArray readOnly = new JSONArray();
+            for (int i = 0; i < definitions.length(); i++) {
+                JSONObject definition = definitions.getJSONObject(i);
+                if (LATENCY_CERTIFICATION_READ_ONLY_TOOLS.contains(definition.optString("name"))) {
+                    readOnly.put(definition);
+                }
+            }
+            if (!containsTool(readOnly, "end_call")) readOnly.put(RealtimeToolDefinitions.endCall());
+            return readOnly;
+        }
 
         if (operationCapabilities != null) {
             Set<String> allowedCommercial = operationCapabilities.allowedToolNames(context.businessId());
@@ -171,6 +206,15 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
             JSONObject result = endCall(context);
             trace.recordTool(context.businessId(), context.callId(), toolName, result);
             return result.toString();
+        }
+
+        if (isLatencyCertification(context)
+                && !LATENCY_CERTIFICATION_READ_ONLY_TOOLS.contains(toolName)) {
+            JSONObject blocked = error(
+                    "LATENCY_CERTIFICATION_READ_ONLY",
+                    "Esta llamada de medición solo permite consultas de lectura. Responde con la información disponible o usa una herramienta read-only.");
+            trace.recordTool(context.businessId(), context.callId(), toolName, blocked);
+            return blocked.toString();
         }
 
         BusinessOperation.Type operationType = null;
@@ -277,6 +321,18 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                                             JSONObject result) {
         if (bookingConversationStateMachine == null) return result;
         return bookingConversationStateMachine.decorate(context, toolName, args, result);
+    }
+
+    private boolean isLatencyCertification(RealtimeCallContext context) {
+        if (context == null || certificationCommands == null) return false;
+        return latencyCertificationCache.computeIfAbsent(context.callId(), ignored -> {
+            CallSession call = calls.findByIdAndBusinessId(context.callId(), context.businessId()).orElse(null);
+            if (call == null || !call.isCertification()) return false;
+            String providerCallId = call.getProviderCallId();
+            return providerCallId != null
+                    && !providerCallId.isBlank()
+                    && certificationCommands.isLatencyCertificationProviderCall(providerCallId);
+        });
     }
 
     private static JSONObject parseArguments(String rawArguments) {
