@@ -1,22 +1,26 @@
 # Helvoca — primera venta hoy
 
+> Para ejecutar la venta sin improvisar, usar primero `docs/FIRST_CUSTOMER_OPERATION.md`.
+
 ## Objetivo
 
-Helvoca ya puede salir a venta asistida. El objetivo de cada reunión es terminar con una acción concreta, en este orden:
+Helvoca / RecepVoz puede salir a venta asistida. El objetivo de cada reunión es terminar con una acción concreta, en este orden:
 
-1. piloto pagado;
-2. piloto aceptado con fecha de configuración;
+1. piloto aceptado con alcance y criterio de éxito;
+2. fecha de configuración acordada;
 3. segunda demo agendada usando datos reales del negocio.
+
+Un **cliente pagador** solo existe cuando el pago fue realmente recibido por un medio autorizado. No adelantar ese estado en el tracker.
 
 No considerar suficiente un cierre ambiguo como “mándame información y después vemos”.
 
 ## Estado comercial actual
 
-La producción estable incluye el core multi-tenant, catálogo, conocimiento, reservas, operaciones universales, Policy Engine, Safe Retry, handoff humano durable, omnicanalidad, mensajería saliente, confirmaciones, jobs persistentes, calendario provider-neutral, observabilidad, RLS PostgreSQL, metering de uso y V42 Plans / Entitlements / Billing.
+El core incluye multi-tenancy, catálogo, conocimiento, reservas, operaciones universales, Policy Engine, Safe Retry, handoff humano durable, mensajería, confirmaciones, jobs persistentes, calendario provider-neutral, observabilidad, RLS PostgreSQL, metering de uso y V42 Plans / Entitlements / Billing.
 
-V42 ya está en producción. Los primeros clientes siguen incorporándose mediante onboarding y configuración asistidos para aprender con uso real y mantener controlado el alcance de cada piloto.
+Regla: que una capacidad exista en el core no significa que un proveedor externo esté activo para todos los tenants. Voz, WhatsApp, outbound y calendario solo se ofrecen como activos cuando la integración concreta del cliente está configurada y probada.
 
-Regla: que una capacidad exista en el core no significa que un proveedor externo esté activo para todos los tenants. Voz, WhatsApp, outbound, calendario y pagos solo se ofrecen como activos cuando la integración concreta del cliente está configurada y probada.
+**Merchant payments LIVE no forman parte de la oferta comercial actual.** El adaptador disponible opera en SANDBOX y el modo LIVE está intencionalmente deshabilitado.
 
 ## Qué vender
 
@@ -24,17 +28,17 @@ No vender “un chatbot” ni explicar arquitectura salvo que el prospecto lo pi
 
 Mensaje central:
 
-> Helvoca ayuda a que una llamada o un WhatsApp sin responder no se convierta en un cliente perdido. Atiende usando la información real del negocio y, según la configuración, puede transformar la conversación en una reserva, pedido, cotización, solicitud o siguiente paso concreto.
+> RecepVoz ayuda a que una llamada o un mensaje sin responder no se convierta en una oportunidad perdida. Atiende usando la información real del negocio y, según la configuración, puede transformar la conversación en una reserva, pedido, cotización, solicitud o siguiente paso concreto.
 
 La promesa comercial inicial es un piloto asistido con alcance definido y medible.
 
-## Pitch de 30 segundos
+## Pitch de 20–30 segundos
 
-> Helvoca es una recepcionista digital para empresas. Atiende llamadas y canales habilitados usando la información real del negocio y puede hacer cosas concretas como reservar, cotizar, registrar solicitudes o tomar pedidos. Nosotros configuramos el primer piloto con tus datos y lo probamos contigo antes de activarlo.
+> RecepVoz es una recepcionista digital con IA para empresas. Atiende usando la información real del negocio y puede hacer cosas concretas como reservar, cotizar, registrar solicitudes o tomar pedidos. Configuramos el primer piloto con tus datos, lo probamos contigo y solo activamos los canales que estén certificados para tu negocio.
 
 ## Preguntas de descubrimiento
 
-1. ¿Qué ocurre cuando entra una llamada o WhatsApp y el equipo está ocupado?
+1. ¿Qué ocurre cuando entra una llamada o mensaje y el equipo está ocupado?
 2. ¿Qué preguntan los clientes una y otra vez?
 3. ¿Qué acción hacen normalmente después de responder: reservar, cotizar, tomar un pedido, registrar datos o derivar a alguien?
 4. ¿Cuánto vale aproximadamente una reserva, pedido o cliente promedio?
@@ -44,15 +48,18 @@ No convertir la reunión en un interrogatorio. Identificar el dolor principal y 
 
 ## Demo principal de 5–10 minutos
 
+La demo por defecto es web/simulador. No improvisar proveedores externos.
+
 1. Mostrar `/sales.html`.
 2. Mostrar el tenant demo ya configurado.
 3. Hacer una consulta real de servicio, producto, precio o información.
 4. Pedir disponibilidad o la acción equivalente del negocio.
 5. Ejecutar una acción permitida por el backend.
-6. Corregir un dato para demostrar que la versión nueva reemplaza a la anterior cuando corresponde.
-7. Mostrar el resultado persistido en el sistema.
-8. Mostrar `/pricing.html`.
-9. Cerrar con una acción concreta.
+6. Corregir un dato o reprogramar para demostrar que se actualiza y no se duplica.
+7. Mostrar el resultado persistido.
+8. Hacer una pregunta desconocida y demostrar que no inventa.
+9. Mostrar `/pricing.html`.
+10. Cerrar con una acción concreta.
 
 ## Escenarios de demo
 
@@ -68,7 +75,7 @@ Ejemplos: odontología, veterinaria, peluquería, estética, academia, gimnasio 
 - comprobar que no se duplica;
 - cancelar si sirve para la demo.
 
-Capacidades: CATALOG + BOOKING + REQUEST. PAYMENT solo cuando el proveedor del tenant esté configurado.
+Capacidades: CATALOG + BOOKING + REQUEST.
 
 ### Talleres y servicios profesionales
 
@@ -86,10 +93,11 @@ Capacidades: CATALOG + QUOTE + BOOKING + REQUEST.
 - elegir productos;
 - crear/corregir un pedido;
 - mostrar total calculado por backend;
-- explicar pickup/delivery si está habilitado;
-- mostrar PAYMENT solo con integración merchant activa.
+- explicar pickup/delivery si está habilitado.
 
-Capacidades: CATALOG + ORDER + DELIVERY/PICKUP + PAYMENT cuando corresponda.
+Capacidades: CATALOG + ORDER + DELIVERY/PICKUP.
+
+**No demostrar merchant payment como cobro real. El flujo disponible es SANDBOX.**
 
 ### Inmobiliarias y negocios orientados a leads
 
@@ -103,10 +111,9 @@ Capacidades: CATALOG + LEAD + BOOKING + REQUEST.
 
 ## Qué sí existe pero requiere activación concreta
 
-- continuidad omnicanal Voice / WhatsApp: el core existe, pero solo demostrarla con canales e identidad del tenant configurados y probados;
-- outbound messaging: el motor durable existe, pero la entrega externa permanece controlada por configuración/proveedor;
-- calendario y reuniones: el core de sincronización existe, pero una integración externa solo se promete cuando el proveedor del tenant esté conectado y certificado;
-- pagos: la operación y los adapters existen, pero el cobro real depende de la cuenta merchant y configuración del tenant;
+- continuidad Voice / WhatsApp: demostrarla solo con canales e identidad del tenant configurados y probados;
+- outbound messaging: la entrega externa depende de configuración/proveedor;
+- calendario y reuniones: una integración externa solo se promete cuando el proveedor del tenant esté conectado y certificado;
 - voz: solo ofrecer demo telefónica real cuando readiness y proveedor Live estén operativos.
 
 ## Qué NO prometer
@@ -115,9 +122,10 @@ Capacidades: CATALOG + LEAD + BOOKING + REQUEST.
 - campañas masivas sin alcance contratado y proveedor adecuado;
 - cero errores de IA;
 - SLA enterprise no contratado;
+- disponibilidad 24/7 garantizada;
 - funciones no habilitadas para ese tenant;
 - integraciones externas no conectadas;
-- pago real sin merchant configurado;
+- merchant payment LIVE;
 - onboarding 100% automático mientras el provisionamiento comercial siga siendo asistido;
 - ROI garantizado.
 
@@ -138,11 +146,11 @@ No inventar descuentos durante una reunión. Cualquier condición especial debe 
 
 No defender el precio hablando de servidores, modelos o tokens.
 
-Preguntar cuánto vale una oportunidad promedio y comparar el plan contra llamadas, reservas o ventas que hoy se pierden. Presentarlo como hipótesis de valor, no como retorno garantizado.
+Preguntar cuánto vale una oportunidad promedio y comparar el plan contra llamadas, reservas o ventas que el negocio confirme que hoy se pierden. Presentarlo como hipótesis de valor, no como retorno garantizado.
 
 ## Cierre
 
-> Puedo configurarlo con sus servicios, horarios y forma de atender para que lo prueben directamente con su negocio. La configuración inicial está incluida y el plan parte desde $24.990 al mes. ¿Avanzamos con un piloto?
+> Puedo configurarlo con sus servicios, horarios y forma de atender para que lo prueben directamente con su negocio. La configuración inicial está incluida y el plan parte desde $24.990 al mes. ¿Definimos el alcance del piloto?
 
 Si responde “mándame información”:
 
@@ -154,26 +162,26 @@ Si responde “lo voy a pensar”:
 
 El objetivo es descubrir la objeción real y acordar una siguiente acción, no presionar.
 
-## Checklist técnico antes de salir
+## Checklist antes de una demo comercial
 
-- [x] producción Railway en SUCCESS;
-- [x] `main` corresponde al SHA desplegado;
-- [x] landing `/sales.html` disponible;
-- [x] `/pricing.html` disponible y precios revisados;
-- [x] tenant demo activo;
-- [x] servicios/productos demo revisados;
-- [x] precios demo confirmados;
-- [x] horarios demo revisados;
-- [x] Knowledge/FAQ demo revisado;
-- [x] agente activo y saludo revisado;
-- [x] capacidades demo habilitadas;
-- [x] cinco conversaciones ensayadas;
-- [x] corrección de datos ensayada;
-- [x] caso desconocido ensayado sin inventar;
+- [ ] `/sales.html` y `/pricing.html` revisados;
+- [ ] precios contrastados con `/api/v1/public/pricing`;
+- [ ] tenant demo disponible;
+- [ ] servicios/productos demo revisados;
+- [ ] precios demo confirmados;
+- [ ] horarios demo revisados;
+- [ ] Knowledge/FAQ demo revisado;
+- [ ] agente activo y saludo revisado;
+- [ ] capacidades demo habilitadas;
+- [ ] consulta, acción, corrección y caso desconocido ensayados;
 - [ ] si se muestra voz real, readiness y llamada real comprobados;
 - [ ] si se muestra WhatsApp real, flujo del alcance acordado comprobado.
 
-> Estado comercial verificado: la demo web segura está lista. Los dos checks restantes son condicionales y solo se completan si se decide mostrar esos canales reales con proveedor e identidad del tenant configurados y probados.
+No marcar producción o un proveedor como READY por documentación histórica. Verificar el estado actual antes de cada piloto real.
+
+## Antes de aceptar dinero
+
+Usar el checklist completo de `docs/FIRST_CUSTOMER_OPERATION.md`. Como mínimo deben estar definidos: alcance, plan/precio, responsables, canal certificado o explícitamente excluido, criterio de éxito, medio autorizado de pago a RecepVoz y ausencia de un bloqueo P0 conocido.
 
 ## Cinco conversaciones obligatorias para la demo
 
@@ -181,7 +189,7 @@ El objetivo es descubrir la objeción real y acordar una siguiente acción, no p
 2. consulta de precio/servicio;
 3. acción principal del rubro;
 4. cambio de opinión/corrección;
-5. pregunta que Helvoca no sabe y debe manejar sin inventar.
+5. pregunta que RecepVoz no sabe y debe manejar sin inventar.
 
 ## Si acepta el piloto
 
@@ -189,10 +197,10 @@ Completar `docs/FIRST_CUSTOMER_ONBOARDING_FORM.md` antes de activar canales real
 
 ## Después de cada reunión
 
-Registrar:
+Registrar en `docs/FIRST_PROSPECTS_TRACKER.csv`:
 
 - empresa y contacto;
-- problema principal;
+- problema principal confirmado;
 - capacidad que más valoró;
 - objeción principal;
 - plan o piloto discutido;
@@ -200,4 +208,4 @@ Registrar:
 - fecha acordada;
 - cambios solicitados.
 
-La primera venta debe alimentar el roadmap. Una necesidad repetida por prospectos reales pesa más que una feature imaginada sin evidencia.
+No mover una fila por expectativa. Cada estado debe reflejar un hecho real.
