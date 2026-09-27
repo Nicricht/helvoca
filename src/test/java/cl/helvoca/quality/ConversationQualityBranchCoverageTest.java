@@ -131,9 +131,9 @@ class ConversationQualityBranchCoverageTest {
         ConversationReplayFixture unexpected = new ConversationReplayFixture(
                 1, "unexpected", "x",
                 List.of(
-                        new ConversationReplayFixture.ReplayTurn("ASSISTANT", "¿A nombre de quién sería?"),
+                        new ConversationReplayFixture.ReplayTurn("ASSISTANT", "¿A nombre de quién sería la reserva?"),
                         new ConversationReplayFixture.ReplayTurn("USER", "X"),
-                        new ConversationReplayFixture.ReplayTurn("ASSISTANT", "Perfecto. ¿A nombre de quién sería?")),
+                        new ConversationReplayFixture.ReplayTurn("ASSISTANT", "Perfecto. ¿A nombre de quién sería la reserva?")),
                 List.of(),
                 new ConversationReplayFixture.Expected(false, List.of()));
         var unexpectedResult = runner.run(unexpected);
