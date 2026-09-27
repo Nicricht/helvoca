@@ -160,6 +160,7 @@ public class BookingConversationStateMachine {
     static JSONObject snapshot(ConversationOperationState state) {
         Map<String, Object> values = state.getState() == null ? Map.of() : state.getState();
 
+        boolean bookingActive = "BOOKING".equals(String.valueOf(values.get("intent")));
         boolean serviceKnown = present(values, "serviceId");
         boolean slotKnown = Boolean.TRUE.equals(values.get("bookingSlotValidated"))
                 && present(values, "startAt");
@@ -182,7 +183,10 @@ public class BookingConversationStateMachine {
 
         String nextRequiredField;
         String nextAction;
-        if (confirmed) {
+        if (!bookingActive) {
+            nextRequiredField = "NONE";
+            nextAction = "CONTINUE_CURRENT_INTENT";
+        } else if (confirmed) {
             nextRequiredField = "NONE";
             nextAction = "BOOKING_COMPLETE";
         } else if (confirmationPending) {
