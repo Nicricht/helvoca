@@ -331,6 +331,160 @@ class GoldenJourneyCommercialV1IntegrationTest {
                 calls.findByIdAndBusinessId(call.getId(), business.getId()).orElseThrow().getResolution());
     }
 
+    @Test
+    void goldenJourneyRecoversWhenSlotIsTakenBeforeConfirmationWithoutDuplicates() {
+        Business business = business("Golden Journey Recovery Spa");
+        ServiceItem service = service(business.getId(), "Masaje recuperación");
+        LocalDate bookingDate = LocalDate.now(ZONE).plusDays(3);
+        businessHours(business.getId(), bookingDate);
+        agent(business.getId(), "Hola, soy RecepVoz de Golden Journey Recovery Spa.");
+
+        CallSession call = call(
+                business.getId(),
+                "+56955556666",
+                "+56266667777",
+                "CA44444444444444444444444444444444",
+                "MZ-golden-recovery");
+        RealtimeCallContext context = context(call);
+
+        JSONObject slotsResult = execute(context, "list_available_slots",
+                new JSONObject()
+                        .put("serviceId", service.getId().toString())
+                        .put("date", bookingDate.toString()));
+        JSONArray slots = data(slotsResult).getJSONArray("slots");
+        assertTrue(slots.length() >= 2,
+                "Recovery certification needs a fallback slot after the first one is taken");
+        Instant firstStart = Instant.parse(slots.getJSONObject(0).getString("startAt"));
+        Instant secondStart = Instant.parse(slots.getJSONObject(1).getString("startAt"));
+
+        JSONObject initialAvailability = execute(context, "check_booking_availability",
+                new JSONObject()
+                        .put("serviceId", service.getId().toString())
+                        .put("startAt", firstStart.toString()));
+        assertTrue(data(initialAvailability).getBoolean("available"));
+
+        JSONObject registered = execute(context, "register_caller",
+                new JSONObject().put("name", "Daniela Recovery"));
+        UUID customerId = UUID.fromString(data(registered).getString("customerId"));
+
+        JSONObject firstProposal = execute(context, "create_booking",
+                new JSONObject()
+                        .put("serviceId", service.getId().toString())
+                        .put("startAt", firstStart.toString()));
+        JSONObject firstProposalData = data(firstProposal);
+        UUID firstOperationId = UUID.fromString(firstProposalData.getString("operationId"));
+        String firstConfirmationToken = firstProposalData.getString("confirmationToken");
+        assertTrue(firstProposalData.getBoolean("requiresConfirmation"));
+        assertEquals(0, data(execute(context, "list_customer_bookings", new JSONObject()))
+                        .getJSONArray("bookings").length(),
+                "A proposal must not persist a customer booking before confirmation");
+
+        Customer competingCustomer = new Customer();
+        competingCustomer.setBusinessId(business.getId());
+        competingCustomer.setName("Cliente Concurrente");
+        competingCustomer.setPhone("+56977778888");
+        competingCustomer = customers.saveAndFlush(competingCustomer);
+
+        Booking competingBooking = new Booking();
+        competingBooking.setBusinessId(business.getId());
+        competingBooking.setCustomerId(competingCustomer.getId());
+        competingBooking.setServiceId(service.getId());
+        competingBooking.setStartAt(firstStart);
+        competingBooking.setEndAt(firstStart.plusSeconds(service.getDurationMinutes() * 60L));
+        competingBooking.setStatus(BookingStatus.CONFIRMED);
+        competingBooking.setSource(BookingSource.ADMIN);
+        bookings.saveAndFlush(competingBooking);
+
+        JSONObject racedAvailability = execute(context, "check_booking_availability",
+                new JSONObject()
+                        .put("serviceId", service.getId().toString())
+                        .put("startAt", firstStart.toString()));
+        assertFalse(data(racedAvailability).getBoolean("available"));
+        assertEquals("SLOT_OCCUPIED",
+                data(racedAvailability).getString("unavailabilityReasonCode"));
+
+        JSONObject rejectedConfirmation = rawExecute(context, "create_booking",
+                new JSONObject()
+                        .put("operationId", firstOperationId.toString())
+                        .put("confirmationToken", firstConfirmationToken));
+        assertFalse(rejectedConfirmation.getBoolean("success"),
+                "The stale proposal must not win after another booking occupies the slot");
+        assertEquals("BOOKING_SLOT_UNAVAILABLE",
+                rejectedConfirmation.getJSONObject("error").getString("code"));
+        assertEquals(0, data(execute(context, "list_customer_bookings", new JSONObject()))
+                        .getJSONArray("bookings").length(),
+                "The failed confirmation must not create a hidden or duplicate customer booking");
+        assertEquals(1, bookings.findAllByBusinessIdOrderByStartAtDesc(business.getId()).size(),
+                "Only the competing booking should exist after the rejected confirmation");
+
+        JSONObject repeatedRejectedConfirmation = rawExecute(context, "create_booking",
+                new JSONObject()
+                        .put("operationId", firstOperationId.toString())
+                        .put("confirmationToken", firstConfirmationToken));
+        assertFalse(repeatedRejectedConfirmation.getBoolean("success"),
+                "Repeating an invalidated confirmation must stay rejected");
+        assertEquals(1, bookings.findAllByBusinessIdOrderByStartAtDesc(business.getId()).size(),
+                "Retrying the rejected confirmation must not create a booking");
+
+        JSONObject fallbackAvailability = execute(context, "check_booking_availability",
+                new JSONObject()
+                        .put("serviceId", service.getId().toString())
+                        .put("startAt", secondStart.toString()));
+        assertTrue(data(fallbackAvailability).getBoolean("available"));
+
+        JSONObject fallbackProposal = execute(context, "create_booking",
+                new JSONObject()
+                        .put("serviceId", service.getId().toString())
+                        .put("startAt", secondStart.toString()));
+        JSONObject fallbackProposalData = data(fallbackProposal);
+        UUID fallbackOperationId = UUID.fromString(fallbackProposalData.getString("operationId"));
+        String fallbackConfirmationToken = fallbackProposalData.getString("confirmationToken");
+        assertNotEquals(firstOperationId, fallbackOperationId,
+                "Recovery must use a fresh durable operation after the original proposal expires");
+
+        JSONObject recovered = execute(context, "create_booking",
+                new JSONObject()
+                        .put("operationId", fallbackOperationId.toString())
+                        .put("confirmationToken", fallbackConfirmationToken));
+        UUID recoveredBookingId = UUID.fromString(data(recovered).getString("bookingId"));
+        assertFalse(data(recovered).getBoolean("idempotentReplay"));
+
+        Booking recoveredBooking = bookings.findByIdAndBusinessIdAndCustomerId(
+                recoveredBookingId, business.getId(), customerId).orElseThrow();
+        assertEquals(secondStart, recoveredBooking.getStartAt());
+        assertEquals(BookingStatus.CONFIRMED, recoveredBooking.getStatus());
+        assertEquals(2, bookings.findAllByBusinessIdOrderByStartAtDesc(business.getId()).size(),
+                "Exactly the competitor plus the recovered customer booking should exist");
+
+        JSONObject replay = bookingWorkflow.execute(
+                business.getId(),
+                customerId,
+                call.getId(),
+                call.getCallerNumber(),
+                BusinessOrder.Source.VOICE,
+                BookingSource.AI_CALL,
+                new JSONObject()
+                        .put("operationId", fallbackOperationId.toString())
+                        .put("confirmationToken", fallbackConfirmationToken));
+        assertTrue(replay.getBoolean("success"), replay::toString);
+        assertTrue(data(replay).getBoolean("idempotentReplay"),
+                "A transport retry after recovery must replay the already confirmed booking");
+        assertEquals(recoveredBookingId.toString(), data(replay).getString("bookingId"));
+        assertEquals(2, bookings.findAllByBusinessIdOrderByStartAtDesc(business.getId()).size(),
+                "Idempotent replay after recovery must not create a third booking");
+
+        JSONArray customerBookings = data(execute(context, "list_customer_bookings", new JSONObject()))
+                .getJSONArray("bookings");
+        assertEquals(1, customerBookings.length());
+        assertEquals(recoveredBookingId.toString(), customerBookings.getJSONObject(0).getString("bookingId"));
+        assertEquals(secondStart.toString(), customerBookings.getJSONObject(0).getString("startAt"));
+
+        List<CallAction> trace = actions.findAllByBusinessIdAndCallIdOrderByCreatedAtAsc(
+                business.getId(), call.getId());
+        assertActionCount(trace, "BOOKING_PROPOSED", 2);
+        assertActionCount(trace, "BOOKING_CREATED", 1);
+    }
+
     private void certifyTenantIsolation(UUID bookingId, Instant expectedStart, UUID primaryCallId) {
         Business otherBusiness = business("Other Tenant");
         service(otherBusiness.getId(), "Servicio de otro tenant");
