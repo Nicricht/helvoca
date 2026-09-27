@@ -13,13 +13,22 @@ import java.util.UUID;
 @PreAuthorize("hasRole('BUSINESS_ADMIN')")
 public class ConversationQualityController {
     private final ConversationQualityService service;
+    private final ConversationReplayCaptureService replayCapture;
 
-    public ConversationQualityController(ConversationQualityService service) {
+    public ConversationQualityController(
+            ConversationQualityService service,
+            ConversationReplayCaptureService replayCapture) {
         this.service = service;
+        this.replayCapture = replayCapture;
     }
 
     @GetMapping("/calls/{callId}")
     public ConversationQualityService.CallQualityReport analyze(@PathVariable UUID callId) {
         return service.analyze(callId);
+    }
+
+    @GetMapping("/calls/{callId}/replay")
+    public ConversationReplayFixture replay(@PathVariable UUID callId) {
+        return replayCapture.capture(callId);
     }
 }
