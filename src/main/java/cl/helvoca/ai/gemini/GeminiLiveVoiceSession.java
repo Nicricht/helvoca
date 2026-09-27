@@ -276,9 +276,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         JSONObject output = content.optJSONObject("outputTranscription");
         if (output != null) {
             append(assistantTranscript, output.optString("text", ""));
-            if (asksIfAnythingElse(bufferText(assistantTranscript))) {
+            if (asksIfAnythingElse(bufferText(assistantTranscript))
+                    && !contextualClosingIntent.get()) {
                 awaitingAnythingElseAnswer.set(true);
-                contextualClosingIntent.set(false);
             }
         }
 
@@ -825,9 +825,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             } else if ("ASSISTANT".equals(speaker)) {
                 previousAssistantUtterance = lastAssistantUtterance;
                 lastAssistantUtterance = text;
-                if (asksIfAnythingElse(text)) {
+                if (asksIfAnythingElse(text) && !contextualClosingIntent.get()) {
                     awaitingAnythingElseAnswer.set(true);
-                    contextualClosingIntent.set(false);
                 }
             }
             transcripts.append(context.callId(), speaker, text);
