@@ -20,7 +20,10 @@ class RealtimeToolDefinitionsTest {
     void bookingToolsTellTheModelHowToContinueWithoutInventingState() {
         JSONArray tools = RealtimeToolDefinitions.all();
         assertDescriptionContains(tools, "list_available_slots", "create_booking");
+        assertDescriptionContains(tools, "list_available_slots", "unavailabilityReasonKnown=false");
+        assertDescriptionContains(tools, "list_available_slots", "jamás inventes alta demanda");
         assertDescriptionContains(tools, "check_booking_availability", "create_booking");
+        assertDescriptionContains(tools, "check_booking_availability", "customerSafeExplanation");
         assertDescriptionContains(tools, "create_booking", "bookingId");
         assertDescriptionContains(tools, "create_booking", "te confirmo la reserva");
         assertDescriptionContains(tools, "create_booking", "UNA sola vez");
