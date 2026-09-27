@@ -61,18 +61,19 @@ Do not overload the core `business` row with every future field. Use a 1:1 busin
 
 ### Product catalog
 
-Products exist in the universal catalog, but there is no first-class support for:
+Products use the universal catalog as the product source of truth. On `feat/inventory-v1`, the isolated Inventory V1 module now adds first-class support for:
 
 - SKU;
-- category hierarchy;
-- product variants/options;
-- inventory tracking flag;
-- inventory quantity;
-- stock reservations/holds;
-- stock movement history;
-- reorder/minimum-stock threshold.
+- product variants/options with independent SKU and stock;
+- authoritative inventory tracking;
+- on-hand, reserved and available quantities;
+- stock reservations/holds with expiry;
+- immutable stock movement history;
+- reorder/minimum-stock thresholds;
+- low-stock, out-of-stock and restocked alerts;
+- opt-in customer restock subscriptions and a provider-neutral pending notification queue.
 
-There is currently no runtime inventory module. Searches for stock, SKU and inventory show no production implementation.
+Category hierarchy remains outside Inventory V1. Inventory V1 does not automatically send WhatsApp/SMS/email messages; external delivery remains a separate explicitly authorized workflow.
 
 ### Booking policy
 

@@ -1,68 +1,194 @@
 # Inventory V1
 
-Status: **isolated development on `feat/inventory-v1`**
+Status: **certification candidate on `feat/inventory-v1` / PR #465**.
 
-This work must not be merged into `main` while the sellable pilot is being certified unless it passes its own tests and is explicitly approved.
+Inventory V1 is intentionally isolated from `main` until explicitly approved for merge. The implementation is backend-authoritative, tenant-scoped and designed to support voice, WhatsApp, orders and payments without allowing the AI or browser to invent stock.
 
-## Goal
+## Scope
 
-Give RecepVoz an authoritative stock backend that voice, WhatsApp, orders and payments can use without guessing availability.
+Inventory V1 provides:
 
-## V1 model
+- product-level stock;
+- optional product variants with independent SKU and stock;
+- on-hand, reserved and available quantities;
+- reorder thresholds;
+- manual stock adjustments;
+- immutable movement history;
+- stock reservations, release, consumption and expiry;
+- order/payment integration;
+- low-stock, out-of-stock and restocked alerts;
+- opt-in customer restock subscriptions;
+- a provider-neutral pending restock notification queue;
+- an inventory workspace for BUSINESS_ADMIN and read-only operational visibility for OPERATOR;
+- authoritative stock lookup for AI tools.
+
+It is not a warehouse-management suite or ERP.
+
+## Stock model and invariants
+
+For every tracked product or variant:
 
 ```text
-Catalog product
-   |
-   +--> Inventory stock
-          |- SKU
-          |- tracking enabled
-          |- on hand
-          |- reserved
-          |- available
-          |- reorder threshold
-          |
-          +--> Product variants
-          |      |- name (for example Negro / 42)
-          |      |- option values JSON (color, size, etc.)
-          |      |- unique SKU
-          |      |- own on-hand / reserved / available
-          |      `- own reorder threshold
-          |
-          +--> Reservations
-          |      |- ACTIVE
-          |      |- CONSUMED
-          |      |- RELEASED
-          |      `- EXPIRED
-          |
-          `--> Immutable movement history
+available = on_hand - reserved
+on_hand >= 0
+reserved >= 0
+reserved <= on_hand
+reorder_threshold >= 0
 ```
 
-## Invariants
+Additional guarantees:
 
-- inventory belongs to exactly one tenant;
-- inventory is allowed only for active catalog products;
-- `on_hand >= 0`;
-- `reserved >= 0`;
-- `reserved <= on_hand`;
-- `available = on_hand - reserved`;
-- stock reservation, payment protection and expiry use pessimistic row locking;
-- an active reservation cannot oversell available stock;
-- consuming a reservation decrements both `on_hand` and `reserved`;
-- releasing or expiring a reservation decrements only `reserved`;
-- expired order reservations are not released while a payment remains `REQUIRES_ACTION` or `PENDING`;
-- if an expired ACTIVE hold belongs to an already `SUCCEEDED` payment, the expiry worker repairs it by consuming the stock instead of releasing it;
-- every stock mutation creates a movement record;
-- base inventory SKU is unique inside a business;
-- every product variant has its own required SKU and stock balance;
-- variant creation refuses a SKU already used by base product inventory or another variant;
-- a variant with reserved units cannot be deactivated;
-- no AI provider is allowed to invent stock;
-- inventory alerts are tenant-scoped and deduplicated per product or variant;
-- alert transitions are state-based: normal → low stock → out of stock → restocked;
-- acknowledging an alert does not cause the same state to notify again;
-- external WhatsApp/provider delivery is not triggered by inventory alerts unless a separate authorized delivery path is explicitly enabled.
+- stock belongs to exactly one business;
+- inventory can only reference catalog products belonging to the same tenant;
+- variant references must match the exact product and tenant;
+- SKU uniqueness is tenant-scoped;
+- one product has at most one base inventory row;
+- reservations use positive quantities only;
+- an ACTIVE reservation cannot exceed authoritative available stock;
+- consumption decrements both `on_hand` and `reserved`;
+- release/expiry decrement only `reserved`;
+- all stock mutations write a movement record;
+- exact variant identity is persisted through draft lines, final order lines and reservations;
+- base-product stock and variant stock remain independent.
 
-## Initial API
+V72 adds composite database foreign keys so cross-tenant product/variant references are rejected by PostgreSQL even for privileged writers. PostgreSQL RLS remains enabled and forced on inventory-owned tenant tables.
+
+## Concurrency and idempotency
+
+Inventory reservation and settlement use pessimistic row locking with deterministic lock ordering.
+
+Certified behaviors include:
+
+- two simultaneous purchases cannot oversell physical stock;
+- concurrent reservations cannot make `reserved > on_hand`;
+- base and variant inventories keep independent identities;
+- tenant context cannot mutate another tenant;
+- payment webhook replay cannot consume inventory twice;
+- semantic replay with a different webhook event id still cannot double-decrement because no ACTIVE reservation remains after settlement.
+
+## Reservation lifecycle
+
+1. **Configure**: BUSINESS_ADMIN enables authoritative tracking and defines SKU/threshold.
+2. **Adjust**: BUSINESS_ADMIN changes physical on-hand stock.
+3. **Reserve**: an operational order reserves exact base or variant stock.
+4. **Release**: cancellation/failure returns reserved capacity without changing physical stock.
+5. **Consume**: successful payment/order settlement removes physical stock.
+6. **Expire**: abandoned ACTIVE holds are released by the expiry worker.
+7. **Repair paid stale hold**: if a stale ACTIVE hold belongs to an already SUCCEEDED payment, expiry recovery consumes it instead of releasing it.
+
+Pending or `REQUIRES_ACTION` payments protect their inventory hold.
+
+## Variants
+
+Variants are optional and have:
+
+- backend-owned `variantId`;
+- name and structured option values;
+- independent SKU;
+- independent on-hand/reserved/available values;
+- independent reorder threshold;
+- active/inactive lifecycle.
+
+A variant with reserved units cannot be deactivated.
+
+## Alerts
+
+The in-app state machine is:
+
+```text
+NORMAL -> LOW_STOCK -> OUT_OF_STOCK -> RESTOCKED
+```
+
+Rules:
+
+- LOW_STOCK means available is positive and at/below threshold;
+- OUT_OF_STOCK means available is zero;
+- RESTOCKED is emitted only when a previously low/out subject returns above threshold;
+- one open alert exists per product/variant subject;
+- acknowledgement does not create duplicate same-state alerts;
+- BUSINESS_ADMIN may acknowledge;
+- OPERATOR may view only.
+
+## Restock subscriptions
+
+Customers can request notification when an unavailable product or exact variant returns.
+
+Safety rules:
+
+- explicit consent is mandatory;
+- the target must be an active product/variant of the same tenant;
+- tracking must be authoritative;
+- subscription is rejected when the target is already available;
+- contact is normalized;
+- duplicate ACTIVE watches are deduplicated;
+- an advisory subject lock closes subscribe/restock races;
+- one idempotent pending notification is created per subscription;
+- subscription becomes NOTIFIED after a real RESTOCKED transition;
+- cancellation is idempotent and cancels a pending notification when present;
+- cancellation through the administration API requires BUSINESS_ADMIN.
+
+Inventory V1 does **not** automatically send WhatsApp, SMS or email. It only creates a provider-neutral PENDING notification for a separately authorized delivery workflow.
+
+## Permissions
+
+### BUSINESS_ADMIN
+
+Can:
+
+- configure stock;
+- make manual adjustments;
+- create/edit/deactivate variants;
+- acknowledge inventory alerts;
+- cancel restock subscriptions;
+- use all read views.
+
+### OPERATOR
+
+Can:
+
+- read inventory, variants, movements, alerts and restock queues;
+- participate in operational reservation/release/consume flows;
+- register a consented restock request during an operational interaction.
+
+The inventory administration UI is read-only for OPERATOR. Sensitive administration mutations are enforced in the backend, not only hidden in the browser.
+
+## Tenant security
+
+Inventory uses the authenticated tenant context. Browser and AI payloads are not trusted to select a business.
+
+Protection layers:
+
+- `TenantProvider` for tenant-bound administration services;
+- business-scoped repository queries;
+- ENABLE + FORCE PostgreSQL RLS;
+- runtime/system role grants;
+- tenant-safe composite foreign keys;
+- exact product/variant identity checks;
+- PostgreSQL integration tests proving tenant isolation and cross-tenant write rejection.
+
+## AI integration
+
+Commercial AI tools receive authoritative inventory data through backend services.
+
+- `list_catalog` exposes active variants and backend ids;
+- `get_stock` resolves exact product or variant stock by backend identity/SKU;
+- AI providers do not calculate or invent availability;
+- order confirmation revalidates authoritative stock before persistence.
+
+## Orders and payments
+
+- order confirmation reserves exact stock;
+- draft and immutable order lines persist `variant_id`;
+- payment retry ensures stock is reserved again when needed;
+- SUCCEEDED consumes;
+- FAILED/CANCELLED/EXPIRED releases;
+- PENDING/REQUIRES_ACTION preserves the hold;
+- REFUNDED does not automatically restock a physical item;
+- verified webhook replay is idempotent.
+
+## API summary
+
+Base inventory:
 
 - `GET /api/v1/inventory`
 - `GET /api/v1/inventory/{catalogItemId}`
@@ -72,53 +198,82 @@ Catalog product
 - `POST /api/v1/inventory/reservations/{reservationId}/release`
 - `POST /api/v1/inventory/reservations/{reservationId}/consume`
 - `GET /api/v1/inventory/{catalogItemId}/movements`
+
+Variants:
+
+- `GET /api/v1/inventory/{catalogItemId}/variants`
+- create/update/adjust/deactivate endpoints under the same resource;
+- variant movement history.
+
+Alerts:
+
 - `GET /api/v1/inventory/alerts`
 - `GET /api/v1/inventory/alerts/history`
 - `POST /api/v1/inventory/alerts/{alertId}/acknowledge`
 
-## Reservation expiry
+Restock queue:
 
-A scheduled worker scans expired ACTIVE holds in batches of 100. Discovery runs with system database scope, while every mutation is re-entered under the reservation's tenant scope.
+- `GET /api/v1/inventory/restock-subscriptions`
+- `POST /api/v1/inventory/restock-subscriptions`
+- `POST /api/v1/inventory/restock-subscriptions/{id}/cancel`
+- `GET /api/v1/inventory/restock-subscriptions/notifications`
 
-Default schedule:
+## UI
 
-- enabled: `HELVOCA_INVENTORY_RESERVATION_EXPIRY_ENABLED=true`;
-- initial delay: 15 seconds;
-- poll delay: 30 seconds.
+`/inventory.html` includes:
 
-This worker is intentionally independent from `APP_JOBS_ENABLED` because releasing abandoned database stock is an internal consistency action, not an outbound delivery action.
+- product/SKU search;
+- tracked/low/out/restocked filters;
+- explicit Agotado state;
+- Reponer stock action;
+- product and variant adjustments;
+- movement history;
+- inventory alert actions;
+- customers waiting for restock;
+- exact variant context;
+- provider-neutral “Aviso listo / Pendiente de envío” state;
+- admin cancellation;
+- operator read-only behavior.
 
-## Current variant integration
+The browser does not submit a tenant/business id to select inventory ownership.
 
-Product variants now carry an exact backend-owned identity through the full commercial lifecycle:
+## Migrations
 
-- `list_catalog` exposes active variants with `variantId`, SKU and structured options;
-- `get_stock` can resolve exact variant stock by `variantId` or variant SKU;
-- draft order lines persist `variant_id`;
-- final immutable order lines persist `variant_id`;
-- inventory reservations persist `variant_id`;
-- order confirmation reserves the exact variant;
-- payment retry re-reserves the exact variant;
-- payment success consumes the exact variant;
-- cancellation, failure and expiry release the exact variant;
-- the visual inventory workspace can create, edit, adjust and inspect variant history;
-- BUSINESS_ADMIN can mutate variants while OPERATOR remains read-only.
+- V67: inventory stock, reservations, movements and RLS;
+- V68: product variants;
+- V69: variant identity through order/reservation lifecycle;
+- V70: inventory alert state machine;
+- V71: consented restock subscriptions + pending notification queue;
+- V72: final tenant/product/variant referential-integrity hardening.
 
-## Automatic inventory alerts
+## Certification evidence
 
-V70 adds an internal alert state machine for base products and variants.
+The branch contains focused tests for:
 
-- `LOW_STOCK`: available stock is positive and at or below the configured minimum;
-- `OUT_OF_STOCK`: available stock reaches zero;
-- `RESTOCKED`: a previously low/out-of-stock item returns above its threshold;
-- one open alert exists per product/variant, preventing repeated duplicate notifications;
-- BUSINESS_ADMIN can acknowledge alerts from `/inventory.html`;
-- OPERATOR can view alerts but cannot acknowledge them;
-- PostgreSQL RLS protects alert rows by tenant;
-- the inventory console refreshes alerts after product and variant changes;
-- this layer is deliberately in-app only. It does not create outbound WhatsApp traffic.
+- `InventoryService`;
+- `InventoryVariantService`;
+- `InventoryAlertService`;
+- `InventoryRestockSubscriptionService`;
+- reservation expiry;
+- PostgreSQL concurrency;
+- PostgreSQL RLS and tenant referential integrity;
+- payment workflow/webhooks;
+- order workflow;
+- controller authorization contracts;
+- Playwright inventory admin/operator workflows.
 
-## Next isolated steps
+Final certification is tied to the current PR #465 HEAD after the full RecepVoz CI workflow succeeds.
 
-1. add PostgreSQL concurrency certification for mixed base-product + variant orders;
-2. add an opt-in customer restock-watch queue that can later connect to authorized outbound WhatsApp delivery.
+## Intentional V1 limitations
+
+Inventory V1 deliberately does not include:
+
+- multiple warehouses/locations;
+- suppliers or purchase orders;
+- costing/accounting;
+- batch/lot/serial tracking;
+- automated physical-return restocking on refunds;
+- automatic outbound WhatsApp/SMS/email delivery;
+- a large CRM/ERP layer.
+
+Those are separate product decisions and must not block the sellable pilot.

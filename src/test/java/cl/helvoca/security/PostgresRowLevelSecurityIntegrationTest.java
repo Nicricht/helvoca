@@ -359,6 +359,41 @@ class PostgresRowLevelSecurityIntegrationTest {
     }
 
     @Test
+    void inventoryForeignKeysRejectCrossTenantCatalogAndVariantIdentityEvenForOwner() {
+        UUID itemA = UUID.randomUUID();
+        UUID itemB = UUID.randomUUID();
+        UUID variantB = UUID.randomUUID();
+
+        ownerJdbc.update(
+                "INSERT INTO catalog_item(id, business_id, kind, name) VALUES (?, ?, 'PRODUCT', ?)",
+                itemA, businessA, "Integrity A");
+        ownerJdbc.update(
+                "INSERT INTO catalog_item(id, business_id, kind, name) VALUES (?, ?, 'PRODUCT', ?)",
+                itemB, businessB, "Integrity B");
+
+        assertThrows(DataAccessException.class, () -> ownerJdbc.update("""
+                INSERT INTO inventory_stock(
+                    business_id, catalog_item_id, sku, tracking_enabled,
+                    on_hand, reserved, reorder_threshold
+                ) VALUES (?, ?, ?, TRUE, 1, 0, 0)
+                """, businessA, itemB, "CROSS-" + UUID.randomUUID()));
+
+        ownerJdbc.update("""
+                INSERT INTO inventory_product_variant(
+                    id, business_id, catalog_item_id, name, sku,
+                    tracking_enabled, on_hand, reserved, reorder_threshold, active
+                ) VALUES (?, ?, ?, 'Variant B', ?, TRUE, 0, 0, 0, TRUE)
+                """, variantB, businessB, itemB, "VAR-" + UUID.randomUUID());
+
+        assertThrows(DataAccessException.class, () -> ownerJdbc.update("""
+                INSERT INTO inventory_alert(
+                    business_id, catalog_item_id, variant_id, alert_type, status,
+                    subject_name, available, reorder_threshold
+                ) VALUES (?, ?, ?, 'OUT_OF_STOCK', 'OPEN', 'Cross tenant variant', 0, 0)
+                """, businessA, itemA, variantB));
+    }
+
+    @Test
     void inventoryRestockSubscriptionsAndNotificationsAreTenantIsolated() {
         UUID customerA = ownerJdbc.queryForObject(
                 "SELECT id FROM customer WHERE business_id = ? LIMIT 1",

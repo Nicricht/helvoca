@@ -30,6 +30,7 @@ public class InventoryRestockSubscriptionController {
     }
 
     @PostMapping("/{subscriptionId}/cancel")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public ResponseEntity<InventoryRestockSubscriptionService.SubscriptionView> cancel(
             @PathVariable UUID subscriptionId) {
         return ResponseEntity.ok(service.cancel(subscriptionId));
