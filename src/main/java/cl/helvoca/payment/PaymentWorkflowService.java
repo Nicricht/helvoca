@@ -603,7 +603,9 @@ public class PaymentWorkflowService {
                 target.getId(),
                 items.stream()
                         .map(item -> new InventoryService.OrderItem(
-                                item.getCatalogItemId(), item.getQuantity()))
+                                item.getCatalogItemId(),
+                                item.getVariantId(),
+                                item.getQuantity()))
                         .toList());
         if (reservation.success()) return null;
 
