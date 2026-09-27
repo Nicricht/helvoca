@@ -29,6 +29,17 @@ class AgentVoiceProfileTest {
     }
 
     @Test
+    void sensualProfilesRemainDistinctAndResolvePerProvider() {
+        assertEquals("seductive_female", AgentVoiceProfile.normalizeForStorage("seductive_female"));
+        assertEquals("Aoede", AgentVoiceProfile.resolveGemini("seductive_female", "Kore"));
+        assertEquals("coral", AgentVoiceProfile.resolveOpenAi("seductive_female", "alloy"));
+
+        assertEquals("seductive_male", AgentVoiceProfile.normalizeForStorage("seductive_male"));
+        assertEquals("Enceladus", AgentVoiceProfile.resolveGemini("seductive_male", "Kore"));
+        assertEquals("cedar", AgentVoiceProfile.resolveOpenAi("seductive_male", "alloy"));
+    }
+
+    @Test
     void unknownSelectionIsRejectedOnSave() {
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,
@@ -38,7 +49,7 @@ class AgentVoiceProfileTest {
 
     @Test
     void everyPublishedProfileHasProviderMappings() {
-        assertEquals(10, AgentVoiceProfile.catalog().size());
+        assertEquals(12, AgentVoiceProfile.catalog().size());
         for (AgentVoiceProfile profile : AgentVoiceProfile.catalog()) {
             assertFalse(profile.code().isBlank());
             assertFalse(profile.displayName().isBlank());
