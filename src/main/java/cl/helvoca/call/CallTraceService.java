@@ -35,6 +35,15 @@ public class CallTraceService {
 
     @Transactional
     public void recordTool(UUID businessId, UUID callId, String toolName, JSONObject result) {
+        recordTool(businessId, callId, toolName, result, null);
+    }
+
+    @Transactional
+    public void recordTool(UUID businessId,
+                           UUID callId,
+                           String toolName,
+                           JSONObject result,
+                           Long durationMs) {
         CallSession call = requireCall(businessId, callId);
         boolean success = result.optBoolean("success", false);
         JSONObject data = result.optJSONObject("data");
@@ -46,6 +55,7 @@ public class CallTraceService {
         action.setActionType(actionType(toolName, data));
         action.setSuccess(success);
         if (error != null) action.setErrorCode(error.optString("code", null));
+        if (durationMs != null) action.setDurationMs(Math.max(0L, durationMs));
         if (data != null) {
             String entityType = entityType(toolName);
             UUID entityId = entityId(toolName, data);
