@@ -82,7 +82,10 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("DESDE LA PRIMERA SÍLABA"));
         assertTrue(instructions.contains("Cuéntame, ¿en qué te puedo ayudar?"));
         assertTrue(instructions.contains("Evita \"¿Qué es lo que usted desea?\""));
-        assertTrue(instructions.contains("habla rápido, ágil y fluido"));
+        assertTrue(instructions.contains("MÁS RÁPIDO que una atención telefónica estándar"));
+        assertTrue(instructions.contains("NO REPETIR"));
+        assertTrue(instructions.contains("pide una sola confirmación compacta"));
+        assertTrue(instructions.contains("mantén exactamente el mismo género"));
         assertTrue(instructions.contains("Termina de decir todas las palabras de la despedida"));
         assertTrue(instructions.contains("completar una reserva, venta, consulta o cualquier otra acción NO significa que la llamada terminó"));
         assertTrue(instructions.contains("entrega rápida, cálida y envolvente"));
@@ -99,6 +102,39 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(hasFunction(declarations, "transfer_to_human"));
         assertFalse(declarations.toString().contains("\"additionalProperties\""),
                 "Gemini Live rejects additionalProperties in FunctionDeclaration parameters");
+    }
+
+    @Test
+    void maleProfileDoesNotReceiveFemaleVoiceInstructions() {
+        GeminiLiveProperties properties = properties();
+        properties.setVoice("Enceladus");
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        String instructions = session.buildSetup()
+                .getJSONObject("setup")
+                .getJSONObject("systemInstruction")
+                .getJSONArray("parts")
+                .getJSONObject(0)
+                .getString("text");
+
+        assertTrue(instructions.contains("voz claramente masculina y adulta"));
+        assertTrue(instructions.contains("mismo género"));
+        assertFalse(instructions.contains("primera frase debe usar de inmediato una voz claramente femenina"));
     }
 
     @Test
