@@ -312,6 +312,57 @@ class DevDataInitializerTest {
     }
 
     @Test
+    void readinessRejectsMissingOrBlankRequiredProfileFields() throws Exception {
+        assertProfileReadinessBlocked(null, "Pasaje Demo 123", true);
+        assertProfileReadinessBlocked("   ", "Pasaje Demo 123", true);
+        assertProfileReadinessBlocked("Descripción demo", null, true);
+        assertProfileReadinessBlocked("Descripción demo", "   ", true);
+        assertProfileReadinessBlocked("Descripción demo", "Pasaje Demo 123", false);
+    }
+
+    @Test
+    void readinessRejectsMissingDemoAgent() throws Exception {
+        DemoMocks f = new DemoMocks();
+        when(f.agents.existsByBusinessId(f.businessId)).thenReturn(true);
+        when(f.agents.findByBusinessId(f.businessId)).thenReturn(Optional.empty());
+
+        DevDataInitializer initializer = f.initializer(true);
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, initializer::run);
+        assertTrue(error.getMessage().contains("AI_AGENT"));
+    }
+
+    @Test
+    void existingSeedAdminWithoutBusinessDoesNotMutateAnything() throws Exception {
+        DemoMocks f = new DemoMocks();
+        AppUser orphanAdmin = new AppUser();
+        orphanAdmin.setEmail("demo@helvoca.local");
+        f.admin.set(orphanAdmin);
+
+        DevDataInitializer initializer = f.initializer(true);
+        initializer.run();
+
+        verify(f.businesses, never()).saveAndFlush(any(Business.class));
+        verify(f.subscriptions, never()).startBasicTrial(any(UUID.class));
+        assertTrue(f.serviceStore.isEmpty());
+        assertTrue(f.bookingStore.isEmpty());
+    }
+
+    @Test
+    void demoCanBeCreatedWithoutOptionalSubscriptionService() throws Exception {
+        DemoMocks f = new DemoMocks();
+        DevDataInitializer initializer = f.initializer(true);
+        initializer.setSubscriptions(null);
+
+        initializer.run();
+
+        verify(f.subscriptions, never()).startBasicTrial(any(UUID.class));
+        assertNotNull(f.business.get());
+        assertEquals(6, f.serviceStore.stream().filter(ServiceItem::isActive).count());
+        assertEquals(3, f.bookingStore.size());
+    }
+
+    @Test
     void doesNothingWhenSeedIsDisabled() throws Exception {
         BusinessRepository businesses = mock(BusinessRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
@@ -324,6 +375,21 @@ class DevDataInitializerTest {
         initializer.run();
 
         verifyNoInteractions(businesses, users, roles, encoder);
+    }
+
+    private void assertProfileReadinessBlocked(String description, String address, Boolean usesReservations) throws Exception {
+        DemoMocks f = new DemoMocks();
+        BusinessProfile profile = new BusinessProfile();
+        profile.setBusinessId(f.businessId);
+        profile.setPublicDescription(description);
+        profile.setAddressLine(address);
+        profile.setUsesReservations(usesReservations);
+        f.profile.set(profile);
+
+        DevDataInitializer initializer = f.initializer(true);
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, initializer::run);
+        assertTrue(error.getMessage().contains("BUSINESS_PROFILE"));
     }
 
     private static final class DemoMocks {
