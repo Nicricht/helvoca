@@ -445,6 +445,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         JSONArray calls = toolCall.optJSONArray("functionCalls");
         if (calls == null || calls.isEmpty()) return;
 
+        long batchStartedAtNanos = System.nanoTime();
+        int executedCalls = 0;
         JSONArray responses = new JSONArray();
         for (int i = 0; i < calls.length(); i++) {
             JSONObject function = calls.optJSONObject(i);
@@ -455,13 +457,20 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             if (id == null || name == null || !completedToolCalls.add(id)) continue;
 
             JSONObject safeArgs = args == null ? new JSONObject() : args;
+            long toolStartedAtNanos = System.nanoTime();
             log.info("tool_call_started call_id={} tool_name={}", context.callId(), name);
             JSONObject result = executeToolWithShortDedupe(name, safeArgs);
+            long toolDurationMs = elapsedMillis(toolStartedAtNanos);
+            executedCalls++;
             boolean success = result.optBoolean("success", false);
             JSONObject data = result.optJSONObject("data");
             String entityId = data == null ? null : firstEntityId(data);
-            log.info("tool_call_completed call_id={} tool_name={} success={} entity_id={}",
-                    context.callId(), name, success, entityId == null ? "none" : entityId);
+            log.info("tool_call_completed call_id={} tool_name={} success={} entity_id={} duration_ms={}",
+                    context.callId(), name, success, entityId == null ? "none" : entityId, toolDurationMs);
+            if (toolDurationMs > properties.getToolLatencyBudgetMs()) {
+                log.warn("VOICE_LATENCY_BUDGET_EXCEEDED call={} stage=tool tool_name={} duration_ms={} budget_ms={}",
+                        context.callId(), name, toolDurationMs, properties.getToolLatencyBudgetMs());
+            }
             recordCertificationToolOutcome(name, success, data);
             responses.put(new JSONObject()
                     .put("id", id)
@@ -469,6 +478,13 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                     .put("response", new JSONObject().put("result", result)));
         }
         if (!responses.isEmpty()) {
+            long batchDurationMs = elapsedMillis(batchStartedAtNanos);
+            log.info("tool_batch_completed call_id={} tool_count={} duration_ms={}",
+                    context.callId(), executedCalls, batchDurationMs);
+            if (batchDurationMs > properties.getToolBatchLatencyBudgetMs()) {
+                log.warn("VOICE_LATENCY_BUDGET_EXCEEDED call={} stage=tool_batch tool_count={} duration_ms={} budget_ms={}",
+                        context.callId(), executedCalls, batchDurationMs, properties.getToolBatchLatencyBudgetMs());
+            }
             if (properties.isCertificationSimulation()) {
                 certificationAwaitingPostToolBoundary.set(true);
                 certificationPostToolOutputSeen.set(false);
@@ -669,6 +685,14 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         long latencyMs = Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
         log.info("VOICE_RESPONSE_LATENCY call={} first_audio_after_local_speech_end_ms={}",
                 context.callId(), latencyMs);
+        if (latencyMs > properties.getResponseLatencyBudgetMs()) {
+            log.warn("VOICE_LATENCY_BUDGET_EXCEEDED call={} stage=first_audio duration_ms={} budget_ms={}",
+                    context.callId(), latencyMs, properties.getResponseLatencyBudgetMs());
+        }
+    }
+
+    private static long elapsedMillis(long startedAtNanos) {
+        return Math.max(0L, (System.nanoTime() - startedAtNanos) / 1_000_000L);
     }
 
     private void handleProviderError(JSONObject error) {
