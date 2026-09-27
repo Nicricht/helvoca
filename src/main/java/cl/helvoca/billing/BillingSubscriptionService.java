@@ -60,6 +60,10 @@ public class BillingSubscriptionService {
         }
 
         SubscriptionPaymentGateway.Checkout checkout = gateway.createCheckout(businessId, payerEmail, paymentPlan);
+        String expectedReference = expectedReference(businessId, plan.code());
+        if (!expectedReference.equals(checkout.externalReference())) {
+            throw new IllegalStateException("Mercado Pago checkout external reference mismatch");
+        }
         subscription.setBillingProvider(PROVIDER);
         subscription.setPendingPlanCode(plan.code());
         subscription.setExternalSubscriptionId(checkout.subscriptionId());
@@ -104,12 +108,25 @@ public class BillingSubscriptionService {
 
     @Transactional
     public void reconcileAuthorizedPayment(String externalInvoiceId) {
+        if (!notBlank(externalInvoiceId)) throw new IllegalArgumentException("Mercado Pago invoice id is required");
+
         SubscriptionPaymentGateway.RemoteInvoice invoice = gateway.getInvoice(externalInvoiceId);
+        if (!externalInvoiceId.equals(invoice.id())) {
+            throw new IllegalStateException("Mercado Pago invoice id mismatch");
+        }
         if (invoice.subscriptionId() == null || invoice.subscriptionId().isBlank()) {
             throw new IllegalArgumentException("Mercado Pago invoice has no subscription id");
         }
+
         BusinessSubscription local = subscriptions.findByExternalSubscriptionId(invoice.subscriptionId())
                 .orElseThrow(() -> new IllegalArgumentException("Unknown Mercado Pago subscription"));
+        lockBusiness(local.getBusinessId());
+        local = subscriptions.findByExternalSubscriptionId(invoice.subscriptionId())
+                .orElseThrow(() -> new IllegalArgumentException("Unknown Mercado Pago subscription"));
+
+        if (externalInvoiceId.equals(local.getLastBillingInvoiceId())) {
+            return;
+        }
 
         String status = normalized(invoice.status());
         if ("approved".equals(status) || "processed".equals(status)) {
@@ -124,6 +141,7 @@ public class BillingSubscriptionService {
                 local.setPendingPlanCode(null);
                 local.setBillingCheckoutUrl(null);
             }
+            local.setLastBillingInvoiceId(externalInvoiceId);
             subscriptions.saveAndFlush(local);
             return;
         }
@@ -132,6 +150,7 @@ public class BillingSubscriptionService {
             Instant now = Instant.now();
             local.setStatus(SubscriptionStatus.PAST_DUE);
             local.setGraceUntil(now.plus(PAST_DUE_GRACE_DAYS, ChronoUnit.DAYS));
+            local.setLastBillingInvoiceId(externalInvoiceId);
             subscriptions.saveAndFlush(local);
         }
     }
@@ -187,8 +206,13 @@ public class BillingSubscriptionService {
     private static void requireExpectedReference(BusinessSubscription local, String reference) {
         String expectedPlan = local.getPendingPlanCode() == null ? local.getPlanCode() : local.getPendingPlanCode();
         if (!notBlank(expectedPlan)) throw new IllegalStateException("Subscription plan is missing");
-        String expected = "helvoca:" + local.getBusinessId() + ":" + expectedPlan.trim().toUpperCase(Locale.ROOT);
-        if (!expected.equals(reference)) throw new IllegalStateException("Mercado Pago external reference mismatch");
+        if (!expectedReference(local.getBusinessId(), expectedPlan).equals(reference)) {
+            throw new IllegalStateException("Mercado Pago external reference mismatch");
+        }
+    }
+
+    private static String expectedReference(UUID businessId, String planCode) {
+        return "helvoca:" + businessId + ":" + planCode.trim().toUpperCase(Locale.ROOT);
     }
 
     private static int requireFixedPrice(CommercialPlanCatalogService.Plan plan) {
