@@ -77,6 +77,9 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     @Autowired(required = false)
     private SafeOperationRetryEngine retryEngine;
 
+    @Autowired(required = false)
+    private BookingConversationStateMachine bookingConversationStateMachine;
+
     public CertificationGuardedRealtimeToolService(BusinessRepository businesses,
                                                     CustomerRepository customers,
                                                     ServiceItemRepository services,
@@ -106,6 +109,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
             instructions += CommercialToolDefinitions.instructions(operationCapabilities.enabled(context.businessId()));
         }
         instructions += "\nPara create_booking usa siempre dos fases: primero llama con serviceId/startAt para obtener una propuesta, presenta esas condiciones y pide confirmación explícita; solo después vuelve a llamar create_booking con el operationId y confirmationToken devueltos. Una respuesta sin bookingId es solo una propuesta y NO significa que exista una reserva.";
+        instructions += "\nESTADO BACKEND DE RESERVA: las respuestas de las herramientas del flujo pueden incluir conversationState. Ese objeto es la fuente de verdad sobre datos ya resueltos. Nunca vuelvas a preguntar ningún campo incluido en closedFields. Sigue nextAction y pregunta únicamente nextRequiredField cuando no sea NONE. Si nextAction=ASK_CONFIRMATION_ONCE, pide confirmación una sola vez; si nextAction=CREATE_BOOKING_PROPOSAL, ejecuta create_booking fase 1 sin recopilar datos otra vez; si nextAction=BOOKING_COMPLETE, no vuelvas a confirmar la reserva.";
         instructions += "\nSi el cliente pide que continúes o envíes contenido al WhatsApp del MISMO número desde el que llama, confirma verbalmente que ese número es su WhatsApp y solo después usa verify_caller_whatsapp con confirmedSameNumber=true. Luego usa send_whatsapp_operation con el mismo operationId. Nunca marques el número como verificado por inferencia.";
         return instructions;
     }
@@ -254,14 +258,35 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                     BookingSource.AI_CALL,
                     args);
             String synchronizedResult = synchronizeBookingMutation(context, toolName, result.toString());
-            trace.recordTool(context.businessId(), context.callId(), toolName, new JSONObject(synchronizedResult));
-            return synchronizedResult;
+            JSONObject decorated = decorateBookingState(context, toolName, args, new JSONObject(synchronizedResult));
+            trace.recordTool(context.businessId(), context.callId(), toolName, decorated);
+            return decorated.toString();
         }
 
         lockBookingMutation(context, toolName, rawArguments);
         String result = super.execute(context, toolName, rawArguments);
-        if (!BOOKING_MUTATIONS.contains(toolName)) return result;
-        return synchronizeBookingMutation(context, toolName, result);
+        JSONObject args = parseArguments(rawArguments);
+        JSONObject decorated = decorateBookingState(context, toolName, args, new JSONObject(result));
+        if (!BOOKING_MUTATIONS.contains(toolName)) return decorated.toString();
+        return synchronizeBookingMutation(context, toolName, decorated.toString());
+    }
+
+    private JSONObject decorateBookingState(RealtimeCallContext context,
+                                            String toolName,
+                                            JSONObject args,
+                                            JSONObject result) {
+        if (bookingConversationStateMachine == null) return result;
+        return bookingConversationStateMachine.decorate(context, toolName, args, result);
+    }
+
+    private static JSONObject parseArguments(String rawArguments) {
+        try {
+            return rawArguments == null || rawArguments.isBlank()
+                    ? new JSONObject()
+                    : new JSONObject(rawArguments);
+        } catch (Exception ignored) {
+            return new JSONObject();
+        }
     }
 
     private String synchronizeBookingMutation(RealtimeCallContext context,
