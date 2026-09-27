@@ -73,8 +73,17 @@ public class CallCertificationAuditRunner implements ApplicationRunner {
                             + (entity == null || entity.isBlank() ? "" : ":" + entity);
                 })
                 .collect(Collectors.joining(","));
-        int transcriptCount = transcripts.findAllByCallIdOrderBySequenceNumberAsc(id).size();
+        List<CallTranscript> persistedTranscripts = transcripts.findAllByCallIdOrderBySequenceNumberAsc(id);
+        int transcriptCount = persistedTranscripts.size();
         boolean summaryPresent = summaries.findByCallId(id).isPresent();
+
+        for (CallTranscript transcript : persistedTranscripts) {
+            log.info("RECEPVOZ_CALL_AUDIT_TRANSCRIPT call={} seq={} speaker={} text={}",
+                    id,
+                    transcript.getSequenceNumber(),
+                    transcript.getSpeaker(),
+                    CallCertificationService.safeTranscriptLogText(transcript.getContent()));
+        }
 
         log.info("RECEPVOZ_CALL_AUDIT SUCCESS call={} provider={} ai_provider={} status={} resolution={} "
                         + "actions={} successful_actions={} failed_actions={} transcript_items={} summary_present={} digest={}",
