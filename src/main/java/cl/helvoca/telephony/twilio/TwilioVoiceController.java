@@ -123,7 +123,10 @@ public class TwilioVoiceController {
             }
         }
 
-        return voiceRouter.route(businessPhone, callerPhone, callSid, voiceOverride)
+        var routeDecision = voiceOverride == null
+                ? voiceRouter.route(businessPhone, callerPhone, callSid)
+                : voiceRouter.route(businessPhone, callerPhone, callSid, voiceOverride);
+        return routeDecision
                 .map(decision -> {
                     log.info("Routing Twilio {} call={} provider={} mode={}",
                             direction, callSid, decision.providerId(), decision.mode());
