@@ -25,7 +25,7 @@ public enum AgentVoiceProfile {
     SMOOTH("smooth", "Serena", "Fluida y estable", "ash", "Algieba"),
     MATURE("mature", "Madura", "Sobria y con presencia", "echo", "Gacrux"),
     NEUTRAL("neutral", "Neutra", "Balanceada para uso general", "alloy", "Schedar"),
-    SEDUCTIVE_FEMALE("seductive_female", "Joven chilena", "Femenina joven-adulta, chilena, alegre, ágil y con presencia premium", "coral", "Leda"),
+    SEDUCTIVE_FEMALE("seductive_female", "Joven chilena", "Femenina joven-adulta, chilena, alegre, ágil y con presencia premium", "coral", "Sulafat"),
     SEDUCTIVE_MALE("seductive_male", "Sensual masculina", "Masculina, chilena, rápida y extremadamente sensual", "cedar", "Enceladus");
 
     private static final Set<String> OPENAI_REALTIME_VOICES = Set.of(
@@ -65,11 +65,12 @@ public enum AgentVoiceProfile {
     public static Optional<AgentVoiceProfile> fromSelection(String value) {
         if (value == null || value.isBlank()) return Optional.empty();
         String normalized = value.trim();
-        // Despina was the provider-specific value stored by the former female
-        // production profile. Treat it as a legacy alias so existing tenants
-        // migrate to the current youthful female profile instead of pinning the
-        // old smooth/call-center-sounding voice forever.
-        if ("Despina".equalsIgnoreCase(normalized)) {
+        // Despina and Leda were provider-specific values stored by earlier
+        // production versions of the youthful female profile. Treat both as
+        // legacy aliases so existing tenants follow the current production
+        // profile instead of remaining pinned to an older Gemini voice.
+        if ("Despina".equalsIgnoreCase(normalized)
+                || "Leda".equalsIgnoreCase(normalized)) {
             return Optional.of(SEDUCTIVE_FEMALE);
         }
         return Arrays.stream(values())

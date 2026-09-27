@@ -31,22 +31,29 @@ class AgentVoiceProfileTest {
     @Test
     void legacyDespinaSelectionMigratesToYouthfulFemaleProfile() {
         assertEquals("seductive_female", AgentVoiceProfile.normalizeForStorage("Despina"));
-        assertEquals("Leda", AgentVoiceProfile.resolveGemini("Despina", "Kore"));
+        assertEquals("Sulafat", AgentVoiceProfile.resolveGemini("Despina", "Kore"));
         assertEquals("coral", AgentVoiceProfile.resolveOpenAi("Despina", "alloy"));
     }
 
     @Test
-    void legacyGlobalDespinaFallbackAlsoMigratesToLeda() {
-        assertEquals("Leda", AgentVoiceProfile.resolveGemini(null, "Despina"));
-        assertEquals("Leda", AgentVoiceProfile.resolveGemini("   ", "Despina"));
+    void legacyGlobalDespinaFallbackAlsoMigratesToSulafat() {
+        assertEquals("Sulafat", AgentVoiceProfile.resolveGemini(null, "Despina"));
+        assertEquals("Sulafat", AgentVoiceProfile.resolveGemini("   ", "Despina"));
         assertEquals("Kore", AgentVoiceProfile.resolveGemini(null, "Kore"));
         assertNull(AgentVoiceProfile.resolveGemini(null, null));
     }
 
     @Test
+    void legacyLedaSelectionMigratesToCurrentYouthfulFemaleProfile() {
+        assertEquals("seductive_female", AgentVoiceProfile.normalizeForStorage("Leda"));
+        assertEquals("Sulafat", AgentVoiceProfile.resolveGemini("Leda", "Kore"));
+        assertEquals("coral", AgentVoiceProfile.resolveOpenAi("Leda", "alloy"));
+    }
+
+    @Test
     void commercialVoiceProfilesRemainDistinctAndResolvePerProvider() {
         assertEquals("seductive_female", AgentVoiceProfile.normalizeForStorage("seductive_female"));
-        assertEquals("Leda", AgentVoiceProfile.resolveGemini("seductive_female", "Kore"));
+        assertEquals("Sulafat", AgentVoiceProfile.resolveGemini("seductive_female", "Kore"));
         assertEquals("Joven chilena", AgentVoiceProfile.SEDUCTIVE_FEMALE.displayName());
         assertTrue(AgentVoiceProfile.SEDUCTIVE_FEMALE.description().contains("joven-adulta"));
         assertEquals("coral", AgentVoiceProfile.resolveOpenAi("seductive_female", "alloy"));

@@ -77,3 +77,13 @@ The final comparison between shortlisted voices uses five deterministic receptio
 This is a simulated conversation for voice evaluation only. Phone microphone audio remains ignored, the system advances the turns automatically, and only `end_call` is exposed. No availability lookup, booking, customer, payment, order or messaging tool is available, so the finalist test cannot create or mutate business data.
 
 The three finalists are run with the same prompt, same five turns, same Gemini configuration and same telephony path. Only `TWILIO_CERTIFICATION_VOICE_OVERRIDE` changes between calls. The human listener chooses the production voice based on perceived gender, consistency, Chilean/Santiago character, naturalness, energy, audible smile and commercial appeal.
+
+
+## Production winner
+
+The September 27, 2026 human listening final selected **Sulafat** as the primary youthful female production voice.
+
+- `seductive_female` resolves to Sulafat for Gemini Live.
+- Legacy `Leda` and `Despina` selections migrate to the current youthful female profile.
+- Leda and Laomedeia remain comparison/fallback candidates in the bake-off catalogue.
+- The masculine profile and unrelated tenant voice profiles are unchanged.
