@@ -148,6 +148,7 @@ app:
       local-barge-in-release-frames: ${GEMINI_LOCAL_BARGE_IN_RELEASE_FRAMES:5}
       local-barge-in-recent-assistant-audio-ms: ${GEMINI_LOCAL_BARGE_IN_RECENT_ASSISTANT_AUDIO_MS:1800}
       tool-latency-budget-ms: ${GEMINI_TOOL_LATENCY_BUDGET_MS:1200}
+      tool-batch-latency-budget-ms: ${GEMINI_TOOL_BATCH_LATENCY_BUDGET_MS:1800}
       response-latency-budget-ms: ${GEMINI_RESPONSE_LATENCY_BUDGET_MS:3000}
   openai:
     api-key: ${OPENAI_API_KEY:}
