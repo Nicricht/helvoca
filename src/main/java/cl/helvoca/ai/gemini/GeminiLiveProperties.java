@@ -66,9 +66,9 @@ public class GeminiLiveProperties {
     public int getPrefixPaddingMs() { return clamp(prefixPaddingMs, 0, 1000); }
     public void setPrefixPaddingMs(int prefixPaddingMs) { this.prefixPaddingMs = prefixPaddingMs; }
     public String getEndOfSpeechSensitivity() {
-        return "END_SENSITIVITY_HIGH".equalsIgnoreCase(endOfSpeechSensitivity)
-                ? "END_SENSITIVITY_HIGH"
-                : "END_SENSITIVITY_LOW";
+        return "END_SENSITIVITY_LOW".equalsIgnoreCase(endOfSpeechSensitivity)
+                ? "END_SENSITIVITY_LOW"
+                : "END_SENSITIVITY_HIGH";
     }
     public void setEndOfSpeechSensitivity(String endOfSpeechSensitivity) {
         this.endOfSpeechSensitivity = endOfSpeechSensitivity;
