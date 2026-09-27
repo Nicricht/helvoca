@@ -194,6 +194,11 @@ public class BookingConfirmationWorkflowService {
             return error("INVALID_CONFIRMATION", "La confirmación requiere identificadores válidos.");
         }
 
+        // Lock before the first JPA read. Otherwise a concurrent waiter can cache
+        // AWAITING_CONFIRMATION before blocking and keep that stale entity after
+        // the first transaction commits.
+        advisoryLock(businessId, operationId);
+
         UniversalConfirmationService.Authorization authorization = confirmations.authorize(
                 businessId, operationId, customerId, sourceReferenceId, trustedPhone, token);
         if (authorization == UniversalConfirmationService.Authorization.IDEMPOTENT_REPLAY) {
@@ -208,22 +213,6 @@ public class BookingConfirmationWorkflowService {
             return success(data);
         }
         JSONObject authError = authorizationError(authorization);
-        if (authError != null) return authError;
-
-        // Serialize confirmations of the same operation before touching a slot.
-        advisoryLock(businessId, operationId);
-        authorization = confirmations.authorize(
-                businessId, operationId, customerId, sourceReferenceId, trustedPhone, token);
-        if (authorization == UniversalConfirmationService.Authorization.IDEMPOTENT_REPLAY) {
-            Booking existing = bookings.findByOperationIdAndBusinessId(operationId, businessId).orElse(null);
-            if (existing == null) return error("BOOKING_PROJECTION_MISSING", "La reserva confirmada no existe.");
-            ServiceItem service = services.findByIdAndBusinessId(existing.getServiceId(), businessId).orElse(null);
-            JSONObject data = bookingData(businessId, existing, service);
-            data.put("operationId", operationId.toString());
-            data.put("idempotentReplay", true);
-            return success(data);
-        }
-        authError = authorizationError(authorization);
         if (authError != null) return authError;
 
         BusinessOperation operation = operations.findByIdAndBusinessId(operationId, businessId).orElse(null);
