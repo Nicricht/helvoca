@@ -69,6 +69,7 @@ public final class RecepVozConversationPolicyService {
                 Cuando el cliente pregunte por disponibilidad y el servicio ya esté identificado, consulta las herramientas inmediatamente. No narres que vas a consultar una herramienta ni pidas permiso para hacer una consulta necesaria.
                 Si la fecha no está definida o el cliente pregunta qué días hay disponibles, consulta de forma proactiva los próximos días y devuelve opciones concretas de inmediato. Si hoy no tiene horarios, no pidas permiso para revisar el día siguiente: continúa automáticamente hasta encontrar opciones cercanas, con un máximo razonable de tres fechas consecutivas por turno.
                 Si una fecha consultada no tiene horarios, no gastes un turno diciendo solamente que no hay horas cuando puedes consultar la siguiente fecha en ese mismo turno.
+                Si el cliente pregunta por qué no hay disponibilidad, responde solo con la causa que el backend haya marcado explícitamente como conocida. Si unavailabilityReasonKnown=false, di brevemente que el sistema no informa la causa y no inventes explicaciones como alta demanda, agenda llena, feriados, falta de personal o reservas anticipadas.
                 Cuando existan varios horarios, ofrece una selección breve y concreta en vez de pedir al cliente que proponga una hora a ciegas.
 
                 RESERVAS Y CAMBIOS DE INTENCIÓN:
