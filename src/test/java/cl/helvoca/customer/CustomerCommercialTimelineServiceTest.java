@@ -15,6 +15,7 @@ import cl.helvoca.operations.BusinessOperationItem;
 import cl.helvoca.operations.BusinessOperationItemRepository;
 import cl.helvoca.operations.BusinessOperationRepository;
 import cl.helvoca.operations.BusinessOrder;
+import cl.helvoca.operations.BusinessOrderLine;
 import cl.helvoca.operations.BusinessOrderLineRepository;
 import cl.helvoca.operations.BusinessOrderRepository;
 import cl.helvoca.payment.BusinessPayment;
@@ -325,6 +326,103 @@ class CustomerCommercialTimelineServiceTest {
         assertTrue(result.events().stream().anyMatch(event -> "Reserva de inventario expirada".equals(event.title())));
         assertTrue(result.events().stream().anyMatch(event -> "Productos enviados".equals(event.title())));
         assertFalse(result.events().stream().anyMatch(event -> "CALL".equals(event.type())));
+    }
+
+    @Test
+    void coversEmptyTimelineOrderLineFilteringAndNullableLabels() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        UUID orderOperationId = UUID.randomUUID();
+
+        CustomerRepository customers = mock(CustomerRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        BusinessOperationItemRepository operationItems = mock(BusinessOperationItemRepository.class);
+        BusinessOrderRepository orders = mock(BusinessOrderRepository.class);
+        BusinessOrderLineRepository orderLines = mock(BusinessOrderLineRepository.class);
+        BusinessPaymentRepository payments = mock(BusinessPaymentRepository.class);
+        OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
+        InventoryReservationRepository reservations = mock(InventoryReservationRepository.class);
+        InventoryProductVariantRepository variants = mock(InventoryProductVariantRepository.class);
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(customers.findByIdAndBusinessId(customerId, businessId))
+                .thenReturn(Optional.of(mock(Customer.class)));
+        when(calls.findTop20ByBusinessIdAndCustomerIdAndCertificationFalseOrderByStartedAtDesc(
+                businessId, customerId)).thenReturn(List.of());
+        when(conversations.findTop20ByBusinessIdAndCustomerIdOrderByLastMessageAtDesc(
+                businessId, customerId)).thenReturn(List.of());
+
+        BusinessOperation nullableOperation = mock(BusinessOperation.class);
+        UUID nullableOperationId = UUID.randomUUID();
+        when(nullableOperation.getId()).thenReturn(nullableOperationId);
+        when(nullableOperation.getType()).thenReturn(null);
+        when(nullableOperation.getStatus()).thenReturn(null);
+        when(nullableOperation.getSource()).thenReturn(null);
+        when(nullableOperation.getUpdatedAt()).thenReturn(null);
+        when(nullableOperation.getMetadata()).thenReturn(Map.of());
+        when(operationItems.findAllByOperationIdOrderByCreatedAtAsc(nullableOperationId))
+                .thenReturn(List.of());
+        when(operations.findTop50ByBusinessIdAndCustomerIdOrderByUpdatedAtDesc(
+                businessId, customerId)).thenReturn(List.of(nullableOperation));
+
+        BusinessOrder order = mock(BusinessOrder.class);
+        when(order.getId()).thenReturn(orderId);
+        when(order.getOperationId()).thenReturn(orderOperationId);
+        when(order.getStatus()).thenReturn(BusinessOrder.Status.DRAFT);
+        when(order.getSource()).thenReturn(BusinessOrder.Source.VOICE);
+        when(order.getCreatedAt()).thenReturn(Instant.parse("2026-09-27T06:00:00Z"));
+        when(orders.findTop5ByBusinessIdAndCustomerIdOrderByCreatedAtDesc(
+                businessId, customerId)).thenReturn(List.of(order));
+
+        BusinessOrderLine nullName = mock(BusinessOrderLine.class);
+        BusinessOrderLine blankName = mock(BusinessOrderLine.class);
+        BusinessOrderLine named = mock(BusinessOrderLine.class);
+        when(nullName.getItemName()).thenReturn(null);
+        when(blankName.getItemName()).thenReturn(" ");
+        when(named.getItemName()).thenReturn("Producto desde línea");
+        when(orderLines.findAllByOrderIdOrderByCreatedAtAsc(orderId))
+                .thenReturn(List.of(nullName, blankName, named));
+
+        when(payments.findTop5ByBusinessIdAndCustomerIdOrderByCreatedAtDesc(
+                businessId, customerId)).thenReturn(List.of());
+
+        InventoryReservation reservation = mock(InventoryReservation.class);
+        when(reservation.getStatus()).thenReturn(null);
+        when(reservation.getVariantId()).thenReturn(UUID.randomUUID());
+        when(reservation.getQuantity()).thenReturn(2);
+        when(reservation.getReferenceId()).thenReturn(orderOperationId);
+        when(reservation.getUpdatedAt()).thenReturn(Instant.parse("2026-09-27T06:01:00Z"));
+        when(reservations.findAllByBusinessIdAndReferenceTypeAndReferenceIdOrderByCreatedAtAsc(
+                businessId, "ORDER_OPERATION", orderOperationId)).thenReturn(List.of(reservation));
+
+        OutboundMessage nullablePurpose = mock(OutboundMessage.class);
+        when(nullablePurpose.getPurpose()).thenReturn(null);
+        when(nullablePurpose.getStatus()).thenReturn(OutboundMessage.Status.SENT);
+        when(nullablePurpose.getCreatedAt()).thenReturn(null);
+        when(outbound.findTop50ByBusinessIdAndCustomerIdOrderByCreatedAtDesc(
+                businessId, customerId)).thenReturn(List.of(nullablePurpose));
+
+        CustomerCommercialTimelineService service = new CustomerCommercialTimelineService(
+                customers, tenant, calls, conversations, operations, operationItems,
+                orders, orderLines, payments, outbound, reservations, variants);
+
+        CustomerCommercialTimelineService.TimelineResponse result = service.get(customerId);
+
+        assertNull(result.summary().commercialStage());
+        assertNull(result.summary().selectedProduct());
+        assertEquals("DRAFT", result.summary().orderStatus());
+        assertNull(result.summary().paymentStatus());
+        assertNull(result.summary().inventoryStatus());
+        assertEquals("VOICE", result.summary().lastChannel());
+        assertTrue(result.events().stream().anyMatch(event ->
+                "Producto desde línea".equals(event.detail())));
+        assertTrue(result.events().stream().noneMatch(event ->
+                "Actividad comercial".equals(event.title())),
+                "Null-date commercial event should be discarded after exercising its fallback title");
     }
 
 }
