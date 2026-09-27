@@ -298,6 +298,116 @@ class InventoryPostgresConcurrencyIntegrationTest {
                 """, Integer.class, businessA, productId, orderOperationId));
     }
 
+    @Test
+    void twoSequentialPaidPurchasesDepleteStockAndThirdReservationFails() {
+        UUID productId = createBaseStock(businessA, 2, "COMMERCIAL-DEPLETION");
+        UUID firstOrderId = UUID.randomUUID();
+        UUID firstPaymentOperationId = UUID.randomUUID();
+        UUID secondOrderId = UUID.randomUUID();
+        UUID secondPaymentOperationId = UUID.randomUUID();
+        UUID thirdOrderId = UUID.randomUUID();
+
+        createOperation(firstOrderId, businessA, "ORDER", "CONFIRMED");
+        createOperation(firstPaymentOperationId, businessA, "PAYMENT", "CONFIRMED");
+        createOperation(secondOrderId, businessA, "ORDER", "CONFIRMED");
+        createOperation(secondPaymentOperationId, businessA, "PAYMENT", "CONFIRMED");
+        createOperation(thirdOrderId, businessA, "ORDER", "CONFIRMED");
+
+        InventoryService.OrderReservationResult firstHold = databaseContext.callAsTenant(
+                businessA,
+                () -> inventory.reserveOrder(
+                        businessA,
+                        firstOrderId,
+                        List.of(new InventoryService.OrderItem(productId, 1))));
+        assertTrue(firstHold.success());
+        assertEquals(1, firstHold.reservationIds().size());
+        assertStock(productId, 2, 1);
+
+        String firstExternalId = createPendingPayment(
+                firstPaymentOperationId, firstOrderId, "commercial-depletion-first");
+
+        assertEquals(PaymentWebhookService.Result.PROCESSED,
+                databaseContext.callAsTenant(
+                        businessA,
+                        () -> paymentWebhooks.processVerified(
+                                businessA,
+                                "concurrency-test",
+                                "event-first-" + UUID.randomUUID(),
+                                firstExternalId,
+                                firstPaymentOperationId.toString(),
+                                "{\"status\":\"paid\"}")));
+
+        assertStock(productId, 1, 0);
+        assertEquals(1, ownerJdbc.queryForObject("""
+                SELECT COUNT(*)
+                  FROM inventory_reservation
+                 WHERE business_id = ?
+                   AND catalog_item_id = ?
+                   AND reference_id = ?
+                   AND status = 'CONSUMED'
+                """, Integer.class, businessA, productId, firstOrderId));
+
+        InventoryService.OrderReservationResult secondHold = databaseContext.callAsTenant(
+                businessA,
+                () -> inventory.reserveOrder(
+                        businessA,
+                        secondOrderId,
+                        List.of(new InventoryService.OrderItem(productId, 1))));
+        assertTrue(secondHold.success());
+        assertEquals(1, secondHold.reservationIds().size());
+        assertStock(productId, 1, 1);
+
+        String secondExternalId = createPendingPayment(
+                secondPaymentOperationId, secondOrderId, "commercial-depletion-second");
+
+        assertEquals(PaymentWebhookService.Result.PROCESSED,
+                databaseContext.callAsTenant(
+                        businessA,
+                        () -> paymentWebhooks.processVerified(
+                                businessA,
+                                "concurrency-test",
+                                "event-second-" + UUID.randomUUID(),
+                                secondExternalId,
+                                secondPaymentOperationId.toString(),
+                                "{\"status\":\"paid\"}")));
+
+        assertStock(productId, 0, 0);
+
+        InventoryService.OrderReservationResult soldOutAttempt = databaseContext.callAsTenant(
+                businessA,
+                () -> inventory.reserveOrder(
+                        businessA,
+                        thirdOrderId,
+                        List.of(new InventoryService.OrderItem(productId, 1))));
+
+        assertFalse(soldOutAttempt.success());
+        assertEquals("INSUFFICIENT_STOCK", soldOutAttempt.code());
+        assertTrue(soldOutAttempt.reservationIds().isEmpty());
+        assertStock(productId, 0, 0);
+
+        assertEquals(2, ownerJdbc.queryForObject("""
+                SELECT COUNT(*)
+                  FROM inventory_reservation
+                 WHERE business_id = ?
+                   AND catalog_item_id = ?
+                   AND status = 'CONSUMED'
+                """, Integer.class, businessA, productId));
+        assertEquals(2, ownerJdbc.queryForObject("""
+                SELECT COUNT(*)
+                  FROM inventory_movement
+                 WHERE business_id = ?
+                   AND catalog_item_id = ?
+                   AND movement_type = 'CONSUMPTION'
+                """, Integer.class, businessA, productId));
+        assertEquals(0, ownerJdbc.queryForObject("""
+                SELECT COUNT(*)
+                  FROM inventory_stock
+                 WHERE business_id = ?
+                   AND catalog_item_id = ?
+                   AND (on_hand < 0 OR reserved < 0 OR reserved > on_hand)
+                """, Integer.class, businessA, productId));
+    }
+
     private Attempt reserve(UUID businessId,
                             UUID orderId,
                             UUID productId,
@@ -388,6 +498,25 @@ class InventoryPostgresConcurrencyIntegrationTest {
                     id, business_id, type, status, source, revision, currency
                 ) VALUES (?, ?, ?, ?, 'API', 1, 'CLP')
                 """, operationId, businessId, type, status);
+    }
+
+    private String createPendingPayment(UUID paymentOperationId,
+                                        UUID orderOperationId,
+                                        String keyPrefix) {
+        String externalId = "payment-" + UUID.randomUUID();
+        ownerJdbc.update("""
+                INSERT INTO business_payment(
+                    operation_id, business_id, target_operation_id,
+                    provider, external_id, idempotency_key,
+                    amount, currency, status, source
+                ) VALUES (?, ?, ?, 'concurrency-test', ?, ?, 1000, 'CLP', 'PENDING', 'API')
+                """,
+                paymentOperationId,
+                businessA,
+                orderOperationId,
+                externalId,
+                keyPrefix + "-" + paymentOperationId);
+        return externalId;
     }
 
     private int activeReservedQuantity(UUID businessId,
