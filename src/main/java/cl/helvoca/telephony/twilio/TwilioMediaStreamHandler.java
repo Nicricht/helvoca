@@ -131,6 +131,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
 
         UUID callId = lifecycle.startInboundCall("twilio", callSid, callerPhone, businessPhone);
         RealtimeCallContext context = lifecycle.markStreamStarted(callId, callSid, streamSid, provider.id());
+        lifecycle.markAiModel(callId, provider.modelId());
         if (voiceOverride != null) {
             context = context.withVoiceOverride(voiceOverride);
             log.info("VOICE_BAKEOFF_ROUTE call={} voice={}", callId, voiceOverride);

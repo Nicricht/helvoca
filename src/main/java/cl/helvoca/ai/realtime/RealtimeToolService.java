@@ -93,6 +93,7 @@ public class RealtimeToolService {
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public String execute(RealtimeCallContext context, String toolName, String rawArguments) {
+        long startedNanos = System.nanoTime();
         JSONObject result;
         try {
             if (aiAgents != null && !aiAgents.toolAllowed(context.businessId(), toolName)) {
@@ -128,7 +129,8 @@ public class RealtimeToolService {
 
         if (trace != null) {
             try {
-                trace.recordTool(context.businessId(), context.callId(), toolName, result);
+                trace.recordTool(context.businessId(), context.callId(), toolName, result,
+                        elapsedMs(startedNanos));
             } catch (Exception e) {
                 log.warn("Could not persist call trace call={} tool={}: {}", context.callId(), toolName, e.getMessage());
             }
@@ -719,6 +721,10 @@ public class RealtimeToolService {
             try { return OffsetDateTime.parse(value).toInstant(); }
             catch (Exception second) { throw new IllegalArgumentException("Fecha/hora inválida. Usa ISO-8601 con offset o Z."); }
         }
+    }
+
+    private static long elapsedMs(long startedNanos) {
+        return Math.max(0L, Duration.ofNanos(System.nanoTime() - startedNanos).toMillis());
     }
 
     private static LocalDate localDate(String value) {
