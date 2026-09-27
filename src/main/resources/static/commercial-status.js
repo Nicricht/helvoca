@@ -300,45 +300,94 @@
 
     const style = document.createElement('style');
     style.id = 'helvoca-operational-home-styles';
-    style.textContent = `
-        #dashboardView #statusGrid.ux-ready-hidden { display: none !important; }
-        #operationalOverview { margin: 0 0 18px; padding: 18px; }
-        .home-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-        .home-metric { min-height: 76px; padding: 13px 14px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.025); color: inherit; text-decoration: none; cursor: pointer; transition: border-color .16s ease, background .16s ease, transform .16s ease; }
-        .home-metric:hover { border-color: rgba(124,92,255,.42); background: rgba(124,92,255,.07); transform: translateY(-1px); }
-        .home-metric:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-        .home-metric strong, .home-metric span { display: block; }
-        .home-metric strong { font-size: 24px; line-height: 1; letter-spacing: -.03em; }
-        .home-metric span { margin-top: 7px; color: var(--muted); font-size: 11px; }
-        @media (max-width: 900px) { .home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        @media (max-width: 520px) { .home-metrics { grid-template-columns: 1fr 1fr; } }
-        @media (max-width: 520px) { #operationalOverview { padding: 14px; } }
-    `;
+    style.textContent = [
+        '#dashboardView #statusGrid.ux-ready-hidden { display: none !important; }',
+        '#operationalOverview { margin: 0 0 18px; padding: 18px; }',
+        '.owner-dashboard-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:14px; }',
+        '.owner-dashboard-head h2 { margin:3px 0 0; font-size:20px; }',
+        '.owner-dashboard-message { margin:0 0 12px; color:var(--muted); font-size:12px; line-height:1.45; }',
+        '.owner-dashboard-message.hidden { display:none; }',
+        '.home-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }',
+        '.home-metric { min-height:82px; padding:13px 14px; border:1px solid var(--border); border-radius:12px; background:rgba(255,255,255,.025); color:inherit; text-decoration:none; cursor:pointer; transition:border-color .16s ease,background .16s ease,transform .16s ease; }',
+        '.home-metric:hover { border-color:rgba(124,92,255,.42); background:rgba(124,92,255,.07); transform:translateY(-1px); }',
+        '.home-metric:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }',
+        '.home-metric strong,.home-metric span,.home-metric small { display:block; }',
+        '.home-metric strong { font-size:24px; line-height:1; letter-spacing:-.03em; }',
+        '.home-metric span { margin-top:7px; color:var(--muted); font-size:11px; }',
+        '.home-metric small { margin-top:4px; color:var(--muted); font-size:9px; line-height:1.35; }',
+        '.owner-dashboard-attention { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }',
+        '.owner-dashboard-chip { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:6px 9px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:10px; }',
+        '.owner-dashboard-chip strong { color:var(--text); font-size:11px; }',
+        '.owner-dashboard-chip.warn { border-color:rgba(244,166,54,.34); background:rgba(244,166,54,.055); }',
+        '.owner-dashboard-chip.hidden { display:none; }',
+        '.owner-plan-row { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:12px; padding:11px 12px; border:1px solid var(--border); border-radius:11px; background:rgba(255,255,255,.018); }',
+        '.owner-plan-row.hidden { display:none; }',
+        '.owner-plan-row strong,.owner-plan-row span { display:block; }',
+        '.owner-plan-row span { color:var(--muted); font-size:10px; margin-top:2px; }',
+        '.owner-recent { margin-top:14px; padding-top:12px; border-top:1px solid var(--border); }',
+        '.owner-recent h3 { margin:0 0 9px; font-size:13px; }',
+        '.owner-activity-list { display:grid; gap:6px; }',
+        '.owner-activity-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.05); }',
+        '.owner-activity-row:last-child { border-bottom:0; }',
+        '.owner-activity-row strong { display:block; font-size:11px; }',
+        '.owner-activity-row span { display:block; margin-top:2px; color:var(--muted); font-size:10px; }',
+        '.owner-activity-row time { flex:0 0 auto; color:var(--muted); font-size:9px; }',
+        '.owner-empty { color:var(--muted); font-size:11px; padding:8px 0; }',
+        '@media (max-width:900px) { .home-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } }',
+        '@media (max-width:520px) { #operationalOverview { padding:14px; } .owner-dashboard-head,.owner-plan-row { align-items:flex-start; flex-direction:column; } .home-metrics { grid-template-columns:1fr 1fr; } .owner-activity-row { align-items:flex-start; } }'
+    ].join('\n');
     document.head.appendChild(style);
 
     const overview = document.createElement('section');
     overview.id = 'operationalOverview';
-    overview.className = 'card hidden';
-    overview.innerHTML = `
-        <div class="home-metrics" aria-label="Actividad principal de hoy">
-            <article id="homeCallsMetric" class="home-metric" aria-label="Llamadas de hoy"><strong id="homeCallsToday">–</strong><span>📞 Llamadas</span></article>
-            <a id="homeBookingsMetric" class="home-metric" href="/?tab=bookings#homeBusinessWorkspace" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>📅 Reservas</span></a>
-            <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver solicitudes"><strong id="homeRequestsToday">–</strong><span>📋 Solicitudes</span></a>
-            <a id="homeCustomersMetric" class="home-metric" href="/?tab=customers#homeBusinessWorkspace" aria-label="Ver clientes"><strong id="homeCustomersToday">–</strong><span>👥 Clientes</span></a>
-        </div>
-        <div hidden aria-hidden="true">
-            <span id="homeWhatsAppToday">–</span>
-            <span id="homeQuestionsToday">–</span>
-            <span id="homeFailuresToday">–</span>
-            <span id="homeMinutesToday">–</span>
-            <span id="homeCostToday">–</span>
-        </div>
-    `;
+    overview.className = 'card hidden owner-commercial-dashboard';
+    overview.dataset.state = 'loading';
+    overview.setAttribute('aria-label', 'Valor generado por RecepVoz');
+    overview.setAttribute('aria-busy', 'true');
+    overview.innerHTML = [
+        '<div class="owner-dashboard-head">',
+        '  <div><div class="eyebrow">Hoy</div><h2>Valor generado</h2></div>',
+        '  <span id="ownerDashboardState" class="badge muted">Cargando</span>',
+        '</div>',
+        '<div id="ownerDashboardMessage" class="owner-dashboard-message">Actualizando actividad confirmada…</div>',
+        '<div class="home-metrics" aria-label="Actividad comercial de hoy">',
+        '  <article id="homeCallsMetric" class="home-metric" aria-label="Conversaciones atendidas"><strong id="homeConversationsToday">–</strong><span>Conversaciones</span><small id="homeConversationBreakdown">–</small></article>',
+        '  <a id="homeBookingsMetric" class="home-metric" href="/?tab=bookings#homeBusinessWorkspace" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>Reservas</span><small>Generadas hoy</small></a>',
+        '  <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver solicitudes pendientes"><strong id="homeRequestsToday">–</strong><span>Pendientes</span><small>Solicitudes por resolver</small></a>',
+        '  <a id="ownerOrdersMetric" class="home-metric hidden" href="/?tab=sales#homeBusinessWorkspace" aria-label="Ver pedidos y ventas"><strong id="ownerOrdersToday">–</strong><span>Pedidos</span><small id="ownerOrdersHint">Generados hoy</small></a>',
+        '</div>',
+        '<div id="ownerDashboardAttention" class="owner-dashboard-attention" aria-label="Señales que requieren atención">',
+        '  <span id="ownerHandoffsChip" class="owner-dashboard-chip"><strong id="ownerHandoffsToday">–</strong> derivaciones</span>',
+        '  <span id="ownerFailuresChip" class="owner-dashboard-chip"><strong id="ownerFailuresToday">–</strong> fallos de llamada</span>',
+        '  <span id="ownerBookingChangesChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingChangesToday">–</strong> reprogramadas</span>',
+        '  <span id="ownerBookingCancelsChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingCancelsToday">–</strong> canceladas</span>',
+        '</div>',
+        '<div id="ownerPlanRow" class="owner-plan-row hidden">',
+        '  <div><strong id="ownerPlanName">–</strong><span>Plan actual</span></div>',
+        '  <div><strong id="ownerPlanUsage">–</strong><span>Minutos usados del periodo</span></div>',
+        '</div>',
+        '<section class="owner-recent" aria-label="Actividad reciente">',
+        '  <h3>Actividad reciente</h3>',
+        '  <div id="homeRecentActivity" class="owner-activity-list"><div class="owner-empty">Cargando actividad…</div></div>',
+        '</section>',
+        '<div hidden aria-hidden="true">',
+        '  <span id="homeCallsToday">–</span>',
+        '  <span id="homeWhatsAppToday">–</span>',
+        '  <span id="homeCustomersToday">–</span>',
+        '  <span id="homeQuestionsToday">–</span>',
+        '  <span id="homeFailuresToday">–</span>',
+        '  <span id="homeMinutesToday">–</span>',
+        '  <span id="homeCostToday">–</span>',
+        '</div>'
+    ].join('');
     heading.insertAdjacentElement('afterend', overview);
 
+    const stateBadge = overview.querySelector('#ownerDashboardState');
+    const message = overview.querySelector('#ownerDashboardMessage');
+    const recent = overview.querySelector('#homeRecentActivity');
     let loading = false;
     let lastLoadedAt = 0;
-    let currentBusinessName = window.helvocaBusinessName || "Tu negocio";
+    let currentBusinessName = window.helvocaBusinessName || 'Tu negocio';
 
     function isReady() {
         const cards = [...statusGrid.querySelectorAll('.status-card')];
@@ -353,44 +402,210 @@
             timeZone: timeZone || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit'
         }).formatToParts(date);
         const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-        return `${values.year}-${values.month}-${values.day}`;
+        return values.year + '-' + values.month + '-' + values.day;
     }
 
-    function renderOperational(operations, whatsapp) {
-        currentBusinessName = operations.businessName || window.helvocaBusinessName || currentBusinessName || "Tu negocio";
-        const timeZone = operations.timezone || 'UTC';
-        const today = dateKey(operations.localNow || new Date().toISOString(), timeZone);
-        const whatsappToday = (whatsapp || []).filter(conversation =>
-            dateKey(conversation.lastMessageAt || conversation.openedAt, timeZone) === today).length;
-        overview.querySelector('#homeCallsToday').textContent = String(Number(operations.callsToday || 0));
-        overview.querySelector('#homeWhatsAppToday').textContent = String(whatsappToday);
-        overview.querySelector('#homeBookingsToday').textContent = String(Number(operations.bookingsToday || 0));
-        overview.querySelector('#homeCustomersToday').textContent = String(Number(operations.newCustomersToday || 0));
-        overview.querySelector('#homeRequestsToday').textContent = String(Number(operations.openRequests || 0));
-        overview.querySelector('#homeQuestionsToday').textContent = String(Number(operations.unansweredQuestions || 0));
-        overview.querySelector('#homeFailuresToday').textContent = String(Number(operations.callFailuresToday || 0));
-        const seconds = Number(operations.callDurationSecondsToday || 0);
-        overview.querySelector('#homeMinutesToday').textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-        overview.querySelector('#homeCostToday').textContent = new Intl.NumberFormat('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(Number(operations.estimatedCallCostTodayUsd || 0));
+    function formatTime(value, timeZone) {
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        return new Intl.DateTimeFormat('es-CL', {
+            timeZone: timeZone || 'UTC', hour: '2-digit', minute: '2-digit'
+        }).format(date);
+    }
+
+    function numeric(value) {
+        const number = Number(value || 0);
+        return Number.isFinite(number) ? number : 0;
+    }
+
+    function labelStage(value) {
+        const labels = {
+            PAID: 'Pagado',
+            PAYMENT_LINK_SENT: 'Pago pendiente',
+            PAYMENT_FAILED: 'Pago fallido',
+            REQUIRES_ACTION: 'Requiere atención',
+            SUCCEEDED: 'Pagado',
+            COMPLETED: 'Completada',
+            FAILED: 'Fallida',
+            NO_ANSWER: 'Sin respuesta',
+            OPEN: 'Abierta',
+            IN_PROGRESS: 'En curso'
+        };
+        const key = String(value || '').toUpperCase();
+        return labels[key] || String(value || '').replaceAll('_', ' ').toLowerCase();
+    }
+
+    function setDashboardState(state, text, detail) {
+        overview.dataset.state = state;
+        overview.setAttribute('aria-busy', state === 'loading' ? 'true' : 'false');
+        stateBadge.textContent = text;
+        stateBadge.className = 'badge ' + (state === 'ready' ? 'online' : 'muted');
+        message.textContent = detail || '';
+        message.classList.toggle('hidden', !detail);
+    }
+
+    function renderRecentActivity(operations, pipeline, timeZone) {
+        const events = [];
+        (operations.recentCalls || []).forEach(item => events.push({
+            at: item.startedAt,
+            kind: 'Llamada',
+            title: item.resolution || labelStage(item.status) || 'Atención telefónica'
+        }));
+        (operations.recentRequests || []).forEach(item => events.push({
+            at: item.createdAt,
+            kind: 'Solicitud',
+            title: item.title || labelStage(item.status) || 'Solicitud del cliente'
+        }));
+        ((pipeline && pipeline.items) || []).forEach(item => events.push({
+            at: item.updatedAt,
+            kind: item.product ? 'Venta' : 'Conversación',
+            title: [item.product || item.customerName || 'Actividad comercial', labelStage(item.commercialStage || item.paymentStatus)].filter(Boolean).join(' · ')
+        }));
+
+        events.sort((a, b) => new Date(b.at || 0).getTime() - new Date(a.at || 0).getTime());
+        recent.innerHTML = '';
+        if (!events.length) {
+            recent.innerHTML = '<div class="owner-empty">Todavía no hay actividad reciente.</div>';
+            return 0;
+        }
+        events.slice(0, 4).forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'owner-activity-row';
+            const copy = document.createElement('div');
+            const titleNode = document.createElement('strong');
+            const meta = document.createElement('span');
+            const time = document.createElement('time');
+            titleNode.textContent = item.title;
+            meta.textContent = item.kind;
+            time.textContent = formatTime(item.at, timeZone);
+            copy.append(titleNode, meta);
+            row.append(copy, time);
+            recent.appendChild(row);
+        });
+        return events.length;
+    }
+
+    function renderOperational(operations, pilotMetrics, pipeline, subscription, audit) {
+        currentBusinessName = operations.businessName || window.helvocaBusinessName || currentBusinessName || 'Tu negocio';
+        const timeZone = operations.timezone || pilotMetrics?.timezone || 'UTC';
+        const todayKey = dateKey(operations.localNow || pilotMetrics?.localNow || new Date().toISOString(), timeZone);
+        const pilotToday = pilotMetrics?.today || null;
+
+        const calls = pilotToday ? numeric(pilotToday.calls) : numeric(operations.callsToday);
+        const whatsapp = pilotToday ? numeric(pilotToday.whatsappConversations) : 0;
+        const conversations = calls + whatsapp;
+        const bookings = pilotToday ? numeric(pilotToday.bookings) : numeric(operations.bookingsToday);
+        const orders = pilotToday ? numeric(pilotToday.orders) : numeric(pipeline?.total);
+        const openRequests = numeric(operations.openRequests);
+        const handoffs = pilotToday ? numeric(pilotToday.humanTransfers) : 0;
+        const failures = pilotToday ? numeric(pilotToday.callFailures) : numeric(operations.callFailuresToday);
+        const pipelineNeedsAction = numeric(pipeline?.needsAction);
+
+        overview.querySelector('#homeConversationsToday').textContent = String(conversations);
+        overview.querySelector('#homeConversationBreakdown').textContent =
+            String(calls) + ' llamadas' + (pilotToday ? ' · ' + String(whatsapp) + ' WhatsApp' : '');
+        overview.querySelector('#homeBookingsToday').textContent = String(bookings);
+        overview.querySelector('#homeRequestsToday').textContent = String(openRequests);
+        overview.querySelector('#ownerOrdersToday').textContent = String(orders);
+        overview.querySelector('#ownerOrdersHint').textContent = pipelineNeedsAction > 0
+            ? String(pipelineNeedsAction) + ' requiere' + (pipelineNeedsAction === 1 ? '' : 'n') + ' atención'
+            : 'Generados hoy';
+
+        const ordersMetric = overview.querySelector('#ownerOrdersMetric');
+        ordersMetric.classList.toggle('hidden', !(orders > 0 || numeric(pipeline?.total) > 0));
+
+        overview.querySelector('#ownerHandoffsToday').textContent = String(handoffs);
+        overview.querySelector('#ownerFailuresToday').textContent = String(failures);
+        overview.querySelector('#ownerHandoffsChip').classList.toggle('warn', handoffs > 0);
+        overview.querySelector('#ownerFailuresChip').classList.toggle('warn', failures > 0);
+
+        const auditRows = Array.isArray(audit) ? audit : null;
+        let rescheduled = 0;
+        let cancelled = 0;
+        if (auditRows) {
+            auditRows.forEach(item => {
+                if (String(item.resourceType || '').toUpperCase() !== 'BOOKING') return;
+                if (dateKey(item.createdAt, timeZone) !== todayKey) return;
+                const action = String(item.action || '').toUpperCase();
+                if (action === 'BOOKING_RESCHEDULE') rescheduled += 1;
+                if (action === 'BOOKING_CANCEL') cancelled += 1;
+            });
+            overview.querySelector('#ownerBookingChangesToday').textContent = String(rescheduled);
+            overview.querySelector('#ownerBookingCancelsToday').textContent = String(cancelled);
+            overview.querySelector('#ownerBookingChangesChip').classList.remove('hidden');
+            overview.querySelector('#ownerBookingCancelsChip').classList.remove('hidden');
+            overview.querySelector('#ownerBookingChangesChip').classList.toggle('warn', rescheduled > 0);
+            overview.querySelector('#ownerBookingCancelsChip').classList.toggle('warn', cancelled > 0);
+        } else {
+            overview.querySelector('#ownerBookingChangesChip').classList.add('hidden');
+            overview.querySelector('#ownerBookingCancelsChip').classList.add('hidden');
+        }
+
+        const planRow = overview.querySelector('#ownerPlanRow');
+        if (subscription) {
+            const used = numeric(subscription.usedMinutes);
+            const included = numeric(subscription.includedMinutes);
+            overview.querySelector('#ownerPlanName').textContent =
+                subscription.planName || subscription.publicPlanCode || subscription.plan || 'Plan';
+            overview.querySelector('#ownerPlanUsage').textContent =
+                String(used) + ' / ' + String(included) + ' min';
+            planRow.classList.remove('hidden');
+        } else {
+            planRow.classList.add('hidden');
+        }
+
+        const recentCount = renderRecentActivity(operations, pipeline, timeZone);
+
+        overview.querySelector('#homeCallsToday').textContent = String(numeric(operations.callsToday));
+        overview.querySelector('#homeWhatsAppToday').textContent = String(whatsapp);
+        overview.querySelector('#homeCustomersToday').textContent = String(numeric(operations.newCustomersToday));
+        overview.querySelector('#homeQuestionsToday').textContent = String(numeric(operations.unansweredQuestions));
+        overview.querySelector('#homeFailuresToday').textContent = String(numeric(operations.callFailuresToday));
+        const seconds = numeric(operations.callDurationSecondsToday);
+        overview.querySelector('#homeMinutesToday').textContent =
+            String(Math.floor(seconds / 60)) + ':' + String(seconds % 60).padStart(2, '0');
+        overview.querySelector('#homeCostToday').textContent = new Intl.NumberFormat('es-CL', {
+            minimumFractionDigits: 2, maximumFractionDigits: 4
+        }).format(numeric(operations.estimatedCallCostTodayUsd));
+
+        const totalSignal = conversations + bookings + orders + openRequests + handoffs + failures + rescheduled + cancelled;
+        if (totalSignal === 0 && recentCount === 0) {
+            setDashboardState('empty', 'SIN ACTIVIDAD', 'Aún no hay actividad comercial hoy.');
+        } else {
+            setDashboardState('ready', 'AL DÍA', '');
+        }
+    }
+
+    function renderError() {
+        setDashboardState('error', 'NO DISPONIBLE', 'No pudimos actualizar las métricas. Usa “Actualizar estado” para reintentar.');
+        recent.innerHTML = '<div class="owner-empty">La actividad reciente no está disponible.</div>';
     }
 
     async function loadOperational(force = false) {
         if (loading || dashboard.classList.contains('hidden') || !isReady() || !sessionStorage.getItem('helvoca_access_token')) return;
         if (!force && Date.now() - lastLoadedAt < 1500) return;
         loading = true;
+        setDashboardState('loading', 'CARGANDO', 'Actualizando actividad confirmada…');
         try {
-            const operations = await api('/api/v1/operations/dashboard');
-            let whatsapp = [];
-            try {
-                const payload = await api('/api/v1/messaging/conversations');
-                whatsapp = Array.isArray(payload) ? payload : [];
-            } catch (error) {
-                if (error.status === 401) throw error;
-            }
-            renderOperational(operations, whatsapp);
+            const [operationsResult, pilotResult, pipelineResult, subscriptionResult, auditResult] = await Promise.allSettled([
+                api('/api/v1/operations/dashboard'),
+                api('/api/v1/operations/pilot-metrics'),
+                api('/api/v1/commercial/pipeline'),
+                api('/api/v1/subscription'),
+                api('/api/v1/audit')
+            ]);
+            if (operationsResult.status !== 'fulfilled') throw operationsResult.reason;
+            renderOperational(
+                operationsResult.value,
+                pilotResult.status === 'fulfilled' ? pilotResult.value : null,
+                pipelineResult.status === 'fulfilled' ? pipelineResult.value : null,
+                subscriptionResult.status === 'fulfilled' ? subscriptionResult.value : null,
+                auditResult.status === 'fulfilled' ? auditResult.value : null
+            );
             lastLoadedAt = Date.now();
         } catch (_) {
-            // Keep the dashboard visible with its last confirmed values.
+            renderError();
         } finally {
             loading = false;
         }
@@ -403,8 +618,8 @@
         statusGrid.classList.toggle('ux-ready-hidden', ready);
         if (!ready || document.body.classList.contains('settings-page')) return;
 
-        currentBusinessName = window.helvocaBusinessName || currentBusinessName || "Tu negocio";
-        const operationalTitle = `${currentBusinessName} está atendiendo 🟢`;
+        currentBusinessName = window.helvocaBusinessName || currentBusinessName || 'Tu negocio';
+        const operationalTitle = currentBusinessName + ' está atendiendo 🟢';
         if (title.textContent !== operationalTitle) title.textContent = operationalTitle;
         if (summary && summary.textContent !== 'Tu negocio está listo. Esto es lo que está pasando hoy.') {
             summary.textContent = 'Tu negocio está listo. Esto es lo que está pasando hoy.';
@@ -420,7 +635,7 @@
     }).observe(dashboard, { attributes: true, attributeFilter: ['class'] });
     new MutationObserver(() => {
         if (isReady() && !document.body.classList.contains('settings-page')) {
-            const operationalTitle = `${currentBusinessName} está atendiendo 🟢`;
+            const operationalTitle = currentBusinessName + ' está atendiendo 🟢';
             if (title.textContent !== operationalTitle) title.textContent = operationalTitle;
         }
     }).observe(title, { childList: true, characterData: true, subtree: true });
