@@ -24,6 +24,7 @@ class RecepVozConversationPolicyServiceTest {
         assertTrue(instructions.contains("tenant asociados a esta llamada"));
         assertTrue(instructions.contains("catálogo real"));
         assertTrue(instructions.contains("La última elección explícita del cliente manda"));
+        assertTrue(instructions.contains("cadencia, ritmo, entonación y vocabulario chilenos reconocibles"));
         assertTrue(instructions.contains("reschedule_booking"));
         assertTrue(instructions.contains("luego usa end_call"));
         assertTrue(instructions.contains("Nunca digas que no puedes cortar la llamada"));
@@ -57,7 +58,10 @@ class RecepVozConversationPolicyServiceTest {
         assertTrue(policy.contains("una sola confirmación explícita"));
         assertTrue(policy.contains("No uses frases como \"para confirmar\" mientras todavía estás recopilando"));
         assertTrue(policy.contains("Recopila primero los datos imprescindibles"));
-        assertTrue(policy.contains("Después de un sí claro, ejecuta la segunda fase sin volver a pedir confirmación"));
+        assertTrue(policy.contains("Después de un sí claro, ejecuta inmediatamente la segunda fase"));
+        assertTrue(policy.contains("ESTADO CERRADO DE DATOS"));
+        assertTrue(policy.contains("no preguntes otra vez \"¿a nombre de quién?\""));
+        assertTrue(policy.contains("no vuelvas a preguntar servicio, fecha, hora, nombre, teléfono"));
         assertTrue(policy.contains("Al terminar, informa el éxito una sola vez"));
     }
 
