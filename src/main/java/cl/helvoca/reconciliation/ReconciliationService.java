@@ -2,6 +2,7 @@ package cl.helvoca.reconciliation;
 
 import cl.helvoca.inventory.InventoryService;
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ public class ReconciliationService {
     private final TenantProvider tenant;
     private final Clock clock;
 
+    @Autowired
     public ReconciliationService(
             ReconciliationRepository repository,
             InventoryService inventory,
