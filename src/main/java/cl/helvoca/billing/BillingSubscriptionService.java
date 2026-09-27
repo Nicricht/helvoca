@@ -120,9 +120,6 @@ public class BillingSubscriptionService {
 
         BusinessSubscription local = subscriptions.findByExternalSubscriptionId(invoice.subscriptionId())
                 .orElseThrow(() -> new IllegalArgumentException("Unknown Mercado Pago subscription"));
-        lockBusiness(local.getBusinessId());
-        local = subscriptions.findByExternalSubscriptionId(invoice.subscriptionId())
-                .orElseThrow(() -> new IllegalArgumentException("Unknown Mercado Pago subscription"));
 
         if (externalInvoiceId.equals(local.getLastBillingInvoiceId())) {
             return;
