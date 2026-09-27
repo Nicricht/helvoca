@@ -3,8 +3,10 @@ package cl.helvoca.messaging.outbound;
 import cl.helvoca.messaging.meta.MetaWhatsAppAccessTokenResolver;
 import cl.helvoca.messaging.meta.MetaWhatsAppCloudClient;
 import cl.helvoca.messaging.meta.MetaWhatsAppProperties;
+import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -18,6 +20,9 @@ public class MetaWhatsAppMessagingProvider implements MessagingProvider {
     private final PhoneNumberRepository phones;
     private final MetaWhatsAppCloudClient client;
     private final Optional<MetaWhatsAppAccessTokenResolver> accessTokens;
+
+    @Autowired(required = false)
+    private ControlledPilotExternalEffectGuard pilotExternalEffects;
 
     public MetaWhatsAppMessagingProvider(MetaWhatsAppProperties properties,
                                          PhoneNumberRepository phones,
@@ -42,6 +47,11 @@ public class MetaWhatsAppMessagingProvider implements MessagingProvider {
     @Override
     public SendResult send(SendCommand command) {
         validateCommand(command);
+        if (pilotExternalEffects != null) {
+            pilotExternalEffects.requireAllowed(
+                    command.businessId(),
+                    ControlledPilotExternalEffectGuard.Effect.WHATSAPP);
+        }
         if (!properties.isEnabled()) {
             throw new IllegalStateException("Meta WhatsApp integration is disabled");
         }
