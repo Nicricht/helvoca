@@ -347,6 +347,9 @@ class GoldenJourneyCommercialV1IntegrationTest {
                 "MZ-golden-recovery");
         RealtimeCallContext context = context(call);
 
+        JSONObject catalog = execute(context, "list_services", new JSONObject());
+        assertTrue(containsId(data(catalog).getJSONArray("services"), "id", service.getId()));
+
         JSONObject slotsResult = execute(context, "list_available_slots",
                 new JSONObject()
                         .put("serviceId", service.getId().toString())
