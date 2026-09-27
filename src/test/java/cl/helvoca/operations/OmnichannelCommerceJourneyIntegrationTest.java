@@ -19,6 +19,10 @@ import cl.helvoca.messaging.MessagingConversation;
 import cl.helvoca.messaging.MessagingConversationRepository;
 import cl.helvoca.messaging.outbound.OutboundMessage;
 import cl.helvoca.messaging.outbound.OutboundMessageRepository;
+import cl.helvoca.inventory.InventoryReservation;
+import cl.helvoca.inventory.InventoryReservationRepository;
+import cl.helvoca.inventory.InventoryStock;
+import cl.helvoca.inventory.InventoryStockRepository;
 import cl.helvoca.omnichannel.CustomerIdentity;
 import cl.helvoca.omnichannel.CustomerIdentityService;
 import cl.helvoca.payment.BusinessPayment;
@@ -84,6 +88,8 @@ class OmnichannelCommerceJourneyIntegrationTest {
     @Autowired BusinessPaymentRepository payments;
     @Autowired PaymentWebhookService paymentWebhooks;
     @Autowired OutboundMessageRepository outboundMessages;
+    @Autowired InventoryStockRepository inventoryStocks;
+    @Autowired InventoryReservationRepository inventoryReservations;
 
     @Test
     void voiceShowcaseContinuesOnWhatsappThroughVerifiedPaymentAndSharedContext() {
@@ -129,6 +135,16 @@ class OmnichannelCommerceJourneyIntegrationTest {
         product.setCurrency("CLP");
         product.setActive(true);
         product = catalog.saveAndFlush(product);
+
+        InventoryStock stock = new InventoryStock();
+        stock.setBusinessId(business.getId());
+        stock.setCatalogItemId(product.getId());
+        stock.setSku("OMNI-E2E-001");
+        stock.setTrackingEnabled(true);
+        stock.setOnHand(2);
+        stock.setReserved(0);
+        stock.setReorderThreshold(0);
+        inventoryStocks.saveAndFlush(stock);
 
         CatalogMedia image = new CatalogMedia();
         image.setBusinessId(business.getId());
@@ -275,6 +291,21 @@ class OmnichannelCommerceJourneyIntegrationTest {
                         .toString()));
         assertNotNull(confirmedOrder.getString("orderId"));
 
+        InventoryStock reservedStock = inventoryStocks
+                .findByBusinessIdAndCatalogItemId(business.getId(), product.getId())
+                .orElseThrow();
+        assertEquals(2, reservedStock.getOnHand());
+        assertEquals(1, reservedStock.getReserved());
+        assertEquals(1, reservedStock.available());
+
+        List<InventoryReservation> activeReservations = inventoryReservations.findAll().stream()
+                .filter(reservation -> business.getId().equals(reservation.getBusinessId()))
+                .filter(reservation -> orderOperationId.equals(reservation.getReferenceId()))
+                .filter(reservation -> reservation.getStatus() == InventoryReservation.Status.ACTIVE)
+                .toList();
+        assertEquals(1, activeReservations.size(),
+                "Order confirmation must create exactly one active stock reservation");
+
         JSONObject paymentQuote = success(commercial.execute(
                 business.getId(),
                 customer.getId(),
@@ -320,6 +351,21 @@ class OmnichannelCommerceJourneyIntegrationTest {
                 .findByOperationIdAndBusinessId(paymentOperationId, business.getId())
                 .orElseThrow();
         assertEquals(BusinessPayment.Status.SUCCEEDED, paid.getStatus());
+
+        InventoryStock consumedStock = inventoryStocks
+                .findByBusinessIdAndCatalogItemId(business.getId(), product.getId())
+                .orElseThrow();
+        assertEquals(1, consumedStock.getOnHand());
+        assertEquals(0, consumedStock.getReserved());
+        assertEquals(1, consumedStock.available());
+
+        List<InventoryReservation> consumedReservations = inventoryReservations.findAll().stream()
+                .filter(reservation -> business.getId().equals(reservation.getBusinessId()))
+                .filter(reservation -> orderOperationId.equals(reservation.getReferenceId()))
+                .filter(reservation -> reservation.getStatus() == InventoryReservation.Status.CONSUMED)
+                .toList();
+        assertEquals(1, consumedReservations.size(),
+                "Verified successful payment must consume the exact order reservation once");
 
         BusinessOperation paidJourney = operations
                 .findByIdAndBusinessId(journey.getId(), business.getId())
