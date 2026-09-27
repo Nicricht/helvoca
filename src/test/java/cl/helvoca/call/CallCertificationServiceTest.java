@@ -16,6 +16,17 @@ import static org.mockito.Mockito.*;
 class CallCertificationServiceTest {
 
     @Test
+    void certificationTranscriptLoggingRedactsPhoneAndFlattensLines() {
+        String safe = CallCertificationService.safeTranscriptLogText(
+                "Llámame al +56 9 1111 2222\ny confirma la hora.");
+
+        assertFalse(safe.contains("1111 2222"));
+        assertTrue(safe.contains("[REDACTED_PHONE]"));
+        assertFalse(safe.contains("\n"));
+        assertTrue(safe.contains("confirma la hora."));
+    }
+
+    @Test
     void succeedsOnlyWhenPersistedMilestonesAndExpectedToolsArePresent() {
         Fixture fixture = new Fixture();
         UUID callId = UUID.randomUUID();

@@ -76,6 +76,9 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("No suenes como locutora"));
         assertTrue(instructions.contains("NO vuelvas a ejecutar la misma herramienta"));
         assertTrue(instructions.contains("entonación chilena urbana neutra"));
+        assertTrue(instructions.contains("DESDE LA PRIMERA SÍLABA"));
+        assertTrue(instructions.contains("Cuéntame, ¿en qué te puedo ayudar?"));
+        assertTrue(instructions.contains("Evita \"¿Qué es lo que usted desea?\""));
         assertTrue(instructions.contains("a las nueve y media"));
         assertTrue(instructions.contains("nunca menciones UUID"));
 

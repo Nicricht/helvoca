@@ -83,12 +83,13 @@ public class CallCertificationService {
         if (!call.isCertification()) return CertificationResult.failed("not_a_certification_call", 0);
 
         List<CallAction> persistedActions = actions.findAllByCallIdOrderByCreatedAtAsc(callId);
+        List<CallTranscript> persistedTranscripts = transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId);
         List<String> reasons = new ArrayList<>();
 
         if (call.getAiSetupCompletedAt() == null) reasons.add("gemini_setup_incomplete");
         if (call.getStreamStartedAt() == null) reasons.add("media_stream_not_started");
         if (call.getStreamEndedAt() == null) reasons.add("media_stream_not_stopped");
-        if (transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId).isEmpty()) reasons.add("transcript_missing");
+        if (persistedTranscripts.isEmpty()) reasons.add("transcript_missing");
         if (persistedActions.isEmpty()) reasons.add("call_action_missing");
         if (summaries.findByCallId(callId).isEmpty()) reasons.add("summary_missing");
 
@@ -99,6 +100,8 @@ public class CallCertificationService {
         }
         requireSuccessful(persistedActions, "BOOKING_CREATED", reasons);
         requireSuccessful(persistedActions, "BOOKING_CANCELLED", reasons);
+
+        logCertificationTranscript(callId, persistedTranscripts);
 
         int cleanupCount = cleanupCertificationBookings(call, persistedActions, reasons);
         CertificationResult result = reasons.isEmpty()
@@ -113,6 +116,26 @@ public class CallCertificationService {
                     callId, result.reason(), persistedActions.size(), cleanupCount);
         }
         return result;
+    }
+
+    private void logCertificationTranscript(UUID callId, List<CallTranscript> persistedTranscripts) {
+        for (CallTranscript transcript : persistedTranscripts) {
+            log.info("RECEPVOZ_CALL_CERTIFICATION_TRANSCRIPT call={} seq={} speaker={} text={}",
+                    callId,
+                    transcript.getSequenceNumber(),
+                    transcript.getSpeaker(),
+                    safeTranscriptLogText(transcript.getContent()));
+        }
+    }
+
+    static String safeTranscriptLogText(String content) {
+        if (content == null) return "";
+        String safe = content
+                .replaceAll("(?i)\\+?56\\s*9(?:[\\s.-]*\\d){8}", "[REDACTED_PHONE]")
+                .replace('\n', ' ')
+                .replace('\r', ' ')
+                .trim();
+        return safe.length() <= 1500 ? safe : safe.substring(0, 1500) + "…";
     }
 
     private int cleanupCertificationBookings(CallSession call,
