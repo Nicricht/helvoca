@@ -30,6 +30,7 @@ public class TwilioVoiceController {
     private final VoiceCallRouter voiceRouter;
     private final CallSummaryService summaries;
     private final TwilioProperties properties;
+    private TwilioCertificationIngressTokenGate certificationIngressTokenGate;
 
     @Autowired(required = false)
     private ControlledPilotExternalEffectGuard pilotExternalEffects;
@@ -39,6 +40,11 @@ public class TwilioVoiceController {
 
     @Value("${TWILIO_CERTIFICATION_VOICE_OVERRIDE:}")
     private String certificationVoiceOverride;
+
+    @Autowired(required = false)
+    void setCertificationIngressTokenGate(TwilioCertificationIngressTokenGate certificationIngressTokenGate) {
+        this.certificationIngressTokenGate = certificationIngressTokenGate;
+    }
 
     public TwilioVoiceController(TwilioCallService calls,
                                  VoiceCallRouter voiceRouter,
@@ -67,14 +73,24 @@ public class TwilioVoiceController {
         return route(from, to, callSid, "outbound-test", voiceOverride);
     }
 
+    public ResponseEntity<String> inboundCertification(String callSid, String from, String to) {
+        return inboundCertification(callSid, from, to, null);
+    }
+
     @PostMapping(value = "/inbound-certification", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> inboundCertification(@RequestParam("CallSid") String callSid,
                                                        @RequestParam("From") String from,
-                                                       @RequestParam("To") String to) {
-        if (!properties.isCertificationIngressEnabled()) {
+                                                       @RequestParam("To") String to,
+                                                       @RequestParam(value = "token", required = false) String token) {
+        boolean oneShotAuthorized = certificationIngressTokenGate != null
+                && certificationIngressTokenGate.authorize(token, callSid, from, to);
+        if (!properties.isCertificationIngressEnabled() && !oneShotAuthorized) {
             log.warn("Blocked disabled Twilio certification ingress call={}", callSid);
             return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+        }
+        if (oneShotAuthorized) {
+            log.info("Authorized one-shot Twilio certification ingress call={}", callSid);
         }
         return route(from, to, callSid, "inbound-certification", null);
     }
