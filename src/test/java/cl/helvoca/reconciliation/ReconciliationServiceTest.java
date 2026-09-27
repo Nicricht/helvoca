@@ -32,7 +32,7 @@ class ReconciliationServiceTest {
     void setUp() {
         businessId = UUID.randomUUID();
         now = Instant.parse("2026-09-27T17:00:00Z");
-        when(tenant.requireBusinessId()).thenReturn(businessId);
+        lenient().when(tenant.requireBusinessId()).thenReturn(businessId);
         service = new ReconciliationService(
                 repository, inventory, tenant, Clock.fixed(now, ZoneOffset.UTC));
     }
