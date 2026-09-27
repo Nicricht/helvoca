@@ -470,16 +470,11 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#pilotControlBadge')).toHaveText('RUNNING');
   await expect(page.locator('#pilotPause')).toBeVisible();
 
-  await expect(page.locator('#pilotMetricsCard')).toBeVisible();
-  await expect(page.locator('#pilotMetricConversations')).toHaveText('7');
-  await expect(page.locator('#pilotMetricOrders')).toHaveText('2');
-  await expect(page.locator('#pilotMetricPaid')).toHaveText('1');
-  await expect(page.locator('#pilotMetricRevenue')).toContainText('$18.990');
-  await expect(page.locator('#pilotMetricConversion')).toContainText('50');
-  await page.locator('[data-pilot-period="last7Days"]').click();
-  await expect(page.locator('#pilotMetricConversations')).toHaveText('50');
-  await expect(page.locator('#pilotMetricPaid')).toHaveText('8');
-  await expect(page.locator('#pilotMetricRevenue')).toContainText('$145.000');
+  await expect(page.locator('#pilotMetricsCard')).toBeHidden();
+  await expect(page.locator('#ownerSevenDayRow')).toBeVisible();
+  await expect(page.locator('#ownerSevenDaySummary')).toContainText('50 conversaciones');
+  await expect(page.locator('#ownerSevenDaySummary')).toContainText('9 reservas');
+  await expect(page.locator('#ownerSevenDaySummary')).toContainText('6 pedidos');
   await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'ready');
   await expect(page.locator('#ownerDashboardState')).toHaveText('AL DÍA');
   await expect(page.locator('#homeRecentActivity')).toBeVisible();
@@ -494,6 +489,11 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeRequestsToday')).toHaveText('1');
   await expect(page.locator('#ownerHandoffsToday')).toHaveText('1');
   await expect(page.locator('#ownerFailuresToday')).toHaveText('1');
+  await expect(page.locator('#ownerDashboardAttention')).toBeVisible();
+  await expect(page.locator('#ownerOrdersAttentionToday')).toHaveText('1');
+  await expect(page.locator('#ownerOrdersAttentionChip')).toBeVisible();
+  await expect(page.locator('#ownerHandoffsChip')).toBeVisible();
+  await expect(page.locator('#ownerFailuresChip')).toBeVisible();
   await expect(page.locator('#homeQuestionsToday')).toHaveText('2');
   await expect(page.locator('#homeFailuresToday')).toHaveText('0');
   await expect(page.locator('#homeMinutesToday')).toHaveText('8:00');
@@ -1983,6 +1983,12 @@ test('orders requests customers remain operable on mobile', async ({ page }) => 
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
   await page.goto('/');
+
+  await expect(page.locator('#operationalOverview')).toBeVisible();
+  const ownerDashboardBox = await page.locator('#operationalOverview').boundingBox();
+  expect(ownerDashboardBox).not.toBeNull();
+  expect(ownerDashboardBox.x).toBeGreaterThanOrEqual(0);
+  expect(ownerDashboardBox.x + ownerDashboardBox.width).toBeLessThanOrEqual(390);
 
   await page.getByRole('tab', { name: /Pedidos/ }).click();
   await expect(page.locator('#homeOrdersList .home-business-mobile-list')).toBeVisible();
