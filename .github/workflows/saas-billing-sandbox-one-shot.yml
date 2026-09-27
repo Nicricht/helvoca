@@ -1,0 +1,57 @@
+name: SaaS Billing Sandbox One-Shot Certification
+
+on:
+  push:
+    branches:
+      - cert/saas-billing-sandbox-provider-run-1
+    paths:
+      - ".github/workflows/saas-billing-sandbox-one-shot.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: saas-billing-sandbox-one-shot
+  cancel-in-progress: false
+
+jobs:
+  sandbox-provider:
+    name: mercadopago-sandbox-provider-one-shot
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST: "true"
+      MERCADOPAGO_TEST_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
+      MERCADOPAGO_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
+      MERCADOPAGO_TEST_PAYER_EMAIL: "test@testuser.com"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Fail closed unless TEST credentials are present
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${MERCADOPAGO_TEST_ACCESS_TOKEN:-}" ]]; then
+            echo "Missing repository secret MERCADOPAGO_TEST_ACCESS_TOKEN"
+            exit 1
+          fi
+          if [[ "$MERCADOPAGO_TEST_ACCESS_TOKEN" != APP_USR* ]]; then
+            echo "Refusing to run: TEST token must start with APP_USR"
+            exit 1
+          fi
+          if [[ "$MERCADOPAGO_TEST_PAYER_EMAIL" != *@testuser.com ]]; then
+            echo "Refusing to run: payer must be a Mercado Pago testuser.com account"
+            exit 1
+          fi
+
+      - name: Run real Mercado Pago sandbox provider certification
+        run: mvn -B -Dtest=MercadoPagoSaasSandboxProviderIT test
