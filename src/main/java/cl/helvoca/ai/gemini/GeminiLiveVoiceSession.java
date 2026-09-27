@@ -46,7 +46,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private static final Logger log = LoggerFactory.getLogger(GeminiLiveVoiceSession.class);
     private static final int MAX_QUEUED_AUDIO_FRAMES = 250;
     private static final int MAX_PENDING_MESSAGES = 600;
-    private static final long READ_TOOL_DEDUPE_WINDOW_MS = 5_000L;
+    // Long enough to cover a natural spoken turn. Booking mutations always
+    // revalidate availability, so a repeated read within this window can be
+    // reused safely without adding another provider/tool round trip.
+    private static final long READ_TOOL_DEDUPE_WINDOW_MS = 30_000L;
     private static final Set<String> DEDUPED_READ_TOOLS = Set.of(
             "list_services",
             "find_caller",
