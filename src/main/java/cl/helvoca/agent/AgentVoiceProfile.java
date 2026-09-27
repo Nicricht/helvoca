@@ -96,7 +96,16 @@ public enum AgentVoiceProfile {
     }
 
     public static String resolveGemini(String storedSelection, String fallback) {
-        if (storedSelection == null || storedSelection.isBlank()) return fallback;
+        if (storedSelection == null || storedSelection.isBlank()) {
+            // A few production environments kept the former provider-specific
+            // default even when the tenant had no explicit voice selection.
+            // Migrate that global legacy fallback too, otherwise it bypasses
+            // fromSelection() and silently pins new sessions to Despina.
+            if ("Despina".equalsIgnoreCase(fallback == null ? null : fallback.trim())) {
+                return SEDUCTIVE_FEMALE.geminiVoice;
+            }
+            return fallback;
+        }
         Optional<AgentVoiceProfile> profile = fromSelection(storedSelection);
         if (profile.isPresent()) return profile.get().geminiVoice;
         String rawGemini = canonicalGeminiVoice(storedSelection);
