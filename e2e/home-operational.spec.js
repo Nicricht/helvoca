@@ -122,6 +122,28 @@ async function mockReadyHome(page, roles = ['BUSINESS_ADMIN'], options = {}) {
     body: Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x45, 0x32, 0x45])
   }));
 
+  await page.route('**/api/v1/commercial/pipeline', route => route.fulfill(json({
+    total: 2,
+    active: 1,
+    paid: 1,
+    needsAction: 1,
+    items: [
+      {
+        journeyId: 'journey-1', customerId: 'cust1', customerName: 'Ana Reserva', customerPhone: '+56922222222',
+        commercialStage: 'PAID', channel: 'WHATSAPP', product: 'Zapatilla Urban',
+        variantId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', variant: 'Negro / 42', quantity: 1,
+        total: 12990, currency: 'CLP', orderStatus: 'CONFIRMED', paymentStatus: 'SUCCEEDED',
+        inventoryStatus: 'CONSUMED', outboundStatus: 'PREPARED', updatedAt: '2026-09-26T13:17:00Z'
+      },
+      {
+        journeyId: 'journey-2', customerId: 'cust2', customerName: 'Bruno Masaje', customerPhone: '+56955555555',
+        commercialStage: 'PAYMENT_LINK_SENT', channel: 'VOICE', product: 'Gift Card',
+        variantId: null, variant: null, quantity: 1, total: 30000, currency: 'CLP',
+        orderStatus: 'CONFIRMED', paymentStatus: 'REQUIRES_ACTION',
+        inventoryStatus: 'ACTIVE', outboundStatus: 'SENT', updatedAt: '2026-09-26T12:00:00Z'
+      }
+    ]
+  })));
   await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([
     { id: 'o1', operationId: 'op1', sourceReferenceId: 'wa-order', status: 'CONFIRMED', fulfillmentType: 'DELIVERY', contactName: 'Juan Pedido', contactPhone: '+56933333333', deliveryAddress: 'Av. Demo 123, Santiago', subtotal: 15990, deliveryFee: 3000, total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z', lines: [{ name: 'Producto demo', quantity: 1, unitPrice: 15990, lineTotal: 15990 }] }
   ])));
@@ -1813,6 +1835,39 @@ test('customers workspace sorts and renders contact data', async ({ page }) => {
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Llamada');
   await page.locator('#homeBookingDetailClose').click();
   await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
+});
+
+test('sales pipeline shows cross-channel commercial state and opens customer CRM', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+  await page.goto('/');
+
+  await page.getByRole('tab', { name: /Ventas/ }).click();
+
+  await expect(page.locator('#homeBusinessSalesCount')).toHaveText('2');
+  await expect(page.locator('#homeSalesSummary')).toContainText('En curso');
+  await expect(page.locator('#homeSalesSummary')).toContainText('Pagadas');
+  await expect(page.locator('#homeSalesSummary')).toContainText('Requieren atención');
+
+  const sales = page.locator('#homeSalesList');
+  await expect(sales).toContainText('Ana Reserva');
+  await expect(sales).toContainText('Zapatilla Urban');
+  await expect(sales).toContainText('Negro / 42');
+  await expect(sales).toContainText('Pagado');
+  await expect(sales).toContainText('Consumido');
+  await expect(sales).toContainText('Bruno Masaje');
+  await expect(sales).toContainText('Requiere acción');
+
+  await page.locator('#homeSalesStage').selectOption('PAID');
+  await expect(page.locator('#homeSalesList')).toContainText('Ana Reserva');
+  await expect(page.locator('#homeSalesList')).not.toContainText('Bruno Masaje');
+
+  await page.locator('#homeSalesClear').click();
+  await page.locator('#homeSalesList [data-home-sale-customer-id="cust1"]').first().click();
+  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('#homeBookingDetailTitle')).toHaveText('Ana Reserva');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Historial comercial');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Inventario consumido');
 });
 
 test('orders requests customers remain operable on mobile', async ({ page }) => {
