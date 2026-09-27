@@ -9,6 +9,10 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 final class TwilioVoiceTransportSession implements VoiceTransportSession {
     private static final Logger log = LoggerFactory.getLogger(TwilioVoiceTransportSession.class);
@@ -19,6 +23,7 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
     private final String callSid;
     private final TwilioCallControl control;
     private final Object sendLock = new Object();
+    private final AtomicReference<String> pendingHangupMark = new AtomicReference<>();
 
     TwilioVoiceTransportSession(WebSocketSession socket,
                                 String streamSid,
@@ -58,12 +63,39 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
     }
 
     @Override
+    public boolean endAfterPlayback() {
+        if (!socket.isOpen()) return false;
+        String marker = "recepvoz-end-" + UUID.randomUUID();
+        if (!pendingHangupMark.compareAndSet(null, marker)) return true;
+
+        boolean sent = send(new JSONObject()
+                .put("event", "mark")
+                .put("streamSid", streamSid)
+                .put("mark", new JSONObject().put("name", marker)));
+        if (!sent) {
+            pendingHangupMark.compareAndSet(marker, null);
+            return false;
+        }
+
+        CompletableFuture.delayedExecutor(10, TimeUnit.SECONDS).execute(() ->
+                completeDeferredHangup(marker, "fallback_timeout"));
+        return true;
+    }
+
+    @Override
+    public void onPlaybackMark(String name) {
+        if (name == null || name.isBlank()) return;
+        completeDeferredHangup(name, "playback_complete");
+    }
+
+    @Override
     public boolean transferToHuman(String targetPhone) {
         return control.transferToHuman(accountSid, callSid, targetPhone);
     }
 
     @Override
     public void closeOnUpstreamFailure() {
+        pendingHangupMark.set(null);
         control.hangup(accountSid, callSid);
         try {
             if (socket.isOpen()) socket.close(CloseStatus.SERVER_ERROR);
@@ -72,16 +104,25 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
         }
     }
 
-    private void send(JSONObject payload) {
+    private boolean send(JSONObject payload) {
         synchronized (sendLock) {
-            if (!socket.isOpen()) return;
+            if (!socket.isOpen()) return false;
             try {
                 socket.sendMessage(new TextMessage(payload.toString()));
+                return true;
             } catch (IOException e) {
                 log.warn("Could not send Twilio media message call={} stream={}: {}",
                         callSid, streamSid, e.getMessage());
+                return false;
             }
         }
+    }
+
+    private void completeDeferredHangup(String marker, String reason) {
+        if (!pendingHangupMark.compareAndSet(marker, null)) return;
+        boolean accepted = control.hangup(accountSid, callSid);
+        log.info("Twilio deferred hangup call={} stream={} reason={} accepted={}",
+                callSid, streamSid, reason, accepted);
     }
 
     private boolean matches(String streamId) {
