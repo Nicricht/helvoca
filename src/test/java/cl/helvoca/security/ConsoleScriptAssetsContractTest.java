@@ -21,6 +21,7 @@ class ConsoleScriptAssetsContractTest {
         Set<String> scripts = new HashSet<>();
         scripts.addAll(scriptPaths("src/main/resources/static/index.html"));
         scripts.addAll(scriptPaths("src/main/resources/static/settings.html"));
+        scripts.addAll(scriptPaths("src/main/resources/static/operations.html"));
 
         for (String script : scripts) {
             assertTrue(
