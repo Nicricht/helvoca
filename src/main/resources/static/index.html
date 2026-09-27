@@ -308,6 +308,7 @@
                 <div class="home-business-tabs" role="tablist" aria-label="Trabajo del negocio">
                     <button class="home-business-tab active" type="button" role="tab" aria-selected="true" data-home-tab="bookings"><span>Reservas</span><strong id="homeBusinessBookingsCount">0</strong></button>
                     <button class="home-business-tab" type="button" role="tab" aria-selected="false" data-home-tab="orders"><span>Pedidos</span><strong id="homeBusinessOrdersCount">0</strong></button>
+                    <button class="home-business-tab" type="button" role="tab" aria-selected="false" data-home-tab="sales"><span>Ventas</span><strong id="homeBusinessSalesCount">0</strong></button>
                     <button class="home-business-tab" type="button" role="tab" aria-selected="false" data-home-tab="requests"><span>Solicitudes</span><strong id="homeBusinessRequestsCount">0</strong></button>
                     <button class="home-business-tab" type="button" role="tab" aria-selected="false" data-home-tab="customers"><span>Clientes</span><strong id="homeBusinessCustomersCount">0</strong></button>
                     <button class="home-business-tab hidden" type="button" role="tab" aria-selected="false" data-home-tab="audit"><span>Auditoría</span><strong id="homeBusinessAuditCount">0</strong></button>
@@ -401,6 +402,18 @@
                 <section class="card home-business-panel hidden" data-home-panel="orders">
                     <div class="home-business-head"><div><div class="eyebrow">Ventas</div><h2>Pedidos</h2><p>Qué compraron, quién hizo el pedido y en qué estado está.</p></div></div>
                     <div id="homeOrdersList" class="home-business-list"><div class="home-business-empty">Cargando pedidos…</div></div>
+                </section>
+                <section class="card home-business-panel hidden" data-home-panel="sales">
+                    <div class="home-business-head">
+                        <div><div class="eyebrow">Pipeline</div><h2>Ventas</h2><p>De la conversación al pago, con producto, canal e inventario en una sola vista.</p></div>
+                    </div>
+                    <div id="homeSalesSummary" class="home-sales-summary"></div>
+                    <div class="home-sales-filters" aria-label="Filtros de ventas">
+                        <label><span>Etapa</span><select id="homeSalesStage"><option value="all">Todas</option></select></label>
+                        <label><span>Canal</span><select id="homeSalesChannel"><option value="all">Todos</option><option value="VOICE">Llamada</option><option value="WHATSAPP">WhatsApp</option></select></label>
+                        <button id="homeSalesClear" class="home-filter-clear" type="button">Limpiar</button>
+                    </div>
+                    <div id="homeSalesList" class="home-business-list"><div class="home-business-empty">Cargando ventas…</div></div>
                 </section>
                 <section class="card home-business-panel hidden" data-home-panel="requests">
                     <div class="home-business-head"><div><div class="eyebrow">Seguimiento</div><h2>Solicitudes</h2><p>Casos que necesitan seguimiento humano.</p></div></div>
