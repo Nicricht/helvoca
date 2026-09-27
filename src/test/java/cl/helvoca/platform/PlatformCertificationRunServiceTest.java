@@ -6,6 +6,7 @@ import cl.helvoca.telephony.twilio.TwilioCertificationCommandStore;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
