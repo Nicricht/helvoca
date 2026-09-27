@@ -52,7 +52,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     private final String forbiddenTo;
     private final int maxSeconds;
     private final String direction;
-    private final boolean voiceOverrideConfigured;
+    private final boolean voiceOverrideValid;
     private final String voiceOverride;
     private final TwilioCallControl callControl;
     private final HttpClient http = HttpClient.newBuilder()
@@ -82,7 +82,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         this.forbiddenTo = forbiddenTo;
         this.maxSeconds = Math.max(20, Math.min(maxSeconds, 180));
         this.direction = normalizeDirection(direction);
-        this.voiceOverrideConfigured = voiceOverride != null && !voiceOverride.isBlank();
+        this.voiceOverrideValid = validVoiceOverride(voiceOverride, this.direction);
         this.voiceOverride = VoiceBakeOffCatalog.normalize(voiceOverride);
         this.callControl = callControl;
     }
@@ -186,8 +186,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 && to != null && E164.matcher(to.trim()).matches()
                 && publicBaseUrl != null && publicBaseUrl.trim().startsWith("https://")
                 && isAllowedTarget(to, allowedTo)
-                && (!voiceOverrideConfigured || voiceOverride != null)
-                && (voiceOverride == null || OUTBOUND_TEST.equals(direction))
+                && voiceOverrideValid
                 && (OUTBOUND_TEST.equals(direction) || INBOUND_CERTIFICATION.equals(direction));
     }
 
@@ -195,6 +194,12 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         if (value == null || value.isBlank()) return OUTBOUND_TEST;
         String normalized = value.trim().toLowerCase(Locale.ROOT);
         return INBOUND_CERTIFICATION.equals(normalized) ? INBOUND_CERTIFICATION : OUTBOUND_TEST;
+    }
+
+    static boolean validVoiceOverride(String value, String direction) {
+        if (value == null || value.isBlank()) return true;
+        return OUTBOUND_TEST.equals(normalizeDirection(direction))
+                && VoiceBakeOffCatalog.allowed(value);
     }
 
     static boolean shouldScheduleSafetyHangup(String direction) {
