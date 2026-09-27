@@ -138,6 +138,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public String prepareDeferredEndCall(RealtimeCallContext context) {
+        long startedNanos = System.nanoTime();
         JSONObject result;
         CallSession call = calls.findByIdAndBusinessId(context.callId(), context.businessId()).orElse(null);
         if (call == null || context.streamSid() == null || !context.streamSid().equals(call.getStreamSid())) {
@@ -160,16 +161,17 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                     .put("alreadyEnded", false)
                     .put("pendingPlaybackCompletion", true));
         }
-        trace.recordTool(context.businessId(), context.callId(), "end_call", result);
+        trace.recordTool(context.businessId(), context.callId(), "end_call", result, elapsedMs(startedNanos));
         return result.toString();
     }
 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public String execute(RealtimeCallContext context, String toolName, String rawArguments) {
+        long startedNanos = System.nanoTime();
         if ("end_call".equals(toolName)) {
             JSONObject result = endCall(context);
-            trace.recordTool(context.businessId(), context.callId(), toolName, result);
+            trace.recordTool(context.businessId(), context.callId(), toolName, result, elapsedMs(startedNanos));
             return result.toString();
         }
 
@@ -177,7 +179,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
         if (automationPolicies != null) {
             JSONObject policyBlock = automationPolicies.blockIfAutomationDisabled(context.businessId(), toolName);
             if (policyBlock != null) {
-                trace.recordTool(context.businessId(), context.callId(), toolName, policyBlock);
+                trace.recordTool(context.businessId(), context.callId(), toolName, policyBlock, elapsedMs(startedNanos));
                 return policyBlock.toString();
             }
             operationType = automationPolicies.operationType(toolName);
@@ -198,6 +200,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     private String executeOperationOnce(RealtimeCallContext context,
                                         String toolName,
                                         String rawArguments) {
+        long startedNanos = System.nanoTime();
         if (commercialOperations != null && commercialOperations.supports(toolName)) {
             JSONObject result;
             if (operationCapabilities == null || !operationCapabilities.isToolAllowed(context.businessId(), toolName)) {
@@ -214,7 +217,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                         toolName,
                         rawArguments));
             }
-            trace.recordTool(context.businessId(), context.callId(), toolName, result);
+            trace.recordTool(context.businessId(), context.callId(), toolName, result, elapsedMs(startedNanos));
             return result.toString();
         }
 
@@ -226,7 +229,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                 default -> null;
             };
             if (blocked != null) {
-                trace.recordTool(context.businessId(), context.callId(), toolName, blocked);
+                trace.recordTool(context.businessId(), context.callId(), toolName, blocked, elapsedMs(startedNanos));
                 return blocked.toString();
             }
         }
@@ -239,7 +242,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                         : new JSONObject(rawArguments);
             } catch (Exception e) {
                 JSONObject invalid = error("INVALID_ARGUMENT", "Los datos de la reserva no son válidos.");
-                trace.recordTool(context.businessId(), context.callId(), toolName, invalid);
+                trace.recordTool(context.businessId(), context.callId(), toolName, invalid, elapsedMs(startedNanos));
                 return invalid.toString();
             }
 
@@ -259,7 +262,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                     args);
             String synchronizedResult = synchronizeBookingMutation(context, toolName, result.toString());
             JSONObject decorated = decorateBookingState(context, toolName, args, new JSONObject(synchronizedResult));
-            trace.recordTool(context.businessId(), context.callId(), toolName, decorated);
+            trace.recordTool(context.businessId(), context.callId(), toolName, decorated, elapsedMs(startedNanos));
             return decorated.toString();
         }
 
@@ -277,6 +280,10 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                                             JSONObject result) {
         if (bookingConversationStateMachine == null) return result;
         return bookingConversationStateMachine.decorate(context, toolName, args, result);
+    }
+
+    private static long elapsedMs(long startedNanos) {
+        return Math.max(0L, (System.nanoTime() - startedNanos) / 1_000_000L);
     }
 
     private static JSONObject parseArguments(String rawArguments) {
