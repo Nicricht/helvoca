@@ -131,6 +131,35 @@ class TwilioVoiceControllerTest {
     }
 
     @Test
+    void oneShotTokenCanAuthorizeCertificationWhileGlobalIngressStaysDisabled() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        TwilioCertificationIngressTokenGate gate = mock(TwilioCertificationIngressTokenGate.class);
+        UUID callId = UUID.randomUUID();
+        String token = "11111111-1111-1111-1111-111111111111";
+        String twiml = "<Response><Connect><Stream url=\"wss://example/ws\"/></Connect></Response>";
+
+        when(gate.authorize(token, CALL_SID, "+14355652512", "+56966939611")).thenReturn(true);
+        when(calls.startInboundCall(CALL_SID, "+56966939611", "+14355652512")).thenReturn(callId);
+        when(router.route("+14355652512", "+56966939611", CALL_SID))
+                .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
+                        "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
+
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        controller.setCertificationIngressTokenGate(gate);
+
+        var response = controller.inboundCertification(
+                CALL_SID, "+14355652512", "+56966939611", token);
+
+        assertEquals(twiml, response.getBody());
+        verify(gate).authorize(token, CALL_SID, "+14355652512", "+56966939611");
+        verify(calls).startInboundCall(CALL_SID, "+56966939611", "+14355652512");
+        verify(calls).markCertification(callId);
+        verify(router).route("+14355652512", "+56966939611", CALL_SID);
+    }
+
+    @Test
     void inboundCertificationFailsClosedByDefault() {
         TwilioCallService calls = mock(TwilioCallService.class);
         VoiceCallRouter router = mock(VoiceCallRouter.class);
