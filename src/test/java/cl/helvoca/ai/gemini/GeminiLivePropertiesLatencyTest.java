@@ -27,6 +27,8 @@ class GeminiLivePropertiesLatencyTest {
         GeminiLiveProperties properties = new GeminiLiveProperties();
 
         properties.setStartOfSpeechSensitivity("START_SENSITIVITY_LOW");
+        properties.setEndOfSpeechSensitivity("END_SENSITIVITY_LOW");
+        assertEquals("END_SENSITIVITY_LOW", properties.getEndOfSpeechSensitivity());
         properties.setEndOfSpeechSensitivity("END_SENSITIVITY_HIGH");
         properties.setPrefixPaddingMs(-10);
         properties.setSilenceDurationMs(10);
