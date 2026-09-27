@@ -117,6 +117,7 @@ public class DevDataInitializer implements CommandLineRunner {
         if (existingAdmin.isPresent()) {
             Business existingBusiness = existingAdmin.get().getBusiness();
             if (existingBusiness != null) {
+                ensureDemoBusinessBasics(existingBusiness);
                 if (subscriptions != null) subscriptions.startBasicTrial(existingBusiness.getId());
                 ensureDemoTenant(existingBusiness.getId());
             }
@@ -143,6 +144,27 @@ public class DevDataInitializer implements CommandLineRunner {
 
         ensureDemoTenant(business.getId());
         log.info("Commercial demo tenant was created and validated without activating external providers");
+    }
+
+    private void ensureDemoBusinessBasics(Business business) {
+        boolean changed = false;
+        if (!DEMO_BUSINESS_NAME.equals(business.getName())) {
+            business.setName(DEMO_BUSINESS_NAME);
+            changed = true;
+        }
+        if (!DEMO_TIMEZONE.equals(business.getTimezone())) {
+            business.setTimezone(DEMO_TIMEZONE);
+            changed = true;
+        }
+        if (!"es".equals(business.getLanguage())) {
+            business.setLanguage("es");
+            changed = true;
+        }
+        if (business.getHumanTransferPhone() != null) {
+            business.setHumanTransferPhone(null);
+            changed = true;
+        }
+        if (changed) businesses.saveAndFlush(business);
     }
 
     private void ensureDemoTenant(UUID businessId) {
@@ -180,6 +202,7 @@ public class DevDataInitializer implements CommandLineRunner {
     private void ensureDemoCatalog(UUID businessId) {
         if (businessId == null || services == null || catalog == null) return;
 
+        deactivateLegacyDemoServices(businessId);
         ensureService(businessId, "Corte clásico",
                 "Corte tradicional con asesoría breve de estilo.", 45, "15990");
         ensureService(businessId, "Corte + barba",
@@ -197,6 +220,16 @@ public class DevDataInitializer implements CommandLineRunner {
                 "Producto ficticio de styling para mostrar consultas de catálogo.", "9990");
         ensureProduct(businessId, "Aceite para barba demo",
                 "Producto ficticio de cuidado de barba para la demostración.", "11990");
+    }
+
+    private void deactivateLegacyDemoServices(UUID businessId) {
+        List<String> legacyNames = List.of("Consulta inicial", "Servicio completo", "Control de seguimiento");
+        for (ServiceItem item : services.findAllByBusinessIdOrderByNameAsc(businessId)) {
+            if (item.isActive() && legacyNames.stream().anyMatch(name -> name.equalsIgnoreCase(item.getName()))) {
+                item.setActive(false);
+                services.saveAndFlush(item);
+            }
+        }
     }
 
     private void ensureDemoAgent(UUID businessId) {
@@ -246,7 +279,24 @@ public class DevDataInitializer implements CommandLineRunner {
     }
 
     private void ensureKnowledge(UUID businessId, String title, String category, String content) {
+        Optional<KnowledgeItem> existing = knowledge.findAllByBusinessIdOrderByTitleAsc(businessId).stream()
+                .filter(item -> title.equalsIgnoreCase(item.getTitle()))
+                .findFirst();
+        if (existing.isPresent()) {
+            KnowledgeItem item = existing.get();
+            boolean changed = !item.isActive()
+                    || !java.util.Objects.equals(category, item.getCategory())
+                    || !java.util.Objects.equals(content, item.getContent());
+            if (changed) {
+                item.setCategory(category);
+                item.setContent(content);
+                item.setActive(true);
+                knowledge.saveAndFlush(item);
+            }
+            return;
+        }
         if (knowledge.existsByBusinessIdAndTitleIgnoreCase(businessId, title)) return;
+
         KnowledgeItem item = new KnowledgeItem();
         item.setBusinessId(businessId);
         item.setTitle(title);
