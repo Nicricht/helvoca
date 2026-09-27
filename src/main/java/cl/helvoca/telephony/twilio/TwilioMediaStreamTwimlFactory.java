@@ -19,10 +19,23 @@ public class TwilioMediaStreamTwimlFactory {
                         String callerPhone,
                         String callSid,
                         String providerId) {
+        return twiml(businessPhone, callerPhone, callSid, providerId, null);
+    }
+
+    public String twiml(String businessPhone,
+                        String callerPhone,
+                        String callSid,
+                        String providerId,
+                        String voiceOverride) {
         long issuedAt = Instant.now().getEpochSecond();
-        String token = signer.sign(businessPhone, callerPhone, callSid, providerId, issuedAt);
+        String token = signer.sign(
+                businessPhone, callerPhone, callSid, providerId, voiceOverride, issuedAt);
         String streamUrl = properties.mediaStreamWebSocketUrl();
         String statusUrl = properties.absoluteWebhook("/webhooks/v1/twilio/stream-status");
+
+        String voiceParameter = voiceOverride == null || voiceOverride.isBlank()
+                ? ""
+                : parameter("voiceOverride", voiceOverride);
 
         return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
                 + "<Response><Connect><Stream url=\"" + xml(streamUrl) + "\""
@@ -31,6 +44,7 @@ public class TwilioMediaStreamTwimlFactory {
                 + parameter("caller", callerPhone)
                 + parameter("callSid", callSid)
                 + parameter("provider", providerId)
+                + voiceParameter
                 + parameter("issuedAt", String.valueOf(issuedAt))
                 + parameter("route", token)
                 + "</Stream></Connect></Response>";
