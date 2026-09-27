@@ -85,6 +85,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     private volatile WebSocket socket;
     private volatile String lastUserUtterance = "";
+    private volatile String lastAssistantUtterance = "";
+    private volatile String previousAssistantUtterance = "";
     private CompletableFuture<Void> sendChain = CompletableFuture.completedFuture(null);
 
     GeminiLiveVoiceSession(RealtimeCallContext context,
@@ -488,7 +490,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         try {
             JSONObject result;
             if ("end_call".equals(name)) {
-                if (!properties.isCertificationSimulation() && !hasExplicitClosingIntent(lastUserUtterance)) {
+                if (!properties.isCertificationSimulation()
+                        && !hasClosingIntent(lastUserUtterance, lastAssistantUtterance, previousAssistantUtterance)) {
                     log.info("Blocked premature end_call call={} last_user={}",
                             context.callId(), truncate(lastUserUtterance));
                     return toolFailure("END_CALL_REQUIRES_EXPLICIT_CLOSING",
@@ -520,13 +523,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     }
 
     static boolean hasExplicitClosingIntent(String text) {
-        if (text == null || text.isBlank()) return false;
-        String normalized = Normalizer.normalize(text, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}+", "")
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9 ]", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
+        String normalized = normalizeSpeech(text);
+        if (normalized.isBlank()) return false;
         return normalized.contains("adios")
                 || normalized.contains("chao")
                 || normalized.contains("chau")
@@ -544,6 +542,35 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 || normalized.contains("corta la llamada")
                 || normalized.contains("cuelga")
                 || normalized.contains("terminemos la llamada");
+    }
+
+    static boolean hasClosingIntent(String userText, String lastAssistantText, String previousAssistantText) {
+        if (hasExplicitClosingIntent(userText)) return true;
+        String user = normalizeSpeech(userText);
+        if (!Set.of("no", "nop", "nope").contains(user)) return false;
+        return asksIfAnythingElse(lastAssistantText) || asksIfAnythingElse(previousAssistantText);
+    }
+
+    private static boolean asksIfAnythingElse(String text) {
+        String normalized = normalizeSpeech(text);
+        if (normalized.isBlank()) return false;
+        return normalized.contains("necesitas algo mas")
+                || normalized.contains("necesita algo mas")
+                || normalized.contains("algo mas en lo que")
+                || normalized.contains("alguna otra cosa")
+                || normalized.contains("otra cosa en la que")
+                || normalized.contains("te ayudo con algo mas")
+                || normalized.contains("puedo ayudarte con algo mas");
+    }
+
+    private static String normalizeSpeech(String text) {
+        if (text == null || text.isBlank()) return "";
+        return Normalizer.normalize(text, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9 ]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private void finishCallAfterPlayback() {
@@ -764,7 +791,12 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             buffer.setLength(0);
         }
         if (!text.isBlank()) {
-            if ("USER".equals(speaker)) lastUserUtterance = text;
+            if ("USER".equals(speaker)) {
+                lastUserUtterance = text;
+            } else if ("ASSISTANT".equals(speaker)) {
+                previousAssistantUtterance = lastAssistantUtterance;
+                lastAssistantUtterance = text;
+            }
             transcripts.append(context.callId(), speaker, text);
         }
     }
