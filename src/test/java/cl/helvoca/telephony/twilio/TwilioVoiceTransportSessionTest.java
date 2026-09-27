@@ -45,6 +45,26 @@ class TwilioVoiceTransportSessionTest {
 
         verify(socket, times(2)).sendMessage(any(TextMessage.class));
     }
+
+    @Test
+    void upstreamFailureClosesOutboundVoiceBeforeCarrierHangup() throws Exception {
+        WebSocketSession socket = mock(WebSocketSession.class);
+        TwilioCallControl control = mock(TwilioCallControl.class);
+        when(socket.isOpen()).thenReturn(true);
+        when(control.hangup("AC-test", "CA-test")).thenReturn(true);
+
+        TwilioVoiceTransportSession transport = new TwilioVoiceTransportSession(
+                socket, "MZ-test", "AC-test", "CA-test", control);
+
+        transport.closeOnUpstreamFailure();
+
+        verify(control).hangup("AC-test", "CA-test");
+        assertFalse(transport.isOpen());
+
+        transport.sendAudio("MZ-test", "late-audio");
+        verify(socket, never()).sendMessage(any(TextMessage.class));
+    }
+
     @Test
     void rejectedDeferredHangupReopensOutputInsteadOfLeavingDeadAir() throws Exception {
         WebSocketSession socket = mock(WebSocketSession.class);
