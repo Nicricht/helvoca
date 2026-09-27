@@ -30,6 +30,7 @@ public class OutboundContentResolver {
         }
         return switch (purpose) {
             case PAYMENT_LINK -> paymentLink(businessId, customerId, operation);
+            case PAYMENT_CONFIRMATION -> paymentConfirmation(businessId, customerId, operation);
             case BOOKING_CONFIRMATION -> booking(operation);
             case MEETING_LINK -> meeting(operation);
             case ORDER_STATUS -> order(operation);
@@ -55,6 +56,20 @@ public class OutboundContentResolver {
         String checkout = requireHttps(payment.getCheckoutUrl(), "checkout URL");
         return "Tienes un pago pendiente por " + money(payment.getAmount(), payment.getCurrency())
                 + ". Usa este enlace seguro generado por el proveedor: " + checkout;
+    }
+
+    private String paymentConfirmation(UUID businessId, UUID customerId, BusinessOperation operation) {
+        requireType(operation, BusinessOperation.Type.PAYMENT);
+        BusinessPayment payment = payments.findByOperationIdAndBusinessId(operation.getId(), businessId)
+                .orElseThrow(() -> new IllegalStateException("Payment record is missing"));
+        if (payment.getCustomerId() == null || !payment.getCustomerId().equals(customerId)) {
+            throw new IllegalStateException("Payment does not belong to customer");
+        }
+        if (payment.getStatus() != BusinessPayment.Status.SUCCEEDED) {
+            throw new IllegalStateException("Payment has not been verified as succeeded");
+        }
+        return "Pago confirmado por " + money(payment.getAmount(), payment.getCurrency())
+                + ". El proveedor verificó el pago correctamente.";
     }
 
     private String booking(BusinessOperation operation) {
