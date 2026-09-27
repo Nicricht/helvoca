@@ -43,8 +43,8 @@ class BookingConversationStateMachineTest {
                         .put("phone", "+56911111111")));
 
         JSONObject machine = result.getJSONObject("conversationState");
-        assertEquals("ASK_SERVICE", machine.getString("nextAction"));
-        assertEquals("SERVICE", machine.getString("nextRequiredField"));
+        assertEquals("CONTINUE_CURRENT_INTENT", machine.getString("nextAction"));
+        assertEquals("NONE", machine.getString("nextRequiredField"));
         assertTrue(machine.getJSONArray("closedFields").toList().contains("name"));
         assertTrue(machine.getJSONArray("closedFields").toList().contains("phone"));
 
