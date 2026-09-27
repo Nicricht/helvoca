@@ -81,6 +81,16 @@ public class RealtimeToolService {
         this.unansweredQuestions = unansweredQuestions;
     }
 
+    /**
+     * Provider hook for transports that can wait until queued audio has actually
+     * finished before ending the carrier call. Base services do not expose
+     * remote hangup preparation.
+     */
+    public String prepareDeferredEndCall(RealtimeCallContext context) {
+        return error("END_CALL_UNSUPPORTED",
+                "El proveedor telefónico actual no admite cierre diferido de reproducción.").toString();
+    }
+
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public String execute(RealtimeCallContext context, String toolName, String rawArguments) {
         JSONObject result;
