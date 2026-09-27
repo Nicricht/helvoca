@@ -129,7 +129,7 @@ class CertificationGuardedRealtimeToolServiceTest {
         assertEquals("CERTIFICATION_CUSTOMER_REQUIRED", result.getJSONObject("error").getString("code"));
         verifyNoInteractions(f.bookings);
         verifyNoInteractions(f.jdbc);
-        verify(f.trace).recordTool(eq(f.businessId), eq(f.callId), eq("create_booking"), any(JSONObject.class));
+        verify(f.trace).recordTool(eq(f.businessId), eq(f.callId), eq("create_booking"), any(JSONObject.class), anyLong());
     }
 
     @Test
