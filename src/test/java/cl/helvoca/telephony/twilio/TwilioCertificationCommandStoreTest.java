@@ -87,7 +87,8 @@ class TwilioCertificationCommandStoreTest {
         store.recordProviderCall(runId, token, callSid);
         store.markFailed(runId, "provider unavailable");
 
-        verify(jdbc, times(2)).update(anyString(), any(), any(), any());
+        verify(jdbc, times(1)).update(anyString(), any(), any(), any(), any());
+        verify(jdbc, times(1)).update(anyString(), any(), any());
     }
 
     @Test
