@@ -21,6 +21,10 @@ public class TwilioCallService {
         return lifecycle.startInboundCall("twilio", providerCallId, caller, destination);
     }
 
+    public void markCertification(UUID callId) {
+        lifecycle.markCertification(callId);
+    }
+
     public UUID updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {
         return lifecycle.updateStatus(providerCallId, providerStatus, durationSeconds);
     }
