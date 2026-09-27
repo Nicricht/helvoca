@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 
 test('pilot preflight renders GO with real traffic still blocked', async ({ page }) => {
+  await page.goto('/');
   await page.setContent(`
     <div id="dashboardView"></div>
     <button id="refreshBtn" type="button">refresh</button>
@@ -52,6 +53,7 @@ test('pilot preflight renders GO with real traffic still blocked', async ({ page
 });
 
 test('pilot preflight makes blockers visually explicit', async ({ page }) => {
+  await page.goto('/');
   await page.setContent(`
     <div id="dashboardView"></div>
     <script>
