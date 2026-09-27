@@ -12,12 +12,13 @@ class GeminiLivePropertiesLatencyTest {
 
         assertEquals("START_SENSITIVITY_HIGH", properties.getStartOfSpeechSensitivity());
         assertEquals(60, properties.getPrefixPaddingMs());
-        assertEquals("END_SENSITIVITY_LOW", properties.getEndOfSpeechSensitivity());
-        assertEquals(300, properties.getSilenceDurationMs());
+        assertEquals("END_SENSITIVITY_HIGH", properties.getEndOfSpeechSensitivity());
+        assertEquals(500, properties.getSilenceDurationMs());
+        assertTrue(properties.isHybridVadEnabled());
         assertTrue(properties.isLocalBargeInEnabled());
         assertEquals(900, properties.getLocalBargeInMeanAmplitudeThreshold());
         assertEquals(2, properties.getLocalBargeInSpeechFrames());
-        assertEquals(5, properties.getLocalBargeInReleaseFrames());
+        assertEquals(25, properties.getLocalBargeInReleaseFrames());
         assertEquals(1800, properties.getLocalBargeInRecentAssistantAudioMs());
     }
 
@@ -29,6 +30,7 @@ class GeminiLivePropertiesLatencyTest {
         properties.setEndOfSpeechSensitivity("END_SENSITIVITY_HIGH");
         properties.setPrefixPaddingMs(-10);
         properties.setSilenceDurationMs(10);
+        properties.setHybridVadEnabled(false);
         properties.setLocalBargeInEnabled(false);
         properties.setLocalBargeInMeanAmplitudeThreshold(1);
         properties.setLocalBargeInSpeechFrames(0);
@@ -39,6 +41,7 @@ class GeminiLivePropertiesLatencyTest {
         assertEquals("END_SENSITIVITY_HIGH", properties.getEndOfSpeechSensitivity());
         assertEquals(0, properties.getPrefixPaddingMs());
         assertEquals(100, properties.getSilenceDurationMs());
+        assertFalse(properties.isHybridVadEnabled());
         assertFalse(properties.isLocalBargeInEnabled());
         assertEquals(100, properties.getLocalBargeInMeanAmplitudeThreshold());
         assertEquals(1, properties.getLocalBargeInSpeechFrames());
@@ -55,7 +58,7 @@ class GeminiLivePropertiesLatencyTest {
         properties.setLocalBargeInRecentAssistantAudioMs(50000);
 
         assertEquals("START_SENSITIVITY_HIGH", properties.getStartOfSpeechSensitivity());
-        assertEquals("END_SENSITIVITY_LOW", properties.getEndOfSpeechSensitivity());
+        assertEquals("END_SENSITIVITY_HIGH", properties.getEndOfSpeechSensitivity());
         assertEquals(1000, properties.getPrefixPaddingMs());
         assertEquals(2000, properties.getSilenceDurationMs());
         assertEquals(20000, properties.getLocalBargeInMeanAmplitudeThreshold());
