@@ -588,12 +588,20 @@
         loading = true;
         setDashboardState('loading', 'CARGANDO', 'Actualizando actividad confirmada…');
         try {
+            let canReadAudit = false;
+            try {
+                const me = await api('/api/v1/auth/me');
+                canReadAudit = Array.isArray(me?.roles) && me.roles.map(String).includes('BUSINESS_ADMIN');
+            } catch (_) {
+                canReadAudit = false;
+            }
+            const auditRequest = canReadAudit ? api('/api/v1/audit') : Promise.resolve(null);
             const [operationsResult, pilotResult, pipelineResult, subscriptionResult, auditResult] = await Promise.allSettled([
                 api('/api/v1/operations/dashboard'),
                 api('/api/v1/operations/pilot-metrics'),
                 api('/api/v1/commercial/pipeline'),
                 api('/api/v1/subscription'),
-                api('/api/v1/audit')
+                auditRequest
             ]);
             if (operationsResult.status !== 'fulfilled') throw operationsResult.reason;
             renderOperational(
