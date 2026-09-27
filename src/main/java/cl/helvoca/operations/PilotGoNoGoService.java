@@ -6,6 +6,7 @@ import cl.helvoca.inventory.InventoryService;
 import cl.helvoca.onboarding.PilotActivationChecklistService;
 import cl.helvoca.reconciliation.ReconciliationAnomaly;
 import cl.helvoca.reconciliation.ReconciliationService;
+import cl.helvoca.security.TenantProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,7 @@ public class PilotGoNoGoService {
     private final InventoryAlertService inventoryAlerts;
     private final ReconciliationService reconciliation;
     private final PilotMetricsService metrics;
+    private final TenantProvider tenantProvider;
 
     public PilotGoNoGoService(PilotReadinessService readiness,
                               PilotActivationChecklistService activation,
@@ -30,7 +32,8 @@ public class PilotGoNoGoService {
                               InventoryService inventory,
                               InventoryAlertService inventoryAlerts,
                               ReconciliationService reconciliation,
-                              PilotMetricsService metrics) {
+                              PilotMetricsService metrics,
+                              TenantProvider tenantProvider) {
         this.readiness = readiness;
         this.activation = activation;
         this.control = control;
@@ -39,6 +42,7 @@ public class PilotGoNoGoService {
         this.inventoryAlerts = inventoryAlerts;
         this.reconciliation = reconciliation;
         this.metrics = metrics;
+        this.tenantProvider = tenantProvider;
     }
 
     @Transactional(readOnly = true)
@@ -51,6 +55,7 @@ public class PilotGoNoGoService {
         List<InventoryAlertService.AlertView> alerts = inventoryAlerts.listOpen();
         List<ReconciliationAnomaly> anomalies = reconciliation.detect();
         PilotMetricsService.Metrics pilotMetrics = metrics.metrics();
+        var businessId = tenantProvider.requireBusinessId();
 
         List<Check> checks = new ArrayList<>();
 
