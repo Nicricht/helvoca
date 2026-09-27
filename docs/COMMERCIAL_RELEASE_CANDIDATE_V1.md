@@ -4,143 +4,137 @@ Fecha de coordinación: 2026-09-27
 
 ## Objetivo
 
-Esta rama no desarrolla funcionalidades nuevas. Su propósito es concentrar la evidencia necesaria para decidir cuándo RecepVoz puede pasar de varias PR comerciales independientes a un único candidato de release verificable.
+Esta rama ensambla y certifica un único candidato comercial de RecepVoz sin tocar `main`, sin deploy y sin activar proveedores reales.
 
-**Estado actual: NO-GO para release comercial.**
+**Estado actual: RC integrado, certificación final automatizada en curso. NO mergear a `main` todavía.**
 
-Esto no significa que el producto completo esté fallando. Significa que todavía faltan gates obligatorios antes de vender/activar un primer cliente real.
-
-## Base actual
+## Base y límites
 
 - repositorio: `Nicricht/helvoca`
-- rama base: `main`
-- SHA base al crear esta coordinación: `2bc4265a0c15498f6f6aa0363238d70b632cb4ae`
-- ese SHA incluye el merge de PR #548, aislamiento de certificación de latencia read-only
-- `main` continúa reportándose sin branch protection obligatoria
+- rama: `chore/commercial-release-candidate-v1`
+- base de ensamblaje: `main@2bc4265a0c15498f6f6aa0363238d70b632cb4ae`
+- #548 ya forma parte de esa base y conserva la certificación de latencia read-only
+- `main` continúa sin branch protection/ruleset obligatorio
+- no se ha creado tag comercial
+- no se ha desplegado este RC
 
-No se debe etiquetar ni desplegar un release candidate desde un SHA anterior.
+## Fuentes integradas
 
-## Matriz de trabajo comercial
-
-| PR | Área | Estado de coordinación |
+| Fuente | Área | Integración al RC |
 | --- | --- | --- |
-| #549 | Release hardening | CI verde en su head; Draft |
-| #550 | Voz y lifecycle | CI verde; certificación automática completa; Draft |
-| #551 | Golden Journey comercial | CI verde; Draft |
-| #552 | Billing SaaS | CI verde y mergeable; 1.260 backend tests, 100% diff line, 97,1% diff branch, 68 E2E; Draft |
-| #553 | Operación primer cliente | CI verde; Draft |
-| #554 | Dashboard del dueño | CI verde después de corregir la validación responsive; Draft |
-| #555 | Demo tenant / onboarding reproducible | CI verde después de completar cobertura diferencial; Draft |
-| #556 | Observabilidad comercial | conflicto con #548 reconciliado; CI verde y mergeable; 1.250 backend tests, 87,8% diff line, 100% diff branch, 68 E2E; Draft |
+| #549 | Release hardening / CI | #567 merged al RC |
+| #550 | Voice lifecycle / hangup fence | #568 merged al RC |
+| #551 | Golden Journey comercial | #561 merged al RC |
+| #552 | Billing SaaS / V77 | #562 merged al RC |
+| #556 | Observabilidad comercial / V78 | #563 merged al RC |
+| #553 | Operación primer cliente | #569 merged al RC |
+| #555 | Demo tenant / onboarding reproducible | reconciliado con #553 en #571 |
+| #554 | Dashboard del dueño | #565 merged al RC |
+| #559 | Separación owner / operations | #566 merged después de #554 |
 
-Todas estas PR deben permanecer sin merge a `main` durante esta coordinación.
+La integración temporal #564 fue cerrada como superseded por #571. La reconciliación conserva simultáneamente los requisitos comerciales de #553 y los requisitos de perfil/demo de #555.
 
-## Resultado automatizado de esta ronda
+## Evidencia de source PRs
 
-- #552 head certificado: `a279f2bf78fc2e0121bf4e26958a1b9627a6a4c1`
-  - workflow run #2230: PASS
-  - backend: 1.260 tests, 0 failures, 0 errors
-  - differential line coverage: 40/40 = 100%
-  - differential branch coverage: 33/34 = 97,1%
-  - browser E2E: 68 passed
-- #556 head certificado: `8b3ad71a1dc973af91ca5bdc2f714b7e8d923005`
-  - workflow run #2228: PASS
-  - backend: 1.250 tests, 0 failures, 0 errors
-  - differential line coverage: 36/41 = 87,8%
-  - differential branch coverage: 10/10 = 100%
-  - browser E2E: 68 passed
-- #560, esta coordinación, pasó su propio CI sobre el `main` actual.
+Todas las fuentes seleccionadas llegaron al ensamblaje con su CI individual verde.
 
-Con esto, el gate de **source PRs individuales** está verde. El estado global sigue siendo NO-GO porque aún no existe una rama integrada certificada con todas las PR juntas y siguen pendientes los gates humanos/externos.
+Evidencia especialmente sensible:
 
-## Gates obligatorios
+- #552: billing SaaS certificado sin cobros reales; migración `V77__saas_billing_webhook_idempotency.sql`.
+- #556: observabilidad certificada; migración `V78__commercial_observability_runtime_metadata.sql`; preserva el aislamiento read-only introducido por #548.
+- #550: agrega fence de salida para impedir audio/clear tardío después de un hangup aceptado; no cambia Sulafat, prompt ni Hybrid VAD.
+- #549: elimina la dependencia de `[verify]` para que Fast Gate + Full Gate también se ejecuten en futuros pushes a `main`.
+
+## Voz y latencia congeladas
+
+Se completó una llamada humana controlada sobre `main@2bc4265a0c15498f6f6aa0363238d70b632cb4ae` con Gemini Live, Sulafat y Hybrid VAD.
+
+Resultado observado:
+
+- mediana de respuesta: 1.765 s
+- máximo: 3.629 s
+- 0 respuestas >5 s
+- barge-in observado
+- herramientas observadas: `list_services` y `end_call`
+- sin operaciones mutantes observadas
+- cierre limpio mediante `end_call`
+- bootstrap de certificación limpiado después del run
+
+Voz + latencia quedan congeladas salvo regresión reproducible.
+
+La integración posterior de #550 no cambia voz, prompt ni VAD: únicamente endurece el transporte después del hangup. Su regresión está cubierta por tests automatizados. Bajo las reglas actuales no se repite otra llamada real solo para este ensamblaje.
+
+## Gates
 
 ### G1. Source PRs verdes
 
-Antes de ensamblar un candidato combinado:
+- [x] #549
+- [x] #550
+- [x] #551
+- [x] #552
+- [x] #553
+- [x] #554
+- [x] #555
+- [x] #556
+- [x] #559
 
-- [x] #549 Fast/Full Gate verde
-- [x] #550 Fast/Full Gate verde
-- [x] #551 Fast/Full Gate verde
-- [x] #552 Fast/Full Gate verde en el head definitivo
-- [x] #553 Fast/Full Gate verde
-- [x] #554 Fast/Full Gate verde
-- [x] #555 Fast/Full Gate verde
-- [x] #556 Fast/Full Gate verde y mergeable contra el `main` actual
+### G2. Compatibilidad e integración
 
-Un PR verde sobre una base antigua no sustituye la validación contra el `main` actual.
+- [x] candidato parte del `main` vigente de la coordinación
+- [x] #548 read-only preservado
+- [x] V77 billing entra antes de V78 observabilidad
+- [x] fix de lifecycle de voz preservado
+- [x] hardening de CI preservado
+- [x] #553 + #555 reconciliados sin descartar requisitos
+- [x] #554 integrado antes de la rama apilada #559
+- [x] sin force push
+- [x] `main` no fue modificado
 
-### G2. Compatibilidad con main actual
+### G3. Certificación automatizada del HEAD integrado
 
-El candidato debe partir del último `main`, no de `67ca6bb...`.
+El HEAD definitivo del RC debe pasar como una sola unidad:
 
-Requisitos:
+- [ ] Fast Gate
+- [ ] Full backend suite + JaCoCo
+- [ ] differential Java coverage
+- [ ] browser E2E
+- [ ] Meta webhook public smoke
+- [ ] Golden Journey incluido en el gate
+- [ ] voice commercial certification incluida en el gate
+- [ ] billing commercial certification incluida en el gate
+- [ ] demo/onboarding tests incluidos en el gate
 
-- [x] todas las PR seleccionadas son mergeables contra el SHA actual de `main`
-- [x] conflictos con #548 resueltos preservando aislamiento read-only de latencia
-- [x] no se pierde instrumentación `ai_model` / `duration_ms`
-- [ ] no se pierde el fix de lifecycle de voz
-- [ ] no se debilitan los gates de CI
+No se considera certificado por el mero hecho de que las ramas fuente estuvieran verdes.
 
-### G3. Candidato integrado
+### G4. Voz humana
 
-CI verde por PR individual no demuestra que todas las PR funcionen juntas.
-
-Antes de release:
-
-- [ ] construir una rama de integración desde el `main` vigente
-- [ ] incorporar únicamente los cambios comerciales aprobados
-- [ ] resolver conflictos sin force push
-- [ ] ejecutar Fast Gate
-- [ ] ejecutar Full Gate
-- [ ] ejecutar Golden Journey
-- [ ] ejecutar voice commercial certification
-- [ ] ejecutar billing commercial certification
-- [ ] ejecutar demo/onboarding certification
-- [ ] verificar browser E2E
-- [ ] verificar cobertura diferencial
-
-No se debe mergear esa rama a `main` hasta completar los gates humanos.
-
-### G4. Voz humana real
-
-La automatización no puede certificar percepción acústica.
-
-Antes de vender telefonía real se requiere una llamada humana controlada que confirme:
-
-- [ ] Sulafat permanece femenina y consistente desde saludo a despedida
-- [ ] español natural para clientes de Chile
-- [ ] ritmo rápido/natural y respuestas breves
-- [ ] interrupción real corta el audio inmediatamente
-- [ ] dos interrupciones rápidas no reanudan audio viejo
-- [ ] tool lenta no produce comportamiento extraño
-- [ ] datos conocidos no se preguntan otra vez
-- [ ] una corrección del usuario reemplaza el dato anterior
-- [ ] despedida completa
-- [ ] carrier corta después de la última palabra audible
-- [ ] no existe audio residual después del hangup
-
-Esta prueba no debe ejecutarse mientras la certificación vigente prohíba llamadas reales.
+- [x] Sulafat consistente durante la prueba humana
+- [x] respuesta percibida dentro del objetivo de latencia definido
+- [x] interrupción/barge-in observada
+- [x] lookup read-only real observado
+- [x] despedida + `end_call` completados
+- [x] sin acciones mutantes durante la certificación
+- [x] sin nueva prueba real requerida mientras no exista una regresión reproducible
 
 ### G5. Billing externo
 
-La lógica SaaS debe seguir separada de merchant payments.
-
-Antes de cobrar a un cliente:
+Antes de cobrar a un cliente mediante el flujo SaaS real:
 
 - [ ] checkout sandbox con cuenta/proveedor autorizado
 - [ ] webhook firmado sandbox
 - [ ] invoice approved activa entitlement correcto
-- [ ] invoice rejected/canceled entra a PAST_DUE sin duplicar efectos
+- [ ] invoice rejected/canceled aplica el estado esperado sin duplicar efectos
 - [ ] webhook repetido es idempotente
 - [ ] referencias e IDs inconsistentes fallan cerrados
-- [ ] cancelación de suscripción retira acceso según política
+- [ ] cancelación respeta la política de acceso
 - [ ] pricing público coincide con catálogo backend
-- [ ] prueba live solo cuando exista autorización explícita y fuera de esta certificación
+- [ ] cualquier prueba live requiere autorización explícita y queda fuera de esta certificación
+
+No confundir este gate con merchant payments de los clientes de nuestros clientes.
 
 ### G6. Seguridad del repositorio
 
-Antes del tag comercial:
+Antes de cualquier merge/tag comercial:
 
 - [ ] proteger `main`
 - [ ] exigir PR para merge
@@ -149,42 +143,40 @@ Antes del tag comercial:
 - [ ] bloquear direct push normal
 - [ ] bloquear force push
 
-La integración conectada actualmente permite auditar estas reglas, pero no aplicar branch protection. No se debe fingir que están configuradas.
+La conexión GitHub disponible puede auditar el repositorio, pero no expone escritura administrativa de branch protection/rulesets. Este bloqueo no debe marcarse como resuelto hasta aplicarlo desde una credencial/canal autorizado.
 
 ### G7. Primer cliente
 
-Antes de declarar CUSTOMER:
+Antes de declarar un cliente real activo:
 
-- [ ] onboarding aprobado con datos reales del negocio
-- [ ] precios/servicios/horarios/FAQ aprobados
-- [ ] canal telefónico real certificado
-- [ ] billing/facturación de RecepVoz autorizado
-- [ ] dashboard muestra actividad del tenant correcto
-- [ ] Journey Trace permite diagnosticar una llamada del piloto
-- [ ] no existe P0/P1 conocido en el flujo contratado
+- [ ] onboarding con datos aprobados del negocio
+- [ ] servicios/productos/precios/horarios/FAQ aprobados
+- [ ] canal incluido certificado para ese tenant
+- [ ] medio autorizado para pagar/facturar RecepVoz
+- [ ] dashboard muestra el tenant correcto
+- [ ] Journey Trace permite diagnosticar su operación
+- [ ] no existe P0/P1 conocido dentro del alcance vendido
 - [ ] rollback y contacto de soporte definidos
 
-## Criterio de GO
+## Condición de salida
 
-RecepVoz pasa a **GO comercial** únicamente cuando:
+El RC queda técnicamente listo para una decisión de merge solo cuando G3 esté completamente verde.
 
-1. los source PRs están verdes y compatibles con el `main` vigente;
-2. un candidato integrado independiente pasa todos los tests;
-3. la llamada humana real pasa el checklist acústico/carrier;
-4. billing sandbox queda certificado con proveedor autorizado;
-5. `main` queda protegido antes de cualquier tag/merge comercial;
-6. el primer cliente tiene onboarding, soporte y rollback definidos.
+El lanzamiento comercial real sigue además condicionado a:
 
-Hasta entonces, la decisión permanece **NO-GO**, aunque varias áreas por separado ya estén certificadas.
+1. billing sandbox autorizado, cuando el flujo de cobro SaaS vaya a activarse;
+2. protección obligatoria de `main`;
+3. onboarding y canales del primer cliente;
+4. autorización explícita antes de tag, merge a `main`, deploy o cobro real.
 
 ## Prohibiciones durante esta coordinación
 
 - no deploy
 - no merge a `main`
 - no force push
-- no llamada real bajo las reglas actuales
+- no llamadas reales adicionales
 - no WhatsApp real
 - no cobro real
 - no credenciales live
-- no activar proveedores para “hacer pasar” una demo
+- no activar proveedores para hacer pasar una demo
 - no esconder fallos bajando umbrales de CI
