@@ -63,7 +63,7 @@ public class ReconciliationRepository {
                    AND o.status <> 'CONFIRMED'
                  ORDER BY p.updated_at ASC
                  LIMIT 100
-                """, rs -> out.add(anomaly(
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> out.add(anomaly(
                 ReconciliationAnomaly.Type.PAYMENT_SUCCEEDED_ORDER_NOT_CONFIRMED,
                 ReconciliationAnomaly.Severity.CRITICAL,
                 "PAYMENT",
@@ -92,7 +92,7 @@ public class ReconciliationRepository {
                  GROUP BY p.id, p.target_operation_id
                  ORDER BY MIN(r.created_at) ASC
                  LIMIT 100
-                """, rs -> out.add(anomaly(
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> out.add(anomaly(
                 ReconciliationAnomaly.Type.PAYMENT_SUCCEEDED_INVENTORY_RESERVED,
                 ReconciliationAnomaly.Severity.CRITICAL,
                 "PAYMENT",
@@ -129,7 +129,7 @@ public class ReconciliationRepository {
                  GROUP BY p.target_operation_id
                  ORDER BY p.target_operation_id
                  LIMIT 100
-                """, rs -> out.add(anomaly(
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> out.add(anomaly(
                 ReconciliationAnomaly.Type.PAYMENT_TERMINAL_INVENTORY_RESERVED,
                 ReconciliationAnomaly.Severity.HIGH,
                 "PAYMENT",
@@ -154,7 +154,7 @@ public class ReconciliationRepository {
                    AND created_at <= ?
                  ORDER BY created_at ASC
                  LIMIT 100
-                """, rs -> out.add(anomaly(
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> out.add(anomaly(
                 ReconciliationAnomaly.Type.OUTBOUND_STUCK_PREPARED,
                 ReconciliationAnomaly.Severity.HIGH,
                 "OUTBOUND_MESSAGE",
@@ -189,7 +189,7 @@ public class ReconciliationRepository {
                  GROUP BY r.reference_id
                  ORDER BY r.reference_id
                  LIMIT 100
-                """, rs -> out.add(anomaly(
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> out.add(anomaly(
                 ReconciliationAnomaly.Type.ORPHAN_RESERVATION,
                 ReconciliationAnomaly.Severity.HIGH,
                 "INVENTORY_RESERVATION",
@@ -212,7 +212,7 @@ public class ReconciliationRepository {
                    AND COALESCE(processed_at, received_at) <= ?
                  ORDER BY COALESCE(processed_at, received_at) ASC
                  LIMIT 100
-                """, rs -> out.add(anomaly(
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> out.add(anomaly(
                 ReconciliationAnomaly.Type.RECOVERABLE_WEBHOOK_FAILED,
                 ReconciliationAnomaly.Severity.HIGH,
                 "PAYMENT_WEBHOOK",
@@ -238,7 +238,7 @@ public class ReconciliationRepository {
                    AND lease_expires_at <= ?
                  ORDER BY lease_expires_at ASC
                  LIMIT 100
-                """, rs -> out.add(anomaly(
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> out.add(anomaly(
                 ReconciliationAnomaly.Type.JOB_STUCK,
                 ReconciliationAnomaly.Severity.MEDIUM,
                 "PERSISTENT_JOB",
@@ -277,7 +277,7 @@ public class ReconciliationRepository {
                    )
                  ORDER BY payment.updated_at ASC
                  LIMIT 100
-                """, rs -> out.add(anomaly(
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> out.add(anomaly(
                 ReconciliationAnomaly.Type.JOURNEY_STATE_MISMATCH,
                 ReconciliationAnomaly.Severity.MEDIUM,
                 "COMMERCIAL_JOURNEY",
