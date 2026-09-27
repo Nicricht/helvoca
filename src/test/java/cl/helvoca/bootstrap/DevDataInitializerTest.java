@@ -7,6 +7,7 @@ import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.booking.Booking;
 import cl.helvoca.booking.BookingRepository;
 import cl.helvoca.booking.BookingSource;
+import cl.helvoca.booking.BookingStatus;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessProfile;
 import cl.helvoca.business.BusinessProfileRepository;
@@ -137,6 +138,12 @@ class DevDataInitializerTest {
         DevDataInitializer initializer = f.initializer(true);
 
         initializer.run();
+
+        Booking staleFixture = f.bookingStore.get(0);
+        staleFixture.setStartAt(Instant.now().minusSeconds(7_200));
+        staleFixture.setEndAt(Instant.now().minusSeconds(5_400));
+        staleFixture.setStatus(BookingStatus.CANCELLED);
+
         initializer.run();
 
         verify(f.businesses, times(1)).saveAndFlush(any(Business.class));
@@ -149,6 +156,8 @@ class DevDataInitializerTest {
         assertNotNull(f.agent.get());
         assertEquals(3, f.customerStore.size());
         assertEquals(3, f.bookingStore.size());
+        assertTrue(f.bookingStore.stream().allMatch(booking -> booking.getStartAt().isAfter(Instant.now())));
+        assertTrue(f.bookingStore.stream().allMatch(booking -> booking.getStatus() == BookingStatus.CONFIRMED));
         assertNotNull(f.profile.get());
     }
 
@@ -444,8 +453,10 @@ class DevDataInitializerTest {
                     new ArrayList<>(bookingStore));
             when(bookings.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> {
                 Booking saved = invocation.getArgument(0);
-                ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
-                bookingStore.add(saved);
+                if (saved.getId() == null) ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
+                if (bookingStore.stream().noneMatch(item -> saved.getId().equals(item.getId()))) {
+                    bookingStore.add(saved);
+                }
                 return saved;
             });
         }
