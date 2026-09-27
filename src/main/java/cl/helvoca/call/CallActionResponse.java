@@ -11,11 +11,12 @@ public record CallActionResponse(
         UUID entityId,
         String detail,
         String errorCode,
+        Long durationMs,
         Instant createdAt
 ) {
     static CallActionResponse from(CallAction action) {
         return new CallActionResponse(
                 action.getId(), action.getActionType(), action.isSuccess(), action.getEntityType(),
-                action.getEntityId(), action.getDetail(), action.getErrorCode(), action.getCreatedAt());
+                action.getEntityId(), action.getDetail(), action.getErrorCode(), action.getDurationMs(), action.getCreatedAt());
     }
 }
