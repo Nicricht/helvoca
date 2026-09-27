@@ -808,6 +808,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 .put("customVocabulary", new JSONArray().put("RecepVoz"))
                 .put("mode", "VERBATIM");
 
+        String instructions = systemInstructions();
+        JSONArray functionDeclarations = geminiFunctionDeclarations();
         JSONObject setup = new JSONObject()
                 .put("model", "models/" + properties.getModel().trim())
                 .put("generationConfig", generation)
@@ -816,11 +818,14 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                         .put("activityHandling", "START_OF_ACTIVITY_INTERRUPTS"))
                 .put("systemInstruction", new JSONObject()
                         .put("parts", new JSONArray().put(new JSONObject()
-                                .put("text", systemInstructions()))))
+                                .put("text", instructions))))
                 .put("inputAudioTranscription", inputTranscription)
                 .put("outputAudioTranscription", new JSONObject())
                 .put("tools", new JSONArray().put(new JSONObject()
-                        .put("functionDeclarations", geminiFunctionDeclarations())));
+                        .put("functionDeclarations", functionDeclarations)));
+        log.info("GEMINI_SETUP_CONTEXT call={} instruction_chars={} tool_count={} tool_schema_chars={}",
+                context.callId(), instructions.length(), functionDeclarations.length(),
+                functionDeclarations.toString().length());
         return new JSONObject().put("setup", setup);
     }
 
@@ -831,10 +836,11 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         for (int i = 0; i < source.length(); i++) {
             JSONObject tool = source.getJSONObject(i);
             if (context.voiceBakeOff() && !"end_call".equals(tool.optString("name"))) continue;
+            String name = tool.getString("name");
             out.put(new JSONObject()
-                    .put("name", tool.getString("name"))
-                    .put("description", tool.optString("description", ""))
-                    .put("parameters", sanitizeGeminiSchema(tool.getJSONObject("parameters"))));
+                    .put("name", name)
+                    .put("description", geminiToolDescription(name, tool.optString("description", "")))
+                    .put("parameters", compactGeminiSchema(tool.getJSONObject("parameters"))));
         }
         return out;
     }
@@ -843,6 +849,57 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         JSONObject copy = new JSONObject(schema.toString());
         removeUnsupportedSchemaFields(copy);
         return copy;
+    }
+
+    static JSONObject compactGeminiSchema(JSONObject schema) {
+        JSONObject copy = sanitizeGeminiSchema(schema);
+        compactDescriptions(copy);
+        return copy;
+    }
+
+    private static void compactDescriptions(Object node) {
+        if (node instanceof JSONObject object) {
+            if (object.has("description")) {
+                object.put("description", compactText(object.optString("description", ""), 120));
+            }
+            for (String key : List.copyOf(object.keySet())) {
+                compactDescriptions(object.opt(key));
+            }
+            return;
+        }
+        if (node instanceof JSONArray array) {
+            for (int i = 0; i < array.length(); i++) compactDescriptions(array.opt(i));
+        }
+    }
+
+    static String geminiToolDescription(String name, String original) {
+        return switch (name == null ? "" : name) {
+            case "get_business_information" -> "Obtiene datos oficiales del negocio.";
+            case "list_services" -> "Lista servicios reales. Úsala si aún no tienes un serviceId válido.";
+            case "search_knowledge" -> "Busca información oficial del negocio.";
+            case "find_caller" -> "Busca al cliente por el teléfono verificado de esta llamada.";
+            case "register_caller" -> "Registra al cliente cuando find_caller devuelve found=false.";
+            case "list_available_slots" -> "Lista horarios reales por serviceId y fecha. Usa literalmente un startAt devuelto; no lo revalides.";
+            case "check_booking_availability" -> "Valida una hora exacta solo si no vino de list_available_slots.";
+            case "create_booking" -> "Reserva en 2 fases: 1) serviceId+startAt crea propuesta; pide confirmación una vez. 2) operationId+confirmationToken crea bookingId.";
+            case "list_customer_bookings" -> "Lista próximas reservas confirmadas del cliente.";
+            case "reschedule_booking" -> "Reprograma una reserva usando bookingId y un horario validado.";
+            case "cancel_booking" -> "Cancela una reserva usando el bookingId exacto.";
+            case "create_request" -> "Crea una solicitud real de seguimiento no relacionada con una reserva.";
+            case "record_unanswered_question" -> "Registra una pregunta sin respuesta oficial.";
+            case "verify_caller_whatsapp" -> "Verifica el número actual como WhatsApp solo tras confirmación explícita.";
+            case "send_whatsapp_operation" -> "Continúa por WhatsApp una operación existente usando su operationId exacto.";
+            case "transfer_to_human" -> "Transfiere a una persona cuando el cliente lo pide o la IA no puede resolver.";
+            case "end_call" -> "Cierra físicamente la llamada solo después de una despedida completa y una intención explícita de terminar.";
+            default -> compactText(original, 180);
+        };
+    }
+
+    private static String compactText(String value, int max) {
+        if (value == null) return "";
+        String normalized = value.replaceAll("\\s+", " ").trim();
+        if (normalized.length() <= max) return normalized;
+        return normalized.substring(0, max - 1).trim() + "…";
     }
 
     private static void removeUnsupportedSchemaFields(Object node) {
