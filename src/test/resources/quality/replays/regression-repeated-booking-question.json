@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "name": "regression-repeated-booking-question",
+  "sourceFingerprint": "fixture000000002",
+  "turns": [
+    {
+      "speaker": "USER",
+      "text": "Mañana a las cuatro."
+    },
+    {
+      "speaker": "ASSISTANT",
+      "text": "¿A nombre de quién sería la reserva?"
+    },
+    {
+      "speaker": "USER",
+      "text": "[CUSTOMER_NAME]."
+    },
+    {
+      "speaker": "ASSISTANT",
+      "text": "¿A nombre de quién sería la reserva?"
+    }
+  ],
+  "actions": [],
+  "expected": {
+    "passed": false,
+    "findingCodes": [
+      "REPEATED_QUESTION"
+    ]
+  }
+}
