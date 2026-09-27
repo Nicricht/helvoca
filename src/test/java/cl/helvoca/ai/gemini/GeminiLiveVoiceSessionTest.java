@@ -899,6 +899,78 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void latencyBudgetBranchesAreExercisedForSlowToolBatchAndFirstAudio() throws Exception {
+        GeminiLiveProperties properties = properties();
+        properties.setToolLatencyBudgetMs(100);
+        properties.setToolBatchLatencyBudgetMs(100);
+        properties.setResponseLatencyBudgetMs(250);
+        properties.setLocalBargeInEnabled(true);
+        properties.setLocalBargeInMeanAmplitudeThreshold(900);
+        properties.setLocalBargeInSpeechFrames(2);
+        properties.setLocalBargeInReleaseFrames(5);
+
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.execute(eq(context), eq("list_services"), anyString())).thenAnswer(invocation -> {
+            Thread.sleep(130);
+            return new JSONObject()
+                    .put("success", true)
+                    .put("data", new JSONObject().put("services", new JSONArray()))
+                    .put("error", JSONObject.NULL)
+                    .toString();
+        });
+
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                transport,
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        session.onOpen(socket);
+        session.onText(socket, new JSONObject().put("setupComplete", new JSONObject()).toString(), true);
+        session.onText(socket, toolCall("slow-list-services", "list_services"), true);
+        verify(tools).execute(eq(context), eq("list_services"), anyString());
+
+        byte[] loud = new byte[160];
+        Arrays.fill(loud, PcmuAudioCodec.encodeMulaw((short) 8_000));
+        String loudBase64 = Base64.getEncoder().encodeToString(loud);
+        byte[] silence = new byte[160];
+        Arrays.fill(silence, (byte) 0xff);
+        String silenceBase64 = Base64.getEncoder().encodeToString(silence);
+
+        session.acceptInboundAudio(loudBase64);
+        session.acceptInboundAudio(loudBase64);
+        for (int i = 0; i < 5; i++) session.acceptInboundAudio(silenceBase64);
+
+        Thread.sleep(270);
+
+        ByteBuffer pcm24 = ByteBuffer.allocate(480 * 2).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        for (int i = 0; i < 480; i++) pcm24.putShort((short) 0);
+        String modelAudio = Base64.getEncoder().encodeToString(pcm24.array());
+        JSONObject assistantAudio = new JSONObject().put("serverContent", new JSONObject()
+                .put("modelTurn", new JSONObject()
+                        .put("parts", new JSONArray().put(new JSONObject()
+                                .put("inlineData", new JSONObject()
+                                        .put("data", modelAudio)
+                                        .put("mimeType", "audio/pcm;rate=24000"))))));
+        session.onText(socket, assistantAudio.toString(), true);
+
+        verify(transport, atLeastOnce()).sendAudio(eq(context.streamSid()), anyString());
+    }
+
+    @Test
     void permissionDeniedAndAccessDeniedAreAuthFailures() {
         assertEquals(VoiceProviderHealthRegistry.FailureKind.AUTH,
                 GeminiLiveVoiceSession.classifyFailure(403, "PERMISSION_DENIED"));
