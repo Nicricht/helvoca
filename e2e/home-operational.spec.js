@@ -480,19 +480,29 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#pilotMetricConversations')).toHaveText('50');
   await expect(page.locator('#pilotMetricPaid')).toHaveText('8');
   await expect(page.locator('#pilotMetricRevenue')).toContainText('$145.000');
-  await expect(page.locator('#homeRecentActivity')).toHaveCount(0);
+  await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'ready');
+  await expect(page.locator('#ownerDashboardState')).toHaveText('AL DÍA');
+  await expect(page.locator('#homeRecentActivity')).toBeVisible();
+  await expect(page.locator('#homeRecentActivity')).toContainText('Zapatilla Urban');
   await expect(page.locator('#statusGrid')).toBeHidden();
+  await expect(page.locator('#homeConversationsToday')).toHaveText('7');
   await expect(page.locator('#homeCallsToday')).toHaveText('3');
-  await expect(page.locator('#homeWhatsAppToday')).toHaveText('1');
+  await expect(page.locator('#homeWhatsAppToday')).toHaveText('3');
   await expect(page.locator('#homeBookingsToday')).toHaveText('2');
+  await expect(page.locator('#ownerOrdersToday')).toHaveText('2');
   await expect(page.locator('#homeCustomersToday')).toHaveText('1');
   await expect(page.locator('#homeRequestsToday')).toHaveText('1');
+  await expect(page.locator('#ownerHandoffsToday')).toHaveText('1');
+  await expect(page.locator('#ownerFailuresToday')).toHaveText('1');
   await expect(page.locator('#homeQuestionsToday')).toHaveText('2');
   await expect(page.locator('#homeFailuresToday')).toHaveText('0');
   await expect(page.locator('#homeMinutesToday')).toHaveText('8:00');
+  await expect(page.locator('#ownerPlanName')).toHaveText('PRO');
+  await expect(page.locator('#ownerPlanUsage')).toHaveText('23 / 500 min');
   expect(await page.locator('#homeCallsMetric').evaluate(element => element.tagName)).toBe('ARTICLE');
   await expect(page.locator('#homeBookingsMetric')).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
   await expect(page.locator('#homeRequestsMetric')).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
+  await expect(page.locator('#ownerOrdersMetric')).toHaveAttribute('href', '/?tab=sales#homeBusinessWorkspace');
   await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
 
   await page.locator('#homeIncidentToggle').click();
@@ -694,6 +704,96 @@ test('ready customer sees live operational home instead of setup cards', async (
 });
 
 
+test('owner commercial dashboard exposes loading and empty states', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+
+  let releaseOperations;
+  const operationsGate = new Promise(resolve => { releaseOperations = resolve; });
+
+  await page.unroute('**/api/v1/operations/dashboard');
+  await page.route('**/api/v1/operations/dashboard', async route => {
+    await operationsGate;
+    await route.fulfill(json({
+      businessName: 'Negocio E2E',
+      timezone: 'America/Santiago',
+      localNow: '2026-09-17T16:30:00-03:00',
+      callsToday: 0,
+      callDurationSecondsToday: 0,
+      bookingsToday: 0,
+      newCustomersToday: 0,
+      openRequests: 0,
+      unansweredQuestions: 0,
+      callFailuresToday: 0,
+      estimatedCallCostTodayUsd: 0,
+      recentCalls: [],
+      recentRequests: [],
+      unanswered: []
+    }));
+  });
+
+  await page.unroute('**/api/v1/operations/pilot-metrics');
+  await page.route('**/api/v1/operations/pilot-metrics', route => route.fulfill(json({
+    businessName: 'Negocio E2E',
+    timezone: 'America/Santiago',
+    localNow: '2026-09-17T16:30:00-03:00',
+    today: {
+      code: 'TODAY', label: 'Hoy', calls: 0, whatsappConversations: 0, bookings: 0, orders: 0,
+      paymentAttempts: 0, successfulPayments: 0, pendingPayments: 0, failedPayments: 0,
+      refundedPayments: 0, humanTransfers: 0, callFailures: 0, confirmedRevenueByCurrency: {},
+      paidOrderConversionPct: 0, paymentSuccessRatePct: 0, callFailureRatePct: 0, humanTransferRatePct: 0
+    },
+    last7Days: {
+      code: 'LAST_7_DAYS', label: 'Últimos 7 días', calls: 0, whatsappConversations: 0, bookings: 0, orders: 0,
+      paymentAttempts: 0, successfulPayments: 0, pendingPayments: 0, failedPayments: 0,
+      refundedPayments: 0, humanTransfers: 0, callFailures: 0, confirmedRevenueByCurrency: {},
+      paidOrderConversionPct: 0, paymentSuccessRatePct: 0, callFailureRatePct: 0, humanTransferRatePct: 0
+    }
+  })));
+
+  await page.unroute('**/api/v1/commercial/pipeline');
+  await page.route('**/api/v1/commercial/pipeline', route => route.fulfill(json({
+    total: 0, active: 0, paid: 0, needsAction: 0, items: []
+  })));
+
+  await page.unroute('**/api/v1/audit');
+  await page.route('**/api/v1/audit', route => route.fulfill(json([])));
+
+  await page.goto('/');
+  await expect(page.locator('#operationalOverview')).toBeVisible();
+  await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'loading');
+  await expect(page.locator('#ownerDashboardState')).toHaveText('CARGANDO');
+
+  releaseOperations();
+
+  await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'empty');
+  await expect(page.locator('#ownerDashboardState')).toHaveText('SIN ACTIVIDAD');
+  await expect(page.locator('#ownerDashboardMessage')).toHaveText('Aún no hay actividad comercial hoy.');
+  await expect(page.locator('#homeRecentActivity')).toContainText('Todavía no hay actividad reciente.');
+});
+
+
+test('owner commercial dashboard exposes an error state without hiding the workspace', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockReadyHome(page);
+
+  await page.unroute('**/api/v1/operations/dashboard');
+  await page.route('**/api/v1/operations/dashboard', route => route.fulfill({
+    status: 500,
+    contentType: 'application/json',
+    body: JSON.stringify({ message: 'dashboard unavailable' })
+  }));
+
+  await page.goto('/');
+
+  await expect(page.locator('#operationalOverview')).toBeVisible();
+  await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'error');
+  await expect(page.locator('#ownerDashboardState')).toHaveText('NO DISPONIBLE');
+  await expect(page.locator('#ownerDashboardMessage')).toContainText('No pudimos actualizar las métricas');
+  await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
+});
+
+
 test('reservation filters drawer and embedded conversation work', async ({ page }) => {
   test.setTimeout(45000);
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
@@ -785,6 +885,12 @@ test('orders list drawer and conversation work', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
   await page.goto('/');
+
+  await expect(page.locator('#operationalOverview')).toBeVisible();
+  const ownerDashboardBox = await page.locator('#operationalOverview').boundingBox();
+  expect(ownerDashboardBox).not.toBeNull();
+  expect(ownerDashboardBox.x).toBeGreaterThanOrEqual(0);
+  expect(ownerDashboardBox.x + ownerDashboardBox.width).toBeLessThanOrEqual(390);
 
   await page.getByRole('tab', { name: /Pedidos/ }).click();
   await expect(page.locator('#homeOrdersList')).toContainText('Juan Pedido');
