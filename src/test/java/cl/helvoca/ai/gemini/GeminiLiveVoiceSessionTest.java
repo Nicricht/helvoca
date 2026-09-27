@@ -210,6 +210,52 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void bakeOffEndCallFailureIsFailClosedAndDuplicateBoundaryDoesNotRetry() {
+        GeminiLiveProperties properties = properties();
+        properties.setVoice("Sadachbia");
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), UUID.randomUUID(), null,
+                "+56966939611", "+14355652512", "MZ-bakeoff-failure", "Sadachbia");
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+        when(tools.prepareDeferredEndCall(context)).thenReturn(new JSONObject()
+                .put("success", false)
+                .put("error", new JSONObject().put("code", "END_CALL_TEST_FAILURE"))
+                .toString());
+
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                transport,
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+        session.onOpen(socket);
+        session.onText(socket, new JSONObject().put("setupComplete", new JSONObject()).toString(), true);
+
+        JSONObject turnComplete = new JSONObject()
+                .put("serverContent", new JSONObject().put("turnComplete", true));
+        session.onText(socket, turnComplete.toString(), true);
+        session.onText(socket, turnComplete.toString(), true);
+        session.onText(socket, turnComplete.toString(), true);
+
+        // A duplicate boundary after the failed one-shot end_call must not retry it.
+        session.onText(socket, turnComplete.toString(), true);
+
+        verify(tools, times(1)).prepareDeferredEndCall(context);
+        verify(transport, never()).endAfterPlayback();
+    }
+
+    @Test
     void maleProfileDoesNotReceiveFemaleVoiceInstructions() {
         GeminiLiveProperties properties = properties();
         properties.setVoice("Enceladus");
