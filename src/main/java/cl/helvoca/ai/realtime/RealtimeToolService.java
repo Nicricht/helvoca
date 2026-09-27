@@ -206,6 +206,7 @@ public class RealtimeToolService {
                 REGLAS OBLIGATORIAS DE HELVOCA:
                 Interpreta expresiones como hoy, mañana y pasado mañana usando la fecha local del negocio, nunca UTC.
                 Nunca inventes disponibilidad, precios, reservas, clientes, horarios ni resultados de operaciones.
+                Nunca inventes causas para una falta de disponibilidad. Si la herramienta indica unavailabilityReasonKnown=false, limita la explicación a customerSafeExplanation y di que la causa no está informada; no atribuyas el resultado a alta demanda, agenda llena, feriados, personal insuficiente ni otra causa no devuelta por el backend.
                 Usa únicamente las herramientas publicadas para consultar información oficial y realizar acciones.
                 Si el cliente pregunta qué horarios hay disponibles en un día sin indicar una hora exacta, usa list_available_slots si está habilitada.
                 Si el cliente indica una hora exacta, usa check_booking_availability antes de prometer disponibilidad si está habilitada.
@@ -383,6 +384,24 @@ public class RealtimeToolService {
                 .put("scheduleConfigured", availability.scheduleConfigured())
                 .put("slots", slots);
 
+        if (slots.isEmpty()) {
+            if (availability.scheduleConfigured()) {
+                data.put("availabilityStatus", "NO_AVAILABLE_SLOTS")
+                        .put("unavailabilityReasonKnown", false)
+                        .put("unavailabilityReasonCode", JSONObject.NULL)
+                        .put("customerSafeExplanation",
+                                "No hay horarios disponibles confirmados para esa fecha. La causa no está informada por el sistema.");
+            } else {
+                data.put("availabilityStatus", "NO_SCHEDULE_CONFIGURED")
+                        .put("unavailabilityReasonKnown", true)
+                        .put("unavailabilityReasonCode", "NO_SCHEDULE_CONFIGURED")
+                        .put("customerSafeExplanation",
+                                "No hay disponibilidad configurada para esa fecha.");
+            }
+        } else {
+            data.put("availabilityStatus", "AVAILABLE");
+        }
+
         if (slots.isEmpty() && availability.scheduleConfigured()) {
             for (int offset = 1; offset <= 7; offset++) {
                 LocalDate nextDate = date.plusDays(offset);
@@ -418,16 +437,32 @@ public class RealtimeToolService {
         ServiceItem service = requireActiveService(context.businessId(), serviceId);
         Instant endAt = startAt.plus(service.getDurationMinutes(), ChronoUnit.MINUTES);
         boolean withinBusinessHours = schedule.isWithinBusinessHours(context.businessId(), startAt, endAt);
-        boolean available = withinBusinessHours
-                && bookings.countOverlaps(context.businessId(), serviceId, startAt, endAt, BookingStatus.CANCELLED, null) == 0;
-        return success(new JSONObject()
+        long overlaps = withinBusinessHours
+                ? bookings.countOverlaps(context.businessId(), serviceId, startAt, endAt, BookingStatus.CANCELLED, null)
+                : 0L;
+        boolean available = withinBusinessHours && overlaps == 0;
+
+        JSONObject data = new JSONObject()
                 .put("serviceId", serviceId.toString())
                 .put("serviceName", service.getName())
                 .put("startAt", startAt.toString())
                 .put("endAt", endAt.toString())
                 .put("localStart", formatLocal(context.businessId(), startAt))
                 .put("available", available)
-                .put("withinBusinessHours", withinBusinessHours));
+                .put("withinBusinessHours", withinBusinessHours);
+
+        if (!available) {
+            if (!withinBusinessHours) {
+                data.put("unavailabilityReasonKnown", true)
+                        .put("unavailabilityReasonCode", "OUTSIDE_BUSINESS_HOURS")
+                        .put("customerSafeExplanation", "Ese horario está fuera del horario de atención.");
+            } else {
+                data.put("unavailabilityReasonKnown", true)
+                        .put("unavailabilityReasonCode", "SLOT_OCCUPIED")
+                        .put("customerSafeExplanation", "Ese horario ya está ocupado.");
+            }
+        }
+        return success(data);
     }
 
     private JSONObject createBooking(RealtimeCallContext context, JSONObject args) {

@@ -123,6 +123,10 @@ class RealtimeToolServiceTest {
         assertTrue(result.getBoolean("success"));
         JSONObject data = result.getJSONObject("data");
         assertTrue(data.getJSONArray("slots").isEmpty());
+        assertEquals("NO_AVAILABLE_SLOTS", data.getString("availabilityStatus"));
+        assertFalse(data.getBoolean("unavailabilityReasonKnown"));
+        assertTrue(data.isNull("unavailabilityReasonCode"));
+        assertTrue(data.getString("customerSafeExplanation").contains("causa no está informada"));
         assertEquals(nextDate.toString(), data.getString("nextAvailableDate"));
         assertEquals(1, data.getJSONArray("nextAvailableSlots").length());
         assertEquals(slot.startAt().toString(),
@@ -132,6 +136,48 @@ class RealtimeToolServiceTest {
         verify(schedule).listAvailableSlots(businessId, serviceId, 30, requestedDate.plusDays(1), 3);
         verify(schedule).listAvailableSlots(businessId, serviceId, 30, nextDate, 3);
         verifyNoMoreInteractions(schedule);
+    }
+
+    @Test
+    void checkAvailabilityReturnsBackendOwnedReasonWhenSlotIsOccupied() {
+        UUID businessId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        Instant startAt = Instant.now().plusSeconds(7200);
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business("America/Santiago")));
+        when(services.findByIdAndBusinessId(serviceId, businessId))
+                .thenReturn(Optional.of(serviceItem(businessId, serviceId, "Consulta", 30)));
+        when(schedule.isWithinBusinessHours(eq(businessId), eq(startAt), any(Instant.class))).thenReturn(true);
+        when(bookings.countOverlaps(eq(businessId), eq(serviceId), eq(startAt), any(Instant.class),
+                eq(BookingStatus.CANCELLED), isNull())).thenReturn(1L);
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZstream");
+        JSONObject result = new JSONObject(tools.execute(
+                context,
+                "check_booking_availability",
+                new JSONObject()
+                        .put("serviceId", serviceId.toString())
+                        .put("startAt", startAt.toString())
+                        .toString()));
+
+        assertTrue(result.getBoolean("success"));
+        JSONObject data = result.getJSONObject("data");
+        assertFalse(data.getBoolean("available"));
+        assertTrue(data.getBoolean("unavailabilityReasonKnown"));
+        assertEquals("SLOT_OCCUPIED", data.getString("unavailabilityReasonCode"));
+        assertEquals("Ese horario ya está ocupado.", data.getString("customerSafeExplanation"));
     }
 
     @Test
