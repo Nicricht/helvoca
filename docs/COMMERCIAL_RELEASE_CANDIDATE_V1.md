@@ -27,13 +27,31 @@ No se debe etiquetar ni desplegar un release candidate desde un SHA anterior.
 | #549 | Release hardening | CI verde en su head; Draft |
 | #550 | Voz y lifecycle | CI verde; certificación automática completa; Draft |
 | #551 | Golden Journey comercial | CI verde; Draft |
-| #552 | Billing SaaS | tests funcionales implementados; nueva certificación CI en curso tras ampliar fail-closed coverage; Draft |
+| #552 | Billing SaaS | CI verde y mergeable; 1.260 backend tests, 100% diff line, 97,1% diff branch, 68 E2E; Draft |
 | #553 | Operación primer cliente | CI verde; Draft |
 | #554 | Dashboard del dueño | CI verde después de corregir la validación responsive; Draft |
 | #555 | Demo tenant / onboarding reproducible | CI verde después de completar cobertura diferencial; Draft |
-| #556 | Observabilidad comercial | reconciliando cambios con el nuevo `main` que ya contiene #548; CI final pendiente; Draft |
+| #556 | Observabilidad comercial | conflicto con #548 reconciliado; CI verde y mergeable; 1.250 backend tests, 87,8% diff line, 100% diff branch, 68 E2E; Draft |
 
 Todas estas PR deben permanecer sin merge a `main` durante esta coordinación.
+
+## Resultado automatizado de esta ronda
+
+- #552 head certificado: `a279f2bf78fc2e0121bf4e26958a1b9627a6a4c1`
+  - workflow run #2230: PASS
+  - backend: 1.260 tests, 0 failures, 0 errors
+  - differential line coverage: 40/40 = 100%
+  - differential branch coverage: 33/34 = 97,1%
+  - browser E2E: 68 passed
+- #556 head certificado: `8b3ad71a1dc973af91ca5bdc2f714b7e8d923005`
+  - workflow run #2228: PASS
+  - backend: 1.250 tests, 0 failures, 0 errors
+  - differential line coverage: 36/41 = 87,8%
+  - differential branch coverage: 10/10 = 100%
+  - browser E2E: 68 passed
+- #560, esta coordinación, pasó su propio CI sobre el `main` actual.
+
+Con esto, el gate de **source PRs individuales** está verde. El estado global sigue siendo NO-GO porque aún no existe una rama integrada certificada con todas las PR juntas y siguen pendientes los gates humanos/externos.
 
 ## Gates obligatorios
 
@@ -44,11 +62,11 @@ Antes de ensamblar un candidato combinado:
 - [x] #549 Fast/Full Gate verde
 - [x] #550 Fast/Full Gate verde
 - [x] #551 Fast/Full Gate verde
-- [ ] #552 Fast/Full Gate verde en el head definitivo
+- [x] #552 Fast/Full Gate verde en el head definitivo
 - [x] #553 Fast/Full Gate verde
 - [x] #554 Fast/Full Gate verde
 - [x] #555 Fast/Full Gate verde
-- [ ] #556 Fast/Full Gate verde y mergeable contra el `main` actual
+- [x] #556 Fast/Full Gate verde y mergeable contra el `main` actual
 
 Un PR verde sobre una base antigua no sustituye la validación contra el `main` actual.
 
@@ -58,9 +76,9 @@ El candidato debe partir del último `main`, no de `67ca6bb...`.
 
 Requisitos:
 
-- [ ] todas las PR seleccionadas son mergeables contra el SHA actual de `main`
-- [ ] conflictos con #548 resueltos preservando aislamiento read-only de latencia
-- [ ] no se pierde instrumentación `ai_model` / `duration_ms`
+- [x] todas las PR seleccionadas son mergeables contra el SHA actual de `main`
+- [x] conflictos con #548 resueltos preservando aislamiento read-only de latencia
+- [x] no se pierde instrumentación `ai_model` / `duration_ms`
 - [ ] no se pierde el fix de lifecycle de voz
 - [ ] no se debilitan los gates de CI
 
