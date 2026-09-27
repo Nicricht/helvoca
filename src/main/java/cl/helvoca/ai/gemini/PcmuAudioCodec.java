@@ -49,6 +49,17 @@ public final class PcmuAudioCodec {
         return Base64.getEncoder().encodeToString(mulaw);
     }
 
+    static int meanAbsoluteMulawAmplitude(String base64Mulaw) {
+        byte[] encoded = Base64.getDecoder().decode(base64Mulaw);
+        if (encoded.length == 0) return 0;
+
+        long sum = 0;
+        for (byte value : encoded) {
+            sum += Math.abs((int) decodeMulaw(value));
+        }
+        return (int) (sum / encoded.length);
+    }
+
     static short decodeMulaw(byte value) {
         int ulaw = (~value) & 0xff;
         int sign = ulaw & 0x80;

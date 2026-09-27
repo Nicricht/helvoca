@@ -14,6 +14,20 @@ public class GeminiLiveProperties {
     private String voice = "Despina";
     private String websocketUrl = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
 
+    // Tuned for fast phone dialogue while preserving short natural pauses.
+    private String startOfSpeechSensitivity = "START_SENSITIVITY_HIGH";
+    private int prefixPaddingMs = 60;
+    private String endOfSpeechSensitivity = "END_SENSITIVITY_LOW";
+    private int silenceDurationMs = 300;
+
+    // Local Twilio-side barge-in cuts queued playback before the provider round-trip
+    // confirms the interruption. Gemini VAD remains authoritative for model turns.
+    private boolean localBargeInEnabled = true;
+    private int localBargeInMeanAmplitudeThreshold = 900;
+    private int localBargeInSpeechFrames = 2;
+    private int localBargeInReleaseFrames = 5;
+    private int localBargeInRecentAssistantAudioMs = 1800;
+
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public boolean isCertificationSimulation() { return certificationSimulation; }
@@ -28,6 +42,46 @@ public class GeminiLiveProperties {
     public void setVoice(String voice) { this.voice = voice; }
     public String getWebsocketUrl() { return websocketUrl; }
     public void setWebsocketUrl(String websocketUrl) { this.websocketUrl = websocketUrl; }
+
+    public String getStartOfSpeechSensitivity() {
+        return "START_SENSITIVITY_LOW".equalsIgnoreCase(startOfSpeechSensitivity)
+                ? "START_SENSITIVITY_LOW"
+                : "START_SENSITIVITY_HIGH";
+    }
+    public void setStartOfSpeechSensitivity(String startOfSpeechSensitivity) {
+        this.startOfSpeechSensitivity = startOfSpeechSensitivity;
+    }
+    public int getPrefixPaddingMs() { return clamp(prefixPaddingMs, 0, 1000); }
+    public void setPrefixPaddingMs(int prefixPaddingMs) { this.prefixPaddingMs = prefixPaddingMs; }
+    public String getEndOfSpeechSensitivity() {
+        return "END_SENSITIVITY_HIGH".equalsIgnoreCase(endOfSpeechSensitivity)
+                ? "END_SENSITIVITY_HIGH"
+                : "END_SENSITIVITY_LOW";
+    }
+    public void setEndOfSpeechSensitivity(String endOfSpeechSensitivity) {
+        this.endOfSpeechSensitivity = endOfSpeechSensitivity;
+    }
+    public int getSilenceDurationMs() { return clamp(silenceDurationMs, 100, 2000); }
+    public void setSilenceDurationMs(int silenceDurationMs) { this.silenceDurationMs = silenceDurationMs; }
+
+    public boolean isLocalBargeInEnabled() { return localBargeInEnabled; }
+    public void setLocalBargeInEnabled(boolean localBargeInEnabled) { this.localBargeInEnabled = localBargeInEnabled; }
+    public int getLocalBargeInMeanAmplitudeThreshold() {
+        return clamp(localBargeInMeanAmplitudeThreshold, 100, 20_000);
+    }
+    public void setLocalBargeInMeanAmplitudeThreshold(int value) {
+        this.localBargeInMeanAmplitudeThreshold = value;
+    }
+    public int getLocalBargeInSpeechFrames() { return clamp(localBargeInSpeechFrames, 1, 20); }
+    public void setLocalBargeInSpeechFrames(int value) { this.localBargeInSpeechFrames = value; }
+    public int getLocalBargeInReleaseFrames() { return clamp(localBargeInReleaseFrames, 1, 100); }
+    public void setLocalBargeInReleaseFrames(int value) { this.localBargeInReleaseFrames = value; }
+    public int getLocalBargeInRecentAssistantAudioMs() {
+        return clamp(localBargeInRecentAssistantAudioMs, 250, 10_000);
+    }
+    public void setLocalBargeInRecentAssistantAudioMs(int value) {
+        this.localBargeInRecentAssistantAudioMs = value;
+    }
 
     public boolean ready() {
         return enabled
@@ -47,5 +101,9 @@ public class GeminiLiveProperties {
 
     private static boolean notBlank(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 }
