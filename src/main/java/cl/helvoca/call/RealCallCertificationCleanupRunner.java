@@ -19,10 +19,10 @@ import java.util.UUID;
  * Disabled-by-default, idempotent cleanup for a booking created by an explicitly
  * authorized real outbound certification call.
  *
- * The runner refuses to touch a booking unless the exact completed Twilio
- * OUTBOUND call has a successful BOOKING_CREATED action pointing at the exact
- * booking id, the booking belongs to the same tenant and it was created by the
- * AI call channel.
+ * The runner refuses to touch a booking unless the exact completed Twilio call
+ * id and provider Call SID both match, the allowlisted human number matches,
+ * a successful BOOKING_CREATED action points at the exact booking id, the
+ * booking belongs to the same tenant and it was created by the AI call channel.
  */
 @Component
 public class RealCallCertificationCleanupRunner implements ApplicationRunner {
@@ -31,6 +31,7 @@ public class RealCallCertificationCleanupRunner implements ApplicationRunner {
     private final boolean enabled;
     private final String callIdValue;
     private final String bookingIdValue;
+    private final String providerCallIdValue;
     private final String allowedPhone;
     private final CallSessionRepository calls;
     private final CallActionRepository actions;
@@ -41,6 +42,7 @@ public class RealCallCertificationCleanupRunner implements ApplicationRunner {
             @Value("${RECEPVOZ_CERTIFICATION_CLEANUP_ENABLED:false}") boolean enabled,
             @Value("${RECEPVOZ_CERTIFICATION_CLEANUP_CALL_ID:}") String callIdValue,
             @Value("${RECEPVOZ_CERTIFICATION_CLEANUP_BOOKING_ID:}") String bookingIdValue,
+            @Value("${RECEPVOZ_CERTIFICATION_CLEANUP_PROVIDER_CALL_ID:}") String providerCallIdValue,
             @Value("${TWILIO_CERTIFICATION_ALLOWED_TO:}") String allowedPhone,
             CallSessionRepository calls,
             CallActionRepository actions,
@@ -49,6 +51,7 @@ public class RealCallCertificationCleanupRunner implements ApplicationRunner {
         this.enabled = enabled;
         this.callIdValue = callIdValue;
         this.bookingIdValue = bookingIdValue;
+        this.providerCallIdValue = providerCallIdValue;
         this.allowedPhone = allowedPhone;
         this.calls = calls;
         this.actions = actions;
@@ -62,7 +65,7 @@ public class RealCallCertificationCleanupRunner implements ApplicationRunner {
 
         UUID callId = parse(callIdValue);
         UUID bookingId = parse(bookingIdValue);
-        if (callId == null || bookingId == null || blank(allowedPhone)) {
+        if (callId == null || bookingId == null || blank(providerCallIdValue) || blank(allowedPhone)) {
             log.error("RECEPVOZ_REAL_CERT_CLEANUP blocked: missing_or_invalid_guard");
             return;
         }
@@ -94,8 +97,8 @@ public class RealCallCertificationCleanupRunner implements ApplicationRunner {
                 && call.getBusinessId() != null
                 && call.getStatus() != null
                 && call.getStatus().terminal()
-                && call.getDirection() == CallDirection.OUTBOUND
                 && "twilio".equalsIgnoreCase(call.getTelephonyProvider())
+                && providerCallIdValue.trim().equals(normalize(call.getProviderCallId()))
                 && allowedPhone.trim().equals(normalize(call.getCallerNumber()));
     }
 
