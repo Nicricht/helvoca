@@ -3,6 +3,7 @@ package cl.helvoca.reconciliation;
 import org.json.JSONObject;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
@@ -291,7 +292,7 @@ public class ReconciliationRepository {
                         "commercialStage", safe(rs.getString("commercial_stage"))))), businessId);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ClaimResult claimRepair(UUID businessId,
                                    ReconciliationAnomaly anomaly,
                                    String idempotencyKey) {
@@ -332,7 +333,7 @@ public class ReconciliationRepository {
                 "COMPLETED".equals(status) ? ClaimState.ALREADY_COMPLETED : ClaimState.IN_PROGRESS);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void complete(UUID businessId, UUID actionId) {
         jdbc.update("""
                 UPDATE reconciliation_action
@@ -341,7 +342,7 @@ public class ReconciliationRepository {
                 """, actionId, businessId);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void fail(UUID businessId, UUID actionId, RuntimeException error) {
         String message = error == null || error.getMessage() == null
                 ? "Reconciliation repair failed"
