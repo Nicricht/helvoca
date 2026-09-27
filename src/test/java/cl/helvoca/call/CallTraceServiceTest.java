@@ -45,6 +45,38 @@ class CallTraceServiceTest {
     }
 
     @Test
+    void bookingProposalDoesNotPretendThatBookingAlreadyExists() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallActionRepository actions = mock(CallActionRepository.class);
+        UUID businessId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        CallSession call = new CallSession();
+        when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
+
+        CallTraceService service = new CallTraceService(calls, actions);
+        JSONObject result = new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("operationId", UUID.randomUUID().toString())
+                        .put("confirmationToken", UUID.randomUUID().toString())
+                        .put("requiresConfirmation", true)
+                        .put("bookingCreated", false)
+                        .put("service", "Consulta")
+                        .put("localStart", "2026-09-28T10:00:00-03:00"))
+                .put("error", JSONObject.NULL);
+
+        service.recordTool(businessId, callId, "create_booking", result);
+
+        assertNull(call.getResolution(), "A proposal must not resolve the call as BOOKING_CREATED");
+        ArgumentCaptor<CallAction> captor = ArgumentCaptor.forClass(CallAction.class);
+        verify(actions).save(captor.capture());
+        CallAction action = captor.getValue();
+        assertTrue(action.isSuccess());
+        assertEquals("BOOKING_PROPOSED", action.getActionType());
+        assertNull(action.getEntityId());
+    }
+
+    @Test
     void failedToolDoesNotClaimSuccessfulResolution() {
         CallSessionRepository calls = mock(CallSessionRepository.class);
         CallActionRepository actions = mock(CallActionRepository.class);
