@@ -43,6 +43,7 @@ class TwilioVoiceControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals(twiml, response.getBody());
         verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
+        verify(calls, never()).markCertification(any());
         verify(router).route("+14355652512", "+56911111111", CALL_SID);
         verifyNoInteractions(summaries);
     }
@@ -69,6 +70,8 @@ class TwilioVoiceControllerTest {
         VoiceCallRouter router = mock(VoiceCallRouter.class);
         CallSummaryService summaries = mock(CallSummaryService.class);
         String twiml = "<Response><Connect><Stream url=\"wss://example/ws\"/></Connect></Response>";
+        UUID callId = UUID.randomUUID();
+        when(calls.startInboundCall(CALL_SID, "+56911111111", "+14355652512")).thenReturn(callId);
         when(router.route("+14355652512", "+56911111111", CALL_SID))
                 .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
                         "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
@@ -79,6 +82,7 @@ class TwilioVoiceControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals(twiml, response.getBody());
         verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
+        verify(calls).markCertification(callId);
         verify(router).route("+14355652512", "+56911111111", CALL_SID);
         verifyNoInteractions(summaries);
     }
