@@ -108,8 +108,9 @@ class PaymentSuccessNotificationServiceTest {
         OutboundDispatchOutboxService outbox = mock(OutboundDispatchOutboxService.class);
 
         BusinessPayment payment = succeededPayment();
-        OutboundMessage message = new OutboundMessage();
-        message.setId(UUID.randomUUID());
+        OutboundMessage message = mock(OutboundMessage.class);
+        UUID messageId = UUID.randomUUID();
+        when(message.getId()).thenReturn(messageId);
         when(outbound.prepare(
                 payment.getBusinessId(),
                 payment.getCustomerId(),
@@ -124,7 +125,7 @@ class PaymentSuccessNotificationServiceTest {
         assertEquals(PaymentSuccessNotificationService.Result.QUEUED,
                 service.onVerifiedSuccess(payment));
         verify(providers).require("meta", OutboundMessage.Channel.WHATSAPP);
-        verify(outbox).queue(payment.getBusinessId(), message.getId());
+        verify(outbox).queue(payment.getBusinessId(), messageId);
     }
 
     @Test
