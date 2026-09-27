@@ -160,14 +160,13 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         if (properties.isCertificationSimulation() || context.voiceBakeOff()) return;
 
         String pcm16k;
+        LocalBargeInDetector.Event localActivity = LocalBargeInDetector.Event.NONE;
         try {
             pcm16k = PcmuAudioCodec.twilioMulaw8kToGeminiPcm16k(base64Audio);
-            if (properties.isLocalBargeInEnabled()) {
-                LocalBargeInDetector.Event localActivity = localBargeInDetector.accept(base64Audio);
+            if (properties.isLocalBargeInEnabled() || properties.isHybridVadEnabled()) {
+                localActivity = localBargeInDetector.accept(base64Audio);
                 if (localActivity == LocalBargeInDetector.Event.SPEECH_STARTED) {
                     onLocalSpeechStarted();
-                } else if (localActivity == LocalBargeInDetector.Event.SPEECH_ENDED) {
-                    onLocalSpeechEnded();
                 }
             }
         } catch (IllegalArgumentException e) {
@@ -180,6 +179,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             return;
         }
         sendAudio(pcm16k);
+        if (localActivity == LocalBargeInDetector.Event.SPEECH_ENDED) {
+            onLocalSpeechEnded();
+        }
     }
 
     @Override
@@ -703,6 +705,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     private void onLocalSpeechStarted() {
         responseLatencyPending.set(false);
+        if (!properties.isLocalBargeInEnabled()) return;
+
         long lastAudio = lastAssistantAudioAtMillis;
         long now = System.currentTimeMillis();
         if (lastAudio <= 0L
@@ -720,6 +724,13 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private void onLocalSpeechEnded() {
         localSpeechEndedAtNanos = System.nanoTime();
         responseLatencyPending.set(true);
+        if (!properties.isHybridVadEnabled()) return;
+
+        send(new JSONObject().put("realtimeInput", new JSONObject().put("audioStreamEnd", true)));
+        log.info("VOICE_HYBRID_VAD_END call={} release_frames={} silence_target_ms={}",
+                context.callId(),
+                properties.getLocalBargeInReleaseFrames(),
+                properties.getSilenceDurationMs());
     }
 
     private void recordFirstResponseAudioLatency() {
