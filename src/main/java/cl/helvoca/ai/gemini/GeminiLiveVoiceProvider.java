@@ -78,8 +78,11 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
         session.setEnabled(properties.isEnabled());
         session.setApiKey(properties.getApiKey());
         session.setModel(properties.getModel());
+        String bakeOffVoice = context == null ? null : VoiceBakeOffCatalog.normalize(context.voiceOverride());
         String tenantVoice = context == null ? null : tools.agentVoice(context, null);
-        session.setVoice(AgentVoiceProfile.resolveGemini(tenantVoice, properties.getVoice()));
+        session.setVoice(bakeOffVoice != null
+                ? bakeOffVoice
+                : AgentVoiceProfile.resolveGemini(tenantVoice, properties.getVoice()));
         session.setWebsocketUrl(properties.getWebsocketUrl());
         session.setCertificationCaller(properties.getCertificationCaller());
         session.setCertificationSimulation(
