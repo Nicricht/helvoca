@@ -83,6 +83,42 @@ class RealtimeEndCallToolTest {
     }
 
     @Test
+    void deferredEndCallValidatesContextWithoutHangingUpEarly() throws Exception {
+        UUID businessId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        String streamSid = "MZ33333333333333333333333333333333";
+        RealtimeCallContext context = new RealtimeCallContext(
+                callId, businessId, null, "+56911111111", "+56222222222", streamSid);
+
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallSession call = new CallSession();
+        call.setBusinessId(businessId);
+        call.setStreamSid(streamSid);
+        call.setTelephonyProvider("twilio");
+        call.setProviderCallId(CALL_SID);
+        call.setStatus(CallStatus.IN_PROGRESS);
+        when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
+
+        TwilioCallControl control = mock(TwilioCallControl.class);
+        CallTraceService trace = mock(CallTraceService.class);
+        CertificationGuardedRealtimeToolService service = new CertificationGuardedRealtimeToolService(
+                mock(BusinessRepository.class), mock(CustomerRepository.class), mock(ServiceItemRepository.class),
+                mock(KnowledgeItemRepository.class), mock(BookingRepository.class), calls,
+                mock(BusinessScheduleService.class), mock(BusinessRequestService.class),
+                mock(UnansweredQuestionService.class), mock(CallActionRepository.class),
+                trace, mock(JdbcTemplate.class));
+        setField(service, "twilioCallControl", control);
+
+        JSONObject result = new JSONObject(service.prepareDeferredEndCall(context));
+
+        assertTrue(result.getBoolean("success"));
+        assertTrue(result.getJSONObject("data").getBoolean("pendingPlaybackCompletion"));
+        assertFalse(result.getJSONObject("data").getBoolean("ended"));
+        verifyNoInteractions(control);
+        verify(trace).recordTool(eq(businessId), eq(callId), eq("end_call"), any(JSONObject.class));
+    }
+
+    @Test
     void endCallRejectsMismatchedStreamWithoutTouchingCarrier() throws Exception {
         UUID businessId = UUID.randomUUID();
         UUID callId = UUID.randomUUID();
