@@ -11,7 +11,7 @@ public class GeminiLiveProperties {
     private String certificationCaller = "";
     private String apiKey = "";
     private String model = "gemini-3.8-live";
-    private String voice = "Enceladus";
+    private String voice = "Aoede";
     private String websocketUrl = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
 
     public boolean isEnabled() { return enabled; }
