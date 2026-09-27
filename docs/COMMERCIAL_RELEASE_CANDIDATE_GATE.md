@@ -4,7 +4,9 @@
 
 Esta rama no agrega funcionalidades de producto. Define la puerta única para convertir el estado actual de RecepVoz / Helvoca en un candidato comercial verificable.
 
-Base auditada de `main`: `67ca6bb78d1664dee139aeced17b779ebfcc6284`.
+Base inicial auditada: `main@2bc4265a0c15498f6f6aa0363238d70b632cb4ae`.
+
+Candidato integrado: `release/recepvoz-v1-pilot-rc`. Las ramas comerciales se integran aquí primero; `main` permanece fuera de esta integración hasta que el gate combinado quede en PASS.
 
 Hasta que esta puerta esté en PASS:
 
@@ -19,17 +21,17 @@ Hasta que esta puerta esté en PASS:
 
 | PR | Rama | Responsabilidad | Estado observado |
 | --- | --- | --- | --- |
-| #548 | `perf/latency-certification-readonly-v1` | certificación de latencia read-only | CI verde |
-| #549 | `chore/commercial-release-hardening` | release/CI/protección | CI verde |
-| #550 | `fix/voice-commercial-certification` | voz y ciclo de llamada | CI verde; validación humana pendiente |
-| #551 | `test/golden-journey-commercial-v1` | Golden Journey E2E | CI verde |
-| #552 | `test/saas-billing-commercial-readiness` | billing SaaS | CI en ejecución |
-| #553 | `docs/first-commercial-pilot` | operación primer cliente | CI verde |
-| #554 | `feat/owner-commercial-dashboard-v1` | dashboard del dueño | corrección CI aplicada; revalidación en ejecución |
-| #555 | `feat/commercial-demo-onboarding` | tenant demo/onboarding | corrección de cobertura aplicada; revalidación en ejecución |
-| #556 | `feat/commercial-observability-v1` | trazabilidad/soporte | migración renumerada a V78; revalidación requerida |
+| #548 | `perf/latency-certification-readonly-v1` | certificación de latencia read-only | MERGED en main; CI verde |
+| #549 | `chore/commercial-release-hardening` | release/CI/protección | CI verde; integrado en RC |
+| #550 | `fix/voice-commercial-certification` | voz y ciclo de llamada | CI verde; integrado en RC; validación humana pendiente |
+| #551 | `test/golden-journey-commercial-v1` | Golden Journey E2E | CI verde; integrado en RC |
+| #552 | `test/saas-billing-commercial-readiness` | billing SaaS | CI verde; V77 integrado en RC |
+| #553 | `docs/first-commercial-pilot` | operación primer cliente | CI verde; contenido integrado y formulario reconciliado en RC |
+| #554 | `feat/owner-commercial-dashboard-v1` | dashboard del dueño | CI verde; integrado en RC |
+| #555 | `feat/commercial-demo-onboarding` | tenant demo/onboarding | CI verde; integrado en RC |
+| #556 | `feat/commercial-observability-v1` | trazabilidad/soporte | CI verde; V78 y guardrails reconciliados e integrados en RC |
 
-Los estados son una fotografía del 27-09-2026. La decisión final se toma contra los HEAD exactos, no contra esta tabla histórica.
+Los estados de las ramas aisladas son evidencia previa. La decisión final se toma únicamente contra el HEAD combinado del release candidate y su CI.
 
 ## Colisiones detectadas y resolución
 
