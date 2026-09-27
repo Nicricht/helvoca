@@ -31,7 +31,7 @@ class CallTraceServiceTest {
                         .put("localStart", "2026-09-12T10:00:00-03:00"))
                 .put("error", JSONObject.NULL);
 
-        service.recordTool(businessId, callId, "create_booking", result);
+        service.recordTool(businessId, callId, "create_booking", result, 87L);
 
         assertEquals("BOOKING_CREATED", call.getResolution());
         ArgumentCaptor<CallAction> captor = ArgumentCaptor.forClass(CallAction.class);
@@ -42,6 +42,7 @@ class CallTraceServiceTest {
         assertEquals("BOOKING", action.getEntityType());
         assertEquals(bookingId, action.getEntityId());
         assertTrue(action.getDetail().contains("Consulta"));
+        assertEquals(87L, action.getDurationMs());
     }
 
     @Test
