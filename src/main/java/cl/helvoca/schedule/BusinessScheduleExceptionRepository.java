@@ -10,4 +10,8 @@ import java.util.UUID;
 public interface BusinessScheduleExceptionRepository extends JpaRepository<BusinessScheduleException, UUID> {
     Optional<BusinessScheduleException> findByBusinessIdAndExceptionDate(UUID businessId, LocalDate exceptionDate);
     List<BusinessScheduleException> findAllByBusinessIdOrderByExceptionDateAsc(UUID businessId);
+    List<BusinessScheduleException> findAllByBusinessIdAndExceptionDateBetweenOrderByExceptionDateAsc(
+            UUID businessId,
+            LocalDate from,
+            LocalDate to);
 }

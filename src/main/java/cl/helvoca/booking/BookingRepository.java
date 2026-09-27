@@ -23,6 +23,23 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     );
 
     @Query("""
+        select b from Booking b
+        where b.businessId = :businessId
+          and b.serviceId = :serviceId
+          and b.status <> :cancelled
+          and b.startAt < :rangeEnd
+          and b.endAt > :rangeStart
+        order by b.startAt asc
+        """)
+    List<Booking> findActiveOverlapsInRange(
+            @Param("businessId") UUID businessId,
+            @Param("serviceId") UUID serviceId,
+            @Param("rangeStart") Instant rangeStart,
+            @Param("rangeEnd") Instant rangeEnd,
+            @Param("cancelled") BookingStatus cancelled
+    );
+
+    @Query("""
         select count(b) from Booking b
         where b.businessId = :businessId
           and b.serviceId = :serviceId

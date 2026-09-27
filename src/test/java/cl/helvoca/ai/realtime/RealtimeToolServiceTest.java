@@ -93,22 +93,19 @@ class RealtimeToolServiceTest {
         ServiceItem service = serviceItem(businessId, serviceId, "Consulta", 30);
         when(services.findByIdAndBusinessId(serviceId, businessId)).thenReturn(Optional.of(service));
 
-        when(schedule.listAvailableSlots(businessId, serviceId, 30, requestedDate, 8))
-                .thenReturn(new BusinessScheduleService.DailyAvailability(
-                        true, zone.getId(), requestedDate, List.of()));
-        when(schedule.listAvailableSlots(businessId, serviceId, 30, requestedDate.plusDays(1), 3))
-                .thenReturn(new BusinessScheduleService.DailyAvailability(
-                        true, zone.getId(), requestedDate.plusDays(1), List.of()));
-
         ZonedDateTime localStart = ZonedDateTime.of(nextDate, LocalTime.of(10, 30), zone);
         BusinessScheduleService.AvailableSlot slot = new BusinessScheduleService.AvailableSlot(
                 localStart.toInstant(),
                 localStart.plusMinutes(30).toInstant(),
                 localStart,
                 localStart.plusMinutes(30));
-        when(schedule.listAvailableSlots(businessId, serviceId, 30, nextDate, 3))
-                .thenReturn(new BusinessScheduleService.DailyAvailability(
-                        true, zone.getId(), nextDate, List.of(slot)));
+        when(schedule.listAvailableSlotsWithLookahead(
+                businessId, serviceId, 30, requestedDate, 8, 7, 3))
+                .thenReturn(new BusinessScheduleService.AvailabilityLookahead(
+                        new BusinessScheduleService.DailyAvailability(
+                                true, zone.getId(), requestedDate, List.of()),
+                        new BusinessScheduleService.DailyAvailability(
+                                true, zone.getId(), nextDate, List.of(slot))));
 
         RealtimeCallContext context = new RealtimeCallContext(
                 UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZstream");
@@ -132,9 +129,8 @@ class RealtimeToolServiceTest {
         assertEquals(slot.startAt().toString(),
                 data.getJSONArray("nextAvailableSlots").getJSONObject(0).getString("startAt"));
 
-        verify(schedule).listAvailableSlots(businessId, serviceId, 30, requestedDate, 8);
-        verify(schedule).listAvailableSlots(businessId, serviceId, 30, requestedDate.plusDays(1), 3);
-        verify(schedule).listAvailableSlots(businessId, serviceId, 30, nextDate, 3);
+        verify(schedule).listAvailableSlotsWithLookahead(
+                businessId, serviceId, 30, requestedDate, 8, 7, 3);
         verifyNoMoreInteractions(schedule);
     }
 

@@ -1,5 +1,6 @@
 package cl.helvoca.schedule;
 
+import cl.helvoca.booking.Booking;
 import cl.helvoca.booking.BookingRepository;
 import cl.helvoca.booking.BookingStatus;
 import cl.helvoca.business.Business;
@@ -10,7 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -39,37 +42,83 @@ public class BusinessScheduleService {
                                                 int durationMinutes,
                                                 LocalDate date,
                                                 int maxResults) {
+        return listAvailableSlotsWithLookahead(
+                businessId, serviceId, durationMinutes, date, maxResults, 0, maxResults).requested();
+    }
+
+    /**
+     * Computes the requested day and the first future day with availability in one
+     * read-only transaction. Business hours, exceptions and active bookings are
+     * loaded once for the entire window, avoiding one DB round-trip per candidate
+     * slot and one service call per lookahead day.
+     */
+    @Transactional(readOnly = true)
+    public AvailabilityLookahead listAvailableSlotsWithLookahead(UUID businessId,
+                                                                 UUID serviceId,
+                                                                 int durationMinutes,
+                                                                 LocalDate date,
+                                                                 int requestedMaxResults,
+                                                                 int lookaheadDays,
+                                                                 int lookaheadMaxResults) {
         Business business = requireBusiness(businessId);
         ZoneId zone = ZoneId.of(business.getTimezone());
-        Optional<BusinessScheduleException> exception = exceptions.findByBusinessIdAndExceptionDate(businessId, date);
-        boolean scheduleConfigured = hours.countByBusinessId(businessId) > 0 || exception.isPresent();
-        if (!scheduleConfigured) {
-            return new DailyAvailability(false, zone.getId(), date, List.of());
+        int safeLookaheadDays = Math.max(0, Math.min(lookaheadDays, 31));
+        LocalDate lastDate = date.plusDays(safeLookaheadDays);
+
+        Map<Integer, List<Window>> weeklyWindows = new HashMap<>();
+        for (BusinessHour hour : hours.findAllByBusinessIdOrderByDayOfWeekAscOpenTimeAsc(businessId)) {
+            weeklyWindows.computeIfAbsent(hour.getDayOfWeek(), ignored -> new ArrayList<>())
+                    .add(new Window(hour.getOpenTime(), hour.getCloseTime()));
         }
 
-        List<Window> windows = windowsForDate(businessId, date, exception);
-        List<AvailableSlot> result = new ArrayList<>();
+        Map<LocalDate, BusinessScheduleException> exceptionByDate = new HashMap<>();
+        for (BusinessScheduleException exception :
+                exceptions.findAllByBusinessIdAndExceptionDateBetweenOrderByExceptionDateAsc(
+                        businessId, date, lastDate)) {
+            exceptionByDate.put(exception.getExceptionDate(), exception);
+        }
+
+        Instant rangeStart = date.atStartOfDay(zone).toInstant();
+        Instant rangeEnd = lastDate.plusDays(1).atStartOfDay(zone).toInstant();
+        List<Booking> activeBookings = bookings.findActiveOverlapsInRange(
+                businessId, serviceId, rangeStart, rangeEnd, BookingStatus.CANCELLED);
+
         Instant now = Instant.now();
-        int limit = Math.max(1, Math.min(maxResults, 24));
+        DailyAvailability requested = availabilityForDate(
+                businessId,
+                serviceId,
+                durationMinutes,
+                date,
+                requestedMaxResults,
+                zone,
+                weeklyWindows,
+                exceptionByDate,
+                activeBookings,
+                now);
 
-        for (Window window : windows) {
-            LocalDateTime candidate = LocalDateTime.of(date, window.open());
-            LocalDateTime latestStart = LocalDateTime.of(date, window.close()).minusMinutes(durationMinutes);
-            while (!candidate.isAfter(latestStart) && result.size() < limit) {
-                ZonedDateTime localStart = candidate.atZone(zone);
-                ZonedDateTime localEnd = localStart.plusMinutes(durationMinutes);
-                Instant startAt = localStart.toInstant();
-                Instant endAt = localEnd.toInstant();
-                if (startAt.isAfter(now)
-                        && bookings.countOverlaps(businessId, serviceId, startAt, endAt, BookingStatus.CANCELLED, null) == 0) {
-                    result.add(new AvailableSlot(startAt, endAt, localStart, localEnd));
+        DailyAvailability next = null;
+        if (requested.scheduleConfigured() && requested.slots().isEmpty()) {
+            for (int offset = 1; offset <= safeLookaheadDays; offset++) {
+                LocalDate candidateDate = date.plusDays(offset);
+                DailyAvailability candidate = availabilityForDate(
+                        businessId,
+                        serviceId,
+                        durationMinutes,
+                        candidateDate,
+                        lookaheadMaxResults,
+                        zone,
+                        weeklyWindows,
+                        exceptionByDate,
+                        activeBookings,
+                        now);
+                if (!candidate.slots().isEmpty()) {
+                    next = candidate;
+                    break;
                 }
-                candidate = candidate.plusMinutes(SLOT_STEP_MINUTES);
             }
-            if (result.size() >= limit) break;
         }
 
-        return new DailyAvailability(true, zone.getId(), date, List.copyOf(result));
+        return new AvailabilityLookahead(requested, next);
     }
 
     @Transactional(readOnly = true)
@@ -90,6 +139,71 @@ public class BusinessScheduleService {
 
         return windowsForDate(businessId, date, exception).stream()
                 .anyMatch(window -> contains(window, localStart.toLocalTime(), localEnd.toLocalTime()));
+    }
+
+    private DailyAvailability availabilityForDate(UUID businessId,
+                                                  UUID serviceId,
+                                                  int durationMinutes,
+                                                  LocalDate date,
+                                                  int maxResults,
+                                                  ZoneId zone,
+                                                  Map<Integer, List<Window>> weeklyWindows,
+                                                  Map<LocalDate, BusinessScheduleException> exceptionByDate,
+                                                  List<Booking> activeBookings,
+                                                  Instant now) {
+        BusinessScheduleException exception = exceptionByDate.get(date);
+        boolean scheduleConfigured = !weeklyWindows.isEmpty() || exception != null;
+        if (!scheduleConfigured) {
+            return new DailyAvailability(false, zone.getId(), date, List.of());
+        }
+
+        List<Window> windows;
+        if (exception != null) {
+            windows = exception.isClosed()
+                    ? List.of()
+                    : List.of(new Window(exception.getOpenTime(), exception.getCloseTime()));
+        } else {
+            windows = weeklyWindows.getOrDefault(date.getDayOfWeek().getValue(), List.of());
+        }
+
+        List<AvailableSlot> result = new ArrayList<>();
+        int limit = Math.max(1, Math.min(maxResults, 24));
+
+        for (Window window : windows) {
+            if (window.open() == null || window.close() == null) continue;
+            LocalDateTime candidate = LocalDateTime.of(date, window.open());
+            LocalDateTime latestStart = LocalDateTime.of(date, window.close()).minusMinutes(durationMinutes);
+            while (!candidate.isAfter(latestStart) && result.size() < limit) {
+                ZonedDateTime localStart = candidate.atZone(zone);
+                ZonedDateTime localEnd = localStart.plusMinutes(durationMinutes);
+                Instant startAt = localStart.toInstant();
+                Instant endAt = localEnd.toInstant();
+                if (startAt.isAfter(now)
+                        && noOverlap(activeBookings, businessId, serviceId, startAt, endAt)) {
+                    result.add(new AvailableSlot(startAt, endAt, localStart, localEnd));
+                }
+                candidate = candidate.plusMinutes(SLOT_STEP_MINUTES);
+            }
+            if (result.size() >= limit) break;
+        }
+
+        return new DailyAvailability(true, zone.getId(), date, List.copyOf(result));
+    }
+
+    private static boolean noOverlap(List<Booking> activeBookings,
+                                     UUID businessId,
+                                     UUID serviceId,
+                                     Instant startAt,
+                                     Instant endAt) {
+        for (Booking booking : activeBookings) {
+            if (!businessId.equals(booking.getBusinessId())) continue;
+            if (!serviceId.equals(booking.getServiceId())) continue;
+            if (booking.getStatus() == BookingStatus.CANCELLED) continue;
+            if (booking.getStartAt().isBefore(endAt) && booking.getEndAt().isAfter(startAt)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private List<Window> windowsForDate(UUID businessId,
@@ -129,4 +243,7 @@ public class BusinessScheduleService {
                                     String timezone,
                                     LocalDate date,
                                     List<AvailableSlot> slots) {}
+
+    public record AvailabilityLookahead(DailyAvailability requested,
+                                        DailyAvailability nextAvailable) {}
 }

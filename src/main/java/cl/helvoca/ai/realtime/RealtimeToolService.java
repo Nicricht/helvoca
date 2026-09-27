@@ -371,8 +371,9 @@ public class RealtimeToolService {
         UUID serviceId = uuid(required(args, "serviceId"));
         LocalDate date = localDate(required(args, "date"));
         ServiceItem service = requireActiveService(context.businessId(), serviceId);
-        BusinessScheduleService.DailyAvailability availability = schedule.listAvailableSlots(
-                context.businessId(), serviceId, service.getDurationMinutes(), date, 8);
+        BusinessScheduleService.AvailabilityLookahead lookup = schedule.listAvailableSlotsWithLookahead(
+                context.businessId(), serviceId, service.getDurationMinutes(), date, 8, 7, 3);
+        BusinessScheduleService.DailyAvailability availability = lookup.requested();
 
         JSONArray slots = slotJson(availability.slots());
         JSONObject data = new JSONObject()
@@ -402,16 +403,10 @@ public class RealtimeToolService {
             data.put("availabilityStatus", "AVAILABLE");
         }
 
-        if (slots.isEmpty() && availability.scheduleConfigured()) {
-            for (int offset = 1; offset <= 7; offset++) {
-                LocalDate nextDate = date.plusDays(offset);
-                BusinessScheduleService.DailyAvailability next = schedule.listAvailableSlots(
-                        context.businessId(), serviceId, service.getDurationMinutes(), nextDate, 3);
-                if (next.slots().isEmpty()) continue;
-                data.put("nextAvailableDate", nextDate.toString());
-                data.put("nextAvailableSlots", slotJson(next.slots()));
-                break;
-            }
+        BusinessScheduleService.DailyAvailability next = lookup.nextAvailable();
+        if (slots.isEmpty() && availability.scheduleConfigured() && next != null) {
+            data.put("nextAvailableDate", next.date().toString());
+            data.put("nextAvailableSlots", slotJson(next.slots()));
         }
 
         return success(data);

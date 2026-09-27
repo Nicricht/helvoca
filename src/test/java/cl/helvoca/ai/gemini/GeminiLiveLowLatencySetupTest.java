@@ -23,6 +23,23 @@ import static org.mockito.Mockito.when;
 class GeminiLiveLowLatencySetupTest {
 
     @Test
+    void latencyBudgetsHaveFastProductionDefaultsAndSafeBounds() {
+        GeminiLiveProperties properties = new GeminiLiveProperties();
+
+        assertEquals(1200, properties.getToolLatencyBudgetMs());
+        assertEquals(1800, properties.getToolBatchLatencyBudgetMs());
+        assertEquals(3000, properties.getResponseLatencyBudgetMs());
+
+        properties.setToolLatencyBudgetMs(1);
+        properties.setToolBatchLatencyBudgetMs(99_999);
+        properties.setResponseLatencyBudgetMs(1);
+
+        assertEquals(100, properties.getToolLatencyBudgetMs());
+        assertEquals(30_000, properties.getToolBatchLatencyBudgetMs());
+        assertEquals(250, properties.getResponseLatencyBudgetMs());
+    }
+
+    @Test
     void setupAllowsNaturalPausesWithoutDisablingBargeIn() {
         GeminiLiveProperties properties = new GeminiLiveProperties();
         properties.setEnabled(true);
