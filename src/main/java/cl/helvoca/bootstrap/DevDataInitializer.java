@@ -47,6 +47,7 @@ import java.util.UUID;
 public class DevDataInitializer implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(DevDataInitializer.class);
     private static final String DEMO_BUSINESS_NAME = "Barbería Norte Demo";
+    private static final String LEGACY_DEMO_BUSINESS_NAME = "Helvoca Demo Business";
     private static final String DEMO_TIMEZONE = "America/Santiago";
     private static final String DEMO_BOOKING_PREFIX = "DEMO_FIXTURE:";
 
@@ -117,9 +118,10 @@ public class DevDataInitializer implements CommandLineRunner {
         if (existingAdmin.isPresent()) {
             Business existingBusiness = existingAdmin.get().getBusiness();
             if (existingBusiness != null) {
-                ensureDemoBusinessBasics(existingBusiness);
+                boolean legacyDemoFixture = LEGACY_DEMO_BUSINESS_NAME.equals(existingBusiness.getName());
+                ensureDemoBusinessBasics(existingBusiness, legacyDemoFixture);
                 if (subscriptions != null) subscriptions.startBasicTrial(existingBusiness.getId());
-                ensureDemoTenant(existingBusiness.getId());
+                ensureDemoTenant(existingBusiness.getId(), legacyDemoFixture);
             }
             log.info("Commercial demo tenant seed is ready without real phone, WhatsApp or payment providers");
             return;
@@ -142,34 +144,21 @@ public class DevDataInitializer implements CommandLineRunner {
         admin.getRoles().add(roles.findByCode(RoleCode.BUSINESS_ADMIN).orElseThrow());
         users.saveAndFlush(admin);
 
-        ensureDemoTenant(business.getId());
+        ensureDemoTenant(business.getId(), false);
         log.info("Commercial demo tenant was created and validated without activating external providers");
     }
 
-    private void ensureDemoBusinessBasics(Business business) {
-        boolean changed = false;
-        if (!DEMO_BUSINESS_NAME.equals(business.getName())) {
-            business.setName(DEMO_BUSINESS_NAME);
-            changed = true;
-        }
-        if (!DEMO_TIMEZONE.equals(business.getTimezone())) {
-            business.setTimezone(DEMO_TIMEZONE);
-            changed = true;
-        }
-        if (!"es".equals(business.getLanguage())) {
-            business.setLanguage("es");
-            changed = true;
-        }
-        if (business.getHumanTransferPhone() != null) {
-            business.setHumanTransferPhone(null);
-            changed = true;
-        }
-        if (changed) businesses.saveAndFlush(business);
+    private void ensureDemoBusinessBasics(Business business, boolean legacyDemoFixture) {
+        if (!legacyDemoFixture) return;
+        business.setName(DEMO_BUSINESS_NAME);
+        business.setTimezone(DEMO_TIMEZONE);
+        business.setLanguage("es");
+        businesses.saveAndFlush(business);
     }
 
-    private void ensureDemoTenant(UUID businessId) {
+    private void ensureDemoTenant(UUID businessId, boolean legacyDemoFixture) {
         ensureDemoProfile(businessId);
-        ensureDemoCatalog(businessId);
+        ensureDemoCatalog(businessId, legacyDemoFixture);
         ensureDemoSchedule(businessId);
         ensureDemoKnowledge(businessId);
         ensureDemoAgent(businessId);
@@ -199,10 +188,10 @@ public class DevDataInitializer implements CommandLineRunner {
         profiles.saveAndFlush(profile);
     }
 
-    private void ensureDemoCatalog(UUID businessId) {
+    private void ensureDemoCatalog(UUID businessId, boolean legacyDemoFixture) {
         if (businessId == null || services == null || catalog == null) return;
 
-        deactivateLegacyDemoServices(businessId);
+        if (legacyDemoFixture) deactivateLegacyDemoServices(businessId);
         ensureService(businessId, "Corte clásico",
                 "Corte tradicional con asesoría breve de estilo.", 45, "15990");
         ensureService(businessId, "Corte + barba",
