@@ -40,3 +40,28 @@ Pausing a pilot must stop these effects without weakening the existing journey, 
 ## Certification
 
 The branch must keep the existing Pilot End-to-End Certification V1, Full Gate, PostgreSQL/Flyway/Testcontainers, JaCoCo, and Playwright green. No coverage exception and no `continue-on-error` is allowed.
+
+
+## GO / NO-GO preflight
+
+The tenant-scoped endpoint `GET /api/v1/operations/pilot-preflight` composes the existing readiness, activation, lifecycle, inventory, metrics, and V6 reconciliation surfaces into one launch decision.
+
+A `GO` requires:
+- all technical readiness checks to pass;
+- all required activation checklist steps to be complete;
+- pilot responsibility, objective, contact, and planned end to be configured;
+- the tenant to be enrolled behind the external-effect guard;
+- the global switch to remain safe for the current pilot lifecycle;
+- tracked sellable inventory to be available;
+- no open out-of-stock blocker;
+- no V6 reconciliation anomaly.
+
+The response also reports the current traffic mode:
+- `BLOCKED_GLOBAL`
+- `BLOCKED_TENANT`
+- `LIVE_ALLOWED`
+- `NOT_ENROLLED`
+
+The dashboard renders this as the **Launch cage** card alongside orders, payment state, inventory availability, stock alerts, and reconciliation anomalies.
+
+A `GO` is readiness evidence only. It never enables providers, changes the global switch, starts a pilot, or deploys code.
