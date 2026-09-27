@@ -73,6 +73,28 @@ class RealtimeToolServiceTest {
     }
 
     @Test
+    void executePersistsMeasuredLatencyWhenTraceIsAvailable() throws Exception {
+        UUID businessId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        RealtimeToolService tools = service();
+        ServiceItemRepository serviceItems = services(tools);
+        CallTraceService trace = mock(CallTraceService.class);
+        Field traceField = RealtimeToolService.class.getDeclaredField("trace");
+        traceField.setAccessible(true);
+        traceField.set(tools, trace);
+        when(serviceItems.findAllByBusinessIdOrderByNameAsc(businessId)).thenReturn(List.of());
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                callId, businessId, null, "+56911111111", "+56222222222", "MZ-observability");
+
+        JSONObject result = new JSONObject(tools.execute(context, "list_services", "{}"));
+
+        assertTrue(result.getBoolean("success"));
+        verify(trace).recordTool(
+                eq(businessId), eq(callId), eq("list_services"), any(JSONObject.class), longThat(value -> value >= 0L));
+    }
+
+    @Test
     void buildInstructionsKeepsChileanStyleFromInitialGreeting() {
         UUID businessId = UUID.randomUUID();
         RealtimeToolService tools = service();
