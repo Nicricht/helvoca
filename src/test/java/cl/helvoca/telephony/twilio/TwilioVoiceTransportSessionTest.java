@@ -6,8 +6,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
@@ -28,7 +26,7 @@ class TwilioVoiceTransportSessionTest {
         assertTrue(transport.endAfterPlayback());
 
         ArgumentCaptor<TextMessage> sent = ArgumentCaptor.forClass(TextMessage.class);
-        verify(socket, atLeast(2)).sendMessage(sent.capture());
+        verify(socket, times(2)).sendMessage(sent.capture());
         String markName = sent.getAllValues().stream()
                 .map(TextMessage::getPayload)
                 .map(JSONObject::new)
@@ -45,18 +43,6 @@ class TwilioVoiceTransportSessionTest {
         transport.sendAudio("MZ-test", "after-hangup");
         transport.clearPlayback("MZ-test");
 
-        List<JSONObject> messages = sent.getAllValues().stream()
-                .map(TextMessage::getPayload)
-                .map(JSONObject::new)
-                .toList();
-
-        assertTrue(messages.stream()
-                .filter(message -> "media".equals(message.optString("event")))
-                .noneMatch(message -> "after-hangup".equals(
-                        message.getJSONObject("media").optString("payload"))));
-        assertTrue(messages.stream()
-                .filter(message -> "clear".equals(message.optString("event")))
-                .findAny()
-                .isEmpty());
+        verify(socket, times(2)).sendMessage(any(TextMessage.class));
     }
 }
