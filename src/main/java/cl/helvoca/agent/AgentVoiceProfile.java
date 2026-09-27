@@ -96,10 +96,15 @@ public enum AgentVoiceProfile {
     }
 
     public static String resolveGemini(String storedSelection, String fallback) {
-        if (storedSelection == null || storedSelection.isBlank()) return fallback;
-        Optional<AgentVoiceProfile> profile = fromSelection(storedSelection);
+        String candidate = storedSelection == null || storedSelection.isBlank()
+                ? fallback
+                : storedSelection;
+        if (candidate == null || candidate.isBlank()) return fallback;
+
+        Optional<AgentVoiceProfile> profile = fromSelection(candidate);
         if (profile.isPresent()) return profile.get().geminiVoice;
-        String rawGemini = canonicalGeminiVoice(storedSelection);
+
+        String rawGemini = canonicalGeminiVoice(candidate);
         return rawGemini == null ? fallback : rawGemini;
     }
 
