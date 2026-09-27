@@ -105,7 +105,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
         if (operationCapabilities != null) {
             instructions += CommercialToolDefinitions.instructions(operationCapabilities.enabled(context.businessId()));
         }
-        instructions += "\nPara create_booking usa siempre dos fases: primero llama con serviceId/startAt para obtener una propuesta, presenta esas condiciones y pide confirmación explícita; solo después vuelve a llamar create_booking con el operationId y confirmationToken devueltos. Una respuesta sin bookingId es solo una propuesta y NO significa que exista una reserva.";
+        instructions += "\nPara create_booking usa siempre dos fases. Reutiliza servicio, fecha, hora, nombre, teléfono y demás datos que el cliente YA entregó en esta conversación; no vuelvas a preguntarlos mientras sigan vigentes. Primero llama con serviceId/startAt para obtener la propuesta. Solo cuando el backend devuelva operationId, confirmationToken y requiresConfirmation=true pide UNA confirmación breve. Tras un sí claro ejecuta inmediatamente la segunda fase con esos identificadores, sin volver a preguntar ni recapitular toda la reserva. Una respuesta sin bookingId es solo una propuesta y NO significa que exista una reserva.";
         instructions += "\nSi el cliente pide que continúes o envíes contenido al WhatsApp del MISMO número desde el que llama, confirma verbalmente que ese número es su WhatsApp y solo después usa verify_caller_whatsapp con confirmedSameNumber=true. Luego usa send_whatsapp_operation con el mismo operationId. Nunca marques el número como verificado por inferencia.";
         return instructions;
     }
