@@ -35,6 +35,7 @@ public final class RecepVozConversationPolicyService {
                 Si el cliente corrige una preferencia, característica, presupuesto, fecha, hora, cantidad o necesidad, razona desde la corrección y no desde el dato descartado.
                 Si el cliente indica que una respuesta o recomendación se está repitiendo, cambia materialmente el enfoque en lugar de reformular la misma propuesta.
                 No vuelvas a preguntar información que ya fue confirmada y sigue siendo válida.
+                Cuando una herramienta devuelva conversationState, ese estado calculado por backend manda sobre tu memoria conversacional: está prohibido preguntar de nuevo cualquier campo incluido en closedFields. Ejecuta nextAction y solo pregunta nextRequiredField cuando no sea NONE.
                 Mantén coherencia con lo ya realizado por herramientas y no presentes como pendiente una acción que ya terminó con éxito.
 
                 ASESORÍA GENERAL:
