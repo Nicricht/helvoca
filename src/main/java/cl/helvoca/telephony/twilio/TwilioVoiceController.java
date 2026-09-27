@@ -3,10 +3,13 @@ package cl.helvoca.telephony.twilio;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.ai.gemini.VoiceBakeOffCatalog;
 import cl.helvoca.common.NotFoundException;
+import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
+import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.telephony.CallCapacityExceededException;
 import cl.helvoca.voice.VoiceCallRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +30,12 @@ public class TwilioVoiceController {
     private final VoiceCallRouter voiceRouter;
     private final CallSummaryService summaries;
     private final TwilioProperties properties;
+
+    @Autowired(required = false)
+    private ControlledPilotExternalEffectGuard pilotExternalEffects;
+
+    @Autowired(required = false)
+    private PhoneNumberRepository pilotPhoneNumbers;
 
     @Value("${TWILIO_CERTIFICATION_VOICE_OVERRIDE:}")
     private String certificationVoiceOverride;
@@ -108,6 +117,27 @@ public class TwilioVoiceController {
                                          String callSid,
                                          String direction,
                                          String voiceOverride) {
+        if (pilotExternalEffects != null && pilotPhoneNumbers != null) {
+            UUID businessId = pilotPhoneNumbers.findByPhoneNumberAndActiveTrue(businessPhone)
+                    .map(phone -> phone.getBusinessId())
+                    .orElse(null);
+            if (businessId != null) {
+                ControlledPilotExternalEffectGuard.Decision pilotDecision =
+                        pilotExternalEffects.evaluate(
+                                businessId,
+                                ControlledPilotExternalEffectGuard.Effect.VOICE);
+                if (!pilotDecision.allowed()) {
+                    log.warn(
+                            "Blocking Twilio {} call={} by controlled pilot guard code={} status={}",
+                            direction,
+                            callSid,
+                            pilotDecision.code(),
+                            pilotDecision.status());
+                    return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+                }
+            }
+        }
+
         if (!"outbound-test".equals(direction)) {
             try {
                 UUID callId = calls.startInboundCall(callSid, callerPhone, businessPhone);
