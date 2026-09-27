@@ -43,6 +43,19 @@ Orden obligatorio:
 2. #556 usa `V78__commercial_observability_runtime_metadata.sql`;
 3. #556 no se integra antes de #552.
 
+### Guard de certificación de latencia vs observabilidad
+
+#548 y #556 modifican `CertificationGuardedRealtimeToolService.java` y su test.
+
+Orden obligatorio:
+
+1. integrar primero #548;
+2. reconciliar #556 encima conservando el modo `latency-` estrictamente read-only y su rechazo backend de mutaciones ocultas;
+3. conservar la instrumentación/trazabilidad añadida por #556;
+4. ejecutar de nuevo `CertificationGuardedRealtimeToolServiceTest`, el pack de latencia, el Golden Journey y Full Gate sobre el HEAD reconciliado.
+
+No aceptar una resolución automática que elimine silenciosamente guardrails o trazabilidad.
+
 ### Formulario de onboarding
 
 #553 y #555 modifican `docs/FIRST_CUSTOMER_ONBOARDING_FORM.md`.
