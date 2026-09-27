@@ -158,7 +158,10 @@ public final class ConversationQualityEngine {
                 || type.contains("CANCEL")
                 || type.contains("RESCHEDULE")
                 || type.contains("TRANSFER")
-                || type.contains("ORDER");
+                || type.contains("ORDER")
+                || type.contains("INVENTORY")
+                || type.contains("STOCK")
+                || type.contains("RESERVATION");
     }
 
     private static boolean assistant(Turn turn) {
