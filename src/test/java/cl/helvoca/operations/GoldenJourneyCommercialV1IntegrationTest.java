@@ -364,7 +364,7 @@ class GoldenJourneyCommercialV1IntegrationTest {
         otherCall = calls.saveAndFlush(otherCall);
 
         RealtimeCallContext otherContext = context(otherCall);
-        JSONObject crossTenant = execute(otherContext, "reschedule_booking",
+        JSONObject crossTenant = rawExecute(otherContext, "reschedule_booking",
                 new JSONObject()
                         .put("bookingId", bookingId.toString())
                         .put("newStartAt", expectedStart.plusSeconds(3600).toString()));
@@ -449,11 +449,15 @@ class GoldenJourneyCommercialV1IntegrationTest {
     }
 
     private JSONObject execute(RealtimeCallContext context, String toolName, JSONObject args) {
-        JSONObject result = new JSONObject(tools.execute(context, toolName, args.toString()));
+        JSONObject result = rawExecute(context, toolName, args);
         if (!result.optBoolean("success", false)) {
             fail(toolName + " failed unexpectedly: " + result);
         }
         return result;
+    }
+
+    private JSONObject rawExecute(RealtimeCallContext context, String toolName, JSONObject args) {
+        return new JSONObject(tools.execute(context, toolName, args.toString()));
     }
 
     private void say(List<ConversationQualityEngine.Turn> dialogue,
