@@ -201,6 +201,36 @@ class RealCallCertificationCleanupRunnerTest {
     }
 
     @Test
+    void refusesCleanupWhenLinkedBookingNoLongerExists() {
+        UUID callId = UUID.randomUUID();
+        UUID businessId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        String allowed = "+56966939611";
+
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallActionRepository actions = mock(CallActionRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSession call = safeCall(callId, businessId, allowed);
+
+        CallAction created = new CallAction();
+        created.setActionType("BOOKING_CREATED");
+        created.setSuccess(true);
+        created.setEntityId(bookingId);
+
+        when(calls.findById(callId)).thenReturn(Optional.of(call));
+        when(actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(List.of(created));
+        when(bookings.findByIdAndBusinessId(bookingId, businessId)).thenReturn(Optional.empty());
+
+        RealCallCertificationCleanupRunner runner = new RealCallCertificationCleanupRunner(
+                true, callId.toString(), bookingId.toString(), allowed,
+                calls, actions, bookings, new TenantDatabaseContext());
+
+        runner.run(mock(ApplicationArguments.class));
+
+        verify(bookings, never()).saveAndFlush(any());
+    }
+
+    @Test
     void refusesNonAiCallBookingEvenWhenActionIdMatches() {
         UUID callId = UUID.randomUUID();
         UUID businessId = UUID.randomUUID();
