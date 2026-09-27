@@ -73,19 +73,22 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("RecepVoz"));
         assertTrue(instructions.contains("[RECEPVOZ_CALL_CONNECTED]"));
         assertTrue(instructions.contains("ESPAÑOL DE CHILE"));
-        assertTrue(instructions.contains("como locutora"));
+        assertTrue(instructions.contains("CERO CALL CENTER"));
         assertTrue(instructions.contains("NO vuelvas a ejecutar la misma herramienta"));
-        assertTrue(instructions.contains("entonación marcadamente chilena santiaguina"));
-        assertTrue(instructions.contains("voz claramente femenina y adulta"));
-        assertTrue(instructions.contains("Debe sentirse inequívocamente como mujer"));
-        assertTrue(instructions.contains("no en contenido sexual ni coqueteo explícito"));
+        assertTrue(instructions.contains("cadencia urbana de Santiago de Chile"));
+        assertTrue(instructions.contains("voz claramente femenina, joven-adulta y luminosa"));
+        assertTrue(instructions.contains("mujer joven de Santiago"));
+        assertTrue(instructions.contains("sonrisa audible"));
         assertTrue(instructions.contains("DESDE LA PRIMERA SÍLABA"));
         assertTrue(instructions.contains("Ya, cuéntame, ¿en qué te ayudo?"));
         assertTrue(instructions.contains("me pueda colaborar"));
-        assertTrue(instructions.contains("habla MUY RÁPIDO"));
+        assertTrue(instructions.contains("habla rápido-natural"));
         assertTrue(instructions.contains("LATENCIA VOCAL"));
-        assertTrue(instructions.contains("No uses suspiros teatrales"));
-        assertTrue(instructions.contains("La sensualidad está en el timbre y la entonación, nunca en hacer más lenta la conversación"));
+        assertTrue(instructions.contains("No uses suspiros"));
+        assertTrue(instructions.contains("qué agradable hablar con ella"));
+        assertTrue(instructions.contains("está prohibido sonar como operadora"));
+        assertTrue(instructions.contains("qué rico saludarte"));
+        assertTrue(instructions.contains("ALEGRÍA COMERCIAL"));
         assertTrue(instructions.contains("está prohibido hacer dos veces la misma pregunta"));
         assertTrue(instructions.contains("mantén exactamente el mismo género"));
         assertTrue(instructions.contains("find_caller antes de pedir nombre o teléfono"));
@@ -812,8 +815,8 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
-    void defaultLiveVoiceUsesFeminineProfileForSeductiveDelivery() {
-        assertEquals("Despina", new GeminiLiveProperties().getVoice());
+    void defaultLiveVoiceUsesYouthfulFemaleProfile() {
+        assertEquals("Leda", new GeminiLiveProperties().getVoice());
     }
 
     @Test

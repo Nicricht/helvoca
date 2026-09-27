@@ -29,9 +29,11 @@ class AgentVoiceProfileTest {
     }
 
     @Test
-    void sensualProfilesRemainDistinctAndResolvePerProvider() {
+    void commercialVoiceProfilesRemainDistinctAndResolvePerProvider() {
         assertEquals("seductive_female", AgentVoiceProfile.normalizeForStorage("seductive_female"));
-        assertEquals("Despina", AgentVoiceProfile.resolveGemini("seductive_female", "Kore"));
+        assertEquals("Leda", AgentVoiceProfile.resolveGemini("seductive_female", "Kore"));
+        assertEquals("Joven chilena", AgentVoiceProfile.SEDUCTIVE_FEMALE.displayName());
+        assertTrue(AgentVoiceProfile.SEDUCTIVE_FEMALE.description().contains("joven-adulta"));
         assertEquals("coral", AgentVoiceProfile.resolveOpenAi("seductive_female", "alloy"));
 
         assertEquals("seductive_male", AgentVoiceProfile.normalizeForStorage("seductive_male"));
