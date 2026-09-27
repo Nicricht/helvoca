@@ -65,25 +65,32 @@ public class TwilioVoiceController {
         return route(from, to, callSid, "outbound-test", voiceOverride);
     }
 
-    public ResponseEntity<String> inboundCertification(String callSid, String from, String to) {
-        return inboundCertification(callSid, from, to, null);
-    }
-
     @PostMapping(value = "/inbound-certification", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> inboundCertification(@RequestParam("CallSid") String callSid,
                                                        @RequestParam("From") String from,
-                                                       @RequestParam("To") String to,
-                                                       @RequestParam(value = "token", required = false) String token) {
-        boolean oneShotAuthorized = certificationIngressTokenGate != null
-                && certificationIngressTokenGate.authorize(token, callSid, from, to);
-        if (!properties.isCertificationIngressEnabled() && !oneShotAuthorized) {
+                                                       @RequestParam("To") String to) {
+        if (!properties.isCertificationIngressEnabled()) {
             log.warn("Blocked disabled Twilio certification ingress call={}", callSid);
             return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
-        if (oneShotAuthorized) {
-            log.info("Authorized one-shot Twilio certification ingress call={}", callSid);
+        return route(from, to, callSid, "inbound-certification", null);
+    }
+
+    @PostMapping(value = "/inbound-certification/{token}",
+            consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+            produces = MediaType.APPLICATION_XML_VALUE)
+    public ResponseEntity<String> oneShotInboundCertification(@PathVariable String token,
+                                                              @RequestParam("CallSid") String callSid,
+                                                              @RequestParam("From") String from,
+                                                              @RequestParam("To") String to) {
+        boolean authorized = certificationIngressTokenGate != null
+                && certificationIngressTokenGate.authorize(token, callSid, from, to);
+        if (!authorized) {
+            log.warn("Blocked unauthorized one-shot Twilio certification ingress call={}", callSid);
+            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
+        log.info("Authorized one-shot Twilio certification ingress call={}", callSid);
         return route(from, to, callSid, "inbound-certification", null);
     }
 
