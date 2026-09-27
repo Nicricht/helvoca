@@ -143,6 +143,36 @@ class TwilioCertificationCommandStoreTest {
     }
 
     @Test
+    void latencyCertificationLookupRejectsInvalidCallSidBeforeDatabase() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+
+        assertFalse(store.isLatencyCertificationProviderCall("bad"));
+
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void latencyCertificationLookupMatchesLatencyRunPrefix() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(1);
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+
+        assertTrue(store.isLatencyCertificationProviderCall(
+                "CA0123456789abcdef0123456789abcdef"));
+    }
+
+    @Test
+    void latencyCertificationLookupReturnsFalseWhenNoRunMatches() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(0);
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+
+        assertFalse(store.isLatencyCertificationProviderCall(
+                "CA0123456789abcdef0123456789abcdef"));
+    }
+
+    @Test
     void emptyQueueReturnsNoClaim() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<String>>any(), any(), any()))
