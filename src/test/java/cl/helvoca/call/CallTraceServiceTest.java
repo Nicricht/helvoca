@@ -13,6 +13,32 @@ import static org.mockito.Mockito.*;
 class CallTraceServiceTest {
 
     @Test
+    void callResponseExposesExactAiModelUsedByTheCall() {
+        CallSession call = new CallSession();
+        call.setAiProvider("gemini");
+        call.setAiModel("models/gemini-live-2.5-flash-native-audio");
+
+        CallResponse response = CallResponse.from(call);
+
+        assertEquals("gemini", response.aiProvider());
+        assertEquals("models/gemini-live-2.5-flash-native-audio", response.aiModel());
+    }
+
+    @Test
+    void callActionResponseExposesMeasuredToolLatency() {
+        CallAction action = new CallAction();
+        action.setActionType("AVAILABILITY_CHECKED");
+        action.setSuccess(true);
+        action.setDurationMs(143L);
+
+        CallActionResponse response = CallActionResponse.from(action);
+
+        assertEquals("AVAILABILITY_CHECKED", response.actionType());
+        assertTrue(response.success());
+        assertEquals(143L, response.durationMs());
+    }
+
+    @Test
     void successfulBookingPersistsLinkedActionAndResolution() {
         CallSessionRepository calls = mock(CallSessionRepository.class);
         CallActionRepository actions = mock(CallActionRepository.class);
