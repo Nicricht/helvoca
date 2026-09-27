@@ -49,7 +49,7 @@ class CustomerCommercialTimelineMappingTest {
         assertEquals("Producto · 2 unidades", invoke(detail, "Producto", null, 2, null));
         assertEquals("Producto · Variante · 1 unidad",
                 invoke(detail, "Producto", "Variante", 1, variantId));
-        assertEquals("2 unidades", invoke(detail, " ", "Variante", 2, variantId));
+        assertEquals("Variante · 2 unidades", invoke(detail, " ", "Variante", 2, variantId));
         assertEquals("Producto · 2 unidades", invoke(detail, "Producto", " ", 2, variantId));
     }
 
