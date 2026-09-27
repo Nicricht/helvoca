@@ -1,6 +1,9 @@
 package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.call.CallSummaryService;
+import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
+import cl.helvoca.phone.PhoneNumber;
+import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.telephony.CallCapacityExceededException;
 import cl.helvoca.voice.VoiceCallRouter;
 import org.junit.jupiter.api.Test;
@@ -157,6 +160,75 @@ class TwilioVoiceControllerTest {
         assertEquals(SILENT_HANGUP, response.getBody());
         verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
         verifyNoInteractions(summaries);
+    }
+
+    @Test
+    void controlledPilotGuardSilentlyHangsUpBeforeStartingOrRoutingCall() {
+        UUID businessId = UUID.randomUUID();
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        ControlledPilotExternalEffectGuard guard = mock(ControlledPilotExternalEffectGuard.class);
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+
+        when(phones.findByPhoneNumberAndActiveTrue("+14355652512"))
+                .thenReturn(Optional.of(phone));
+        when(guard.evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.VOICE))
+                .thenReturn(new ControlledPilotExternalEffectGuard.Decision(
+                        false,
+                        true,
+                        "PILOT_NOT_RUNNING",
+                        "PAUSED",
+                        ControlledPilotExternalEffectGuard.Effect.VOICE));
+
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        ReflectionTestUtils.setField(controller, "pilotExternalEffects", guard);
+        ReflectionTestUtils.setField(controller, "pilotPhoneNumbers", phones);
+
+        var response = controller.incoming(
+                CALL_SID, "+56911111111", "+14355652512");
+
+        assertEquals(SILENT_HANGUP, response.getBody());
+        verifyNoInteractions(calls, router, summaries);
+    }
+
+    @Test
+    void controlledPilotGuardAllowsRunningPilotToReachNormalVoiceRoute() {
+        UUID businessId = UUID.randomUUID();
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        ControlledPilotExternalEffectGuard guard = mock(ControlledPilotExternalEffectGuard.class);
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        String twiml = "<Response><Connect><Stream/></Connect></Response>";
+
+        when(phones.findByPhoneNumberAndActiveTrue("+14355652512"))
+                .thenReturn(Optional.of(phone));
+        when(guard.evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.VOICE))
+                .thenReturn(new ControlledPilotExternalEffectGuard.Decision(
+                        true,
+                        true,
+                        "ALLOWED",
+                        "RUNNING",
+                        ControlledPilotExternalEffectGuard.Effect.VOICE));
+        when(router.route("+14355652512", "+56911111111", CALL_SID))
+                .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
+                        "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
+
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        ReflectionTestUtils.setField(controller, "pilotExternalEffects", guard);
+        ReflectionTestUtils.setField(controller, "pilotPhoneNumbers", phones);
+
+        var response = controller.incoming(
+                CALL_SID, "+56911111111", "+14355652512");
+
+        assertEquals(twiml, response.getBody());
+        verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
+        verify(router).route("+14355652512", "+56911111111", CALL_SID);
     }
 
     @Test
