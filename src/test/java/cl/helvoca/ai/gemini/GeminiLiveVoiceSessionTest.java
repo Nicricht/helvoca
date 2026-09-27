@@ -111,7 +111,7 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
-    void bakeOffModeAdvancesAllThreeLinesEndsAfterPlaybackAndIgnoresPhoneAudio() {
+    void finalistBakeOffAdvancesFiveConversationTurnsEndsAfterPlaybackAndIgnoresPhoneAudio() {
         GeminiLiveProperties properties = properties();
         properties.setVoice("Sadachbia");
         RealtimeCallContext context = new RealtimeCallContext(
@@ -151,13 +151,17 @@ class GeminiLiveVoiceSessionTest {
 
         String instructions = setup.getJSONObject("systemInstruction")
                 .getJSONArray("parts").getJSONObject(0).getString("text");
-        assertTrue(instructions.contains("MODO VOICE BAKE-OFF DE RECEPVOZ"));
+        assertTrue(instructions.contains("MODO VOICE FINALIST DE RECEPVOZ"));
         assertTrue(instructions.contains("[RECEPVOZ_VOICE_BAKEOFF_LINE_1]"));
         assertTrue(instructions.contains("[RECEPVOZ_VOICE_BAKEOFF_LINE_2]"));
         assertTrue(instructions.contains("[RECEPVOZ_VOICE_BAKEOFF_LINE_3]"));
+        assertTrue(instructions.contains("[RECEPVOZ_VOICE_BAKEOFF_LINE_4]"));
+        assertTrue(instructions.contains("[RECEPVOZ_VOICE_BAKEOFF_LINE_5]"));
         assertTrue(instructions.contains("Hola, gracias por llamar. Ya, cuéntame, ¿en qué te ayudo?"));
-        assertTrue(instructions.contains("Tengo una hora mañana a las diez y media y otra a las doce"));
-        assertTrue(instructions.contains("NO esperes respuesta del teléfono"));
+        assertTrue(instructions.contains("Entonces buscas una hora para mañana"));
+        assertTrue(instructions.contains("Tengo una a las diez y media y otra a las doce"));
+        assertTrue(instructions.contains("MISMA identidad vocal"));
+        assertTrue(instructions.contains("el sistema simula al cliente"));
 
         JSONArray declarations = setup.getJSONArray("tools")
                 .getJSONObject(0).getJSONArray("functionDeclarations");
@@ -177,8 +181,10 @@ class GeminiLiveVoiceSessionTest {
 
         String[] lines = {
                 "Hola, gracias por llamar. Ya, cuéntame, ¿en qué te ayudo?",
-                "Sí, obvio. Tengo una hora mañana a las diez y media y otra a las doce. ¿Cuál te acomoda más?",
-                "Ya, súper. Quedó clarito. Gracias por llamar, que estés súper. Chao."
+                "Ya, perfecto. Entonces buscas una hora para mañana, ¿cierto?",
+                "Sí, obvio. Tengo una a las diez y media y otra a las doce. ¿Cuál te acomoda más?",
+                "Dale, las diez y media. Súper.",
+                "Gracias por llamar, que estés súper. Chao."
         };
         for (String line : lines) {
             JSONObject completedTurn = new JSONObject().put("serverContent", new JSONObject()
@@ -188,7 +194,7 @@ class GeminiLiveVoiceSessionTest {
         }
 
         ArgumentCaptor<CharSequence> sent = ArgumentCaptor.forClass(CharSequence.class);
-        verify(socket, atLeast(4)).sendText(sent.capture(), eq(true));
+        verify(socket, atLeast(6)).sendText(sent.capture(), eq(true));
         var markers = sent.getAllValues().stream()
                 .map(CharSequence::toString)
                 .map(JSONObject::new)
@@ -202,7 +208,9 @@ class GeminiLiveVoiceSessionTest {
         assertEquals(Arrays.asList(
                 "[RECEPVOZ_VOICE_BAKEOFF_LINE_1]",
                 "[RECEPVOZ_VOICE_BAKEOFF_LINE_2]",
-                "[RECEPVOZ_VOICE_BAKEOFF_LINE_3]"), markers);
+                "[RECEPVOZ_VOICE_BAKEOFF_LINE_3]",
+                "[RECEPVOZ_VOICE_BAKEOFF_LINE_4]",
+                "[RECEPVOZ_VOICE_BAKEOFF_LINE_5]"), markers);
         verify(tools, times(1)).prepareDeferredEndCall(context);
         verify(transport, times(1)).endAfterPlayback();
         verify(tools, never()).execute(eq(context), eq("end_call"), anyString());
@@ -244,9 +252,9 @@ class GeminiLiveVoiceSessionTest {
 
         JSONObject turnComplete = new JSONObject()
                 .put("serverContent", new JSONObject().put("turnComplete", true));
-        session.onText(socket, turnComplete.toString(), true);
-        session.onText(socket, turnComplete.toString(), true);
-        session.onText(socket, turnComplete.toString(), true);
+        for (int i = 0; i < 5; i++) {
+            session.onText(socket, turnComplete.toString(), true);
+        }
 
         // A duplicate boundary after the failed one-shot end_call must not retry it.
         session.onText(socket, turnComplete.toString(), true);
