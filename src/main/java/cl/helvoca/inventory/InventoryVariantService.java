@@ -6,6 +6,7 @@ import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.security.TenantProvider;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,9 @@ public class InventoryVariantService {
     private final InventoryMovementRepository movements;
     private final CatalogItemRepository catalog;
     private final TenantProvider tenant;
+
+    @Autowired(required = false)
+    private InventoryAlertService inventoryAlerts;
 
     public InventoryVariantService(InventoryProductVariantRepository variants,
                                    InventoryStockRepository baseStocks,
@@ -79,6 +83,9 @@ public class InventoryVariantService {
 
         if (input.onHand() < variant.getReserved()) {
             throw new ConflictException("On-hand stock cannot be lower than reserved variant stock");
+        }
+        if (!input.active() && variant.getReserved() > 0) {
+            throw new ConflictException("A variant with reserved stock cannot be deactivated");
         }
 
         int delta = input.onHand() - variant.getOnHand();
@@ -217,6 +224,7 @@ public class InventoryVariantService {
         movement.setReferenceId(referenceId);
         movement.setNote(blankToNull(note));
         movements.save(movement);
+        if (inventoryAlerts != null) inventoryAlerts.evaluateVariant(variant);
     }
 
     private static String normalizeSku(String sku) {
