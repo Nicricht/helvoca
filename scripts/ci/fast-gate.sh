@@ -26,6 +26,7 @@ fi
 declare -A TESTS=()
 JAVA_CHANGED=false
 POM_CHANGED=false
+RUN_CHAOS=false
 
 add_tests_from_dir() {
   local dir="$1"
@@ -77,12 +78,24 @@ for file in "${CHANGED[@]}"; do
         src/main/java/cl/helvoca/operations/*)
           add_tests_from_dir "src/test/java/cl/helvoca/operations"
           add_tests_from_dir "src/test/java/cl/helvoca/booking"
+          RUN_CHAOS=true
+          ;;
+        src/main/java/cl/helvoca/payment/*|src/main/java/cl/helvoca/jobs/*|src/main/java/cl/helvoca/messaging/meta/*|src/main/java/cl/helvoca/messaging/audio/*|src/main/java/cl/helvoca/quality/*)
+          RUN_CHAOS=true
           ;;
       esac
       ;;
     src/test/java/*.java|src/test/java/**/*.java)
       JAVA_CHANGED=true
       add_test_file "$file"
+      case "$file" in
+        src/test/java/cl/helvoca/chaos/*|src/test/java/cl/helvoca/payment/*Chaos*|src/test/java/cl/helvoca/operations/*Chaos*)
+          RUN_CHAOS=true
+          ;;
+      esac
+      ;;
+    scripts/ci/chaos-certification.sh)
+      RUN_CHAOS=true
       ;;
     src/main/resources/static/*.js|src/main/resources/static/**/*.js|e2e/*.js|e2e/**/*.js)
       echo "Syntax check: $file"
@@ -106,6 +119,11 @@ if [[ ${#TESTS[@]} -gt 0 ]]; then
     test
 elif [[ "$JAVA_CHANGED" == true ]]; then
   echo "No direct package tests found. Compilation gate completed; Full Gate will run the complete suite."
+fi
+
+if [[ "$RUN_CHAOS" == true ]]; then
+  echo "Critical reliability surface changed. Running Failure/Chaos Lab V3..."
+  bash scripts/ci/chaos-certification.sh
 fi
 
 echo "Fast Gate passed."

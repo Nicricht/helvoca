@@ -11,4 +11,6 @@ public interface OutboundMessageRepository extends JpaRepository<OutboundMessage
     Optional<OutboundMessage> findByBusinessIdAndIdempotencyKey(UUID businessId, String idempotencyKey);
     Optional<OutboundMessage> findTopByProviderAndProviderMessageIdOrderByUpdatedAtDesc(String provider, String providerMessageId);
     List<OutboundMessage> findTop100ByBusinessIdOrderByCreatedAtDesc(UUID businessId);
+    List<OutboundMessage> findTop50ByBusinessIdAndCustomerIdOrderByCreatedAtDesc(
+            UUID businessId, UUID customerId);
 }
