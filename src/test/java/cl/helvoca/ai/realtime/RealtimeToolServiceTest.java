@@ -36,6 +36,24 @@ import static org.mockito.Mockito.*;
 
 class RealtimeToolServiceTest {
     @Test
+    void buildInstructionsKeepsChileanStyleFromInitialGreeting() {
+        UUID businessId = UUID.randomUUID();
+        RealtimeToolService tools = service();
+        BusinessRepository businesses = businesses(tools);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business("America/Santiago")));
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+10000000000", "+10000000001", "MZstream");
+
+        String instructions = tools.buildInstructions(context);
+
+        assertTrue(instructions.contains("español de Chile desde la primera sílaba"));
+        assertTrue(instructions.contains("CONTENIDO DEL SALUDO CONFIGURADO (no lo recites literalmente)"));
+        assertTrue(instructions.contains("Cuéntame, ¿en qué te puedo ayudar?"));
+        assertTrue(instructions.contains("¿Qué es lo que usted desea?"));
+    }
+
+    @Test
     void modelCannotSelectAnotherTenant() {
         UUID trustedBusiness = UUID.randomUUID();
         UUID attackerBusiness = UUID.randomUUID();
@@ -355,6 +373,16 @@ class RealtimeToolServiceTest {
                 mock(KnowledgeItemRepository.class), mock(BookingRepository.class), mock(CallSessionRepository.class),
                 mock(BusinessScheduleService.class), mock(BusinessRequestService.class),
                 mock(UnansweredQuestionService.class));
+    }
+
+    private static BusinessRepository businesses(RealtimeToolService service) {
+        try {
+            var field = RealtimeToolService.class.getDeclaredField("businesses");
+            field.setAccessible(true);
+            return (BusinessRepository) field.get(service);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 
     private static ServiceItemRepository services(RealtimeToolService service) {
