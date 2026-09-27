@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   production-gate:
+    needs: golden-journey-release-contract
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -97,6 +98,25 @@ jobs:
             check_asset "https://recepvoz.cl" "$path" "recepvoz.cl"
           done
 
+  golden-journey-release-contract:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run commercial Golden Journey release contract
+        run: bash scripts/ci/pilot-e2e-certification.sh
+
   fast-gate:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -126,7 +146,7 @@ jobs:
         run: bash scripts/ci/fast-gate.sh "$BASE_SHA"
 
   test:
-    needs: fast-gate
+    needs: [fast-gate, golden-journey-release-contract]
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     runs-on: ubuntu-latest
 
