@@ -31,6 +31,7 @@ public class GeminiLiveProperties {
     // Observability budgets. Exceeding them emits structured warnings; it never
     // changes business outcomes or skips backend validation.
     private int toolLatencyBudgetMs = 1200;
+    private int toolBatchLatencyBudgetMs = 1800;
     private int responseLatencyBudgetMs = 3000;
 
     public boolean isEnabled() { return enabled; }
@@ -89,6 +90,8 @@ public class GeminiLiveProperties {
     }
     public int getToolLatencyBudgetMs() { return clamp(toolLatencyBudgetMs, 100, 30_000); }
     public void setToolLatencyBudgetMs(int value) { this.toolLatencyBudgetMs = value; }
+    public int getToolBatchLatencyBudgetMs() { return clamp(toolBatchLatencyBudgetMs, 100, 30_000); }
+    public void setToolBatchLatencyBudgetMs(int value) { this.toolBatchLatencyBudgetMs = value; }
     public int getResponseLatencyBudgetMs() { return clamp(responseLatencyBudgetMs, 250, 30_000); }
     public void setResponseLatencyBudgetMs(int value) { this.responseLatencyBudgetMs = value; }
 
