@@ -111,6 +111,53 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void bakeOffModeUsesExactSampleOnlyEndCallAndIgnoresPhoneAudio() {
+        GeminiLiveProperties properties = properties();
+        properties.setVoice("Sadachbia");
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), UUID.randomUUID(), null,
+                "+56966939611", "+14355652512", "MZ-bakeoff", "Sadachbia");
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        JSONObject setup = session.buildSetup().getJSONObject("setup");
+        assertEquals("Sadachbia", setup.getJSONObject("generationConfig")
+                .getJSONObject("speechConfig")
+                .getJSONObject("voiceConfig")
+                .getJSONObject("prebuiltVoiceConfig")
+                .getString("voiceName"));
+
+        String instructions = setup.getJSONObject("systemInstruction")
+                .getJSONArray("parts").getJSONObject(0).getString("text");
+        assertTrue(instructions.contains("MODO VOICE BAKE-OFF DE RECEPVOZ"));
+        assertTrue(instructions.contains("Hola, gracias por llamar. Ya, cuéntame, ¿en qué te ayudo?"));
+        assertTrue(instructions.contains("Tengo una hora mañana a las diez y media y otra a las doce"));
+        assertTrue(instructions.contains("No esperes respuesta del usuario"));
+
+        JSONArray declarations = setup.getJSONArray("tools")
+                .getJSONObject(0).getJSONArray("functionDeclarations");
+        assertEquals(1, declarations.length());
+        assertTrue(hasFunction(declarations, "end_call"));
+        assertFalse(hasFunction(declarations, "create_booking"));
+
+        // Must return before decoding/sending even deliberately malformed phone audio.
+        assertDoesNotThrow(() -> session.acceptInboundAudio("not-valid-base64"));
+        verify(tools, never()).buildInstructions(context);
+    }
+
+    @Test
     void maleProfileDoesNotReceiveFemaleVoiceInstructions() {
         GeminiLiveProperties properties = properties();
         properties.setVoice("Enceladus");
