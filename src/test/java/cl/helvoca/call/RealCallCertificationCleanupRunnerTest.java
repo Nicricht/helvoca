@@ -170,6 +170,7 @@ class RealCallCertificationCleanupRunnerTest {
                 false,
                 UUID.randomUUID().toString(),
                 UUID.randomUUID().toString(),
+                "CA1234567890",
                 "+56966939611",
                 calls,
                 actions,
@@ -311,7 +312,7 @@ class RealCallCertificationCleanupRunnerTest {
         when(call.getId()).thenReturn(callId);
         when(call.getBusinessId()).thenReturn(businessId);
         when(call.getStatus()).thenReturn(CallStatus.COMPLETED);
-                when(call.getTelephonyProvider()).thenReturn("twilio");
+        when(call.getTelephonyProvider()).thenReturn("twilio");
         when(call.getProviderCallId()).thenReturn(providerCallId);
         when(call.getCallerNumber()).thenReturn(caller);
         return call;
