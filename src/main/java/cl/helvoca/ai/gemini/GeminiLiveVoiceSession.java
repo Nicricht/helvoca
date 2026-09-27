@@ -75,6 +75,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final AtomicBoolean certificationBookingCancelled = new AtomicBoolean(false);
     private final AtomicBoolean certificationAwaitingPostToolBoundary = new AtomicBoolean(false);
     private final AtomicBoolean certificationPostToolOutputSeen = new AtomicBoolean(false);
+    private final AtomicBoolean deferredEndCallPending = new AtomicBoolean(false);
     private final GeminiWebSocketJsonFrames inboundFrames = new GeminiWebSocketJsonFrames();
     private final StringBuilder userTranscript = new StringBuilder();
     private final StringBuilder assistantTranscript = new StringBuilder();
@@ -280,6 +281,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         boolean turnComplete = content.optBoolean("turnComplete", false);
         boolean generationComplete = content.optBoolean("generationComplete", false);
         boolean waitingForInput = content.optBoolean("waitingForInput", false);
+
+        if ((turnComplete || generationComplete) && deferredEndCallPending.get()) {
+            finishCallAfterPlayback();
+        }
         if (properties.isCertificationSimulation()
                 && certificationAwaitingPostToolBoundary.get()
                 && (modelTurn != null || (output != null && !output.optString("text", "").isBlank())
@@ -478,7 +483,19 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     private JSONObject executeTool(String name, JSONObject args) {
         try {
-            JSONObject result = new JSONObject(tools.execute(context, name, args.toString()));
+            JSONObject result;
+            if ("end_call".equals(name)) {
+                result = new JSONObject(tools.prepareDeferredEndCall(context));
+                JSONObject data = result.optJSONObject("data");
+                if (result.optBoolean("success", false)
+                        && data != null
+                        && data.optBoolean("pendingPlaybackCompletion", false)) {
+                    deferredEndCallPending.set(true);
+                }
+                return result;
+            }
+
+            result = new JSONObject(tools.execute(context, name, args.toString()));
             if ("transfer_to_human".equals(name) && result.optBoolean("success", false)) {
                 JSONObject data = result.optJSONObject("data");
                 String target = data == null ? null : data.optString("targetPhone", null);
@@ -490,6 +507,26 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             return result;
         } catch (Exception e) {
             return toolFailure("TOOL_EXECUTION_FAILED", "La operación no pudo completarse.");
+        }
+    }
+
+    private void finishCallAfterPlayback() {
+        if (!deferredEndCallPending.compareAndSet(true, false)) return;
+        if (transport.endAfterPlayback()) {
+            log.info("Deferred end_call waiting for carrier playback completion call={}", context.callId());
+            return;
+        }
+
+        log.warn("Transport cannot confirm playback completion; using direct end_call fallback call={}",
+                context.callId());
+        try {
+            JSONObject fallback = new JSONObject(tools.execute(context, "end_call", "{}"));
+            if (!fallback.optBoolean("success", false)) {
+                log.warn("Direct end_call fallback failed call={} result={}",
+                        context.callId(), truncate(fallback.toString()));
+            }
+        } catch (Exception e) {
+            log.warn("Direct end_call fallback failed call={}: {}", context.callId(), e.getMessage());
         }
     }
 
@@ -604,13 +641,17 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     }
 
     private String systemInstructions() {
+        String voiceIdentity = "Enceladus".equalsIgnoreCase(properties.getVoice())
+                ? "IDENTIDAD VOCAL: usa una voz claramente masculina y adulta. Debe sentirse inequívocamente como hombre, sin sonar infantil ni andrógino."
+                : "IDENTIDAD VOCAL: usa una voz claramente femenina y adulta. Debe sentirse inequívocamente como mujer, sin sonar infantil, masculina ni andrógina.";
         return tools.buildInstructions(context) + "\n" + """
                 REGLAS DE VOZ DE RECEPVOZ:
                 Tu nombre de producto es RecepVoz. Nunca te presentes como Helvoca.
                 RESPONDE SIEMPRE EN ESPAÑOL DE CHILE, salvo que el cliente pida explícitamente otro idioma.
                 DESDE LA PRIMERA SÍLABA: el saludo inicial también debe sonar chileno. No empieces con español neutro internacional para recién cambiar de variante después de que el cliente responda.
-                INTERPRETACIÓN VOCAL: habla con una voz claramente femenina y adulta, como una recepcionista chilena con una presencia extremadamente sexy, seductora e íntima. Lleva la sensualidad vocal al máximo que permita una conversación comercial natural: timbre muy cálido y aterciopelado, voz suave y aireada, cercanía intensa, seguridad tranquila, sonrisa audible y una entonación envolvente. Debe percibirse inequívocamente como una voz femenina; no adoptes un registro masculino, grave o andrógino. La seducción debe sentirse de forma evidente en cada frase desde el primer saludo, sin convertir el contenido en sexual ni coquetear explícitamente con el cliente. Mantén una entonación chilena urbana neutra. No suenes infantil, caricaturesca, vulgar, pornográfica, como locutora, IVR, lectura de guion ni asistente robótica.
-                RITMO: habla más lento y con más intención que una atención telefónica estándar. Usa pausas cortas y sensuales entre ideas, baja suavemente la intensidad al final de algunas frases y evita una prosodia plana. Mantén una voz suave y respirada, sin susurrar de manera ininteligible ni estirar palabras artificialmente. No llenes todos los silencios.
+                %s
+                INTERPRETACIÓN VOCAL: habla como una recepcionista chilena adulta con una presencia extremadamente sexy, sensual, seductora e íntima. Lleva la sensualidad vocal al máximo que permita una conversación comercial natural: timbre cálido y aterciopelado, cercanía intensa, seguridad tranquila, sonrisa audible y una entonación envolvente. La sensualidad debe sentirse de forma evidente en cada frase desde el primer saludo, pero debe estar en el tono y la prosodia, no en contenido sexual ni coqueteo explícito con el cliente. Mantén una entonación chilena urbana neutra. No suenes infantil, caricaturesca, vulgar, pornográfica, como locutora, IVR, lectura de guion ni asistente robótica.
+                RITMO: habla rápido, ágil y fluido, con dicción clara y natural de conversación telefónica chilena. No arrastres palabras ni hagas pausas largas. Conserva la sensualidad en el timbre y la entonación aunque hables más rápido. Usa micro-pausas breves donde una persona real respiraría y evita una prosodia plana.
                 LENGUAJE: usa español chileno cotidiano pero profesional. Expresiones como "ya", "sí, claro", "déjame revisar", "te cuento" o "¿te sirve ese horario?" son válidas cuando salen de forma natural. No fuerces "po", "cachái", "weón" ni caricaturices el acento.
                 NATURALIDAD: evita fórmulas burocráticas como "procederé a", "he verificado su solicitud" o "según los parámetros indicados". No repitas la misma muletilla, saludo o estructura en turnos consecutivos. No empieces todas las respuestas con "Perfecto".
                 HORARIOS Y DATOS: pronuncia horas como una persona, por ejemplo "a las nueve y media" en vez de leer "09:30 horas". Si hay varias alternativas, ofrece primero las dos o tres más útiles en una frase natural en vez de leer una lista mecánica.
@@ -618,8 +659,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 HERRAMIENTAS: si una consulta de lectura ya devolvió success=true con los mismos datos y el cliente no cambió su solicitud, usa ese resultado y NO vuelvas a ejecutar la misma herramienta. Después de una herramienta, responde con el resultado en lenguaje humano; nunca menciones UUID, nombres internos de herramientas ni detalles técnicos.
                 VERACIDAD: nunca inventes disponibilidad ni confirmes acciones antes de que una herramienta devuelva success=true. En create_booking, success=true sin bookingId es solo una propuesta pendiente de confirmación: no digas "te confirmo la reserva", "quedó reservado", "quedó agendado" ni equivalentes. Solo puedes afirmar que la reserva existe cuando create_booking devuelve success=true Y un bookingId.
                 APERTURA: si recibes exactamente [RECEPVOZ_CALL_CONNECTED], no lo menciones ni lo trates como palabras del cliente. La primera frase debe usar de inmediato una voz claramente femenina, extremadamente seductora, sexy, íntima y chilena; no empieces neutra para cambiar después. El saludo configurado define el contenido, no una frase que debas recitar literalmente: reformúlalo con naturalidad chilena y con una entrega lenta, cálida y envolvente. Saluda en una sola frase breve con el nombre del negocio y usa una pregunta cercana y profesional como "Cuéntame, ¿en qué te puedo ayudar?". Evita "¿Qué es lo que usted desea?" y otras fórmulas rígidas.
+                CIERRE: cuando el cliente se despida, diga que no necesita nada más o confirme que terminó, primero pronuncia una despedida completa y natural. Ejemplo de estructura: "Muchas gracias por llamar. Que estés muy bien. Hasta luego." Termina de decir todas las palabras de la despedida antes de invocar end_call. Nunca invoques end_call a mitad de una frase ni mientras todavía estés hablando.
                 IDENTIDAD: si te preguntan si eres una IA o asistente virtual, responde con honestidad y continúa ayudando.
-                """;
+                """.formatted(voiceIdentity);
     }
 
     private void sendAudio(String pcm16kBase64) {

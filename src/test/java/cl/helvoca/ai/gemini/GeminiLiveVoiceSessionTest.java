@@ -77,11 +77,13 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("NO vuelvas a ejecutar la misma herramienta"));
         assertTrue(instructions.contains("entonación chilena urbana neutra"));
         assertTrue(instructions.contains("voz claramente femenina y adulta"));
-        assertTrue(instructions.contains("no adoptes un registro masculino, grave o andrógino"));
-        assertTrue(instructions.contains("sin convertir el contenido en sexual ni coquetear explícitamente"));
+        assertTrue(instructions.contains("Debe sentirse inequívocamente como mujer"));
+        assertTrue(instructions.contains("no en contenido sexual ni coqueteo explícito"));
         assertTrue(instructions.contains("DESDE LA PRIMERA SÍLABA"));
         assertTrue(instructions.contains("Cuéntame, ¿en qué te puedo ayudar?"));
         assertTrue(instructions.contains("Evita \"¿Qué es lo que usted desea?\""));
+        assertTrue(instructions.contains("habla rápido, ágil y fluido"));
+        assertTrue(instructions.contains("Termina de decir todas las palabras de la despedida"));
         assertTrue(instructions.contains("a las nueve y media"));
         assertTrue(instructions.contains("nunca menciones UUID"));
         assertTrue(instructions.contains("success=true sin bookingId es solo una propuesta pendiente de confirmación"));
@@ -146,6 +148,52 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(hasFunction(declarations, "end_call"));
         assertFalse(hasFunction(declarations, "create_booking"));
         verify(tools).toolDefinitions(context);
+    }
+
+    @Test
+    void endCallWaitsForGenerationBoundaryBeforeCarrierPlaybackHangup() {
+        GeminiLiveProperties properties = properties();
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        when(tools.prepareDeferredEndCall(context)).thenReturn(new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("ended", false)
+                        .put("pendingPlaybackCompletion", true))
+                .put("error", JSONObject.NULL)
+                .toString());
+        when(transport.endAfterPlayback()).thenReturn(true);
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                transport,
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        WebSocket providerSocket = mock(WebSocket.class);
+        JSONObject toolCall = new JSONObject().put("toolCall", new JSONObject()
+                .put("functionCalls", new JSONArray().put(new JSONObject()
+                        .put("id", "end-1")
+                        .put("name", "end_call")
+                        .put("args", new JSONObject()))));
+        session.onText(providerSocket, toolCall.toString(), true);
+
+        verify(tools).prepareDeferredEndCall(context);
+        verify(transport, never()).endAfterPlayback();
+
+        JSONObject generationDone = new JSONObject()
+                .put("serverContent", new JSONObject().put("generationComplete", true));
+        session.onText(providerSocket, generationDone.toString(), true);
+
+        verify(transport).endAfterPlayback();
+        verify(tools, never()).execute(eq(context), eq("end_call"), anyString());
     }
 
     @Test

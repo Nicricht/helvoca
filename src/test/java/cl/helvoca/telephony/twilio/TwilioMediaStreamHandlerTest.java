@@ -18,6 +18,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 class TwilioMediaStreamHandlerTest {
@@ -92,5 +93,26 @@ class TwilioMediaStreamHandlerTest {
         verify(provider).createSession(eq(context), transport.capture());
         assertNotNull(transport.getValue());
         assertEquals(streamSid, transport.getValue().id());
+
+        when(control.hangup(accountSid, callSid)).thenReturn(true);
+        assertTrue(transport.getValue().endAfterPlayback());
+
+        ArgumentCaptor<TextMessage> outbound = ArgumentCaptor.forClass(TextMessage.class);
+        verify(socket, atLeastOnce()).sendMessage(outbound.capture());
+        JSONObject markRequest = outbound.getAllValues().stream()
+                .map(TextMessage::getPayload)
+                .map(JSONObject::new)
+                .filter(json -> "mark".equals(json.optString("event")))
+                .findFirst()
+                .orElseThrow();
+        String markerName = markRequest.getJSONObject("mark").getString("name");
+
+        JSONObject mark = new JSONObject()
+                .put("event", "mark")
+                .put("streamSid", streamSid)
+                .put("mark", new JSONObject().put("name", markerName));
+        handler.handleTextMessage(socket, new TextMessage(mark.toString()));
+
+        verify(control).hangup(accountSid, callSid);
     }
 }
