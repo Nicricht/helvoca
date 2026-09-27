@@ -116,9 +116,10 @@ public class CommercialPipelineService {
                                 Comparator.nullsFirst(Comparator.naturalOrder())))
                         .orElse(null);
 
-        OutboundMessage latestOutbound = outbound
-                .findTop50ByBusinessIdAndCustomerIdOrderByCreatedAtDesc(businessId, customerId)
-                .stream()
+        List<OutboundMessage> outboundRows = customerId == null
+                ? List.of()
+                : outbound.findTop50ByBusinessIdAndCustomerIdOrderByCreatedAtDesc(businessId, customerId);
+        OutboundMessage latestOutbound = outboundRows.stream()
                 .filter(message -> message.getOperationId() != null
                         && (message.getOperationId().equals(journey.getId())
                         || message.getOperationId().equals(paymentOperationId)
