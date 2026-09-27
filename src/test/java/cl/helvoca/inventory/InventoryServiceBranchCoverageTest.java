@@ -260,7 +260,7 @@ class InventoryServiceBranchCoverageTest {
                 businessId, "ORDER_OPERATION", freshOrder, InventoryReservation.Status.ACTIVE))
                 .thenReturn(List.of());
         assertThrows(IllegalArgumentException.class, () ->
-                service.reserveOrder(businessId, freshOrder, List.of((InventoryService.OrderItem) null)));
+                service.reserveOrder(businessId, freshOrder, java.util.Collections.singletonList(null)));
         assertThrows(IllegalArgumentException.class, () ->
                 service.reserveOrder(businessId, freshOrder,
                         List.of(new InventoryService.OrderItem(null, 1))));
