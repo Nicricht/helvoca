@@ -702,12 +702,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         } catch (Exception e) {
             log.warn("Could not summarize Gemini call {}: {}", context.callId(), e.getMessage());
         }
-        if (properties.isCertificationSimulation()) {
-            try {
-                certifications.verifyAfterCall(context.callId());
-            } catch (Exception e) {
-                log.warn("Could not schedule certification verification call={}: {}", context.callId(), e.getMessage());
-            }
+        try {
+            certifications.verifyAfterCall(context.callId());
+        } catch (Exception e) {
+            log.warn("Could not schedule certification verification call={}: {}", context.callId(), e.getMessage());
         }
     }
 

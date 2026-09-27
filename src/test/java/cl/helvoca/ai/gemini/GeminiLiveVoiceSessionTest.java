@@ -201,6 +201,39 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void realCallCloseSchedulesCertificationReviewAndServiceFiltersNormalCalls() {
+        GeminiLiveProperties properties = properties();
+        properties.setCertificationSimulation(false);
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        CallCertificationService certifications = mock(CallCertificationService.class);
+
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+        when(socket.sendClose(anyInt(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                certifications,
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        session.onOpen(socket);
+        session.close();
+
+        verify(certifications).verifyAfterCall(context.callId());
+    }
+
+    @Test
     void certificationScenarioWaitsForAvailabilityCreationAndCancellationMilestones() {
         GeminiLiveProperties properties = properties();
         properties.setCertificationSimulation(true);
