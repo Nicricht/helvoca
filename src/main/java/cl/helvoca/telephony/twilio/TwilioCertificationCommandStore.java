@@ -58,6 +58,17 @@ public class TwilioCertificationCommandStore {
         return rows.stream().findFirst();
     }
 
+    public boolean isLatencyCertificationProviderCall(String providerCallSid) {
+        if (!validCallSid(providerCallSid)) return false;
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                  FROM twilio_certification_command
+                 WHERE provider_call_sid = ?
+                   AND run_id LIKE 'latency-%'
+                """, Integer.class, providerCallSid.trim());
+        return count != null && count > 0;
+    }
+
     public Optional<ClaimedCommand> claimNext() {
         String token = UUID.randomUUID().toString();
         List<String> rows = jdbc.query("""

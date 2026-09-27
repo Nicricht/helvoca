@@ -71,8 +71,7 @@ public class TwilioCertificationCommandCallLauncher {
             throw new IllegalArgumentException("invalid certification callback token");
         }
 
-        String voiceUrl = twilio.absoluteWebhook("/webhooks/v1/twilio/inbound-certification")
-                + "?token=" + URLEncoder.encode(callbackToken, StandardCharsets.UTF_8);
+        String voiceUrl = certificationVoiceUrl(callbackToken);
         String statusUrl = twilio.absoluteWebhook("/webhooks/v1/twilio/status");
 
         String body = form("To", to.trim())
@@ -110,6 +109,14 @@ public class TwilioCertificationCommandCallLauncher {
         }
         scheduleSafetyHangup(callSid);
         return callSid;
+    }
+
+    String certificationVoiceUrl(String callbackToken) {
+        if (!TwilioCertificationCommandStore.validToken(callbackToken)) {
+            throw new IllegalArgumentException("invalid certification callback token");
+        }
+        return twilio.absoluteWebhook(
+                "/webhooks/v1/twilio/inbound-certification/" + callbackToken.trim());
     }
 
     boolean validConfiguration() {
