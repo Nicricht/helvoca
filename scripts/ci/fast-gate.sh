@@ -27,6 +27,7 @@ declare -A TESTS=()
 JAVA_CHANGED=false
 POM_CHANGED=false
 RUN_CHAOS=false
+RUN_PILOT=false
 
 add_tests_from_dir() {
   local dir="$1"
@@ -97,6 +98,9 @@ for file in "${CHANGED[@]}"; do
     scripts/ci/chaos-certification.sh)
       RUN_CHAOS=true
       ;;
+    scripts/ci/pilot-e2e-certification.sh|docs/PILOT_END_TO_END_CERTIFICATION_V1.md)
+      RUN_PILOT=true
+      ;;
     src/main/resources/static/*.js|src/main/resources/static/**/*.js|e2e/*.js|e2e/**/*.js)
       echo "Syntax check: $file"
       node --check "$file"
@@ -124,6 +128,11 @@ fi
 if [[ "$RUN_CHAOS" == true ]]; then
   echo "Critical reliability surface changed. Running Failure/Chaos Lab V3..."
   bash scripts/ci/chaos-certification.sh
+fi
+
+if [[ "$RUN_PILOT" == true ]]; then
+  echo "Pilot certification surface changed. Running Pilot End-to-End Certification V1..."
+  bash scripts/ci/pilot-e2e-certification.sh
 fi
 
 echo "Fast Gate passed."
