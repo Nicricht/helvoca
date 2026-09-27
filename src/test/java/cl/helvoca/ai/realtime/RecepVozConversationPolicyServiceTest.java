@@ -48,6 +48,8 @@ class RecepVozConversationPolicyServiceTest {
         assertTrue(policy.contains("consulta de forma proactiva los próximos días"));
         assertTrue(policy.contains("devuelve opciones concretas de inmediato"));
         assertTrue(policy.contains("No narres que vas a consultar una herramienta"));
+        assertTrue(policy.contains("unavailabilityReasonKnown=false"));
+        assertTrue(policy.contains("no inventes explicaciones como alta demanda"));
     }
 
     @Test
