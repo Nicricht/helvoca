@@ -96,6 +96,7 @@ class OmnichannelCommerceJourneyIntegrationTest {
         Business business = new Business();
         business.setName("Omnichannel commerce E2E");
         business = businesses.saveAndFlush(business);
+        UUID tenantId = business.getId();
 
         Customer customer = new Customer();
         customer.setBusinessId(business.getId());
@@ -299,7 +300,7 @@ class OmnichannelCommerceJourneyIntegrationTest {
         assertEquals(1, reservedStock.available());
 
         List<InventoryReservation> activeReservations = inventoryReservations.findAll().stream()
-                .filter(reservation -> business.getId().equals(reservation.getBusinessId()))
+                .filter(reservation -> tenantId.equals(reservation.getBusinessId()))
                 .filter(reservation -> orderOperationId.equals(reservation.getReferenceId()))
                 .filter(reservation -> reservation.getStatus() == InventoryReservation.Status.ACTIVE)
                 .toList();
@@ -360,7 +361,7 @@ class OmnichannelCommerceJourneyIntegrationTest {
         assertEquals(1, consumedStock.available());
 
         List<InventoryReservation> consumedReservations = inventoryReservations.findAll().stream()
-                .filter(reservation -> business.getId().equals(reservation.getBusinessId()))
+                .filter(reservation -> tenantId.equals(reservation.getBusinessId()))
                 .filter(reservation -> orderOperationId.equals(reservation.getReferenceId()))
                 .filter(reservation -> reservation.getStatus() == InventoryReservation.Status.CONSUMED)
                 .toList();
