@@ -36,6 +36,9 @@ public class CallAction {
     @Column(name = "error_code", length = 80)
     private String errorCode;
 
+    @Column(name = "duration_ms")
+    private Long durationMs;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -59,5 +62,7 @@ public class CallAction {
     public void setDetail(String detail) { this.detail = detail; }
     public String getErrorCode() { return errorCode; }
     public void setErrorCode(String errorCode) { this.errorCode = errorCode; }
+    public Long getDurationMs() { return durationMs; }
+    public void setDurationMs(Long durationMs) { this.durationMs = durationMs; }
     public Instant getCreatedAt() { return createdAt; }
 }

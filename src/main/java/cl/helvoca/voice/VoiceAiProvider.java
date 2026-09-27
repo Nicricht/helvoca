@@ -13,6 +13,10 @@ public interface VoiceAiProvider {
 
     boolean configured();
 
+    default String modelId() {
+        return null;
+    }
+
     default boolean certificationSession(RealtimeCallContext context) {
         return false;
     }
