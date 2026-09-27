@@ -62,3 +62,18 @@ Score each candidate from 1 to 5 on:
 - "I would pay for this receptionist" overall reaction.
 
 Provider labels are discovery hints only. The final production choice is made from real-call listening.
+
+
+## Finalist conversation mode
+
+The final comparison between shortlisted voices uses five deterministic receptionist turns instead of the shorter three-line sample:
+
+1. "Hola, gracias por llamar. Ya, cuéntame, ¿en qué te ayudo?"
+2. "Ya, perfecto. Entonces buscas una hora para mañana, ¿cierto?"
+3. "Sí, obvio. Tengo una a las diez y media y otra a las doce. ¿Cuál te acomoda más?"
+4. "Dale, las diez y media. Súper."
+5. "Gracias por llamar, que estés súper. Chao."
+
+This is a simulated conversation for voice evaluation only. Phone microphone audio remains ignored, the system advances the turns automatically, and only `end_call` is exposed. No availability lookup, booking, customer, payment, order or messaging tool is available, so the finalist test cannot create or mutate business data.
+
+The three finalists are run with the same prompt, same five turns, same Gemini configuration and same telephony path. Only `TWILIO_CERTIFICATION_VOICE_OVERRIDE` changes between calls. The human listener chooses the production voice based on perceived gender, consistency, Chilean/Santiago character, naturalness, energy, audible smile and commercial appeal.
