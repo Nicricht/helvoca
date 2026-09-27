@@ -1,0 +1,47 @@
+name: Mercado Pago TEST User Probe
+
+on:
+  push:
+    branches:
+      - cert/saas-billing-sandbox-provider-run-1
+    paths:
+      - ".github/workflows/mercadopago-test-user-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: create-mlc-test-user-probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      MERCADOPAGO_TEST_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
+    steps:
+      - name: Fail closed unless TEST secret exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${MERCADOPAGO_TEST_ACCESS_TOKEN:-}" ]]; then
+            echo "Missing MERCADOPAGO_TEST_ACCESS_TOKEN"
+            exit 1
+          fi
+          if [[ "$MERCADOPAGO_TEST_ACCESS_TOKEN" != APP_USR* ]]; then
+            echo "Refusing to run: TEST token must start with APP_USR"
+            exit 1
+          fi
+
+      - name: Create one Chile TEST buyer probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(curl --fail-with-body -sS -X POST             'https://api.mercadopago.com/users/test'             -H 'Content-Type: application/json'             -H "Authorization: Bearer $MERCADOPAGO_TEST_ACCESS_TOKEN"             -d '{"site_id":"MLC","description":"recepvoz-subscription-probe"}')"
+          echo "$response" | jq -e '.id and .nickname and .email and .site_id' >/dev/null
+          echo "MERCADOPAGO_TEST_USER_ID=$(echo "$response" | jq -r '.id')"
+          echo "MERCADOPAGO_TEST_USER_NICKNAME=$(echo "$response" | jq -r '.nickname')"
+          echo "MERCADOPAGO_TEST_USER_EMAIL=$(echo "$response" | jq -r '.email')"
+          echo "MERCADOPAGO_TEST_USER_SITE=$(echo "$response" | jq -r '.site_id')"
+          if [[ "$(echo "$response" | jq -r '.site_id')" != "MLC" ]]; then
+            echo "Expected MLC test user"
+            exit 1
+          fi
