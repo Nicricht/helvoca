@@ -59,6 +59,27 @@ test('internal operations surface hosts readiness control and pilot metrics away
     await route.fulfill(json(control));
   });
 
+  await page.route('**/api/v1/operations/pilot-preflight', route => route.fulfill(json({
+    decision: 'GO',
+    pilotStatus: 'READY',
+    trafficMode: 'BLOCKED_GLOBAL',
+    globalExternalEffectsEnabled: false,
+    blockers: [],
+    warnings: [],
+    checks: [
+      { code: 'TECH_VOICE', label: 'Llamadas con IA', passed: true, required: true, detail: 'Voz lista.' }
+    ],
+    snapshot: {
+      ordersToday: 2,
+      paymentAttemptsToday: 1,
+      successfulPaymentsToday: 1,
+      availableInventoryUnits: 8,
+      lowStockAlerts: 0,
+      outOfStockAlerts: 0,
+      reconciliationAnomalies: 0
+    }
+  })));
+
   await page.route('**/api/v1/operations/pilot-metrics', route => route.fulfill(json({
     timezone: 'America/Santiago',
     today: {
@@ -86,6 +107,9 @@ test('internal operations surface hosts readiness control and pilot metrics away
   await expect(page.locator('#pilotControlCard')).toBeVisible();
   await expect(page.locator('#pilotControlBadge')).toHaveText('GO');
   await expect(page.locator('#pilotMetricsCard')).toBeVisible();
+  await expect(page.locator('#pilotPreflightCard')).toBeVisible();
+  await expect(page.locator('#pilotPreflightDecision')).toHaveText('GO');
+  await expect(page.locator('#pilotPreflightTraffic')).toContainText('bloqueado globalmente');
   await expect(page.locator('#pilotMetricConversations')).toHaveText('7');
   await expect(page.locator('#pilotMetricRevenue')).toContainText('$18.990');
 
