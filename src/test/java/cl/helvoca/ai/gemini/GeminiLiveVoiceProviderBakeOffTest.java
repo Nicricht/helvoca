@@ -44,7 +44,7 @@ class GeminiLiveVoiceProviderBakeOffTest {
                 normal.callerNumber(), normal.destinationNumber(), "MZ-bakeoff", "Sadachbia");
         when(tools.agentVoice(bakeOff, null)).thenReturn("seductive_female");
 
-        assertEquals("Leda", provider.sessionProperties(normal).getVoice());
+        assertEquals("Sulafat", provider.sessionProperties(normal).getVoice());
         assertEquals("Sadachbia", provider.sessionProperties(bakeOff).getVoice());
     }
 
@@ -95,6 +95,6 @@ class GeminiLiveVoiceProviderBakeOffTest {
                 "+56911111111", "+14355652512", "MZ-test", "NotARealCandidate");
         when(tools.agentVoice(context, null)).thenReturn("seductive_female");
 
-        assertEquals("Leda", provider.sessionProperties(context).getVoice());
+        assertEquals("Sulafat", provider.sessionProperties(context).getVoice());
     }
 }

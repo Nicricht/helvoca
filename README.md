@@ -109,7 +109,7 @@ Configuración:
 GEMINI_LIVE_ENABLED=true
 GEMINI_API_KEY=tu_api_key
 GEMINI_LIVE_MODEL=gemini-3.1-flash-live-preview
-GEMINI_LIVE_VOICE=Leda
+GEMINI_LIVE_VOICE=Sulafat
 ```
 
 No habilites Gemini hasta haber configurado una credencial válida.
