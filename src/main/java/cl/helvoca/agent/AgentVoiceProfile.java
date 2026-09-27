@@ -25,7 +25,7 @@ public enum AgentVoiceProfile {
     SMOOTH("smooth", "Serena", "Fluida y estable", "ash", "Algieba"),
     MATURE("mature", "Madura", "Sobria y con presencia", "echo", "Gacrux"),
     NEUTRAL("neutral", "Neutra", "Balanceada para uso general", "alloy", "Schedar"),
-    SEDUCTIVE_FEMALE("seductive_female", "Sensual femenina", "Femenina, chilena, rápida y extremadamente sensual", "coral", "Aoede"),
+    SEDUCTIVE_FEMALE("seductive_female", "Sensual femenina", "Femenina, chilena, rápida y extremadamente sensual", "coral", "Despina"),
     SEDUCTIVE_MALE("seductive_male", "Sensual masculina", "Masculina, chilena, rápida y extremadamente sensual", "cedar", "Enceladus");
 
     private static final Set<String> OPENAI_REALTIME_VOICES = Set.of(
