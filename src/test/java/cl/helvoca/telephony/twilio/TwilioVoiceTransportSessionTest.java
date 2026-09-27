@@ -45,4 +45,31 @@ class TwilioVoiceTransportSessionTest {
 
         verify(socket, times(2)).sendMessage(any(TextMessage.class));
     }
+    @Test
+    void rejectedDeferredHangupReopensOutputInsteadOfLeavingDeadAir() throws Exception {
+        WebSocketSession socket = mock(WebSocketSession.class);
+        TwilioCallControl control = mock(TwilioCallControl.class);
+        when(socket.isOpen()).thenReturn(true);
+        when(control.hangup("AC-test", "CA-test")).thenReturn(false);
+
+        TwilioVoiceTransportSession transport = new TwilioVoiceTransportSession(
+                socket, "MZ-test", "AC-test", "CA-test", control);
+
+        assertTrue(transport.endAfterPlayback());
+
+        ArgumentCaptor<TextMessage> sent = ArgumentCaptor.forClass(TextMessage.class);
+        verify(socket, times(1)).sendMessage(sent.capture());
+        String markName = new JSONObject(sent.getValue().getPayload())
+                .getJSONObject("mark")
+                .getString("name");
+
+        transport.onPlaybackMark(markName);
+
+        verify(control).hangup("AC-test", "CA-test");
+        assertTrue(transport.isOpen());
+
+        transport.sendAudio("MZ-test", "recovered-output");
+        verify(socket, times(2)).sendMessage(any(TextMessage.class));
+    }
+
 }
