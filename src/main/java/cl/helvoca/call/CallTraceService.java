@@ -43,7 +43,7 @@ public class CallTraceService {
         CallAction action = new CallAction();
         action.setBusinessId(businessId);
         action.setCallId(callId);
-        action.setActionType(actionType(toolName));
+        action.setActionType(actionType(toolName, data));
         action.setSuccess(success);
         if (error != null) action.setErrorCode(error.optString("code", null));
         if (data != null) {
@@ -56,7 +56,7 @@ public class CallTraceService {
         actions.save(action);
 
         if (success) {
-            String resolution = resolution(toolName);
+            String resolution = resolution(toolName, data);
             if (resolution != null) markResolution(call, resolution);
         }
     }
@@ -87,7 +87,7 @@ public class CallTraceService {
         if (current == null || nextPriority >= currentPriority) call.setResolution(next);
     }
 
-    private static String actionType(String toolName) {
+    private static String actionType(String toolName, JSONObject data) {
         return switch (toolName) {
             case "get_business_information" -> "BUSINESS_INFORMATION";
             case "list_services" -> "SERVICES_LISTED";
@@ -109,7 +109,7 @@ public class CallTraceService {
             case "register_caller" -> "CUSTOMER_REGISTERED";
             case "list_available_slots" -> "AVAILABILITY_LISTED";
             case "check_booking_availability" -> "AVAILABILITY_CHECKED";
-            case "create_booking" -> "BOOKING_CREATED";
+            case "create_booking" -> bookingActuallyCreated(data) ? "BOOKING_CREATED" : "BOOKING_PROPOSED";
             case "list_customer_bookings" -> "BOOKINGS_LISTED";
             case "reschedule_booking" -> "BOOKING_RESCHEDULED";
             case "cancel_booking" -> "BOOKING_CANCELLED";
@@ -121,12 +121,12 @@ public class CallTraceService {
         };
     }
 
-    private static String resolution(String toolName) {
+    private static String resolution(String toolName, JSONObject data) {
         return switch (toolName) {
             case "get_business_information", "list_services", "list_catalog", "list_delivery_zones",
                     "quote_order", "get_order_status", "quote_payment", "get_payment_status", "search_knowledge" -> "INFORMATION_ONLY";
             case "register_caller" -> "CUSTOMER_REGISTERED";
-            case "create_booking" -> "BOOKING_CREATED";
+            case "create_booking" -> bookingActuallyCreated(data) ? "BOOKING_CREATED" : null;
             case "reschedule_booking" -> "BOOKING_RESCHEDULED";
             case "cancel_booking" -> "BOOKING_CANCELLED";
             case "create_order" -> "ORDER_CREATED";
@@ -137,6 +137,10 @@ public class CallTraceService {
             case "record_unanswered_question" -> "UNANSWERED_QUESTION";
             default -> null;
         };
+    }
+
+    private static boolean bookingActuallyCreated(JSONObject data) {
+        return data != null && !data.optString("bookingId", "").isBlank();
     }
 
     private static String entityType(String toolName) {
