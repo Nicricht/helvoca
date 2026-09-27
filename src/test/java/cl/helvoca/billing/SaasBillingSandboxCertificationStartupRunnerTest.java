@@ -38,6 +38,20 @@ class SaasBillingSandboxCertificationStartupRunnerTest {
     }
 
     @Test
+    void enabledRunnerRejectsInvalidBusinessIdBeforeProviderCall() {
+        BillingSubscriptionService billing = mock(BillingSubscriptionService.class);
+        SaasBillingSandboxCertificationStartupRunner runner = runner(
+                true, true, "not-a-uuid", "test@testuser.com", "EMPRENDE", billing);
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> runner.run(new DefaultApplicationArguments(new String[0])));
+
+        assertTrue(error.getMessage().contains("BUSINESS_ID"));
+        verifyNoInteractions(billing);
+    }
+
+    @Test
     void rejectsNonTestPayerBeforeProviderCall() {
         BillingSubscriptionService billing = mock(BillingSubscriptionService.class);
         SaasBillingSandboxCertificationStartupRunner runner = runner(
@@ -103,6 +117,92 @@ class SaasBillingSandboxCertificationStartupRunnerTest {
 
         verify(databaseContext).runAsTenant(eq(businessId), any(Runnable.class));
         verify(billing).createCheckout(businessId, "test@testuser.com", "NEGOCIO");
+    }
+
+    @Test
+    void rejectsNullProviderResponse() {
+        UUID businessId = UUID.randomUUID();
+        BillingSubscriptionService billing = mock(BillingSubscriptionService.class);
+        when(billing.createCheckout(businessId, "test@testuser.com", "EMPRENDE"))
+                .thenReturn(null);
+
+        SaasBillingSandboxCertificationStartupRunner runner = runner(
+                false, true, "", "", "EMPRENDE", billing);
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> runner.certify(businessId, "test@testuser.com", "EMPRENDE"));
+
+        assertTrue(error.getMessage().contains("no subscription id"));
+    }
+
+    @Test
+    void rejectsProviderResponseWithoutSubscriptionId() {
+        UUID businessId = UUID.randomUUID();
+        BillingSubscriptionService billing = mock(BillingSubscriptionService.class);
+        when(billing.createCheckout(businessId, "test@testuser.com", "EMPRENDE"))
+                .thenReturn(new BillingSubscriptionService.CheckoutResponse(
+                        null,
+                        "https://www.mercadopago.cl/subscriptions/checkout?preapproval_id=test",
+                        "EMPRENDE",
+                        "Emprende",
+                        24990,
+                        false));
+
+        SaasBillingSandboxCertificationStartupRunner runner = runner(
+                false, true, "", "", "EMPRENDE", billing);
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> runner.certify(businessId, "test@testuser.com", "EMPRENDE"));
+
+        assertTrue(error.getMessage().contains("no subscription id"));
+    }
+
+    @Test
+    void rejectsProviderResponseWithInvalidPrice() {
+        UUID businessId = UUID.randomUUID();
+        BillingSubscriptionService billing = mock(BillingSubscriptionService.class);
+        when(billing.createCheckout(businessId, "test@testuser.com", "EMPRENDE"))
+                .thenReturn(new BillingSubscriptionService.CheckoutResponse(
+                        "preapproval-test-123",
+                        "https://www.mercadopago.cl/subscriptions/checkout?preapproval_id=test",
+                        "EMPRENDE",
+                        "Emprende",
+                        0,
+                        false));
+
+        SaasBillingSandboxCertificationStartupRunner runner = runner(
+                false, true, "", "", "EMPRENDE", billing);
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> runner.certify(businessId, "test@testuser.com", "EMPRENDE"));
+
+        assertTrue(error.getMessage().contains("invalid price"));
+    }
+
+    @Test
+    void rejectsProviderResponseWithoutCheckoutUrl() {
+        UUID businessId = UUID.randomUUID();
+        BillingSubscriptionService billing = mock(BillingSubscriptionService.class);
+        when(billing.createCheckout(businessId, "test@testuser.com", "EMPRENDE"))
+                .thenReturn(new BillingSubscriptionService.CheckoutResponse(
+                        "preapproval-test-123",
+                        null,
+                        "EMPRENDE",
+                        "Emprende",
+                        24990,
+                        false));
+
+        SaasBillingSandboxCertificationStartupRunner runner = runner(
+                false, true, "", "", "EMPRENDE", billing);
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> runner.certify(businessId, "test@testuser.com", "EMPRENDE"));
+
+        assertTrue(error.getMessage().contains("no HTTPS checkout URL"));
     }
 
     @Test
