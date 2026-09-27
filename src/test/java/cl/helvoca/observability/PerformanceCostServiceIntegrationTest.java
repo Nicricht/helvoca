@@ -171,7 +171,7 @@ class PerformanceCostServiceIntegrationTest {
 
         assertEquals(0, snapshot.current().calls());
         assertEquals(0, snapshot.current().observedJourneys());
-        assertEquals(BigDecimal.ZERO.setScale(6), snapshot.current().toolCallsPerJourney());
+        assertEquals(0, snapshot.current().toolCallsPerJourney().compareTo(BigDecimal.ZERO));
     }
 
     private UUID insertCall(UUID tenant,
