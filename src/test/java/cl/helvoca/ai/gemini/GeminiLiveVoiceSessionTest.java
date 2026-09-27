@@ -84,6 +84,8 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("Evita \"¿Qué es lo que usted desea?\""));
         assertTrue(instructions.contains("habla rápido, ágil y fluido"));
         assertTrue(instructions.contains("Termina de decir todas las palabras de la despedida"));
+        assertTrue(instructions.contains("completar una reserva, venta, consulta o cualquier otra acción NO significa que la llamada terminó"));
+        assertTrue(instructions.contains("entrega rápida, cálida y envolvente"));
         assertTrue(instructions.contains("a las nueve y media"));
         assertTrue(instructions.contains("nunca menciones UUID"));
         assertTrue(instructions.contains("success=true sin bookingId es solo una propuesta pendiente de confirmación"));
@@ -151,6 +153,52 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void explicitClosingIntentRecognizerRejectsSimpleConfirmation() {
+        assertFalse(GeminiLiveVoiceSession.hasExplicitClosingIntent("Sí."));
+        assertFalse(GeminiLiveVoiceSession.hasExplicitClosingIntent("Perfecto."));
+        assertTrue(GeminiLiveVoiceSession.hasExplicitClosingIntent("No, gracias."));
+        assertTrue(GeminiLiveVoiceSession.hasExplicitClosingIntent("Eso es todo, chao."));
+        assertTrue(GeminiLiveVoiceSession.hasExplicitClosingIntent("Puedes cortar la llamada."));
+    }
+
+    @Test
+    void endCallIsBlockedAfterSimpleConfirmationWithoutGoodbye() {
+        GeminiLiveProperties properties = properties();
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                transport,
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        WebSocket providerSocket = mock(WebSocket.class);
+        JSONObject userConfirmation = new JSONObject()
+                .put("serverContent", new JSONObject()
+                        .put("inputTranscription", new JSONObject().put("text", "Sí."))
+                        .put("turnComplete", true));
+        session.onText(providerSocket, userConfirmation.toString(), true);
+
+        JSONObject toolCall = new JSONObject().put("toolCall", new JSONObject()
+                .put("functionCalls", new JSONArray().put(new JSONObject()
+                        .put("id", "end-premature")
+                        .put("name", "end_call")
+                        .put("args", new JSONObject()))));
+        session.onText(providerSocket, toolCall.toString(), true);
+
+        verify(tools, never()).prepareDeferredEndCall(context);
+        verify(transport, never()).endAfterPlayback();
+    }
+
+    @Test
     void endCallWaitsForGenerationBoundaryBeforeCarrierPlaybackHangup() {
         GeminiLiveProperties properties = properties();
         RealtimeCallContext context = context();
@@ -178,6 +226,12 @@ class GeminiLiveVoiceSessionTest {
                 HttpClient.newHttpClient());
 
         WebSocket providerSocket = mock(WebSocket.class);
+        JSONObject closingTurn = new JSONObject()
+                .put("serverContent", new JSONObject()
+                        .put("inputTranscription", new JSONObject().put("text", "No, gracias. Eso es todo."))
+                        .put("turnComplete", true));
+        session.onText(providerSocket, closingTurn.toString(), true);
+
         JSONObject toolCall = new JSONObject().put("toolCall", new JSONObject()
                 .put("functionCalls", new JSONArray().put(new JSONObject()
                         .put("id", "end-1")
