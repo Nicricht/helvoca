@@ -41,6 +41,19 @@ class TwilioCertificationCommandCallLauncherTest {
     }
 
     @Test
+    void certificationTokenIsPartOfSignedPathNotQueryString() {
+        TwilioCertificationCommandCallLauncher launcher = launcher(
+                properties(), "+56966939611", "+56966939611", "+56975856664", mock(HttpClient.class));
+
+        String url = launcher.certificationVoiceUrl(TOKEN);
+
+        assertEquals(
+                "https://recepvoz.example/webhooks/v1/twilio/inbound-certification/" + TOKEN,
+                url);
+        assertFalse(url.contains("?token="));
+    }
+
+    @Test
     void validTokenCreatesCallThroughInjectedHttpClient() throws Exception {
         HttpClient http = mock(HttpClient.class);
         HttpResponse<String> response = mock(HttpResponse.class);
