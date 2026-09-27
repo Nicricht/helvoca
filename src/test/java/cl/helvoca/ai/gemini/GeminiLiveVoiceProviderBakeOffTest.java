@@ -49,6 +49,30 @@ class GeminiLiveVoiceProviderBakeOffTest {
     }
 
     @Test
+    void bakeOffContextIsClassifiedAsCertificationSession() {
+        GeminiLiveProperties properties = new GeminiLiveProperties();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        GeminiLiveVoiceProvider provider = new GeminiLiveVoiceProvider(
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry());
+
+        RealtimeCallContext bakeOff = new RealtimeCallContext(
+                UUID.randomUUID(), UUID.randomUUID(), null,
+                "+56966939611", "+14355652512", "MZ-bakeoff", "Achird");
+        RealtimeCallContext normal = new RealtimeCallContext(
+                UUID.randomUUID(), UUID.randomUUID(), null,
+                "+56911111111", "+14355652512", "MZ-normal");
+
+        assertEquals(true, provider.certificationSession(bakeOff));
+        assertEquals(false, provider.certificationSession(normal));
+    }
+
+    @Test
     void unknownOverrideCannotBypassCuratedCatalog() {
         GeminiLiveProperties properties = new GeminiLiveProperties();
         properties.setEnabled(true);
