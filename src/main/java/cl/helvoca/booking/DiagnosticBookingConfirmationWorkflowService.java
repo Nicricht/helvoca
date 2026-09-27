@@ -12,7 +12,6 @@ import org.json.JSONObject;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
@@ -37,7 +36,7 @@ public class DiagnosticBookingConfirmationWorkflowService extends BookingConfirm
     }
 
     @Override
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional
     public JSONObject execute(UUID businessId,
                               UUID customerId,
                               UUID sourceReferenceId,
