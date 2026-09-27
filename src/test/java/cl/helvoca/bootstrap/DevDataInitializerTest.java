@@ -363,6 +363,57 @@ class DevDataInitializerTest {
     }
 
     @Test
+    void readinessValidationCoversEachRequiredProfileAndAgentBranch() throws Exception {
+        DemoMocks f = new DemoMocks();
+        DevDataInitializer initializer = f.initializer(true);
+        initializer.run();
+
+        BusinessProfile profile = f.profile.get();
+        profile.setPublicDescription(null);
+        assertReadinessBlocker(initializer, f.businessId, "BUSINESS_PROFILE");
+        profile.setPublicDescription("Demo");
+
+        profile.setPublicDescription("   ");
+        assertReadinessBlocker(initializer, f.businessId, "BUSINESS_PROFILE");
+        profile.setPublicDescription("Demo");
+
+        profile.setAddressLine(null);
+        assertReadinessBlocker(initializer, f.businessId, "BUSINESS_PROFILE");
+        profile.setAddressLine("Pasaje Demo 123");
+
+        profile.setAddressLine("   ");
+        assertReadinessBlocker(initializer, f.businessId, "BUSINESS_PROFILE");
+        profile.setAddressLine("Pasaje Demo 123");
+
+        profile.setUsesReservations(false);
+        assertReadinessBlocker(initializer, f.businessId, "BUSINESS_PROFILE");
+        profile.setUsesReservations(true);
+
+        AiAgent agent = f.agent.get();
+        agent.setActive(false);
+        assertReadinessBlocker(initializer, f.businessId, "AI_AGENT");
+        agent.setActive(true);
+
+        for (AiCapability capability : List.of(
+                AiCapability.GET_BUSINESS_INFORMATION,
+                AiCapability.LIST_SERVICES,
+                AiCapability.SEARCH_KNOWLEDGE,
+                AiCapability.CHECK_BOOKING_AVAILABILITY,
+                AiCapability.CREATE_BOOKING)) {
+            agent.getCapabilities().remove(capability);
+            assertReadinessBlocker(initializer, f.businessId, "AI_AGENT");
+            agent.getCapabilities().add(capability);
+        }
+    }
+
+    private static void assertReadinessBlocker(DevDataInitializer initializer, UUID businessId, String blocker) {
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> ReflectionTestUtils.invokeMethod(initializer, "validateDemoReadiness", businessId));
+        assertTrue(error.getMessage().contains(blocker));
+    }
+
+    @Test
     void doesNothingWhenSeedIsDisabled() throws Exception {
         BusinessRepository businesses = mock(BusinessRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
