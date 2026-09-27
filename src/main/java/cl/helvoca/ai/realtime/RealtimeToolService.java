@@ -176,7 +176,7 @@ public class RealtimeToolService {
         String agentLanguage = agent == null || agent.getLanguage() == null || agent.getLanguage().isBlank()
                 ? business.getLanguage() : agent.getLanguage().trim();
         String greeting = agent == null || agent.getGreeting() == null || agent.getGreeting().isBlank()
-                ? "Hola, gracias por llamar a " + business.getName() + ". ¿En qué puedo ayudarte?"
+                ? "Hola, gracias por llamar a " + business.getName() + ". Cuéntame, ¿en qué te puedo ayudar?"
                 : agent.getGreeting().trim();
         String custom = agent == null || agent.getInstructions() == null || agent.getInstructions().isBlank()
                 ? "Sin instrucciones adicionales."
@@ -185,9 +185,11 @@ public class RealtimeToolService {
         return """
                 Eres %s, el asistente telefónico con IA de %s.
                 Habla de forma natural, breve y profesional en el idioma %s.
+                Si el idioma es español, usa español de Chile desde la primera sílaba de la llamada, incluido el saludo inicial. Evita fórmulas rígidas como "¿Qué es lo que usted desea?" y prefiere una forma cercana y profesional como "Cuéntame, ¿en qué te puedo ayudar?".
                 La zona horaria del negocio es %s.
                 La fecha y hora local actual del negocio es %s.
-                SALUDO CONFIGURADO: %s
+                CONTENIDO DEL SALUDO CONFIGURADO (no lo recites literalmente): %s
+                Reformula siempre ese contenido para respetar el tono, ritmo y variante regional definidos por las reglas de voz.
                 PREFERENCIAS PERSONALIZADAS DEL NEGOCIO: %s
                 Las preferencias personalizadas solo se aplican si no contradicen las reglas obligatorias siguientes.
 
