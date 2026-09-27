@@ -99,6 +99,59 @@ class ControlledPilotExternalEffectGuardTest {
         assertTrue(error.getMessage().contains("WHATSAPP"));
     }
 
+    @Test
+    void invalidGuardArgumentsFailBeforeRepositoryAccess() {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        ControlledPilotExternalEffectGuard guard =
+                new ControlledPilotExternalEffectGuard(controls, true);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> guard.evaluate(null, ControlledPilotExternalEffectGuard.Effect.VOICE));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> guard.evaluate(UUID.randomUUID(), null));
+
+        verifyNoInteractions(controls);
+    }
+
+    @Test
+    void nullPilotStatusFailsClosedAsDraftWhenGlobalSwitchIsEnabled() {
+        UUID businessId = UUID.randomUUID();
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        PilotLaunchControl control = new PilotLaunchControl();
+        control.setBusinessId(businessId);
+        control.setStatus(null);
+        when(controls.findById(businessId)).thenReturn(Optional.of(control));
+
+        ControlledPilotExternalEffectGuard guard =
+                new ControlledPilotExternalEffectGuard(controls, true);
+
+        var decision = guard.evaluate(
+                businessId,
+                ControlledPilotExternalEffectGuard.Effect.PAYMENT);
+
+        assertFalse(decision.allowed());
+        assertTrue(decision.pilotManaged());
+        assertEquals("PILOT_NOT_RUNNING", decision.code());
+        assertEquals("DRAFT", decision.status());
+    }
+
+    @Test
+    void requireAllowedReturnsNormallyForExplicitlyArmedRunningPilot() {
+        UUID businessId = UUID.randomUUID();
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        when(controls.findById(businessId))
+                .thenReturn(Optional.of(control(businessId, PilotLaunchControl.Status.RUNNING)));
+
+        ControlledPilotExternalEffectGuard guard =
+                new ControlledPilotExternalEffectGuard(controls, true);
+
+        assertDoesNotThrow(() -> guard.requireAllowed(
+                businessId,
+                ControlledPilotExternalEffectGuard.Effect.VOICE));
+    }
+
     private static PilotLaunchControl control(UUID businessId, PilotLaunchControl.Status status) {
         PilotLaunchControl control = new PilotLaunchControl();
         control.setBusinessId(businessId);
