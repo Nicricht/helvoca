@@ -18,7 +18,7 @@ function card(plan) {
       <ul>
         <li><strong>${plan.includedMinutes}</strong> minutos incluidos</li>
         <li><strong>${plan.maxConcurrentCalls}</strong> llamada${plan.maxConcurrentCalls === 1 ? '' : 's'} simultánea${plan.maxConcurrentCalls === 1 ? '' : 's'}</li>
-        <li>Atención IA 24/7</li>
+        <li>Atención IA con datos y reglas del negocio</li>
         <li>Preguntas, reservas y reagendamiento</li>
         <li>Transferencia a humano</li>
         <li>${overage}</li>
