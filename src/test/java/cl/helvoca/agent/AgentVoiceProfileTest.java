@@ -32,6 +32,8 @@ class AgentVoiceProfileTest {
     void legacyDespinaSelectionMigratesToYouthfulFemaleProfile() {
         assertEquals("seductive_female", AgentVoiceProfile.normalizeForStorage("Despina"));
         assertEquals("Leda", AgentVoiceProfile.resolveGemini("Despina", "Kore"));
+        assertEquals("Leda", AgentVoiceProfile.resolveGemini(null, "Despina"));
+        assertEquals("Leda", AgentVoiceProfile.resolveGemini(" ", "Despina"));
         assertEquals("coral", AgentVoiceProfile.resolveOpenAi("Despina", "alloy"));
     }
 
