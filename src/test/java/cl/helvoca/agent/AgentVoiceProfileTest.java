@@ -36,6 +36,14 @@ class AgentVoiceProfileTest {
     }
 
     @Test
+    void legacyGlobalDespinaFallbackAlsoMigratesToLeda() {
+        assertEquals("Leda", AgentVoiceProfile.resolveGemini(null, "Despina"));
+        assertEquals("Leda", AgentVoiceProfile.resolveGemini("   ", "Despina"));
+        assertEquals("Kore", AgentVoiceProfile.resolveGemini(null, "Kore"));
+        assertNull(AgentVoiceProfile.resolveGemini(null, null));
+    }
+
+    @Test
     void commercialVoiceProfilesRemainDistinctAndResolvePerProvider() {
         assertEquals("seductive_female", AgentVoiceProfile.normalizeForStorage("seductive_female"));
         assertEquals("Leda", AgentVoiceProfile.resolveGemini("seductive_female", "Kore"));
