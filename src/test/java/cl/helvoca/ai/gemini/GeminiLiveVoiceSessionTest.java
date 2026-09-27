@@ -165,12 +165,15 @@ class GeminiLiveVoiceSessionTest {
 
         ArgumentCaptor<CharSequence> sent = ArgumentCaptor.forClass(CharSequence.class);
         verify(socket, atLeast(2)).sendText(sent.capture(), eq(true));
-        assertTrue(sent.getAllValues().stream()
+        var realtimeTexts = sent.getAllValues().stream()
                 .map(CharSequence::toString)
-                .anyMatch(payload -> payload.contains("[RECEPVOZ_VOICE_BAKEOFF_SAMPLE]")));
-        assertFalse(sent.getAllValues().stream()
-                .map(CharSequence::toString)
-                .anyMatch(payload -> payload.contains("[RECEPVOZ_CALL_CONNECTED]")));
+                .map(JSONObject::new)
+                .filter(payload -> payload.has("realtimeInput"))
+                .map(payload -> payload.getJSONObject("realtimeInput").optString("text"))
+                .toList();
+
+        assertTrue(realtimeTexts.contains("[RECEPVOZ_VOICE_BAKEOFF_SAMPLE]"));
+        assertFalse(realtimeTexts.contains("[RECEPVOZ_CALL_CONNECTED]"));
         verify(lifecycle).markAiSetupCompleted(context.callId());
     }
 
