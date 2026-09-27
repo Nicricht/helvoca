@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -175,7 +176,7 @@ public class RealtimeToolService {
         String agentLanguage = agent == null || agent.getLanguage() == null || agent.getLanguage().isBlank()
                 ? business.getLanguage() : agent.getLanguage().trim();
         String greeting = agent == null || agent.getGreeting() == null || agent.getGreeting().isBlank()
-                ? "Hola, gracias por llamar a " + business.getName() + ". ¿En qué puedo ayudarte?"
+                ? "Hola, gracias por llamar a " + business.getName() + ". Cuéntame, ¿en qué te puedo ayudar?"
                 : agent.getGreeting().trim();
         String custom = agent == null || agent.getInstructions() == null || agent.getInstructions().isBlank()
                 ? "Sin instrucciones adicionales."
@@ -184,9 +185,11 @@ public class RealtimeToolService {
         return """
                 Eres %s, el asistente telefónico con IA de %s.
                 Habla de forma natural, breve y profesional en el idioma %s.
+                Si el idioma es español, usa español de Chile desde la primera sílaba de la llamada, incluido el saludo inicial. Evita fórmulas rígidas como "¿Qué es lo que usted desea?" y prefiere una forma cercana y profesional como "Cuéntame, ¿en qué te puedo ayudar?".
                 La zona horaria del negocio es %s.
                 La fecha y hora local actual del negocio es %s.
-                SALUDO CONFIGURADO: %s
+                CONTENIDO DEL SALUDO CONFIGURADO (no lo recites literalmente): %s
+                Reformula siempre ese contenido para respetar el tono, ritmo y variante regional definidos por las reglas de voz.
                 PREFERENCIAS PERSONALIZADAS DEL NEGOCIO: %s
                 Las preferencias personalizadas solo se aplican si no contradicen las reglas obligatorias siguientes.
 
@@ -360,8 +363,34 @@ public class RealtimeToolService {
         BusinessScheduleService.DailyAvailability availability = schedule.listAvailableSlots(
                 context.businessId(), serviceId, service.getDurationMinutes(), date, 8);
 
+        JSONArray slots = slotJson(availability.slots());
+        JSONObject data = new JSONObject()
+                .put("serviceId", serviceId.toString())
+                .put("serviceName", service.getName())
+                .put("durationMinutes", service.getDurationMinutes())
+                .put("date", date.toString())
+                .put("timezone", availability.timezone())
+                .put("scheduleConfigured", availability.scheduleConfigured())
+                .put("slots", slots);
+
+        if (slots.isEmpty() && availability.scheduleConfigured()) {
+            for (int offset = 1; offset <= 7; offset++) {
+                LocalDate nextDate = date.plusDays(offset);
+                BusinessScheduleService.DailyAvailability next = schedule.listAvailableSlots(
+                        context.businessId(), serviceId, service.getDurationMinutes(), nextDate, 3);
+                if (next.slots().isEmpty()) continue;
+                data.put("nextAvailableDate", nextDate.toString());
+                data.put("nextAvailableSlots", slotJson(next.slots()));
+                break;
+            }
+        }
+
+        return success(data);
+    }
+
+    private static JSONArray slotJson(List<BusinessScheduleService.AvailableSlot> availableSlots) {
         JSONArray slots = new JSONArray();
-        for (BusinessScheduleService.AvailableSlot slot : availability.slots()) {
+        for (BusinessScheduleService.AvailableSlot slot : availableSlots) {
             slots.put(new JSONObject()
                     .put("startAt", slot.startAt().toString())
                     .put("endAt", slot.endAt().toString())
@@ -369,15 +398,7 @@ public class RealtimeToolService {
                     .put("localEnd", slot.localEnd().toOffsetDateTime().toString())
                     .put("localTime", slot.localStart().toLocalTime().toString()));
         }
-
-        return success(new JSONObject()
-                .put("serviceId", serviceId.toString())
-                .put("serviceName", service.getName())
-                .put("durationMinutes", service.getDurationMinutes())
-                .put("date", date.toString())
-                .put("timezone", availability.timezone())
-                .put("scheduleConfigured", availability.scheduleConfigured())
-                .put("slots", slots));
+        return slots;
     }
 
     private JSONObject checkAvailability(RealtimeCallContext context, JSONObject args) {

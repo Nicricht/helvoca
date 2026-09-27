@@ -44,6 +44,12 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private static final Logger log = LoggerFactory.getLogger(GeminiLiveVoiceSession.class);
     private static final int MAX_QUEUED_AUDIO_FRAMES = 250;
     private static final int MAX_PENDING_MESSAGES = 600;
+    private static final long READ_TOOL_DEDUPE_WINDOW_MS = 5_000L;
+    private static final Set<String> DEDUPED_READ_TOOLS = Set.of(
+            "list_services",
+            "find_caller",
+            "list_available_slots",
+            "check_booking_availability");
 
     private final RealtimeCallContext context;
     private final VoiceTransportSession transport;
@@ -57,6 +63,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final HttpClient http;
     private final Queue<String> pendingAudio = new ConcurrentLinkedQueue<>();
     private final Set<String> completedToolCalls = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<String, CachedToolResult> recentReadToolResults = new ConcurrentHashMap<>();
     private final AtomicBoolean setupComplete = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean finalized = new AtomicBoolean(false);
@@ -66,6 +73,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final AtomicBoolean certificationBookingProposalReady = new AtomicBoolean(false);
     private final AtomicBoolean certificationBookingCreated = new AtomicBoolean(false);
     private final AtomicBoolean certificationBookingCancelled = new AtomicBoolean(false);
+    private final AtomicBoolean certificationAwaitingPostToolBoundary = new AtomicBoolean(false);
+    private final AtomicBoolean certificationPostToolOutputSeen = new AtomicBoolean(false);
     private final GeminiWebSocketJsonFrames inboundFrames = new GeminiWebSocketJsonFrames();
     private final StringBuilder userTranscript = new StringBuilder();
     private final StringBuilder assistantTranscript = new StringBuilder();
@@ -268,8 +277,27 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             }
         }
 
-        if (content.optBoolean("turnComplete", false)) {
+        boolean turnComplete = content.optBoolean("turnComplete", false);
+        boolean generationComplete = content.optBoolean("generationComplete", false);
+        boolean waitingForInput = content.optBoolean("waitingForInput", false);
+        if (properties.isCertificationSimulation()
+                && certificationAwaitingPostToolBoundary.get()
+                && (modelTurn != null || (output != null && !output.optString("text", "").isBlank())
+                || waitingForInput)) {
+            certificationPostToolOutputSeen.set(true);
+        }
+
+        if (turnComplete) {
             flushTranscripts();
+            certificationAwaitingPostToolBoundary.set(false);
+            certificationPostToolOutputSeen.set(false);
+            advanceCertificationSimulation();
+        } else if (generationComplete && properties.isCertificationSimulation()
+                && (!certificationAwaitingPostToolBoundary.get()
+                || certificationPostToolOutputSeen.get())) {
+            flushTranscripts();
+            certificationAwaitingPostToolBoundary.set(false);
+            certificationPostToolOutputSeen.set(false);
             advanceCertificationSimulation();
         }
     }
@@ -327,7 +355,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         if (!certificationStep.compareAndSet(step, nextStep)) return;
         transcripts.append(context.callId(), "USER", "[SIMULATED_CERTIFICATION] " + text);
         log.info("RECEPVOZ_CERTIFICATION_SCENARIO step={} call={}", nextStep, context.callId());
-        sendRealtimeText(text);
+        sendClientTurn(text);
     }
 
     private void recordCertificationToolOutcome(String name, boolean success, JSONObject data) {
@@ -358,6 +386,15 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         send(new JSONObject().put("realtimeInput", new JSONObject().put("text", text)));
     }
 
+    private void sendClientTurn(String text) {
+        JSONObject turn = new JSONObject()
+                .put("role", "user")
+                .put("parts", new JSONArray().put(new JSONObject().put("text", text)));
+        send(new JSONObject().put("clientContent", new JSONObject()
+                .put("turns", new JSONArray().put(turn))
+                .put("turnComplete", true)));
+    }
+
     private void handleToolCall(JSONObject toolCall) {
         JSONArray calls = toolCall.optJSONArray("functionCalls");
         if (calls == null || calls.isEmpty()) return;
@@ -371,8 +408,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             JSONObject args = function.optJSONObject("args");
             if (id == null || name == null || !completedToolCalls.add(id)) continue;
 
+            JSONObject safeArgs = args == null ? new JSONObject() : args;
             log.info("tool_call_started call_id={} tool_name={}", context.callId(), name);
-            JSONObject result = executeTool(name, args == null ? new JSONObject() : args);
+            JSONObject result = executeToolWithShortDedupe(name, safeArgs);
             boolean success = result.optBoolean("success", false);
             JSONObject data = result.optJSONObject("data");
             String entityId = data == null ? null : firstEntityId(data);
@@ -385,9 +423,57 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                     .put("response", new JSONObject().put("result", result)));
         }
         if (!responses.isEmpty()) {
+            if (properties.isCertificationSimulation()) {
+                certificationAwaitingPostToolBoundary.set(true);
+                certificationPostToolOutputSeen.set(false);
+            }
             send(new JSONObject().put("toolResponse",
                     new JSONObject().put("functionResponses", responses)));
         }
+    }
+
+    private JSONObject executeToolWithShortDedupe(String name, JSONObject args) {
+        if (!DEDUPED_READ_TOOLS.contains(name)) return executeTool(name, args);
+
+        long now = System.currentTimeMillis();
+        String key = name + "|" + canonicalJson(args);
+        CachedToolResult cached = recentReadToolResults.get(key);
+        if (cached != null && now - cached.createdAtMillis() <= READ_TOOL_DEDUPE_WINDOW_MS) {
+            log.info("tool_call_deduplicated call_id={} tool_name={}", context.callId(), name);
+            return new JSONObject(cached.payload());
+        }
+
+        JSONObject result = executeTool(name, args);
+        if (result.optBoolean("success", false)) {
+            recentReadToolResults.put(key, new CachedToolResult(result.toString(), now));
+        }
+        recentReadToolResults.entrySet().removeIf(entry ->
+                now - entry.getValue().createdAtMillis() > READ_TOOL_DEDUPE_WINDOW_MS);
+        return result;
+    }
+
+    private static String canonicalJson(Object value) {
+        if (value == null || value == JSONObject.NULL) return "null";
+        if (value instanceof JSONObject object) {
+            StringBuilder out = new StringBuilder("{");
+            boolean first = true;
+            for (String key : object.keySet().stream().sorted().toList()) {
+                if (!first) out.append(',');
+                first = false;
+                out.append(JSONObject.quote(key)).append(':').append(canonicalJson(object.opt(key)));
+            }
+            return out.append('}').toString();
+        }
+        if (value instanceof JSONArray array) {
+            StringBuilder out = new StringBuilder("[");
+            for (int i = 0; i < array.length(); i++) {
+                if (i > 0) out.append(',');
+                out.append(canonicalJson(array.opt(i)));
+            }
+            return out.append(']').toString();
+        }
+        if (value instanceof String text) return JSONObject.quote(text);
+        return String.valueOf(value);
     }
 
     private JSONObject executeTool(String name, JSONObject args) {
@@ -455,18 +541,26 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
         JSONObject activityDetection = new JSONObject()
                 .put("disabled", false)
-                .put("endOfSpeechSensitivity", "END_SENSITIVITY_HIGH")
-                .put("silenceDurationMs", 250);
+                .put("startOfSpeechSensitivity", "START_SENSITIVITY_HIGH")
+                .put("prefixPaddingMs", 80)
+                .put("endOfSpeechSensitivity", "END_SENSITIVITY_LOW")
+                .put("silenceDurationMs", 450);
+
+        JSONObject inputTranscription = new JSONObject()
+                .put("languageCodes", new JSONArray().put("es-CL"))
+                .put("customVocabulary", new JSONArray().put("RecepVoz"))
+                .put("mode", "VERBATIM");
 
         JSONObject setup = new JSONObject()
                 .put("model", "models/" + properties.getModel().trim())
                 .put("generationConfig", generation)
                 .put("realtimeInputConfig", new JSONObject()
-                        .put("automaticActivityDetection", activityDetection))
+                        .put("automaticActivityDetection", activityDetection)
+                        .put("activityHandling", "START_OF_ACTIVITY_INTERRUPTS"))
                 .put("systemInstruction", new JSONObject()
                         .put("parts", new JSONArray().put(new JSONObject()
                                 .put("text", systemInstructions()))))
-                .put("inputAudioTranscription", new JSONObject())
+                .put("inputAudioTranscription", inputTranscription)
                 .put("outputAudioTranscription", new JSONObject())
                 .put("tools", new JSONArray().put(new JSONObject()
                         .put("functionDeclarations", geminiFunctionDeclarations())));
@@ -513,12 +607,18 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         return tools.buildInstructions(context) + "\n" + """
                 REGLAS DE VOZ DE RECEPVOZ:
                 Tu nombre de producto es RecepVoz. Nunca te presentes como Helvoca.
-                Habla como una recepcionista humana, cálida, natural y breve. Haz una sola pregunta a la vez.
-                Permite interrupciones y usa el contexto previo; no repitas preguntas ya contestadas.
-                Nunca inventes disponibilidad ni confirmes acciones antes de que una herramienta devuelva success=true.
-                Si recibes exactamente el mensaje técnico [RECEPVOZ_CALL_CONNECTED], no lo menciones ni lo trates como palabras del cliente. Saluda brevemente, menciona el nombre del negocio y pregunta en qué puedes ayudar.
-                Si el cliente empieza a hablar mientras tú respondes, detente y atiende su nueva intervención.
-                Evita usar "Perfecto" de manera repetitiva.
+                RESPONDE SIEMPRE EN ESPAÑOL DE CHILE, salvo que el cliente pida explícitamente otro idioma.
+                DESDE LA PRIMERA SÍLABA: el saludo inicial también debe sonar chileno. No empieces con español neutro internacional para recién cambiar de variante después de que el cliente responda.
+                INTERPRETACIÓN VOCAL: habla como una recepcionista chilena adulta, cercana y profesional. Usa una entonación chilena urbana neutra, cálida y relajada. No suenes como locutora, IVR, lectura de guion ni asistente robótica.
+                RITMO: habla en frases breves, con velocidad conversacional de teléfono. Deja pequeñas pausas naturales entre ideas y antes de entregar horarios o datos consultados. No llenes todos los silencios.
+                LENGUAJE: usa español chileno cotidiano pero profesional. Expresiones como "ya", "sí, claro", "déjame revisar", "te cuento" o "¿te sirve ese horario?" son válidas cuando salen de forma natural. No fuerces "po", "cachái", "weón" ni caricaturices el acento.
+                NATURALIDAD: evita fórmulas burocráticas como "procederé a", "he verificado su solicitud" o "según los parámetros indicados". No repitas la misma muletilla, saludo o estructura en turnos consecutivos. No empieces todas las respuestas con "Perfecto".
+                HORARIOS Y DATOS: pronuncia horas como una persona, por ejemplo "a las nueve y media" en vez de leer "09:30 horas". Si hay varias alternativas, ofrece primero las dos o tres más útiles en una frase natural en vez de leer una lista mecánica.
+                CONVERSACIÓN: haz una sola pregunta a la vez. Escucha la idea completa del cliente; si hace una pausa breve, no asumas automáticamente que terminó. Permite interrupciones y si el cliente empieza a hablar, detente y atiende su nueva intervención.
+                HERRAMIENTAS: si una consulta de lectura ya devolvió success=true con los mismos datos y el cliente no cambió su solicitud, usa ese resultado y NO vuelvas a ejecutar la misma herramienta. Después de una herramienta, responde con el resultado en lenguaje humano; nunca menciones UUID, nombres internos de herramientas ni detalles técnicos.
+                VERACIDAD: nunca inventes disponibilidad ni confirmes acciones antes de que una herramienta devuelva success=true.
+                APERTURA: si recibes exactamente [RECEPVOZ_CALL_CONNECTED], no lo menciones ni lo trates como palabras del cliente. Desde esa primera respuesta usa español de Chile. El saludo configurado define el contenido, no una frase que debas recitar literalmente: reformúlalo con naturalidad chilena. Saluda en una sola frase breve con el nombre del negocio y usa una pregunta cercana y profesional como "Cuéntame, ¿en qué te puedo ayudar?". Evita "¿Qué es lo que usted desea?" y otras fórmulas rígidas.
+                IDENTIDAD: si te preguntan si eres una IA o asistente virtual, responde con honestidad y continúa ayudando.
                 """;
     }
 
@@ -602,14 +702,14 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         } catch (Exception e) {
             log.warn("Could not summarize Gemini call {}: {}", context.callId(), e.getMessage());
         }
-        if (properties.isCertificationSimulation()) {
-            try {
-                certifications.verifyAfterCall(context.callId());
-            } catch (Exception e) {
-                log.warn("Could not schedule certification verification call={}: {}", context.callId(), e.getMessage());
-            }
+        try {
+            certifications.verifyAfterCall(context.callId());
+        } catch (Exception e) {
+            log.warn("Could not schedule certification verification call={}: {}", context.callId(), e.getMessage());
         }
     }
+
+    private record CachedToolResult(String payload, long createdAtMillis) {}
 
     @Override
     public void close() {

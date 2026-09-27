@@ -23,6 +23,10 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,6 +35,24 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class RealtimeToolServiceTest {
+    @Test
+    void buildInstructionsKeepsChileanStyleFromInitialGreeting() {
+        UUID businessId = UUID.randomUUID();
+        RealtimeToolService tools = service();
+        BusinessRepository businesses = businesses(tools);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business("America/Santiago")));
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+10000000000", "+10000000001", "MZstream");
+
+        String instructions = tools.buildInstructions(context);
+
+        assertTrue(instructions.contains("español de Chile desde la primera sílaba"));
+        assertTrue(instructions.contains("CONTENIDO DEL SALUDO CONFIGURADO (no lo recites literalmente)"));
+        assertTrue(instructions.contains("Cuéntame, ¿en qué te puedo ayudar?"));
+        assertTrue(instructions.contains("¿Qué es lo que usted desea?"));
+    }
+
     @Test
     void modelCannotSelectAnotherTenant() {
         UUID trustedBusiness = UUID.randomUUID();
@@ -47,6 +69,69 @@ class RealtimeToolServiceTest {
         assertTrue(new JSONObject(result).getBoolean("success"));
         verify(services).findAllByBusinessIdOrderByNameAsc(trustedBusiness);
         verify(services, never()).findAllByBusinessIdOrderByNameAsc(attackerBusiness);
+    }
+
+    @Test
+    void listAvailableSlotsReturnsNextRealAlternativesWithoutDayByDayToolLoop() {
+        UUID businessId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        LocalDate requestedDate = LocalDate.of(2026, 9, 27);
+        LocalDate nextDate = requestedDate.plusDays(2);
+        ZoneId zone = ZoneId.of("America/Santiago");
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+
+        ServiceItem service = serviceItem(businessId, serviceId, "Consulta", 30);
+        when(services.findByIdAndBusinessId(serviceId, businessId)).thenReturn(Optional.of(service));
+
+        when(schedule.listAvailableSlots(businessId, serviceId, 30, requestedDate, 8))
+                .thenReturn(new BusinessScheduleService.DailyAvailability(
+                        true, zone.getId(), requestedDate, List.of()));
+        when(schedule.listAvailableSlots(businessId, serviceId, 30, requestedDate.plusDays(1), 3))
+                .thenReturn(new BusinessScheduleService.DailyAvailability(
+                        true, zone.getId(), requestedDate.plusDays(1), List.of()));
+
+        ZonedDateTime localStart = ZonedDateTime.of(nextDate, LocalTime.of(10, 30), zone);
+        BusinessScheduleService.AvailableSlot slot = new BusinessScheduleService.AvailableSlot(
+                localStart.toInstant(),
+                localStart.plusMinutes(30).toInstant(),
+                localStart,
+                localStart.plusMinutes(30));
+        when(schedule.listAvailableSlots(businessId, serviceId, 30, nextDate, 3))
+                .thenReturn(new BusinessScheduleService.DailyAvailability(
+                        true, zone.getId(), nextDate, List.of(slot)));
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZstream");
+        JSONObject result = new JSONObject(tools.execute(
+                context,
+                "list_available_slots",
+                new JSONObject()
+                        .put("serviceId", serviceId.toString())
+                        .put("date", requestedDate.toString())
+                        .toString()));
+
+        assertTrue(result.getBoolean("success"));
+        JSONObject data = result.getJSONObject("data");
+        assertTrue(data.getJSONArray("slots").isEmpty());
+        assertEquals(nextDate.toString(), data.getString("nextAvailableDate"));
+        assertEquals(1, data.getJSONArray("nextAvailableSlots").length());
+        assertEquals(slot.startAt().toString(),
+                data.getJSONArray("nextAvailableSlots").getJSONObject(0).getString("startAt"));
+
+        verify(schedule).listAvailableSlots(businessId, serviceId, 30, requestedDate, 8);
+        verify(schedule).listAvailableSlots(businessId, serviceId, 30, requestedDate.plusDays(1), 3);
+        verify(schedule).listAvailableSlots(businessId, serviceId, 30, nextDate, 3);
+        verifyNoMoreInteractions(schedule);
     }
 
     @Test
@@ -288,6 +373,16 @@ class RealtimeToolServiceTest {
                 mock(KnowledgeItemRepository.class), mock(BookingRepository.class), mock(CallSessionRepository.class),
                 mock(BusinessScheduleService.class), mock(BusinessRequestService.class),
                 mock(UnansweredQuestionService.class));
+    }
+
+    private static BusinessRepository businesses(RealtimeToolService service) {
+        try {
+            var field = RealtimeToolService.class.getDeclaredField("businesses");
+            field.setAccessible(true);
+            return (BusinessRepository) field.get(service);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 
     private static ServiceItemRepository services(RealtimeToolService service) {

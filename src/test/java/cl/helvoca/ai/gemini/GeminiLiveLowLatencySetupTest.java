@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 class GeminiLiveLowLatencySetupTest {
 
     @Test
-    void setupEndsSpeechQuicklyWithoutDisablingAutomaticVad() {
+    void setupAllowsNaturalPausesWithoutDisablingBargeIn() {
         GeminiLiveProperties properties = new GeminiLiveProperties();
         properties.setEnabled(true);
         properties.setApiKey("test-key");
@@ -49,13 +49,16 @@ class GeminiLiveLowLatencySetupTest {
                 new VoiceProviderHealthRegistry(),
                 HttpClient.newHttpClient());
 
-        JSONObject activity = session.buildSetup()
-                .getJSONObject("setup")
-                .getJSONObject("realtimeInputConfig")
-                .getJSONObject("automaticActivityDetection");
+        JSONObject setup = session.buildSetup().getJSONObject("setup");
+        JSONObject realtimeInput = setup.getJSONObject("realtimeInputConfig");
+        JSONObject activity = realtimeInput.getJSONObject("automaticActivityDetection");
 
         assertFalse(activity.getBoolean("disabled"));
-        assertEquals("END_SENSITIVITY_HIGH", activity.getString("endOfSpeechSensitivity"));
-        assertEquals(250, activity.getInt("silenceDurationMs"));
+        assertEquals("START_SENSITIVITY_HIGH", activity.getString("startOfSpeechSensitivity"));
+        assertEquals(80, activity.getInt("prefixPaddingMs"));
+        assertEquals("END_SENSITIVITY_LOW", activity.getString("endOfSpeechSensitivity"));
+        assertEquals(450, activity.getInt("silenceDurationMs"));
+        assertEquals("START_OF_ACTIVITY_INTERRUPTS", realtimeInput.getString("activityHandling"));
+        assertFalse(setup.has("proactivity"));
     }
 }

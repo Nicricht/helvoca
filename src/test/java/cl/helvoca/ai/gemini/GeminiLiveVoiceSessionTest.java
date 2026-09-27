@@ -61,12 +61,26 @@ class GeminiLiveVoiceSessionTest {
                 .getString("voiceName"));
         assertTrue(setup.has("inputAudioTranscription"));
         assertTrue(setup.has("outputAudioTranscription"));
+        JSONObject inputTranscription = setup.getJSONObject("inputAudioTranscription");
+        assertEquals("es-CL", inputTranscription.getJSONArray("languageCodes").getString(0));
+        assertEquals("VERBATIM", inputTranscription.getString("mode"));
+        assertTrue(inputTranscription.getJSONArray("customVocabulary").toList().contains("RecepVoz"));
+        assertFalse(setup.has("proactivity"));
 
         String instructions = setup.getJSONObject("systemInstruction")
                 .getJSONArray("parts").getJSONObject(0).getString("text");
         assertTrue(instructions.contains("Reglas oficiales del negocio"));
         assertTrue(instructions.contains("RecepVoz"));
         assertTrue(instructions.contains("[RECEPVOZ_CALL_CONNECTED]"));
+        assertTrue(instructions.contains("ESPAÑOL DE CHILE"));
+        assertTrue(instructions.contains("No suenes como locutora"));
+        assertTrue(instructions.contains("NO vuelvas a ejecutar la misma herramienta"));
+        assertTrue(instructions.contains("entonación chilena urbana neutra"));
+        assertTrue(instructions.contains("DESDE LA PRIMERA SÍLABA"));
+        assertTrue(instructions.contains("Cuéntame, ¿en qué te puedo ayudar?"));
+        assertTrue(instructions.contains("Evita \"¿Qué es lo que usted desea?\""));
+        assertTrue(instructions.contains("a las nueve y media"));
+        assertTrue(instructions.contains("nunca menciones UUID"));
 
         JSONArray declarations = setup.getJSONArray("tools")
                 .getJSONObject(0).getJSONArray("functionDeclarations");
@@ -187,6 +201,39 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void realCallCloseSchedulesCertificationReviewAndServiceFiltersNormalCalls() {
+        GeminiLiveProperties properties = properties();
+        properties.setCertificationSimulation(false);
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        CallCertificationService certifications = mock(CallCertificationService.class);
+
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+        when(socket.sendClose(anyInt(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                certifications,
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        session.onOpen(socket);
+        session.close();
+
+        verify(certifications).verifyAfterCall(context.callId());
+    }
+
+    @Test
     void certificationScenarioWaitsForAvailabilityCreationAndCancellationMilestones() {
         GeminiLiveProperties properties = properties();
         properties.setCertificationSimulation(true);
@@ -241,16 +288,19 @@ class GeminiLiveVoiceSessionTest {
         verify(transcripts, times(1)).append(eq(context.callId()), eq("USER"), anyString());
 
         session.onText(socket, toolCall("slot-1", "list_available_slots"), true);
+        verify(transcripts, never()).append(eq(context.callId()), eq("USER"), contains("Ejecuta ahora create_booking"));
         session.onText(socket, turnComplete(), true);
         verify(transcripts).append(eq(context.callId()), eq("USER"), contains("Ejecuta ahora create_booking"));
         verify(transcripts, times(2)).append(eq(context.callId()), eq("USER"), anyString());
 
         session.onText(socket, toolCall("book-1", "create_booking"), true);
+        verify(transcripts, never()).append(eq(context.callId()), eq("USER"), contains("ejecuta cancel_booking ahora"));
         session.onText(socket, turnComplete(), true);
         verify(transcripts).append(eq(context.callId()), eq("USER"), contains("ejecuta cancel_booking ahora"));
         verify(transcripts, times(3)).append(eq(context.callId()), eq("USER"), anyString());
 
         session.onText(socket, toolCall("cancel-1", "cancel_booking"), true);
+        verify(transcripts, never()).append(eq(context.callId()), eq("USER"), contains("La cancelación ya devolvió success=true"));
         session.onText(socket, turnComplete(), true);
         verify(transcripts).append(eq(context.callId()), eq("USER"), contains("La cancelación ya devolvió success=true"));
         verify(transcripts, times(4)).append(eq(context.callId()), eq("USER"), anyString());
@@ -260,12 +310,72 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(sent.getAllValues().stream()
                 .map(CharSequence::toString)
                 .map(JSONObject::new)
-                .anyMatch(message -> message.optJSONObject("realtimeInput") != null
-                        && message.getJSONObject("realtimeInput").optString("text", "")
-                        .contains("Ejecuta ahora create_booking")));
-        assertTrue(sent.getAllValues().stream()
-                .map(CharSequence::toString)
-                .noneMatch(message -> message.contains("\"clientContent\"")));
+                .anyMatch(message -> {
+                    JSONObject client = message.optJSONObject("clientContent");
+                    if (client == null || !client.optBoolean("turnComplete", false)) return false;
+                    JSONArray turns = client.optJSONArray("turns");
+                    if (turns == null || turns.isEmpty()) return false;
+                    JSONArray parts = turns.getJSONObject(0).optJSONArray("parts");
+                    return parts != null
+                            && !parts.isEmpty()
+                            && parts.getJSONObject(0).optString("text", "")
+                            .contains("Ejecuta ahora create_booking");
+                }));
+    }
+
+    @Test
+    void certificationScenarioAdvancesOnGenerationCompleteWithoutWaitingForPlaybackTurnComplete() {
+        GeminiLiveProperties properties = properties();
+        properties.setCertificationSimulation(true);
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.execute(eq(context), eq("list_available_slots"), anyString())).thenReturn(
+                new JSONObject().put("success", true)
+                        .put("data", new JSONObject().put("slots", new JSONArray().put(
+                                new JSONObject().put("startAt", "2026-09-14T22:00:00Z"))))
+                        .put("error", JSONObject.NULL)
+                        .toString());
+
+        CallTranscriptService transcripts = mock(CallTranscriptService.class);
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                transcripts,
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        session.onOpen(socket);
+        session.onText(socket, "{\"setupComplete\":{}}", true);
+        session.onText(socket, turnComplete(), true);
+        session.onText(socket, toolCall("slot-generation-complete", "list_available_slots"), true);
+
+        verify(transcripts, never()).append(eq(context.callId()), eq("USER"),
+                contains("Ejecuta ahora create_booking"));
+
+        session.onText(socket, generationComplete(), true);
+
+        verify(transcripts, never()).append(eq(context.callId()), eq("USER"),
+                contains("Ejecuta ahora create_booking"));
+
+        session.onText(socket, generationCompleteWithOutput("Ya revisé los horarios disponibles."), true);
+
+        verify(transcripts).append(eq(context.callId()), eq("USER"),
+                contains("Ejecuta ahora create_booking"));
+        verify(transcripts, times(2)).append(eq(context.callId()), eq("USER"), anyString());
+
+        session.onText(socket, turnComplete(), true);
+
+        verify(transcripts, times(2)).append(eq(context.callId()), eq("USER"), anyString());
     }
 
     @Test
@@ -439,6 +549,93 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void defaultLiveVoiceUsesNaturalProfileInsteadOfFirmKore() {
+        assertEquals("Aoede", new GeminiLiveProperties().getVoice());
+    }
+
+    @Test
+    void repeatedIdenticalReadToolCallIsDeduplicatedWithinShortWindow() {
+        GeminiLiveProperties properties = properties();
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.execute(eq(context), eq("list_available_slots"), anyString())).thenReturn(
+                new JSONObject()
+                        .put("success", true)
+                        .put("data", new JSONObject().put("slots", new JSONArray()))
+                        .put("error", JSONObject.NULL)
+                        .toString());
+
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        String serviceId = UUID.randomUUID().toString();
+        JSONObject firstArgs = new JSONObject()
+                .put("serviceId", serviceId)
+                .put("date", "2026-09-27");
+        JSONObject sameSemanticArgsDifferentOrder = new JSONObject()
+                .put("date", "2026-09-27")
+                .put("serviceId", serviceId);
+
+        session.onOpen(socket);
+        session.onText(socket, toolCall("slot-duplicate-1", "list_available_slots", firstArgs), true);
+        session.onText(socket, toolCall("slot-duplicate-2", "list_available_slots", sameSemanticArgsDifferentOrder), true);
+
+        verify(tools, times(1)).execute(eq(context), eq("list_available_slots"), anyString());
+    }
+
+    @Test
+    void sideEffectingToolCallsAreNeverDeduplicated() {
+        GeminiLiveProperties properties = properties();
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.execute(eq(context), eq("create_booking"), anyString())).thenReturn(
+                new JSONObject()
+                        .put("success", true)
+                        .put("data", new JSONObject().put("requiresConfirmation", true))
+                        .put("error", JSONObject.NULL)
+                        .toString());
+
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        JSONObject args = new JSONObject().put("serviceId", UUID.randomUUID().toString());
+
+        session.onOpen(socket);
+        session.onText(socket, toolCall("booking-1", "create_booking", args), true);
+        session.onText(socket, toolCall("booking-2", "create_booking", args), true);
+
+        verify(tools, times(2)).execute(eq(context), eq("create_booking"), anyString());
+    }
+
+    @Test
     void permissionDeniedAndAccessDeniedAreAuthFailures() {
         assertEquals(VoiceProviderHealthRegistry.FailureKind.AUTH,
                 GeminiLiveVoiceSession.classifyFailure(403, "PERMISSION_DENIED"));
@@ -472,6 +669,20 @@ class GeminiLiveVoiceSessionTest {
     private static String turnComplete() {
         return new JSONObject()
                 .put("serverContent", new JSONObject().put("turnComplete", true))
+                .toString();
+    }
+
+    private static String generationComplete() {
+        return new JSONObject()
+                .put("serverContent", new JSONObject().put("generationComplete", true))
+                .toString();
+    }
+
+    private static String generationCompleteWithOutput(String text) {
+        return new JSONObject()
+                .put("serverContent", new JSONObject()
+                        .put("outputTranscription", new JSONObject().put("text", text))
+                        .put("generationComplete", true))
                 .toString();
     }
 

@@ -83,12 +83,13 @@ public class CallCertificationService {
         if (!call.isCertification()) return CertificationResult.failed("not_a_certification_call", 0);
 
         List<CallAction> persistedActions = actions.findAllByCallIdOrderByCreatedAtAsc(callId);
+        List<CallTranscript> persistedTranscripts = transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId);
         List<String> reasons = new ArrayList<>();
 
         if (call.getAiSetupCompletedAt() == null) reasons.add("gemini_setup_incomplete");
         if (call.getStreamStartedAt() == null) reasons.add("media_stream_not_started");
         if (call.getStreamEndedAt() == null) reasons.add("media_stream_not_stopped");
-        if (transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId).isEmpty()) reasons.add("transcript_missing");
+        if (persistedTranscripts.isEmpty()) reasons.add("transcript_missing");
         if (persistedActions.isEmpty()) reasons.add("call_action_missing");
         if (summaries.findByCallId(callId).isEmpty()) reasons.add("summary_missing");
 
@@ -99,6 +100,8 @@ public class CallCertificationService {
         }
         requireSuccessful(persistedActions, "BOOKING_CREATED", reasons);
         requireSuccessful(persistedActions, "BOOKING_CANCELLED", reasons);
+
+        logCertificationTranscript(callId, persistedTranscripts);
 
         int cleanupCount = cleanupCertificationBookings(call, persistedActions, reasons);
         CertificationResult result = reasons.isEmpty()
@@ -115,17 +118,37 @@ public class CallCertificationService {
         return result;
     }
 
+    private void logCertificationTranscript(UUID callId, List<CallTranscript> persistedTranscripts) {
+        for (CallTranscript transcript : persistedTranscripts) {
+            log.info("RECEPVOZ_CALL_CERTIFICATION_TRANSCRIPT call={} seq={} speaker={} text={}",
+                    callId,
+                    transcript.getSequenceNumber(),
+                    transcript.getSpeaker(),
+                    safeTranscriptLogText(transcript.getContent()));
+        }
+    }
+
+    static String safeTranscriptLogText(String content) {
+        if (content == null) return "";
+        String safe = content
+                .replaceAll("(?i)\\+?56\\s*9(?:[\\s.-]*\\d){8}", "[REDACTED_PHONE]")
+                .replace('\n', ' ')
+                .replace('\r', ' ')
+                .trim();
+        return safe.length() <= 1500 ? safe : safe.substring(0, 1500) + "…";
+    }
+
     private int cleanupCertificationBookings(CallSession call,
                                              List<CallAction> persistedActions,
                                              List<String> reasons) {
         int cleanupCount = 0;
+        boolean createdBookingEntityFound = false;
         for (CallAction action : persistedActions) {
             if (!action.isSuccess() || !"BOOKING_CREATED".equals(action.getActionType())) continue;
             UUID bookingId = action.getEntityId();
-            if (bookingId == null) {
-                reasons.add("created_booking_entity_missing");
-                continue;
-            }
+            if (bookingId == null) continue;
+
+            createdBookingEntityFound = true;
             Booking booking = bookings.findByIdAndBusinessId(bookingId, call.getBusinessId()).orElse(null);
             if (booking == null) {
                 reasons.add("created_booking_not_found");
@@ -139,6 +162,9 @@ public class CallCertificationService {
                 log.warn("RECEPVOZ_CALL_CERTIFICATION CLEANUP call={} entity_id={} action=cancel_booking",
                         call.getId(), bookingId);
             }
+        }
+        if (!createdBookingEntityFound && hasSuccessful(persistedActions, "BOOKING_CREATED")) {
+            reasons.add("created_booking_entity_missing");
         }
         return cleanupCount;
     }
