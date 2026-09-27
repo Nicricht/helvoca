@@ -484,7 +484,22 @@ class GoldenJourneyCommercialV1IntegrationTest {
 
         List<CallAction> trace = actions.findAllByBusinessIdAndCallIdOrderByCreatedAtAsc(
                 business.getId(), call.getId());
-        assertActionCount(trace, "BOOKING_PROPOSED", 2);
+        long successfulProposals = trace.stream()
+                .filter(CallAction::isSuccess)
+                .filter(action -> "BOOKING_PROPOSED".equals(action.getActionType()))
+                .count();
+        assertEquals(2, successfulProposals,
+                "Recovery must create exactly the original and fallback proposals");
+
+        List<String> rejectedConfirmationCodes = trace.stream()
+                .filter(action -> !action.isSuccess())
+                .filter(action -> "BOOKING_PROPOSED".equals(action.getActionType()))
+                .map(CallAction::getErrorCode)
+                .toList();
+        assertEquals(2, rejectedConfirmationCodes.size(),
+                "The occupied-slot confirmation and its retry must both be rejected");
+        assertTrue(rejectedConfirmationCodes.contains("BOOKING_SLOT_UNAVAILABLE"));
+        assertTrue(rejectedConfirmationCodes.contains("OPERATION_NOT_AWAITING_CONFIRMATION"));
         assertActionCount(trace, "BOOKING_CREATED", 1);
     }
 
