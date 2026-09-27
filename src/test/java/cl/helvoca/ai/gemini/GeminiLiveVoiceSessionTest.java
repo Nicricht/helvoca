@@ -1055,6 +1055,66 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void hybridVadFinalizesTurnOnlyAfterConservativeLocalSilence() {
+        GeminiLiveProperties properties = properties();
+        properties.setHybridVadEnabled(true);
+        properties.setLocalBargeInEnabled(true);
+        properties.setLocalBargeInMeanAmplitudeThreshold(900);
+        properties.setLocalBargeInSpeechFrames(2);
+        properties.setLocalBargeInReleaseFrames(25);
+
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        session.onOpen(socket);
+        session.onText(socket, new JSONObject().put("setupComplete", new JSONObject()).toString(), true);
+        clearInvocations(socket);
+
+        byte[] loud = new byte[160];
+        Arrays.fill(loud, PcmuAudioCodec.encodeMulaw((short) 8_000));
+        String loudBase64 = Base64.getEncoder().encodeToString(loud);
+        byte[] silence = new byte[160];
+        Arrays.fill(silence, (byte) 0xff);
+        String silenceBase64 = Base64.getEncoder().encodeToString(silence);
+
+        session.acceptInboundAudio(loudBase64);
+        session.acceptInboundAudio(loudBase64);
+        for (int i = 0; i < 24; i++) session.acceptInboundAudio(silenceBase64);
+
+        verify(socket, never()).sendText(argThat(payload -> {
+            JSONObject event = new JSONObject(payload.toString());
+            JSONObject realtime = event.optJSONObject("realtimeInput");
+            return realtime != null && realtime.optBoolean("audioStreamEnd", false);
+        }), eq(true));
+
+        session.acceptInboundAudio(silenceBase64);
+
+        verify(socket, timeout(1000).times(1)).sendText(argThat(payload -> {
+            JSONObject event = new JSONObject(payload.toString());
+            JSONObject realtime = event.optJSONObject("realtimeInput");
+            return realtime != null && realtime.optBoolean("audioStreamEnd", false);
+        }), eq(true));
+    }
+
+    @Test
     void latencyBudgetBranchesAreExercisedForSlowToolBatchAndFirstAudio() throws Exception {
         GeminiLiveProperties properties = properties();
         properties.setToolLatencyBudgetMs(100);
