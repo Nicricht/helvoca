@@ -22,6 +22,8 @@ class RealtimeToolDefinitionsTest {
         assertDescriptionContains(tools, "list_available_slots", "create_booking");
         assertDescriptionContains(tools, "check_booking_availability", "create_booking");
         assertDescriptionContains(tools, "create_booking", "bookingId");
+        assertDescriptionContains(tools, "create_booking", "te confirmo la reserva");
+        assertDescriptionContains(tools, "create_booking", "Antes de reservar, te confirmo los datos");
         assertDescriptionContains(tools, "cancel_booking", "create_booking");
         assertDescriptionContains(tools, "cancel_booking", "bookingId");
     }
