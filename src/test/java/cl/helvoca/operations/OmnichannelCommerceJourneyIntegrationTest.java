@@ -19,6 +19,8 @@ import cl.helvoca.messaging.MessagingConversation;
 import cl.helvoca.messaging.MessagingConversationRepository;
 import cl.helvoca.messaging.outbound.OutboundMessage;
 import cl.helvoca.messaging.outbound.OutboundMessageRepository;
+import cl.helvoca.inventory.InventoryProductVariant;
+import cl.helvoca.inventory.InventoryProductVariantRepository;
 import cl.helvoca.inventory.InventoryReservation;
 import cl.helvoca.inventory.InventoryReservationRepository;
 import cl.helvoca.inventory.InventoryStock;
@@ -89,7 +91,10 @@ class OmnichannelCommerceJourneyIntegrationTest {
     @Autowired PaymentWebhookService paymentWebhooks;
     @Autowired OutboundMessageRepository outboundMessages;
     @Autowired InventoryStockRepository inventoryStocks;
+    @Autowired InventoryProductVariantRepository inventoryVariants;
     @Autowired InventoryReservationRepository inventoryReservations;
+    @Autowired BusinessOperationItemRepository operationItems;
+    @Autowired BusinessOrderLineRepository orderLines;
 
     @Test
     void voiceShowcaseContinuesOnWhatsappThroughVerifiedPaymentAndSharedContext() {
@@ -146,6 +151,35 @@ class OmnichannelCommerceJourneyIntegrationTest {
         stock.setReserved(0);
         stock.setReorderThreshold(0);
         inventoryStocks.saveAndFlush(stock);
+
+        InventoryProductVariant black42 = new InventoryProductVariant();
+        black42.setBusinessId(business.getId());
+        black42.setCatalogItemId(product.getId());
+        black42.setName("Negra · talla 42");
+        black42.setOptionValuesJson("{\"color\":\"negro\",\"talla\":\"42\"}");
+        black42.setSku("OMNI-E2E-BLK-42");
+        black42.setTrackingEnabled(true);
+        black42.setOnHand(2);
+        black42.setReserved(0);
+        black42.setReorderThreshold(0);
+        black42.setActive(true);
+        black42 = inventoryVariants.saveAndFlush(black42);
+
+        InventoryProductVariant white41 = new InventoryProductVariant();
+        white41.setBusinessId(business.getId());
+        white41.setCatalogItemId(product.getId());
+        white41.setName("Blanca · talla 41");
+        white41.setOptionValuesJson("{\"color\":\"blanco\",\"talla\":\"41\"}");
+        white41.setSku("OMNI-E2E-WHT-41");
+        white41.setTrackingEnabled(true);
+        white41.setOnHand(5);
+        white41.setReserved(0);
+        white41.setReorderThreshold(0);
+        white41.setActive(true);
+        white41 = inventoryVariants.saveAndFlush(white41);
+
+        UUID selectedVariantId = black42.getId();
+        UUID untouchedVariantId = white41.getId();
 
         CatalogMedia image = new CatalogMedia();
         image.setBusinessId(business.getId());
@@ -249,7 +283,7 @@ class OmnichannelCommerceJourneyIntegrationTest {
         assertEquals(product.getId().toString(),
                 selection.getString("selectedCatalogItemId"));
 
-        JSONObject quote = success(commercial.execute(
+        JSONObject missingVariantQuote = new JSONObject(commercial.execute(
                 business.getId(),
                 customer.getId(),
                 whatsapp.getId(),
@@ -260,8 +294,25 @@ class OmnichannelCommerceJourneyIntegrationTest {
                         .put("operationId", journey.getId().toString())
                         .put("quantity", 1)
                         .toString()));
+        assertFalse(missingVariantQuote.getBoolean("success"));
+        assertEquals("VARIANT_SELECTION_REQUIRED",
+                missingVariantQuote.getJSONObject("error").getString("code"));
+
+        JSONObject quote = success(commercial.execute(
+                business.getId(),
+                customer.getId(),
+                whatsapp.getId(),
+                customer.getPhone(),
+                BusinessOrder.Source.WHATSAPP,
+                CommercialOperationToolService.SHOWCASE_QUOTE_TOOL,
+                new JSONObject()
+                        .put("operationId", journey.getId().toString())
+                        .put("variantId", selectedVariantId.toString())
+                        .put("quantity", 1)
+                        .toString()));
         assertEquals(0, new BigDecimal(String.valueOf(quote.get("total")))
                 .compareTo(new BigDecimal("12990")));
+        assertEquals(selectedVariantId.toString(), quote.getString("selectedVariantId"));
 
         JSONObject orderQuote = success(commercial.execute(
                 business.getId(),
@@ -278,6 +329,13 @@ class OmnichannelCommerceJourneyIntegrationTest {
 
         UUID orderOperationId = UUID.fromString(orderQuote.getString("orderOperationId"));
         String orderConfirmationToken = orderQuote.getString("confirmationToken");
+        assertEquals(selectedVariantId.toString(), orderQuote.getString("selectedVariantId"));
+
+        List<BusinessOperationItem> draftItems =
+                operationItems.findAllByOperationIdOrderByCreatedAtAsc(orderOperationId);
+        assertEquals(1, draftItems.size());
+        assertEquals(selectedVariantId, draftItems.get(0).getVariantId(),
+                "The exact selected variant must survive in the order draft");
 
         JSONObject confirmedOrder = success(commercial.execute(
                 business.getId(),
@@ -290,14 +348,32 @@ class OmnichannelCommerceJourneyIntegrationTest {
                         .put("operationId", orderOperationId.toString())
                         .put("confirmationToken", orderConfirmationToken)
                         .toString()));
-        assertNotNull(confirmedOrder.getString("orderId"));
+        UUID orderId = UUID.fromString(confirmedOrder.getString("orderId"));
+
+        List<BusinessOrderLine> persistedLines = orderLines.findAllByOrderIdOrderByCreatedAtAsc(orderId);
+        assertEquals(1, persistedLines.size());
+        assertEquals(selectedVariantId, persistedLines.get(0).getVariantId(),
+                "The exact selected variant must survive in the confirmed order");
 
         InventoryStock reservedStock = inventoryStocks
                 .findByBusinessIdAndCatalogItemId(business.getId(), product.getId())
                 .orElseThrow();
         assertEquals(2, reservedStock.getOnHand());
-        assertEquals(1, reservedStock.getReserved());
-        assertEquals(1, reservedStock.available());
+        assertEquals(0, reservedStock.getReserved(),
+                "Base product stock must remain untouched when an exact variant is selected");
+
+        InventoryProductVariant reservedVariant = inventoryVariants
+                .findByIdAndBusinessId(selectedVariantId, business.getId())
+                .orElseThrow();
+        assertEquals(2, reservedVariant.getOnHand());
+        assertEquals(1, reservedVariant.getReserved());
+        assertEquals(1, reservedVariant.available());
+
+        InventoryProductVariant untouchedBeforePayment = inventoryVariants
+                .findByIdAndBusinessId(untouchedVariantId, business.getId())
+                .orElseThrow();
+        assertEquals(5, untouchedBeforePayment.getOnHand());
+        assertEquals(0, untouchedBeforePayment.getReserved());
 
         List<InventoryReservation> activeReservations = inventoryReservations.findAll().stream()
                 .filter(reservation -> tenantId.equals(reservation.getBusinessId()))
@@ -306,6 +382,8 @@ class OmnichannelCommerceJourneyIntegrationTest {
                 .toList();
         assertEquals(1, activeReservations.size(),
                 "Order confirmation must create exactly one active stock reservation");
+        assertEquals(selectedVariantId, activeReservations.get(0).getVariantId(),
+                "The reservation must target the exact selected variant");
 
         JSONObject paymentQuote = success(commercial.execute(
                 business.getId(),
@@ -356,9 +434,23 @@ class OmnichannelCommerceJourneyIntegrationTest {
         InventoryStock consumedStock = inventoryStocks
                 .findByBusinessIdAndCatalogItemId(business.getId(), product.getId())
                 .orElseThrow();
-        assertEquals(1, consumedStock.getOnHand());
-        assertEquals(0, consumedStock.getReserved());
-        assertEquals(1, consumedStock.available());
+        assertEquals(2, consumedStock.getOnHand());
+        assertEquals(0, consumedStock.getReserved(),
+                "Base product stock must remain untouched after exact variant payment");
+
+        InventoryProductVariant consumedVariant = inventoryVariants
+                .findByIdAndBusinessId(selectedVariantId, business.getId())
+                .orElseThrow();
+        assertEquals(1, consumedVariant.getOnHand());
+        assertEquals(0, consumedVariant.getReserved());
+        assertEquals(1, consumedVariant.available());
+
+        InventoryProductVariant untouchedAfterPayment = inventoryVariants
+                .findByIdAndBusinessId(untouchedVariantId, business.getId())
+                .orElseThrow();
+        assertEquals(5, untouchedAfterPayment.getOnHand(),
+                "Paying for one variant must never decrement another variant");
+        assertEquals(0, untouchedAfterPayment.getReserved());
 
         List<InventoryReservation> consumedReservations = inventoryReservations.findAll().stream()
                 .filter(reservation -> tenantId.equals(reservation.getBusinessId()))
@@ -367,6 +459,7 @@ class OmnichannelCommerceJourneyIntegrationTest {
                 .toList();
         assertEquals(1, consumedReservations.size(),
                 "Verified successful payment must consume the exact order reservation once");
+        assertEquals(selectedVariantId, consumedReservations.get(0).getVariantId());
 
         BusinessOperation paidJourney = operations
                 .findByIdAndBusinessId(journey.getId(), business.getId())
