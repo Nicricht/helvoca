@@ -76,7 +76,7 @@ Start the application through the normal local development path. The existing bo
 
 No SQL insert/update is part of the operator procedure.
 
-Rerunning with the same seed email is designed to be idempotent. Existing fixture rows are reused by stable business/admin identity, service name, knowledge title, customer email and booking fixture marker.
+Rerunning with the same seed email is designed to be idempotent. Existing fixture rows are reused by stable business/admin identity, service name, knowledge title, customer email and booking fixture marker. Fixture reservations are refreshed onto the next demo business day when needed so an old local database does not slowly turn into a museum of expired demo appointments.
 
 ## Demo readiness contract
 
