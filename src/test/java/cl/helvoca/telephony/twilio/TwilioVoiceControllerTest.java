@@ -4,6 +4,7 @@ import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.telephony.CallCapacityExceededException;
 import cl.helvoca.voice.VoiceCallRouter;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -25,6 +26,48 @@ class TwilioVoiceControllerTest {
         TwilioProperties properties = new TwilioProperties();
         properties.setCertificationIngressEnabled(certificationEnabled);
         return new TwilioVoiceController(calls, router, summaries, properties);
+    }
+
+    @Test
+    void outboundBakeOffPassesOnlyCuratedVoiceOverrideToRouter() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        String twiml = "<Response><Connect><Stream/></Connect></Response>";
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        ReflectionTestUtils.setField(controller, "certificationVoiceOverride", " sadachbia ");
+
+        when(router.route("+14355652512", "+56966939611", CALL_SID, "Sadachbia"))
+                .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
+                        "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
+
+        var response = controller.outboundTest(
+                CALL_SID, "+14355652512", "+56966939611");
+
+        assertEquals(twiml, response.getBody());
+        verify(router).route("+14355652512", "+56966939611", CALL_SID, "Sadachbia");
+        verifyNoInteractions(calls, summaries);
+    }
+
+    @Test
+    void invalidBakeOffVoiceFallsBackToNormalOutboundTestPath() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        String twiml = "<Response><Connect><Stream/></Connect></Response>";
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        ReflectionTestUtils.setField(controller, "certificationVoiceOverride", "Despina");
+
+        when(router.route("+14355652512", "+56966939611", CALL_SID))
+                .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
+                        "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
+
+        var response = controller.outboundTest(
+                CALL_SID, "+14355652512", "+56966939611");
+
+        assertEquals(twiml, response.getBody());
+        verify(router).route("+14355652512", "+56966939611", CALL_SID);
+        verify(router, never()).route(anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
