@@ -1107,6 +1107,45 @@
     }).join("")}</div></section>`;
   }
 
+  function commercialStatusLabel(value) {
+    return ({
+      PAID:"Pagado", PURCHASE_PENDING:"Compra pendiente", QUOTE_PENDING:"Cotización pendiente",
+      PRODUCT_SELECTED:"Producto seleccionado", SHOWCASE_SENT:"Productos enviados",
+      SUCCEEDED:"Pagado", REQUIRES_ACTION:"Requiere acción", PENDING:"Pendiente",
+      FAILED:"Fallido", EXPIRED:"Expirado", REFUNDED:"Reembolsado",
+      CONSUMED:"Consumido", ACTIVE:"Activo", RELEASED:"Liberado",
+      PREPARED:"Preparado", QUEUED:"En cola", SENT:"Enviado", BLOCKED:"Bloqueado",
+      CONFIRMED:"Confirmado", COMPLETED:"Completado", CANCELLED:"Cancelado"
+    })[value] || value || "Sin estado";
+  }
+
+  function renderCustomerCommercialTimeline(payload, unavailable = false) {
+    if (unavailable) {
+      return '<section class="home-detail-section"><h3>Historial comercial</h3><p class="home-detail-muted">No pude cargar el historial comercial de este cliente.</p></section>';
+    }
+    const summary = payload?.summary || {};
+    const events = Array.isArray(payload?.events) ? payload.events : [];
+    const facts = [
+      ["Etapa", commercialStatusLabel(summary.commercialStage)],
+      ["Producto", summary.selectedProduct || "Sin selección"],
+      ["Variante", summary.selectedVariant || "Sin variante"],
+      ["Pedido", commercialStatusLabel(summary.orderStatus)],
+      ["Pago", commercialStatusLabel(summary.paymentStatus)],
+      ["Inventario", commercialStatusLabel(summary.inventoryStatus)],
+      ["Último canal", source(summary.lastChannel)]
+    ];
+    const summaryHtml = `<div class="home-detail-facts">${facts.map(([label, value]) =>
+      `<div><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join("")}</div>`;
+    if (!events.length) {
+      return `<section class="home-detail-section"><h3>Historial comercial</h3>${summaryHtml}<p class="home-detail-muted">Todavía no hay actividad comercial omnicanal para este cliente.</p></section>`;
+    }
+    const history = events.map(event => {
+      const meta = [source(event.channel), commercialStatusLabel(event.status)].filter(Boolean).join(" · ");
+      const detail = event.detail ? ` · ${esc(event.detail)}` : "";
+      return `<div><span>${esc(fmtCompact(event.at))}</span><strong>${esc(event.title || event.type || "Actividad")}${detail}${meta ? ` · ${esc(meta)}` : ""}</strong></div>`;
+    }).join("");
+    return `<section class="home-detail-section"><h3>Historial comercial</h3>${summaryHtml}<div class="home-detail-history">${history}</div></section>`;
+  }
   async function openCustomerDetail(id) {
     const fallback = state.customers.find(item => String(item.id) === String(id));
     if (!fallback) return;
@@ -1123,18 +1162,26 @@
 
     showBookingDrawer();
 
-    try {
-      const profile = await api(`/api/v1/customers/${encodeURIComponent(id)}/profile`);
-      const customer = profile?.customer || fallback;
-      document.querySelector("#homeBookingDetailTitle").textContent = customer.name || customer.phone || "Cliente";
-      document.querySelector("#homeBookingDetailMeta").textContent = customer.createdAt
-        ? `Cliente desde ${fmtCompact(customer.createdAt)}`
-        : "Ficha de cliente";
-      body.innerHTML = customerProfileFacts(customer) + renderCustomerBookingHistory(profile?.bookings);
-    } catch (error) {
-      body.innerHTML = customerProfileFacts(fallback) +
-        '<section class="home-detail-section"><h3>Historial de reservas</h3><p class="home-detail-muted">No pude cargar el historial de este cliente.</p></section>';
-    }
+    const [profileResult, timelineResult] = await Promise.allSettled([
+      api(`/api/v1/customers/${encodeURIComponent(id)}/profile`),
+      api(`/api/v1/customers/${encodeURIComponent(id)}/commercial-timeline`)
+    ]);
+
+    const profile = profileResult.status === "fulfilled" ? profileResult.value : null;
+    const customer = profile?.customer || fallback;
+    document.querySelector("#homeBookingDetailTitle").textContent = customer.name || customer.phone || "Cliente";
+    document.querySelector("#homeBookingDetailMeta").textContent = customer.createdAt
+      ? `Cliente desde ${fmtCompact(customer.createdAt)}`
+      : "Ficha de cliente";
+
+    const bookingHistory = profileResult.status === "fulfilled"
+      ? renderCustomerBookingHistory(profile?.bookings)
+      : '<section class="home-detail-section"><h3>Historial de reservas</h3><p class="home-detail-muted">No pude cargar el historial de este cliente.</p></section>';
+    const commercialTimeline = timelineResult.status === "fulfilled"
+      ? renderCustomerCommercialTimeline(timelineResult.value)
+      : renderCustomerCommercialTimeline(null, true);
+
+    body.innerHTML = customerProfileFacts(customer) + commercialTimeline + bookingHistory;
   }
 
   function bindCustomerOpeners() {
