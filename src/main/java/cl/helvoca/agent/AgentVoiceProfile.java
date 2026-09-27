@@ -65,6 +65,13 @@ public enum AgentVoiceProfile {
     public static Optional<AgentVoiceProfile> fromSelection(String value) {
         if (value == null || value.isBlank()) return Optional.empty();
         String normalized = value.trim();
+        // Despina was the provider-specific value stored by the former female
+        // production profile. Treat it as a legacy alias so existing tenants
+        // migrate to the current youthful female profile instead of pinning the
+        // old smooth/call-center-sounding voice forever.
+        if ("Despina".equalsIgnoreCase(normalized)) {
+            return Optional.of(SEDUCTIVE_FEMALE);
+        }
         return Arrays.stream(values())
                 .filter(profile -> profile.code.equalsIgnoreCase(normalized)
                         || profile.openAiVoice.equalsIgnoreCase(normalized)
