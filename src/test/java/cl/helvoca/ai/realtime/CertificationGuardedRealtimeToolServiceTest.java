@@ -1,6 +1,7 @@
 package cl.helvoca.ai.realtime;
 
 import cl.helvoca.booking.BookingRepository;
+import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallAction;
 import cl.helvoca.call.CallActionRepository;
@@ -33,6 +34,28 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class CertificationGuardedRealtimeToolServiceTest {
+
+    @Test
+    void latencyCertificationInstructionsEnterReadOnlyMode() {
+        Fixture f = new Fixture();
+        TwilioCertificationCommandStore commands = mock(TwilioCertificationCommandStore.class);
+        f.call.setProviderCallId("CA0123456789abcdef0123456789abcdef");
+        when(commands.isLatencyCertificationProviderCall(f.call.getProviderCallId())).thenReturn(true);
+        f.service.setCertificationCommands(commands);
+
+        Business business = new Business();
+        business.setName("Negocio Demo");
+        business.setTimezone("America/Santiago");
+        business.setLanguage("es-CL");
+        when(f.businesses.findById(f.businessId)).thenReturn(Optional.of(business));
+
+        String instructions = f.service.buildInstructions(f.context);
+
+        assertTrue(instructions.contains("MODO CERTIFICACIÓN DE LATENCIA READ-ONLY"));
+        assertTrue(instructions.contains("Usa como máximo una herramienta de solo lectura"));
+        assertTrue(instructions.contains("no intentes reservar")
+                || instructions.contains("No intentes reservar"));
+    }
 
     @Test
     void latencyCertificationExposesOnlyMinimalReadOnlyTools() {
