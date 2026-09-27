@@ -1,49 +1,62 @@
 # Helvoca — lanzamiento comercial controlado
 
+> Runbook operativo: `docs/FIRST_CUSTOMER_OPERATION.md`.
+
 ## Objetivo inmediato
 
-Conseguir los primeros 3–5 clientes pagadores usando onboarding asistido, medir conversaciones reales y corregir problemas antes de escalar adquisición.
+Conseguir los primeros clientes pagadores usando onboarding asistido, medir conversaciones reales y corregir problemas antes de escalar adquisición.
 
-Helvoca se vende como **recepción digital con IA para teléfono y WhatsApp**, no como un chatbot genérico. El valor comercial es atender consultas, usar información real del negocio y convertir conversaciones en reservas, solicitudes o derivaciones.
+RecepVoz / Helvoca se vende como **recepción digital con IA**. La promesa no es “IA mágica”: es atender con información real del negocio y avanzar a una acción permitida y verificable.
 
 ## Qué podemos vender hoy
 
+### Core comercial
+
+- información del negocio y FAQ;
+- catálogo de servicios/productos;
+- horarios y disponibilidad;
+- reservas: crear, consultar, reprogramar y cancelar;
+- pedidos;
+- cotizaciones;
+- leads;
+- solicitudes;
+- delivery/pickup cuando corresponda;
+- registro/identificación de clientes;
+- preguntas no resueltas;
+- handoff humano;
+- resúmenes, trazabilidad y panel operativo;
+- planes, límites y metering de voz.
+
 ### Voz
 
-- Atención telefónica con IA.
-- Identidad y configuración por negocio.
-- Catálogo de servicios y precios.
-- Horarios y disponibilidad.
-- Registro e identificación de clientes.
-- Crear, consultar, reprogramar y cancelar reservas.
-- Base de conocimiento del negocio.
-- Registro de preguntas no resueltas.
-- Solicitudes y transferencia humana cuando corresponda.
-- Cierre remoto de llamadas por la IA cuando existe intención clara de terminar.
-- Resúmenes, trazabilidad y panel de operaciones.
+La capacidad existe, pero una demo o piloto con telefonía real exige readiness y proveedor Live probado para ese tenant. No improvisar llamadas comerciales ni presentar voz como activa sin esa verificación.
 
-### WhatsApp — piloto controlado
+### WhatsApp — alcance controlado
 
-- Webhook Twilio validado.
-- Idempotencia por MessageSid para evitar repetir acciones por reintentos del proveedor.
-- Cliente compartido con voz mediante número telefónico dentro del tenant.
-- Catálogo, conocimiento, horarios y reservas compartidos con voz.
-- Crear, consultar, reprogramar y cancelar reservas.
-- Perfil AiAgent compartido: identidad, idioma e instrucciones del negocio.
-- Herramientas publicadas al modelo filtradas por capacidades del agente del tenant.
+El core de mensajería/continuidad existe. La entrega real depende de proveedor, credenciales e identidad del tenant.
 
-## Qué NO debemos prometer todavía
+No ofrecer WhatsApp ilimitado ni campañas masivas como parte automática de un plan.
 
-- WhatsApp ilimitado incluido en cualquier plan.
-- Campañas masivas o marketing outbound por WhatsApp.
-- Provisioning 100% autoservicio de WhatsApp por cliente.
-- SLA empresarial formal.
-- Cero errores de IA.
-- Superioridad frente a competidores sin evidencia.
+### Merchant payment
+
+**No vender como capacidad LIVE.** El adaptador actual opera en SANDBOX y el modo LIVE está intencionalmente deshabilitado. Puede registrarse como requisito futuro, no como función incluida en el piloto actual.
+
+## Qué NO debemos prometer
+
+- WhatsApp ilimitado incluido en cualquier plan;
+- campañas masivas o marketing outbound por WhatsApp;
+- provisioning 100% autoservicio de WhatsApp por cliente;
+- SLA empresarial formal no contratado;
+- disponibilidad 24/7 garantizada;
+- cero errores de IA;
+- merchant payment LIVE;
+- integraciones externas no certificadas;
+- ROI garantizado;
+- superioridad frente a competidores sin evidencia.
 
 ## Oferta para primeros clientes
 
-Vender como **piloto comercial pagado con configuración asistida**.
+Vender como **piloto comercial pagado con configuración asistida y alcance escrito**.
 
 Catálogo público de lanzamiento:
 
@@ -54,107 +67,148 @@ Catálogo público de lanzamiento:
 | Pro | $69.990 CLP | 500 min | $109/min | Mayor volumen y concurrencia |
 | Enterprise | Desde $119.990 CLP | Según cotización | Según cotización | Volumen, sedes o integraciones especiales |
 
-Los valores vigentes que ve el producto se obtienen desde `/api/v1/public/pricing`. No ofrecer precios distintos sin modificar primero el catálogo oficial o dejar por escrito que se trata de un acuerdo comercial especial.
+Los valores vigentes que ve el producto se obtienen desde `/api/v1/public/pricing`. No ofrecer precios distintos sin modificar primero el catálogo oficial o documentar expresamente un acuerdo comercial especial.
 
-La configuración asistida se incluye durante la etapa inicial para reducir fricción comercial. Para WhatsApp durante el piloto, acordar límites de uso y alcance de forma explícita hasta que exista metering de mensajes y coste por conversación.
+La configuración asistida se incluye durante la etapa inicial. Para WhatsApp, acordar límites y alcance de forma explícita hasta que el metering comercial correspondiente esté disponible.
 
 ## Perfil de cliente inicial recomendado
 
-Helvoca es horizontal y puede configurarse para cualquier negocio donde existan consultas, reservas, citas, solicitudes o atención repetitiva. Esto incluye, entre otros, odontología, centros médicos y clínicas cuando el alcance sea administrativo, además de estética, talleres, restaurantes, inmobiliarias, servicios profesionales, veterinarias, academias y comercios.
-
-Priorizar prospectos que:
+Priorizar negocios que:
 
 1. reciben llamadas o mensajes mientras el equipo está ocupado;
 2. tienen catálogo o información relativamente clara;
-3. trabajan con citas, reservas o solicitudes;
+3. trabajan con citas, reservas, pedidos, cotizaciones, leads o solicitudes;
 4. repiten muchas respuestas durante el día;
-5. pueden medir el valor de una reserva o lead recuperado.
+5. pueden medir el valor de una acción recuperada;
+6. aceptan empezar con un alcance pequeño.
 
-## Demo comercial de 5 minutos
+Ejemplos: odontología, estética, veterinarias, peluquerías, talleres, restaurantes, inmobiliarias, academias, comercios y servicios profesionales.
 
-1. Mostrar `/sales.html` y explicar el problema que resuelve Helvoca.
-2. Abrir una empresa demo o una configuración preparada para el prospecto.
+## Pitch
+
+> RecepVoz es una recepcionista digital con IA para negocios. Atiende usando la información real de la empresa y puede convertir una conversación en una acción concreta, por ejemplo una reserva, solicitud, cotización, pedido o derivación. El primer cliente entra con un piloto asistido: configuramos sus datos, lo probamos con él y solo activamos los canales certificados para ese negocio.
+
+## Demo comercial de 5–10 minutos
+
+Demo por defecto: web/simulador.
+
+1. Mostrar `/sales.html`.
+2. Abrir una empresa demo ya configurada.
 3. Mostrar servicios, horarios, conocimiento y perfil del agente.
 4. Simular una consulta por precio/servicio.
-5. Consultar disponibilidad.
-6. Crear una reserva.
-7. Cambiar la hora y demostrar que se reprograma, no se duplica.
-8. Mostrar una pregunta que el sistema no conoce y cómo la registra sin inventar.
-9. Mostrar que teléfono y WhatsApp comparten cliente y reservas.
-10. Mostrar operaciones/resumen y explicar el plan mensual.
+5. Consultar disponibilidad cuando corresponda.
+6. Crear la acción principal del caso.
+7. Cambiar/corregir un dato y demostrar que no se duplica.
+8. Mostrar una pregunta desconocida y cómo la registra/maneja sin inventar.
+9. Mostrar operaciones/resumen.
+10. Mostrar `/pricing.html`.
+11. Cerrar definiendo un piloto.
+
+Solo mostrar voz o WhatsApp real si el canal del tenant ya está configurado y probado. No mostrar merchant payment como cobro LIVE.
 
 ## Datos que pedir al cerrar un piloto
 
-- Nombre legal/comercial y nombre que debe usar la recepcionista.
-- Persona responsable del piloto.
-- Servicios/productos activos.
-- Precio y duración cuando corresponda.
-- Horarios normales y excepciones conocidas.
-- Preguntas frecuentes.
-- Políticas de reserva, cancelación y atraso.
-- Promociones vigentes que la IA sí puede mencionar.
-- Afirmaciones que la IA nunca debe realizar.
-- Teléfono de transferencia humana.
-- Número/canal de telefonía y WhatsApp a conectar.
-- Tono deseado, idioma y saludo.
-- Herramientas/capacidades que se habilitarán.
+- nombre legal/comercial y nombre que debe usar la recepcionista;
+- persona responsable del piloto;
+- servicios/productos activos;
+- precio y duración cuando corresponda;
+- horarios normales y excepciones conocidas;
+- preguntas frecuentes;
+- políticas de reserva, cancelación y atraso;
+- promociones vigentes que la IA sí puede mencionar;
+- afirmaciones que la IA nunca debe realizar;
+- teléfono/persona de transferencia humana;
+- canal(es) que realmente se incluirán;
+- tono deseado, idioma y saludo;
+- herramientas/capacidades que se habilitarán;
+- plan/precio;
+- medio autorizado para que el cliente pague a RecepVoz;
+- criterio de éxito y fecha de revisión.
+
+## Checklist antes de aceptar dinero
+
+No aceptar dinero hasta que:
+
+- [ ] el prospecto haya aceptado un piloto con alcance escrito;
+- [ ] plan, precio, límites y condiciones estén confirmados;
+- [ ] canal e integración vendidos estén certificados para el tenant o expresamente excluidos;
+- [ ] merchant payment LIVE no forme parte de lo prometido;
+- [ ] responsables de ambas partes estén definidos;
+- [ ] datos mínimos del negocio estén disponibles;
+- [ ] medio de pago a RecepVoz y datos de facturación/cobro estén definidos;
+- [ ] términos y privacidad estén disponibles para el cliente;
+- [ ] criterio de éxito esté escrito;
+- [ ] no exista un bloqueo P0 conocido para el alcance.
 
 ## Checklist antes de activar un cliente real
 
-- [ ] Tenant creado y acceso del administrador confirmado.
-- [ ] Servicios revisados por el cliente.
-- [ ] Precios revisados por el cliente.
-- [ ] Horarios revisados por el cliente.
-- [ ] Knowledge/FAQ revisado por el cliente.
-- [ ] Saludo e instrucciones del agente aprobados.
-- [ ] Capacidades del agente revisadas.
-- [ ] Número telefónico asociado al tenant correcto.
-- [ ] Transferencia humana configurada o decisión explícita de operar sin ella.
-- [ ] Simulador probado con al menos: consulta, venta, disponibilidad, reserva, reagendamiento, cancelación, desconocido y solicitud humana.
-- [ ] Llamada real certificada si se habilita voz.
-- [ ] Flujo real de WhatsApp certificado si se habilita WhatsApp.
-- [ ] Plan/suscripción habilitado.
-- [ ] El cliente conoce el alcance del piloto y sus límites.
+- [ ] tenant creado y acceso del administrador confirmado;
+- [ ] servicios revisados por el cliente;
+- [ ] precios revisados por el cliente;
+- [ ] horarios revisados por el cliente;
+- [ ] knowledge/FAQ revisado por el cliente;
+- [ ] saludo e instrucciones del agente aprobados;
+- [ ] capacidades del agente revisadas;
+- [ ] transferencia humana configurada o decisión explícita de operar sin ella;
+- [ ] simulador probado con consulta, acción principal, corrección y caso desconocido;
+- [ ] llamada real certificada si se habilita voz;
+- [ ] flujo real de WhatsApp certificado si se habilita WhatsApp;
+- [ ] plan/suscripción habilitado;
+- [ ] cliente conoce alcance, límites y exclusiones;
+- [ ] merchant payment LIVE excluido mientras siga deshabilitado.
 
 ## Bloqueadores antes de escalar más allá de pilotos
 
 ### P0 comercial
 
-- Metering de WhatsApp por tenant (mensajes/conversaciones y coste estimado).
-- Estado de provisioning de WhatsApp por número/tenant, no solo flag global.
-- Certificación E2E real de WhatsApp: consulta → reserva → reagendamiento → cancelación → humano.
-- Política y flujo operativo de takeover humano en WhatsApp.
+- metering de WhatsApp por tenant;
+- provisioning repetible de WhatsApp;
+- certificación E2E real del alcance WhatsApp;
+- política y flujo operativo de takeover humano;
+- runbooks repetibles para activación de canales externos.
 
 ### P0 legal/privacidad
 
-- Identificar la entidad que comercializa Helvoca y datos de contacto legales.
-- Términos de servicio revisados.
-- Política de privacidad revisada.
-- Definir retención/eliminación de conversaciones y grabaciones.
-- Definir tratamiento de datos entre Helvoca y cada negocio.
+Antes de escalar más allá de pilotos:
+
+- definir claramente entidad que comercializa/factura y datos de contacto legales;
+- revisar términos de servicio;
+- revisar política de privacidad;
+- definir retención/eliminación de conversaciones y grabaciones;
+- definir tratamiento de datos entre RecepVoz y cada negocio.
 
 ### P1 escala
 
-- Pruebas de carga y concurrencia.
-- Límites por plan para mensajes y llamadas concurrentes.
-- Alertas de coste y consumo.
-- Failover y degradación controlada cuando un proveedor de IA/telefonía no responde.
+- pruebas de carga y concurrencia;
+- límites por plan para mensajes y llamadas concurrentes;
+- alertas de coste y consumo;
+- failover/degradación controlada ante fallos de proveedores.
 
 ## Métricas de los primeros clientes
 
-No medir solo cantidad de conversaciones. Registrar como mínimo:
+Registrar como mínimo:
 
-- llamadas y chats atendidos;
+- llamadas/chats atendidos;
 - conversaciones resueltas;
-- reservas creadas;
-- reservas reprogramadas;
-- solicitudes/leads generados;
+- reservas creadas/reprogramadas/canceladas;
+- solicitudes/leads/pedidos/cotizaciones;
 - derivaciones humanas;
 - preguntas sin respuesta;
-- tasa de error de herramientas;
-- duración/coste de voz;
-- mensajes/coste estimado de WhatsApp cuando el metering esté disponible;
-- ingreso o valor estimado atribuido a acciones recuperadas.
+- errores de herramientas;
+- duración/minutos de voz;
+- consumo/coste de WhatsApp cuando exista metering;
+- valor estimado atribuido a acciones recuperadas.
+
+## Regla para declarar piloto exitoso
+
+Antes de activar, escribir el objetivo y umbral. Al cerrar:
+
+- la acción principal debe funcionar de punta a punta dentro del alcance certificado;
+- debe existir volumen real suficiente para evaluar;
+- resultados y fallos deben ser verificables;
+- no deben quedar acciones críticas no autorizadas o duplicadas sin resolver;
+- la métrica principal debe alcanzar el umbral acordado;
+- el cliente debe confirmar continuidad con un plan/alcance definido.
 
 ## Regla de producto durante el lanzamiento
 
