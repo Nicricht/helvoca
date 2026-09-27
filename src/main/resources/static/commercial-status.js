@@ -316,12 +316,18 @@
         '.home-metric span { margin-top:7px; color:var(--muted); font-size:11px; }',
         '.home-metric small { margin-top:4px; color:var(--muted); font-size:9px; line-height:1.35; }',
         '.owner-dashboard-attention { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }',
-        '.owner-dashboard-chip { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:6px 9px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:10px; }',
+        '.owner-dashboard-attention.hidden { display:none; }',
+        '.owner-dashboard-attention-title { flex-basis:100%; color:var(--text); font-size:11px; }',
+        '.owner-dashboard-chip { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:6px 9px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:10px; text-decoration:none; }',
         '.owner-dashboard-chip strong { color:var(--text); font-size:11px; }',
         '.owner-dashboard-chip.warn { border-color:rgba(244,166,54,.34); background:rgba(244,166,54,.055); }',
         '.owner-dashboard-chip.hidden { display:none; }',
         '.owner-plan-row { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:12px; padding:11px 12px; border:1px solid var(--border); border-radius:11px; background:rgba(255,255,255,.018); }',
         '.owner-plan-row.hidden { display:none; }',
+        '.owner-seven-day { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px; color:var(--muted); font-size:10px; }',
+        '.owner-seven-day strong { color:var(--text); font-size:11px; }',
+        '.owner-seven-day.hidden { display:none; }',
+        'body.home-page.operational-ready #pilotMetricsCard { display:none!important; }',
         '.owner-plan-row strong,.owner-plan-row span { display:block; }',
         '.owner-plan-row span { color:var(--muted); font-size:10px; margin-top:2px; }',
         '.owner-recent { margin-top:14px; padding-top:12px; border-top:1px solid var(--border); }',
@@ -356,12 +362,15 @@
         '  <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver solicitudes pendientes"><strong id="homeRequestsToday">–</strong><span>Pendientes</span><small>Solicitudes por resolver</small></a>',
         '  <a id="ownerOrdersMetric" class="home-metric hidden" href="/?tab=sales#homeBusinessWorkspace" aria-label="Ver pedidos y ventas"><strong id="ownerOrdersToday">–</strong><span>Pedidos</span><small id="ownerOrdersHint">Generados hoy</small></a>',
         '</div>',
-        '<div id="ownerDashboardAttention" class="owner-dashboard-attention" aria-label="Señales que requieren atención">',
-        '  <span id="ownerHandoffsChip" class="owner-dashboard-chip"><strong id="ownerHandoffsToday">–</strong> derivaciones</span>',
-        '  <span id="ownerFailuresChip" class="owner-dashboard-chip"><strong id="ownerFailuresToday">–</strong> fallos de llamada</span>',
+        '<div id="ownerDashboardAttention" class="owner-dashboard-attention hidden" aria-label="Señales que requieren atención">',
+        '  <strong class="owner-dashboard-attention-title">Necesita tu atención</strong>',
+        '  <a id="ownerOrdersAttentionChip" class="owner-dashboard-chip warn hidden" href="/?tab=sales#homeBusinessWorkspace"><strong id="ownerOrdersAttentionToday">–</strong> ventas por revisar</a>',
+        '  <span id="ownerHandoffsChip" class="owner-dashboard-chip hidden"><strong id="ownerHandoffsToday">–</strong> derivaciones</span>',
+        '  <span id="ownerFailuresChip" class="owner-dashboard-chip hidden"><strong id="ownerFailuresToday">–</strong> fallos de llamada</span>',
         '  <span id="ownerBookingChangesChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingChangesToday">–</strong> reprogramadas</span>',
         '  <span id="ownerBookingCancelsChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingCancelsToday">–</strong> canceladas</span>',
         '</div>',
+        '<div id="ownerSevenDayRow" class="owner-seven-day hidden"><strong>Últimos 7 días</strong><span id="ownerSevenDaySummary">–</span></div>',
         '<div id="ownerPlanRow" class="owner-plan-row hidden">',
         '  <div><strong id="ownerPlanName">–</strong><span>Plan actual</span></div>',
         '  <div><strong id="ownerPlanUsage">–</strong><span>Minutos usados del periodo</span></div>',
@@ -514,9 +523,13 @@
 
         const ordersMetric = overview.querySelector('#ownerOrdersMetric');
         ordersMetric.classList.toggle('hidden', !(orders > 0 || numeric(pipeline?.total) > 0));
+        overview.querySelector('#ownerOrdersAttentionToday').textContent = String(pipelineNeedsAction);
+        overview.querySelector('#ownerOrdersAttentionChip').classList.toggle('hidden', pipelineNeedsAction <= 0);
 
         overview.querySelector('#ownerHandoffsToday').textContent = String(handoffs);
         overview.querySelector('#ownerFailuresToday').textContent = String(failures);
+        overview.querySelector('#ownerHandoffsChip').classList.toggle('hidden', handoffs <= 0);
+        overview.querySelector('#ownerFailuresChip').classList.toggle('hidden', failures <= 0);
         overview.querySelector('#ownerHandoffsChip').classList.toggle('warn', handoffs > 0);
         overview.querySelector('#ownerFailuresChip').classList.toggle('warn', failures > 0);
 
@@ -533,13 +546,31 @@
             });
             overview.querySelector('#ownerBookingChangesToday').textContent = String(rescheduled);
             overview.querySelector('#ownerBookingCancelsToday').textContent = String(cancelled);
-            overview.querySelector('#ownerBookingChangesChip').classList.remove('hidden');
-            overview.querySelector('#ownerBookingCancelsChip').classList.remove('hidden');
+            overview.querySelector('#ownerBookingChangesChip').classList.toggle('hidden', rescheduled <= 0);
+            overview.querySelector('#ownerBookingCancelsChip').classList.toggle('hidden', cancelled <= 0);
             overview.querySelector('#ownerBookingChangesChip').classList.toggle('warn', rescheduled > 0);
             overview.querySelector('#ownerBookingCancelsChip').classList.toggle('warn', cancelled > 0);
         } else {
             overview.querySelector('#ownerBookingChangesChip').classList.add('hidden');
             overview.querySelector('#ownerBookingCancelsChip').classList.add('hidden');
+        }
+
+        const attentionCount = pipelineNeedsAction + handoffs + failures + rescheduled + cancelled;
+        overview.querySelector('#ownerDashboardAttention').classList.toggle('hidden', attentionCount <= 0);
+
+        const sevenDay = pilotMetrics?.last7Days || null;
+        const sevenDayRow = overview.querySelector('#ownerSevenDayRow');
+        if (sevenDay) {
+            const sevenDayConversations = numeric(sevenDay.calls) + numeric(sevenDay.whatsappConversations);
+            const sevenDayBookings = numeric(sevenDay.bookings);
+            const sevenDayOrders = numeric(sevenDay.orders);
+            overview.querySelector('#ownerSevenDaySummary').textContent =
+                String(sevenDayConversations) + ' conversaciones · ' +
+                String(sevenDayBookings) + ' reservas · ' +
+                String(sevenDayOrders) + ' pedidos';
+            sevenDayRow.classList.toggle('hidden', (sevenDayConversations + sevenDayBookings + sevenDayOrders) <= 0);
+        } else {
+            sevenDayRow.classList.add('hidden');
         }
 
         const planRow = overview.querySelector('#ownerPlanRow');
