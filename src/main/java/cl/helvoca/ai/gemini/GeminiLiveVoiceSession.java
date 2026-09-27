@@ -248,8 +248,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             String frame;
             while ((frame = pendingAudio.poll()) != null) sendAudio(frame);
         }
-        log.info("Gemini Live setup complete call={} certification_simulation={}",
-                context.callId(), properties.isCertificationSimulation());
+        log.info("Gemini Live setup complete call={} certification_simulation={} voice={}",
+                context.callId(), properties.isCertificationSimulation(), properties.getVoice());
     }
 
     private void handleServerContent(JSONObject content) {
