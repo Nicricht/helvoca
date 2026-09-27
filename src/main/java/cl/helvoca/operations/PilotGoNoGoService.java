@@ -97,11 +97,11 @@ public class PilotGoNoGoService {
                 lifecycleSafe ? "El piloto puede avanzar o permanecer pausado." : "El piloto ya fue completado."));
 
         ControlledPilotExternalEffectGuard.Decision voice =
-                externalEffects.evaluateCurrentTenant(ControlledPilotExternalEffectGuard.Effect.VOICE);
+                externalEffects.evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.VOICE);
         ControlledPilotExternalEffectGuard.Decision whatsapp =
-                externalEffects.evaluateCurrentTenant(ControlledPilotExternalEffectGuard.Effect.WHATSAPP);
+                externalEffects.evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.WHATSAPP);
         ControlledPilotExternalEffectGuard.Decision payment =
-                externalEffects.evaluateCurrentTenant(ControlledPilotExternalEffectGuard.Effect.PAYMENT);
+                externalEffects.evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.PAYMENT);
 
         boolean guardEnrolled = voice.pilotManaged() && whatsapp.pilotManaged() && payment.pilotManaged();
         checks.add(new Check(
