@@ -59,7 +59,7 @@ class BillingSubscriptionServiceTest {
 
         when(gateway.getInvoice("invoice-1"))
                 .thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
-                        "invoice-1", "pre-1", "approved", "", OffsetDateTime.now(ZoneOffset.UTC)));
+                        "invoice-1", "pre-1", "processed", "approved", "", OffsetDateTime.now(ZoneOffset.UTC)));
         service.reconcileAuthorizedPayment("invoice-1");
 
         assertEquals("PRO", local.getPlanCode());
@@ -152,7 +152,7 @@ class BillingSubscriptionServiceTest {
 
         when(gateway.getInvoice("invoice-authorized"))
                 .thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
-                        "invoice-authorized", "pre-authorized", "processed", "",
+                        "invoice-authorized", "pre-authorized", "processed", "approved", "",
                         OffsetDateTime.now(ZoneOffset.UTC)));
         service.reconcileAuthorizedPayment("invoice-authorized");
 
@@ -233,7 +233,7 @@ class BillingSubscriptionServiceTest {
         when(subscriptions.findByExternalSubscriptionId("pre-dup")).thenReturn(Optional.of(local));
         when(gateway.getInvoice("invoice-dup"))
                 .thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
-                        "invoice-dup", "pre-dup", "approved", "", debitDate));
+                        "invoice-dup", "pre-dup", "processed", "approved", "", debitDate));
         when(catalog.requireByCode("PRO")).thenReturn(plan("PRO", "NEGOCIO", "Negocio", 39_990, false));
 
         BillingSubscriptionService service = new BillingSubscriptionService(
@@ -244,6 +244,7 @@ class BillingSubscriptionServiceTest {
         service.reconcileAuthorizedPayment("invoice-dup");
 
         assertEquals("invoice-dup", local.getLastBillingInvoiceId());
+        assertEquals("approved", local.getLastBillingPaymentStatus());
         assertEquals("PRO", local.getPlanCode());
         assertEquals(debitDate.toInstant(), local.getCurrentPeriodStart());
         assertEquals(firstPeriodEnd, local.getCurrentPeriodEnd());
@@ -264,7 +265,7 @@ class BillingSubscriptionServiceTest {
         when(subscriptions.findByExternalSubscriptionId("pre-rejected")).thenReturn(Optional.of(local));
         when(gateway.getInvoice("invoice-rejected"))
                 .thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
-                        "invoice-rejected", "pre-rejected", "rejected", "", OffsetDateTime.now(ZoneOffset.UTC)));
+                        "invoice-rejected", "pre-rejected", "recycling", "rejected", "", OffsetDateTime.now(ZoneOffset.UTC)));
 
         BillingSubscriptionService service = new BillingSubscriptionService(
                 subscriptions, gateway, configuredProperties(), jdbc, catalog);
@@ -275,6 +276,7 @@ class BillingSubscriptionServiceTest {
 
         assertEquals(SubscriptionStatus.PAST_DUE, local.getStatus());
         assertEquals("invoice-rejected", local.getLastBillingInvoiceId());
+        assertEquals("rejected", local.getLastBillingPaymentStatus());
         assertEquals(firstGraceUntil, local.getGraceUntil());
         verify(subscriptions, times(1)).saveAndFlush(local);
     }
@@ -294,7 +296,7 @@ class BillingSubscriptionServiceTest {
         when(subscriptions.findByExternalSubscriptionId("pre-renew")).thenReturn(Optional.of(local));
         when(gateway.getInvoice("invoice-renew"))
                 .thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
-                        "invoice-renew", "pre-renew", "processed", "", debitDate));
+                        "invoice-renew", "pre-renew", "processed", "approved", "", debitDate));
 
         BillingSubscriptionService service = new BillingSubscriptionService(
                 subscriptions, gateway, configuredProperties(), jdbc, catalog);
@@ -306,6 +308,78 @@ class BillingSubscriptionServiceTest {
         assertEquals(debitDate.toInstant(), local.getCurrentPeriodStart());
         assertEquals(debitDate.plusMonths(1).toInstant(), local.getCurrentPeriodEnd());
         assertEquals("invoice-renew", local.getLastBillingInvoiceId());
+        assertEquals("approved", local.getLastBillingPaymentStatus());
+    }
+
+    @Test
+    void processedInvoiceWithoutApprovedPaymentCannotActivatePlan() {
+        BusinessSubscriptionRepository subscriptions = mock(BusinessSubscriptionRepository.class);
+        SubscriptionPaymentGateway gateway = mock(SubscriptionPaymentGateway.class);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        CommercialPlanCatalogService catalog = mock(CommercialPlanCatalogService.class);
+        UUID businessId = UUID.randomUUID();
+        BusinessSubscription local = activeBasic(businessId);
+        local.setBillingProvider("mercadopago");
+        local.setPendingPlanCode("PRO");
+        local.setExternalSubscriptionId("pre-no-payment");
+
+        when(subscriptions.findByExternalSubscriptionId("pre-no-payment")).thenReturn(Optional.of(local));
+        when(gateway.getInvoice("invoice-no-payment"))
+                .thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
+                        "invoice-no-payment", "pre-no-payment", "processed", null, "",
+                        OffsetDateTime.now(ZoneOffset.UTC)));
+
+        BillingSubscriptionService service = new BillingSubscriptionService(
+                subscriptions, gateway, configuredProperties(), jdbc, catalog);
+
+        assertThrows(IllegalStateException.class,
+                () -> service.reconcileAuthorizedPayment("invoice-no-payment"));
+        assertEquals("BASIC", local.getPlanCode());
+        assertEquals(SubscriptionStatus.ACTIVE, local.getStatus());
+        assertEquals("PRO", local.getPendingPlanCode());
+        verify(subscriptions, never()).saveAndFlush(local);
+    }
+
+    @Test
+    void sameInvoiceCanRecoverFromRejectedPaymentToApprovedPayment() {
+        BusinessSubscriptionRepository subscriptions = mock(BusinessSubscriptionRepository.class);
+        SubscriptionPaymentGateway gateway = mock(SubscriptionPaymentGateway.class);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        CommercialPlanCatalogService catalog = mock(CommercialPlanCatalogService.class);
+        UUID businessId = UUID.randomUUID();
+        BusinessSubscription local = activeBasic(businessId);
+        local.setBillingProvider("mercadopago");
+        local.setPendingPlanCode("PRO");
+        local.setExternalSubscriptionId("pre-recover");
+        OffsetDateTime debitDate = OffsetDateTime.of(2026, 9, 27, 18, 30, 0, 0, ZoneOffset.UTC);
+
+        when(subscriptions.findByExternalSubscriptionId("pre-recover")).thenReturn(Optional.of(local));
+        when(gateway.getInvoice("invoice-recover"))
+                .thenReturn(
+                        new SubscriptionPaymentGateway.RemoteInvoice(
+                                "invoice-recover", "pre-recover", "recycling", "rejected", "", debitDate),
+                        new SubscriptionPaymentGateway.RemoteInvoice(
+                                "invoice-recover", "pre-recover", "processed", "approved", "", debitDate));
+        when(catalog.requireByCode("PRO")).thenReturn(plan("PRO", "NEGOCIO", "Negocio", 39_990, false));
+
+        BillingSubscriptionService service = new BillingSubscriptionService(
+                subscriptions, gateway, configuredProperties(), jdbc, catalog);
+
+        service.reconcileAuthorizedPayment("invoice-recover");
+        Instant graceAfterRejection = local.getGraceUntil();
+
+        assertEquals(SubscriptionStatus.PAST_DUE, local.getStatus());
+        assertEquals("rejected", local.getLastBillingPaymentStatus());
+        assertNotNull(graceAfterRejection);
+
+        service.reconcileAuthorizedPayment("invoice-recover");
+
+        assertEquals(SubscriptionStatus.ACTIVE, local.getStatus());
+        assertEquals("PRO", local.getPlanCode());
+        assertNull(local.getPendingPlanCode());
+        assertNull(local.getGraceUntil());
+        assertEquals("approved", local.getLastBillingPaymentStatus());
+        verify(subscriptions, times(2)).saveAndFlush(local);
     }
 
     @Test
