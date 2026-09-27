@@ -93,6 +93,9 @@ for file in "${CHANGED[@]}"; do
         src/test/java/cl/helvoca/chaos/*|src/test/java/cl/helvoca/payment/*Chaos*|src/test/java/cl/helvoca/operations/*Chaos*)
           RUN_CHAOS=true
           ;;
+        src/test/java/cl/helvoca/operations/GoldenJourneyCommercialV1IntegrationTest.java)
+          RUN_PILOT=true
+          ;;
       esac
       ;;
     scripts/ci/chaos-certification.sh)
