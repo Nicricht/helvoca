@@ -29,6 +29,13 @@ class AgentVoiceProfileTest {
     }
 
     @Test
+    void legacyDespinaSelectionMigratesToYouthfulFemaleProfile() {
+        assertEquals("seductive_female", AgentVoiceProfile.normalizeForStorage("Despina"));
+        assertEquals("Leda", AgentVoiceProfile.resolveGemini("Despina", "Kore"));
+        assertEquals("coral", AgentVoiceProfile.resolveOpenAi("Despina", "alloy"));
+    }
+
+    @Test
     void commercialVoiceProfilesRemainDistinctAndResolvePerProvider() {
         assertEquals("seductive_female", AgentVoiceProfile.normalizeForStorage("seductive_female"));
         assertEquals("Leda", AgentVoiceProfile.resolveGemini("seductive_female", "Kore"));
