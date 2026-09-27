@@ -66,6 +66,50 @@ class PlatformCertificationRunServiceTest {
     }
 
     @Test
+    void missingActorUsesPlatformAdminAuditFallback() {
+        TwilioCertificationCommandStore store = mock(TwilioCertificationCommandStore.class);
+        PlatformCertificationRunService service = new PlatformCertificationRunService(store);
+        String runId = "latency-api-20260927-020";
+        var status = new TwilioCertificationCommandStore.CommandStatus(
+                runId, "PENDING", "platform-admin", Instant.now(), null, null, null, null, null);
+
+        when(store.enqueue(runId, "platform-admin")).thenReturn(true);
+        when(store.find(runId)).thenReturn(Optional.of(status));
+
+        var response = service.create(runId, null);
+
+        assertEquals("platform-admin", response.requestedBy());
+        verify(store).enqueue(runId, "platform-admin");
+    }
+
+    @Test
+    void longActorIsBoundedBeforePersistence() {
+        TwilioCertificationCommandStore store = mock(TwilioCertificationCommandStore.class);
+        PlatformCertificationRunService service = new PlatformCertificationRunService(store);
+        String runId = "latency-api-20260927-021";
+        String actor = "x".repeat(250);
+        String bounded = "x".repeat(180);
+        var status = new TwilioCertificationCommandStore.CommandStatus(
+                runId, "PENDING", bounded, Instant.now(), null, null, null, null, null);
+
+        when(store.enqueue(runId, bounded)).thenReturn(true);
+        when(store.find(runId)).thenReturn(Optional.of(status));
+
+        var response = service.create(runId, actor);
+
+        assertEquals(180, response.requestedBy().length());
+    }
+
+    @Test
+    void invalidGetFailsBeforeDatabase() {
+        TwilioCertificationCommandStore store = mock(TwilioCertificationCommandStore.class);
+        PlatformCertificationRunService service = new PlatformCertificationRunService(store);
+
+        assertThrows(IllegalArgumentException.class, () -> service.get("bad"));
+        verifyNoInteractions(store);
+    }
+
+    @Test
     void responseNeverContainsCallbackToken() {
         assertTrue(Arrays.stream(PlatformCertificationRunResponse.class.getRecordComponents())
                 .noneMatch(field -> "callbackToken".equals(field.getName())
