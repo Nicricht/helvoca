@@ -153,6 +153,57 @@ class DevDataInitializerTest {
     }
 
     @Test
+    void upgradesLegacyGenericDemoFixtureWithoutLeavingExtraActiveServices() throws Exception {
+        DemoMocks f = new DemoMocks();
+
+        Business legacyBusiness = new Business();
+        ReflectionTestUtils.setField(legacyBusiness, "id", f.businessId);
+        legacyBusiness.setName("Helvoca Demo Business");
+        AppUser existingAdmin = new AppUser();
+        existingAdmin.setBusiness(legacyBusiness);
+        existingAdmin.setEmail("demo@helvoca.local");
+        f.business.set(legacyBusiness);
+        f.admin.set(existingAdmin);
+
+        for (String name : List.of("Consulta inicial", "Servicio completo", "Control de seguimiento")) {
+            ServiceItem legacy = new ServiceItem();
+            ReflectionTestUtils.setField(legacy, "id", UUID.randomUUID());
+            legacy.setBusinessId(f.businessId);
+            legacy.setName(name);
+            legacy.setDurationMinutes(30);
+            legacy.setActive(true);
+            f.serviceStore.add(legacy);
+        }
+
+        KnowledgeItem legacyCancellation = new KnowledgeItem();
+        ReflectionTestUtils.setField(legacyCancellation, "id", UUID.randomUUID());
+        legacyCancellation.setBusinessId(f.businessId);
+        legacyCancellation.setTitle("Cambios y cancelaciones");
+        legacyCancellation.setCategory("Reservas");
+        legacyCancellation.setContent("Texto legacy sin política concreta.");
+        legacyCancellation.setActive(true);
+        f.knowledgeStore.add(legacyCancellation);
+
+        DevDataInitializer initializer = f.initializer(true);
+        initializer.run();
+
+        assertEquals("Barbería Norte Demo", legacyBusiness.getName());
+        assertEquals(6, f.serviceStore.stream().filter(ServiceItem::isActive).count());
+        assertTrue(f.serviceStore.stream()
+                .filter(item -> List.of("Consulta inicial", "Servicio completo", "Control de seguimiento").contains(item.getName()))
+                .noneMatch(ServiceItem::isActive));
+        assertEquals(6, f.knowledgeStore.size());
+        KnowledgeItem upgraded = f.knowledgeStore.stream()
+                .filter(item -> "Cambios y cancelaciones".equals(item.getTitle()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("Políticas", upgraded.getCategory());
+        assertTrue(upgraded.getContent().contains("4 horas"));
+        assertEquals(3, f.customerStore.size());
+        assertEquals(3, f.bookingStore.size());
+    }
+
+    @Test
     void keepsExistingDemoScheduleUntouched() throws Exception {
         BusinessRepository businesses = mock(BusinessRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
@@ -331,8 +382,10 @@ class DevDataInitializerTest {
             });
             when(services.saveAndFlush(any(ServiceItem.class))).thenAnswer(invocation -> {
                 ServiceItem saved = invocation.getArgument(0);
-                ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
-                serviceStore.add(saved);
+                if (saved.getId() == null) ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
+                if (serviceStore.stream().noneMatch(item -> saved.getId().equals(item.getId()))) {
+                    serviceStore.add(saved);
+                }
                 return saved;
             });
             when(services.findAllByBusinessIdOrderByNameAsc(businessId)).thenAnswer(invocation ->
@@ -360,9 +413,11 @@ class DevDataInitializerTest {
                 String title = invocation.getArgument(1);
                 return knowledgeStore.stream().anyMatch(item -> title.equalsIgnoreCase(item.getTitle()));
             });
+            when(knowledge.findAllByBusinessIdOrderByTitleAsc(businessId)).thenAnswer(invocation ->
+                    new ArrayList<>(knowledgeStore));
             when(knowledge.saveAndFlush(any(KnowledgeItem.class))).thenAnswer(invocation -> {
                 KnowledgeItem saved = invocation.getArgument(0);
-                knowledgeStore.add(saved);
+                if (!knowledgeStore.contains(saved)) knowledgeStore.add(saved);
                 return saved;
             });
             when(knowledge.findAllByBusinessIdAndActiveTrueOrderByTitleAsc(businessId)).thenAnswer(invocation ->
