@@ -77,11 +77,13 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("NO vuelvas a ejecutar la misma herramienta"));
         assertTrue(instructions.contains("entonación chilena urbana neutra"));
         assertTrue(instructions.contains("voz claramente femenina y adulta"));
-        assertTrue(instructions.contains("no adoptes un registro masculino, grave o andrógino"));
-        assertTrue(instructions.contains("sin convertir el contenido en sexual ni coquetear explícitamente"));
+        assertTrue(instructions.contains("Debe sentirse inequívocamente como mujer"));
+        assertTrue(instructions.contains("no en contenido sexual ni coqueteo explícito"));
         assertTrue(instructions.contains("DESDE LA PRIMERA SÍLABA"));
         assertTrue(instructions.contains("Cuéntame, ¿en qué te puedo ayudar?"));
         assertTrue(instructions.contains("Evita \"¿Qué es lo que usted desea?\""));
+        assertTrue(instructions.contains("habla rápido, ágil y fluido"));
+        assertTrue(instructions.contains("Termina de decir todas las palabras de la despedida"));
         assertTrue(instructions.contains("a las nueve y media"));
         assertTrue(instructions.contains("nunca menciones UUID"));
         assertTrue(instructions.contains("success=true sin bookingId es solo una propuesta pendiente de confirmación"));
