@@ -66,14 +66,14 @@ class TwilioCertificationCommandStoreTest {
     @Test
     void validIngressTokenIsSingleAtomicUpdate() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.update(anyString(), any(), any(), any())).thenReturn(1);
+        when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
         TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
 
         assertTrue(store.consumeIngressToken(
                 "11111111-1111-1111-1111-111111111111",
                 "CA0123456789abcdef0123456789abcdef"));
 
-        verify(jdbc, times(1)).update(anyString(), any(), any(), any());
+        verify(jdbc, times(1)).update(anyString(), any(Object[].class));
     }
 
     @Test
@@ -87,14 +87,13 @@ class TwilioCertificationCommandStoreTest {
         store.recordProviderCall(runId, token, callSid);
         store.markFailed(runId, "provider unavailable");
 
-        verify(jdbc, times(1)).update(anyString(), any(), any(), any(), any());
-        verify(jdbc, times(1)).update(anyString(), any(), any());
+        verify(jdbc, times(2)).update(anyString(), any(Object[].class));
     }
 
     @Test
     void failedAtomicConsumeReturnsFalse() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.update(anyString(), any(), any(), any())).thenReturn(0);
+        when(jdbc.update(anyString(), any(Object[].class))).thenReturn(0);
         TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
 
         assertFalse(store.consumeIngressToken(
