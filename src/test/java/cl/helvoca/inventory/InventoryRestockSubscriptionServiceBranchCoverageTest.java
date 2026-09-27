@@ -235,7 +235,7 @@ class InventoryRestockSubscriptionServiceBranchCoverageTest {
         when(subscriptions.lockByIdAndBusinessId(activeId, businessId)).thenReturn(Optional.of(cancellable));
 
         InventoryRestockNotification sent = new InventoryRestockNotification();
-        sent.setStatus(InventoryRestockNotification.Status.SENT);
+        sent.setStatus(InventoryRestockNotification.Status.CANCELLED);
         when(notifications.findByBusinessIdAndSubscriptionId(businessId, activeId))
                 .thenReturn(Optional.of(sent));
 
