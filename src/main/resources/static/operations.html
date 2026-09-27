@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Operación interna · RecepVoz</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { min-height:100vh; }
+    .operations-shell { width:min(1040px,calc(100% - 32px)); margin:0 auto; padding:26px 0 48px; }
+    .operations-top { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
+    .operations-top-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .operations-heading { margin-bottom:16px; }
+    .operations-heading h1 { margin:3px 0 5px; font-size:clamp(26px,4vw,38px); }
+    .operations-heading p { margin:0; color:var(--muted); font-size:12px; line-height:1.5; }
+    .operations-note { margin-bottom:16px; padding:11px 13px; border:1px solid var(--border); border-radius:11px; color:var(--muted); font-size:11px; line-height:1.5; background:rgba(255,255,255,.02); }
+    .operations-error { margin-bottom:16px; padding:12px 14px; border:1px solid rgba(242,141,141,.28); border-radius:11px; color:#f28d8d; font-size:12px; }
+    @media(max-width:620px){ .operations-top{align-items:flex-start;flex-direction:column;} .operations-top-actions{width:100%;} }
+  </style>
+</head>
+<body>
+  <main class="operations-shell">
+    <header class="operations-top">
+      <div>
+        <div class="brand">RECEPVOZ</div>
+        <div class="subtitle">Herramientas internas de operación</div>
+      </div>
+      <div class="operations-top-actions">
+        <a class="button small ghost" href="/">Volver al negocio</a>
+        <button id="refreshBtn" class="button small secondary" type="button">Actualizar</button>
+        <button id="operationsLogout" class="button small ghost" type="button">Salir</button>
+      </div>
+    </header>
+
+    <section id="operationsGuardMessage" class="operations-error hidden" role="alert"></section>
+
+    <section id="dashboardView" class="hidden" aria-label="Operación interna de RecepVoz">
+      <div class="dashboard-heading operations-heading">
+        <div class="eyebrow">Uso interno</div>
+        <h1>Operación y certificación</h1>
+        <p>Readiness, control del piloto y métricas de salud separados de la portada comercial del negocio.</p>
+      </div>
+      <div class="operations-note">
+        Esta superficie es para operación y certificación. La portada del negocio muestra únicamente valor comercial y acciones del dueño.
+      </div>
+    </section>
+  </main>
+
+  <script src="/operations.js?v=20260927-1" defer></script>
+  <script src="/pilot-readiness.js?v=20260926-1" defer></script>
+  <script src="/pilot-control.js?v=20260926-1" defer></script>
+  <script src="/pilot-metrics.js?v=20260926-1" defer></script>
+</body>
+</html>
