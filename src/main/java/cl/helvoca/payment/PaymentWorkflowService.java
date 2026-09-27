@@ -272,7 +272,9 @@ public class PaymentWorkflowService {
 
         operation.setStatus(operationStatus(payment.getStatus()));
         operation.setConfirmationToken(null);
-        operation.setMetadata(operationMetadata(recalculated, false, payment));
+        operation.setMetadata(mergeMetadata(
+                operation.getMetadata(),
+                operationMetadata(recalculated, false, payment)));
         operation = operations.saveAndFlush(operation);
 
         recordConversation(
