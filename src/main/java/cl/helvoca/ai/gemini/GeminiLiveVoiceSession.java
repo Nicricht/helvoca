@@ -55,6 +55,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             "find_caller",
             "list_available_slots",
             "check_booking_availability");
+    private static final List<String> VOICE_BAKEOFF_MARKERS = List.of(
+            "[RECEPVOZ_VOICE_BAKEOFF_LINE_1]",
+            "[RECEPVOZ_VOICE_BAKEOFF_LINE_2]",
+            "[RECEPVOZ_VOICE_BAKEOFF_LINE_3]");
 
     private final RealtimeCallContext context;
     private final VoiceTransportSession transport;
@@ -75,6 +79,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final AtomicBoolean finalized = new AtomicBoolean(false);
     private final AtomicInteger pendingMessages = new AtomicInteger(0);
     private final AtomicInteger certificationStep = new AtomicInteger(0);
+    private final AtomicInteger voiceBakeOffStep = new AtomicInteger(0);
+    private final AtomicBoolean voiceBakeOffEndCallRequested = new AtomicBoolean(false);
     private final AtomicBoolean certificationAvailabilityResolved = new AtomicBoolean(false);
     private final AtomicBoolean certificationBookingProposalReady = new AtomicBoolean(false);
     private final AtomicBoolean certificationBookingCreated = new AtomicBoolean(false);
@@ -267,9 +273,11 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             log.warn("Could not persist Gemini setup milestone call={}: {}", context.callId(), e.getMessage());
         }
 
-        sendRealtimeText(context.voiceBakeOff()
-                ? "[RECEPVOZ_VOICE_BAKEOFF_SAMPLE]"
-                : "[RECEPVOZ_CALL_CONNECTED]");
+        if (context.voiceBakeOff()) {
+            advanceVoiceBakeOff();
+        } else {
+            sendRealtimeText("[RECEPVOZ_CALL_CONNECTED]");
+        }
 
         if (properties.isCertificationSimulation()) {
             pendingAudio.clear();
@@ -325,6 +333,12 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         boolean generationComplete = content.optBoolean("generationComplete", false);
         boolean waitingForInput = content.optBoolean("waitingForInput", false);
 
+        if (context.voiceBakeOff() && turnComplete) {
+            flushTranscripts();
+            advanceVoiceBakeOff();
+            return;
+        }
+
         if ((turnComplete || generationComplete) && deferredEndCallPending.get()) {
             finishCallAfterPlayback();
         }
@@ -347,6 +361,31 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             certificationAwaitingPostToolBoundary.set(false);
             certificationPostToolOutputSeen.set(false);
             advanceCertificationSimulation();
+        }
+    }
+
+    private void advanceVoiceBakeOff() {
+        if (!context.voiceBakeOff() || closed.get()) return;
+
+        int step = voiceBakeOffStep.getAndIncrement();
+        if (step < VOICE_BAKEOFF_MARKERS.size()) {
+            String marker = VOICE_BAKEOFF_MARKERS.get(step);
+            log.info("VOICE_BAKEOFF_STEP call={} step={} marker={}",
+                    context.callId(), step + 1, marker);
+            sendClientTurn(marker);
+            return;
+        }
+
+        if (!voiceBakeOffEndCallRequested.compareAndSet(false, true)) return;
+        JSONObject result = executeTool("end_call", new JSONObject());
+        if (!result.optBoolean("success", false)) {
+            log.error("VOICE_BAKEOFF_END_CALL failed call={} result={}",
+                    context.callId(), truncate(result.toString()));
+            return;
+        }
+        log.info("VOICE_BAKEOFF_END_CALL requested call={}", context.callId());
+        if (deferredEndCallPending.get()) {
+            finishCallAfterPlayback();
         }
     }
 
@@ -544,7 +583,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         try {
             JSONObject result;
             if ("end_call".equals(name)) {
-                if (!properties.isCertificationSimulation()
+                if (!context.voiceBakeOff()
+                        && !properties.isCertificationSimulation()
                         && !contextualClosingIntent.get()
                         && !hasExplicitClosingIntent(lastUserUtterance)) {
                     log.info("Blocked premature end_call call={} last_user={}",
@@ -813,11 +853,13 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 ? """
                 MODO VOICE BAKE-OFF DE RECEPVOZ:
                 Esta llamada compara únicamente la calidad vocal. No ejecutes herramientas de negocio, no consultes datos y no improvises contenido.
-                Cuando recibas exactamente [RECEPVOZ_VOICE_BAKEOFF_SAMPLE], pronuncia EXACTAMENTE estas tres líneas, en este orden y sin agregar ni quitar palabras:
-                1. "Hola, gracias por llamar. Ya, cuéntame, ¿en qué te ayudo?"
-                2. "Sí, obvio. Tengo una hora mañana a las diez y media y otra a las doce. ¿Cuál te acomoda más?"
-                3. "Ya, súper. Quedó clarito. Gracias por llamar, que estés súper. Chao."
-                Después de terminar COMPLETA la tercera línea, invoca end_call una sola vez. No esperes respuesta del usuario.
+                El sistema te enviará tres marcadores de locución, uno por turno. Cada marcador es una orden de narración y NO una conversación con el usuario:
+                - [RECEPVOZ_VOICE_BAKEOFF_LINE_1] -> pronuncia EXACTAMENTE: "Hola, gracias por llamar. Ya, cuéntame, ¿en qué te ayudo?"
+                - [RECEPVOZ_VOICE_BAKEOFF_LINE_2] -> pronuncia EXACTAMENTE: "Sí, obvio. Tengo una hora mañana a las diez y media y otra a las doce. ¿Cuál te acomoda más?"
+                - [RECEPVOZ_VOICE_BAKEOFF_LINE_3] -> pronuncia EXACTAMENTE: "Ya, súper. Quedó clarito. Gracias por llamar, que estés súper. Chao."
+                Pronuncia únicamente la línea correspondiente al marcador actual, sin agregar ni quitar palabras.
+                Aunque una línea termine en pregunta, NO esperes respuesta del teléfono: termina ese turno y el sistema enviará inmediatamente el siguiente marcador.
+                No invoques herramientas por tu cuenta. Después de completar la tercera línea, el harness ejecutará end_call una sola vez.
                 """
                 : tools.buildInstructions(context);
         String voiceIdentity = "Enceladus".equalsIgnoreCase(properties.getVoice())
@@ -844,7 +886,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 HERRAMIENTAS: si una consulta de lectura ya devolvió success=true con los mismos datos y el cliente no cambió su solicitud, usa ese resultado y NO vuelvas a ejecutar la misma herramienta. Para una reserva, consulta find_caller antes de pedir nombre o teléfono; si el cliente ya existe, reutiliza sus datos y no se los vuelvas a preguntar. Después de una herramienta, responde con el resultado en lenguaje humano; nunca menciones UUID, nombres internos de herramientas ni detalles técnicos.
                 VERACIDAD: nunca inventes disponibilidad ni confirmes acciones antes de que una herramienta devuelva success=true. En create_booking, success=true sin bookingId es solo una propuesta pendiente de confirmación: no digas "te confirmo la reserva", "quedó reservado", "quedó agendado" ni equivalentes. Solo puedes afirmar que la reserva existe cuando create_booking devuelve success=true Y un bookingId.
                 APERTURA: si recibes exactamente [RECEPVOZ_CALL_CONNECTED], no lo menciones ni lo trates como palabras del cliente. Desde la PRIMERA PALABRA usa la misma identidad femenina joven-adulta, alegre y santiaguina del resto de la llamada. El saludo debe tener sonrisa audible y energía inmediata, pero cero tono de call center. El saludo configurado define solo el contenido: reformúlalo en una frase corta y chilena, por ejemplo "Hola, gracias por llamar a [negocio]. Ya, cuéntame, ¿en qué te ayudo?". No empieces neutra para cambiar después y no sobreactúes la bienvenida.
-                BAKE-OFF: si recibes [RECEPVOZ_VOICE_BAKEOFF_SAMPLE], obedece el guion exacto del modo bake-off. No hagas preguntas adicionales, no uses herramientas salvo end_call y no reacciones al audio del teléfono.
+                BAKE-OFF: si recibes uno de los marcadores [RECEPVOZ_VOICE_BAKEOFF_LINE_1], [RECEPVOZ_VOICE_BAKEOFF_LINE_2] o [RECEPVOZ_VOICE_BAKEOFF_LINE_3], obedece únicamente la línea exacta asignada. No hagas preguntas adicionales, no uses herramientas por tu cuenta y no reacciones al audio del teléfono.
                 CIERRE: completar una reserva, venta o consulta NO significa que la llamada terminó. Después de resolverla, pregunta UNA sola vez "¿Necesitas algo más?". Si el cliente responde "no", "no gracias", "nada más" o equivalente, NO vuelvas a preguntar nada: di UNA sola despedida chilena completa, por ejemplo "Ya, perfecto. Gracias por llamar, que estés súper. Chao.", y luego invoca end_call una sola vez. Nunca repitas la despedida. Termina de pronunciar todas sus palabras antes de invocar end_call.
                 IDENTIDAD: si te preguntan si eres una IA o asistente virtual, responde con honestidad y continúa ayudando.
                 """.formatted(voiceIdentity);

@@ -49,7 +49,7 @@ class GeminiLiveVoiceProviderBakeOffTest {
     }
 
     @Test
-    void bakeOffContextIsClassifiedAsCertificationSession() {
+    void bakeOffContextIsNotClassifiedAsBookingCertificationSession() {
         GeminiLiveProperties properties = new GeminiLiveProperties();
         RealtimeToolService tools = mock(RealtimeToolService.class);
         GeminiLiveVoiceProvider provider = new GeminiLiveVoiceProvider(
@@ -68,7 +68,7 @@ class GeminiLiveVoiceProviderBakeOffTest {
                 UUID.randomUUID(), UUID.randomUUID(), null,
                 "+56911111111", "+14355652512", "MZ-normal");
 
-        assertEquals(true, provider.certificationSession(bakeOff));
+        assertEquals(false, provider.certificationSession(bakeOff));
         assertEquals(false, provider.certificationSession(normal));
     }
 

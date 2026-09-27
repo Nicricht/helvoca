@@ -111,7 +111,7 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
-    void bakeOffModeUsesExactSampleOnlyEndCallAndIgnoresPhoneAudio() {
+    void bakeOffModeAdvancesAllThreeLinesEndsAfterPlaybackAndIgnoresPhoneAudio() {
         GeminiLiveProperties properties = properties();
         properties.setVoice("Sadachbia");
         RealtimeCallContext context = new RealtimeCallContext(
@@ -119,11 +119,20 @@ class GeminiLiveVoiceSessionTest {
                 "+56966939611", "+14355652512", "MZ-bakeoff", "Sadachbia");
         RealtimeToolService tools = mock(RealtimeToolService.class);
         when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+        when(tools.prepareDeferredEndCall(context)).thenReturn(new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("ended", false)
+                        .put("pendingPlaybackCompletion", true))
+                .put("error", JSONObject.NULL)
+                .toString());
 
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        when(transport.endAfterPlayback()).thenReturn(true);
         CallLifecycleService lifecycle = mock(CallLifecycleService.class);
         GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
                 context,
-                mock(VoiceTransportSession.class),
+                transport,
                 properties,
                 tools,
                 mock(CallTranscriptService.class),
@@ -143,9 +152,12 @@ class GeminiLiveVoiceSessionTest {
         String instructions = setup.getJSONObject("systemInstruction")
                 .getJSONArray("parts").getJSONObject(0).getString("text");
         assertTrue(instructions.contains("MODO VOICE BAKE-OFF DE RECEPVOZ"));
+        assertTrue(instructions.contains("[RECEPVOZ_VOICE_BAKEOFF_LINE_1]"));
+        assertTrue(instructions.contains("[RECEPVOZ_VOICE_BAKEOFF_LINE_2]"));
+        assertTrue(instructions.contains("[RECEPVOZ_VOICE_BAKEOFF_LINE_3]"));
         assertTrue(instructions.contains("Hola, gracias por llamar. Ya, cuéntame, ¿en qué te ayudo?"));
         assertTrue(instructions.contains("Tengo una hora mañana a las diez y media y otra a las doce"));
-        assertTrue(instructions.contains("No esperes respuesta del usuario"));
+        assertTrue(instructions.contains("NO esperes respuesta del teléfono"));
 
         JSONArray declarations = setup.getJSONArray("tools")
                 .getJSONObject(0).getJSONArray("functionDeclarations");
@@ -163,18 +175,84 @@ class GeminiLiveVoiceSessionTest {
         session.onOpen(socket);
         session.onText(socket, new JSONObject().put("setupComplete", new JSONObject()).toString(), true);
 
+        String[] lines = {
+                "Hola, gracias por llamar. Ya, cuéntame, ¿en qué te ayudo?",
+                "Sí, obvio. Tengo una hora mañana a las diez y media y otra a las doce. ¿Cuál te acomoda más?",
+                "Ya, súper. Quedó clarito. Gracias por llamar, que estés súper. Chao."
+        };
+        for (String line : lines) {
+            JSONObject completedTurn = new JSONObject().put("serverContent", new JSONObject()
+                    .put("outputTranscription", new JSONObject().put("text", line))
+                    .put("turnComplete", true));
+            session.onText(socket, completedTurn.toString(), true);
+        }
+
         ArgumentCaptor<CharSequence> sent = ArgumentCaptor.forClass(CharSequence.class);
-        verify(socket, atLeast(2)).sendText(sent.capture(), eq(true));
-        var realtimeTexts = sent.getAllValues().stream()
+        verify(socket, atLeast(4)).sendText(sent.capture(), eq(true));
+        var markers = sent.getAllValues().stream()
                 .map(CharSequence::toString)
                 .map(JSONObject::new)
-                .filter(payload -> payload.has("realtimeInput"))
-                .map(payload -> payload.getJSONObject("realtimeInput").optString("text"))
+                .filter(payload -> payload.has("clientContent"))
+                .map(payload -> payload.getJSONObject("clientContent")
+                        .getJSONArray("turns").getJSONObject(0)
+                        .getJSONArray("parts").getJSONObject(0)
+                        .getString("text"))
                 .toList();
 
-        assertTrue(realtimeTexts.contains("[RECEPVOZ_VOICE_BAKEOFF_SAMPLE]"));
-        assertFalse(realtimeTexts.contains("[RECEPVOZ_CALL_CONNECTED]"));
+        assertEquals(Arrays.asList(
+                "[RECEPVOZ_VOICE_BAKEOFF_LINE_1]",
+                "[RECEPVOZ_VOICE_BAKEOFF_LINE_2]",
+                "[RECEPVOZ_VOICE_BAKEOFF_LINE_3]"), markers);
+        verify(tools, times(1)).prepareDeferredEndCall(context);
+        verify(transport, times(1)).endAfterPlayback();
+        verify(tools, never()).execute(eq(context), eq("end_call"), anyString());
         verify(lifecycle).markAiSetupCompleted(context.callId());
+    }
+
+    @Test
+    void bakeOffEndCallFailureIsFailClosedAndDuplicateBoundaryDoesNotRetry() {
+        GeminiLiveProperties properties = properties();
+        properties.setVoice("Sadachbia");
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), UUID.randomUUID(), null,
+                "+56966939611", "+14355652512", "MZ-bakeoff-failure", "Sadachbia");
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+        when(tools.prepareDeferredEndCall(context)).thenReturn(new JSONObject()
+                .put("success", false)
+                .put("error", new JSONObject().put("code", "END_CALL_TEST_FAILURE"))
+                .toString());
+
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                transport,
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+        session.onOpen(socket);
+        session.onText(socket, new JSONObject().put("setupComplete", new JSONObject()).toString(), true);
+
+        JSONObject turnComplete = new JSONObject()
+                .put("serverContent", new JSONObject().put("turnComplete", true));
+        session.onText(socket, turnComplete.toString(), true);
+        session.onText(socket, turnComplete.toString(), true);
+        session.onText(socket, turnComplete.toString(), true);
+
+        // A duplicate boundary after the failed one-shot end_call must not retry it.
+        session.onText(socket, turnComplete.toString(), true);
+
+        verify(tools, times(1)).prepareDeferredEndCall(context);
+        verify(transport, never()).endAfterPlayback();
     }
 
     @Test
