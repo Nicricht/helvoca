@@ -3,9 +3,11 @@ package cl.helvoca.messaging.outbound;
 import cl.helvoca.messaging.meta.MetaWhatsAppAccessTokenResolver;
 import cl.helvoca.messaging.meta.MetaWhatsAppCloudClient;
 import cl.helvoca.messaging.meta.MetaWhatsAppProperties;
+import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -162,6 +164,32 @@ class MetaWhatsAppMessagingProviderTest {
                 IllegalArgumentException.class,
                 () -> provider.send(command(UUID.randomUUID(), null)));
 
+        verifyNoInteractions(phones, client);
+    }
+
+    @Test
+    void controlledPilotGuardBlocksBeforeMetaClientOrSenderLookup() {
+        UUID businessId = UUID.randomUUID();
+        var properties = enabledProperties();
+        var phones = mock(PhoneNumberRepository.class);
+        var client = mock(MetaWhatsAppCloudClient.class);
+        var guard = mock(ControlledPilotExternalEffectGuard.class);
+        var provider = provider(properties, phones, client, Optional.empty());
+
+        ReflectionTestUtils.setField(provider, "pilotExternalEffects", guard);
+        doThrow(new IllegalStateException("blocked"))
+                .when(guard)
+                .requireAllowed(
+                        businessId,
+                        ControlledPilotExternalEffectGuard.Effect.WHATSAPP);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> provider.send(command(businessId, OutboundMessage.Channel.WHATSAPP)));
+
+        verify(guard).requireAllowed(
+                businessId,
+                ControlledPilotExternalEffectGuard.Effect.WHATSAPP);
         verifyNoInteractions(phones, client);
     }
 
