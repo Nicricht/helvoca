@@ -75,7 +75,7 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("ESPAÑOL DE CHILE"));
         assertTrue(instructions.contains("como locutora"));
         assertTrue(instructions.contains("NO vuelvas a ejecutar la misma herramienta"));
-        assertTrue(instructions.contains("entonación chilena urbana neutra"));
+        assertTrue(instructions.contains("entonación marcadamente chilena santiaguina"));
         assertTrue(instructions.contains("voz claramente femenina y adulta"));
         assertTrue(instructions.contains("Debe sentirse inequívocamente como mujer"));
         assertTrue(instructions.contains("no en contenido sexual ni coqueteo explícito"));
@@ -83,9 +83,9 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("Ya, cuéntame, ¿en qué te ayudo?"));
         assertTrue(instructions.contains("me pueda colaborar"));
         assertTrue(instructions.contains("habla MUY RÁPIDO"));
-        assertTrue(instructions.contains("NO REPETIR"));
         assertTrue(instructions.contains("está prohibido hacer dos veces la misma pregunta"));
-        assertTrue(instructions.contains("mantén exactamente el mismo género"));
+        assertTrue(instructions.contains("está prohibido hacer dos veces la misma pregunta"));
+        assertTrue(instructions.contains("mantén exactamente el mismo género"));\n        assertTrue(instructions.contains("find_caller antes de pedir nombre o teléfono"));
         assertTrue(instructions.contains("NO vuelvas a preguntar nada"));
         assertTrue(instructions.contains("completar una reserva, venta, consulta o cualquier otra acción NO significa que la llamada terminó"));
         assertTrue(instructions.contains("cadencia urbana de Santiago de Chile"));
