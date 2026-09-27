@@ -6,6 +6,7 @@ import cl.helvoca.operations.BusinessOperationItem;
 import cl.helvoca.operations.BusinessOperationItemRepository;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.operations.ConversationStateService;
+import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
 import cl.helvoca.operations.OperationPolicyService;
 import cl.helvoca.inventory.InventoryService;
 import org.json.JSONObject;
@@ -702,6 +703,99 @@ class PaymentWorkflowServiceTest {
         assertEquals("SUCCEEDED", journey.getMetadata().get("paymentStatus"));
         assertEquals("PAYMENT_STATUS_VERIFIED", journey.getMetadata().get("lastAction"));
         verify(provider).getStatus(any());
+    }
+
+    @Test
+    void controlledPilotGuardBlocksPaymentBeforeProviderAndInventoryMutation() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID sourceReferenceId = UUID.randomUUID();
+        BusinessOperation target = payableTarget(
+                businessId, customerId, sourceReferenceId, new BigDecimal("12000.00"));
+        BusinessOperation paymentDraft = paymentDraft(
+                businessId, customerId, sourceReferenceId, target, new BigDecimal("12000.00"));
+
+        when(payments.findByOperationIdAndBusinessId(paymentDraft.getId(), businessId))
+                .thenReturn(Optional.empty());
+        when(operations.findByIdAndBusinessId(paymentDraft.getId(), businessId))
+                .thenReturn(Optional.of(paymentDraft));
+        when(operations.findByIdAndBusinessId(target.getId(), businessId))
+                .thenReturn(Optional.of(target));
+        when(payments.findAllByBusinessIdAndTargetOperationIdOrderByCreatedAtAsc(
+                businessId, target.getId())).thenReturn(List.of());
+
+        ControlledPilotExternalEffectGuard guard = mock(ControlledPilotExternalEffectGuard.class);
+        when(guard.evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.PAYMENT))
+                .thenReturn(new ControlledPilotExternalEffectGuard.Decision(
+                        false,
+                        true,
+                        "GLOBAL_KILL_SWITCH_ACTIVE",
+                        "READY",
+                        ControlledPilotExternalEffectGuard.Effect.PAYMENT));
+        ReflectionTestUtils.setField(service, "pilotExternalEffects", guard);
+
+        JSONObject result = service.confirm(
+                businessId,
+                customerId,
+                sourceReferenceId,
+                "+56911111111",
+                BusinessOrder.Source.WHATSAPP,
+                confirmArgs(paymentDraft));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals(
+                "PILOT_EXTERNAL_EFFECTS_BLOCKED",
+                result.getJSONObject("error").getString("code"));
+        verifyNoInteractions(providers);
+        verify(payments, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void controlledPilotGuardAllowsRunningPilotToReachPaymentProvider() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID sourceReferenceId = UUID.randomUUID();
+        BusinessOperation target = payableTarget(
+                businessId, customerId, sourceReferenceId, new BigDecimal("12000.00"));
+        BusinessOperation paymentDraft = paymentDraft(
+                businessId, customerId, sourceReferenceId, target, new BigDecimal("12000.00"));
+
+        when(payments.findByOperationIdAndBusinessId(paymentDraft.getId(), businessId))
+                .thenReturn(Optional.empty());
+        when(operations.findByIdAndBusinessId(paymentDraft.getId(), businessId))
+                .thenReturn(Optional.of(paymentDraft));
+        when(operations.findByIdAndBusinessId(target.getId(), businessId))
+                .thenReturn(Optional.of(target));
+        when(payments.findAllByBusinessIdAndTargetOperationIdOrderByCreatedAtAsc(
+                businessId, target.getId())).thenReturn(List.of());
+        when(providers.resolve(businessId)).thenReturn(Optional.of(provider));
+        when(provider.providerCode()).thenReturn("sandbox");
+        when(provider.create(any())).thenReturn(new PaymentProviderAdapter.CreateResult(
+                "ext-pilot",
+                "https://checkout.example.test/pilot",
+                BusinessPayment.Status.REQUIRES_ACTION,
+                Map.of()));
+
+        ControlledPilotExternalEffectGuard guard = mock(ControlledPilotExternalEffectGuard.class);
+        when(guard.evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.PAYMENT))
+                .thenReturn(new ControlledPilotExternalEffectGuard.Decision(
+                        true,
+                        true,
+                        "ALLOWED",
+                        "RUNNING",
+                        ControlledPilotExternalEffectGuard.Effect.PAYMENT));
+        ReflectionTestUtils.setField(service, "pilotExternalEffects", guard);
+
+        JSONObject result = service.confirm(
+                businessId,
+                customerId,
+                sourceReferenceId,
+                "+56911111111",
+                BusinessOrder.Source.WHATSAPP,
+                confirmArgs(paymentDraft));
+
+        assertTrue(result.getBoolean("success"), result::toString);
+        verify(provider).create(any());
     }
 
     private static BusinessOperation payableTarget(UUID businessId,

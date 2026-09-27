@@ -6,6 +6,7 @@ import cl.helvoca.operations.BusinessOperationItem;
 import cl.helvoca.operations.BusinessOperationItemRepository;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.operations.ConversationStateService;
+import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
 import cl.helvoca.operations.OperationPolicyService;
 import cl.helvoca.inventory.InventoryService;
 import org.json.JSONArray;
@@ -32,6 +33,9 @@ public class PaymentWorkflowService {
     private final PaymentProviderRegistry providers;
     private final OperationPolicyService policies;
     private final ConversationStateService conversationState;
+
+    @Autowired(required = false)
+    private ControlledPilotExternalEffectGuard pilotExternalEffects;
 
     @Autowired(required = false)
     private InventoryService inventory;
@@ -223,6 +227,18 @@ public class PaymentWorkflowService {
                     "PAYMENT_TERMS_CHANGED",
                     "El monto o la moneda cambió. Presenta las condiciones nuevas y solicita una nueva confirmación.",
                     quoteData(operation, recalculated));
+        }
+
+        if (pilotExternalEffects != null) {
+            ControlledPilotExternalEffectGuard.Decision pilotDecision =
+                    pilotExternalEffects.evaluate(
+                            businessId,
+                            ControlledPilotExternalEffectGuard.Effect.PAYMENT);
+            if (!pilotDecision.allowed()) {
+                return error(
+                        "PILOT_EXTERNAL_EFFECTS_BLOCKED",
+                        "El piloto controlado está detenido. No se creó ninguna intención de pago externa.");
+            }
         }
 
         PaymentProviderAdapter provider = providers.resolve(businessId).orElse(null);
