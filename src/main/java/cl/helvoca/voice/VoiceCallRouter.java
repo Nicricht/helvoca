@@ -64,8 +64,11 @@ public class VoiceCallRouter {
                 if (bakeOff && !GeminiLiveVoiceProvider.ID.equals(mediaId)) continue;
                 VoiceAiProvider provider = mediaProviders.require(mediaId);
                 if (!health.allow(provider.id(), provider.configured())) continue;
-                String twiml = mediaTwiml.twiml(
-                        businessPhone, callerPhone, twilioCallSid, provider.id(), voiceOverride);
+                String twiml = bakeOff
+                        ? mediaTwiml.twiml(
+                                businessPhone, callerPhone, twilioCallSid, provider.id(), voiceOverride)
+                        : mediaTwiml.twiml(
+                                businessPhone, callerPhone, twilioCallSid, provider.id());
                 log.info("Voice router selected provider={} mode=MEDIA_STREAM call={} voice_override={}",
                         provider.id(), twilioCallSid, bakeOff ? voiceOverride : "none");
                 return Optional.of(new RouteDecision(provider.id(), RouteMode.MEDIA_STREAM, twiml));
