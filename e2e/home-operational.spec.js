@@ -454,23 +454,23 @@ test('ready customer sees live operational home instead of setup cards', async (
     await route.fulfill(json(created));
   });
 
+  let internalPilotRequests = 0;
+  page.on('request', request => {
+    const path = new URL(request.url()).pathname;
+    if (path === '/api/v1/operations/pilot-readiness' || path.startsWith('/api/v1/operations/pilot-control')) {
+      internalPilotRequests += 1;
+    }
+  });
+
   await page.goto('/');
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Negocio E2E está atendiendo 🟢');
   await expect(page.locator('#operationalOverview')).toBeVisible();
   await expect(page.locator('#operationalOverview')).toHaveCount(1);
-  await expect(page.locator('#pilotReadinessCard')).toBeVisible();
-  await expect(page.locator('#pilotReadinessScore')).toHaveText('5/5');
-  await expect(page.locator('#pilotReadinessCard')).toContainText('Todo el circuito crítico está listo');
-  await expect(page.locator('#pilotReadinessCard .pilot-readiness-item.ready')).toHaveCount(5);
-  await expect(page.locator('#pilotControlCard')).toBeVisible();
-  await expect(page.locator('#pilotControlBadge')).toHaveText('GO');
-  await expect(page.locator('#pilotStart')).toBeVisible();
-  await page.locator('#pilotStart').click();
-  await expect(page.locator('#pilotControlBadge')).toHaveText('RUNNING');
-  await expect(page.locator('#pilotPause')).toBeVisible();
-
-  await expect(page.locator('#pilotMetricsCard')).toBeHidden();
+  await expect(page.locator('#pilotReadinessCard')).toHaveCount(0);
+  await expect(page.locator('#pilotControlCard')).toHaveCount(0);
+  await expect(page.locator('#pilotMetricsCard')).toHaveCount(0);
+  expect(internalPilotRequests).toBe(0);
   await expect(page.locator('#ownerSevenDayRow')).toBeVisible();
   await expect(page.locator('#ownerSevenDaySummary')).toContainText('50 conversaciones');
   await expect(page.locator('#ownerSevenDaySummary')).toContainText('12 reservas');
