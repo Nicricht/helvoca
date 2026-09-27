@@ -22,11 +22,11 @@ TESTS=(
 TEST_CSV="$(IFS=,; echo "${TESTS[*]}")"
 
 echo "Certification suites:"
-printf ' - %s\\n' "${TESTS[@]}"
+printf ' - %s\n' "${TESTS[@]}"
 
-mvn --batch-mode --no-transfer-progress \\
-  -Dtest="$TEST_CSV" \\
-  -Dsurefire.failIfNoSpecifiedTests=false \\
+mvn --batch-mode --no-transfer-progress \
+  -Dtest="$TEST_CSV" \
+  -Dsurefire.failIfNoSpecifiedTests=false \
   test
 
 echo "Pilot End-to-End Certification V1 passed."
