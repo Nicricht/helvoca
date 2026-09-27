@@ -120,6 +120,7 @@ class GeminiLiveVoiceSessionTest {
         RealtimeToolService tools = mock(RealtimeToolService.class);
         when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
 
+        CallLifecycleService lifecycle = mock(CallLifecycleService.class);
         GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
                 context,
                 mock(VoiceTransportSession.class),
@@ -127,7 +128,7 @@ class GeminiLiveVoiceSessionTest {
                 tools,
                 mock(CallTranscriptService.class),
                 mock(CallSummaryService.class),
-                mock(CallLifecycleService.class),
+                lifecycle,
                 mock(CallCertificationService.class),
                 new VoiceProviderHealthRegistry(),
                 HttpClient.newHttpClient());
@@ -155,6 +156,22 @@ class GeminiLiveVoiceSessionTest {
         // Must return before decoding/sending even deliberately malformed phone audio.
         assertDoesNotThrow(() -> session.acceptInboundAudio("not-valid-base64"));
         verify(tools, never()).buildInstructions(context);
+
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+        session.onOpen(socket);
+        session.onText(socket, new JSONObject().put("setupComplete", new JSONObject()).toString(), true);
+
+        ArgumentCaptor<CharSequence> sent = ArgumentCaptor.forClass(CharSequence.class);
+        verify(socket, atLeast(2)).sendText(sent.capture(), eq(true));
+        assertTrue(sent.getAllValues().stream()
+                .map(CharSequence::toString)
+                .anyMatch(payload -> payload.contains("[RECEPVOZ_VOICE_BAKEOFF_SAMPLE]")));
+        assertFalse(sent.getAllValues().stream()
+                .map(CharSequence::toString)
+                .anyMatch(payload -> payload.contains("[RECEPVOZ_CALL_CONNECTED]")));
+        verify(lifecycle).markAiSetupCompleted(context.callId());
     }
 
     @Test
