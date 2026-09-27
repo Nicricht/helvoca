@@ -132,6 +132,35 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public String prepareDeferredEndCall(RealtimeCallContext context) {
+        JSONObject result;
+        CallSession call = calls.findByIdAndBusinessId(context.callId(), context.businessId()).orElse(null);
+        if (call == null || context.streamSid() == null || !context.streamSid().equals(call.getStreamSid())) {
+            result = error("CALL_CONTEXT_MISMATCH",
+                    "No pude verificar que esta llamada corresponda al contexto telefónico actual.");
+        } else if (call.getStatus() != null && call.getStatus().terminal()) {
+            result = success(new JSONObject()
+                    .put("ended", true)
+                    .put("alreadyEnded", true)
+                    .put("pendingPlaybackCompletion", false));
+        } else if (!"twilio".equalsIgnoreCase(call.getTelephonyProvider())) {
+            result = error("END_CALL_UNSUPPORTED",
+                    "El proveedor telefónico actual no admite cierre remoto desde este flujo.");
+        } else if (call.getProviderCallId() == null || call.getProviderCallId().isBlank()) {
+            result = error("END_CALL_UNAVAILABLE",
+                    "La llamada no tiene un identificador telefónico válido para finalizarla.");
+        } else {
+            result = success(new JSONObject()
+                    .put("ended", false)
+                    .put("alreadyEnded", false)
+                    .put("pendingPlaybackCompletion", true));
+        }
+        trace.recordTool(context.businessId(), context.callId(), "end_call", result);
+        return result.toString();
+    }
+
+    @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public String execute(RealtimeCallContext context, String toolName, String rawArguments) {
         if ("end_call".equals(toolName)) {
