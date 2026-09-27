@@ -228,6 +228,8 @@ La ruta interna `/webhooks/v1/twilio/inbound-certification` está deshabilitada 
 
 ## Documentación
 
+- `docs/COMMERCIAL_DEMO_ONBOARDING.md`
+- `docs/FIRST_CUSTOMER_ONBOARDING_FORM.md`
 - `docs/PRODUCT_ARCHITECTURE.md`
 - `docs/SPRINT1.md`
 - `docs/SPRINT2.md`
