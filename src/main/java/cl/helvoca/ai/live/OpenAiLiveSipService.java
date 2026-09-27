@@ -343,8 +343,7 @@ public class OpenAiLiveSipService {
                     + " attempt_ms=" + attemptMs
                     + " elapsed_ms=" + elapsedMs
                     + " retry_window_open=" + retryWindowOpen
-                    + " session=" + sessionId
-                    + " body=" + truncate(response.body()),
+                    + " session=" + sessionId,
                     response.statusCode(), errorCode, terminal);
         }
 
