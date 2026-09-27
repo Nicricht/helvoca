@@ -71,6 +71,29 @@ class TwilioSignatureValidatorTest {
     }
 
     @Test
+    void validatesTokenizedCertificationPathWithoutDuplicatingTokenAsFormParameter() throws Exception {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setPublicBaseUrl("https://helvoca.example");
+        TwilioAuthTokenResolver tokens = mock(TwilioAuthTokenResolver.class);
+        when(tokens.resolve(null)).thenReturn(TOKEN);
+        TwilioSignatureValidator validator = new TwilioSignatureValidator(properties, tokens);
+        String callbackToken = "11111111-1111-1111-1111-111111111111";
+        String path = "/webhooks/v1/twilio/inbound-certification/" + callbackToken;
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
+        request.addParameter("CallSid", "CA123");
+        request.addParameter("From", "+14355652512");
+        request.addParameter("To", "+56966939611");
+        String url = "https://helvoca.example" + path;
+        request.addHeader("X-Twilio-Signature", signature(url, Map.of(
+                "CallSid", "CA123",
+                "From", "+14355652512",
+                "To", "+56966939611"), TOKEN));
+
+        assertTrue(validator.validateHttp(request));
+    }
+
+    @Test
     void usesOwningSubaccountTokenWhenAccountSidIsPresent() throws Exception {
         TwilioProperties properties = new TwilioProperties();
         properties.setPublicBaseUrl("https://recepvoz.cl");
