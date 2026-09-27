@@ -230,6 +230,11 @@ class PaymentWorkflowServiceTest {
         BusinessOperation target = payableTarget(businessId, customerId, sourceReferenceId, new BigDecimal("22000.00"));
         BusinessOperation paymentDraft = paymentDraft(
                 businessId, customerId, sourceReferenceId, target, new BigDecimal("22000.00"));
+        UUID journeyId = UUID.randomUUID();
+        Map<String, Object> paymentMetadata =
+                new java.util.LinkedHashMap<>(paymentDraft.getMetadata());
+        paymentMetadata.put("commercialJourneyOperationId", journeyId.toString());
+        paymentDraft.setMetadata(paymentMetadata);
 
         when(payments.findByOperationIdAndBusinessId(paymentDraft.getId(), businessId)).thenReturn(Optional.empty());
         when(operations.findByIdAndBusinessId(paymentDraft.getId(), businessId)).thenReturn(Optional.of(paymentDraft));
@@ -274,6 +279,13 @@ class PaymentWorkflowServiceTest {
         assertEquals(
                 PaymentWorkflowService.providerIdempotencyKey(paymentDraft),
                 payment.getValue().getIdempotencyKey());
+        assertEquals(
+                journeyId.toString(),
+                paymentDraft.getMetadata().get("commercialJourneyOperationId"),
+                "Confirming a provider payment must preserve the commercial journey linkage");
+        assertEquals(
+                target.getId().toString(),
+                paymentDraft.getMetadata().get("targetOperationId"));
     }
 
     @Test
