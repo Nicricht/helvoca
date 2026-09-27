@@ -8,9 +8,13 @@ import cl.helvoca.delivery.DeliveryCoverageService;
 import cl.helvoca.delivery.DeliveryWorkflowService;
 import cl.helvoca.delivery.DeliveryZone;
 import cl.helvoca.delivery.DeliveryZoneRepository;
+import cl.helvoca.inventory.InventoryProductVariant;
+import cl.helvoca.inventory.InventoryProductVariantRepository;
+import cl.helvoca.inventory.InventoryService;
 import cl.helvoca.payment.PaymentWorkflowService;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,9 +32,11 @@ public class CommercialOperationToolService {
     public static final String SHOWCASE_SELECTION_TOOL = "select_showcase_product";
     public static final String SHOWCASE_QUOTE_TOOL = "quote_selected_product";
     public static final String SHOWCASE_ORDER_TOOL = "quote_selected_product_order";
+    public static final String GET_STOCK_TOOL = "get_stock";
 
     private static final Set<String> SUPPORTED = Set.of(
             "list_catalog",
+            GET_STOCK_TOOL,
             SHOWCASE_SELECTION_TOOL,
             SHOWCASE_QUOTE_TOOL,
             SHOWCASE_ORDER_TOOL,
@@ -74,6 +80,12 @@ public class CommercialOperationToolService {
     private final UniversalOperationWorkflowService universalOperations;
     private final PaymentWorkflowService paymentWorkflow;
     private final ConversationStateService conversationState;
+
+    @Autowired(required = false)
+    private InventoryService inventory;
+
+    @Autowired(required = false)
+    private InventoryProductVariantRepository inventoryVariants;
 
     public CommercialOperationToolService(CatalogItemRepository catalog,
                                           CatalogMediaRepository catalogMedia,
@@ -127,6 +139,7 @@ public class CommercialOperationToolService {
                     : new JSONObject(rawArguments);
             result = switch (toolName) {
                 case "list_catalog" -> listCatalog(businessId);
+                case GET_STOCK_TOOL -> getStock(businessId, args);
                 case SHOWCASE_SELECTION_TOOL -> selectShowcaseProduct(businessId, customerId, args);
                 case SHOWCASE_QUOTE_TOOL -> quoteSelectedProduct(businessId, customerId, args);
                 case SHOWCASE_ORDER_TOOL -> quoteSelectedProductOrder(
@@ -185,13 +198,54 @@ public class CommercialOperationToolService {
         return result.toString();
     }
 
+    private JSONObject getStock(UUID businessId, JSONObject args) {
+        if (inventory == null) {
+            return error("INVENTORY_UNAVAILABLE", "El inventario todavía no está disponible.");
+        }
+        String catalogItemIdRaw = optional(args, "catalogItemId");
+        String variantIdRaw = optional(args, "variantId");
+        String sku = optional(args, "sku");
+        UUID catalogItemId = blank(catalogItemIdRaw) ? null : uuid(catalogItemIdRaw);
+        UUID variantId = blank(variantIdRaw) ? null : uuid(variantIdRaw);
+        InventoryService.StockLookupView stock =
+                inventory.lookupForBusiness(businessId, catalogItemId, variantId, sku);
+        JSONObject data = new JSONObject()
+                .put("catalogItemId", nullable(stock.catalogItemId()))
+                .put("productName", nullable(stock.productName()))
+                .put("sku", nullable(stock.sku()))
+                .put("variantId", nullable(stock.variantId()))
+                .put("variantName", nullable(stock.variantName()))
+                .put("variantOptions", stock.optionValuesJson() == null
+                        ? JSONObject.NULL
+                        : new JSONObject(stock.optionValuesJson()))
+                .put("configured", stock.configured())
+                .put("trackingEnabled", stock.trackingEnabled())
+                .put("availabilityKnown", stock.trackingEnabled() && stock.configured())
+                .put("onHand", nullable(stock.onHand()))
+                .put("reserved", nullable(stock.reserved()))
+                .put("available", nullable(stock.available()))
+                .put("reorderThreshold", nullable(stock.reorderThreshold()))
+                .put("lowStock", stock.lowStock());
+        return success(data);
+    }
+
     private JSONObject listCatalog(UUID businessId) {
         JSONArray items = new JSONArray();
         for (CatalogItem item : catalog.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId)) {
+            List<InventoryProductVariant> variantsForItem =
+                    inventoryVariants == null || item.getKind() != CatalogItem.Kind.PRODUCT
+                            ? List.of()
+                            : inventoryVariants
+                                    .findAllByBusinessIdAndCatalogItemIdOrderByNameAsc(
+                                            businessId, item.getId())
+                                    .stream()
+                                    .filter(InventoryProductVariant::isActive)
+                                    .toList();
             items.put(catalogData(
                     item,
                     catalogMedia.findAllByBusinessIdAndCatalogItemIdAndActiveTrueOrderBySortOrderAscCreatedAtAsc(
-                            businessId, item.getId())));
+                            businessId, item.getId()),
+                    variantsForItem));
         }
         return success(new JSONObject().put("items", items));
     }
@@ -306,7 +360,8 @@ public class CommercialOperationToolService {
                 .put("selectedCatalogItemId", item.getId().toString())
                 .put("commercialStage", commercialStage)
                 .put("idempotent", idempotent)
-                .put("product", catalogData(item, media));
+                .put("product", catalogData(
+                        item, media, variantsForItem(operation.getBusinessId(), item)));
     }
 
     private JSONObject quoteSelectedProduct(UUID businessId,
@@ -416,7 +471,8 @@ public class CommercialOperationToolService {
                 .put("currency", currency)
                 .put("commercialStage", "QUOTE_PENDING")
                 .put("idempotent", idempotent)
-                .put("product", catalogData(item, media)));
+                .put("product", catalogData(
+                        item, media, variantsForItem(businessId, item))));
     }
 
     private JSONObject quoteSelectedProductOrder(UUID businessId,
@@ -856,6 +912,9 @@ public class CommercialOperationToolService {
         }
         order.setStatus(BusinessOrder.Status.CANCELLED);
         order = orders.saveAndFlush(order);
+        if (inventory != null) {
+            inventory.releaseOrder(businessId, order.getOperationId(), "Order cancelled");
+        }
         operations.findByIdAndBusinessId(order.getOperationId(), businessId).ifPresent(operation -> {
             operation.setStatus(BusinessOperation.Status.CANCELLED);
             operation.setConfirmationToken(null);
@@ -940,6 +999,9 @@ public class CommercialOperationToolService {
         for (BusinessOrderLine line : lines) {
             JSONObject item = new JSONObject()
                     .put("catalogItemId", line.getCatalogItemId().toString())
+                    .put("variantId", line.getVariantId() == null
+                            ? JSONObject.NULL
+                            : line.getVariantId().toString())
                     .put("name", line.getItemName())
                     .put("quantity", line.getQuantity())
                     .put("unitPrice", line.getUnitPrice())
@@ -961,7 +1023,22 @@ public class CommercialOperationToolService {
                 .put("deliveryAddress", nullable(order.getDeliveryAddress()));
     }
 
-    private static JSONObject catalogData(CatalogItem item, List<CatalogMedia> media) {
+    private List<InventoryProductVariant> variantsForItem(UUID businessId, CatalogItem item) {
+        if (inventoryVariants == null
+                || item == null
+                || item.getKind() != CatalogItem.Kind.PRODUCT) {
+            return List.of();
+        }
+        return inventoryVariants
+                .findAllByBusinessIdAndCatalogItemIdOrderByNameAsc(businessId, item.getId())
+                .stream()
+                .filter(InventoryProductVariant::isActive)
+                .toList();
+    }
+
+    private static JSONObject catalogData(CatalogItem item,
+                                          List<CatalogMedia> media,
+                                          List<InventoryProductVariant> variants) {
         JSONArray mediaItems = new JSONArray();
         for (CatalogMedia value : media == null ? List.<CatalogMedia>of() : media) {
             mediaItems.put(new JSONObject()
@@ -970,6 +1047,17 @@ public class CommercialOperationToolService {
                     .put("mimeType", nullable(value.getMimeType()))
                     .put("caption", nullable(value.getCaption())));
         }
+        JSONArray variantItems = new JSONArray();
+        for (InventoryProductVariant variant
+                : variants == null ? List.<InventoryProductVariant>of() : variants) {
+            variantItems.put(new JSONObject()
+                    .put("variantId", variant.getId().toString())
+                    .put("name", variant.getName())
+                    .put("sku", variant.getSku())
+                    .put("options", new JSONObject(variant.getOptionValuesJson()))
+                    .put("trackingEnabled", variant.isTrackingEnabled()));
+        }
+
         return new JSONObject()
                 .put("id", item.getId().toString())
                 .put("kind", item.getKind().name())
@@ -979,7 +1067,9 @@ public class CommercialOperationToolService {
                 .put("currency", item.getCurrency())
                 .put("durationMinutes", nullable(item.getDurationMinutes()))
                 .put("media", mediaItems)
-                .put("hasMedia", !mediaItems.isEmpty());
+                .put("hasMedia", !mediaItems.isEmpty())
+                .put("variants", variantItems)
+                .put("hasVariants", !variantItems.isEmpty());
     }
 
     private static boolean ownedBy(BusinessOrder order, UUID customerId, String trustedPhone) {
