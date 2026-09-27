@@ -76,8 +76,8 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("como locutora"));
         assertTrue(instructions.contains("NO vuelvas a ejecutar la misma herramienta"));
         assertTrue(instructions.contains("entonación chilena urbana neutra"));
-        assertTrue(instructions.contains("extremadamente sexy, seductora e íntima"));
-        assertTrue(instructions.contains("voz aireada y respirada"));
+        assertTrue(instructions.contains("voz claramente femenina y adulta"));
+        assertTrue(instructions.contains("no adoptes un registro masculino, grave o andrógino"));
         assertTrue(instructions.contains("sin convertir el contenido en sexual ni coquetear explícitamente"));
         assertTrue(instructions.contains("DESDE LA PRIMERA SÍLABA"));
         assertTrue(instructions.contains("Cuéntame, ¿en qué te puedo ayudar?"));
@@ -554,8 +554,8 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
-    void defaultLiveVoiceUsesBreathyProfileForSeductiveDelivery() {
-        assertEquals("Enceladus", new GeminiLiveProperties().getVoice());
+    void defaultLiveVoiceUsesFeminineProfileForSeductiveDelivery() {
+        assertEquals("Aoede", new GeminiLiveProperties().getVoice());
     }
 
     @Test
