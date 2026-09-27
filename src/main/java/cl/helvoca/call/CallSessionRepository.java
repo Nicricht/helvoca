@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,6 +18,8 @@ public interface CallSessionRepository extends JpaRepository<CallSession, UUID> 
     Optional<CallSession> findByStreamSid(String streamSid);
     Optional<CallSession> findByIdAndBusinessId(UUID id, UUID businessId);
     Optional<CallSession> findFirstByBusinessIdAndCertificationTrueOrderByStartedAtDesc(UUID businessId);
+    List<CallSession> findTop20ByBusinessIdAndCustomerIdAndCertificationFalseOrderByStartedAtDesc(
+            UUID businessId, UUID customerId);
     Page<CallSession> findAllByBusinessId(UUID businessId, Pageable pageable);
     Page<CallSession> findAllByBusinessIdAndCertificationFalseAndTelephonyProviderNot(
             UUID businessId, String excludedProvider, Pageable pageable);

@@ -3,6 +3,8 @@ package cl.helvoca.operations;
 import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
 import cl.helvoca.delivery.DeliveryZoneRepository;
+import cl.helvoca.inventory.InventoryProductVariant;
+import cl.helvoca.inventory.InventoryProductVariantRepository;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -31,6 +34,7 @@ class OrderWorkflowServiceTest {
     @Mock BusinessOrderRepository orders;
     @Mock BusinessOrderLineRepository orderLines;
     @Mock BusinessOperationCapabilityService capabilities;
+    @Mock InventoryProductVariantRepository inventoryVariants;
 
     private OrderWorkflowService service;
 
@@ -38,6 +42,7 @@ class OrderWorkflowServiceTest {
     void setUp() {
         service = new OrderWorkflowService(
                 catalog, deliveryZones, operations, operationItems, orders, orderLines, capabilities);
+        ReflectionTestUtils.setField(service, "inventoryVariants", inventoryVariants);
     }
 
     @Test
@@ -90,6 +95,89 @@ class OrderWorkflowServiceTest {
         assertEquals(List.of("cebolla"), draftLine.getModifiers().get("remove"));
         assertEquals("grande", ((Map<?, ?>) draftLine.getModifiers().get("options")).get("size"));
         verify(orders, never()).saveAndFlush(any(BusinessOrder.class));
+    }
+
+    @Test
+    void quotePersistsExactVariantIdentityFromBackend() {
+        UUID businessId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID variantId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        CatalogItem shoe = item(businessId, itemId, "Zapatilla", "34990");
+
+        InventoryProductVariant variant = new InventoryProductVariant();
+        variant.setId(variantId);
+        variant.setBusinessId(businessId);
+        variant.setCatalogItemId(itemId);
+        variant.setName("Negro / 42");
+        variant.setSku("SHOE-BLK-42");
+        variant.setActive(true);
+
+        AtomicReference<BusinessOperationItem> persisted = new AtomicReference<>();
+        when(catalog.findByIdAndBusinessId(itemId, businessId)).thenReturn(Optional.of(shoe));
+        when(inventoryVariants.findByIdAndBusinessId(variantId, businessId))
+                .thenReturn(Optional.of(variant));
+        when(operations.saveAndFlush(any(BusinessOperation.class))).thenAnswer(invocation -> {
+            BusinessOperation operation = invocation.getArgument(0);
+            operation.setId(operationId);
+            return operation;
+        });
+        when(operationItems.saveAll(any())).thenAnswer(invocation -> {
+            Iterable<BusinessOperationItem> values = invocation.getArgument(0);
+            BusinessOperationItem first = values.iterator().next();
+            persisted.set(first);
+            return List.of(first);
+        });
+
+        JSONObject result = service.quote(
+                businessId, UUID.randomUUID(), UUID.randomUUID(), "+56911111111",
+                BusinessOrder.Source.WHATSAPP,
+                new JSONObject()
+                        .put("items", new JSONArray().put(new JSONObject()
+                                .put("catalogItemId", itemId.toString())
+                                .put("variantId", variantId.toString())
+                                .put("quantity", 1)))
+                        .put("fulfillmentType", "PICKUP"));
+
+        assertTrue(result.getBoolean("success"));
+        assertEquals(variantId, persisted.get().getVariantId());
+        JSONObject line = result.getJSONObject("data").getJSONArray("items").getJSONObject(0);
+        assertEquals(variantId.toString(), line.getString("variantId"));
+        assertEquals("Negro / 42", line.getString("variantName"));
+        assertEquals("SHOE-BLK-42", line.getString("variantSku"));
+    }
+
+    @Test
+    void quoteRejectsVariantFromDifferentProduct() {
+        UUID businessId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID otherItemId = UUID.randomUUID();
+        UUID variantId = UUID.randomUUID();
+        CatalogItem shoe = item(businessId, itemId, "Zapatilla", "34990");
+
+        InventoryProductVariant variant = new InventoryProductVariant();
+        variant.setId(variantId);
+        variant.setBusinessId(businessId);
+        variant.setCatalogItemId(otherItemId);
+        variant.setName("Negro / 42");
+        variant.setSku("OTHER-42");
+        variant.setActive(true);
+
+        when(catalog.findByIdAndBusinessId(itemId, businessId)).thenReturn(Optional.of(shoe));
+        when(inventoryVariants.findByIdAndBusinessId(variantId, businessId))
+                .thenReturn(Optional.of(variant));
+
+        assertThrows(IllegalArgumentException.class, () -> service.quote(
+                businessId, UUID.randomUUID(), UUID.randomUUID(), "+56911111111",
+                BusinessOrder.Source.VOICE,
+                new JSONObject()
+                        .put("items", new JSONArray().put(new JSONObject()
+                                .put("catalogItemId", itemId.toString())
+                                .put("variantId", variantId.toString())
+                                .put("quantity", 1)))
+                        .put("fulfillmentType", "PICKUP")));
+
+        verify(operations, never()).saveAndFlush(any());
     }
 
     @Test

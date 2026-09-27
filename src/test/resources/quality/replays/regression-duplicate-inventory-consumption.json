@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "name": "regression-duplicate-inventory-consumption",
+  "sourceFingerprint": "fixture000000005",
+  "turns": [],
+  "actions": [
+    {
+      "type": "INVENTORY_CONSUMED",
+      "success": true,
+      "entityType": "INVENTORY_RESERVATION",
+      "entityRef": "ENTITY_1",
+      "detail": "consumed"
+    },
+    {
+      "type": "INVENTORY_CONSUMED",
+      "success": true,
+      "entityType": "INVENTORY_RESERVATION",
+      "entityRef": "ENTITY_1",
+      "detail": "consumed retry"
+    }
+  ],
+  "expected": {
+    "passed": false,
+    "findingCodes": [
+      "DUPLICATE_SUCCESSFUL_EFFECT"
+    ]
+  }
+}

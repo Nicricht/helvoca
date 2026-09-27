@@ -4,8 +4,9 @@
   const statusGrid = document.querySelector("#statusGrid");
   if (!root || !dashboard || !statusGrid || typeof api !== "function") return;
 
-  const state = { bookings: [], customers: [], services: [], orders: [], requests: [], audit: [], auditCatalog: [], roles: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
+  const state = { bookings: [], customers: [], services: [], orders: [], sales: [], salesSummary: {}, requests: [], audit: [], auditCatalog: [], roles: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
   const bookingFilters = { query: "", date: "all", serviceId: "all", status: "all", source: "all" };
+  const salesFilters = { stage: "all", channel: "all" };
   const EVENT_LABELS = {
     BOOKING_CREATE: "Reserva creada",
     BOOKING_RESCHEDULE: "Reserva reprogramada",
@@ -1077,6 +1078,91 @@
     bindOrderOpeners();
   }
 
+
+  function salesStageLabel(value) {
+    return commercialStatusLabel(value);
+  }
+
+  function renderSales() {
+    const allItems = Array.isArray(state.sales) ? state.sales : [];
+    const items = allItems.filter(item =>
+      (salesFilters.stage === "all" || item.commercialStage === salesFilters.stage)
+      && (salesFilters.channel === "all" || item.channel === salesFilters.channel));
+
+    const count = document.querySelector("#homeBusinessSalesCount");
+    if (count) count.textContent = String(allItems.length);
+
+    const summary = state.salesSummary || {};
+    const summaryHost = document.querySelector("#homeSalesSummary");
+    if (summaryHost) {
+      summaryHost.innerHTML = [
+        ["En curso", summary.active ?? 0],
+        ["Pagadas", summary.paid ?? 0],
+        ["Requieren atención", summary.needsAction ?? 0]
+      ].map(([label,value]) => `<article><strong>${esc(value)}</strong><span>${esc(label)}</span></article>`).join("");
+    }
+
+    const stageSelect = document.querySelector("#homeSalesStage");
+    if (stageSelect) {
+      const current = salesFilters.stage;
+      const stages = [...new Set(allItems.map(item => item.commercialStage).filter(Boolean))];
+      stageSelect.innerHTML = '<option value="all">Todas</option>' + stages
+        .map(stage => `<option value="${esc(stage)}">${esc(salesStageLabel(stage))}</option>`).join("");
+      stageSelect.value = stages.includes(current) ? current : "all";
+    }
+
+    const host = document.querySelector("#homeSalesList");
+    if (!host) return;
+    if (!items.length) {
+      host.innerHTML = '<div class="home-business-empty">No hay ventas que coincidan con estos filtros.</div>';
+      return;
+    }
+
+    const row = item => {
+      const customer = item.customerName || item.customerPhone || "Cliente";
+      const product = [item.product, item.variant].filter(Boolean).join(" · ") || "Sin producto";
+      const moneyText = item.total == null ? "Sin total" : money(item.total, item.currency);
+      const stateText = [salesStageLabel(item.commercialStage), item.paymentStatus ? `Pago ${salesStageLabel(item.paymentStatus)}` : null].filter(Boolean).join(" · ");
+      return {customer, product, moneyText, stateText};
+    };
+
+    host.innerHTML = `<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Cliente</th><th>Producto</th><th>Etapa</th><th>Total</th><th>Canal</th><th>Inventario</th></tr></thead><tbody>${items.map(item => {
+      const data = row(item);
+      return `<tr tabindex="0" data-home-sale-customer-id="${esc(item.customerId || "")}"><td><strong>${esc(data.customer)}</strong></td><td>${esc(data.product)}</td><td><span class="home-pill">${esc(data.stateText)}</span></td><td>${esc(data.moneyText)}</td><td>${esc(source(item.channel))}</td><td>${esc(salesStageLabel(item.inventoryStatus))}</td></tr>`;
+    }).join("")}</tbody></table></div>
+    <div class="home-business-mobile-list">${items.map(item => {
+      const data = row(item);
+      return `<article class="home-business-mobile-card" tabindex="0" data-home-sale-customer-id="${esc(item.customerId || "")}"><strong>${esc(data.customer)}</strong><span>${esc(data.product)} · ${esc(data.stateText)} · ${esc(data.moneyText)}</span></article>`;
+    }).join("")}</div>`;
+
+    document.querySelectorAll("[data-home-sale-customer-id]").forEach(node => {
+      const open = () => {
+        const customerId = node.dataset.homeSaleCustomerId;
+        if (customerId) openCustomerDetail(customerId);
+      };
+      node.addEventListener("click", open);
+      node.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); }
+      });
+    });
+  }
+
+  function bindSalesFilters() {
+    const stage = document.querySelector("#homeSalesStage");
+    const channel = document.querySelector("#homeSalesChannel");
+    const clear = document.querySelector("#homeSalesClear");
+    if (!stage || !channel || !clear || stage.dataset.bound === "true") return;
+    stage.dataset.bound = "true";
+    stage.addEventListener("change", () => { salesFilters.stage = stage.value; renderSales(); });
+    channel.addEventListener("change", () => { salesFilters.channel = channel.value; renderSales(); });
+    clear.addEventListener("click", () => {
+      salesFilters.stage = "all";
+      salesFilters.channel = "all";
+      channel.value = "all";
+      renderSales();
+    });
+  }
+
   function renderRequests() {
     const items=state.requests||[];
     document.querySelector("#homeBusinessRequestsCount").textContent=String(items.length);
@@ -1107,6 +1193,45 @@
     }).join("")}</div></section>`;
   }
 
+  function commercialStatusLabel(value) {
+    return ({
+      PAID:"Pagado", PURCHASE_PENDING:"Compra pendiente", QUOTE_PENDING:"Cotización pendiente",
+      PRODUCT_SELECTED:"Producto seleccionado", SHOWCASE_SENT:"Productos enviados",
+      SUCCEEDED:"Pagado", REQUIRES_ACTION:"Requiere acción", PENDING:"Pendiente",
+      FAILED:"Fallido", EXPIRED:"Expirado", REFUNDED:"Reembolsado",
+      CONSUMED:"Consumido", ACTIVE:"Activo", RELEASED:"Liberado",
+      PREPARED:"Preparado", QUEUED:"En cola", SENT:"Enviado", BLOCKED:"Bloqueado",
+      CONFIRMED:"Confirmado", COMPLETED:"Completado", CANCELLED:"Cancelado"
+    })[value] || value || "Sin estado";
+  }
+
+  function renderCustomerCommercialTimeline(payload, unavailable = false) {
+    if (unavailable) {
+      return '<section class="home-detail-section"><h3>Historial comercial</h3><p class="home-detail-muted">No pude cargar el historial comercial de este cliente.</p></section>';
+    }
+    const summary = payload?.summary || {};
+    const events = Array.isArray(payload?.events) ? payload.events : [];
+    const facts = [
+      ["Etapa", commercialStatusLabel(summary.commercialStage)],
+      ["Producto", summary.selectedProduct || "Sin selección"],
+      ["Variante", summary.selectedVariant || "Sin variante"],
+      ["Pedido", commercialStatusLabel(summary.orderStatus)],
+      ["Pago", commercialStatusLabel(summary.paymentStatus)],
+      ["Inventario", commercialStatusLabel(summary.inventoryStatus)],
+      ["Último canal", source(summary.lastChannel)]
+    ];
+    const summaryHtml = `<div class="home-detail-facts">${facts.map(([label, value]) =>
+      `<div><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join("")}</div>`;
+    if (!events.length) {
+      return `<section class="home-detail-section"><h3>Historial comercial</h3>${summaryHtml}<p class="home-detail-muted">Todavía no hay actividad comercial omnicanal para este cliente.</p></section>`;
+    }
+    const history = events.map(event => {
+      const meta = [source(event.channel), commercialStatusLabel(event.status)].filter(Boolean).join(" · ");
+      const detail = event.detail ? ` · ${esc(event.detail)}` : "";
+      return `<div><span>${esc(fmtCompact(event.at))}</span><strong>${esc(event.title || event.type || "Actividad")}${detail}${meta ? ` · ${esc(meta)}` : ""}</strong></div>`;
+    }).join("");
+    return `<section class="home-detail-section"><h3>Historial comercial</h3>${summaryHtml}<div class="home-detail-history">${history}</div></section>`;
+  }
   async function openCustomerDetail(id) {
     const fallback = state.customers.find(item => String(item.id) === String(id));
     if (!fallback) return;
@@ -1123,18 +1248,26 @@
 
     showBookingDrawer();
 
-    try {
-      const profile = await api(`/api/v1/customers/${encodeURIComponent(id)}/profile`);
-      const customer = profile?.customer || fallback;
-      document.querySelector("#homeBookingDetailTitle").textContent = customer.name || customer.phone || "Cliente";
-      document.querySelector("#homeBookingDetailMeta").textContent = customer.createdAt
-        ? `Cliente desde ${fmtCompact(customer.createdAt)}`
-        : "Ficha de cliente";
-      body.innerHTML = customerProfileFacts(customer) + renderCustomerBookingHistory(profile?.bookings);
-    } catch (error) {
-      body.innerHTML = customerProfileFacts(fallback) +
-        '<section class="home-detail-section"><h3>Historial de reservas</h3><p class="home-detail-muted">No pude cargar el historial de este cliente.</p></section>';
-    }
+    const [profileResult, timelineResult] = await Promise.allSettled([
+      api(`/api/v1/customers/${encodeURIComponent(id)}/profile`),
+      api(`/api/v1/customers/${encodeURIComponent(id)}/commercial-timeline`)
+    ]);
+
+    const profile = profileResult.status === "fulfilled" ? profileResult.value : null;
+    const customer = profile?.customer || fallback;
+    document.querySelector("#homeBookingDetailTitle").textContent = customer.name || customer.phone || "Cliente";
+    document.querySelector("#homeBookingDetailMeta").textContent = customer.createdAt
+      ? `Cliente desde ${fmtCompact(customer.createdAt)}`
+      : "Ficha de cliente";
+
+    const bookingHistory = profileResult.status === "fulfilled"
+      ? renderCustomerBookingHistory(profile?.bookings)
+      : '<section class="home-detail-section"><h3>Historial de reservas</h3><p class="home-detail-muted">No pude cargar el historial de este cliente.</p></section>';
+    const commercialTimeline = timelineResult.status === "fulfilled"
+      ? renderCustomerCommercialTimeline(timelineResult.value)
+      : renderCustomerCommercialTimeline(null, true);
+
+    body.innerHTML = customerProfileFacts(customer) + commercialTimeline + bookingHistory;
   }
 
   function bindCustomerOpeners() {
@@ -2178,11 +2311,12 @@
       state.roles = Array.isArray(me?.roles) ? me.roles.map(String) : [];
       applyRoleVisibility();
       const auditRequest = isBusinessAdmin() ? api("/api/v1/audit") : Promise.resolve([]);
-      const [bookings,customers,services,orders,ops,audit]=await Promise.allSettled([
+      const [bookings,customers,services,orders,sales,ops,audit]=await Promise.allSettled([
         api("/api/v1/bookings"),
         api("/api/v1/customers"),
         api("/api/v1/services"),
         api("/api/v1/commercial/orders"),
+        api("/api/v1/commercial/pipeline"),
         api("/api/v1/operations/dashboard"),
         auditRequest
       ]);
@@ -2190,12 +2324,14 @@
       state.customers=customers.status==="fulfilled"&&Array.isArray(customers.value)?customers.value:[];
       state.services=services.status==="fulfilled"&&Array.isArray(services.value)?services.value:[];
       state.orders=orders.status==="fulfilled"&&Array.isArray(orders.value)?orders.value:[];
+      state.sales=sales.status==="fulfilled"&&Array.isArray(sales.value?.items)?sales.value.items:[];
+      state.salesSummary=sales.status==="fulfilled"&&sales.value?{active:sales.value.active,paid:sales.value.paid,needsAction:sales.value.needsAction}:{};
       state.requests=ops.status==="fulfilled"&&Array.isArray(ops.value?.recentRequests)?ops.value.recentRequests:[];
       state.audit=audit.status==="fulfilled"&&Array.isArray(audit.value)?audit.value:[];
       state.auditCatalog=[...state.audit];
       state.businessName=ops.status==="fulfilled"&&ops.value?.businessName?String(ops.value.businessName):(window.helvocaBusinessName||state.businessName||"Tu negocio");
       state.businessTimezone=ops.status==="fulfilled"&&ops.value?.timezone?String(ops.value.timezone):"America/Santiago";
-      renderBookings(); renderOrders(); renderRequests(); renderCustomers(); renderAudit(); populateAuditFilterOptions(); if (isBusinessAdmin()) { bindCustomerExports(); bindAuditFilters(); } bindCustomerCreate(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
+      renderBookings(); renderOrders(); renderSales(); renderRequests(); renderCustomers(); renderAudit(); populateAuditFilterOptions(); bindSalesFilters(); if (isBusinessAdmin()) { bindCustomerExports(); bindAuditFilters(); } bindCustomerCreate(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
     } finally { loading=false; }
   }
 
@@ -2205,6 +2341,6 @@
   document.querySelector("#refreshBtn")?.addEventListener("click",load);
   ensureBookingDrawer();
   const requestedTab = new URLSearchParams(window.location.search).get("tab");
-  setTab(["bookings","orders","requests","customers"].includes(requestedTab) ? requestedTab : "bookings");
+  setTab(["bookings","orders","sales","requests","customers"].includes(requestedTab) ? requestedTab : "bookings");
   queueMicrotask(load);
 })();

@@ -30,6 +30,7 @@ class PaymentWebhookServiceTest {
         BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
         PaymentProviderRegistry providers = mock(PaymentProviderRegistry.class);
         ConversationStateService conversation = mock(ConversationStateService.class);
+        PaymentSuccessNotificationService notifications = mock(PaymentSuccessNotificationService.class);
         PaymentProviderAdapter adapter = mock(PaymentProviderAdapter.class);
 
         BusinessPayment payment = payment(paymentId, businessId, operationId, sourceReferenceId);
@@ -77,7 +78,7 @@ class PaymentWebhookServiceTest {
         when(operations.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         PaymentWebhookService service = new PaymentWebhookService(
-                events, payments, operations, providers, conversation);
+                events, payments, operations, providers, conversation, notifications);
         PaymentWebhookService.Result result = service.processVerified(
                 businessId,
                 "mercadopago",
@@ -96,6 +97,7 @@ class PaymentWebhookServiceTest {
         verify(adapter).getStatus(any());
         verify(conversation).apply(eq(businessId), eq(sourceReferenceId),
                 eq(BusinessOrder.Source.WHATSAPP), eq(operationId), any());
+        verify(notifications).onVerifiedSuccess(payment);
     }
 
     @Test
@@ -106,6 +108,7 @@ class PaymentWebhookServiceTest {
         BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
         PaymentProviderRegistry providers = mock(PaymentProviderRegistry.class);
         ConversationStateService conversation = mock(ConversationStateService.class);
+        PaymentSuccessNotificationService notifications = mock(PaymentSuccessNotificationService.class);
 
         when(events.findByBusinessIdAndProviderAndEventId(
                 businessId, "mercadopago", "evt-race")).thenReturn(Optional.empty());
@@ -113,13 +116,14 @@ class PaymentWebhookServiceTest {
                 eq("ORDTST123"), any())).thenReturn(0);
 
         PaymentWebhookService service = new PaymentWebhookService(
-                events, payments, operations, providers, conversation);
+                events, payments, operations, providers, conversation, notifications);
         PaymentWebhookService.Result result = service.processVerified(
                 businessId, "mercadopago", "evt-race", "ORDTST123", null, "{}");
 
         assertEquals(PaymentWebhookService.Result.DUPLICATE, result);
         verifyNoInteractions(providers);
         verifyNoInteractions(payments);
+        verifyNoInteractions(notifications);
     }
 
     @Test
@@ -130,6 +134,7 @@ class PaymentWebhookServiceTest {
         BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
         PaymentProviderRegistry providers = mock(PaymentProviderRegistry.class);
         ConversationStateService conversation = mock(ConversationStateService.class);
+        PaymentSuccessNotificationService notifications = mock(PaymentSuccessNotificationService.class);
 
         PaymentWebhookEvent existing = new PaymentWebhookEvent();
         existing.setBusinessId(businessId);
@@ -140,13 +145,14 @@ class PaymentWebhookServiceTest {
                 businessId, "mercadopago", "evt-duplicate")).thenReturn(Optional.of(existing));
 
         PaymentWebhookService service = new PaymentWebhookService(
-                events, payments, operations, providers, conversation);
+                events, payments, operations, providers, conversation, notifications);
         PaymentWebhookService.Result result = service.processVerified(
                 businessId, "mercadopago", "evt-duplicate", "ORDTST123", null, "{}");
 
         assertEquals(PaymentWebhookService.Result.DUPLICATE, result);
         verifyNoInteractions(providers);
         verifyNoInteractions(payments);
+        verifyNoInteractions(notifications);
     }
 
     private static BusinessPayment payment(UUID id,
