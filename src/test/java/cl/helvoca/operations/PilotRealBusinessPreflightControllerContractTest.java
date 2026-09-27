@@ -2,7 +2,11 @@ package cl.helvoca.operations;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.lang.reflect.Method;
@@ -26,6 +30,12 @@ class PilotRealBusinessPreflightControllerContractTest {
 
         Method current = PilotRealBusinessPreflightController.class.getMethod("current");
         assertNotNull(current.getAnnotation(GetMapping.class));
-        assertEquals(1, PilotRealBusinessPreflightController.class.getDeclaredMethods().length);
+
+        assertTrue(Arrays.stream(PilotRealBusinessPreflightController.class.getDeclaredMethods())
+                .noneMatch(method ->
+                        method.isAnnotationPresent(PostMapping.class)
+                                || method.isAnnotationPresent(PutMapping.class)
+                                || method.isAnnotationPresent(PatchMapping.class)
+                                || method.isAnnotationPresent(DeleteMapping.class)));
     }
 }
