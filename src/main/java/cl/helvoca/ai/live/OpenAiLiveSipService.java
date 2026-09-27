@@ -165,6 +165,7 @@ public class OpenAiLiveSipService {
             UUID callId = lifecycle.startInboundCall("twilio", twilioCallSid, callerPhone, businessPhone);
             RealtimeCallContext context = lifecycle.markStreamStarted(
                     callId, twilioCallSid, "live:" + sessionId, PROVIDER_ID);
+            lifecycle.markAiModel(callId, live.getModel());
 
             String configuredAgentName = tools.agentName(context, null);
             if (configuredAgentName != null && !tools.agentActive(context)) {
