@@ -31,6 +31,7 @@ public class RealCallCertificationCleanupRunner implements ApplicationRunner {
     private final boolean enabled;
     private final String callIdValue;
     private final String bookingIdValue;
+    private final String providerCallIdValue;
     private final String allowedPhone;
     private final CallSessionRepository calls;
     private final CallActionRepository actions;
@@ -41,6 +42,7 @@ public class RealCallCertificationCleanupRunner implements ApplicationRunner {
             @Value("${RECEPVOZ_CERTIFICATION_CLEANUP_ENABLED:false}") boolean enabled,
             @Value("${RECEPVOZ_CERTIFICATION_CLEANUP_CALL_ID:}") String callIdValue,
             @Value("${RECEPVOZ_CERTIFICATION_CLEANUP_BOOKING_ID:}") String bookingIdValue,
+            @Value("${RECEPVOZ_CERTIFICATION_CLEANUP_PROVIDER_CALL_ID:}") String providerCallIdValue,
             @Value("${TWILIO_CERTIFICATION_ALLOWED_TO:}") String allowedPhone,
             CallSessionRepository calls,
             CallActionRepository actions,
@@ -49,6 +51,7 @@ public class RealCallCertificationCleanupRunner implements ApplicationRunner {
         this.enabled = enabled;
         this.callIdValue = callIdValue;
         this.bookingIdValue = bookingIdValue;
+        this.providerCallIdValue = providerCallIdValue;
         this.allowedPhone = allowedPhone;
         this.calls = calls;
         this.actions = actions;
@@ -62,7 +65,7 @@ public class RealCallCertificationCleanupRunner implements ApplicationRunner {
 
         UUID callId = parse(callIdValue);
         UUID bookingId = parse(bookingIdValue);
-        if (callId == null || bookingId == null || blank(allowedPhone)) {
+        if (callId == null || bookingId == null || blank(providerCallIdValue) || blank(allowedPhone)) {
             log.error("RECEPVOZ_REAL_CERT_CLEANUP blocked: missing_or_invalid_guard");
             return;
         }
@@ -94,8 +97,8 @@ public class RealCallCertificationCleanupRunner implements ApplicationRunner {
                 && call.getBusinessId() != null
                 && call.getStatus() != null
                 && call.getStatus().terminal()
-                && call.getDirection() == CallDirection.OUTBOUND
                 && "twilio".equalsIgnoreCase(call.getTelephonyProvider())
+                && providerCallIdValue.trim().equals(normalize(call.getProviderCallId()))
                 && allowedPhone.trim().equals(normalize(call.getCallerNumber()));
     }
 
