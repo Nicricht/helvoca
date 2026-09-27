@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 final class TwilioVoiceTransportSession implements VoiceTransportSession {
@@ -23,6 +24,7 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
     private final String callSid;
     private final TwilioCallControl control;
     private final Object sendLock = new Object();
+    private final AtomicBoolean outputClosed = new AtomicBoolean(false);
     private final AtomicReference<String> pendingHangupMark = new AtomicReference<>();
 
     TwilioVoiceTransportSession(WebSocketSession socket,
@@ -44,7 +46,7 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
 
     @Override
     public boolean isOpen() {
-        return socket.isOpen();
+        return !outputClosed.get() && socket.isOpen();
     }
 
     @Override
@@ -64,7 +66,7 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
 
     @Override
     public boolean endAfterPlayback() {
-        if (!socket.isOpen()) return false;
+        if (!isOpen()) return false;
         String marker = "recepvoz-end-" + UUID.randomUUID();
         if (!pendingHangupMark.compareAndSet(null, marker)) return true;
 
@@ -95,6 +97,7 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
 
     @Override
     public void closeOnUpstreamFailure() {
+        outputClosed.set(true);
         pendingHangupMark.set(null);
         control.hangup(accountSid, callSid);
         try {
@@ -106,7 +109,7 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
 
     private boolean send(JSONObject payload) {
         synchronized (sendLock) {
-            if (!socket.isOpen()) return false;
+            if (outputClosed.get() || !socket.isOpen()) return false;
             try {
                 socket.sendMessage(new TextMessage(payload.toString()));
                 return true;
@@ -122,7 +125,14 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
         String expected = pendingHangupMark.get();
         if (expected == null || !expected.equals(marker)) return;
         if (!pendingHangupMark.compareAndSet(expected, null)) return;
-        boolean accepted = control.hangup(accountSid, callSid);
+
+        boolean accepted;
+        synchronized (sendLock) {
+            if (outputClosed.get()) return;
+            outputClosed.set(true);
+            accepted = control.hangup(accountSid, callSid);
+            if (!accepted) outputClosed.set(false);
+        }
         log.info("Twilio deferred hangup call={} stream={} reason={} accepted={}",
                 callSid, streamSid, reason, accepted);
     }
