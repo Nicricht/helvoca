@@ -151,6 +151,52 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void endCallWaitsForGenerationBoundaryBeforeCarrierPlaybackHangup() {
+        GeminiLiveProperties properties = properties();
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        when(tools.prepareDeferredEndCall(context)).thenReturn(new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("ended", false)
+                        .put("pendingPlaybackCompletion", true))
+                .put("error", JSONObject.NULL)
+                .toString());
+        when(transport.endAfterPlayback()).thenReturn(true);
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                transport,
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        WebSocket providerSocket = mock(WebSocket.class);
+        JSONObject toolCall = new JSONObject().put("toolCall", new JSONObject()
+                .put("functionCalls", new JSONArray().put(new JSONObject()
+                        .put("id", "end-1")
+                        .put("name", "end_call")
+                        .put("args", new JSONObject()))));
+        session.onText(providerSocket, toolCall.toString(), true);
+
+        verify(tools).prepareDeferredEndCall(context);
+        verify(transport, never()).endAfterPlayback();
+
+        JSONObject generationDone = new JSONObject()
+                .put("serverContent", new JSONObject().put("generationComplete", true));
+        session.onText(providerSocket, generationDone.toString(), true);
+
+        verify(transport).endAfterPlayback();
+        verify(tools, never()).execute(eq(context), eq("end_call"), anyString());
+    }
+
+    @Test
     void binarySetupCompleteUnlocksProviderPersistsMilestoneAndStartsOpeningTurn() {
         GeminiLiveProperties properties = properties();
         RealtimeCallContext context = context();
