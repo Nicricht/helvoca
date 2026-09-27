@@ -146,10 +146,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     @Override
     public void acceptInboundAudio(String base64Audio) {
         if (closed.get() || base64Audio == null || base64Audio.isBlank()) return;
-        // Certification is a deterministic synthetic dialogue. Forwarding the
-        // real phone microphone here would let VAD/barge-in race the scripted
-        // realtime text turns and make the production certification flaky.
-        if (properties.isCertificationSimulation()) return;
+        // Certification and voice bake-off calls are deterministic synthetic
+        // experiences. The real phone microphone is ignored so VAD/barge-in
+        // cannot contaminate the exact same sample between voice candidates.
+        if (properties.isCertificationSimulation() || context.voiceBakeOff()) return;
 
         String pcm16k;
         try {
@@ -267,7 +267,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             log.warn("Could not persist Gemini setup milestone call={}: {}", context.callId(), e.getMessage());
         }
 
-        sendRealtimeText("[RECEPVOZ_CALL_CONNECTED]");
+        sendRealtimeText(context.voiceBakeOff()
+                ? "[RECEPVOZ_VOICE_BAKEOFF_SAMPLE]"
+                : "[RECEPVOZ_CALL_CONNECTED]");
 
         if (properties.isCertificationSimulation()) {
             pendingAudio.clear();
@@ -275,8 +277,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             String frame;
             while ((frame = pendingAudio.poll()) != null) sendAudio(frame);
         }
-        log.info("Gemini Live setup complete call={} certification_simulation={} voice={}",
-                context.callId(), properties.isCertificationSimulation(), properties.getVoice());
+        log.info("Gemini Live setup complete call={} certification_simulation={} voice={} bakeoff={}",
+                context.callId(), properties.isCertificationSimulation(), properties.getVoice(), context.voiceBakeOff());
     }
 
     private void handleServerContent(JSONObject content) {
@@ -775,6 +777,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         if (source == null) source = new JSONArray();
         for (int i = 0; i < source.length(); i++) {
             JSONObject tool = source.getJSONObject(i);
+            if (context.voiceBakeOff() && !"end_call".equals(tool.optString("name"))) continue;
             out.put(new JSONObject()
                     .put("name", tool.getString("name"))
                     .put("description", tool.optString("description", ""))
@@ -806,10 +809,21 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     }
 
     private String systemInstructions() {
+        String bakeOffPrelude = context.voiceBakeOff()
+                ? """
+                MODO VOICE BAKE-OFF DE RECEPVOZ:
+                Esta llamada compara únicamente la calidad vocal. No ejecutes herramientas de negocio, no consultes datos y no improvises contenido.
+                Cuando recibas exactamente [RECEPVOZ_VOICE_BAKEOFF_SAMPLE], pronuncia EXACTAMENTE estas tres líneas, en este orden y sin agregar ni quitar palabras:
+                1. "Hola, gracias por llamar. Ya, cuéntame, ¿en qué te ayudo?"
+                2. "Sí, obvio. Tengo una hora mañana a las diez y media y otra a las doce. ¿Cuál te acomoda más?"
+                3. "Ya, súper. Quedó clarito. Gracias por llamar, que estés súper. Chao."
+                Después de terminar COMPLETA la tercera línea, invoca end_call una sola vez. No esperes respuesta del usuario.
+                """
+                : tools.buildInstructions(context);
         String voiceIdentity = "Enceladus".equalsIgnoreCase(properties.getVoice())
                 ? "IDENTIDAD VOCAL: usa una voz claramente masculina y adulta. Debe sentirse inequívocamente como hombre, sin sonar infantil ni andrógino."
                 : "IDENTIDAD VOCAL: usa una voz claramente femenina, joven-adulta y luminosa. Debe sentirse inequívocamente como una mujer joven de Santiago, con energía alegre y segura, sin sonar infantil, masculina ni andrógina.";
-        return tools.buildInstructions(context) + "\n" + """
+        return bakeOffPrelude + "\n" + """
                 REGLAS DE VOZ DE RECEPVOZ:
                 Tu nombre de producto es RecepVoz. Nunca te presentes como Helvoca.
                 RESPONDE SIEMPRE EN ESPAÑOL DE CHILE, salvo que el cliente pida explícitamente otro idioma.
@@ -830,6 +844,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 HERRAMIENTAS: si una consulta de lectura ya devolvió success=true con los mismos datos y el cliente no cambió su solicitud, usa ese resultado y NO vuelvas a ejecutar la misma herramienta. Para una reserva, consulta find_caller antes de pedir nombre o teléfono; si el cliente ya existe, reutiliza sus datos y no se los vuelvas a preguntar. Después de una herramienta, responde con el resultado en lenguaje humano; nunca menciones UUID, nombres internos de herramientas ni detalles técnicos.
                 VERACIDAD: nunca inventes disponibilidad ni confirmes acciones antes de que una herramienta devuelva success=true. En create_booking, success=true sin bookingId es solo una propuesta pendiente de confirmación: no digas "te confirmo la reserva", "quedó reservado", "quedó agendado" ni equivalentes. Solo puedes afirmar que la reserva existe cuando create_booking devuelve success=true Y un bookingId.
                 APERTURA: si recibes exactamente [RECEPVOZ_CALL_CONNECTED], no lo menciones ni lo trates como palabras del cliente. Desde la PRIMERA PALABRA usa la misma identidad femenina joven-adulta, alegre y santiaguina del resto de la llamada. El saludo debe tener sonrisa audible y energía inmediata, pero cero tono de call center. El saludo configurado define solo el contenido: reformúlalo en una frase corta y chilena, por ejemplo "Hola, gracias por llamar a [negocio]. Ya, cuéntame, ¿en qué te ayudo?". No empieces neutra para cambiar después y no sobreactúes la bienvenida.
+                BAKE-OFF: si recibes [RECEPVOZ_VOICE_BAKEOFF_SAMPLE], obedece el guion exacto del modo bake-off. No hagas preguntas adicionales, no uses herramientas salvo end_call y no reacciones al audio del teléfono.
                 CIERRE: completar una reserva, venta o consulta NO significa que la llamada terminó. Después de resolverla, pregunta UNA sola vez "¿Necesitas algo más?". Si el cliente responde "no", "no gracias", "nada más" o equivalente, NO vuelvas a preguntar nada: di UNA sola despedida chilena completa, por ejemplo "Ya, perfecto. Gracias por llamar, que estés súper. Chao.", y luego invoca end_call una sola vez. Nunca repitas la despedida. Termina de pronunciar todas sus palabras antes de invocar end_call.
                 IDENTIDAD: si te preguntan si eres una IA o asistente virtual, responde con honestidad y continúa ayudando.
                 """.formatted(voiceIdentity);
