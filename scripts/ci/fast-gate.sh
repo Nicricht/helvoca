@@ -59,6 +59,11 @@ for file in "${CHANGED[@]}"; do
           add_tests_from_dir "src/test/java/cl/helvoca/ai/realtime"
           add_tests_from_dir "src/test/java/cl/helvoca/booking"
           add_tests_from_dir "src/test/java/cl/helvoca/call"
+          add_test_file "src/test/java/cl/helvoca/ai/gemini/ClosingConversationCertificationPackTest.java"
+          ;;
+        src/main/java/cl/helvoca/ai/gemini/*)
+          add_tests_from_dir "src/test/java/cl/helvoca/ai/gemini"
+          add_test_file "src/test/java/cl/helvoca/ai/realtime/BookingConversationCertificationPackTest.java"
           ;;
         src/main/java/cl/helvoca/booking/*)
           add_tests_from_dir "src/test/java/cl/helvoca/booking"
