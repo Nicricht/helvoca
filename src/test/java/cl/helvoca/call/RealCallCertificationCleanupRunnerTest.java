@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 class RealCallCertificationCleanupRunnerTest {
+    private static final String PROVIDER_CALL_ID = "CA11111111111111111111111111111111";
 
     @Test
     void cancelsOnlyBookingPersistedByExactCompletedAuthorizedCall() {
@@ -47,6 +48,7 @@ class RealCallCertificationCleanupRunnerTest {
                 true,
                 callId.toString(),
                 bookingId.toString(),
+                PROVIDER_CALL_ID,
                 allowed,
                 calls,
                 actions,
@@ -76,7 +78,39 @@ class RealCallCertificationCleanupRunnerTest {
                 true,
                 callId.toString(),
                 bookingId.toString(),
+                PROVIDER_CALL_ID,
                 "+56966939611",
+                calls,
+                actions,
+                bookings,
+                new TenantDatabaseContext());
+
+        runner.run(mock(ApplicationArguments.class));
+
+        verifyNoInteractions(actions);
+        verifyNoInteractions(bookings);
+    }
+
+    @Test
+    void refusesCleanupWhenTwilioProviderCallIdDoesNotMatch() {
+        UUID callId = UUID.randomUUID();
+        UUID businessId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        String allowed = "+56966939611";
+
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallActionRepository actions = mock(CallActionRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSession call = safeCall(callId, businessId, allowed);
+        when(call.getProviderCallId()).thenReturn("CA22222222222222222222222222222222");
+        when(calls.findById(callId)).thenReturn(Optional.of(call));
+
+        RealCallCertificationCleanupRunner runner = new RealCallCertificationCleanupRunner(
+                true,
+                callId.toString(),
+                bookingId.toString(),
+                PROVIDER_CALL_ID,
+                allowed,
                 calls,
                 actions,
                 bookings,
@@ -112,6 +146,7 @@ class RealCallCertificationCleanupRunnerTest {
                 true,
                 callId.toString(),
                 bookingId.toString(),
+                PROVIDER_CALL_ID,
                 allowed,
                 calls,
                 actions,
@@ -133,6 +168,7 @@ class RealCallCertificationCleanupRunnerTest {
                 false,
                 UUID.randomUUID().toString(),
                 UUID.randomUUID().toString(),
+                PROVIDER_CALL_ID,
                 "+56966939611",
                 calls,
                 actions,
@@ -154,6 +190,7 @@ class RealCallCertificationCleanupRunnerTest {
                 true,
                 "not-a-uuid",
                 "also-not-a-uuid",
+                PROVIDER_CALL_ID,
                 "+56966939611",
                 calls,
                 actions,
@@ -192,7 +229,7 @@ class RealCallCertificationCleanupRunnerTest {
         when(bookings.findByIdAndBusinessId(bookingId, businessId)).thenReturn(Optional.of(booking));
 
         RealCallCertificationCleanupRunner runner = new RealCallCertificationCleanupRunner(
-                true, callId.toString(), bookingId.toString(), allowed,
+                true, callId.toString(), bookingId.toString(), PROVIDER_CALL_ID, allowed,
                 calls, actions, bookings, new TenantDatabaseContext());
 
         runner.run(mock(ApplicationArguments.class));
@@ -222,7 +259,7 @@ class RealCallCertificationCleanupRunnerTest {
         when(bookings.findByIdAndBusinessId(bookingId, businessId)).thenReturn(Optional.empty());
 
         RealCallCertificationCleanupRunner runner = new RealCallCertificationCleanupRunner(
-                true, callId.toString(), bookingId.toString(), allowed,
+                true, callId.toString(), bookingId.toString(), PROVIDER_CALL_ID, allowed,
                 calls, actions, bookings, new TenantDatabaseContext());
 
         runner.run(mock(ApplicationArguments.class));
@@ -257,7 +294,7 @@ class RealCallCertificationCleanupRunnerTest {
         when(bookings.findByIdAndBusinessId(bookingId, businessId)).thenReturn(Optional.of(booking));
 
         RealCallCertificationCleanupRunner runner = new RealCallCertificationCleanupRunner(
-                true, callId.toString(), bookingId.toString(), allowed,
+                true, callId.toString(), bookingId.toString(), PROVIDER_CALL_ID, allowed,
                 calls, actions, bookings, new TenantDatabaseContext());
 
         runner.run(mock(ApplicationArguments.class));
@@ -270,8 +307,12 @@ class RealCallCertificationCleanupRunnerTest {
         when(call.getId()).thenReturn(callId);
         when(call.getBusinessId()).thenReturn(businessId);
         when(call.getStatus()).thenReturn(CallStatus.COMPLETED);
-        when(call.getDirection()).thenReturn(CallDirection.OUTBOUND);
+        // outbound-test is currently materialized by the media stream path as
+        // an INBOUND lifecycle row, so direction is intentionally not trusted
+        // as certification evidence.
+        when(call.getDirection()).thenReturn(CallDirection.INBOUND);
         when(call.getTelephonyProvider()).thenReturn("twilio");
+        when(call.getProviderCallId()).thenReturn(PROVIDER_CALL_ID);
         when(call.getCallerNumber()).thenReturn(caller);
         return call;
     }
