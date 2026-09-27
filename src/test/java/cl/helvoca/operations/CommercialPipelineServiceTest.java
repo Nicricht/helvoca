@@ -149,4 +149,124 @@ class CommercialPipelineServiceTest {
         assertTrue(service.get().items().isEmpty());
         verifyNoInteractions(items, orders, payments, reservations, variants, outbound, customers);
     }
+    @Test
+    void coversPipelineFallbacksMissingRelationsAndNeedsActionStates() {
+        UUID businessId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID journeyOneId = UUID.randomUUID();
+        UUID journeyTwoId = UUID.randomUUID();
+        UUID journeyThreeId = UUID.randomUUID();
+        UUID itemVariantId = UUID.randomUUID();
+
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        BusinessOperationItemRepository items = mock(BusinessOperationItemRepository.class);
+        BusinessOrderRepository orders = mock(BusinessOrderRepository.class);
+        BusinessPaymentRepository payments = mock(BusinessPaymentRepository.class);
+        InventoryReservationRepository reservations = mock(InventoryReservationRepository.class);
+        InventoryProductVariantRepository variants = mock(InventoryProductVariantRepository.class);
+        OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+
+        BusinessOperation first = mock(BusinessOperation.class);
+        when(first.getId()).thenReturn(journeyOneId);
+        when(first.getCustomerId()).thenReturn(null);
+        when(first.getContactName()).thenReturn("Sin ficha");
+        when(first.getContactPhone()).thenReturn("+56900000001");
+        when(first.getSource()).thenReturn(null);
+        when(first.getTotal()).thenReturn(new BigDecimal("100"));
+        when(first.getCurrency()).thenReturn("CLP");
+        when(first.getUpdatedAt()).thenReturn(Instant.parse("2026-09-27T05:00:00Z"));
+        when(first.getMetadata()).thenReturn(Map.of(
+                "selectedCatalogItemId", UUID.randomUUID().toString(),
+                "paymentStatus", "FAILED",
+                "handoffChannel", " "));
+
+        BusinessOperationItem firstItem = mock(BusinessOperationItem.class);
+        when(firstItem.getItemName()).thenReturn("Producto fallback");
+        when(firstItem.getVariantId()).thenReturn(itemVariantId);
+        when(firstItem.getQuantity()).thenReturn(2);
+        when(items.findAllByOperationIdOrderByCreatedAtAsc(journeyOneId))
+                .thenReturn(List.of(firstItem));
+        when(variants.findByIdAndBusinessId(itemVariantId, businessId)).thenReturn(Optional.empty());
+
+        BusinessOperation second = mock(BusinessOperation.class);
+        when(second.getId()).thenReturn(journeyTwoId);
+        when(second.getCustomerId()).thenReturn(customerId);
+        when(second.getContactName()).thenReturn("Contacto original");
+        when(second.getContactPhone()).thenReturn("+56900000002");
+        when(second.getSource()).thenReturn(BusinessOrder.Source.VOICE);
+        when(second.getTotal()).thenReturn(new BigDecimal("200"));
+        when(second.getCurrency()).thenReturn("USD");
+        when(second.getUpdatedAt()).thenReturn(Instant.parse("2026-09-27T05:01:00Z"));
+        when(second.getMetadata()).thenReturn(Map.of(
+                "orderOperationId", "not-a-uuid",
+                "paymentOperationId", "also-not-a-uuid",
+                "commercialStage", "PAYMENT_FAILED"));
+
+        when(customers.findByIdAndBusinessId(customerId, businessId)).thenReturn(Optional.empty());
+        when(items.findAllByOperationIdOrderByCreatedAtAsc(journeyTwoId)).thenReturn(List.of());
+        OutboundMessage irrelevant = mock(OutboundMessage.class);
+        when(irrelevant.getOperationId()).thenReturn(null);
+        when(outbound.findTop50ByBusinessIdAndCustomerIdOrderByCreatedAtDesc(businessId, customerId))
+                .thenReturn(List.of(irrelevant));
+
+        BusinessOperation third = mock(BusinessOperation.class);
+        UUID missingOrderOperationId = UUID.randomUUID();
+        UUID missingPaymentOperationId = UUID.randomUUID();
+        when(third.getId()).thenReturn(journeyThreeId);
+        when(third.getCustomerId()).thenReturn(customerId);
+        when(third.getSource()).thenReturn(BusinessOrder.Source.WHATSAPP);
+        when(third.getUpdatedAt()).thenReturn(Instant.parse("2026-09-27T05:02:00Z"));
+        when(third.getMetadata()).thenReturn(Map.of(
+                "paymentOperationId", missingPaymentOperationId.toString(),
+                "orderOperationId", missingOrderOperationId.toString(),
+                "selectedVariantId", "bad-variant-id",
+                "paymentStatus", "REQUIRES_ACTION"));
+        when(items.findAllByOperationIdOrderByCreatedAtAsc(journeyThreeId)).thenReturn(List.of());
+        when(orders.findByOperationIdAndBusinessId(missingOrderOperationId, businessId))
+                .thenReturn(Optional.empty());
+        when(payments.findByOperationIdAndBusinessId(missingPaymentOperationId, businessId))
+                .thenReturn(Optional.empty());
+        when(reservations.findAllByBusinessIdAndReferenceTypeAndReferenceIdOrderByCreatedAtAsc(
+                businessId, "ORDER_OPERATION", missingOrderOperationId)).thenReturn(List.of());
+
+        when(operations.findTop100ByBusinessIdAndTypeOrderByUpdatedAtDesc(
+                businessId, BusinessOperation.Type.REQUEST))
+                .thenReturn(List.of(first, second, third));
+
+        CommercialPipelineService service = new CommercialPipelineService(
+                operations, items, orders, payments, reservations, variants, outbound, customers, tenant);
+
+        CommercialPipelineService.PipelineResponse result = service.get();
+
+        assertEquals(3, result.total());
+        assertEquals(3, result.active());
+        assertEquals(0, result.paid());
+        assertEquals(3, result.needsAction());
+
+        CommercialPipelineService.PipelineItem firstRow = result.items().get(0);
+        assertEquals("Sin ficha", firstRow.customerName());
+        assertEquals("Producto fallback", firstRow.product());
+        assertEquals(itemVariantId, firstRow.variantId());
+        assertNull(firstRow.variant());
+        assertEquals("FAILED", firstRow.paymentStatus());
+        assertNull(firstRow.channel());
+
+        CommercialPipelineService.PipelineItem secondRow = result.items().get(1);
+        assertEquals("Contacto original", secondRow.customerName());
+        assertEquals("VOICE", secondRow.channel());
+        assertEquals("PAYMENT_FAILED", secondRow.commercialStage());
+        assertNull(secondRow.orderStatus());
+        assertNull(secondRow.inventoryStatus());
+        assertNull(secondRow.outboundStatus());
+
+        CommercialPipelineService.PipelineItem thirdRow = result.items().get(2);
+        assertEquals("REQUIRES_ACTION", thirdRow.paymentStatus());
+        assertEquals("WHATSAPP", thirdRow.channel());
+        assertNull(thirdRow.orderStatus());
+        assertNull(thirdRow.variantId());
+    }
+
 }
