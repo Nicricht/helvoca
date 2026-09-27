@@ -51,6 +51,27 @@ async function mockReadyHome(page, roles = ['BUSINESS_ADMIN'], options = {}) {
     { id: 'cust1', name: 'Ana Reserva', phone: '+56922222222', email: 'ana@example.cl', createdAt: '2026-09-17T10:00:00Z' },
     { id: 'cust2', name: 'Bruno Masaje', phone: '+56955555555', email: 'bruno@example.cl', createdAt: '2026-09-17T11:00:00Z' }
   ])));
+  await page.route('**/api/v1/customers/cust1/commercial-timeline', route => route.fulfill(json({
+    summary: {
+      commercialStage: 'PAID',
+      selectedProduct: 'Zapatilla Urban',
+      selectedVariantId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      selectedVariant: 'Negro / 42',
+      orderStatus: 'CONFIRMED',
+      paymentStatus: 'SUCCEEDED',
+      inventoryStatus: 'CONSUMED',
+      lastChannel: 'WHATSAPP'
+    },
+    events: [
+      { at: '2026-09-26T13:17:00Z', type: 'OUTBOUND', channel: 'WHATSAPP', title: 'Confirmación de pago', detail: 'Mensaje preparado', status: 'PREPARED', operationId: 'pay-op' },
+      { at: '2026-09-26T13:16:00Z', type: 'INVENTORY', channel: 'SYSTEM', title: 'Inventario consumido', detail: 'Zapatilla Urban · Negro / 42 · 1 unidad', status: 'CONSUMED', operationId: 'order-op' },
+      { at: '2026-09-26T13:15:00Z', type: 'PAYMENT', channel: 'WHATSAPP', title: 'Pago', detail: '$12.990 CLP', status: 'SUCCEEDED', operationId: 'pay-op' },
+      { at: '2026-09-26T13:12:00Z', type: 'ORDER', channel: 'WHATSAPP', title: 'Pedido', detail: 'Zapatilla Urban · Negro / 42', status: 'CONFIRMED', operationId: 'order-op' },
+      { at: '2026-09-26T13:10:00Z', type: 'COMMERCIAL', channel: 'VOICE', title: 'Compra omnicanal', detail: 'Zapatilla Urban · Negro / 42', status: 'PAID', operationId: 'journey-op' },
+      { at: '2026-09-26T13:05:00Z', type: 'WHATSAPP', channel: 'WHATSAPP', title: 'Conversación WhatsApp', detail: 'Continuó la atención por WhatsApp', status: 'ACTIVE', operationId: null },
+      { at: '2026-09-26T13:00:00Z', type: 'CALL', channel: 'VOICE', title: 'Llamada', detail: 'Consulta de producto', status: 'COMPLETED', operationId: null }
+    ]
+  })));
   await page.route('**/api/v1/customers/cust1/profile', route => route.fulfill(json({
     customer: {
       id: 'cust1', name: 'Ana Reserva', phone: '+56922222222', email: 'ana@example.cl',
@@ -1783,6 +1804,13 @@ test('customers workspace sorts and renders contact data', async ({ page }) => {
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Masaje');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Confirmada');
   await expect(page.locator('#homeBookingDetailBody')).toContainText('Cancelada');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Historial comercial');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Zapatilla Urban');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Negro / 42');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Pagado');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Inventario consumido');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Conversación WhatsApp');
+  await expect(page.locator('#homeBookingDetailBody')).toContainText('Llamada');
   await page.locator('#homeBookingDetailClose').click();
   await expect(page.locator('#homeBookingDetailBackdrop')).toBeHidden();
 });
