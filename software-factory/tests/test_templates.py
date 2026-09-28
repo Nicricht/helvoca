@@ -15,7 +15,7 @@ class RepositoryTemplateContractTest(unittest.TestCase):
         self.assertIn("project-specific", text)
         self.assertIn("risk", text)
         self.assertIn("final commit", text)
-        self.assertIn("software-factory/skill/first-pass-engineering/SKILL.md", text)
+        self.assertIn("software-factory/skill/first-pass-engineering/skill.md", text)
 
     def test_pr_template_captures_evidence_and_risk(self):
         text = self.read("pull_request_template.md").lower()
