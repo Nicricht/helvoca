@@ -449,13 +449,22 @@ test('primary and public navigation fit desktop tablet and mobile viewports', as
 
       await page.goto('/');
       await expect(page.locator('#primaryNav')).toBeVisible();
+      await expect(page.locator('.nav-inventory')).toHaveAttribute('href', '/inventory.html');
       await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
       await expectNoPageOverflow();
 
       await page.goto('/settings.html');
+      await expect(page.locator('.nav-inventory')).toHaveAttribute('href', '/inventory.html');
       await expect(page.locator('.nav-config')).toHaveClass(/active/);
       await page.getByRole('button', { name: '🏪 Negocio', exact: true }).click();
       await expect(page.locator('#configBusinessPanel')).toBeVisible();
+      await expectNoPageOverflow();
+
+      await page.goto('/inventory.html');
+      await expect(page.locator('.nav-inventory')).toHaveClass(/active/);
+      await expect(page.locator('.nav-bookings')).toHaveAttribute('href', '/#bookings');
+      await expect(page.locator('.nav-customers')).toHaveAttribute('href', '/#customers');
+      await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
       await expectNoPageOverflow();
 
       await page.goto('/sales.html');
