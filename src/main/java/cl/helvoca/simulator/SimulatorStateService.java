@@ -31,8 +31,19 @@ public class SimulatorStateService {
         sessions.put(callId, new SessionState());
     }
 
-    public void finish(UUID callId) {
-        sessions.remove(callId);
+    public synchronized void finish(UUID callId) {
+        SessionState session = sessions.remove(callId);
+        if (session == null) return;
+
+        for (SimulatedOrder order : session.orders.values()) {
+            if (order.orderId() == null || !"CONFIRMED".equals(order.status())) continue;
+            for (SimulatedOrderItem item : order.items()) {
+                StockKey key = new StockKey(order.businessId(), item.catalogItemId(), item.variantId());
+                int next = Math.max(0, simulatedCommittedStock.getOrDefault(key, 0) - item.quantity());
+                if (next == 0) simulatedCommittedStock.remove(key);
+                else simulatedCommittedStock.put(key, next);
+            }
+        }
     }
 
     public SimulatedCustomer customer(UUID callId) {
