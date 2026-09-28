@@ -399,6 +399,7 @@ function readOptionalBoolean(field) {
 
 const PRESET_PRESENTATION_SUGGESTIONS = Object.freeze({
     store: "Prioriza productos.",
+    hardware_store: "Prioriza catálogo, stock, cotizaciones, pedidos y despacho. Confirma medidas, cantidades y disponibilidad antes de cerrar una venta.",
     salon: "Prioriza servicios y reservas.",
     restaurant: "Prioriza productos y pedidos.",
     clinic: "Prioriza servicios y reservas."
