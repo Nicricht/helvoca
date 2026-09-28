@@ -234,7 +234,7 @@ async function mockReadyHome(page, roles = ['BUSINESS_ADMIN'], options = {}) {
     callFailuresToday: 0,
     estimatedCallCostTodayUsd: 0.7,
     recentCalls: [{
-      id: 'call-1', callerNumber: '+56911111111', status: 'COMPLETED', resolution: 'Reserva creada',
+      id: 'call-1', callerNumber: '+56911111111', status: 'COMPLETED', resolution: 'BOOKING_CREATED',
       startedAt: '2026-09-17T18:00:00Z', durationSeconds: 95
     }],
     recentRequests: [],
@@ -2304,6 +2304,8 @@ test('dashboard prioritizes calls, attention, recent activity and quick access',
   await expect(page.locator('#ownerDashboardMessage')).toHaveAttribute('aria-live', 'polite');
   await expect(page.locator('#homeRecentActivity')).toHaveAttribute('role', 'list');
   await expect(page.locator('#homeRecentActivity')).toContainText('+56911111111');
+  await expect(page.locator('#homeRecentActivity')).toContainText('Reserva creada');
+  await expect(page.locator('#homeRecentActivity')).not.toContainText('BOOKING_CREATED');
 
   await page.setViewportSize({ width: 390, height: 844 });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
