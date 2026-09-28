@@ -348,38 +348,59 @@
     overview.id = 'operationalOverview';
     overview.className = 'card hidden owner-commercial-dashboard';
     overview.dataset.state = 'loading';
-    overview.setAttribute('aria-label', 'Valor generado por RecepVoz');
+    overview.setAttribute('aria-labelledby', 'ownerDashboardTitle');
     overview.setAttribute('aria-busy', 'true');
     overview.innerHTML = [
         '<div class="owner-dashboard-head">',
-        '  <div><div class="eyebrow">Hoy</div><h2>Valor generado</h2></div>',
-        '  <span id="ownerDashboardState" class="badge muted">Cargando</span>',
+        '  <div><div class="eyebrow">Hoy</div><h2 id="ownerDashboardTitle">Qué está pasando hoy</h2><p>Lo importante para atender, resolver y seguir operando.</p></div>',
+        '  <span id="ownerDashboardState" class="badge muted" role="status" aria-live="polite">Cargando</span>',
         '</div>',
-        '<div id="ownerDashboardMessage" class="owner-dashboard-message">Actualizando actividad confirmada…</div>',
-        '<div class="home-metrics" aria-label="Actividad comercial de hoy">',
-        '  <article id="homeCallsMetric" class="home-metric" aria-label="Conversaciones atendidas"><strong id="homeConversationsToday">–</strong><span>Conversaciones</span><small id="homeConversationBreakdown">–</small></article>',
-        '  <a id="homeBookingsMetric" class="home-metric" href="/?tab=bookings#homeBusinessWorkspace" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>Reservas</span><small>Generadas hoy</small></a>',
-        '  <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver solicitudes pendientes"><strong id="homeRequestsToday">–</strong><span>Pendientes</span><small>Solicitudes por resolver</small></a>',
-        '  <a id="ownerOrdersMetric" class="home-metric hidden" href="/?tab=sales#homeBusinessWorkspace" aria-label="Ver pedidos y ventas"><strong id="ownerOrdersToday">–</strong><span>Pedidos</span><small id="ownerOrdersHint">Generados hoy</small></a>',
+        '<div id="ownerDashboardMessage" class="owner-dashboard-message" aria-live="polite">Actualizando actividad confirmada…</div>',
+        '<div class="owner-dashboard-layout">',
+        '  <div class="owner-dashboard-main">',
+        '    <div class="home-metrics" aria-label="Actividad de hoy">',
+        '      <a id="homeCallsMetric" class="home-metric" href="/operations.html" aria-label="Ver llamadas recibidas"><strong id="ownerCallsTodayPrimary">–</strong><span>Llamadas</span><small id="homeConversationBreakdown">–</small></a>',
+        '      <a id="homeBookingsMetric" class="home-metric" href="/?tab=bookings#homeBusinessWorkspace" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>Reservas</span><small>Generadas hoy</small></a>',
+        '      <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver solicitudes pendientes"><strong id="homeRequestsToday">–</strong><span>Pendientes</span><small>Solicitudes por resolver</small></a>',
+        '      <a id="ownerOrdersMetric" class="home-metric hidden" href="/?tab=sales#homeBusinessWorkspace" aria-label="Ver pedidos y ventas"><strong id="ownerOrdersToday">–</strong><span>Pedidos</span><small id="ownerOrdersHint">Generados hoy</small></a>',
+        '    </div>',
+        '    <section class="owner-recent" aria-labelledby="ownerRecentTitle">',
+        '      <div class="owner-section-heading"><div><div class="eyebrow">Últimos movimientos</div><h3 id="ownerRecentTitle">Actividad reciente</h3></div><a href="/operations.html">Ver historial</a></div>',
+        '      <div id="homeRecentActivity" class="owner-activity-list" role="list"><div class="owner-empty">Cargando actividad…</div></div>',
+        '    </section>',
+        '  </div>',
+        '  <aside class="owner-dashboard-side" aria-label="Prioridades y accesos">',
+        '    <section id="ownerAttentionPanel" class="owner-attention-panel" aria-labelledby="ownerAttentionTitle" data-state="loading">',
+        '      <div class="eyebrow">Prioridad</div>',
+        '      <h3 id="ownerAttentionTitle">Necesita tu atención</h3>',
+        '      <p id="ownerAttentionSummary" aria-live="polite">Revisando pendientes…</p>',
+        '      <div id="ownerDashboardAttention" class="owner-dashboard-attention hidden" aria-label="Señales que requieren atención">',
+        '        <a id="ownerOrdersAttentionChip" class="owner-dashboard-chip warn hidden" href="/?tab=sales#homeBusinessWorkspace"><strong id="ownerOrdersAttentionToday">–</strong> ventas por revisar</a>',
+        '        <span id="ownerHandoffsChip" class="owner-dashboard-chip hidden"><strong id="ownerHandoffsToday">–</strong> derivaciones</span>',
+        '        <span id="ownerFailuresChip" class="owner-dashboard-chip hidden"><strong id="ownerFailuresToday">–</strong> fallos de llamada</span>',
+        '        <span id="ownerBookingChangesChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingChangesToday">–</strong> reprogramadas</span>',
+        '        <span id="ownerBookingCancelsChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingCancelsToday">–</strong> canceladas</span>',
+        '      </div>',
+        '    </section>',
+        '    <nav id="ownerQuickActions" class="owner-quick-actions" aria-label="Accesos principales">',
+        '      <div class="owner-section-heading"><div><div class="eyebrow">Accesos</div><h3>Ir a</h3></div></div>',
+        '      <div class="owner-quick-grid">',
+        '        <a href="/operations.html">Llamadas</a>',
+        '        <a href="/?tab=bookings#homeBusinessWorkspace">Reservas</a>',
+        '        <a href="/?tab=customers#homeBusinessWorkspace">Clientes</a>',
+        '        <a href="/inventory.html">Inventario</a>',
+        '        <a href="/settings.html">Configuración</a>',
+        '      </div>',
+        '    </nav>',
+        '    <div id="ownerSevenDayRow" class="owner-seven-day hidden"><strong>Últimos 7 días</strong><span id="ownerSevenDaySummary">–</span></div>',
+        '    <div id="ownerPlanRow" class="owner-plan-row hidden">',
+        '      <div><strong id="ownerPlanName">–</strong><span>Plan actual</span></div>',
+        '      <div><strong id="ownerPlanUsage">–</strong><span>Minutos usados del periodo</span></div>',
+        '    </div>',
+        '  </aside>',
         '</div>',
-        '<div id="ownerDashboardAttention" class="owner-dashboard-attention hidden" aria-label="Señales que requieren atención">',
-        '  <strong class="owner-dashboard-attention-title">Necesita tu atención</strong>',
-        '  <a id="ownerOrdersAttentionChip" class="owner-dashboard-chip warn hidden" href="/?tab=sales#homeBusinessWorkspace"><strong id="ownerOrdersAttentionToday">–</strong> ventas por revisar</a>',
-        '  <span id="ownerHandoffsChip" class="owner-dashboard-chip hidden"><strong id="ownerHandoffsToday">–</strong> derivaciones</span>',
-        '  <span id="ownerFailuresChip" class="owner-dashboard-chip hidden"><strong id="ownerFailuresToday">–</strong> fallos de llamada</span>',
-        '  <span id="ownerBookingChangesChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingChangesToday">–</strong> reprogramadas</span>',
-        '  <span id="ownerBookingCancelsChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingCancelsToday">–</strong> canceladas</span>',
-        '</div>',
-        '<div id="ownerSevenDayRow" class="owner-seven-day hidden"><strong>Últimos 7 días</strong><span id="ownerSevenDaySummary">–</span></div>',
-        '<div id="ownerPlanRow" class="owner-plan-row hidden">',
-        '  <div><strong id="ownerPlanName">–</strong><span>Plan actual</span></div>',
-        '  <div><strong id="ownerPlanUsage">–</strong><span>Minutos usados del periodo</span></div>',
-        '</div>',
-        '<section class="owner-recent" aria-label="Actividad reciente">',
-        '  <h3>Actividad reciente</h3>',
-        '  <div id="homeRecentActivity" class="owner-activity-list"><div class="owner-empty">Cargando actividad…</div></div>',
-        '</section>',
         '<div hidden aria-hidden="true">',
+        '  <span id="homeConversationsToday">–</span>',
         '  <span id="homeCallsToday">–</span>',
         '  <span id="homeWhatsAppToday">–</span>',
         '  <span id="homeCustomersToday">–</span>',
@@ -459,34 +480,38 @@
         (operations.recentCalls || []).forEach(item => events.push({
             at: item.startedAt,
             kind: 'Llamada',
-            title: item.resolution || labelStage(item.status) || 'Atención telefónica'
+            title: item.resolution || labelStage(item.status) || 'Atención telefónica',
+            detail: item.callerNumber || ''
         }));
         (operations.recentRequests || []).forEach(item => events.push({
             at: item.createdAt,
             kind: 'Solicitud',
-            title: item.title || labelStage(item.status) || 'Solicitud del cliente'
+            title: item.title || labelStage(item.status) || 'Solicitud del cliente',
+            detail: item.contactName || item.description || ''
         }));
         ((pipeline && pipeline.items) || []).forEach(item => events.push({
             at: item.updatedAt,
             kind: item.product ? 'Venta' : 'Conversación',
-            title: [item.product || item.customerName || 'Actividad comercial', labelStage(item.commercialStage || item.paymentStatus)].filter(Boolean).join(' · ')
+            title: [item.product || item.customerName || 'Actividad comercial', labelStage(item.commercialStage || item.paymentStatus)].filter(Boolean).join(' · '),
+            detail: item.customerName || item.customerPhone || ''
         }));
 
         events.sort((a, b) => new Date(b.at || 0).getTime() - new Date(a.at || 0).getTime());
         recent.innerHTML = '';
         if (!events.length) {
-            recent.innerHTML = '<div class="owner-empty">Todavía no hay actividad reciente.</div>';
+            recent.innerHTML = '<div class="owner-empty" role="listitem">Todavía no hay actividad reciente.</div>';
             return 0;
         }
-        events.slice(0, 4).forEach(item => {
+        events.slice(0, 5).forEach(item => {
             const row = document.createElement('div');
             row.className = 'owner-activity-row';
+            row.setAttribute('role', 'listitem');
             const copy = document.createElement('div');
             const titleNode = document.createElement('strong');
             const meta = document.createElement('span');
             const time = document.createElement('time');
             titleNode.textContent = item.title;
-            meta.textContent = item.kind;
+            meta.textContent = [item.kind, item.detail].filter(Boolean).join(' · ');
             time.textContent = formatTime(item.at, timeZone);
             copy.append(titleNode, meta);
             row.append(copy, time);
@@ -511,9 +536,11 @@
         const failures = pilotToday ? numeric(pilotToday.callFailures) : numeric(operations.callFailuresToday);
         const pipelineNeedsAction = numeric(pipeline?.needsAction);
 
+        overview.querySelector('#ownerCallsTodayPrimary').textContent = String(calls);
         overview.querySelector('#homeConversationsToday').textContent = String(conversations);
-        overview.querySelector('#homeConversationBreakdown').textContent =
-            String(calls) + ' llamadas' + (pilotToday ? ' · ' + String(whatsapp) + ' WhatsApp' : '');
+        overview.querySelector('#homeConversationBreakdown').textContent = pilotToday
+            ? String(whatsapp) + ' WhatsApp · ' + String(conversations) + ' conversaciones'
+            : String(conversations) + ' conversaciones registradas';
         overview.querySelector('#homeBookingsToday').textContent = String(bookings);
         overview.querySelector('#homeRequestsToday').textContent = String(openRequests);
         overview.querySelector('#ownerOrdersToday').textContent = String(orders);
@@ -556,6 +583,12 @@
         }
 
         const attentionCount = pipelineNeedsAction + handoffs + failures + rescheduled + cancelled;
+        const attentionPanel = overview.querySelector('#ownerAttentionPanel');
+        const attentionSummary = overview.querySelector('#ownerAttentionSummary');
+        attentionPanel.dataset.state = attentionCount > 0 ? 'attention' : 'clear';
+        attentionSummary.textContent = attentionCount > 0
+            ? String(attentionCount) + (attentionCount === 1 ? ' señal requiere revisión.' : ' señales requieren revisión.')
+            : 'No hay pendientes críticos detectados.';
         overview.querySelector('#ownerDashboardAttention').classList.toggle('hidden', attentionCount <= 0);
 
         const sevenDay = pilotMetrics?.last7Days || null;
@@ -610,13 +643,19 @@
 
     function renderError() {
         setDashboardState('error', 'NO DISPONIBLE', 'No pudimos actualizar las métricas. Usa “Actualizar estado” para reintentar.');
-        recent.innerHTML = '<div class="owner-empty">La actividad reciente no está disponible.</div>';
+        const attentionPanel = overview.querySelector('#ownerAttentionPanel');
+        attentionPanel.dataset.state = 'error';
+        overview.querySelector('#ownerAttentionSummary').textContent = 'No pudimos verificar qué requiere atención.';
+        overview.querySelector('#ownerDashboardAttention').classList.add('hidden');
+        recent.innerHTML = '<div class="owner-empty" role="listitem">La actividad reciente no está disponible.</div>';
     }
 
     async function loadOperational(force = false) {
         if (loading || dashboard.classList.contains('hidden') || !isReady() || !sessionStorage.getItem('helvoca_access_token')) return;
         if (!force && Date.now() - lastLoadedAt < 1500) return;
         loading = true;
+        overview.querySelector('#ownerAttentionPanel').dataset.state = 'loading';
+        overview.querySelector('#ownerAttentionSummary').textContent = 'Revisando pendientes…';
         setDashboardState('loading', 'CARGANDO', 'Actualizando actividad confirmada…');
         try {
             let canReadAudit = false;
