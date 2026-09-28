@@ -159,6 +159,35 @@ test('auth tabs and simplified registration controls are usable', async ({ page 
   await expect(page.locator('#loginForm')).toBeHidden();
 });
 
+test('auth surface is focused, dark and mobile-safe', async ({ page }) => {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 768, height: 900 },
+    { width: 390, height: 844 }
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+
+    const auth = page.locator('#authView .auth-card');
+    await expect(auth.locator('.rv-auth-heading')).toBeVisible();
+    await expect(auth.locator('.rv-auth-heading')).toContainText('Empieza con RecepVoz');
+    await expect(auth.locator('.rv-auth-heading')).toContainText('Tu recepcionista puede quedar lista en pocos pasos.');
+
+    const palette = await auth.evaluate(element => {
+      const style = getComputedStyle(element);
+      return { background: style.backgroundColor, color: style.color };
+    });
+    expect(palette.background).toBe('rgb(21, 25, 34)');
+
+    await expect(page.locator('#registerTab')).toHaveAttribute('role', 'tab');
+    await expect(page.locator('#loginTab')).toHaveAttribute('role', 'tab');
+    await expect(page.locator('#registerTab')).toHaveAttribute('aria-controls', 'registerForm');
+    await expect(page.locator('#loginTab')).toHaveAttribute('aria-controls', 'loginForm');
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  }
+});
+
 test('registration validates fields and enters the dashboard with the expected payload', async ({ page }) => {
   await mockReadyTenant(page, {
     activationGuide: {
