@@ -56,7 +56,12 @@ test('canonical dark foundation is served and loaded after legacy styles', async
   expect(foundation).toContain('--rv-bg-canvas: #070a10');
   expect(foundation).toContain('--rv-accent: #806bff');
 
-  for (const path of ['/', '/settings.html', '/inventory.html', '/simulator.html', '/operations.html']) {
+  for (const path of [
+    '/', '/settings.html', '/inventory.html', '/simulator.html', '/operations.html',
+    '/platform.html', '/invite.html', '/phone-numbers.html',
+    '/privacy.html', '/terms.html', '/data-deletion.html',
+    '/sales.html', '/pricing.html'
+  ]) {
     const html = await getText(request, path);
     const stylesheets = stylesheetPaths(html);
     expect(stylesheets, path).toContain('/frontend-foundation.css');
