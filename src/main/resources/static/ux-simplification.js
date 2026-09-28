@@ -8,10 +8,10 @@
     const style = document.createElement('style');
     style.id = 'helvoca-ux-simplification-styles';
     style.textContent = `
-        :root { --ux-surface: rgba(255,255,255,.028); --ux-surface-strong: rgba(255,255,255,.045); }
-        .hero-card { min-height: 0 !important; padding: clamp(28px, 5vw, 54px) !important; justify-content: center; }
-        .hero-card h1 { max-width: 660px; font-size: clamp(38px, 5vw, 66px) !important; }
-        .hero-card p { max-width: 580px; font-size: clamp(15px, 1.4vw, 18px); line-height: 1.6; }
+        :root { --ux-surface: var(--surface); --ux-surface-strong: var(--surface-2); }
+        body.settings-page .hero-card { min-height: 0 !important; padding: clamp(28px, 5vw, 54px) !important; justify-content: center; }
+        body.settings-page .hero-card h1 { max-width: 660px; font-size: clamp(38px, 5vw, 66px) !important; }
+        body.settings-page .hero-card p { max-width: 580px; font-size: clamp(15px, 1.4vw, 18px); line-height: 1.6; }
         .hero-card .feature-grid { display: none !important; }
         .auth-card .form-hint { opacity: .72; }
 
@@ -41,11 +41,11 @@
 
         #advancedPanel.ux-config-hub { display: block !important; grid-template-columns: 1fr !important; margin-top: 12px; padding: 0; }
         #advancedPanel.ux-config-hub.hidden { display: block !important; }
-        .ux-config-shell { border: 1px solid var(--border); border-radius: 18px; overflow: hidden; background: rgba(10,15,25,.42); }
+        .ux-config-shell { border: 1px solid var(--border); border-radius: 18px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
         .ux-config-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 20px 22px; border-bottom: 1px solid var(--border); }
         .ux-config-heading h2 { margin: 2px 0 0; font-size: 21px; }
         .ux-config-heading p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
-        .ux-config-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,.015); }
+        .ux-config-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
         .ux-config-nav button { min-width: 0; text-align: left; border: 1px solid transparent; border-radius: 12px; padding: 13px 14px; color: var(--text); background: transparent; cursor: pointer; font: inherit; transition: .16s ease; }
         .ux-config-nav button:hover { background: var(--ux-surface); border-color: var(--border); }
         .ux-config-nav button[aria-expanded="true"] { background: rgba(124,92,255,.12); border-color: rgba(124,92,255,.38); }
@@ -83,7 +83,7 @@
         #configPhonePanel > .eyebrow { display: none; }
         #configPhonePanel > h2 { margin: 0 0 8px !important; font-size: 16px !important; }
         #configPhonePanel > p { display: none !important; }
-        .ux-phone-modes { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: rgba(255,255,255,.02); margin-bottom: 10px; }
+        .ux-phone-modes { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); margin-bottom: 10px; }
         .ux-phone-modes button { min-height: 30px; border: 0; border-radius: 8px; padding: 6px 10px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
         .ux-phone-modes button.active { color: var(--text); background: rgba(124,92,255,.16); }
         .ux-phone-path.hidden { display: none !important; }
@@ -130,9 +130,9 @@
         const eyebrow = $('.eyebrow', hero);
         const title = $('h1', hero);
         const copy = $('p', hero);
-        setText(eyebrow, 'Tu recepcionista con IA');
-        setText(title, 'Tu negocio, atendido por IA.');
-        setText(copy, 'Pega el enlace de tu negocio y configura RecepVoz en minutos.');
+        setText(eyebrow, 'Tu negocio siempre contesta');
+        setText(title, 'No pierdas otra llamada.');
+        setText(copy, 'RecepVoz responde a tus clientes, resuelve consultas y crea reservas mientras tú sigues trabajando.');
     }
 
     function simplifyDashboardCopy() {

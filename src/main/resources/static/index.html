@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>RecepVoz · Recepcionista virtual con IA para negocios</title>
     <meta name="description" content="RecepVoz automatiza la atención de negocios con IA: llamadas, integración con WhatsApp Business, reservas, pedidos y seguimiento de clientes.">
-    <meta name="theme-color" content="#0b0e14">
+    <meta name="theme-color" content="#080b12">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="RecepVoz">
@@ -214,6 +214,7 @@
         body.home-page.operational-ready #advancedPanel,
         body.home-page.operational-ready #commercialStatusCard { display: none !important; }
 </style>
+    <link rel="stylesheet" href="/commercial-ui-v3.css?v=20260928-1">
 </head>
 <body class="home-page">
 <div class="shell">
@@ -226,6 +227,7 @@
             <a class="nav-home active" href="/">Inicio</a>
             <a class="nav-bookings" data-home-nav="bookings" href="/#bookings">Reservas</a>
             <a class="nav-customers" data-home-nav="customers" href="/#customers">Clientes</a>
+            <a class="nav-inventory" href="/inventory.html">Inventario</a>
             <a class="nav-config" href="/settings.html">Configuración</a>
         </nav>
         <div class="top-actions">
@@ -237,9 +239,17 @@
     <main>
         <section id="authView" class="auth-grid">
             <article class="card hero-card">
-                <div class="eyebrow">Atención inteligente para negocios</div>
-                <h1>RecepVoz atiende mientras tú trabajas.</h1>
-                <p>Automatiza llamadas, reservas y atención de clientes, con integración para WhatsApp Business y una operación centralizada.</p>
+                <div class="eyebrow">Tu negocio siempre contesta</div>
+                <h1>No pierdas otra llamada.</h1>
+                <p>RecepVoz responde a tus clientes, resuelve consultas y crea reservas mientras tú sigues trabajando.</p>
+                <div class="rv-voice-preview" aria-label="Vista previa de la recepcionista virtual">
+                    <div class="rv-voice-preview-head">
+                        <span class="rv-live-dot" aria-hidden="true"></span>
+                        <div><strong>Sofía está disponible</strong><small>Recepcionista IA · 24/7</small></div>
+                    </div>
+                    <div class="rv-wave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                    <div class="rv-voice-preview-result"><span>Cliente: “Quiero reservar para mañana”</span><strong>Reserva lista ✓</strong></div>
+                </div>
             </article>
 
             <article class="card auth-card">
@@ -335,8 +345,8 @@
             <div class="dashboard-heading">
                 <div>
                     <div class="eyebrow">Tu negocio</div>
-                    <h1>Prepara tu negocio en minutos</h1>
-                    <p id="welcomeText">Pega una fuente pública y deja que preparemos la configuración.</p>
+                    <h1>Tu negocio, de un vistazo</h1>
+                    <p id="welcomeText">Revisa llamadas, reservas, clientes y lo que necesita tu atención.</p>
                 </div>
                 <div class="dashboard-heading-actions">
                     <a id="tryRecepVozBtn" class="button primary hidden" href="/simulator.html">Probar RecepVoz</a>
