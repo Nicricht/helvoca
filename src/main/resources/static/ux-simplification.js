@@ -132,7 +132,7 @@
         const copy = $('p', hero);
         setText(eyebrow, 'Tu recepcionista con IA');
         setText(title, 'Tu negocio, atendido por IA.');
-        setText(copy, 'Pega el enlace de tu negocio y configura Helvoca en minutos.');
+        setText(copy, 'Pega el enlace de tu negocio y configura RecepVoz en minutos.');
     }
 
     function simplifyDashboardCopy() {
@@ -141,7 +141,7 @@
         const eyebrow = $('.eyebrow', heading);
         const title = $('h1', heading);
         const copy = $('#welcomeText', heading);
-        setText(eyebrow, 'Tu Helvoca');
+        setText(eyebrow, 'Tu RecepVoz');
         if (title && !title.id) title.id = 'dashboardTitle';
         if (copy && !copy.id.includes('dashboardSummary')) copy.dataset.uxSummary = 'true';
         const refresh = $('#refreshBtn');
@@ -178,12 +178,12 @@
         if (!title || !copy) return;
 
         if (ready) {
-            setText(title, 'Helvoca está operativa');
+            setText(title, 'RecepVoz está operativo');
             setText(copy, 'Tu negocio está listo para atender clientes.');
             const nextStep = $('#nextStepBanner');
             if (nextStep && !nextStep.classList.contains('hidden')) nextStep.classList.add('hidden');
         } else {
-            setText(title, 'Termina de preparar Helvoca');
+            setText(title, 'Termina de preparar RecepVoz');
             setText(copy, 'Completa lo esencial para empezar a atender.');
             const nextStep = $('#nextStepBanner');
             if (nextStep?.classList.contains('hidden')) nextStep.classList.remove('hidden');

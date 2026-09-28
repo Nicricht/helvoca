@@ -502,7 +502,7 @@ test('authentication and phone administration fit all target viewports', async (
       await page.goto('/phone-numbers.html');
       await expect(page.getByText('+56911111111')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Desvincular' })).toBeVisible();
-      await expect(page.getByRole('link', { name: /Volver a Helvoca/ })).toHaveAttribute('href', '/');
+      await expect(page.getByRole('link', { name: /Volver a RecepVoz/ })).toHaveAttribute('href', '/');
       await expectNoPageOverflow();
     });
   }
