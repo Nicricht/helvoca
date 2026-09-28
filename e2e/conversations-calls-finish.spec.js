@@ -149,7 +149,7 @@ test('simulator uses dark safe UI, progress feedback and human action labels', a
   await expect(page.getByRole('button', { name: 'Nueva prueba' })).toBeDisabled();
 
   await expect(page.getByText('Hola, ¿en qué te ayudo?')).toBeVisible();
-  await expect(page.getByText('Reserva creada')).toBeVisible();
+  await expect(page.locator('#resolution')).toHaveText('Reserva creada');
   await expect(page.locator('body')).not.toContainText('CREATE_BOOKING');
 
   const palette = await page.evaluate(() => ({
@@ -158,4 +158,58 @@ test('simulator uses dark safe UI, progress feedback and human action labels', a
   }));
   expect(palette.bg).toBe('#0f1115');
   expect(palette.surface).toBe('#151922');
+});
+
+
+test('conversation workspace keeps WhatsApp usable when call history is unavailable', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+
+  await page.route('**/api/v1/calls?**', route => route.fulfill({
+    status: 503,
+    contentType: 'application/json',
+    body: JSON.stringify({ message: 'Historial temporalmente no disponible' })
+  }));
+  await page.route('**/api/v1/messaging/conversations', route => route.fulfill(json([{
+    id: 'wa-demo',
+    channel: 'whatsapp',
+    sender: '+15550000003',
+    recipient: '+15550000009',
+    openedAt: '2026-09-28T16:40:00Z',
+    lastMessageAt: '2026-09-28T16:44:00Z'
+  }])));
+  await page.route('**/api/v1/messaging/conversations/wa-demo', route => route.fulfill(json({
+    conversation: {
+      id: 'wa-demo',
+      channel: 'whatsapp',
+      sender: '+15550000003',
+      recipient: '+15550000009',
+      openedAt: '2026-09-28T16:40:00Z',
+      lastMessageAt: '2026-09-28T16:44:00Z'
+    },
+    messages: [
+      { id: 'm1', direction: 'INBOUND', role: 'USER', content: '¿Atienden mañana?', createdAt: '2026-09-28T16:40:10Z' }
+    ]
+  })));
+
+  await page.goto('/conversations.html?whatsapp=wa-demo');
+
+  await expect(page.locator('#sourceStatus')).toContainText('historial de llamadas');
+  await expect(page.locator('#detailCustomer')).toHaveText('+15550000003');
+  await expect(page.getByText('¿Atienden mañana?')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'WhatsApp' })).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
+test('conversation workspace has an intentional empty state', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await page.route('**/api/v1/calls?**', route => route.fulfill(json({
+    content: [], number: 0, size: 100, totalElements: 0, totalPages: 0
+  })));
+  await page.route('**/api/v1/messaging/conversations', route => route.fulfill(json([])));
+
+  await page.goto('/conversations.html');
+
+  await expect(page.getByText('Todavía no hay conversaciones')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Selecciona una conversación' })).toBeVisible();
 });
