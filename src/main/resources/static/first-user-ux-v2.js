@@ -4,6 +4,7 @@
   const onboarding = document.querySelector("#firstUserOnboarding");
   const progressText = document.querySelector("#firstUserProgressText");
   const progressBar = document.querySelector("#firstUserProgressBar");
+  const progressMeter = onboarding?.querySelector('[role="progressbar"]');
   const stepsHost = document.querySelector("#firstUserSteps");
   const tryButton = document.querySelector("#tryRecepVozBtn");
   const nextAction = document.querySelector("#firstUserNextAction");
