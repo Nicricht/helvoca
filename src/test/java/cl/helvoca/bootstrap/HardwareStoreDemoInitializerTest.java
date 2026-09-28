@@ -208,7 +208,7 @@ class HardwareStoreDemoInitializerTest {
                 && LocalTime.of(9, 0).equals(value.getOpenTime())
                 && LocalTime.of(14, 0).equals(value.getCloseTime())));
 
-        assertEquals(15, knowledgeStore.stream().filter(KnowledgeItem::isActive).count());
+        assertEquals(16, knowledgeStore.stream().filter(KnowledgeItem::isActive).count());
         assertEquals(3, zoneStore.stream().filter(DeliveryZone::isActive).count());
         assertTrue(zoneStore.stream().anyMatch(value -> value.getName().equals("Providencia Demo")
                 && value.getFee().intValueExact() == 3990));
@@ -228,7 +228,7 @@ class HardwareStoreDemoInitializerTest {
 
         assertEquals(34, catalogStore.size());
         assertEquals(34, stockStore.size());
-        assertEquals(15, knowledgeStore.size());
+        assertEquals(16, knowledgeStore.size());
         assertEquals(3, zoneStore.size());
         assertEquals(6, hourStore.size());
         verify(subscriptions, times(2)).startBasicTrial(businessId);
