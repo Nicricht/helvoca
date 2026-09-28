@@ -2,13 +2,13 @@
 
 These rules are mandatory for implementation work in this repository.
 
-Helvoca follows **First-Pass Engineering**: understand the complete impact before coding, implement the smallest coherent solution, and verify the exact final commit before calling work complete. The user is not the QA system.
+Helvoca follows **First-Pass Engineering**: understand the complete impact before coding, implement the smallest coherent solution, verify the exact final commit, and preserve durable state so interrupted work can resume safely. The user is not the QA system.
 
 Before implementation, read `software-factory/skill/first-pass-engineering/SKILL.md` when it is present so a fresh conversation does not depend on prior chat memory.
 
 ## Goal
 
-Optimize for one short correction loop: design broadly, test cheaply first, and run the expensive certification once.
+Optimize for one short correction loop: design broadly, test cheaply first, run the expensive certification once, and never lose engineering progress because a chat or session ended.
 
 ## Risk and impact
 
@@ -18,7 +18,7 @@ Classify each implementation as LOW, MEDIUM, or HIGH risk before coding.
 - MEDIUM: normal features, APIs, CRUD, business rules, and stateful UI.
 - HIGH: authentication, authorization, billing/payments, tenant isolation, inventory consistency, migrations, external messaging/telephony, destructive operations, sensitive data, or production infrastructure.
 
-Use verification proportional to the real risk. Before implementation, review the affected path across UI, API, business logic, data, security, integrations, and operations, plus the project invariants in `docs/engineering/invariants.md`.
+Use verification proportional to the real risk. Before implementation, review the affected path across UI, API, business logic, data, security, integrations, operations, and continuity for long-running work, plus the project invariants in `docs/engineering/invariants.md`.
 
 ## Required workflow
 
@@ -33,17 +33,20 @@ Use verification proportional to the real risk. Before implementation, review th
 8. New or modified executable Java lines must maintain at least 80% differential line coverage and 70% differential branch coverage when branches are present.
 9. Never merge a red or incomplete PR. Re-check that the branch is not behind current `main` immediately before merge.
 10. Completion evidence must belong to the exact final commit. Any implementation or engineering-contract change after certification invalidates the earlier certification and requires fresh verification.
-11. After merge, verify the exact commit deployed to Railway and confirm runtime readiness before calling the work complete.
-12. Production calls, payments, messages and destructive operations require the project-specific safety rules and must never be triggered merely to satisfy a test.
+11. For MEDIUM/HIGH or multi-step work likely to outlive one interaction, maintain a **resume checkpoint** in the Draft PR. It must identify branch, PR, exact HEAD, completed blocks, CI/evidence valid for that HEAD, blockers/rulings, and next step.
+12. On resume, reconstruct repository -> branch -> PR -> HEAD -> CI -> checkpoint -> next step. Do not repeat completed work whose evidence is still valid, and never duplicate external side effects.
+13. Before a long external wait such as Full CI, update the resume checkpoint so a disconnected session can be recovered without user reconstruction.
+14. After merge, verify the exact commit deployed to Railway and confirm runtime readiness before calling the work complete.
+15. Production calls, payments, messages and destructive operations require the project-specific safety rules and must never be triggered merely to satisfy a test.
 
 ## Speed rule
 
 Do not run the complete suite after every small edit. Use targeted tests through Fast Gate while iterating. Run Full Gate once the functional block and its regression tests are complete.
 
-LOW-risk work must not be inflated into HIGH-risk ceremony. HIGH-risk work must not be downgraded to save time.
+LOW-risk work must not be inflated into HIGH-risk ceremony. HIGH-risk work must not be downgraded to save time. Resume must be idempotent: reuse still-valid evidence instead of repeating expensive work without cause.
 
 ## Truth rule
 
 A successful tool request, proposal, queued action or accepted provider request is not equivalent to a completed business outcome. Tests and application state must prove the terminal outcome explicitly.
 
-Do not claim code is fixed, passing, safe, or complete without fresh verification evidence from the exact state being presented.
+Do not claim code is fixed, passing, safe, or complete without fresh verification evidence from the exact state being presented. Chat memory never overrides Git, PR, commit, or CI state.
