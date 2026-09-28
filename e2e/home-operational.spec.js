@@ -773,6 +773,7 @@ test('owner commercial dashboard exposes loading and empty states', async ({ pag
   await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'empty');
   await expect(page.locator('#ownerDashboardState')).toHaveText('SIN ACTIVIDAD');
   await expect(page.locator('#ownerDashboardMessage')).toHaveText('Aún no hay actividad comercial hoy.');
+  await expect(page.locator('#ownerAttentionTitle')).toHaveText('Todo bajo control');
   await expect(page.locator('#ownerAttentionSummary')).toHaveText('No hay pendientes críticos detectados.');
   await expect(page.locator('#ownerDashboardAttention')).toBeHidden();
   await expect(page.locator('#homeRecentActivity')).toContainText('Todavía no hay actividad reciente.');
@@ -796,6 +797,7 @@ test('owner commercial dashboard exposes an error state without hiding the works
   await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'error');
   await expect(page.locator('#ownerDashboardState')).toHaveText('NO DISPONIBLE');
   await expect(page.locator('#ownerDashboardMessage')).toContainText('No pudimos actualizar las métricas');
+  await expect(page.locator('#ownerAttentionTitle')).toHaveText('Atención no verificada');
   await expect(page.locator('#ownerAttentionSummary')).toHaveText('No pudimos verificar qué requiere atención.');
   await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
 });
