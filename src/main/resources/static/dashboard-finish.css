@@ -298,7 +298,7 @@
   border-radius: 10px;
   background: var(--surface);
   color: var(--text);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-decoration: none;
 }
@@ -349,7 +349,7 @@
 }
 
 #operationalOverview .owner-plan-row strong {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 #operationalOverview .owner-plan-row span {
