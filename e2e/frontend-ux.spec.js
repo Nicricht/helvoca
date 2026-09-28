@@ -563,6 +563,29 @@ test('public hero is calm, dark and focused on one receptionist conversation', a
   expect(palette.textAlign).toBe('left');
 });
 
+test('public landing trust strip stays compact and readable across target viewports', async ({ page }) => {
+  const viewports = [
+    { width: 1440, height: 900 },
+    { width: 768, height: 900 },
+    { width: 390, height: 844 }
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+
+    const strip = page.locator('#publicTrustStrip');
+    await expect(strip).toBeVisible();
+    await expect(strip.locator('.rv-trust-item')).toHaveCount(4);
+    await expect(strip).toContainText('Atiende llamadas');
+    await expect(strip).toContainText('Responde consultas');
+    await expect(strip).toContainText('Agenda reservas');
+    await expect(strip).toContainText('Disponible 24/7');
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  }
+});
+
 test('ready customer console uses the light commercial design system', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'commercial-ui-token'));
   await mockReadyTenant(page);
