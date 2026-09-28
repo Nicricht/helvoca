@@ -1,0 +1,37 @@
+package cl.helvoca.architecture;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import org.junit.jupiter.api.Test;
+
+class EngineeringGuardrailsContractTest {
+
+    private static String read(String relativePath) throws IOException {
+        return Files.readString(Path.of(relativePath));
+    }
+
+    @Test
+    void repositoryGuardrailsRequireFirstPassEngineeringAndFreshEvidence() throws Exception {
+        String agents = read("AGENTS.md");
+        assertTrue(agents.contains("First-Pass Engineering"));
+        assertTrue(agents.contains("80% differential line coverage"));
+        assertTrue(agents.contains("70% differential branch coverage"));
+        assertTrue(agents.toLowerCase().contains("final commit"));
+        assertTrue(agents.contains("Never develop directly on `main`"));
+        assertTrue(agents.toLowerCase().contains("regression tests for every bug fixed"));
+    }
+
+    @Test
+    void projectInvariantsProtectCriticalCommercialAndTenantTruths() throws Exception {
+        String invariants = read("docs/engineering/invariants.md").toLowerCase();
+        assertTrue(invariants.contains("tenant"));
+        assertTrue(invariants.contains("simulator"));
+        assertTrue(invariants.contains("external side effect"));
+        assertTrue(invariants.contains("payment"));
+        assertTrue(invariants.contains("duplicate"));
+        assertTrue(invariants.contains("order"));
+    }
+}
