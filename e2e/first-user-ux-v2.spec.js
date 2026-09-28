@@ -141,8 +141,8 @@ test('ready owner lands on a simple daily home with direct reservations and cust
   await expect(page.getByRole('link', { name: 'Probar RecepVoz' })).toBeVisible();
 
   const nav = page.locator('#primaryNav');
-  await expect(nav.locator('a')).toContainText(['Inicio', 'Reservas', 'Clientes', 'Configuración']);
-  await expect(nav).not.toContainText('Inventario');
+  await expect(nav.locator('a')).toContainText(['Inicio', 'Reservas', 'Clientes', 'Inventario', 'Configuración']);
+  await expect(nav.getByRole('link', { name: 'Inventario', exact: true })).toHaveAttribute('href', '/inventory.html');
 
   await nav.getByRole('link', { name: 'Reservas', exact: true }).click();
   await expect(page.locator('[data-home-tab="bookings"]')).toHaveClass(/active/);
