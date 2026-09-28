@@ -696,7 +696,7 @@ test('settings presents human setup categories with accessible selected state', 
   const primary = nav.locator('[data-settings-section]');
   await expect(primary).toContainText(['Negocio', 'Servicios', 'Horarios', 'Recepcionista']);
 
-  const selected = nav.locator('[aria-selected="true"]');
+  const selected = nav.locator('[aria-current="page"]');
   await expect(selected).toHaveCount(1);
   await expect(selected).toContainText('Negocio');
 
@@ -712,7 +712,7 @@ test('settings deep link opens the requested onboarding section', async ({ page 
 
   await expect(page.locator('#configHoursPanel')).toBeVisible();
   await expect(page.locator('#configBusinessPanel')).toBeHidden();
-  await expect(page.locator('.ux-config-nav [data-settings-section="hours"]')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.ux-config-nav [data-settings-section="hours"]')).toHaveAttribute('aria-current', 'page');
 
   await page.locator('.ux-config-nav [data-settings-section="receptionist"]').click();
   await expect(page.locator('#configAgentPanel')).toBeVisible();
