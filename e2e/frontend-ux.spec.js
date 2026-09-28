@@ -598,7 +598,7 @@ test('public hero is calm, dark and focused on one receptionist conversation', a
   const primaryCta = hero.getByRole('link', { name: 'Probar RecepVoz', exact: true });
   const secondaryCta = hero.getByRole('link', { name: 'Ver cómo funciona', exact: true });
   await expect(primaryCta).toHaveAttribute('href', '#registerForm');
-  await expect(secondaryCta).toHaveAttribute('href', '/sales.html');
+  await expect(secondaryCta).toHaveAttribute('href', '#howItWorks');
 
   const demo = hero.locator('.rv-call-demo');
   await expect(demo).toBeVisible();
@@ -630,6 +630,41 @@ test('public hero is calm, dark and focused on one receptionist conversation', a
   expect(palette.background).toBe('rgb(15, 17, 21)');
   expect(palette.heroBackground).toBe('rgb(21, 25, 34)');
   expect(palette.textAlign).toBe('left');
+});
+
+test('public landing completes the sales story without technical clutter', async ({ page }) => {
+  await page.goto('/');
+
+  const how = page.locator('#howItWorks');
+  await expect(how).toBeVisible();
+  await expect(how.locator('.rv-how-step')).toHaveCount(3);
+  await expect(how).toContainText('Tu cliente llama');
+  await expect(how).toContainText('Sofía resuelve');
+  await expect(how).toContainText('Tu negocio continúa');
+
+  const features = page.locator('#publicFeatures');
+  await expect(features).toBeVisible();
+  await expect(features.locator('.rv-feature')).toHaveCount(4);
+  await expect(features).toContainText('Llamadas');
+  await expect(features).toContainText('Reservas');
+  await expect(features).toContainText('Clientes');
+  await expect(features).toContainText('Inventario');
+
+  const preview = page.locator('#publicPreview');
+  await expect(preview).toBeVisible();
+  await expect(preview).toContainText('Reservas próximas');
+  await expect(preview).toContainText('Actividad reciente');
+  await expect(preview).toContainText('Sofía está atendiendo');
+
+  const finalCta = page.locator('#publicFinalCta');
+  await expect(finalCta).toBeVisible();
+  await expect(finalCta.getByRole('link', { name: 'Crear mi cuenta', exact: true })).toHaveAttribute('href', '#registerForm');
+  await expect(finalCta.getByRole('link', { name: 'Ver planes', exact: true })).toHaveAttribute('href', '/pricing.html');
+
+  const publicText = await page.locator('#authView').innerText();
+  for (const technicalWord of ['Twilio', 'webhook', 'tenant', 'entitlements', 'sandbox']) {
+    expect(publicText.toLowerCase()).not.toContain(technicalWord.toLowerCase());
+  }
 });
 
 test('public landing trust strip stays compact and readable across target viewports', async ({ page }) => {
