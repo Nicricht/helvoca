@@ -469,6 +469,12 @@ public class ReceptionistSimulatorService {
         for (int i = executions.size() - 1; i >= 0; i--) {
             ToolExecution item = executions.get(i);
             try {
+                if (!new JSONObject(item.result()).optBoolean("success", false)) return item;
+            } catch (Exception ignored) { }
+        }
+        for (int i = executions.size() - 1; i >= 0; i--) {
+            ToolExecution item = executions.get(i);
+            try {
                 if (new JSONObject(item.result()).optBoolean("success", false)) return item;
             } catch (Exception ignored) { }
         }
