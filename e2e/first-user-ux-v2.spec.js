@@ -109,7 +109,7 @@ test('new owner gets a four-step guided setup instead of the operational workspa
   await expect(page.locator('#firstUserOnboarding')).toBeVisible();
   await expect(page.locator('#firstUserOnboarding h1')).toHaveText('Vamos a preparar tu recepcionista');
   await expect(page.locator('#firstUserProgressText')).toHaveText('1 de 4 pasos completados');
-  await expect(page.locator('#firstUserSteps')).toContainText([
+  await expect(page.locator('#firstUserSteps .first-user-step')).toContainText([
     'Tu negocio',
     'Servicios',
     'Horarios',
