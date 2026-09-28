@@ -2263,3 +2263,41 @@ test('manual booking creation checks availability and adds the reservation', asy
   await expect(page.locator('#homeBookingsList')).toContainText('Manual');
   await expect(page.locator('#homeBookingCreateMessage')).toHaveText('Reserva creada para Ana Reserva ✓');
 });
+
+test('dashboard prioritizes calls, attention, recent activity and quick access', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'dashboard-finish-token'));
+  await mockReadyHome(page);
+  await page.goto('/');
+
+  const overview = page.locator('#operationalOverview');
+  await expect(overview).toBeVisible();
+  await expect(overview).toHaveAttribute('aria-labelledby', 'ownerDashboardTitle');
+  await expect(page.locator('#ownerDashboardTitle')).toHaveText('Qué está pasando hoy');
+
+  await expect(page.locator('#ownerCallsTodayPrimary')).toHaveText('4');
+  await expect(page.locator('#homeCallsMetric')).toHaveAttribute('href', '/operations.html');
+  await expect(page.locator('#homeCallsMetric')).toContainText('Llamadas');
+
+  const attention = page.locator('#ownerAttentionPanel');
+  await expect(attention).toBeVisible();
+  await expect(attention.getByRole('heading', { name: 'Necesita tu atención' })).toBeVisible();
+  await expect(page.locator('#ownerAttentionSummary')).toContainText('requieren revisión');
+  await expect(page.locator('#ownerDashboardAttention')).toBeVisible();
+
+  const quick = page.locator('#ownerQuickActions');
+  await expect(quick).toBeVisible();
+  await expect(quick.getByRole('link', { name: 'Reservas' })).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
+  await expect(quick.getByRole('link', { name: 'Clientes' })).toHaveAttribute('href', '/?tab=customers#homeBusinessWorkspace');
+  await expect(quick.getByRole('link', { name: 'Inventario' })).toHaveAttribute('href', '/inventory.html');
+  await expect(quick.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/settings.html');
+
+  await expect(page.locator('#ownerDashboardState')).toHaveAttribute('role', 'status');
+  await expect(page.locator('#ownerDashboardMessage')).toHaveAttribute('aria-live', 'polite');
+  await expect(page.locator('#homeRecentActivity')).toHaveAttribute('role', 'list');
+  await expect(page.locator('#homeRecentActivity')).toContainText('+56911111111');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
