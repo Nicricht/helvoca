@@ -1,0 +1,306 @@
+/* RecepVoz First User UX V2
+   Bootstrap provides the layout primitives; this file applies the RecepVoz visual system
+   and keeps the first-time journey deliberately simpler than the full operations surface. */
+
+:root {
+  --rv-sidebar-width: 204px;
+  --rv-panel: rgba(13, 18, 29, .92);
+  --rv-panel-soft: rgba(255, 255, 255, .035);
+  --rv-panel-strong: rgba(124, 92, 255, .12);
+  --rv-line: rgba(255, 255, 255, .08);
+}
+
+#firstUserOnboarding {
+  max-width: 920px;
+  margin: 18px auto 0;
+  padding: clamp(22px, 4vw, 34px);
+  border: 1px solid rgba(124, 92, 255, .22);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(124, 92, 255, .15), transparent 38%),
+    var(--rv-panel);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .22);
+}
+
+#firstUserOnboarding.hidden { display: none !important; }
+
+.first-user-onboarding-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.first-user-onboarding-copy { max-width: 650px; }
+
+.first-user-onboarding-copy .eyebrow {
+  margin-bottom: 8px;
+  color: var(--accent-2);
+}
+
+#firstUserOnboarding h1 {
+  margin: 0;
+  font-size: clamp(30px, 5vw, 48px);
+  line-height: 1.02;
+  letter-spacing: -.04em;
+}
+
+#firstUserOnboarding .first-user-lead {
+  max-width: 640px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.first-user-progress {
+  margin-top: 26px;
+}
+
+.first-user-progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+
+#firstUserProgressText {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.first-user-progress .progress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .06);
+}
+
+.first-user-progress .progress-bar {
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), #a78bfa);
+  transition: width .25s ease;
+}
+
+#firstUserSteps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.first-user-step {
+  position: relative;
+  min-height: 112px;
+  padding: 15px;
+  border: 1px solid var(--rv-line);
+  border-radius: 15px;
+  background: var(--rv-panel-soft);
+}
+
+.first-user-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 50%;
+  color: var(--muted);
+  background: rgba(255, 255, 255, .035);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.first-user-step strong {
+  display: block;
+  font-size: 13px;
+}
+
+.first-user-step small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.first-user-step.complete {
+  border-color: rgba(75, 216, 143, .24);
+  background: rgba(75, 216, 143, .055);
+}
+
+.first-user-step.complete .first-user-step-number {
+  color: #dcffec;
+  border-color: rgba(75, 216, 143, .35);
+  background: rgba(75, 216, 143, .16);
+}
+
+.first-user-step.next {
+  border-color: rgba(124, 92, 255, .48);
+  background: var(--rv-panel-strong);
+  box-shadow: inset 0 0 0 1px rgba(124, 92, 255, .12);
+}
+
+.first-user-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.first-user-actions .button.primary {
+  min-height: 42px;
+  padding: 0 18px;
+  text-decoration: none;
+}
+
+.first-user-actions span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.dashboard-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#tryRecepVozBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  text-decoration: none;
+}
+
+body.first-user-onboarding-active #dashboardView > .dashboard-heading,
+body.first-user-onboarding-active #statusGrid,
+body.first-user-onboarding-active #readyBanner,
+body.first-user-onboarding-active #nextStepBanner,
+body.first-user-onboarding-active #homeBusinessWorkspace,
+body.first-user-onboarding-active .ai-onboarding-card,
+body.first-user-onboarding-active .secondary-actions,
+body.first-user-onboarding-active #advancedPanel,
+body.first-user-onboarding-active #commercialStatusCard,
+body.first-user-onboarding-active #businessActivationGuide,
+body.first-user-onboarding-active #operationalOverview {
+  display: none !important;
+}
+
+/* The daily home keeps only the modules that are active. */
+.home-business-tab.rv-module-empty[data-home-tab="orders"],
+.home-business-tab.rv-module-empty[data-home-tab="sales"],
+.home-business-tab.rv-module-empty[data-home-tab="requests"] {
+  display: none !important;
+}
+
+/* Desktop: turn the existing compact nav into a calm left rail. */
+@media (min-width: 981px) {
+  body.home-page:has(#dashboardView:not(.hidden)) .shell,
+  body.settings-page:has(#dashboardView:not(.hidden)) .shell {
+    width: auto;
+    max-width: none;
+    margin: 0 28px 0 calc(var(--rv-sidebar-width) + 56px);
+  }
+
+  body.home-page:has(#dashboardView:not(.hidden)) #primaryNav,
+  body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav {
+    position: fixed;
+    z-index: 25;
+    top: 88px;
+    left: 24px;
+    width: var(--rv-sidebar-width);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 5px;
+    padding: 10px;
+    border: 1px solid var(--rv-line);
+    border-radius: 18px;
+    background: rgba(9, 13, 22, .94);
+    box-shadow: 0 18px 54px rgba(0, 0, 0, .22);
+    backdrop-filter: blur(18px);
+  }
+
+  body.home-page:has(#dashboardView:not(.hidden)) #primaryNav a,
+  body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav a {
+    width: 100%;
+    min-height: 42px;
+    justify-content: flex-start;
+    padding: 0 13px;
+    border-radius: 11px;
+    font-size: 12px;
+  }
+
+  body.home-page:has(#dashboardView:not(.hidden)) #primaryNav a.active,
+  body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav a.active {
+    border-color: rgba(124, 92, 255, .20);
+    background: rgba(124, 92, 255, .13);
+  }
+
+  body.home-page:has(#dashboardView:not(.hidden)) .topbar,
+  body.settings-page:has(#dashboardView:not(.hidden)) .topbar {
+    position: sticky;
+    z-index: 20;
+    top: 0;
+    background: linear-gradient(180deg, rgba(8, 11, 18, .96), rgba(8, 11, 18, .78) 72%, transparent);
+    backdrop-filter: blur(14px);
+  }
+}
+
+@media (max-width: 980px) {
+  #firstUserSteps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  body.home-page:has(#dashboardView:not(.hidden)) #primaryNav,
+  body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav {
+    display: flex;
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+}
+
+@media (max-width: 620px) {
+  #firstUserOnboarding {
+    margin-top: 10px;
+    padding: 20px;
+    border-radius: 18px;
+  }
+
+  .first-user-onboarding-head,
+  .first-user-actions,
+  .dashboard-heading-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #firstUserSteps { grid-template-columns: 1fr; }
+
+  .first-user-step {
+    min-height: auto;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    column-gap: 10px;
+    align-items: start;
+  }
+
+  .first-user-step-number {
+    grid-row: 1 / span 2;
+    margin: 0;
+  }
+
+  .first-user-step strong { margin-top: 2px; }
+
+  .first-user-actions .button.primary,
+  #tryRecepVozBtn {
+    width: 100%;
+  }
+}
