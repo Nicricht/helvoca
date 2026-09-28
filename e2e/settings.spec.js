@@ -681,3 +681,36 @@ test('settings lets operators review schedule exceptions without mutation contro
   expect(state.scheduleExceptionPuts).toEqual([]);
   expect(state.scheduleExceptionDeletes).toEqual([]);
 });
+
+
+test('settings presents human setup categories with accessible selected state', async ({ page }) => {
+  await mockSettings(page);
+  await page.goto('/settings.html');
+
+  const nav = page.locator('.ux-config-nav');
+  await expect(nav).toBeVisible();
+
+  const primary = nav.locator('[data-settings-section]');
+  await expect(primary).toContainText(['Negocio', 'Servicios', 'Horarios', 'Recepcionista']);
+
+  const selected = nav.locator('[aria-selected="true"]');
+  await expect(selected).toHaveCount(1);
+  await expect(selected).toContainText('Negocio');
+
+  await expect(page.locator('#uxAdvancedSettings')).toBeVisible();
+  await expect(page.locator('#uxAdvancedSettings')).toContainText('Respuestas');
+  await expect(page.locator('#uxAdvancedSettings')).toContainText('Canales');
+});
+
+test('settings deep link opens the requested onboarding section', async ({ page }) => {
+  await mockSettings(page);
+  await page.goto('/settings.html?section=hours');
+
+  await expect(page.locator('#configHoursPanel')).toBeVisible();
+  await expect(page.locator('#configBusinessPanel')).toBeHidden();
+  await expect(page.locator('.ux-config-nav [data-settings-section="hours"]')).toHaveAttribute('aria-selected', 'true');
+
+  await page.locator('.ux-config-nav [data-settings-section="receptionist"]').click();
+  await expect(page.locator('#configAgentPanel')).toBeVisible();
+  await expect(page).toHaveURL(/section=receptionist/);
+});
