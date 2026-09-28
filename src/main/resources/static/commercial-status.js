@@ -430,6 +430,29 @@
         return labels[key] || String(value || '').replaceAll('_', ' ').toLowerCase();
     }
 
+    function labelCallResolution(value, status) {
+        const raw = String(value || '').trim();
+        const labels = {
+            INFORMATION_ONLY: 'Información entregada',
+            CUSTOMER_REGISTERED: 'Cliente registrado',
+            UNANSWERED_QUESTION: 'Pregunta pendiente registrada',
+            REQUEST_CREATED: 'Solicitud creada',
+            QUOTE_CREATED: 'Cotización creada',
+            LEAD_CREATED: 'Oportunidad registrada',
+            BOOKING_CREATED: 'Reserva creada',
+            BOOKING_RESCHEDULED: 'Reserva reprogramada',
+            BOOKING_CANCELLED: 'Reserva cancelada',
+            ORDER_CREATED: 'Pedido creado',
+            ORDER_CANCELLED: 'Pedido cancelado',
+            HUMAN_TRANSFERRED: 'Derivada a una persona',
+            FAILED: 'Llamada fallida'
+        };
+        const key = raw.toUpperCase();
+        if (labels[key]) return labels[key];
+        if (raw && !/^[A-Z0-9_]+$/.test(raw)) return raw;
+        return labelStage(status) || 'Atención telefónica';
+    }
+
     function setDashboardState(state, text, detail) {
         overview.dataset.state = state;
         overview.setAttribute('aria-busy', state === 'loading' ? 'true' : 'false');
@@ -444,7 +467,7 @@
         (operations.recentCalls || []).forEach(item => events.push({
             at: item.startedAt,
             kind: 'Llamada',
-            title: item.resolution || labelStage(item.status) || 'Atención telefónica',
+            title: labelCallResolution(item.resolution, item.status),
             detail: item.callerNumber || ''
         }));
         (operations.recentRequests || []).forEach(item => events.push({
