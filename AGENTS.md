@@ -4,6 +4,8 @@ These rules are mandatory for implementation work in this repository.
 
 Helvoca follows **First-Pass Engineering**: understand the complete impact before coding, implement the smallest coherent solution, and verify the exact final commit before calling work complete. The user is not the QA system.
 
+Before implementation, read `software-factory/skill/first-pass-engineering/SKILL.md` when it is present so a fresh conversation does not depend on prior chat memory.
+
 ## Goal
 
 Optimize for one short correction loop: design broadly, test cheaply first, and run the expensive certification once.
