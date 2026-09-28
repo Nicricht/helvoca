@@ -190,7 +190,7 @@ test.beforeEach(async ({ page }) => {
 test('inventory is an actionable product and stock workspace on desktop and mobile', async ({ page }) => {
   await page.goto('/inventory.html');
 
-  await expect(page.getByRole('heading', { name: 'Inventario' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inventario', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Nuevo producto' })).toBeVisible();
   await expect(page.locator('#inventorySearch')).toHaveAttribute('placeholder', /producto|sku/i);
   await expect(page.locator('#inventoryFilter')).toBeVisible();
