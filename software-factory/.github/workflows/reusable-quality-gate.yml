@@ -11,7 +11,7 @@ on:
       verify_command:
         description: Repository-local verification entry point
         required: false
-        default: scripts/verify
+        default: bash scripts/verify
         type: string
 
 jobs:
