@@ -66,6 +66,7 @@
     progressText.textContent = `${completed} de ${states.length} pasos completados`;
     progressBar.style.width = `${Math.round((completed / states.length) * 100)}%`;
     progressBar.setAttribute("aria-valuenow", String(completed));
+    progressMeter?.setAttribute("aria-valuenow", String(completed));
 
     states.forEach((step, index) => {
       const node = stepsHost.querySelector(`[data-step-key="${step.key}"]`);
