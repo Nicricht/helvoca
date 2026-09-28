@@ -102,7 +102,7 @@ test('conversation workspace is searchable and makes human attention obvious', a
   await expect(page.getByRole('heading', { level: 1, name: 'Conversaciones' })).toBeVisible();
   await expect(page.getByRole('searchbox', { name: 'Buscar conversaciones' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Necesita atención', exact: true })).toBeVisible();
-  await expect(page.getByText('+15550000001')).toBeVisible();
+  await expect(page.locator('#conversationList').getByText('+15550000001', { exact: true })).toBeVisible();
   await expect(page.locator('#conversationList').getByText('Necesita atención humana')).toBeVisible();
 
   await expect(page.getByRole('heading', { name: 'Qué ocurrió' })).toBeVisible();
@@ -115,13 +115,13 @@ test('conversation workspace is searchable and makes human attention obvious', a
   await expect(page.locator('body')).not.toContainText('SEARCH_KNOWLEDGE');
 
   await page.getByRole('searchbox', { name: 'Buscar conversaciones' }).fill('+15550000002');
-  await expect(page.getByText('+15550000002')).toBeVisible();
-  await expect(page.getByText('+15550000001')).toHaveCount(0);
+  await expect(page.locator('#conversationList').getByText('+15550000002', { exact: true })).toBeVisible();
+  await expect(page.locator('#conversationList').getByText('+15550000001', { exact: true })).toHaveCount(0);
 
   await page.getByRole('searchbox', { name: 'Buscar conversaciones' }).fill('');
   await page.getByRole('button', { name: 'Necesita atención', exact: true }).click();
-  await expect(page.getByText('+15550000001')).toBeVisible();
-  await expect(page.getByText('+15550000002')).toHaveCount(0);
+  await expect(page.locator('#conversationList').getByText('+15550000001', { exact: true })).toBeVisible();
+  await expect(page.locator('#conversationList').getByText('+15550000002', { exact: true })).toHaveCount(0);
 });
 
 test('simulator uses dark safe UI, progress feedback and human action labels', async ({ page }) => {
@@ -197,7 +197,7 @@ test('conversation workspace keeps WhatsApp usable when call history is unavaila
   await expect(page.locator('#sourceStatus')).toContainText('historial de llamadas');
   await expect(page.locator('#detailCustomer')).toHaveText('+15550000003');
   await expect(page.getByText('¿Atienden mañana?', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'WhatsApp' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.filter-group button[data-channel="whatsapp"]')).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
 
