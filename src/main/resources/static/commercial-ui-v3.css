@@ -190,7 +190,7 @@ body.home-page:has(#authView:not(.hidden)) .public-company-card {
   color: var(--text);
 }
 
-/* Customer console: light, calm and operational. */
+/* Customer console composition: dark, calm and operational. */
 body.home-page:has(#dashboardView:not(.hidden)),
 body.settings-page,
 body.inventory-page {
