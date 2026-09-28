@@ -66,6 +66,7 @@ final class HardwareStoreDemoData {
                 new Policy("Cambios de intención","Pedidos","Si el cliente corrige cantidad, producto, medida o modalidad, se debe actualizar la intención vigente y evitar duplicar la línea anterior."),
                 new Policy("Retiro","Entrega","El retiro simulado se realiza durante horario de atención y solo después de confirmar que el pedido quedó preparado."),
                 new Policy("Delivery","Entrega","El delivery de esta fixture es simulado. Tarifa y plazo dependen de la zona configurada; cargas voluminosas requieren revisión humana antes de prometer despacho."),
+                new Policy("Plazos de delivery","Entrega","Providencia Demo: mismo día sujeto a corte 13:00. Ñuñoa Demo: día hábil siguiente. Santiago Centro Demo: día hábil siguiente. No prometer otro plazo sin información configurada."),
                 new Policy("Devoluciones","Postventa","Política ficticia: productos estándar sin uso y con comprobante pueden solicitar devolución hasta 30 días. Productos cortados a medida no admiten devolución salvo defecto."),
                 new Policy("Corte a medida","Productos","Cable vendido por metro y madera cortada a medida requieren confirmación explícita de longitud; una vez preparados no se consideran devolución estándar."),
                 new Policy("Compatibilidad","Asesoría","RecepVoz puede describir medidas y usos configurados, pero no debe asegurar compatibilidad con una instalación desconocida. Debe pedir datos o derivar."),
