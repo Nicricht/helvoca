@@ -2,3 +2,41 @@
 /* Customer-facing readability contract: normal controls, statuses, transcript and follow-up copy stay readable. */
 .search-control input,.filter-chip,.conversation-row,.row-identity small,.row-summary,.status-badge,.attention-badge,.mini-badge,.channel-badge,.list-empty p,.detail-person p,.source-status,.summary-card,.fact dd,.turn-head strong,.turn-card p,.transcript-empty,.timeline-empty,.outcome-block strong,.timeline-head strong,.timeline-content p,.detail-loading,.detail-empty p,.toast{font-size:14px}
 .fact dt,.outcome-block span,.turn-head time,.timeline-head time,.section-count{font-size:12px}
+
+
+/* Readability hardening: customer-facing compact copy never drops below 12px. */
+.rv-brand strong{font-size:13px}
+.rv-brand small,
+.eyebrow,
+.source-status,
+.filter-chip,
+.inbox-head div>span,
+.loading-badge,
+.row-identity small,
+.channel-badge,
+.status-badge,
+.attention-badge,
+.mini-badge,
+.list-empty p,
+.detail-empty p,
+.detail-loading,
+.detail-person p,
+.section-count,
+.fact dt,
+.speaker-avatar,
+.turn-head strong,
+.turn-head time,
+.transcript-empty,
+.timeline-empty,
+.outcome-block span,
+.timeline-head strong,
+.timeline-head time,
+.timeline-content p{font-size:12px}
+.inbox-head strong,
+.row-identity strong,
+.row-summary,
+.fact dd,
+.turn-card p,
+.outcome-block strong,
+.toast{font-size:13px}
+@media(max-width:520px){.rv-nav a{font-size:12px}}
