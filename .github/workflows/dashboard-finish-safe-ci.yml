@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  dashboard-finish:
+  frontend-safe-gate:
     if: contains(github.event.head_commit.message, '[dashboard-safe-ci]')
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -22,13 +22,32 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Validate dashboard JavaScript
-        run: node --check src/main/resources/static/commercial-status.js
+      - name: Validate frontend JavaScript
+        run: |
+          node --check src/main/resources/static/app.js
+          node --check src/main/resources/static/phone-provisioning.js
+          node --check src/main/resources/static/commercial-status.js
+          node --check src/main/resources/static/voice-selector.js
+          node --check src/main/resources/static/ux-simplification.js
+          node --check src/main/resources/static/pricing.js
+          node --check src/main/resources/static/home-business.js
+          node --check src/main/resources/static/settings-page.js
+          node --check src/main/resources/static/simulator.js
 
       - name: Install frontend test dependencies
         run: |
           npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
 
-      - name: Run dashboard operational E2E
-        run: npx playwright test e2e/home-operational.spec.js
+      - name: Run all frontend E2E
+        run: npm run test:e2e
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-finish-safe-ci-diagnostics
+          path: |
+            test-results/**
+            playwright-report/**
+          if-no-files-found: warn
