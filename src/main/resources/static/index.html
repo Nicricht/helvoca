@@ -214,7 +214,7 @@
         body.home-page.operational-ready #advancedPanel,
         body.home-page.operational-ready #commercialStatusCard { display: none !important; }
 </style>
-    <link rel="stylesheet" href="/commercial-ui-v3.css?v=20260928-1">
+    <link rel="stylesheet" href="/commercial-ui-v3.css?v=20260928-2">
 </head>
 <body class="home-page">
 <div class="shell">
@@ -239,16 +239,40 @@
     <main>
         <section id="authView" class="auth-grid">
             <article class="card hero-card">
-                <div class="eyebrow">Tu negocio siempre contesta</div>
-                <h1>No pierdas otra llamada.</h1>
-                <p>RecepVoz responde a tus clientes, resuelve consultas y crea reservas mientras tú sigues trabajando.</p>
-                <div class="rv-voice-preview" aria-label="Vista previa de la recepcionista virtual">
-                    <div class="rv-voice-preview-head">
-                        <span class="rv-live-dot" aria-hidden="true"></span>
-                        <div><strong>Sofía está disponible</strong><small>Recepcionista IA · 24/7</small></div>
+                <div class="rv-hero-copy">
+                    <div class="eyebrow">Recepcionista con IA</div>
+                    <h1>No pierdas otra llamada.</h1>
+                    <p>RecepVoz atiende a tus clientes, responde preguntas y agenda reservas mientras tú trabajas.</p>
+                    <div class="rv-hero-actions" aria-label="Acciones principales">
+                        <a class="button primary rv-hero-primary" href="#registerForm">Probar RecepVoz</a>
+                        <a class="button ghost rv-hero-secondary" href="/sales.html">Ver cómo funciona</a>
                     </div>
-                    <div class="rv-wave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-                    <div class="rv-voice-preview-result"><span>Cliente: “Quiero reservar para mañana”</span><strong>Reserva lista ✓</strong></div>
+                </div>
+
+                <div class="rv-call-demo" aria-label="Ejemplo de conversación con Sofía">
+                    <div class="rv-call-demo-head">
+                        <div class="rv-sofia-avatar" aria-hidden="true">S</div>
+                        <div class="rv-call-demo-identity">
+                            <strong>Sofía</strong>
+                            <span><i aria-hidden="true"></i>Recepcionista IA · Disponible</span>
+                        </div>
+                    </div>
+
+                    <div class="rv-call-thread">
+                        <div class="rv-call-message client">
+                            <span>Cliente</span>
+                            <p>¿Tienen hora mañana a las 16:00?</p>
+                        </div>
+                        <div class="rv-call-message assistant">
+                            <span>Sofía</span>
+                            <p>Sí. Puedo reservarte a las 16:00.</p>
+                        </div>
+                    </div>
+
+                    <div class="rv-call-result">
+                        <span class="rv-call-check" aria-hidden="true">✓</span>
+                        <div><strong>Reserva creada</strong><small>Mañana · 16:00</small></div>
+                    </div>
                 </div>
             </article>
 
@@ -700,7 +724,7 @@ if ("serviceWorker" in navigator) {
 <script src="/commercial-status.js?v=20260918-4" defer></script>
 <script src="/business-activation-guide.js?v=20260926-1" defer></script>
 <script src="/home-business.js?v=20260919-1" defer></script>
-<script src="/ux-simplification.js?v=20260919-1" defer></script>
+<script src="/ux-simplification.js?v=20260928-2" defer></script>
 <script src="/first-user-ux-v2.js?v=20260928-1" defer></script>
 <script src="/phone-provisioning.js?v=20260919-3" defer></script>
 </body>
