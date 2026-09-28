@@ -623,6 +623,7 @@
         loading = true;
         overview.querySelector('#ownerAttentionPanel').dataset.state = 'loading';
         overview.querySelector('#ownerAttentionSummary').textContent = 'Revisando pendientes…';
+        overview.querySelector('#ownerDashboardAttention').classList.add('hidden');
         setDashboardState('loading', 'CARGANDO', 'Actualizando actividad confirmada…');
         try {
             let canReadAudit = false;
