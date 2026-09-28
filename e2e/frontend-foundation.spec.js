@@ -5,10 +5,32 @@ function stylesheetPaths(html) {
     .map(match => new URL(match[1], 'http://127.0.0.1:4173').pathname);
 }
 
-function luminance(cssColor) {
-  const values = (cssColor.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+function rgbValues(cssColor) {
+  return (cssColor.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+}
+
+function simpleLuminance(cssColor) {
+  const values = rgbValues(cssColor);
   if (values.length !== 3) return 255;
   return values.reduce((sum, value) => sum + value, 0) / 3;
+}
+
+function relativeLuminance(cssColor) {
+  const values = rgbValues(cssColor);
+  if (values.length !== 3) return 1;
+  const linear = values.map(value => {
+    const channel = value / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
+}
+
+function contrastRatio(foreground, background) {
+  const first = relativeLuminance(foreground);
+  const second = relativeLuminance(background);
+  const lighter = Math.max(first, second);
+  const darker = Math.min(first, second);
+  return (lighter + 0.05) / (darker + 0.05);
 }
 
 async function getText(request, path) {
@@ -91,6 +113,7 @@ test('canonical foundation owns dark surfaces and interaction states', async ({ 
       bodyText: body.color,
       card: card.backgroundColor,
       input: input.backgroundColor,
+      mutedText: style('.muted').color,
       disabledOpacity: Number.parseFloat(disabled.opacity),
       disabledCursor: disabled.cursor
     };
@@ -98,10 +121,15 @@ test('canonical foundation owns dark surfaces and interaction states', async ({ 
 
   expect(computed.canvasToken).toBe('#070a10');
   expect(computed.accentToken).toBe('#806bff');
-  expect(luminance(computed.body)).toBeLessThan(55);
-  expect(luminance(computed.card)).toBeLessThan(70);
-  expect(luminance(computed.input)).toBeLessThan(65);
-  expect(luminance(computed.bodyText)).toBeGreaterThan(190);
+  expect(computed.body).not.toBe('rgba(0, 0, 0, 0)');
+  expect(computed.card).not.toBe('rgba(0, 0, 0, 0)');
+  expect(computed.input).not.toBe('rgba(0, 0, 0, 0)');
+  expect(simpleLuminance(computed.body)).toBeLessThan(55);
+  expect(simpleLuminance(computed.card)).toBeLessThan(70);
+  expect(simpleLuminance(computed.input)).toBeLessThan(65);
+  expect(simpleLuminance(computed.bodyText)).toBeGreaterThan(190);
+  expect(contrastRatio(computed.bodyText, computed.body)).toBeGreaterThanOrEqual(4.5);
+  expect(contrastRatio(computed.mutedText, computed.card)).toBeGreaterThanOrEqual(4.5);
   expect(computed.disabledOpacity).toBeLessThan(0.7);
   expect(computed.disabledCursor).toBe('not-allowed');
 
@@ -119,12 +147,16 @@ test('foundation contains tables dialogs and navigation inside compact viewport'
   await page.setViewportSize({ width: 390, height: 844 });
   await mountFoundation(page, request);
 
-  const layout = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-    dialog: document.querySelector('dialog').getBoundingClientRect(),
-    nav: document.querySelector('#primaryNav').getBoundingClientRect()
-  }));
+  const layout = await page.evaluate(() => {
+    const dialog = document.querySelector('dialog').getBoundingClientRect();
+    const nav = document.querySelector('#primaryNav').getBoundingClientRect();
+    return {
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      dialog: { left: dialog.left, right: dialog.right, width: dialog.width },
+      nav: { left: nav.left, right: nav.right, width: nav.width }
+    };
+  });
 
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
   expect(layout.dialog.left).toBeGreaterThanOrEqual(0);
