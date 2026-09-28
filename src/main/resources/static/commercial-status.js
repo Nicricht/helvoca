@@ -375,8 +375,10 @@
         '      <h3 id="ownerAttentionTitle">Necesita tu atención</h3>',
         '      <p id="ownerAttentionSummary" aria-live="polite">Revisando pendientes…</p>',
         '      <div id="ownerDashboardAttention" class="owner-dashboard-attention hidden" aria-label="Señales que requieren atención">',
+        '        <a id="ownerRequestsAttentionChip" class="owner-dashboard-chip warn hidden" href="/?tab=requests#homeBusinessWorkspace"><strong id="ownerRequestsAttentionToday">–</strong> solicitudes abiertas</a>',
         '        <a id="ownerOrdersAttentionChip" class="owner-dashboard-chip warn hidden" href="/?tab=sales#homeBusinessWorkspace"><strong id="ownerOrdersAttentionToday">–</strong> ventas por revisar</a>',
         '        <span id="ownerHandoffsChip" class="owner-dashboard-chip hidden"><strong id="ownerHandoffsToday">–</strong> derivaciones</span>',
+        '        <span id="ownerQuestionsAttentionChip" class="owner-dashboard-chip hidden"><strong id="ownerQuestionsAttentionToday">–</strong> preguntas sin respuesta</span>',
         '        <span id="ownerFailuresChip" class="owner-dashboard-chip hidden"><strong id="ownerFailuresToday">–</strong> fallos de llamada</span>',
         '        <span id="ownerBookingChangesChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingChangesToday">–</strong> reprogramadas</span>',
         '        <span id="ownerBookingCancelsChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingCancelsToday">–</strong> canceladas</span>',
@@ -532,6 +534,7 @@
         const bookings = pilotToday ? numeric(pilotToday.bookings) : numeric(operations.bookingsToday);
         const orders = pilotToday ? numeric(pilotToday.orders) : numeric(pipeline?.total);
         const openRequests = numeric(operations.openRequests);
+        const unanswered = numeric(operations.unansweredQuestions);
         const handoffs = pilotToday ? numeric(pilotToday.humanTransfers) : 0;
         const failures = pilotToday ? numeric(pilotToday.callFailures) : numeric(operations.callFailuresToday);
         const pipelineNeedsAction = numeric(pipeline?.needsAction);
@@ -550,8 +553,12 @@
 
         const ordersMetric = overview.querySelector('#ownerOrdersMetric');
         ordersMetric.classList.toggle('hidden', !(orders > 0 || numeric(pipeline?.total) > 0));
+        overview.querySelector('#ownerRequestsAttentionToday').textContent = String(openRequests);
+        overview.querySelector('#ownerRequestsAttentionChip').classList.toggle('hidden', openRequests <= 0);
         overview.querySelector('#ownerOrdersAttentionToday').textContent = String(pipelineNeedsAction);
         overview.querySelector('#ownerOrdersAttentionChip').classList.toggle('hidden', pipelineNeedsAction <= 0);
+        overview.querySelector('#ownerQuestionsAttentionToday').textContent = String(unanswered);
+        overview.querySelector('#ownerQuestionsAttentionChip').classList.toggle('hidden', unanswered <= 0);
 
         overview.querySelector('#ownerHandoffsToday').textContent = String(handoffs);
         overview.querySelector('#ownerFailuresToday').textContent = String(failures);
@@ -573,21 +580,19 @@
             });
             overview.querySelector('#ownerBookingChangesToday').textContent = String(rescheduled);
             overview.querySelector('#ownerBookingCancelsToday').textContent = String(cancelled);
-            overview.querySelector('#ownerBookingChangesChip').classList.toggle('hidden', rescheduled <= 0);
-            overview.querySelector('#ownerBookingCancelsChip').classList.toggle('hidden', cancelled <= 0);
-            overview.querySelector('#ownerBookingChangesChip').classList.toggle('warn', rescheduled > 0);
-            overview.querySelector('#ownerBookingCancelsChip').classList.toggle('warn', cancelled > 0);
+            overview.querySelector('#ownerBookingChangesChip').classList.add('hidden');
+            overview.querySelector('#ownerBookingCancelsChip').classList.add('hidden');
         } else {
             overview.querySelector('#ownerBookingChangesChip').classList.add('hidden');
             overview.querySelector('#ownerBookingCancelsChip').classList.add('hidden');
         }
 
-        const attentionCount = pipelineNeedsAction + handoffs + failures + rescheduled + cancelled;
+        const attentionCount = openRequests + pipelineNeedsAction + unanswered + handoffs + failures;
         const attentionPanel = overview.querySelector('#ownerAttentionPanel');
         const attentionSummary = overview.querySelector('#ownerAttentionSummary');
         attentionPanel.dataset.state = attentionCount > 0 ? 'attention' : 'clear';
         attentionSummary.textContent = attentionCount > 0
-            ? String(attentionCount) + (attentionCount === 1 ? ' señal requiere revisión.' : ' señales requieren revisión.')
+            ? 'Hay asuntos que requieren revisión.'
             : 'No hay pendientes críticos detectados.';
         overview.querySelector('#ownerDashboardAttention').classList.toggle('hidden', attentionCount <= 0);
 
@@ -633,7 +638,7 @@
             minimumFractionDigits: 2, maximumFractionDigits: 4
         }).format(numeric(operations.estimatedCallCostTodayUsd));
 
-        const totalSignal = conversations + bookings + orders + openRequests + handoffs + failures + rescheduled + cancelled;
+        const totalSignal = conversations + bookings + orders + openRequests + unanswered + handoffs + failures;
         if (totalSignal === 0 && recentCount === 0) {
             setDashboardState('empty', 'SIN ACTIVIDAD', 'Aún no hay actividad comercial hoy.');
         } else {
