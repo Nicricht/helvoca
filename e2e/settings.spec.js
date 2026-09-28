@@ -415,6 +415,12 @@ test('settings preset changes guidance only and never rewrites capability choice
   await preset.selectOption('restaurant');
   await expect(suggestion).toHaveText('Prioriza productos y pedidos.');
 
+  await preset.selectOption('hardware_store');
+  await expect(suggestion).toHaveText('Prioriza catálogo, stock, cotizaciones, pedidos y despacho. Confirma medidas, cantidades y disponibilidad antes de cerrar una venta.');
+  await expect(products).toHaveValue('true');
+  await expect(services).toHaveValue('true');
+  await expect(reservations).toHaveValue('false');
+
   await preset.selectOption('clinic');
   await expect(suggestion).toHaveText('Prioriza servicios y reservas.');
 });
