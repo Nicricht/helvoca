@@ -551,8 +551,10 @@
 
         const attentionCount = openRequests + pipelineNeedsAction + unanswered + handoffs + failures;
         const attentionPanel = overview.querySelector('#ownerAttentionPanel');
+        const attentionTitle = overview.querySelector('#ownerAttentionTitle');
         const attentionSummary = overview.querySelector('#ownerAttentionSummary');
         attentionPanel.dataset.state = attentionCount > 0 ? 'attention' : 'clear';
+        attentionTitle.textContent = attentionCount > 0 ? 'Necesita tu atención' : 'Todo bajo control';
         attentionSummary.textContent = attentionCount > 0
             ? 'Hay asuntos que requieren revisión.'
             : 'No hay pendientes críticos detectados.';
@@ -612,6 +614,7 @@
         setDashboardState('error', 'NO DISPONIBLE', 'No pudimos actualizar las métricas. Usa “Actualizar estado” para reintentar.');
         const attentionPanel = overview.querySelector('#ownerAttentionPanel');
         attentionPanel.dataset.state = 'error';
+        overview.querySelector('#ownerAttentionTitle').textContent = 'Atención no verificada';
         overview.querySelector('#ownerAttentionSummary').textContent = 'No pudimos verificar qué requiere atención.';
         overview.querySelector('#ownerDashboardAttention').classList.add('hidden');
         recent.innerHTML = '<div class="owner-empty" role="listitem">La actividad reciente no está disponible.</div>';
@@ -622,6 +625,7 @@
         if (!force && Date.now() - lastLoadedAt < 1500) return;
         loading = true;
         overview.querySelector('#ownerAttentionPanel').dataset.state = 'loading';
+        overview.querySelector('#ownerAttentionTitle').textContent = 'Revisando prioridades';
         overview.querySelector('#ownerAttentionSummary').textContent = 'Revisando pendientes…';
         overview.querySelector('#ownerDashboardAttention').classList.add('hidden');
         setDashboardState('loading', 'CARGANDO', 'Actualizando actividad confirmada…');
