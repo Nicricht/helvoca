@@ -274,6 +274,37 @@ class ReceptionistSimulatorOpenAiLoopTest {
     }
 
     @Test
+    void degradedMultiToolFallbackSurfacesCommercialFailureInsteadOfEarlierSuccess() throws Exception {
+        HttpServer server = server(new AtomicInteger(), new ArrayList<>(),
+                new JSONObject().put("output", new JSONArray()
+                        .put(new JSONObject()
+                                .put("type", "function_call")
+                                .put("call_id", "catalog-ok")
+                                .put("name", "list_catalog")
+                                .put("arguments", "{}"))
+                        .put(new JSONObject()
+                                .put("type", "function_call")
+                                .put("call_id", "order-fail")
+                                .put("name", "quote_order")
+                                .put("arguments", "{}"))).toString());
+        try {
+            Fixture f = fixture(server);
+            when(f.tools.execute(any(), eq("list_catalog"), anyString())).thenReturn(
+                    success(new JSONObject().put("items", new JSONArray().put(new JSONObject()
+                            .put("name", "Martillo")
+                            .put("price", 11990)
+                            .put("currency", "CLP")))));
+            when(f.tools.execute(any(), eq("quote_order"), anyString())).thenReturn(
+                    error("INSUFFICIENT_STOCK", "No hay stock suficiente para confirmar el pedido simulado."));
+
+            assertEquals("No hay stock suficiente para confirmar el pedido simulado.",
+                    f.service.message(f.sessionId, "Dame el catálogo y confirma el pedido").reply());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void unusableFunctionCallProducesSafeFallbackInsteadOfLooping() throws Exception {
         HttpServer server = server(new AtomicInteger(), new ArrayList<>(),
                 new JSONObject().put("id", "resp-1").put("output", new JSONArray().put(
@@ -416,6 +447,14 @@ class ReceptionistSimulatorOpenAiLoopTest {
 
     private static String success(JSONObject data) {
         return new JSONObject().put("success", true).put("data", data).put("error", JSONObject.NULL).toString();
+    }
+
+    private static String error(String code, String message) {
+        return new JSONObject()
+                .put("success", false)
+                .put("data", JSONObject.NULL)
+                .put("error", new JSONObject().put("code", code).put("message", message))
+                .toString();
     }
 
     private record Fixture(
