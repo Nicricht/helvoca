@@ -761,3 +761,51 @@ body.inventory-page .inventory-restock-card {
     padding: 16px;
   }
 }
+
+
+/* Inventory navigation follows the same calm app shell. */
+body.inventory-page .inventory-nav a {
+  color: #667085;
+}
+
+body.inventory-page .inventory-nav a:hover {
+  color: #27243e;
+  background: #f7f7fb;
+}
+
+body.inventory-page .inventory-nav a.active {
+  border-color: #d8d5ff;
+  background: var(--rv3-purple-soft);
+  color: #4338ca;
+}
+
+body.inventory-page .inventory-spinner {
+  border-color: #e4e7ec;
+  border-top-color: var(--rv3-purple);
+}
+
+body.inventory-page .inventory-dialog-close {
+  border-color: var(--rv3-line);
+  background: #f8f9fc;
+  color: #667085;
+}
+
+body.inventory-page .inventory-dialog-close:hover {
+  background: var(--rv3-purple-soft);
+  color: #4338ca;
+}
+
+@media (max-width: 860px) {
+  body.inventory-page .topbar {
+    flex-wrap: wrap;
+  }
+
+  body.inventory-page .inventory-nav {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+}
