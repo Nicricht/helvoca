@@ -48,6 +48,7 @@ public class ReceptionistSimulatorService {
     private static final Logger log = LoggerFactory.getLogger(ReceptionistSimulatorService.class);
     private static final int MAX_TURNS = 32;
     private static final int MAX_OPENAI_ATTEMPTS = 3;
+    private static final int MAX_TOOL_ROUNDS = 4;
 
     private final TenantProvider tenantProvider;
     private final BusinessRepository businesses;
@@ -204,21 +205,62 @@ public class ReceptionistSimulatorService {
         if (!openAi.hasApiKey()) {
             throw new IllegalStateException("OpenAI simulator request failed because provider is not configured");
         }
-        JSONObject body = new JSONObject()
+
+        JSONObject body = baseOpenAiBody(context, instructions)
+                .put("input", buildHistory(sessionId));
+        List<ToolExecution> lastExecutions = List.of();
+
+        for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
+            JSONObject response = send(body);
+            JSONArray calls = functionCalls(response);
+            if (calls.isEmpty()) {
+                String text = extractOutputText(response);
+                if (text != null && !text.isBlank()) return sanitize(text);
+                break;
+            }
+
+            lastExecutions = executeTools(context, calls);
+            List<String> results = lastExecutions.stream()
+                    .map(ToolExecution::result)
+                    .toList();
+            JSONArray continuation = toolContinuationInput(calls, results);
+            String previousResponseId = response.optString("id", "");
+            if (previousResponseId.isBlank() || continuation.isEmpty()) {
+                return summarize(context, lastExecutions);
+            }
+
+            body = baseOpenAiBody(context, instructions)
+                    .put("previous_response_id", previousResponseId)
+                    .put("input", continuation);
+        }
+
+        if (!lastExecutions.isEmpty()) return summarize(context, lastExecutions);
+        return "No entendí del todo. ¿Puedes decírmelo de otra forma?";
+    }
+
+    private JSONObject baseOpenAiBody(RealtimeCallContext context, String instructions) {
+        return new JSONObject()
                 .put("model", openAi.getTrialModel())
                 .put("instructions", instructions)
                 .put("tools", responseTools(context))
                 .put("tool_choice", "auto")
-                .put("input", buildHistory(sessionId))
-                .put("max_output_tokens", 180);
-        JSONObject first = send(body);
-        JSONArray functionCalls = functionCalls(first);
-        String text = extractOutputText(first);
-        if (!functionCalls.isEmpty()) {
-            return summarize(context, executeTools(context, functionCalls));
+                .put("max_output_tokens", 220);
+    }
+
+    static JSONArray toolContinuationInput(JSONArray calls, List<String> results) {
+        JSONArray input = new JSONArray();
+        if (calls == null || results == null) return input;
+        int count = Math.min(calls.length(), results.size());
+        for (int i = 0; i < count; i++) {
+            JSONObject call = calls.optJSONObject(i);
+            String callId = call == null ? "" : call.optString("call_id", "");
+            if (callId.isBlank()) continue;
+            input.put(new JSONObject()
+                    .put("type", "function_call_output")
+                    .put("call_id", callId)
+                    .put("output", results.get(i) == null ? "" : results.get(i)));
         }
-        if (text != null && !text.isBlank()) return sanitize(text);
-        return "No entendí del todo. ¿Puedes decírmelo de otra forma?";
+        return input;
     }
 
     private List<MessagingAiClient.Turn> buildMessagingHistory(UUID callId) {
