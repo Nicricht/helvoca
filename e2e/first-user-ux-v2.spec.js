@@ -117,7 +117,7 @@ test('new owner gets a four-step guided setup instead of the operational workspa
   ]);
   await expect(page.getByRole('link', { name: 'Continuar configuración' })).toHaveAttribute('href', '/settings.html');
   await expect(page.locator('#homeBusinessWorkspace')).toBeHidden();
-  await expect(page.locator('#primaryNav')).toContainText(['Inicio', 'Reservas', 'Clientes', 'Configuración']);
+  await expect(page.locator('#primaryNav a')).toContainText(['Inicio', 'Reservas', 'Clientes', 'Configuración']);
   await expect(page.locator('#primaryNav')).not.toContainText('Inventario');
 });
 
@@ -141,7 +141,7 @@ test('ready owner lands on a simple daily home with direct reservations and cust
   await expect(page.getByRole('link', { name: 'Probar RecepVoz' })).toBeVisible();
 
   const nav = page.locator('#primaryNav');
-  await expect(nav).toContainText(['Inicio', 'Reservas', 'Clientes', 'Configuración']);
+  await expect(nav.locator('a')).toContainText(['Inicio', 'Reservas', 'Clientes', 'Configuración']);
   await expect(nav).not.toContainText('Inventario');
 
   await page.getByRole('link', { name: 'Reservas' }).click();
