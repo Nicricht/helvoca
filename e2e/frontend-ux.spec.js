@@ -518,6 +518,41 @@ test('authentication and phone administration fit all target viewports', async (
 });
 
 
+test('public entry uses the canonical dark design system and final stylesheet ownership', async ({ page }) => {
+  const viewports = [
+    { width: 1440, height: 900 },
+    { width: 768, height: 900 },
+    { width: 390, height: 844 }
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+
+    const stylesheets = await page.locator('link[rel="stylesheet"]').evaluateAll(nodes =>
+      nodes.map(node => new URL(node.href).pathname)
+    );
+    const canonicalIndex = stylesheets.indexOf('/recepvoz-ui.css');
+    expect(canonicalIndex).toBeGreaterThanOrEqual(0);
+    expect(canonicalIndex).toBe(stylesheets.length - 1);
+
+    const palette = await page.evaluate(() => {
+      const body = getComputedStyle(document.body);
+      const hero = getComputedStyle(document.querySelector('#authView .hero-card'));
+      return {
+        body: body.backgroundColor,
+        hero: hero.backgroundColor
+      };
+    });
+
+    expect(palette.body).toBe('rgb(15, 17, 21)');
+    expect(palette.hero).toBe('rgb(21, 25, 34)');
+    await expect(page.locator('.topbar .rv-brand-logo')).toHaveAttribute('src', '/recepvoz-brand-header.webp');
+    await expect(page.locator('.topbar .brand')).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  }
+});
+
 test('public header uses the RecepVoz brand mark without crowding the layout', async ({ page }) => {
   const viewports = [
     { width: 1440, height: 900 },
@@ -536,7 +571,7 @@ test('public header uses the RecepVoz brand mark without crowding the layout', a
     await expect(brandLink).toBeVisible();
     await expect(brandLink).toHaveAttribute('href', '/');
     await expect(logo).toBeVisible();
-    await expect(logo).toHaveAttribute('src', /^data:image\/webp;base64,/);
+    await expect(logo).toHaveAttribute('src', '/recepvoz-brand-header.webp');
     await expect(logo).toHaveAttribute('alt', 'RecepVoz');
     await expect(header.locator('.brand')).toHaveCount(0);
     await expect(page.locator('#sessionBadge')).toBeVisible();
