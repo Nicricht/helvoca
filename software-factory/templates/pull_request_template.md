@@ -21,6 +21,18 @@
 
 <!-- List targeted, integration, coverage, E2E, security/adversarial, and full-suite evidence as applicable. -->
 
+## Resume checkpoint
+
+<!-- Keep current for MEDIUM/HIGH or multi-step work. This is the durable recovery point for a fresh conversation. -->
+
+- Branch:
+- Pull Request / durable work item:
+- HEAD:
+- Completed blocks:
+- CI / evidence valid for this HEAD:
+- Blockers / rulings:
+- Next step:
+
 ## Final commit evidence
 
 - [ ] Verification belongs to the exact final commit.
