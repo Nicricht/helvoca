@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RecepVoz · Plan y facturación</title>
+  <meta name="description" content="Revisa tu plan, consumo y estado de facturación en RecepVoz.">
+  <meta name="theme-color" content="#0F1115">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/account.css">
+  <link rel="stylesheet" href="/frontend-foundation.css?v=20260928-1">
+</head>
+<body class="account-page">
+<div class="shell">
+  <header class="topbar">
+    <div>
+      <a class="brand account-brand" href="/" aria-label="RecepVoz, ir al inicio">RECEPVOZ</a>
+      <div class="subtitle">Cuenta, plan y consumo</div>
+    </div>
+    <nav class="account-nav" aria-label="Navegación principal">
+      <a href="/">Inicio</a>
+      <a href="/#bookings">Reservas</a>
+      <a href="/#customers">Clientes</a>
+      <a href="/inventory.html">Inventario</a>
+      <a href="/settings.html">Configuración</a>
+    </nav>
+    <button id="accountLogoutBtn" class="button ghost" type="button">Salir</button>
+  </header>
+
+  <main class="account-main">
+    <section class="account-heading" aria-labelledby="accountTitle">
+      <div>
+        <p class="eyebrow">CUENTA</p>
+        <h1 id="accountTitle">Plan y facturación</h1>
+        <p>Entiende qué plan tienes, cuánto has usado y el estado de tu período actual.</p>
+      </div>
+      <a class="button secondary" href="/pricing.html">Ver planes</a>
+    </section>
+
+    <div id="accountLoading" class="card account-state" role="status" aria-live="polite">
+      <span class="account-spinner" aria-hidden="true"></span>
+      <div><strong>Cargando tu cuenta</strong><p>Consultando plan y consumo actual.</p></div>
+    </div>
+
+    <div id="accountError" class="message error hidden" role="alert">
+      <strong>No pudimos cargar tu plan.</strong>
+      <span>Tu cuenta sigue disponible. Puedes volver a intentarlo más tarde.</span>
+    </div>
+
+    <section id="accountApp" class="hidden">
+      <section class="account-grid" aria-label="Resumen de cuenta">
+        <article class="card account-plan-card">
+          <div class="account-card-heading">
+            <div><p class="eyebrow">PLAN ACTUAL</p><h2 id="planName">Sin plan</h2></div>
+            <span id="planStatus" class="badge muted">Sin estado</span>
+          </div>
+          <div class="usage-copy">
+            <div><span>Minutos de voz</span><strong id="voiceUsage">0 de 0 min</strong></div>
+            <span id="voiceUsagePercent">0%</span>
+          </div>
+          <div id="voiceUsageProgress" class="account-progress" role="progressbar" aria-label="Uso de minutos de voz" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <span id="voiceUsageBar"></span>
+          </div>
+          <dl class="account-facts">
+            <div><dt>Período</dt><dd id="billingPeriod">Sin información</dd></div>
+            <div><dt>Llamadas simultáneas</dt><dd id="concurrentCalls">0</dd></div>
+            <div><dt>Exceso</dt><dd id="overageMinutes">0 min</dd></div>
+          </dl>
+          <div id="billingConnection" class="account-connection">Estado de facturación no disponible</div>
+        </article>
+
+        <article class="card account-identity-card">
+          <div class="account-card-heading"><div><p class="eyebrow">TU CUENTA</p><h2>Acceso</h2></div></div>
+          <dl class="account-facts identity">
+            <div><dt>Correo</dt><dd id="accountEmail">Cargando…</dd></div>
+            <div><dt>Rol</dt><dd id="accountRole">Cargando…</dd></div>
+          </dl>
+          <p class="account-help">Los permisos de tu rol determinan qué información administrativa puedes consultar.</p>
+          <a class="button ghost account-settings-link" href="/settings.html">Ir a Configuración</a>
+        </article>
+      </section>
+
+      <section class="card usage-panel" aria-labelledby="usageTitle">
+        <div class="account-card-heading">
+          <div><p class="eyebrow">CONSUMO</p><h2 id="usageTitle">Uso del período</h2></div>
+          <span id="usagePeriod" class="account-period"></span>
+        </div>
+        <div id="usageState" class="account-state-inline" role="status" aria-live="polite">Cargando detalle de uso…</div>
+        <div id="usageList" class="usage-list"></div>
+      </section>
+
+      <aside class="account-note" aria-label="Información sobre facturación">
+        <strong>Esta pantalla es informativa.</strong>
+        <span>No ejecuta pagos ni cambios de plan. Los importes y condiciones comerciales autoritativas se confirman antes de cualquier activación.</span>
+      </aside>
+    </section>
+  </main>
+</div>
+<script src="/account.js?v=20260928-1" defer></script>
+</body>
+</html>
