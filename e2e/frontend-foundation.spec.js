@@ -64,6 +64,7 @@ test('canonical dark foundation is served and loaded after legacy styles', async
   ]) {
     const html = await getText(request, path);
     const stylesheets = stylesheetPaths(html);
+    expect(html, path + ' should not contain escaped newline artifacts').not.toContain('\\n</head>');
     expect(stylesheets, path).toContain('/frontend-foundation.css');
     expect(stylesheets.at(-1), path + ' should load the canonical layer last').toBe('/frontend-foundation.css');
   }
