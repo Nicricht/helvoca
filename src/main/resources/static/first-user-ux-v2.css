@@ -192,12 +192,6 @@ body.first-user-onboarding-active #operationalOverview {
   display: none !important;
 }
 
-/* The daily home keeps only the modules that are active. */
-.home-business-tab.rv-module-empty[data-home-tab="orders"],
-.home-business-tab.rv-module-empty[data-home-tab="sales"],
-.home-business-tab.rv-module-empty[data-home-tab="requests"] {
-  display: none !important;
-}
 
 /* Desktop: turn the existing compact nav into a calm left rail. */
 @media (min-width: 981px) {
