@@ -12,7 +12,9 @@ Completion requires evidence appropriate to its risk:
 - required CI gates are green;
 - evidence belongs to the **final commit** being presented;
 - any code or engineering-contract change after certification makes earlier certification **invalid** and requires fresh verification;
+- MEDIUM/HIGH or multi-step work has a durable resume checkpoint when it can outlive one interaction;
+- a fresh conversation can reconstruct repository, branch, work item, HEAD, valid CI evidence, completed blocks, and next step without relying on chat memory;
 - production-impacting work has an explicit release and rollback path;
 - tests did not trigger unauthorized real external effects.
 
-No completion claim may rely on stale runs, partial verification, or “it should work”.
+No completion claim may rely on stale runs, partial verification, chat-only state, or “it should work”.
