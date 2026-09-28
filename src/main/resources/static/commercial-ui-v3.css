@@ -34,13 +34,35 @@ body.home-page:has(#authView:not(.hidden)) .topbar {
   background: #0f1115;
 }
 
-body.home-page:has(#authView:not(.hidden)) .brand {
-  color: #f5f7fa;
-  letter-spacing: .14em;
+.rv-brand-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  text-decoration: none;
 }
 
-body.home-page:has(#authView:not(.hidden)) .subtitle {
-  color: #8f98a8;
+.rv-brand-logo {
+  display: block;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+body.home-page:has(#authView:not(.hidden)) .topbar {
+  min-height: 72px !important;
+  padding: 8px 0 !important;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-brand-logo {
+  width: 52px;
+  height: 52px;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-brand-link:focus-visible {
+  outline: 3px solid rgba(109,93,246,.32);
+  outline-offset: 4px;
 }
 
 body.home-page:has(#authView:not(.hidden)) #authView.auth-grid {
@@ -913,6 +935,16 @@ body.inventory-page .inventory-restock-card {
 }
 
 @media (max-width: 620px) {
+  body.home-page:has(#authView:not(.hidden)) .rv-brand-logo {
+    width: 44px;
+    height: 44px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .topbar {
+    min-height: 60px !important;
+    padding: 6px 0 !important;
+  }
+
   body.home-page:has(#authView:not(.hidden)) .shell {
     width: min(100% - 24px, 620px);
   }
