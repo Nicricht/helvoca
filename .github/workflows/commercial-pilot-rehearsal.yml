@@ -1,0 +1,52 @@
+name: Commercial Pilot Rehearsal V1
+
+on:
+  push:
+    branches:
+      - test/commercial-pilot-rehearsal-v1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commercial-pilot-rehearsal-v1
+  cancel-in-progress: true
+
+jobs:
+  rehearsal:
+    name: commercial-pilot-rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      COMMERCIAL_PILOT_REHEARSAL_FULL: "true"
+      DIFF_LINE_COVERAGE: "80"
+      DIFF_BRANCH_COVERAGE: "70"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Resolve base SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          echo "BASE_SHA=$(git merge-base HEAD origin/main)" >> "$GITHUB_ENV"
+
+      - name: Run exhaustive commercial pilot rehearsal
+        run: bash scripts/ci/commercial-pilot-rehearsal.sh
