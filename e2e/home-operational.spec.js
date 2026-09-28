@@ -499,7 +499,8 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeMinutesToday')).toHaveText('8:00');
   await expect(page.locator('#ownerPlanName')).toHaveText('PRO');
   await expect(page.locator('#ownerPlanUsage')).toHaveText('23 / 500 min');
-  expect(await page.locator('#homeCallsMetric').evaluate(element => element.tagName)).toBe('ARTICLE');
+  expect(await page.locator('#homeCallsMetric').evaluate(element => element.tagName)).toBe('A');
+  await expect(page.locator('#homeCallsMetric')).toHaveAttribute('href', '/operations.html');
   await expect(page.locator('#homeBookingsMetric')).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
   await expect(page.locator('#homeRequestsMetric')).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
   await expect(page.locator('#ownerOrdersMetric')).toHaveAttribute('href', '/?tab=sales#homeBusinessWorkspace');
