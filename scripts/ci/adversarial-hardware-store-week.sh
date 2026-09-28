@@ -45,8 +45,12 @@ BACKEND_TESTS=(
   SimulatorExternalSideEffectIsolationTest
   ReceptionistSimulatorAdversarialCapacityTest
   SimulatorCommercialOrderIsolationTest
+  SimulatorCommercialQuoteDeliveryIsolationTest
   SimulatorCommercialStateCleanupTest
+  SimulatorStateBranchCoverageTest
+  SimulatorCommercialErrorBranchesTest
   ReceptionistSimulatorToolContinuationTest
+  ReceptionistSimulatorOpenAiLoopTest
   GoldenJourneyCommercialV1IntegrationTest
   OmnichannelCommerceJourneyIntegrationTest
   SafeOperationRetryChaosCertificationTest
