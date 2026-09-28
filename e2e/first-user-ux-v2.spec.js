@@ -144,10 +144,10 @@ test('ready owner lands on a simple daily home with direct reservations and cust
   await expect(nav.locator('a')).toContainText(['Inicio', 'Reservas', 'Clientes', 'Configuración']);
   await expect(nav).not.toContainText('Inventario');
 
-  await page.getByRole('link', { name: 'Reservas' }).click();
+  await nav.getByRole('link', { name: 'Reservas', exact: true }).click();
   await expect(page.locator('[data-home-tab="bookings"]')).toHaveClass(/active/);
 
-  await page.getByRole('link', { name: 'Clientes' }).click();
+  await nav.getByRole('link', { name: 'Clientes', exact: true }).click();
   await expect(page.locator('[data-home-tab="customers"]')).toHaveClass(/active/);
 });
 
