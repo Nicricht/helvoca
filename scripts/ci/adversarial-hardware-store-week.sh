@@ -42,6 +42,8 @@ BACKEND_TESTS=(
   InventoryVariantServiceTest
   RealtimeToolServiceTest
   SimulatorToolExecutorTest
+  SimulatorExternalSideEffectIsolationTest
+  ReceptionistSimulatorAdversarialCapacityTest
   GoldenJourneyCommercialV1IntegrationTest
   OmnichannelCommerceJourneyIntegrationTest
   SafeOperationRetryChaosCertificationTest
