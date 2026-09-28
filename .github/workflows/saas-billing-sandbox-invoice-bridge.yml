@@ -1,0 +1,44 @@
+name: SaaS Billing Sandbox Invoice Bridge
+
+on:
+  push:
+    branches:
+      - cert/saas-billing-sandbox-provider-run-1
+    paths:
+      - ".github/workflows/saas-billing-sandbox-invoice-bridge.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  bridge:
+    name: approved-invoice-to-entitlements
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST: "true"
+      MERCADOPAGO_TEST_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Fail closed unless TEST credentials are present
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${MERCADOPAGO_TEST_ACCESS_TOKEN:-}" ]]; then
+            echo "Missing MERCADOPAGO_TEST_ACCESS_TOKEN"
+            exit 1
+          fi
+          if [[ "$MERCADOPAGO_TEST_ACCESS_TOKEN" != APP_USR* ]]; then
+            echo "Refusing to run: TEST token must start with APP_USR"
+            exit 1
+          fi
+
+      - name: Bridge real approved sandbox invoice into RecepVoz billing logic
+        run: mvn -B -Dtest=MercadoPagoSaasSandboxInvoiceBridgeIT test
