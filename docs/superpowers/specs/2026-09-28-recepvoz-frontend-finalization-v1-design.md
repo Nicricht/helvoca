@@ -363,20 +363,35 @@ Requisitos:
 
 La implementación se hará en bloques cerrados sobre una rama dedicada.
 
-Orden:
+Orden de trabajo en grupos visibles de tres pantallas:
 
-1. sistema visual canónico + shell/header/nav;
-2. Landing + Auth;
-3. Onboarding;
-4. Inicio;
-5. Reservas + Clientes;
-6. Inventario;
-7. Recepcionista IA;
-8. Configuración;
-9. Pricing/public pages;
-10. eliminación de CSS muerto y overrides;
-11. responsive/accesibilidad;
+### Bloque 1
+1. Landing.
+2. Login/Registro.
+3. Onboarding.
+
+### Bloque 2
+4. Inicio.
+5. Reservas.
+6. Clientes.
+
+### Bloque 3
+7. Inventario.
+8. Recepcionista IA.
+9. Configuración.
+
+### Cierre transversal
+10. Pricing y páginas públicas auxiliares.
+11. eliminación de CSS muerto/overrides + responsive/accesibilidad global.
 12. certificación completa.
+
+La base visual canónica (tokens, shell, header, navegación y componentes compartidos) se implementa de forma incremental dentro del primer bloque que la necesite; no se considera una pantalla adicional.
+
+Al terminar cada grupo de tres pantallas:
+- mostrar al usuario qué cambió en cada pantalla antes de continuar;
+- incluir evidencia visual cuando sea posible y, como mínimo, los cambios concretos de estructura/estilo;
+- reportar pruebas dirigidas y estado del gate;
+- no iniciar el siguiente grupo hasta que el usuario indique continuar.
 
 Cada bloque:
 - prueba/regresión primero;
@@ -385,7 +400,7 @@ Cada bloque:
 - revisión visual/adversarial;
 - commit.
 
-Full Gate se ejecuta al cierre de bloques grandes y obligatoriamente antes de merge.
+Full Gate se ejecuta al cierre de cada grupo de tres pantallas y obligatoriamente antes de merge.
 
 ## Estrategia de tests
 
