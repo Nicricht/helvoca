@@ -167,7 +167,7 @@ test('public and authenticated shells load Bootstrap 5 before RecepVoz styles', 
 
 
 test('customer-facing entry surfaces consistently present the RecepVoz brand', async ({ page }) => {
-  for (const path of ['/settings.html', '/sales.html', '/pricing.html']) {
+  for (const path of ['/settings.html', '/sales.html', '/pricing.html', '/phone-numbers.html']) {
     await page.goto(path);
     await expect(page).toHaveTitle(/RecepVoz/i);
     await expect(page.locator('body')).toContainText(/RecepVoz/i);
