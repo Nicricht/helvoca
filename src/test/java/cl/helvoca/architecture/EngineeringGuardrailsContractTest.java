@@ -17,6 +17,7 @@ class EngineeringGuardrailsContractTest {
     void repositoryGuardrailsRequireFirstPassEngineeringAndFreshEvidence() throws Exception {
         String agents = read("AGENTS.md");
         assertTrue(agents.contains("First-Pass Engineering"));
+        assertTrue(agents.contains("software-factory/skill/first-pass-engineering/SKILL.md"));
         assertTrue(agents.contains("80% differential line coverage"));
         assertTrue(agents.contains("70% differential branch coverage"));
         assertTrue(agents.toLowerCase().contains("final commit"));
