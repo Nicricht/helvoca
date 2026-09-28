@@ -13,8 +13,12 @@
     const message = $("#inventoryMessage");
     const search = $("#inventorySearch");
     const filter = $("#inventoryFilter");
+    const sort = $("#inventorySort");
     const roleBadge = $("#inventoryRoleBadge");
 
+    const productDialog = $("#inventoryProductDialog");
+    const productForm = $("#inventoryProductForm");
+    const productMessage = $("#inventoryProductMessage");
     const configDialog = $("#inventoryConfigDialog");
     const configForm = $("#inventoryConfigForm");
     const configMessage = $("#inventoryConfigMessage");
@@ -62,6 +66,21 @@
             .replaceAll(">", "&gt;")
             .replaceAll('"', "&quot;")
             .replaceAll("'", "&#039;");
+    }
+
+    function formatMoney(value, currency = "CLP") {
+        if (value === null || value === undefined || value === "") {
+            return '<span class="inventory-sku missing">Sin precio</span>';
+        }
+        try {
+            return escapeHtml(new Intl.NumberFormat("es-CL", {
+                style: "currency",
+                currency: currency || "CLP",
+                maximumFractionDigits: (currency || "CLP") === "CLP" ? 0 : 2
+            }).format(Number(value)));
+        } catch (_) {
+            return escapeHtml(String(value));
+        }
     }
 
     function showMessage(target, text, kind = "error") {
@@ -332,7 +351,7 @@
 
     function productMatches(item) {
         const query = search.value.trim().toLowerCase();
-        if (query && !`${item.name} ${item.sku}`.toLowerCase().includes(query)) return false;
+        if (query && !`${item.name} ${item.sku} ${item.description}`.toLowerCase().includes(query)) return false;
         switch (filter.value) {
             case "TRACKED": return item.configured && item.trackingEnabled;
             case "LOW": return item.configured && item.trackingEnabled
@@ -342,6 +361,37 @@
             case "RESTOCKED": return productHasAlert(item, "RESTOCKED");
             case "UNCONFIGURED": return !item.configured || !item.trackingEnabled;
             default: return true;
+        }
+    }
+
+    function attentionRank(item) {
+        if (item.configured && item.trackingEnabled && Number(item.available) === 0) return 0;
+        if (item.configured && item.trackingEnabled && (item.lowStock || productHasAlert(item, "LOW_STOCK"))) return 1;
+        if (!item.configured || !item.trackingEnabled) return 2;
+        return 3;
+    }
+
+    function sortProducts(items) {
+        const next = [...items];
+        switch (sort?.value) {
+            case "NAME_ASC":
+                return next.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "es"));
+            case "AVAILABLE_ASC":
+                return next.sort((a, b) => {
+                    const av = a.available === null || a.available === undefined ? Number.POSITIVE_INFINITY : Number(a.available);
+                    const bv = b.available === null || b.available === undefined ? Number.POSITIVE_INFINITY : Number(b.available);
+                    return av - bv || String(a.name || "").localeCompare(String(b.name || ""), "es");
+                });
+            case "AVAILABLE_DESC":
+                return next.sort((a, b) => {
+                    const av = a.available === null || a.available === undefined ? Number.NEGATIVE_INFINITY : Number(a.available);
+                    const bv = b.available === null || b.available === undefined ? Number.NEGATIVE_INFINITY : Number(b.available);
+                    return bv - av || String(a.name || "").localeCompare(String(b.name || ""), "es");
+                });
+            default:
+                return next.sort((a, b) =>
+                    attentionRank(a) - attentionRank(b)
+                    || String(a.name || "").localeCompare(String(b.name || ""), "es"));
         }
     }
 
@@ -365,31 +415,33 @@
             ? `<button class="button ghost inventory-history-btn" type="button" data-id="${item.id}">Historial</button>`
             : "";
         if (!state.canManage) return variants + history;
-        const configureLabel = item.configured ? "Editar" : "Configurar";
-        const configure = `<button class="button ghost inventory-config-btn" type="button" data-id="${item.id}">${configureLabel}</button>`;
+        const editProduct = `<button class="button ghost inventory-product-edit-btn" type="button" data-id="${item.id}" aria-label="Editar producto ${escapeHtml(item.name)}">Producto</button>`;
+        const configureLabel = item.configured ? "Editar stock" : "Configurar stock";
+        const configure = `<button class="button ghost inventory-config-btn" type="button" data-id="${item.id}" aria-label="${configureLabel} de ${escapeHtml(item.name)}">${configureLabel}</button>`;
         const needsRestock = item.configured && item.trackingEnabled
             && Number(item.available) <= Number(item.reorderThreshold || 0);
         const adjust = item.configured && item.trackingEnabled
             ? `<button class="button ${needsRestock ? "primary" : "secondary"} inventory-adjust-btn" type="button" data-id="${item.id}">${needsRestock ? "Reponer" : "Ajustar"}</button>`
             : "";
-        return variants + configure + adjust + history;
+        return editProduct + variants + configure + adjust + history;
     }
 
     function renderRows() {
-        const visible = state.products.filter(productMatches);
+        const visible = sortProducts(state.products.filter(productMatches));
         rows.innerHTML = visible.map(item => `
             <tr data-inventory-product-id="${escapeHtml(item.id)}">
-                <td class="inventory-product">
+                <td class="inventory-product" data-label="Producto">
                     <strong>${escapeHtml(item.name)}</strong>
                     <small>${escapeHtml(item.description || "Producto del catálogo")}</small>
                 </td>
-                <td><span class="inventory-sku ${item.sku ? "" : "missing"}">${escapeHtml(item.sku || "Sin SKU")}</span></td>
-                <td>${numberCell(item.onHand)}</td>
-                <td>${numberCell(item.reserved, "reserved")}</td>
-                <td>${numberCell(item.available, "available")}</td>
-                <td>${numberCell(item.reorderThreshold)}</td>
-                <td>${stateBadge(item)}</td>
-                <td><div class="inventory-row-actions">${actionButtons(item)}</div></td>
+                <td data-label="SKU"><span class="inventory-sku ${item.sku ? "" : "missing"}">${escapeHtml(item.sku || "Sin SKU")}</span></td>
+                <td data-label="Precio"><span class="inventory-price">${formatMoney(item.price, item.currency)}</span></td>
+                <td data-label="Físico">${numberCell(item.onHand)}</td>
+                <td data-label="Reservado">${numberCell(item.reserved, "reserved")}</td>
+                <td data-label="Disponible">${numberCell(item.available, "available")}</td>
+                <td data-label="Mínimo">${numberCell(item.reorderThreshold)}</td>
+                <td data-label="Estado">${stateBadge(item)}</td>
+                <td data-label="Acciones"><div class="inventory-row-actions">${actionButtons(item)}</div></td>
             </tr>
         `).join("");
         empty.classList.toggle("hidden", visible.length > 0);
@@ -397,7 +449,10 @@
     }
 
     function bindRowActions() {
-        $$(".inventory-variants-btn", rows).forEach(button => {
+        $(".inventory-product-edit-btn", rows).forEach(button => {
+            button.addEventListener("click", () => openProductForm(button.dataset.id));
+        });
+        $(".inventory-variants-btn", rows).forEach(button => {
             button.addEventListener("click", () => openVariants(button.dataset.id));
         });
         $$(".inventory-config-btn", rows).forEach(button => {
@@ -420,6 +475,22 @@
 
     function product(id) {
         return state.products.find(item => String(item.id) === String(id));
+    }
+
+    function openProductForm(id = null) {
+        if (!state.canManage) return;
+        const item = id ? product(id) : null;
+        clearMessage(productMessage);
+        productForm.reset();
+        productForm.elements.catalogItemId.value = item?.id || "";
+        productForm.elements.name.value = item?.name || "";
+        productForm.elements.description.value = item?.description || "";
+        productForm.elements.price.value = item?.price ?? "";
+        productForm.elements.currency.value = String(item?.currency || "CLP").toUpperCase();
+        $("#inventoryProductTitle").textContent = item ? `Editar · ${item.name}` : "Nuevo producto";
+        $("#inventoryProductSave").textContent = item ? "Guardar producto" : "Crear producto";
+        productDialog.showModal();
+        setTimeout(() => productForm.elements.name.focus(), 0);
     }
 
     function openConfig(id) {
@@ -700,6 +771,56 @@
         }).join("");
     }
 
+    async function saveProduct(event) {
+        event.preventDefault();
+        if (!state.canManage) return;
+        clearMessage(productMessage);
+
+        const id = productForm.elements.catalogItemId.value;
+        const name = productForm.elements.name.value.trim();
+        const description = productForm.elements.description.value.trim();
+        const currency = productForm.elements.currency.value.trim().toUpperCase();
+        const priceText = productForm.elements.price.value.trim();
+        const price = Number(priceText);
+
+        if (!name) {
+            showMessage(productMessage, "Escribe un nombre para el producto.");
+            return;
+        }
+        if (priceText === "" || !Number.isFinite(price) || price < 0) {
+            showMessage(productMessage, "El precio debe ser un número igual o mayor que cero.");
+            return;
+        }
+        if (!/^[A-Z]{3}$/.test(currency)) {
+            showMessage(productMessage, "La moneda debe tener tres letras, por ejemplo CLP.");
+            return;
+        }
+
+        const button = $("#inventoryProductSave");
+        button.disabled = true;
+        try {
+            await api(id ? `/api/v1/catalog/${encodeURIComponent(id)}` : "/api/v1/catalog", {
+                method: id ? "PUT" : "POST",
+                body: JSON.stringify({
+                    kind: "PRODUCT",
+                    name,
+                    description: description || null,
+                    price,
+                    currency,
+                    durationMinutes: null,
+                    metadataJson: null,
+                    active: true
+                })
+            });
+            productDialog.close();
+            await reloadInventory(id ? "Producto actualizado." : "Producto creado.");
+        } catch (error) {
+            showMessage(productMessage, error.message);
+        } finally {
+            button.disabled = false;
+        }
+    }
+
     async function saveConfig(event) {
         event.preventDefault();
         clearMessage(configMessage);
@@ -819,6 +940,7 @@
 
             roleBadge.textContent = state.canManage ? "Administrador" : "Solo lectura";
             roleBadge.className = `badge ${state.canManage ? "online" : "muted"}`;
+            $("#inventoryAddProductBtn").classList.toggle("hidden", !state.canManage);
 
             mergeProducts();
             render();
@@ -834,6 +956,8 @@
 
     search.addEventListener("input", renderRows);
     filter.addEventListener("change", renderRows);
+    sort?.addEventListener("change", renderRows);
+    $("#inventoryAddProductBtn").addEventListener("click", () => openProductForm());
     $("#inventoryRefreshBtn").addEventListener("click", async event => {
         event.currentTarget.disabled = true;
         clearMessage(message);
@@ -842,6 +966,7 @@
         finally { event.currentTarget.disabled = false; }
     });
 
+    productForm.addEventListener("submit", saveProduct);
     configForm.addEventListener("submit", saveConfig);
     adjustForm.addEventListener("submit", saveAdjustment);
     variantForm.addEventListener("submit", saveVariant);
@@ -850,7 +975,7 @@
     $$("[data-close-dialog]").forEach(button => {
         button.addEventListener("click", () => button.closest("dialog")?.close());
     });
-    [configDialog, adjustDialog, historyDialog, variantsDialog, variantEditDialog].forEach(dialog => {
+    [productDialog, configDialog, adjustDialog, historyDialog, variantsDialog, variantEditDialog].forEach(dialog => {
         dialog.addEventListener("click", event => {
             if (event.target === dialog) dialog.close();
         });
