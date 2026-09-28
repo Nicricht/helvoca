@@ -289,9 +289,11 @@ test('settings exposes the Mi negocio sections with simple navigation', async ({
 
   await expect(page.locator('.dashboard-heading h1')).toHaveText('Mi negocio');
   const nav = page.locator('#advancedPanel .ux-config-nav');
-  await expect(nav.getByRole('button')).toHaveText([
-    '🏪 Negocio', '✂️ Servicios', '📅 Horarios', '💬 Respuestas', '🤖 Recepcionista', '📞 Canales'
+  await expect(nav.locator('[data-settings-section]')).toContainText([
+    'Negocio', 'Servicios', 'Horarios', 'Recepcionista'
   ]);
+  await expect(page.locator('#uxAdvancedSettings')).toContainText('Respuestas');
+  await expect(page.locator('#uxAdvancedSettings')).toContainText('Canales');
   await expect(page.locator('#configBusinessPanel')).toBeVisible();
   await expect(page.locator('#configAgentPanel')).toBeHidden();
 
@@ -684,6 +686,7 @@ test('settings lets operators review schedule exceptions without mutation contro
 
 
 test('settings presents human setup categories with accessible selected state', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockSettings(page);
   await page.goto('/settings.html');
 
@@ -703,6 +706,7 @@ test('settings presents human setup categories with accessible selected state', 
 });
 
 test('settings deep link opens the requested onboarding section', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockSettings(page);
   await page.goto('/settings.html?section=hours');
 
