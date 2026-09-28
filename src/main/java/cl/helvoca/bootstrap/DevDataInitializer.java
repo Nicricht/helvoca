@@ -571,11 +571,11 @@ public class DevDataInitializer implements CommandLineRunner {
             InventoryStock stock = existing.get();
             boolean changed = !product.sku().equalsIgnoreCase(stock.getSku() == null ? "" : stock.getSku())
                     || !stock.isTrackingEnabled()
-                    || stock.getReorderThreshold() != 2;
+                    || stock.getReorderThreshold() != 5;
             if (changed) {
                 stock.setSku(product.sku());
                 stock.setTrackingEnabled(true);
-                stock.setReorderThreshold(2);
+                stock.setReorderThreshold(5);
                 inventoryStocks.saveAndFlush(stock);
             }
             return;
