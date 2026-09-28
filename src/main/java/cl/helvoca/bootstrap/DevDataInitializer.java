@@ -16,6 +16,10 @@ import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.CatalogItemRepository;
 import cl.helvoca.customer.Customer;
 import cl.helvoca.customer.CustomerRepository;
+import cl.helvoca.delivery.DeliveryZone;
+import cl.helvoca.delivery.DeliveryZoneRepository;
+import cl.helvoca.inventory.InventoryStock;
+import cl.helvoca.inventory.InventoryStockRepository;
 import cl.helvoca.knowledge.KnowledgeItem;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.schedule.BusinessHour;
@@ -40,8 +44,10 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
@@ -65,10 +71,13 @@ public class DevDataInitializer implements CommandLineRunner {
     private BusinessProfileRepository profiles;
     private CustomerRepository customers;
     private BookingRepository bookings;
+    private InventoryStockRepository inventoryStocks;
+    private DeliveryZoneRepository deliveryZones;
 
     @Value("${app.seed.enabled:false}") private boolean enabled;
     @Value("${app.seed.admin-email:admin@helvoca.local}") private String adminEmail;
     @Value("${app.seed.admin-password:ChangeMe123!}") private String adminPassword;
+    @Value("${app.seed.preset:barbershop}") private String seedPreset;
 
     public DevDataInitializer(BusinessRepository businesses, AppUserRepository users, RoleRepository roles, PasswordEncoder encoder) {
         this.businesses = businesses; this.users = users; this.roles = roles; this.encoder = encoder;
@@ -111,6 +120,13 @@ public class DevDataInitializer implements CommandLineRunner {
         this.bookings = bookings;
     }
 
+    @Autowired(required = false)
+    void setHardwareStoreRepositories(InventoryStockRepository inventoryStocks,
+                                      DeliveryZoneRepository deliveryZones) {
+        this.inventoryStocks = inventoryStocks;
+        this.deliveryZones = deliveryZones;
+    }
+
     @Override @Transactional
     public void run(String... args) {
         if (!enabled) return;
@@ -129,7 +145,7 @@ public class DevDataInitializer implements CommandLineRunner {
         }
 
         Business business = new Business();
-        business.setName(DEMO_BUSINESS_NAME);
+        business.setName(demoBusinessName());
         business.setTimezone(DEMO_TIMEZONE);
         business.setLanguage("es");
         business = businesses.saveAndFlush(business);
@@ -139,7 +155,7 @@ public class DevDataInitializer implements CommandLineRunner {
 
         AppUser admin = new AppUser();
         admin.setBusiness(business);
-        admin.setName("Administración Demo");
+        admin.setName(isHardwareStoreDemo() ? "Administración Ferretería Demo" : "Administración Demo");
         admin.setEmail(adminEmail.toLowerCase());
         admin.setPasswordHash(encoder.encode(adminPassword));
         admin.getRoles().add(roles.findByCode(RoleCode.BUSINESS_ADMIN).orElseThrow());
@@ -150,14 +166,19 @@ public class DevDataInitializer implements CommandLineRunner {
     }
 
     private void ensureDemoBusinessBasics(Business business, boolean legacyDemoFixture) {
-        if (!legacyDemoFixture) return;
-        business.setName(DEMO_BUSINESS_NAME);
+        if (!legacyDemoFixture && !isHardwareStoreDemo()) return;
+        business.setName(demoBusinessName());
         business.setTimezone(DEMO_TIMEZONE);
         business.setLanguage("es");
+        business.setHumanTransferPhone(null);
         businesses.saveAndFlush(business);
     }
 
     private void ensureDemoTenant(UUID businessId, boolean legacyDemoFixture) {
+        if (isHardwareStoreDemo()) {
+            ensureHardwareStoreTenant(businessId);
+            return;
+        }
         ensureDemoProfile(businessId);
         ensureDemoCatalog(businessId, legacyDemoFixture);
         ensureDemoSchedule(businessId);
@@ -166,6 +187,24 @@ public class DevDataInitializer implements CommandLineRunner {
         ensureDemoCustomers(businessId);
         ensureDemoBookings(businessId);
         validateDemoReadiness(businessId);
+    }
+
+    private boolean isHardwareStoreDemo() {
+        return HardwareStoreDemoData.PRESET.equalsIgnoreCase(seedPreset == null ? "" : seedPreset.trim());
+    }
+
+    private String demoBusinessName() {
+        return isHardwareStoreDemo() ? HardwareStoreDemoData.BUSINESS_NAME : DEMO_BUSINESS_NAME;
+    }
+
+    private void ensureHardwareStoreTenant(UUID businessId) {
+        ensureHardwareStoreProfile(businessId);
+        ensureHardwareStoreCatalogAndInventory(businessId);
+        ensureHardwareStoreSchedule(businessId);
+        ensureHardwareStoreKnowledge(businessId);
+        ensureHardwareStoreAgent(businessId);
+        ensureHardwareStoreDeliveryZones(businessId);
+        validateHardwareStoreReadiness(businessId);
     }
 
     private void ensureDemoProfile(UUID businessId) {
@@ -454,6 +493,228 @@ public class DevDataInitializer implements CommandLineRunner {
             date = date.plusDays(1);
         }
         return date;
+    }
+
+    private void ensureHardwareStoreProfile(UUID businessId) {
+        if (businessId == null || profiles == null) return;
+        BusinessProfile profile = profiles.findById(businessId).orElseGet(BusinessProfile::new);
+        profile.setBusinessId(businessId);
+        profile.setPresetKey(HardwareStoreDemoData.PRESET);
+        profile.setPublicDescription("Ferretería ficticia de barrio para pruebas comerciales de RecepVoz. Vende fijaciones, PVC, electricidad, pintura, herramientas, madera, gasfitería, jardín, seguridad y materiales básicos.");
+        profile.setPublicEmail("hola@ferreteria-san-martin-demo.invalid");
+        profile.setWebsiteUrl("https://ferreteria-san-martin-demo.invalid");
+        profile.setAddressLine("Pasaje Tuerca Demo 742");
+        profile.setCommune("Providencia");
+        profile.setCity("Santiago");
+        profile.setRegion("Región Metropolitana");
+        profile.setCountryCode("CL");
+        profile.setDefaultCurrency(HardwareStoreDemoData.CURRENCY);
+        profile.setSellsProducts(true);
+        profile.setSellsServices(false);
+        profile.setUsesReservations(false);
+        profiles.saveAndFlush(profile);
+    }
+
+    private void ensureHardwareStoreCatalogAndInventory(UUID businessId) {
+        if (businessId == null || catalog == null) return;
+
+        Set<String> desiredNames = new HashSet<>();
+        for (HardwareStoreDemoData.Product product : HardwareStoreDemoData.products()) {
+            desiredNames.add(product.name().toLowerCase(java.util.Locale.ROOT));
+        }
+
+        for (CatalogItem existing : catalog.findAllByBusinessIdOrderByNameAsc(businessId)) {
+            if (existing.getKind() == CatalogItem.Kind.PRODUCT
+                    && existing.isActive()
+                    && !desiredNames.contains(existing.getName().toLowerCase(java.util.Locale.ROOT))) {
+                existing.setActive(false);
+                catalog.saveAndFlush(existing);
+            }
+        }
+        if (services != null) {
+            for (ServiceItem existing : services.findAllByBusinessIdOrderByNameAsc(businessId)) {
+                if (existing.isActive()) {
+                    existing.setActive(false);
+                    services.saveAndFlush(existing);
+                }
+            }
+        }
+
+        for (HardwareStoreDemoData.Product product : HardwareStoreDemoData.products()) {
+            CatalogItem item = catalog.findAllByBusinessIdOrderByNameAsc(businessId).stream()
+                    .filter(value -> value.getKind() == CatalogItem.Kind.PRODUCT)
+                    .filter(value -> product.name().equalsIgnoreCase(value.getName()))
+                    .findFirst()
+                    .orElseGet(CatalogItem::new);
+            item.setBusinessId(businessId);
+            item.setKind(CatalogItem.Kind.PRODUCT);
+            item.setName(product.name());
+            item.setDescription(HardwareStoreDemoData.productDescription(product));
+            item.setPrice(product.price());
+            item.setCurrency(HardwareStoreDemoData.CURRENCY);
+            item.setMetadataJson("{\"sku\":\"" + product.sku() + "\",\"category\":\""
+                    + product.category().replace("\"", "\\\"") + "\",\"unit\":\""
+                    + product.unit() + "\",\"restrictedAdvice\":" + product.restrictedAdvice() + "}");
+            item.setActive(true);
+            item = catalog.saveAndFlush(item);
+            ensureHardwareStoreStock(businessId, item, product);
+        }
+    }
+
+    private void ensureHardwareStoreStock(UUID businessId,
+                                          CatalogItem item,
+                                          HardwareStoreDemoData.Product product) {
+        if (inventoryStocks == null || item == null || item.getId() == null) return;
+        Optional<InventoryStock> existing =
+                inventoryStocks.findByBusinessIdAndCatalogItemId(businessId, item.getId());
+        if (existing.isPresent()) {
+            InventoryStock stock = existing.get();
+            boolean changed = !product.sku().equalsIgnoreCase(stock.getSku() == null ? "" : stock.getSku())
+                    || !stock.isTrackingEnabled()
+                    || stock.getReorderThreshold() != 2;
+            if (changed) {
+                stock.setSku(product.sku());
+                stock.setTrackingEnabled(true);
+                stock.setReorderThreshold(2);
+                inventoryStocks.saveAndFlush(stock);
+            }
+            return;
+        }
+
+        InventoryStock stock = new InventoryStock();
+        stock.setBusinessId(businessId);
+        stock.setCatalogItemId(item.getId());
+        stock.setSku(product.sku());
+        stock.setTrackingEnabled(true);
+        stock.setOnHand(product.stock());
+        stock.setReserved(0);
+        stock.setReorderThreshold(2);
+        inventoryStocks.saveAndFlush(stock);
+    }
+
+    private void ensureHardwareStoreSchedule(UUID businessId) {
+        if (businessId == null || hours == null) return;
+        List<BusinessHour> current = hours.findAllByBusinessIdOrderByDayOfWeekAscOpenTimeAsc(businessId);
+        boolean correct = current.size() == 6
+                && current.stream().filter(value -> value.getDayOfWeek() >= 1 && value.getDayOfWeek() <= 5)
+                        .allMatch(value -> LocalTime.of(8, 0).equals(value.getOpenTime())
+                                && LocalTime.of(18, 30).equals(value.getCloseTime()))
+                && current.stream().filter(value -> value.getDayOfWeek() == 6)
+                        .anyMatch(value -> LocalTime.of(9, 0).equals(value.getOpenTime())
+                                && LocalTime.of(14, 0).equals(value.getCloseTime()));
+        if (correct) return;
+
+        hours.deleteAllByBusinessId(businessId);
+        for (int day = 1; day <= 5; day++) {
+            ensureHour(businessId, day, LocalTime.of(8, 0), LocalTime.of(18, 30));
+        }
+        ensureHour(businessId, 6, LocalTime.of(9, 0), LocalTime.of(14, 0));
+    }
+
+    private void ensureHardwareStoreKnowledge(UUID businessId) {
+        if (businessId == null || knowledge == null) return;
+        Set<String> desiredTitles = new HashSet<>();
+        for (HardwareStoreDemoData.Policy policy : HardwareStoreDemoData.policies()) {
+            desiredTitles.add(policy.title().toLowerCase(java.util.Locale.ROOT));
+        }
+
+        for (KnowledgeItem item : knowledge.findAllByBusinessIdOrderByTitleAsc(businessId)) {
+            if (item.isActive()
+                    && !desiredTitles.contains(item.getTitle().toLowerCase(java.util.Locale.ROOT))) {
+                item.setActive(false);
+                knowledge.saveAndFlush(item);
+            }
+        }
+        for (HardwareStoreDemoData.Policy policy : HardwareStoreDemoData.policies()) {
+            ensureKnowledge(businessId, policy.title(), policy.category(), policy.content());
+        }
+    }
+
+    private void ensureHardwareStoreAgent(UUID businessId) {
+        if (businessId == null || agents == null) return;
+        AiAgent agent = agents.findByBusinessId(businessId).orElseGet(AiAgent::new);
+        agent.setBusinessId(businessId);
+        agent.setName("RecepVoz Ferretería");
+        agent.setLanguage("es");
+        agent.setVoice(null);
+        agent.setGreeting(HardwareStoreDemoData.greeting());
+        agent.setInstructions(HardwareStoreDemoData.instructions());
+        agent.setActive(true);
+        agent.setCapabilities(HardwareStoreDemoData.capabilities());
+        agents.saveAndFlush(agent);
+    }
+
+    private void ensureHardwareStoreDeliveryZones(UUID businessId) {
+        if (businessId == null || deliveryZones == null) return;
+        Set<String> desired = new HashSet<>();
+        for (HardwareStoreDemoData.Delivery definition : HardwareStoreDemoData.deliveryZones()) {
+            desired.add(definition.name().toLowerCase(java.util.Locale.ROOT));
+        }
+
+        for (DeliveryZone zone : deliveryZones.findAllByBusinessIdOrderByNameAsc(businessId)) {
+            if (zone.isActive() && !desired.contains(zone.getName().toLowerCase(java.util.Locale.ROOT))) {
+                zone.setActive(false);
+                deliveryZones.saveAndFlush(zone);
+            }
+        }
+
+        for (HardwareStoreDemoData.Delivery definition : HardwareStoreDemoData.deliveryZones()) {
+            DeliveryZone zone = deliveryZones.findAllByBusinessIdOrderByNameAsc(businessId).stream()
+                    .filter(value -> definition.name().equalsIgnoreCase(value.getName()))
+                    .findFirst()
+                    .orElseGet(DeliveryZone::new);
+            zone.setBusinessId(businessId);
+            zone.setName(definition.name());
+            zone.setCoverageTerms(definition.coverageTerms());
+            zone.setFee(definition.feeAmount());
+            zone.setMinimumOrder(BigDecimal.ZERO);
+            zone.setActive(true);
+            deliveryZones.saveAndFlush(zone);
+        }
+    }
+
+    private void validateHardwareStoreReadiness(UUID businessId) {
+        if (profiles == null || catalog == null || hours == null || knowledge == null
+                || agents == null || inventoryStocks == null || deliveryZones == null) {
+            log.debug("Hardware-store readiness validation skipped because optional demo repositories are not wired");
+            return;
+        }
+
+        java.util.ArrayList<String> blockers = new java.util.ArrayList<>();
+        BusinessProfile profile = profiles.findById(businessId).orElse(null);
+        if (profile == null
+                || !HardwareStoreDemoData.PRESET.equalsIgnoreCase(profile.getPresetKey())
+                || profile.getPublicDescription() == null || profile.getPublicDescription().isBlank()
+                || profile.getAddressLine() == null || profile.getAddressLine().isBlank()
+                || !Boolean.TRUE.equals(profile.getSellsProducts())
+                || Boolean.TRUE.equals(profile.getSellsServices())
+                || Boolean.TRUE.equals(profile.getUsesReservations())) {
+            blockers.add("BUSINESS_PROFILE");
+        }
+
+        long activeProducts = catalog.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId).stream()
+                .filter(item -> item.getKind() == CatalogItem.Kind.PRODUCT)
+                .count();
+        if (activeProducts < HardwareStoreDemoData.products().size()) blockers.add("CATALOG");
+        if (inventoryStocks.findAllByBusinessIdOrderByUpdatedAtDesc(businessId).size()
+                < HardwareStoreDemoData.products().size()) blockers.add("INVENTORY");
+        if (hours.countByBusinessId(businessId) < 6) blockers.add("SCHEDULE");
+        if (knowledge.findAllByBusinessIdAndActiveTrueOrderByTitleAsc(businessId).size()
+                < HardwareStoreDemoData.policies().size()) blockers.add("KNOWLEDGE");
+        if (deliveryZones.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId).size()
+                < HardwareStoreDemoData.deliveryZones().size()) blockers.add("DELIVERY");
+
+        AiAgent agent = agents.findByBusinessId(businessId).orElse(null);
+        Set<AiCapability> required = HardwareStoreDemoData.capabilities();
+        if (agent == null || !agent.isActive() || !agent.getCapabilities().containsAll(required)
+                || agent.getCapabilities().contains(AiCapability.CREATE_PAYMENT)) {
+            blockers.add("AI_AGENT");
+        }
+
+        if (!blockers.isEmpty()) {
+            throw new IllegalStateException("Hardware-store demo tenant is incomplete: " + String.join(", ", blockers));
+        }
+        log.info("Hardware-store demo readiness validated: profile, catalog, inventory, schedule, knowledge, delivery and agent are ready");
     }
 
     private void validateDemoReadiness(UUID businessId) {
