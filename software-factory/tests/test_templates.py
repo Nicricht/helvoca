@@ -33,6 +33,11 @@ class RepositoryTemplateContractTest(unittest.TestCase):
         self.assertIn("must never", text)
         self.assertIn("testable", text)
 
+    def test_verify_wrapper_is_portable_and_points_to_factory_runner(self):
+        text = self.read("verify")
+        self.assertIn("software-factory/scripts/verify.py", text)
+        self.assertIn("python3", text)
+
     def test_workflow_calls_repository_verifier_without_stack_assumptions(self):
         text = self.read("software-factory.yml")
         self.assertIn("scripts/verify", text)
