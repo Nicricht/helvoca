@@ -49,8 +49,15 @@ public class SimulatorToolExecutor {
                 case "cancel_booking" -> traced(context, toolName, cancelBooking(context, args));
                 case "create_request" -> traced(context, toolName, createRequest(context, args));
                 case "record_unanswered_question" -> traced(context, toolName, recordQuestion(context, args));
-                case "transfer_to_human" -> realTools.execute(context, toolName, rawArguments);
-                default -> realTools.execute(context, toolName, rawArguments);
+                case "verify_caller_whatsapp" -> traced(context, toolName, verifyCallerWhatsapp(args));
+                case "send_whatsapp_operation" -> traced(context, toolName, simulatedExternalAction("WHATSAPP_OPERATION"));
+                case "transfer_to_human" -> traced(context, toolName, simulatedExternalAction("HUMAN_TRANSFER"));
+                case "end_call" -> traced(context, toolName, simulatedExternalAction("END_CALL"));
+                case "get_business_information", "list_services", "search_knowledge" ->
+                        realTools.execute(context, toolName, rawArguments);
+                default -> traced(context, toolName,
+                        error("SIMULATOR_TOOL_BLOCKED",
+                                "La herramienta no está habilitada dentro del simulador seguro."));
             };
         } catch (IllegalArgumentException e) {
             return traced(context, toolName, error("INVALID_ARGUMENT", e.getMessage()));
@@ -211,6 +218,25 @@ public class SimulatorToolExecutor {
                 .put("questionId", item.id().toString())
                 .put("question", item.question())
                 .put("occurrences", 1)
+                .put("status", "SIMULATED"));
+    }
+
+    private JSONObject verifyCallerWhatsapp(JSONObject args) {
+        if (!args.optBoolean("confirmedSameNumber", false)) {
+            return error("WHATSAPP_CONFIRMATION_REQUIRED",
+                    "La simulación requiere confirmación explícita de que el número actual también es WhatsApp.");
+        }
+        return success(new JSONObject()
+                .put("simulated", true)
+                .put("verified", true)
+                .put("sameAsCallerNumber", true)
+                .put("status", "SIMULATED"));
+    }
+
+    private static JSONObject simulatedExternalAction(String action) {
+        return success(new JSONObject()
+                .put("simulated", true)
+                .put("action", action)
                 .put("status", "SIMULATED"));
     }
 
