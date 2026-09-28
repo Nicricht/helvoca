@@ -518,13 +518,26 @@ test('authentication and phone administration fit all target viewports', async (
 });
 
 
-test('commercial visual layer loads after legacy styles and presents the voice product clearly', async ({ page }) => {
+test('public hero is calm, dark and focused on one receptionist conversation', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { level: 1, name: 'No pierdas otra llamada.' })).toBeVisible();
-  await expect(page.locator('.rv-voice-preview')).toBeVisible();
-  await expect(page.locator('.rv-voice-preview')).toContainText('Sofía está disponible');
-  await expect(page.locator('.rv-voice-preview')).toContainText('Reserva lista');
+  const hero = page.locator('#authView .hero-card');
+  await expect(hero.getByText('Recepcionista con IA', { exact: true })).toBeVisible();
+  await expect(hero.getByRole('heading', { level: 1, name: 'No pierdas otra llamada.' })).toBeVisible();
+  await expect(hero.getByText('RecepVoz atiende a tus clientes, responde preguntas y agenda reservas mientras tú trabajas.')).toBeVisible();
+
+  const primaryCta = hero.getByRole('link', { name: 'Probar RecepVoz', exact: true });
+  const secondaryCta = hero.getByRole('link', { name: 'Ver cómo funciona', exact: true });
+  await expect(primaryCta).toHaveAttribute('href', '#registerForm');
+  await expect(secondaryCta).toHaveAttribute('href', '/sales.html');
+
+  const demo = hero.locator('.rv-call-demo');
+  await expect(demo).toBeVisible();
+  await expect(demo).toContainText('Sofía');
+  await expect(demo).toContainText('Recepcionista IA · Disponible');
+  await expect(demo).toContainText('¿Tienen hora mañana a las 16:00?');
+  await expect(demo).toContainText('Sí. Puedo reservarte a las 16:00.');
+  await expect(demo).toContainText('Reserva creada');
 
   const stylesheets = await page.locator('link[rel="stylesheet"]').evaluateAll(
     links => links.map(link => new URL(link.href).pathname)
@@ -536,15 +549,18 @@ test('commercial visual layer loads after legacy styles and presents the voice p
   expect(commercialIndex).toBeGreaterThan(homeIndex);
   expect(commercialIndex).toBeGreaterThan(firstUserIndex);
 
-  const heroStyle = await page.locator('#authView .hero-card').evaluate(element => {
-    const style = getComputedStyle(element);
+  const palette = await page.evaluate(() => {
+    const body = getComputedStyle(document.body);
+    const heroCard = getComputedStyle(document.querySelector('#authView .hero-card'));
     return {
-      textAlign: style.textAlign,
-      borderRadius: style.borderRadius
+      background: body.backgroundColor,
+      heroBackground: heroCard.backgroundColor,
+      textAlign: heroCard.textAlign
     };
   });
-  expect(heroStyle.textAlign).toBe('left');
-  expect(Number.parseFloat(heroStyle.borderRadius)).toBeGreaterThanOrEqual(20);
+  expect(palette.background).toBe('rgb(15, 17, 21)');
+  expect(palette.heroBackground).toBe('rgb(21, 25, 34)');
+  expect(palette.textAlign).toBe('left');
 });
 
 test('ready customer console uses the light commercial design system', async ({ page }) => {
