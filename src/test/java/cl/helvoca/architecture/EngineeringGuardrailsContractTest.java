@@ -25,6 +25,12 @@ class EngineeringGuardrailsContractTest {
     }
 
     @Test
+    void fastGateRunsSoftwareFactoryContractTestsWhenFactoryChanges() throws Exception {
+        String fastGate = read("scripts/ci/fast-gate.sh");
+        assertTrue(fastGate.contains("python3 -m unittest discover -s software-factory/tests -p 'test_*.py' -v"));
+    }
+
+    @Test
     void projectInvariantsProtectCriticalCommercialAndTenantTruths() throws Exception {
         String invariants = read("docs/engineering/invariants.md").toLowerCase();
         assertTrue(invariants.contains("tenant"));
