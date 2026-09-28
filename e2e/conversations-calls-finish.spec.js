@@ -213,3 +213,27 @@ test('conversation workspace has an intentional empty state', async ({ page }) =
   await expect(page.getByText('Todavía no hay conversaciones')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Selecciona una conversación' })).toBeVisible();
 });
+
+
+test('customer-facing conversations and simulator keep readable compact type', async ({ page }) => {
+  await mockConversations(page);
+  await page.goto('/conversations.html');
+
+  for (const selector of [
+    '.filter-chip',
+    '.row-summary',
+    '.channel-badge',
+    '.fact dd',
+    '.turn-card p',
+    '.timeline-content p'
+  ]) {
+    const size = await page.locator(selector).first().evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(size, selector).toBeGreaterThanOrEqual(12);
+  }
+
+  await page.goto('/simulator.html');
+  for (const selector of ['.safe-note div > span', '.hint', '.topbar a']) {
+    const size = await page.locator(selector).first().evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(size, selector).toBeGreaterThanOrEqual(12);
+  }
+});
