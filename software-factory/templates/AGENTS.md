@@ -14,5 +14,9 @@ Before implementation, read `software-factory/skill/first-pass-engineering/SKILL
 - Do not claim completion from stale evidence. Verification must belong to the exact final commit.
 - Preserve stronger existing project checks.
 - Do not use the human user as the QA system.
+- Do not use chat history as the only durable progress record.
+- For MEDIUM/HIGH or multi-step work likely to outlive one interaction, maintain a **resume checkpoint** in the Draft PR or another repository-backed artifact.
+- A resume checkpoint must identify branch, work item, exact HEAD, completed blocks, valid CI/evidence, blockers/rulings, and next step.
+- On resume, reconstruct durable state first and do not repeat completed work whose evidence remains valid.
 
-Project-specific commands, safety constraints, deployment rules, and invariants remain authoritative.
+Project-specific commands, safety constraints, deployment rules, invariants, and continuity mechanisms remain authoritative.
