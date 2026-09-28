@@ -12,7 +12,7 @@ Use a local or disposable demo database.
 
 ```bash
 export SEED_ENABLED=true
-export APP_SEED_PRESET=hardware_store
+export SEED_PRESET=hardware_store
 export SEED_ADMIN_EMAIL=ferreteria.demo@helvoca.local
 export SEED_ADMIN_PASSWORD='choose-a-local-demo-password'
 ```
