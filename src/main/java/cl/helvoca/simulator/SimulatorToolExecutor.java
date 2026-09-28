@@ -49,6 +49,8 @@ public class SimulatorToolExecutor {
             "get_stock",
             "list_delivery_zones",
             "validate_delivery_address",
+            "quote_delivery",
+            "create_quote",
             "quote_order",
             "update_order",
             "create_order",
@@ -103,6 +105,8 @@ public class SimulatorToolExecutor {
                 case "list_catalog", "get_stock", "list_delivery_zones", "validate_delivery_address",
                      "get_business_information", "list_services", "search_knowledge" ->
                         realTools.execute(context, toolName, rawArguments);
+                case "quote_delivery" -> traced(context, toolName, quoteDelivery(context, args));
+                case "create_quote" -> traced(context, toolName, createQuote(context, args));
                 case "quote_order" -> traced(context, toolName, quoteOrder(context, args));
                 case "update_order" -> traced(context, toolName, updateOrder(context, args));
                 case "create_order" -> traced(context, toolName, createOrder(context, args));
@@ -272,6 +276,120 @@ public class SimulatorToolExecutor {
                 .put("question", item.question())
                 .put("occurrences", 1)
                 .put("status", "SIMULATED"));
+    }
+
+    private JSONObject quoteDelivery(RealtimeCallContext context, JSONObject args) {
+        String address = required(args, "address").trim();
+        JSONObject validation = parse(realTools.execute(
+                context,
+                "validate_delivery_address",
+                new JSONObject().put("address", address).toString()));
+        if (!validation.optBoolean("success", false)) return validation;
+
+        JSONObject delivery = validation.optJSONObject("data");
+        if (delivery == null || !delivery.optBoolean("covered", false)) {
+            return error("DELIVERY_ADDRESS_UNAVAILABLE",
+                    "La dirección no está cubierta por una zona de despacho configurada.");
+        }
+
+        return success(new JSONObject()
+                .put("simulated", true)
+                .put("operationId", UUID.randomUUID().toString())
+                .put("revision", 1)
+                .put("confirmationToken", UUID.randomUUID().toString())
+                .put("status", "AWAITING_CONFIRMATION")
+                .put("address", delivery.optString("address", address))
+                .put("deliveryZoneId", delivery.opt("deliveryZoneId"))
+                .put("deliveryZone", delivery.opt("deliveryZone"))
+                .put("fee", delivery.opt("fee"))
+                .put("minimumOrder", delivery.opt("minimumOrder"))
+                .put("confirmationRequired", true));
+    }
+
+    private JSONObject createQuote(RealtimeCallContext context, JSONObject args) {
+        String title = required(args, "title").trim();
+        if (title.isBlank()) throw new IllegalArgumentException("La cotización necesita un título.");
+
+        JSONArray requestedItems = args.optJSONArray("items");
+        if (requestedItems == null || requestedItems.isEmpty()) {
+            return success(new JSONObject()
+                    .put("simulated", true)
+                    .put("operationId", UUID.randomUUID().toString())
+                    .put("revision", 1)
+                    .put("quoteId", UUID.randomUUID().toString())
+                    .put("title", title)
+                    .put("status", "REQUESTED")
+                    .put("amount", JSONObject.NULL)
+                    .put("currency", "CLP")
+                    .put("confirmationRequired", false));
+        }
+
+        JSONObject catalogResult = parse(realTools.execute(context, "list_catalog", "{}"));
+        if (!catalogResult.optBoolean("success", false)) {
+            return error("CATALOG_UNAVAILABLE",
+                    "No pude consultar el catálogo autoritativo para esta simulación.");
+        }
+        JSONObject catalogData = catalogResult.optJSONObject("data");
+        JSONArray catalogItems = catalogData == null ? null : catalogData.optJSONArray("items");
+        if (catalogItems == null) {
+            return error("CATALOG_UNAVAILABLE",
+                    "El catálogo autoritativo no devolvió productos.");
+        }
+
+        BigDecimal amount = BigDecimal.ZERO;
+        String currency = null;
+        JSONArray quotedItems = new JSONArray();
+        for (int i = 0; i < requestedItems.length(); i++) {
+            JSONObject requested = requestedItems.optJSONObject(i);
+            if (requested == null) {
+                return error("INVALID_ARGUMENT", "Cada ítem debe ser un objeto válido.");
+            }
+            UUID itemId = uuid(required(requested, "catalogItemId"));
+            int quantity = requested.optInt("quantity", 0);
+            if (quantity < 1 || quantity > 100) {
+                return error("INVALID_QUANTITY", "La cantidad debe estar entre 1 y 100.");
+            }
+
+            JSONObject catalogItem = findCatalogItem(catalogItems, itemId);
+            if (catalogItem == null) {
+                return error("CATALOG_ITEM_UNAVAILABLE",
+                        "El producto solicitado no existe en el catálogo activo.");
+            }
+            BigDecimal unitPrice = money(catalogItem.opt("price"));
+            if (unitPrice == null) {
+                return error("CATALOG_PRICE_UNAVAILABLE",
+                        "El producto no tiene un precio configurado.");
+            }
+            String itemCurrency = catalogItem.optString("currency", "CLP");
+            if (itemCurrency == null || itemCurrency.isBlank()) itemCurrency = "CLP";
+            itemCurrency = itemCurrency.trim().toUpperCase(Locale.ROOT);
+            if (currency == null) currency = itemCurrency;
+            if (!currency.equals(itemCurrency)) {
+                return error("CURRENCY_MISMATCH",
+                        "No se pueden mezclar monedas distintas en la misma cotización.");
+            }
+
+            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+            amount = amount.add(lineTotal);
+            quotedItems.put(new JSONObject()
+                    .put("catalogItemId", itemId.toString())
+                    .put("name", catalogItem.optString("name", "Producto"))
+                    .put("quantity", quantity)
+                    .put("unitPrice", unitPrice)
+                    .put("lineTotal", lineTotal));
+        }
+
+        return success(new JSONObject()
+                .put("simulated", true)
+                .put("operationId", UUID.randomUUID().toString())
+                .put("revision", 1)
+                .put("quoteId", UUID.randomUUID().toString())
+                .put("title", title)
+                .put("status", "READY")
+                .put("amount", amount)
+                .put("currency", currency == null ? "CLP" : currency)
+                .put("items", quotedItems)
+                .put("confirmationRequired", false));
     }
 
     private JSONObject quoteOrder(RealtimeCallContext context, JSONObject args) {
