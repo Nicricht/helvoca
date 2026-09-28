@@ -46,7 +46,7 @@ import java.util.UUID;
 public class ReceptionistSimulatorService {
     public static final String PROVIDER_ID = "simulator";
     private static final Logger log = LoggerFactory.getLogger(ReceptionistSimulatorService.class);
-    private static final int MAX_TURNS = 24;
+    private static final int MAX_TURNS = 32;
     private static final int MAX_OPENAI_ATTEMPTS = 3;
 
     private final TenantProvider tenantProvider;
