@@ -1,0 +1,34 @@
+name: Dashboard Finish Safe CI
+
+on:
+  push:
+    branches:
+      - feat/frontend-dashboard-finish
+
+permissions:
+  contents: read
+
+jobs:
+  dashboard-finish:
+    if: contains(github.event.head_commit.message, '[dashboard-safe-ci]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Validate dashboard JavaScript
+        run: node --check src/main/resources/static/commercial-status.js
+
+      - name: Install frontend test dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run dashboard operational E2E
+        run: npx playwright test e2e/home-operational.spec.js
