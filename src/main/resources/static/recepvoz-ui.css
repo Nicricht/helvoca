@@ -1,0 +1,412 @@
+/* RecepVoz UI
+   Canonical customer-facing design layer.
+   Batch 1 owns Landing, Auth and First-user onboarding. */
+
+:root {
+  --rv-bg: #0f1115;
+  --rv-surface: #151922;
+  --rv-surface-elevated: #1b2230;
+  --rv-surface-interactive: #202735;
+  --rv-text: #f5f7fa;
+  --rv-text-secondary: #a7b0bf;
+  --rv-text-muted: #7f8998;
+  --rv-brand: #6d5df6;
+  --rv-brand-secondary: #8b7cff;
+  --rv-success: #22c55e;
+  --rv-warning: #f59e0b;
+  --rv-danger: #ef4444;
+  --rv-border: rgba(255,255,255,.08);
+  --rv-radius-sm: 12px;
+  --rv-radius-md: 16px;
+  --rv-radius-lg: 20px;
+  --rv-shadow: 0 18px 48px rgba(0,0,0,.18);
+}
+
+/* Public entry */
+body.home-page:has(#authView:not(.hidden)) {
+  background: var(--rv-bg) !important;
+  color: var(--rv-text) !important;
+}
+
+body.home-page:has(#authView:not(.hidden)) .shell {
+  width: min(1200px, calc(100% - 48px));
+}
+
+body.home-page:has(#authView:not(.hidden)) .topbar {
+  min-height: 72px !important;
+  padding: 8px 0 !important;
+  border-bottom: 1px solid var(--rv-border) !important;
+  background: var(--rv-bg) !important;
+}
+
+.rv-brand-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  text-decoration: none;
+}
+
+.rv-brand-logo {
+  display: block;
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.rv-brand-link:focus-visible,
+body.home-page:has(#authView:not(.hidden)) a:focus-visible,
+body.home-page:has(#authView:not(.hidden)) button:focus-visible,
+body.home-page:has(#authView:not(.hidden)) input:focus-visible {
+  outline: 3px solid rgba(109,93,246,.34);
+  outline-offset: 3px;
+}
+
+body.home-page:has(#authView:not(.hidden)) #primaryNav {
+  display: none;
+}
+
+body.home-page:has(#authView:not(.hidden)) #sessionBadge {
+  border-color: var(--rv-border);
+  background: transparent;
+  color: var(--rv-text-muted);
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView.auth-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  max-width: 1180px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .hero-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(340px, .78fr);
+  gap: 56px;
+  align-items: center;
+  min-height: 520px;
+  padding: 64px;
+  border: 1px solid var(--rv-border);
+  border-radius: 24px;
+  background: var(--rv-surface) !important;
+  box-shadow: var(--rv-shadow);
+  color: var(--rv-text);
+  text-align: left;
+  overflow: hidden;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .hero-card .eyebrow {
+  margin: 0 0 14px;
+  color: var(--rv-brand-secondary);
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .hero-card h1 {
+  max-width: 650px;
+  margin: 0;
+  color: var(--rv-text) !important;
+  font-size: clamp(48px, 6vw, 72px);
+  line-height: .98;
+  letter-spacing: -.05em;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .hero-card > .rv-hero-copy > p {
+  max-width: 610px;
+  margin: 20px 0 0;
+  color: var(--rv-text-secondary) !important;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.rv-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+}
+
+.rv-hero-actions .button {
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: var(--rv-radius-sm);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.rv-hero-primary {
+  border-color: var(--rv-brand) !important;
+  background: var(--rv-brand) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+.rv-hero-primary:hover {
+  border-color: #5d50da !important;
+  background: #5d50da !important;
+}
+
+.rv-hero-secondary {
+  border-color: rgba(255,255,255,.12) !important;
+  background: transparent !important;
+  color: #d9deea !important;
+  box-shadow: none !important;
+}
+
+.rv-call-demo {
+  width: 100%;
+  padding: 22px;
+  border: 1px solid var(--rv-border);
+  border-radius: 18px;
+  background: var(--rv-surface-elevated);
+}
+
+.rv-call-demo-head,
+.rv-call-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rv-call-demo-head {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--rv-border);
+}
+
+.rv-sofia-avatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 13px;
+  background: var(--rv-brand);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.rv-call-demo-identity strong,
+.rv-call-demo-identity span,
+.rv-call-result strong,
+.rv-call-result small {
+  display: block;
+}
+
+.rv-call-demo-identity strong { color: var(--rv-text); font-size: 14px; }
+.rv-call-demo-identity span { margin-top: 4px; color: #9ca6b6; font-size: 11px; }
+.rv-call-demo-identity i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--rv-success);
+  vertical-align: 1px;
+}
+
+.rv-call-thread {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.rv-call-message {
+  max-width: 90%;
+  padding: 12px 14px;
+  border: 1px solid var(--rv-border);
+  border-radius: 14px;
+  background: rgba(255,255,255,.035);
+}
+
+.rv-call-message.assistant {
+  justify-self: end;
+  border-color: rgba(109,93,246,.28);
+  background: rgba(109,93,246,.10);
+}
+
+.rv-call-message span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--rv-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.rv-call-message p {
+  margin: 0 !important;
+  color: #e8ebf2 !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+.rv-call-result {
+  padding-top: 16px;
+  border-top: 1px solid var(--rv-border);
+}
+
+.rv-call-check {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 9px;
+  background: rgba(34,197,94,.12);
+  color: #54d985;
+  font-weight: 900;
+}
+
+.rv-call-result strong { color: #effcf4; font-size: 12px; }
+.rv-call-result small { margin-top: 2px; color: var(--rv-text-muted); font-size: 10px; }
+
+.rv-trust-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
+  border: 1px solid var(--rv-border);
+  border-radius: var(--rv-radius-md);
+  background: var(--rv-surface);
+  overflow: hidden;
+}
+
+.rv-trust-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 14px 18px;
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+
+.rv-trust-item + .rv-trust-item { border-left: 1px solid var(--rv-border); }
+.rv-trust-item > span {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: var(--rv-brand-secondary);
+}
+.rv-trust-item strong { color: #dce2eb; font-weight: 700; }
+
+/* Auth */
+body.home-page:has(#authView:not(.hidden)) #authView .auth-card {
+  width: min(560px, 100%);
+  justify-self: center;
+  padding: 28px;
+  border: 1px solid var(--rv-border);
+  border-radius: var(--rv-radius-lg);
+  background: var(--rv-surface) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .tabs {
+  background: rgba(255,255,255,.04);
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView input {
+  border-color: var(--rv-border);
+  background: var(--rv-bg) !important;
+  color: var(--rv-text) !important;
+}
+
+/* First-user onboarding canonical ownership */
+body.first-user-onboarding-active {
+  background: var(--rv-bg) !important;
+  color: var(--rv-text) !important;
+}
+
+body.first-user-onboarding-active #firstUserOnboarding {
+  border-color: var(--rv-border) !important;
+  background: var(--rv-surface) !important;
+  color: var(--rv-text);
+  box-shadow: var(--rv-shadow);
+}
+
+body.first-user-onboarding-active #firstUserOnboarding h1 {
+  color: var(--rv-text) !important;
+}
+
+body.first-user-onboarding-active #firstUserOnboarding .first-user-lead,
+body.first-user-onboarding-active .first-user-step small,
+body.first-user-onboarding-active .first-user-actions span {
+  color: var(--rv-text-secondary) !important;
+}
+
+@media (max-width: 900px) {
+  body.home-page:has(#authView:not(.hidden)) #authView .hero-card {
+    grid-template-columns: 1fr;
+    gap: 34px;
+    min-height: auto;
+    padding: 42px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .hero-card h1 {
+    font-size: clamp(44px, 9vw, 62px);
+  }
+
+  .rv-call-demo { max-width: 620px; }
+
+  .rv-trust-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rv-trust-item:nth-child(3) { border-left: 0; }
+  .rv-trust-item:nth-child(n+3) { border-top: 1px solid var(--rv-border); }
+}
+
+@media (max-width: 620px) {
+  body.home-page:has(#authView:not(.hidden)) .shell {
+    width: min(100% - 24px, 620px);
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .topbar {
+    min-height: 60px !important;
+    padding: 6px 0 !important;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-brand-logo {
+    width: 44px;
+    height: 44px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .hero-card {
+    gap: 28px;
+    padding: 30px 22px;
+    border-radius: 20px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .hero-card h1 {
+    font-size: clamp(40px, 13vw, 52px);
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .hero-card > .rv-hero-copy > p {
+    margin-top: 16px;
+    font-size: 15px;
+  }
+
+  .rv-hero-actions { margin-top: 24px; }
+  .rv-call-demo { padding: 18px; }
+}
+
+@media (max-width: 430px) {
+  .rv-trust-strip { grid-template-columns: 1fr; }
+  .rv-trust-item + .rv-trust-item {
+    border-left: 0;
+    border-top: 1px solid var(--rv-border);
+  }
+  .rv-trust-item {
+    justify-content: flex-start;
+    min-height: 54px;
+    text-align: left;
+  }
+}
