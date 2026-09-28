@@ -490,6 +490,10 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#ownerHandoffsToday')).toHaveText('1');
   await expect(page.locator('#ownerFailuresToday')).toHaveText('1');
   await expect(page.locator('#ownerDashboardAttention')).toBeVisible();
+  await expect(page.locator('#ownerRequestsAttentionToday')).toHaveText('1');
+  await expect(page.locator('#ownerRequestsAttentionChip')).toBeVisible();
+  await expect(page.locator('#ownerQuestionsAttentionToday')).toHaveText('2');
+  await expect(page.locator('#ownerQuestionsAttentionChip')).toBeVisible();
   await expect(page.locator('#ownerOrdersAttentionToday')).toHaveText('1');
   await expect(page.locator('#ownerOrdersAttentionChip')).toBeVisible();
   await expect(page.locator('#ownerHandoffsChip')).toBeVisible();
@@ -770,6 +774,8 @@ test('owner commercial dashboard exposes loading and empty states', async ({ pag
   await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'empty');
   await expect(page.locator('#ownerDashboardState')).toHaveText('SIN ACTIVIDAD');
   await expect(page.locator('#ownerDashboardMessage')).toHaveText('Aún no hay actividad comercial hoy.');
+  await expect(page.locator('#ownerAttentionSummary')).toHaveText('No hay pendientes críticos detectados.');
+  await expect(page.locator('#ownerDashboardAttention')).toBeHidden();
   await expect(page.locator('#homeRecentActivity')).toContainText('Todavía no hay actividad reciente.');
 });
 
@@ -791,6 +797,7 @@ test('owner commercial dashboard exposes an error state without hiding the works
   await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'error');
   await expect(page.locator('#ownerDashboardState')).toHaveText('NO DISPONIBLE');
   await expect(page.locator('#ownerDashboardMessage')).toContainText('No pudimos actualizar las métricas');
+  await expect(page.locator('#ownerAttentionSummary')).toHaveText('No pudimos verificar qué requiere atención.');
   await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
 });
 
