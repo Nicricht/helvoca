@@ -115,10 +115,36 @@ test('new owner gets a four-step guided setup instead of the operational workspa
     'Horarios',
     'Recepcionista'
   ]);
-  await expect(page.getByRole('link', { name: 'Continuar configuración' })).toHaveAttribute('href', '/settings.html');
+  const nextAction = page.locator('#firstUserNextAction');
+  await expect(nextAction).toBeVisible();
+  await expect(nextAction).toHaveText('Continuar con Servicios');
+  await expect(nextAction).toHaveAttribute('href', '/settings.html');
+  await expect(page.locator('#firstUserSteps .first-user-step.next')).toHaveCount(1);
   await expect(page.locator('#homeBusinessWorkspace')).toBeHidden();
   await expect(page.locator('#primaryNav a')).toContainText(['Inicio', 'Reservas', 'Clientes', 'Configuración']);
   await expect(page.locator('#primaryNav .nav-inventory')).toBeHidden();
+});
+
+test('onboarding next action follows the real next incomplete step', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockBaseTenant(page, {
+    businessProfileConfigured: true,
+    servicesConfigured: true,
+    scheduleConfigured: true,
+    knowledgeConfigured: false,
+    humanTransferConfigured: false,
+    phoneConfigured: false,
+    readyForCalls: false,
+    nextStep: 'PHONE'
+  });
+
+  await page.goto('/');
+
+  await expect(page.locator('#firstUserOnboarding')).toBeVisible();
+  await expect(page.locator('#firstUserProgressText')).toHaveText('3 de 4 pasos completados');
+  await expect(page.locator('#firstUserSteps .first-user-step.next')).toHaveCount(1);
+  await expect(page.locator('#firstUserNextAction')).toHaveText('Continuar con Recepcionista');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
 });
 
 test('ready owner lands on a simple daily home with direct reservations and customers navigation', async ({ page }) => {
