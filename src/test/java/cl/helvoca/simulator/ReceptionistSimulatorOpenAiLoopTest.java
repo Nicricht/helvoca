@@ -154,6 +154,126 @@ class ReceptionistSimulatorOpenAiLoopTest {
     }
 
     @Test
+    void commercialFallbackBranchesStaySpecificAndFactual() throws Exception {
+        assertEquals("No hay productos activos configurados.",
+                fallbackSummary("list_catalog", new JSONObject()));
+
+        assertEquals("No hay productos activos configurados.",
+                fallbackSummary("list_catalog", new JSONObject()
+                        .put("items", new JSONArray().put(JSONObject.NULL))));
+
+        assertEquals("Tengo Producto sin precio.",
+                fallbackSummary("list_catalog", new JSONObject()
+                        .put("items", new JSONArray().put(new JSONObject()
+                                .put("name", "Producto sin precio")
+                                .put("price", JSONObject.NULL)))));
+
+        assertEquals("Tengo Producto por 1000 CLP.",
+                fallbackSummary("list_catalog", new JSONObject()
+                        .put("items", new JSONArray().put(new JSONObject()
+                                .put("name", "Producto")
+                                .put("price", 1000)
+                                .put("currency", "")))));
+
+        assertEquals("No tengo stock confirmado de Producto.",
+                fallbackSummary("get_stock", new JSONObject()
+                        .put("productName", "Producto")
+                        .put("availabilityKnown", false)));
+
+        assertEquals("No tengo stock confirmado de Producto.",
+                fallbackSummary("get_stock", new JSONObject()
+                        .put("productName", "Producto")
+                        .put("availabilityKnown", true)
+                        .put("available", -1)));
+
+        assertEquals("Producto está agotado.",
+                fallbackSummary("get_stock", new JSONObject()
+                        .put("productName", "Producto")
+                        .put("availabilityKnown", true)
+                        .put("available", 0)));
+
+        assertEquals("Quedan 4 unidades disponibles de Producto.",
+                fallbackSummary("get_stock", new JSONObject()
+                        .put("productName", "Producto")
+                        .put("availabilityKnown", true)
+                        .put("available", 4)));
+
+        assertEquals("No hay zonas de despacho activas configuradas.",
+                fallbackSummary("list_delivery_zones", new JSONObject()));
+
+        assertEquals("No hay zonas de despacho activas configuradas.",
+                fallbackSummary("list_delivery_zones", new JSONObject()
+                        .put("zones", new JSONArray().put(JSONObject.NULL)
+                                .put(new JSONObject().put("name", "")))));
+
+        assertEquals("Hay despacho en Providencia Demo o Ñuñoa Demo.",
+                fallbackSummary("list_delivery_zones", new JSONObject()
+                        .put("zones", new JSONArray()
+                                .put(new JSONObject().put("name", "Providencia Demo"))
+                                .put(new JSONObject().put("name", "Ñuñoa Demo")))));
+
+        assertEquals("Esa dirección no está dentro de la cobertura configurada.",
+                fallbackSummary("validate_delivery_address", new JSONObject().put("covered", false)));
+
+        assertEquals("El despacho cuesta 3990 CLP.",
+                fallbackSummary("quote_delivery", new JSONObject().put("fee", 3990).put("currency", "")));
+
+        assertEquals("La dirección está cubierta por Providencia Demo.",
+                fallbackSummary("validate_delivery_address", new JSONObject()
+                        .put("covered", true)
+                        .put("deliveryZone", "Providencia Demo")));
+
+        assertEquals("La dirección está dentro de la cobertura configurada.",
+                fallbackSummary("validate_delivery_address", new JSONObject().put("covered", true)));
+
+        assertEquals("La cotización requiere revisión del negocio antes de dar un monto.",
+                fallbackSummary("create_quote", new JSONObject()
+                        .put("status", "REQUESTED")
+                        .put("amount", JSONObject.NULL)));
+
+        assertEquals("La cotización quedó registrada dentro de la simulación.",
+                fallbackSummary("create_quote", new JSONObject()
+                        .put("status", "READY")
+                        .put("amount", JSONObject.NULL)));
+
+        assertEquals("La cotización queda en 5000 CLP.",
+                fallbackSummary("create_quote", new JSONObject()
+                        .put("amount", 5000)
+                        .put("currency", "")));
+
+        assertEquals("El pedido queda preparado para confirmar dentro de la simulación.",
+                fallbackSummary("quote_order", new JSONObject()
+                        .put("total", JSONObject.NULL)
+                        .put("currency", "")));
+
+        assertEquals("En una llamada real, el pedido quedaría confirmado.",
+                fallbackSummary("create_order", new JSONObject()
+                        .put("total", JSONObject.NULL)
+                        .put("currency", "")));
+
+        assertEquals("En una llamada real, el pedido quedaría confirmado por 7000 CLP.",
+                fallbackSummary("create_order", new JSONObject()
+                        .put("total", 7000)
+                        .put("currency", "")));
+
+        assertEquals("No hay pedidos dentro de esta simulación.",
+                fallbackSummary("get_order_status", new JSONObject().put("orders", new JSONArray())));
+
+        assertEquals("Hay 2 pedido(s) dentro de esta simulación.",
+                fallbackSummary("get_order_status", new JSONObject()
+                        .put("orders", new JSONArray().put(new JSONObject()).put(new JSONObject()))));
+
+        assertEquals("Encontré el pedido dentro de esta simulación.",
+                fallbackSummary("get_order_status", new JSONObject()));
+
+        assertEquals("El pedido está awaiting confirmation.",
+                fallbackSummary("get_order_status", new JSONObject().put("status", "AWAITING_CONFIRMATION")));
+
+        assertEquals("En una llamada real, ese pedido quedaría cancelado.",
+                fallbackSummary("cancel_order", new JSONObject().put("status", "CANCELLED")));
+    }
+
+    @Test
     void unusableFunctionCallProducesSafeFallbackInsteadOfLooping() throws Exception {
         HttpServer server = server(new AtomicInteger(), new ArrayList<>(),
                 new JSONObject().put("id", "resp-1").put("output", new JSONArray().put(
@@ -202,6 +322,23 @@ class ReceptionistSimulatorOpenAiLoopTest {
         assertEquals(1, output.length());
         assertEquals("", output.getJSONObject(0).getString("output"));
         assertEquals("ok", output.getJSONObject(0).getString("call_id"));
+    }
+
+    private static String fallbackSummary(String toolName, JSONObject data) throws Exception {
+        HttpServer server = server(new AtomicInteger(), new ArrayList<>(),
+                new JSONObject().put("output", new JSONArray().put(
+                        new JSONObject()
+                                .put("type", "function_call")
+                                .put("call_id", toolName + "-fallback")
+                                .put("name", toolName)
+                                .put("arguments", "{}"))).toString());
+        try {
+            Fixture f = fixture(server);
+            when(f.tools.execute(any(), eq(toolName), anyString())).thenReturn(success(data));
+            return f.service.message(f.sessionId, "prueba").reply();
+        } finally {
+            server.stop(0);
+        }
     }
 
     private static Fixture fixture(HttpServer server) {
