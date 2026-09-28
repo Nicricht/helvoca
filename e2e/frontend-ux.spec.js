@@ -536,7 +536,7 @@ test('public header uses the RecepVoz brand mark without crowding the layout', a
     await expect(brandLink).toBeVisible();
     await expect(brandLink).toHaveAttribute('href', '/');
     await expect(logo).toBeVisible();
-    await expect(logo).toHaveAttribute('src', '/recepvoz-brand-header.webp');
+    await expect(logo).toHaveAttribute('src', /^data:image\/webp;base64,/);
     await expect(logo).toHaveAttribute('alt', 'RecepVoz');
     await expect(header.locator('.brand')).toHaveCount(0);
     await expect(page.locator('#sessionBadge')).toBeVisible();
