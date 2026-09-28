@@ -449,6 +449,15 @@ public class ReceptionistSimulatorService {
             case "list_services" -> serviceNames(data);
             case "get_business_information" -> "Estás hablando con " + data.optString("name", "este negocio") + ".";
             case "search_knowledge" -> knowledgeAnswer(data);
+            case "list_catalog" -> catalogSummary(data);
+            case "get_stock" -> stockSummary(data);
+            case "list_delivery_zones" -> deliveryZonesSummary(data);
+            case "validate_delivery_address", "quote_delivery" -> deliverySummary(data);
+            case "create_quote" -> quoteSummary(data);
+            case "quote_order", "update_order" -> orderQuoteSummary(data);
+            case "create_order" -> confirmedOrderSummary(data);
+            case "get_order_status" -> orderStatusSummary(data);
+            case "cancel_order" -> "En una llamada real, ese pedido quedaría cancelado.";
             case "create_request" -> "En una llamada real, la solicitud quedaría registrada para seguimiento del negocio.";
             case "record_unanswered_question" -> "No tengo esa información confirmada. En una llamada real dejaría la pregunta pendiente para que el negocio la responda.";
             case "transfer_to_human" -> "En una llamada real, ahora te transferiría con una persona del negocio.";
@@ -506,6 +515,115 @@ public class ReceptionistSimulatorService {
         if (results == null || results.isEmpty()) return "No tengo esa información confirmada.";
         String content = results.getJSONObject(0).optString("content", "");
         return content.isBlank() ? "No tengo esa información confirmada." : sanitize(content);
+    }
+
+    private String catalogSummary(JSONObject data) {
+        JSONArray items = data.optJSONArray("items");
+        if (items == null || items.isEmpty()) return "No hay productos activos configurados.";
+        List<String> values = new ArrayList<>();
+        for (int i = 0; i < Math.min(3, items.length()); i++) {
+            JSONObject item = items.optJSONObject(i);
+            if (item == null) continue;
+            String name = item.optString("name", "Producto");
+            Object price = item.opt("price");
+            if (price == null || price == JSONObject.NULL) {
+                values.add(name);
+            } else {
+                String currency = item.optString("currency", "CLP");
+                if (currency == null || currency.isBlank()) currency = "CLP";
+                values.add(name + " por " + price + " " + currency);
+            }
+        }
+        if (values.isEmpty()) return "No hay productos activos configurados.";
+        return "Tengo " + joinSpanish(values) + ".";
+    }
+
+    private String stockSummary(JSONObject data) {
+        String name = data.optString("productName", "ese producto");
+        if (!data.optBoolean("availabilityKnown", false)) {
+            return "No tengo stock confirmado de " + name + ".";
+        }
+        int available = data.optInt("available", -1);
+        if (available < 0) return "No tengo stock confirmado de " + name + ".";
+        if (available == 0) return name + " está agotado.";
+        if (available == 1) return "Queda 1 unidad disponible de " + name + ".";
+        return "Quedan " + available + " unidades disponibles de " + name + ".";
+    }
+
+    private String deliveryZonesSummary(JSONObject data) {
+        JSONArray zones = data.optJSONArray("zones");
+        if (zones == null || zones.isEmpty()) return "No hay zonas de despacho activas configuradas.";
+        List<String> names = new ArrayList<>();
+        for (int i = 0; i < Math.min(4, zones.length()); i++) {
+            JSONObject zone = zones.optJSONObject(i);
+            if (zone == null) continue;
+            String name = zone.optString("name", "");
+            if (!name.isBlank()) names.add(name);
+        }
+        return names.isEmpty()
+                ? "No hay zonas de despacho activas configuradas."
+                : "Hay despacho en " + joinSpanish(names) + ".";
+    }
+
+    private String deliverySummary(JSONObject data) {
+        if (data.has("covered") && !data.optBoolean("covered", false)) {
+            return "Esa dirección no está dentro de la cobertura configurada.";
+        }
+        String address = data.optString("address", "");
+        Object fee = data.opt("fee");
+        String currency = data.optString("currency", "CLP");
+        if (currency == null || currency.isBlank()) currency = "CLP";
+        if (fee != null && fee != JSONObject.NULL) {
+            if (!address.isBlank()) return "El despacho a " + address + " cuesta " + fee + " " + currency + ".";
+            return "El despacho cuesta " + fee + " " + currency + ".";
+        }
+        String zone = data.optString("deliveryZone", "");
+        if (!zone.isBlank()) return "La dirección está cubierta por " + zone + ".";
+        return "La dirección está dentro de la cobertura configurada.";
+    }
+
+    private String quoteSummary(JSONObject data) {
+        Object amount = data.opt("amount");
+        String status = data.optString("status", "");
+        if (amount == null || amount == JSONObject.NULL) {
+            return "REQUESTED".equalsIgnoreCase(status)
+                    ? "La cotización requiere revisión del negocio antes de dar un monto."
+                    : "La cotización quedó registrada dentro de la simulación.";
+        }
+        String currency = data.optString("currency", "CLP");
+        if (currency == null || currency.isBlank()) currency = "CLP";
+        return "La cotización queda en " + amount + " " + currency + ".";
+    }
+
+    private String orderQuoteSummary(JSONObject data) {
+        Object total = data.opt("total");
+        String currency = data.optString("currency", "CLP");
+        if (currency == null || currency.isBlank()) currency = "CLP";
+        if (total == null || total == JSONObject.NULL) {
+            return "El pedido queda preparado para confirmar dentro de la simulación.";
+        }
+        return "El pedido queda cotizado en " + total + " " + currency + " y espera tu confirmación.";
+    }
+
+    private String confirmedOrderSummary(JSONObject data) {
+        Object total = data.opt("total");
+        String currency = data.optString("currency", "CLP");
+        if (currency == null || currency.isBlank()) currency = "CLP";
+        if (total == null || total == JSONObject.NULL) {
+            return "En una llamada real, el pedido quedaría confirmado.";
+        }
+        return "En una llamada real, el pedido quedaría confirmado por " + total + " " + currency + ".";
+    }
+
+    private String orderStatusSummary(JSONObject data) {
+        JSONArray orders = data.optJSONArray("orders");
+        if (orders != null) {
+            if (orders.isEmpty()) return "No hay pedidos dentro de esta simulación.";
+            return "Hay " + orders.length() + " pedido(s) dentro de esta simulación.";
+        }
+        String status = data.optString("status", "");
+        if (status.isBlank()) return "Encontré el pedido dentro de esta simulación.";
+        return "El pedido está " + status.toLowerCase(Locale.ROOT).replace('_', ' ') + ".";
     }
 
     private String buildHistory(UUID callId) {
