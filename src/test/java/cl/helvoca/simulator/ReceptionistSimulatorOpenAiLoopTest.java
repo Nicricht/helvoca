@@ -106,7 +106,7 @@ class ReceptionistSimulatorOpenAiLoopTest {
                 f.service.message(f.sessionId, "Necesito ayuda").reply());
 
         verify(f.gemini).respond(
-                anyString(), anyList(), argThat(names -> names.contains("list_catalog") && !names.contains("evil_tool")), any());
+                anyString(), anyList(), argThat(names -> names.size() == 1 && names.contains("list_catalog")), any());
         verify(f.calls).save(f.call);
     }
 
@@ -160,7 +160,6 @@ class ReceptionistSimulatorOpenAiLoopTest {
         when(realTools.buildInstructions(any(RealtimeCallContext.class))).thenReturn("Instrucciones base.");
         when(tools.toolDefinitions(any())).thenReturn(new JSONArray()
                 .put(tool("list_catalog"))
-                .put(tool("evil_tool"))
                 .put(new JSONObject().put("type", "function").put("name", "")));
         when(openAi.hasApiKey()).thenReturn(true);
         when(openAi.getApiKey()).thenReturn("test-key");
