@@ -6,6 +6,7 @@ import cl.helvoca.booking.BookingStatus;
 import cl.helvoca.call.CallTraceService;
 import cl.helvoca.request.RequestPriority;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 
@@ -116,7 +117,7 @@ public class SimulatorToolExecutor {
                         error("SIMULATOR_TOOL_BLOCKED",
                                 "La herramienta no está habilitada dentro del simulador seguro."));
             };
-        } catch (IllegalArgumentException e) {
+        } catch (JSONException | IllegalArgumentException e) {
             return traced(context, toolName, error("INVALID_ARGUMENT", e.getMessage()));
         } catch (Exception e) {
             return traced(context, toolName, error("SIMULATOR_TOOL_FAILED", "No pude completar esa acción dentro de la simulación."));
