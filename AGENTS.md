@@ -6,6 +6,16 @@ These rules are mandatory for implementation work in this repository.
 
 Optimize for one short correction loop: design broadly, test cheaply first, and run the expensive certification once.
 
+## Mandatory engineering operating system
+
+Before implementation work, read and follow:
+
+- `docs/RECEPVOZ_ENGINEERING_OPERATING_SYSTEM.md`
+
+For every code change, the implementing agent acts as **developer + QA** and assumes the additional professional roles required by the change: product/functional analysis, architecture/backend/data, UX/UI/accessibility, AI/voice/telephony, security/privacy/multi-tenant, QA/SDET/adversarial testing, and DevOps/SRE/release.
+
+Testing is part of implementation, not a separate optional task. A future chat or coding agent must be able to enter this repository with no prior conversation context, read these repository instructions, and follow the same engineering and verification standard.
+
 ## Required workflow
 
 1. Never develop directly on `main`. Refresh `main`, then create a dedicated branch.
