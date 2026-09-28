@@ -264,6 +264,46 @@ body.home-page:has(#authView:not(.hidden)) .rv-hero-secondary:hover {
   font-size: 10px;
 }
 
+.rv-trust-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  width: 100%;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 16px;
+  background: #151922;
+  overflow: hidden;
+}
+
+.rv-trust-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 14px 18px;
+  color: #b7c0cf;
+  font-size: 12px;
+  text-align: center;
+}
+
+.rv-trust-item + .rv-trust-item {
+  border-left: 1px solid rgba(255,255,255,.07);
+}
+
+.rv-trust-item > span {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: #8b7cff;
+}
+
+.rv-trust-item strong {
+  color: #dce2eb;
+  font-weight: 700;
+}
+
 body.home-page:has(#authView:not(.hidden)) #authView .auth-card {
   width: min(560px, 100%);
   justify-self: center;
@@ -822,6 +862,37 @@ body.inventory-page .inventory-restock-card {
 :where(a, button, input, textarea, select):focus-visible {
   outline: 3px solid rgba(99,91,255,.28);
   outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .rv-trust-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rv-trust-item:nth-child(3) {
+    border-left: 0;
+  }
+
+  .rv-trust-item:nth-child(n+3) {
+    border-top: 1px solid rgba(255,255,255,.07);
+  }
+}
+
+@media (max-width: 430px) {
+  .rv-trust-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .rv-trust-item + .rv-trust-item {
+    border-left: 0;
+    border-top: 1px solid rgba(255,255,255,.07);
+  }
+
+  .rv-trust-item {
+    justify-content: flex-start;
+    min-height: 54px;
+    text-align: left;
+  }
 }
 
 @media (max-width: 900px) {
