@@ -425,6 +425,27 @@ test('settings preset changes guidance only and never rewrites capability choice
   await expect(suggestion).toHaveText('Prioriza servicios y reservas.');
 });
 
+test('settings persists the hardware store preset without rewriting business choices', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const state = {};
+  await mockSettings(page, state);
+  await page.goto('/settings.html');
+
+  const preset = page.locator('#setupForm [name="presetKey"]');
+  await expect(preset.locator('option[value="hardware_store"]')).toHaveText('Ferretería / materiales');
+  await preset.selectOption('hardware_store');
+
+  await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
+
+  await expect.poll(() => state.profilePayloads.length).toBe(1);
+  expect(state.profilePayloads[0]).toMatchObject({
+    presetKey: 'hardware_store',
+    sellsProducts: true,
+    sellsServices: true,
+    usesReservations: false
+  });
+});
+
 test('settings activates managed Mercado Pago sandbox without exposing credentials', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   const state = {};
