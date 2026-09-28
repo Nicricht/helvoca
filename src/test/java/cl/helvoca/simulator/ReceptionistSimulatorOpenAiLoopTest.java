@@ -67,10 +67,87 @@ class ReceptionistSimulatorOpenAiLoopTest {
         try {
             Fixture f = fixture(server);
             when(f.tools.execute(any(), eq("list_catalog"), anyString())).thenReturn(
-                    success(new JSONObject().put("items", new JSONArray())));
+                    success(new JSONObject().put("items", new JSONArray()
+                            .put(new JSONObject()
+                                    .put("name", "Martillo carpintero 16 oz")
+                                    .put("price", 11990)
+                                    .put("currency", "CLP")))));
 
-            assertEquals("Listo dentro de la simulación.",
+            assertEquals("Tengo Martillo carpintero 16 oz por 11990 CLP.",
                     f.service.message(f.sessionId, "Muéstrame el catálogo").reply());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void missingResponseIdSummarizesAuthoritativeStockInsteadOfGenericSuccess() throws Exception {
+        HttpServer server = server(new AtomicInteger(), new ArrayList<>(),
+                new JSONObject().put("output", new JSONArray().put(
+                        new JSONObject()
+                                .put("type", "function_call")
+                                .put("call_id", "stock-1")
+                                .put("name", "get_stock")
+                                .put("arguments", "{}"))).toString());
+        try {
+            Fixture f = fixture(server);
+            when(f.tools.execute(any(), eq("get_stock"), anyString())).thenReturn(
+                    success(new JSONObject()
+                            .put("productName", "Alargador 6 tomas 3 m")
+                            .put("availabilityKnown", true)
+                            .put("available", 1)
+                            .put("lowStock", true)));
+
+            assertEquals("Queda 1 unidad disponible de Alargador 6 tomas 3 m.",
+                    f.service.message(f.sessionId, "¿Cuántos alargadores quedan?").reply());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void missingResponseIdSummarizesOrderQuoteInsteadOfGenericSuccess() throws Exception {
+        HttpServer server = server(new AtomicInteger(), new ArrayList<>(),
+                new JSONObject().put("output", new JSONArray().put(
+                        new JSONObject()
+                                .put("type", "function_call")
+                                .put("call_id", "order-1")
+                                .put("name", "quote_order")
+                                .put("arguments", "{}"))).toString());
+        try {
+            Fixture f = fixture(server);
+            when(f.tools.execute(any(), eq("quote_order"), anyString())).thenReturn(
+                    success(new JSONObject()
+                            .put("status", "AWAITING_CONFIRMATION")
+                            .put("total", 12990)
+                            .put("currency", "CLP")));
+
+            assertEquals("El pedido queda cotizado en 12990 CLP y espera tu confirmación.",
+                    f.service.message(f.sessionId, "Cotízame uno").reply());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void missingResponseIdSummarizesDeliveryQuoteInsteadOfGenericSuccess() throws Exception {
+        HttpServer server = server(new AtomicInteger(), new ArrayList<>(),
+                new JSONObject().put("output", new JSONArray().put(
+                        new JSONObject()
+                                .put("type", "function_call")
+                                .put("call_id", "delivery-1")
+                                .put("name", "quote_delivery")
+                                .put("arguments", "{}"))).toString());
+        try {
+            Fixture f = fixture(server);
+            when(f.tools.execute(any(), eq("quote_delivery"), anyString())).thenReturn(
+                    success(new JSONObject()
+                            .put("address", "Av. Demo 123, Providencia")
+                            .put("deliveryZone", "Providencia Demo")
+                            .put("fee", 3990)));
+
+            assertEquals("El despacho a Av. Demo 123, Providencia cuesta 3990 CLP.",
+                    f.service.message(f.sessionId, "¿Cuánto cuesta el despacho?").reply());
         } finally {
             server.stop(0);
         }
