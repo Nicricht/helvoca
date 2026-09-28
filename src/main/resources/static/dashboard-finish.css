@@ -27,14 +27,14 @@
   max-width: 620px;
   margin: 8px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.55;
 }
 
 #operationalOverview .owner-dashboard-message {
-  margin: 0 0 18px;
+  margin: 0 0 20px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -53,7 +53,7 @@
 #operationalOverview .home-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 #operationalOverview .home-metric {
@@ -64,7 +64,7 @@
   flex-direction: column;
   justify-content: space-between;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--surface-2);
   color: var(--text);
   text-decoration: none;
@@ -113,22 +113,22 @@
 }
 
 #operationalOverview .home-metric span {
-  margin-top: 13px;
+  margin-top: 12px;
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 750;
 }
 
 #operationalOverview .home-metric small {
-  margin-top: 5px;
+  margin-top: 4px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
 }
 
 #operationalOverview .owner-recent {
-  margin-top: 22px;
-  padding-top: 18px;
+  margin-top: 24px;
+  padding-top: 16px;
   border-top: 1px solid var(--border);
 }
 
@@ -137,7 +137,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 #operationalOverview .owner-section-heading h3 {
@@ -148,7 +148,7 @@
 
 #operationalOverview .owner-section-heading > a {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   text-decoration: none;
 }
@@ -184,7 +184,7 @@
   display: block;
   overflow: hidden;
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -195,7 +195,7 @@
   overflow: hidden;
   margin-top: 4px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -203,23 +203,28 @@
 
 #operationalOverview .owner-activity-row time {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
 #operationalOverview .owner-dashboard-side {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding-left: 24px;
   border-left: 1px solid var(--border);
 }
 
-#operationalOverview .owner-attention-panel,
-#operationalOverview .owner-quick-actions {
+#operationalOverview .owner-attention-panel {
   padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
   background: var(--surface-2);
+}
+
+#operationalOverview .owner-quick-actions {
+  padding: 16px 0 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
 }
 
 #operationalOverview .owner-attention-panel[data-state="attention"] {
@@ -233,7 +238,7 @@
 }
 
 #operationalOverview #ownerAttentionSummary {
-  margin: 7px 0 0;
+  margin: 8px 0 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.45;
@@ -246,22 +251,22 @@
 
 #operationalOverview .owner-dashboard-attention {
   display: grid;
-  gap: 7px;
+  gap: 8px;
   margin-top: 12px;
 }
 
 #operationalOverview .owner-dashboard-chip {
   display: flex;
   min-width: 0;
-  min-height: 36px;
-  padding: 8px 10px;
+  min-height: 40px;
+  padding: 8px 12px;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.3;
   text-decoration: none;
 }
@@ -277,20 +282,20 @@
 }
 
 #operationalOverview .owner-quick-actions .owner-section-heading {
-  margin-bottom: 11px;
+  margin-bottom: 12px;
 }
 
 #operationalOverview .owner-quick-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+  gap: 8px;
 }
 
 #operationalOverview .owner-quick-grid a {
   display: flex;
   min-width: 0;
-  min-height: 38px;
-  padding: 8px 10px;
+  min-height: 40px;
+  padding: 8px 12px;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -317,7 +322,7 @@
 #operationalOverview .owner-seven-day,
 #operationalOverview .owner-plan-row {
   margin: 0;
-  padding: 13px 2px 0;
+  padding: 12px 0 0;
   border: 0;
   border-top: 1px solid var(--border);
   border-radius: 0;
@@ -327,14 +332,14 @@
 
 #operationalOverview .owner-seven-day {
   display: grid;
-  gap: 5px;
+  gap: 4px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 #operationalOverview .owner-seven-day strong {
   color: var(--text);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 #operationalOverview .owner-plan-row {
@@ -349,13 +354,13 @@
 }
 
 #operationalOverview .owner-plan-row strong {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 #operationalOverview .owner-plan-row span {
-  margin-top: 3px;
+  margin-top: 4px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -403,7 +408,7 @@
   #operationalOverview .owner-dashboard-head {
     align-items: flex-start;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
 
   #operationalOverview .home-metrics {
@@ -411,8 +416,8 @@
   }
 
   #operationalOverview .home-metric {
-    min-height: 102px;
-    padding: 13px;
+    min-height: 104px;
+    padding: 12px;
   }
 
   #operationalOverview .home-metric strong {
@@ -429,7 +434,12 @@
   }
 
   #operationalOverview .owner-activity-row {
-    gap: 10px;
+    gap: 12px;
+  }
+
+  #operationalOverview .owner-dashboard-chip,
+  #operationalOverview .owner-quick-grid a {
+    min-height: 44px;
   }
 }
 
