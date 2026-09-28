@@ -72,10 +72,24 @@
   transition: border-color .16s ease, transform .16s ease;
 }
 
-#operationalOverview .home-metric:hover {
+#operationalOverview a.home-metric {
+  cursor: pointer;
+}
+
+#operationalOverview a.home-metric:hover {
   border-color: var(--accent);
   background: var(--surface-2);
   transform: translateY(-1px);
+}
+
+#operationalOverview article.home-metric {
+  cursor: default;
+}
+
+#operationalOverview article.home-metric:hover {
+  border-color: var(--border);
+  background: var(--surface-2);
+  transform: none;
 }
 
 #operationalOverview .home-metric:focus-visible,
