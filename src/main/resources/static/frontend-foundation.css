@@ -1,0 +1,541 @@
+/*
+ * RecepVoz canonical frontend foundation
+ * Dark-first shared visual contract. Feature styles may own composition,
+ * but shared color, surface, control and interaction primitives live here.
+ */
+
+:root {
+  color-scheme: dark;
+
+  --rv-bg-canvas: #070a10;
+  --rv-bg-shell: #0a0f17;
+  --rv-surface-1: #0d131d;
+  --rv-surface-2: #121a26;
+  --rv-surface-3: #182232;
+  --rv-surface-hover: #1d293a;
+
+  --rv-border-subtle: #202b3a;
+  --rv-border-default: #2a3749;
+  --rv-border-strong: #3a4a60;
+
+  --rv-text-primary: #f4f7fb;
+  --rv-text-secondary: #a7b3c5;
+  --rv-text-tertiary: #76859a;
+  --rv-text-disabled: #59677a;
+
+  --rv-accent: #806bff;
+  --rv-accent-hover: #927fff;
+  --rv-accent-soft: rgba(128, 107, 255, .14);
+  --rv-accent-border: rgba(128, 107, 255, .38);
+
+  --rv-success: #45d89a;
+  --rv-warning: #f2b864;
+  --rv-danger: #ff7187;
+  --rv-info: #65a7ff;
+
+  --rv-space-1: 4px;
+  --rv-space-2: 8px;
+  --rv-space-3: 12px;
+  --rv-space-4: 16px;
+  --rv-space-5: 20px;
+  --rv-space-6: 24px;
+  --rv-space-8: 32px;
+  --rv-space-10: 40px;
+  --rv-space-12: 48px;
+  --rv-space-16: 64px;
+
+  --rv-radius-sm: 8px;
+  --rv-radius-md: 12px;
+  --rv-radius-lg: 16px;
+  --rv-radius-xl: 20px;
+  --rv-radius-pill: 999px;
+
+  --rv-shadow-sm: 0 8px 24px rgba(0, 0, 0, .20);
+  --rv-shadow-md: 0 18px 48px rgba(0, 0, 0, .28);
+  --rv-shadow-overlay: 0 28px 88px rgba(0, 0, 0, .46);
+  --rv-focus-ring: 0 0 0 3px rgba(128, 107, 255, .25);
+
+  /* Compatibility aliases for the existing static frontend. */
+  --bg: var(--rv-bg-canvas);
+  --bg-elevated: var(--rv-bg-shell);
+  --surface: var(--rv-surface-1);
+  --surface-2: var(--rv-surface-2);
+  --surface-3: var(--rv-surface-3);
+  --surface-soft: rgba(255,255,255,.035);
+  --surface-hover: var(--rv-surface-hover);
+  --border: var(--rv-border-default);
+  --border-strong: var(--rv-border-strong);
+  --text: var(--rv-text-primary);
+  --text-strong: #ffffff;
+  --muted: var(--rv-text-secondary);
+  --subtle: var(--rv-text-tertiary);
+  --accent: var(--rv-accent);
+  --accent-hover: var(--rv-accent-hover);
+  --accent-strong: #6956f3;
+  --accent-2: #bbb4ff;
+  --accent-soft: var(--rv-accent-soft);
+  --success: var(--rv-success);
+  --warning: var(--rv-warning);
+  --danger: var(--rv-danger);
+  --info: var(--rv-info);
+  --focus-ring: var(--rv-focus-ring);
+  --radius-sm: var(--rv-radius-sm);
+  --radius-md: var(--rv-radius-md);
+  --radius-lg: var(--rv-radius-lg);
+  --radius-xl: var(--rv-radius-xl);
+  --radius-pill: var(--rv-radius-pill);
+}
+
+html {
+  background: var(--rv-bg-canvas);
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--rv-bg-canvas);
+  color: var(--rv-text-primary);
+}
+
+body.home-page:has(#dashboardView:not(.hidden)),
+body.settings-page,
+body.inventory-page {
+  background:
+    radial-gradient(circle at 8% -12%, rgba(128,107,255,.13), transparent 30%),
+    radial-gradient(circle at 96% 4%, rgba(69,216,154,.055), transparent 24%),
+    var(--rv-bg-canvas);
+  color: var(--rv-text-primary);
+}
+
+::selection {
+  background: rgba(128,107,255,.30);
+  color: #fff;
+}
+
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--rv-accent-hover);
+  outline-offset: 2px;
+  box-shadow: var(--rv-focus-ring);
+}
+
+:where(button, .button, input, textarea, select):disabled,
+:where(.button, [role="button"])[aria-disabled="true"] {
+  opacity: .52;
+  cursor: not-allowed;
+  transform: none;
+  filter: saturate(.65);
+}
+
+a {
+  color: inherit;
+}
+
+.brand,
+h1, h2, h3,
+.dashboard-heading h1,
+.home-business-head h2,
+.inventory-dialog-head h2 {
+  color: var(--rv-text-primary);
+}
+
+.subtitle,
+.muted,
+.muted-text,
+.dashboard-heading p,
+.section-heading p,
+.home-business-head p,
+.form-hint,
+.hint {
+  color: var(--rv-text-secondary);
+}
+
+.eyebrow {
+  color: #bbb4ff;
+}
+
+body.home-page:has(#dashboardView:not(.hidden)) .topbar,
+body.settings-page .topbar,
+body.inventory-page .topbar,
+.operations-shell .operations-top,
+.sim-grid ~ .topbar,
+body > .topbar {
+  border-color: var(--rv-border-subtle);
+  background-color: rgba(7, 10, 16, .88);
+}
+
+body.home-page:has(#dashboardView:not(.hidden)) .card,
+body.settings-page .card,
+body.inventory-page .card,
+.card,
+.panel,
+.home-business-panel,
+.inventory-workspace,
+.inventory-alerts-panel,
+.inventory-restock-panel {
+  border-color: var(--rv-border-default);
+  background-color: var(--rv-surface-1);
+  background-image: linear-gradient(180deg, rgba(255,255,255,.018), rgba(255,255,255,0));
+  color: var(--rv-text-primary);
+  box-shadow: var(--rv-shadow-sm);
+}
+
+#firstUserOnboarding {
+  border-color: var(--rv-accent-border);
+  background: linear-gradient(145deg, rgba(128,107,255,.10), rgba(13,19,29,.98));
+  color: var(--rv-text-primary);
+}
+
+.ai-onboarding-card {
+  border-color: var(--rv-accent-border) !important;
+  background: linear-gradient(145deg, rgba(128,107,255,.095), rgba(13,19,29,.98)) !important;
+  color: var(--rv-text-primary);
+  box-shadow: var(--rv-shadow-sm) !important;
+}
+
+.status-card,
+.first-user-step,
+.repeat-row,
+.agent-toggle,
+.agent-capability,
+.proposal-summary-item,
+.proposal-box,
+.home-business-mobile-card,
+.home-simple-row,
+.home-detail-facts > div,
+.home-detail-fact-link,
+.home-detail-note,
+.home-detail-section,
+.home-detail-message,
+.inventory-switch {
+  border-color: var(--rv-border-subtle);
+  background-color: var(--rv-surface-2);
+  color: var(--rv-text-primary);
+}
+
+.status-card.done,
+.first-user-step.complete,
+.home-detail-message.assistant {
+  border-color: rgba(69,216,154,.24);
+  background-color: rgba(69,216,154,.07);
+}
+
+.ready-banner,
+.badge.online,
+.home-pill {
+  border-color: rgba(69,216,154,.30);
+  background-color: rgba(69,216,154,.10);
+  color: #9df0ca;
+}
+
+.next-banner,
+.home-business-tab.active,
+.ai-chip {
+  border-color: var(--rv-accent-border);
+  background-color: var(--rv-accent-soft);
+  color: #ddd9ff;
+}
+
+.home-pill.bad,
+.message.error,
+.operations-error {
+  border-color: rgba(255,113,135,.30);
+  background-color: rgba(255,113,135,.09);
+  color: #ffa0af;
+}
+
+.badge.warning {
+  border-color: rgba(242,184,100,.32);
+  background-color: rgba(242,184,100,.10);
+  color: #ffd79e;
+}
+
+.button,
+button,
+input,
+textarea,
+select {
+  transition:
+    border-color .14s ease,
+    background-color .14s ease,
+    color .14s ease,
+    box-shadow .14s ease,
+    opacity .14s ease,
+    transform .14s ease;
+}
+
+body.home-page:has(#dashboardView:not(.hidden)) input,
+body.home-page:has(#dashboardView:not(.hidden)) textarea,
+body.home-page:has(#dashboardView:not(.hidden)) select,
+body.settings-page input,
+body.settings-page textarea,
+body.settings-page select,
+body.inventory-page input,
+body.inventory-page textarea,
+body.inventory-page select,
+.sim-grid input,
+.sim-grid textarea,
+.sim-grid select,
+input,
+textarea,
+select {
+  border-color: var(--rv-border-default);
+  background-color: #0b111a;
+  color: var(--rv-text-primary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--rv-text-tertiary);
+  opacity: 1;
+}
+
+:where(input, textarea, select):hover:not(:disabled) {
+  border-color: var(--rv-border-strong);
+}
+
+:where(input, textarea, select):focus,
+:where(input, textarea, select):focus-visible {
+  border-color: var(--rv-accent);
+  background-color: #0c131e;
+}
+
+.button.primary,
+.home-booking-primary,
+.home-order-primary {
+  border-color: rgba(128,107,255,.46);
+  background: linear-gradient(135deg, var(--rv-accent), #6956f3);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(128,107,255,.16);
+}
+
+.button.primary:hover,
+.home-booking-primary:hover,
+.home-order-primary:hover {
+  background: linear-gradient(135deg, var(--rv-accent-hover), #7563fa);
+}
+
+.button.secondary {
+  border-color: rgba(69,216,154,.28);
+  background-color: rgba(69,216,154,.09);
+  color: #9df0ca;
+}
+
+.button.ghost,
+.inventory-dialog-close,
+.home-filter-clear {
+  border-color: var(--rv-border-default);
+  background-color: rgba(255,255,255,.035);
+  color: #d8e0eb;
+}
+
+.button.ghost:hover,
+.inventory-dialog-close:hover,
+.home-filter-clear:hover {
+  border-color: var(--rv-border-strong);
+  background-color: var(--rv-surface-hover);
+  color: #fff;
+}
+
+.app-nav a,
+.inventory-nav a,
+.topbar nav a {
+  color: var(--rv-text-secondary);
+}
+
+.app-nav a:hover,
+.inventory-nav a:hover,
+.topbar nav a:hover {
+  background-color: rgba(255,255,255,.045);
+  color: var(--rv-text-primary);
+}
+
+.app-nav a.active,
+.inventory-nav a.active,
+.topbar nav a.active,
+.app-nav a[aria-current="page"],
+.inventory-nav a[aria-current="page"] {
+  border-color: var(--rv-accent-border);
+  background-color: var(--rv-accent-soft);
+  color: #ddd9ff;
+}
+
+.home-business-table-shell,
+.inventory-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border-color: var(--rv-border-subtle);
+  background-color: var(--rv-surface-1);
+  scrollbar-color: var(--rv-border-strong) transparent;
+}
+
+table,
+.home-business-table,
+.inventory-table {
+  color: var(--rv-text-primary);
+}
+
+thead th,
+.home-business-table th,
+.inventory-table th {
+  border-bottom-color: var(--rv-border-default);
+  background-color: var(--rv-surface-2);
+  color: var(--rv-text-secondary);
+}
+
+tbody td,
+.home-business-table td,
+.inventory-table td {
+  border-bottom-color: var(--rv-border-subtle);
+  color: #dce4ef;
+}
+
+tbody tr:hover,
+.home-business-table tbody tr:hover,
+.inventory-table tbody tr:hover {
+  background-color: rgba(128,107,255,.055);
+}
+
+dialog,
+.inventory-dialog,
+.home-detail-drawer {
+  color: var(--rv-text-primary);
+  border-color: var(--rv-border-default);
+  background-color: var(--rv-surface-1);
+  box-shadow: var(--rv-shadow-overlay);
+}
+
+dialog,
+.inventory-dialog {
+  width: min(680px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+}
+
+dialog::backdrop,
+.inventory-dialog::backdrop {
+  background: rgba(2,5,9,.74);
+  backdrop-filter: blur(5px);
+}
+
+.home-detail-order-actions {
+  background-color: rgba(13,19,29,.96);
+}
+
+.sim-grid .panel,
+.trace-panel,
+.safe-note,
+.chat,
+.composer {
+  border-color: var(--rv-border-default);
+  background-color: var(--rv-surface-1);
+  color: var(--rv-text-primary);
+}
+
+.safe-note {
+  background-color: rgba(69,216,154,.07);
+  border-color: rgba(69,216,154,.24);
+}
+
+.chat .empty,
+.trace-list .empty {
+  color: var(--rv-text-secondary);
+}
+
+.operations-note {
+  border-color: var(--rv-border-default);
+  background-color: var(--rv-surface-1);
+  color: var(--rv-text-secondary);
+}
+
+@media (min-width: 981px) {
+  body.home-page:has(#dashboardView:not(.hidden)) #primaryNav,
+  body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav {
+    border-color: var(--rv-border-default);
+    background-color: rgba(13,19,29,.97);
+    box-shadow: var(--rv-shadow-md);
+  }
+}
+
+@media (max-width: 980px) {
+  .shell {
+    width: min(100% - 28px, 100%);
+  }
+
+  #primaryNav,
+  .app-nav,
+  .inventory-nav,
+  .topbar nav {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+  }
+
+  .topbar {
+    gap: var(--rv-space-3);
+  }
+
+  .home-business-table-shell,
+  .inventory-table-wrap {
+    width: 100%;
+  }
+}
+
+@media (max-width: 620px) {
+  .shell {
+    width: min(100% - 20px, 100%);
+  }
+
+  main {
+    padding-top: var(--rv-space-5);
+  }
+
+  .card,
+  .panel,
+  .home-business-panel,
+  .inventory-workspace,
+  .inventory-alerts-panel,
+  .inventory-restock-panel {
+    border-radius: var(--rv-radius-md);
+  }
+
+  .button,
+  button,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  #primaryNav,
+  .app-nav,
+  .inventory-nav {
+    gap: var(--rv-space-1);
+  }
+
+  #primaryNav a,
+  .app-nav a,
+  .inventory-nav a {
+    flex: 0 0 auto;
+    min-height: 42px;
+  }
+
+  dialog,
+  .inventory-dialog {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    margin: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
