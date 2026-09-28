@@ -46,6 +46,15 @@ class RepositoryTemplateContractTest(unittest.TestCase):
         self.assertNotIn("npm test", text)
         self.assertNotIn("pytest", text)
 
+    def test_workflow_resolves_risk_from_dispatch_or_pr_checklist(self):
+        text = self.read("software-factory.yml")
+        self.assertIn("Resolve First-Pass risk", text)
+        self.assertIn("github.event.pull_request.body", text)
+        self.assertIn("steps.risk.outputs.risk", text)
+        self.assertIn("options:", text)
+        for level in ("LOW", "MEDIUM", "HIGH"):
+            self.assertIn(level, text)
+
 
 if __name__ == "__main__":
     unittest.main()
