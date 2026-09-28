@@ -96,6 +96,12 @@ Three fictional delivery zones are configured:
 - Ñuñoa Demo: CLP 4,990
 - Santiago Centro Demo: CLP 5,990
 
+Configured delivery estimates:
+
+- Providencia Demo: same day, subject to 13:00 cutoff
+- Ñuñoa Demo: next business day
+- Santiago Centro Demo: next business day
+
 Coverage is resolved from the configured address terms. No physical delivery is created by simply loading this fixture.
 
 ## Knowledge and policies
