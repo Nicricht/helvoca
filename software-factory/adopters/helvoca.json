@@ -1,0 +1,45 @@
+{
+  "project": "Nicricht/helvoca",
+  "methodology": "First-Pass Engineering",
+  "preserveExistingCI": true,
+  "risk": {
+    "low": [
+      "targeted syntax/lint/type validation",
+      "targeted tests when behavior changes"
+    ],
+    "medium": [
+      "bash scripts/ci/fast-gate.sh <base-sha>",
+      "full backend suite",
+      "JaCoCo differential coverage",
+      "browser E2E when applicable"
+    ],
+    "high": [
+      "all medium-risk gates",
+      "security and tenant-isolation tests",
+      "idempotency/concurrency/provider-failure tests as applicable",
+      "adversarial certification",
+      "Golden Journey",
+      "full regression"
+    ]
+  },
+  "coverage": {
+    "differentialLineMinimumPercent": 80,
+    "differentialBranchMinimumPercent": 70
+  },
+  "externalEffects": {
+    "allowRealEffectsForTests": false,
+    "forbiddenByDefault": [
+      "production phone calls",
+      "real WhatsApp messages",
+      "real payments",
+      "destructive production mutations",
+      "physical deliveries"
+    ]
+  },
+  "authoritativeFiles": [
+    "AGENTS.md",
+    "docs/engineering/invariants.md",
+    ".github/workflows/ci.yml",
+    ".github/pull_request_template.md"
+  ]
+}
