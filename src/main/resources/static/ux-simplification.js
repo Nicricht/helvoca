@@ -48,7 +48,7 @@
         .ux-config-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
         .ux-config-nav button { min-width: 0; text-align: left; border: 1px solid transparent; border-radius: 12px; padding: 13px 14px; color: var(--text); background: transparent; cursor: pointer; font: inherit; transition: .16s ease; }
         .ux-config-nav button:hover { background: var(--ux-surface); border-color: var(--border); }
-        .ux-config-nav button[aria-expanded="true"], .ux-config-nav button[aria-selected="true"] { background: rgba(124,92,255,.12); border-color: rgba(124,92,255,.38); }
+        .ux-config-nav button[aria-expanded="true"], .ux-config-nav button[aria-current="page"] { background: rgba(124,92,255,.12); border-color: rgba(124,92,255,.38); }
         .ux-config-nav strong, .ux-config-nav small { display: block; }
         .ux-config-nav strong { font-size: 13px; }
         .ux-config-nav small { color: var(--muted); margin-top: 3px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -285,7 +285,6 @@
         const nav = document.createElement('nav');
         nav.className = 'ux-config-nav';
         nav.setAttribute('aria-label', 'Configuración principal');
-        nav.setAttribute('role', 'tablist');
 
         const body = document.createElement('div');
         body.className = 'ux-config-body';
@@ -345,8 +344,8 @@
                 if (!button) return;
 
                 if (primaryItems.includes(item)) {
-                    button.setAttribute('aria-selected', String(active));
-                    button.setAttribute('tabindex', active ? '0' : '-1');
+                    if (active) button.setAttribute('aria-current', 'page');
+                    else button.removeAttribute('aria-current');
                     button.setAttribute('aria-expanded', String(active));
                 } else {
                     button.setAttribute('aria-pressed', String(active));
@@ -363,11 +362,8 @@
         primaryItems.forEach(item => {
             const button = document.createElement('button');
             button.type = 'button';
-            button.role = 'tab';
             button.dataset.settingsSection = item.key;
-            button.setAttribute('aria-selected', 'false');
             button.setAttribute('aria-expanded', 'false');
-            button.setAttribute('tabindex', '-1');
             if (item.panel?.id) button.setAttribute('aria-controls', item.panel.id);
             button.innerHTML = `<strong>${item.label}</strong>`;
             button.addEventListener('click', () => openSection(item.key));
