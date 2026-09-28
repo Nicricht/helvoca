@@ -463,7 +463,28 @@
                     <div id="homeBookingsList" class="home-business-list"><div class="home-business-empty">Cargando reservas…</div></div>
                 </section>
                 <section class="card home-business-panel hidden" data-home-panel="orders">
-                    <div class="home-business-head"><div><div class="eyebrow">Ventas</div><h2>Pedidos</h2><p>Qué compraron, quién hizo el pedido y en qué estado está.</p></div></div>
+                    <div class="home-business-head">
+                        <div><div class="eyebrow">Ventas</div><h2>Pedidos</h2><p>Qué compraron, quién hizo el pedido, su estado y qué acción sigue.</p></div>
+                    </div>
+                    <div class="home-order-filters" aria-label="Filtros de pedidos">
+                        <label class="home-order-search"><span>Buscar</span><input id="homeOrderSearch" type="search" placeholder="Cliente, teléfono o pedido" autocomplete="off"></label>
+                        <label><span>Estado</span><select id="homeOrderStatus">
+                            <option value="all">Todos</option>
+                            <option value="CONFIRMED">Confirmado</option>
+                            <option value="PREPARING">Preparando</option>
+                            <option value="READY">Listo</option>
+                            <option value="DISPATCHED">Despachado</option>
+                            <option value="COMPLETED">Completado</option>
+                            <option value="CANCELLED">Cancelado</option>
+                        </select></label>
+                        <label><span>Orden</span><select id="homeOrderSort">
+                            <option value="newest">Más recientes</option>
+                            <option value="oldest">Más antiguos</option>
+                            <option value="status">Por estado</option>
+                        </select></label>
+                        <button id="homeOrderClearFilters" class="home-filter-clear" type="button">Limpiar</button>
+                    </div>
+                    <p id="homeOrderResult" class="home-filter-result" aria-live="polite">0 pedidos</p>
                     <div id="homeOrdersList" class="home-business-list"><div class="home-business-empty">Cargando pedidos…</div></div>
                 </section>
                 <section class="card home-business-panel hidden" data-home-panel="sales">
