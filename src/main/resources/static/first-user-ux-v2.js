@@ -5,7 +5,8 @@
   const progressText = document.querySelector("#firstUserProgressText");
   const progressBar = document.querySelector("#firstUserProgressBar");
   const stepsHost = document.querySelector("#firstUserSteps");
-  const tryButton = document.querySelector("#tryRecepVozBtn");\n  const nextAction = document.querySelector("#firstUserNextAction");
+  const tryButton = document.querySelector("#tryRecepVozBtn");
+  const nextAction = document.querySelector("#firstUserNextAction");
   const homeWorkspace = document.querySelector("#homeBusinessWorkspace");
   const primaryNav = document.querySelector("#primaryNav");
 
