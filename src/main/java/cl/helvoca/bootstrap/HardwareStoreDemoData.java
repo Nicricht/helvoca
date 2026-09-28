@@ -58,6 +58,7 @@ final class HardwareStoreDemoData {
 
     static List<Policy> policies() {
         return List.of(
+                new Policy("Propietario demo","Información","El propietario ficticio de Ferretería San Martín Demo es Mauricio San Martín Demo."),
                 new Policy("Precios e IVA","Ventas","Todos los precios están expresados en CLP e incluyen IVA. No existen descuentos automáticos salvo que estén explícitamente configurados."),
                 new Policy("Stock autoritativo","Inventario","El stock mostrado por inventario es la única fuente autoritativa. No prometer unidades agotadas ni reservar más de lo disponible."),
                 new Policy("Cotizaciones","Cotizaciones","Las cotizaciones son referenciales por 48 horas. Una cotización no reserva stock; el stock se valida nuevamente antes de confirmar un pedido."),
