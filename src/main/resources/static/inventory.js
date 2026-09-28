@@ -141,6 +141,9 @@
                     description: item.description || "",
                     price: item.price,
                     currency: item.currency || "CLP",
+                    durationMinutes: item.durationMinutes ?? null,
+                    metadataJson: item.metadataJson ?? null,
+                    active: item.active !== false,
                     configured: Boolean(stock),
                     sku: stock?.sku || "",
                     trackingEnabled: Boolean(stock?.trackingEnabled),
@@ -777,6 +780,9 @@
         clearMessage(productMessage);
 
         const id = productForm.elements.catalogItemId.value;
+        const catalogItem = id
+            ? state.catalog.find(item => String(item.id) === String(id))
+            : null;
         const name = productForm.elements.name.value.trim();
         const description = productForm.elements.description.value.trim();
         const currency = productForm.elements.currency.value.trim().toUpperCase();
@@ -807,9 +813,9 @@
                     description: description || null,
                     price,
                     currency,
-                    durationMinutes: null,
-                    metadataJson: null,
-                    active: true
+                    durationMinutes: catalogItem?.durationMinutes ?? null,
+                    metadataJson: catalogItem?.metadataJson ?? null,
+                    active: catalogItem?.active !== false
                 })
             });
             productDialog.close();
