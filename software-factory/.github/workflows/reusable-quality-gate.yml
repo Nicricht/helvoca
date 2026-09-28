@@ -1,0 +1,30 @@
+name: First-Pass Quality Gate
+
+on:
+  workflow_call:
+    inputs:
+      risk:
+        description: LOW, MEDIUM, or HIGH
+        required: false
+        default: MEDIUM
+        type: string
+      verify_command:
+        description: Repository-local verification entry point
+        required: false
+        default: scripts/verify
+        type: string
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run repository verification
+        env:
+          FIRST_PASS_RISK: ${{ inputs.risk }}
+          VERIFY_COMMAND: ${{ inputs.verify_command }}
+        run: bash -lc "$VERIFY_COMMAND"
