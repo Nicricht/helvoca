@@ -157,7 +157,7 @@ public class ReceptionistSimulatorService {
                     reply = geminiFallback.respond(
                             instructions,
                             buildMessagingHistory(sessionId),
-                            simulatorToolNames(),
+                            simulatorToolNames(context),
                             (name, arguments) -> simulatorTools.execute(context, name, arguments));
                     call.setAiProvider("gemini");
                     calls.save(call);
@@ -186,6 +186,9 @@ public class ReceptionistSimulatorService {
                 Las consultas usan la configuración real del negocio, pero toda acción de escritura es una simulación aislada.
                 Nunca afirmes que una reserva, solicitud, cliente o pregunta fue guardada realmente.
                 Cuando una acción simulada tenga éxito, dilo como algo que ocurriría en una llamada real.
+                Para catálogo, stock, zonas y cobertura usa únicamente las herramientas de lectura publicadas.
+                Para pedidos usa quote_order, update_order y create_order: dentro del simulador esas mutaciones quedan aisladas y nunca crean pedidos ni reservas de inventario reales.
+                Si cambia cantidad, producto, retiro o despacho después de una cotización, usa update_order y vuelve a pedir confirmación porque el token anterior deja de ser válido.
                 No menciones nombres de herramientas, UUID, backend, base de datos ni detalles técnicos.
                 Responde en español natural, breve y sin markdown, con un máximo de 55 palabras.
                 Si el cliente quiere reservar y aún no está identificado en la simulación, pregunta su nombre de forma natural.
@@ -204,7 +207,7 @@ public class ReceptionistSimulatorService {
         JSONObject body = new JSONObject()
                 .put("model", openAi.getTrialModel())
                 .put("instructions", instructions)
-                .put("tools", responseTools())
+                .put("tools", responseTools(context))
                 .put("tool_choice", "auto")
                 .put("input", buildHistory(sessionId))
                 .put("max_output_tokens", 180);
@@ -230,8 +233,8 @@ public class ReceptionistSimulatorService {
         return history;
     }
 
-    private static Set<String> simulatorToolNames() {
-        JSONArray definitions = RealtimeToolDefinitions.all();
+    private Set<String> simulatorToolNames(RealtimeCallContext context) {
+        JSONArray definitions = simulatorTools.toolDefinitions(context);
         Set<String> names = new HashSet<>();
         for (int i = 0; i < definitions.length(); i++) {
             String name = definitions.getJSONObject(i).optString("name", "");
@@ -336,11 +339,11 @@ public class ReceptionistSimulatorService {
         return clean.length() <= 80 ? clean : clean.substring(0, 80);
     }
 
-    private JSONArray responseTools() {
-        JSONArray realtime = RealtimeToolDefinitions.all();
+    private JSONArray responseTools(RealtimeCallContext context) {
+        JSONArray definitions = simulatorTools.toolDefinitions(context);
         JSONArray out = new JSONArray();
-        for (int i = 0; i < realtime.length(); i++) {
-            JSONObject copy = new JSONObject(realtime.getJSONObject(i).toString());
+        for (int i = 0; i < definitions.length(); i++) {
+            JSONObject copy = new JSONObject(definitions.getJSONObject(i).toString());
             copy.put("strict", false);
             out.put(copy);
         }
