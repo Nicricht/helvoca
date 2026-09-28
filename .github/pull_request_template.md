@@ -38,6 +38,18 @@
 
 <!-- Commands/runs and what they prove. -->
 
+## Resume checkpoint
+
+<!-- Required for MEDIUM/HIGH or multi-step work. Keep this current so another conversation can continue without rebuilding context. -->
+
+- Branch:
+- Pull Request:
+- HEAD:
+- Completed blocks:
+- CI / evidence valid for this HEAD:
+- Blockers / rulings:
+- Next step:
+
 ## Final commit evidence
 
 - [ ] Cited verification belongs to the exact final commit.
