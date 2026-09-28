@@ -518,6 +518,40 @@ test('authentication and phone administration fit all target viewports', async (
 });
 
 
+test('public header uses the RecepVoz brand mark without crowding the layout', async ({ page }) => {
+  const viewports = [
+    { width: 1440, height: 900 },
+    { width: 768, height: 900 },
+    { width: 390, height: 844 }
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+
+    const header = page.locator('.topbar');
+    const brandLink = header.locator('.rv-brand-link');
+    const logo = brandLink.locator('.rv-brand-logo');
+
+    await expect(brandLink).toBeVisible();
+    await expect(brandLink).toHaveAttribute('href', '/');
+    await expect(logo).toBeVisible();
+    await expect(logo).toHaveAttribute('src', '/recepvoz-brand-header.webp');
+    await expect(logo).toHaveAttribute('alt', 'RecepVoz');
+    await expect(header.locator('.brand')).toHaveCount(0);
+    await expect(page.locator('#sessionBadge')).toBeVisible();
+
+    const metrics = await logo.evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    });
+    expect(metrics.height).toBeGreaterThanOrEqual(40);
+    expect(metrics.height).toBeLessThanOrEqual(64);
+    expect(metrics.width).toBeLessThanOrEqual(120);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  }
+});
+
 test('public hero is calm, dark and focused on one receptionist conversation', async ({ page }) => {
   await page.goto('/');
 
