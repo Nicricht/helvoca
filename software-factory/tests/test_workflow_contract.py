@@ -14,6 +14,7 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertIn("workflow_call:", self.text)
         self.assertIn("risk:", self.text)
         self.assertIn("verify_command:", self.text)
+        self.assertIn("default: bash scripts/verify", self.text)
 
     def test_checks_out_and_runs_repository_verifier(self):
         self.assertIn("actions/checkout@", self.text)
