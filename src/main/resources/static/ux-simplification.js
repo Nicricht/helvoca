@@ -130,9 +130,9 @@
         const eyebrow = $('.eyebrow', hero);
         const title = $('h1', hero);
         const copy = $('p', hero);
-        setText(eyebrow, 'Tu negocio siempre contesta');
+        setText(eyebrow, 'Recepcionista con IA');
         setText(title, 'No pierdas otra llamada.');
-        setText(copy, 'RecepVoz responde a tus clientes, resuelve consultas y crea reservas mientras tú sigues trabajando.');
+        setText(copy, 'RecepVoz atiende a tus clientes, responde preguntas y agenda reservas mientras tú trabajas.');
     }
 
     function simplifyDashboardCopy() {
