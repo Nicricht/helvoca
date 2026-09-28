@@ -2,6 +2,8 @@
 
 This repository follows **First-Pass Engineering**.
 
+Before implementation, read `software-factory/skill/first-pass-engineering/SKILL.md` when it is present. This keeps the workflow reusable even when the agent does not have the skill installed globally.
+
 ## Required behavior
 
 - Read this repository's project-specific rules, architecture, tests, and invariants before editing code.
