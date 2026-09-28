@@ -809,3 +809,9 @@ body.inventory-page .inventory-dialog-close:hover {
     padding-bottom: 2px;
   }
 }
+
+
+/* Keep first-time setup deliberately narrow; operational tools appear once ready. */
+body.first-user-onboarding-active #primaryNav .nav-inventory {
+  display: none !important;
+}
