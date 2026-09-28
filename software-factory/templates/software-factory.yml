@@ -3,6 +3,16 @@ name: Software Factory
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      risk:
+        description: First-Pass risk level
+        required: true
+        default: MEDIUM
+        type: choice
+        options:
+          - LOW
+          - MEDIUM
+          - HIGH
 
 jobs:
   first-pass-quality:
@@ -11,7 +21,44 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Resolve First-Pass risk
+        id: risk
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_RISK: ${{ inputs.risk }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          risk="${DISPATCH_RISK:-MEDIUM}"
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            if grep -Eiq '^[[:space:]]*-[[:space:]]*\[[xX]\][[:space:]]*HIGH[[:space:]]*$' <<< "${PR_BODY:-}"; then
+              risk="HIGH"
+            elif grep -Eiq '^[[:space:]]*-[[:space:]]*\[[xX]\][[:space:]]*MEDIUM[[:space:]]*$' <<< "${PR_BODY:-}"; then
+              risk="MEDIUM"
+            elif grep -Eiq '^[[:space:]]*-[[:space:]]*\[[xX]\][[:space:]]*LOW[[:space:]]*$' <<< "${PR_BODY:-}"; then
+              risk="LOW"
+            else
+              # Safe default for an unclassified pull request.
+              risk="MEDIUM"
+            fi
+          fi
+
+          case "$risk" in
+            LOW|MEDIUM|HIGH) ;;
+            *)
+              echo "Invalid First-Pass risk: $risk" >&2
+              exit 2
+              ;;
+          esac
+
+          echo "risk=$risk" >> "$GITHUB_OUTPUT"
+          echo "Resolved First-Pass risk: $risk"
+
       - name: Run repository verification
         env:
-          FIRST_PASS_RISK: ${{ inputs.risk || 'MEDIUM' }}
+          FIRST_PASS_RISK: ${{ steps.risk.outputs.risk }}
         run: bash scripts/verify
