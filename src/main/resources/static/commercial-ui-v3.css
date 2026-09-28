@@ -3,20 +3,20 @@
    Keeps the existing DOM contracts and business logic intact. */
 
 :root {
-  --rv3-bg: #f7f8fc;
-  --rv3-surface: #ffffff;
-  --rv3-surface-soft: #f1f3f9;
-  --rv3-text: #111827;
-  --rv3-muted: #667085;
-  --rv3-line: #e7eaf0;
-  --rv3-purple: #635bff;
-  --rv3-purple-strong: #5147e5;
-  --rv3-purple-soft: #f0efff;
-  --rv3-success: #16a36a;
-  --rv3-warning: #f59e0b;
-  --rv3-danger: #e5484d;
-  --rv3-shadow: 0 10px 30px rgba(17, 24, 39, .06);
-  --rv3-shadow-lg: 0 24px 70px rgba(15, 23, 42, .11);
+  --rv3-bg: #080b12;
+  --rv3-surface: #101722;
+  --rv3-surface-soft: #151e2b;
+  --rv3-text: #f4f7fb;
+  --rv3-muted: #98a5b9;
+  --rv3-line: #263246;
+  --rv3-purple: #7c6cff;
+  --rv3-purple-strong: #6656ef;
+  --rv3-purple-soft: rgba(124,108,255,.12);
+  --rv3-success: #3ddc97;
+  --rv3-warning: #f6bd60;
+  --rv3-danger: #ff7187;
+  --rv3-shadow: 0 10px 28px rgba(0,0,0,.22);
+  --rv3-shadow-lg: 0 28px 80px rgba(0,0,0,.38);
 }
 
 /* Public entry surface: premium, focused and voice-first. */
@@ -25,7 +25,7 @@ body.home-page:has(#authView:not(.hidden)) {
     radial-gradient(circle at 12% 0%, rgba(99, 91, 255, .28), transparent 34%),
     radial-gradient(circle at 92% 16%, rgba(54, 230, 176, .12), transparent 28%),
     #080b12;
-  color: #f8fafc;
+  color: var(--text);
 }
 
 body.home-page:has(#authView:not(.hidden)) .shell {
@@ -73,7 +73,7 @@ body.home-page:has(#authView:not(.hidden)) #authView .hero-card h1 {
 body.home-page:has(#authView:not(.hidden)) #authView .hero-card p {
   max-width: 650px;
   margin: 0;
-  color: #b8c1d1;
+  color: var(--muted);
   font-size: 16px;
   line-height: 1.65;
 }
@@ -136,7 +136,7 @@ body.home-page:has(#authView:not(.hidden)) .public-company-card {
 
 .rv-voice-preview-head small {
   margin-top: 3px;
-  color: #98a4b8;
+  color: var(--muted);
   font-size: 11px;
 }
 
@@ -182,12 +182,12 @@ body.home-page:has(#authView:not(.hidden)) .public-company-card {
   justify-content: space-between;
   padding-top: 13px;
   border-top: 1px solid rgba(255,255,255,.075);
-  color: #aab5c6;
+  color: var(--muted);
   font-size: 11px;
 }
 
 .rv-voice-preview-result strong {
-  color: #f8fafc;
+  color: var(--text);
 }
 
 /* Customer console: light, calm and operational. */
@@ -218,21 +218,21 @@ body.home-page:has(#dashboardView:not(.hidden)) .topbar,
 body.settings-page .topbar,
 body.inventory-page .topbar {
   border-bottom-color: var(--rv3-line);
-  background: rgba(247,248,252,.92);
+  background: rgba(8,11,18,.96);
   backdrop-filter: blur(18px);
 }
 
 body.home-page:has(#dashboardView:not(.hidden)) .brand,
 body.settings-page .brand,
 body.inventory-page .brand {
-  color: #181b2a;
+  color: var(--text);
   letter-spacing: .14em;
 }
 
 body.home-page:has(#dashboardView:not(.hidden)) .subtitle,
 body.settings-page .subtitle,
 body.inventory-page .subtitle {
-  color: #7a8497;
+  color: var(--muted);
 }
 
 body.home-page:has(#dashboardView:not(.hidden)) .card,
@@ -252,8 +252,8 @@ body.settings-page select,
 body.inventory-page input,
 body.inventory-page textarea,
 body.inventory-page select {
-  border-color: #dfe3ec;
-  background: #ffffff;
+  border-color: var(--border);
+  background: #0b111b;
   color: var(--rv3-text);
 }
 
@@ -273,7 +273,7 @@ body.inventory-page select:focus {
 body.home-page:has(#dashboardView:not(.hidden)) label,
 body.settings-page label,
 body.inventory-page label {
-  color: #344054;
+  color: #d9e0ea;
 }
 
 body.home-page:has(#dashboardView:not(.hidden)) .eyebrow,
@@ -306,17 +306,17 @@ body.home-page:has(#dashboardView:not(.hidden)) .button.ghost,
 body.settings-page .button.ghost,
 body.inventory-page .button.ghost,
 body.home-page:has(#dashboardView:not(.hidden)) .home-filter-clear {
-  border-color: #dfe3ec;
-  background: #fff;
-  color: #475467;
+  border-color: var(--border);
+  background: var(--surface);
+  color: #bcc7d7;
 }
 
 body.home-page:has(#dashboardView:not(.hidden)) .button.secondary,
 body.settings-page .button.secondary,
 body.inventory-page .button.secondary {
   border-color: rgba(22,163,106,.22);
-  background: #edf9f3;
-  color: #087a4b;
+  background: rgba(61,220,151,.10);
+  color: #90f0c5;
 }
 
 /* Left navigation rail. */
@@ -324,26 +324,26 @@ body.inventory-page .button.secondary {
   body.home-page:has(#dashboardView:not(.hidden)) #primaryNav,
   body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav {
     border: 1px solid var(--rv3-line);
-    background: rgba(255,255,255,.96);
+    background: rgba(13,19,29,.96);
     box-shadow: var(--rv3-shadow-lg);
   }
 
   body.home-page:has(#dashboardView:not(.hidden)) #primaryNav a,
   body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav a {
-    color: #667085;
+    color: var(--muted);
   }
 
   body.home-page:has(#dashboardView:not(.hidden)) #primaryNav a:hover,
   body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav a:hover {
-    color: #27243e;
-    background: #f7f7fb;
+    color: var(--text);
+    background: rgba(255,255,255,.045);
   }
 
   body.home-page:has(#dashboardView:not(.hidden)) #primaryNav a.active,
   body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav a.active {
     border-color: transparent;
     background: var(--rv3-purple-soft);
-    color: #4338ca;
+    color: #ddd8ff;
     box-shadow: inset 3px 0 0 var(--rv3-purple);
   }
 }
@@ -364,7 +364,7 @@ body.settings-page .dashboard-heading {
 
 body.home-page:has(#dashboardView:not(.hidden)) .dashboard-heading h1,
 body.settings-page .dashboard-heading h1 {
-  color: #101828;
+  color: var(--text);
   font-size: clamp(34px, 4vw, 50px);
   line-height: 1;
   letter-spacing: -.045em;
@@ -373,19 +373,19 @@ body.settings-page .dashboard-heading h1 {
 body.home-page:has(#dashboardView:not(.hidden)) .dashboard-heading p,
 body.settings-page .dashboard-heading p {
   max-width: 720px;
-  color: #667085;
+  color: var(--muted);
 }
 
 .status-card {
   min-height: 86px;
   border-color: var(--rv3-line);
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 5px 18px rgba(17,24,39,.035);
 }
 
 .status-card.done {
-  border-color: #d6f0e4;
-  background: #fbfffd;
+  border-color: rgba(61,220,151,.20);
+  background: rgba(61,220,151,.035);
 }
 
 .status-card.done .dot {
@@ -393,20 +393,20 @@ body.settings-page .dashboard-heading p {
 }
 
 .ready-banner {
-  border-color: #cfeee0;
-  background: #f0fbf6;
-  color: #087a4b;
+  border-color: rgba(61,220,151,.24);
+  background: rgba(61,220,151,.10);
+  color: #90f0c5;
 }
 
 .next-banner {
-  border-color: #dedbff;
-  background: #f4f2ff;
-  color: #5147e5;
+  border-color: rgba(124,108,255,.28);
+  background: rgba(124,108,255,.12);
+  color: #ddd8ff;
 }
 
 /* First-time setup. */
 #firstUserOnboarding {
-  border-color: #dedbff;
+  border-color: rgba(124,108,255,.28);
   background:
     radial-gradient(circle at 100% 0, rgba(99,91,255,.09), transparent 34%),
     #fff;
@@ -414,33 +414,33 @@ body.settings-page .dashboard-heading p {
 }
 
 .first-user-progress .progress {
-  background: #eceef4;
+  background: rgba(255,255,255,.065);
 }
 
 .first-user-step {
   border-color: var(--rv3-line);
-  background: #fafbfe;
+  background: rgba(255,255,255,.022);
 }
 
 .first-user-step-number {
-  border-color: #dfe3ec;
-  background: #fff;
-  color: #667085;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--muted);
 }
 
 .first-user-step.complete {
-  border-color: #d4eee2;
-  background: #f3fbf7;
+  border-color: rgba(61,220,151,.20);
+  background: rgba(61,220,151,.055);
 }
 
 .first-user-step.complete .first-user-step-number {
-  border-color: #bde5d2;
-  background: #e5f7ef;
-  color: #087a4b;
+  border-color: rgba(61,220,151,.30);
+  background: rgba(61,220,151,.10);
+  color: #90f0c5;
 }
 
 .first-user-step.next {
-  border-color: #cbc7ff;
+  border-color: rgba(124,108,255,.34);
   background: var(--rv3-purple-soft);
   box-shadow: none;
 }
@@ -454,25 +454,25 @@ body.settings-page .dashboard-heading p {
 .home-business-tab {
   min-height: 38px;
   padding: 7px 12px;
-  border-color: #dfe3ec;
-  background: #fff;
-  color: #667085;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--muted);
 }
 
 .home-business-tab strong {
-  background: #f2f4f7;
-  color: #475467;
+  background: var(--surface-2);
+  color: #bcc7d7;
 }
 
 .home-business-tab.active {
-  border-color: #cbc7ff;
+  border-color: rgba(124,108,255,.34);
   background: var(--rv3-purple-soft);
-  color: #4338ca;
+  color: #ddd8ff;
 }
 
 .home-business-tab.active strong {
-  background: #fff;
-  color: #4338ca;
+  background: var(--surface);
+  color: #ddd8ff;
 }
 
 .home-business-panel {
@@ -481,65 +481,65 @@ body.settings-page .dashboard-heading p {
 }
 
 .home-business-head h2 {
-  color: #101828;
+  color: var(--text);
   font-size: 22px;
 }
 
 .home-business-head p {
-  color: #667085;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .home-business-table-shell {
   border-color: var(--rv3-line);
-  background: #fff;
+  background: var(--surface);
 }
 
 .home-business-table th {
-  color: #667085;
+  color: var(--muted);
   border-bottom-color: var(--rv3-line);
-  background: #fafbfc;
+  background: rgba(255,255,255,.022);
 }
 
 .home-business-table td {
-  color: #344054;
-  border-bottom-color: #eef0f4;
+  color: #d9e0ea;
+  border-bottom-color: rgba(255,255,255,.055);
 }
 
 .home-business-table tbody tr:hover,
 .home-business-table tbody tr:focus-visible,
 [data-home-customer-id]:hover,
 [data-home-customer-id]:focus-visible {
-  background: #f8f7ff;
+  background: rgba(124,108,255,.055);
 }
 
 .home-business-mobile-card,
 .home-simple-row {
   border-color: var(--rv3-line);
-  background: #fff;
+  background: var(--surface);
 }
 
 .home-pill {
-  border-color: #ccebdd;
-  background: #effaf5;
-  color: #087a4b;
+  border-color: rgba(61,220,151,.24);
+  background: rgba(61,220,151,.10);
+  color: #90f0c5;
 }
 
 .home-pill.bad {
-  border-color: #f3d0d2;
-  background: #fff4f4;
-  color: #b4232a;
+  border-color: rgba(255,113,135,.25);
+  background: rgba(255,113,135,.10);
+  color: #ff9dad;
 }
 
 .home-booking-create-trigger {
-  border-color: #c9eada;
-  background: #f0fbf6;
-  color: #087a4b;
+  border-color: rgba(61,220,151,.24);
+  background: rgba(61,220,151,.10);
+  color: #90f0c5;
 }
 
 .home-booking-create-panel {
-  border-color: #cfeee0;
-  background: #f6fcf9;
+  border-color: rgba(61,220,151,.24);
+  background: rgba(61,220,151,.035);
 }
 
 .home-booking-create-form select,
@@ -547,17 +547,17 @@ body.settings-page .dashboard-heading p {
 .home-booking-filters select,
 .home-booking-reschedule select,
 .home-incident-form select {
-  border-color: #dfe3ec;
-  background: #fff;
-  color: #344054;
+  border-color: var(--border);
+  background: var(--surface);
+  color: #d9e0ea;
 }
 
 .home-incident-trigger,
 .home-incident-preview-btn,
 .home-incident-footer button {
-  border-color: #cbc7ff;
+  border-color: rgba(124,108,255,.34);
   background: var(--rv3-purple-soft);
-  color: #4338ca;
+  color: #ddd8ff;
 }
 
 /* Detail drawer. */
@@ -566,7 +566,7 @@ body.settings-page .dashboard-heading p {
 }
 
 .home-detail-drawer {
-  background: #fff;
+  background: var(--surface);
   border-left-color: var(--rv3-line);
   box-shadow: -30px 0 80px rgba(15,23,42,.16);
 }
@@ -577,7 +577,7 @@ body.settings-page .dashboard-heading p {
 }
 
 .home-detail-order-actions {
-  background: rgba(255,255,255,.96);
+  background: rgba(13,19,29,.96);
 }
 
 .home-detail-facts > div,
@@ -586,15 +586,15 @@ body.settings-page .dashboard-heading p {
 .home-detail-section,
 .home-detail-message {
   border-color: var(--rv3-line);
-  background: #fafbfc;
+  background: rgba(255,255,255,.022);
 }
 
 .home-detail-message.assistant {
-  background: #f0fbf6;
+  background: rgba(61,220,151,.10);
 }
 
 .home-detail-message strong {
-  color: #5147e5;
+  color: #ddd8ff;
 }
 
 /* Configuration forms. */
@@ -613,7 +613,7 @@ body.home-page:has(#dashboardView:not(.hidden)) .divider {
 body.settings-page .repeat-row,
 body.home-page:has(#dashboardView:not(.hidden)) .repeat-row {
   border-color: var(--rv3-line);
-  background: #fafbfc;
+  background: rgba(255,255,255,.022);
 }
 
 body.settings-page .agent-toggle,
@@ -621,8 +621,8 @@ body.settings-page .agent-capability,
 body.home-page:has(#dashboardView:not(.hidden)) .agent-toggle,
 body.home-page:has(#dashboardView:not(.hidden)) .agent-capability {
   border-color: var(--rv3-line);
-  background: #fafbfc;
-  color: #344054;
+  background: rgba(255,255,255,.022);
+  color: #d9e0ea;
 }
 
 body.settings-page #configPermissionsPanel .agent-capability input:checked,
@@ -632,20 +632,20 @@ body.home-page:has(#dashboardView:not(.hidden)) #configPermissionsPanel .agent-c
 }
 
 .ai-onboarding-card {
-  border-color: #dedbff !important;
+  border-color: rgba(124,108,255,.28) !important;
   background: linear-gradient(135deg, #fff, #faf9ff) !important;
 }
 
 .ai-chip {
-  border-color: #d6d2ff;
+  border-color: rgba(124,108,255,.30);
   background: var(--rv3-purple-soft);
-  color: #5147e5;
+  color: #ddd8ff;
 }
 
 .proposal-summary-item,
 .proposal-box {
   border-color: var(--rv3-line);
-  background: #fafbfc;
+  background: rgba(255,255,255,.022);
 }
 
 /* Inventory. */
@@ -654,48 +654,48 @@ body.inventory-page .inventory-workspace,
 body.inventory-page .inventory-alerts-panel,
 body.inventory-page .inventory-restock-panel {
   border-color: var(--rv3-line);
-  background: #fff;
+  background: var(--surface);
   box-shadow: var(--rv3-shadow);
 }
 
 body.inventory-page .inventory-kpi.alert {
-  border-color: #f4ddb0;
-  background: #fffbf2;
+  border-color: rgba(246,189,96,.30);
+  background: rgba(246,189,96,.10);
 }
 
 body.inventory-page .inventory-toolbar {
   border-bottom-color: var(--rv3-line);
-  background: #fafbfc;
+  background: rgba(255,255,255,.022);
 }
 
 body.inventory-page .inventory-table th {
   border-bottom-color: var(--rv3-line);
-  background: #fafbfc;
+  background: rgba(255,255,255,.022);
 }
 
 body.inventory-page .inventory-table td {
-  border-bottom-color: #eef0f4;
+  border-bottom-color: rgba(255,255,255,.055);
 }
 
 body.inventory-page .inventory-table tbody tr:hover {
-  background: #f8f7ff;
+  background: rgba(124,108,255,.055);
 }
 
 body.inventory-page .inventory-number.available {
-  color: #087a4b;
+  color: #90f0c5;
 }
 
 body.inventory-page .inventory-number.reserved {
-  color: #5147e5;
+  color: #ddd8ff;
 }
 
 body.inventory-page .inventory-sku {
-  color: #475467;
+  color: #bcc7d7;
 }
 
 body.inventory-page .inventory-dialog {
   color: var(--rv3-text);
-  background: #fff;
+  background: var(--surface);
   border-color: var(--rv3-line);
   box-shadow: 0 30px 100px rgba(15,23,42,.18);
 }
@@ -706,7 +706,7 @@ body.inventory-page .inventory-dialog::backdrop {
 
 body.inventory-page .inventory-switch {
   border-color: var(--rv3-line);
-  background: #fafbfc;
+  background: rgba(255,255,255,.022);
 }
 
 body.inventory-page .inventory-history-item,
@@ -714,7 +714,7 @@ body.inventory-page .inventory-variant-card,
 body.inventory-page .inventory-alert-card,
 body.inventory-page .inventory-restock-card {
   border-color: var(--rv3-line);
-  background: #fafbfc;
+  background: rgba(255,255,255,.022);
 }
 
 /* Accessibility and interaction polish. */
@@ -765,34 +765,34 @@ body.inventory-page .inventory-restock-card {
 
 /* Inventory navigation follows the same calm app shell. */
 body.inventory-page .inventory-nav a {
-  color: #667085;
+  color: var(--muted);
 }
 
 body.inventory-page .inventory-nav a:hover {
-  color: #27243e;
-  background: #f7f7fb;
+  color: var(--text);
+  background: rgba(255,255,255,.045);
 }
 
 body.inventory-page .inventory-nav a.active {
-  border-color: #d8d5ff;
+  border-color: rgba(124,108,255,.30);
   background: var(--rv3-purple-soft);
-  color: #4338ca;
+  color: #ddd8ff;
 }
 
 body.inventory-page .inventory-spinner {
-  border-color: #e4e7ec;
+  border-color: var(--border);
   border-top-color: var(--rv3-purple);
 }
 
 body.inventory-page .inventory-dialog-close {
   border-color: var(--rv3-line);
-  background: #f8f9fc;
-  color: #667085;
+  background: var(--surface-2);
+  color: var(--muted);
 }
 
 body.inventory-page .inventory-dialog-close:hover {
   background: var(--rv3-purple-soft);
-  color: #4338ca;
+  color: #ddd8ff;
 }
 
 @media (max-width: 860px) {
@@ -814,4 +814,14 @@ body.inventory-page .inventory-dialog-close:hover {
 /* Keep first-time setup deliberately narrow; operational tools appear once ready. */
 body.first-user-onboarding-active #primaryNav .nav-inventory {
   display: none !important;
+}
+
+/* Keep the fixed desktop rail anchored to the viewport, not a filtered topbar. */
+@media (min-width: 981px) {
+  body.home-page:has(#dashboardView:not(.hidden)) .topbar,
+  body.settings-page:has(#dashboardView:not(.hidden)) .topbar {
+    background: rgba(8,11,18,.97);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }

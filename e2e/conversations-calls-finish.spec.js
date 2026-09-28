@@ -153,11 +153,11 @@ test('simulator uses dark safe UI, progress feedback and human action labels', a
   await expect(page.locator('body')).not.toContainText('CREATE_BOOKING');
 
   const palette = await page.evaluate(() => ({
-    bg: getComputedStyle(document.documentElement).getPropertyValue('--rv-bg').trim(),
-    surface: getComputedStyle(document.documentElement).getPropertyValue('--rv-surface').trim()
+    bg: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+    surface: getComputedStyle(document.documentElement).getPropertyValue('--surface').trim()
   }));
-  expect(palette.bg).toBe('#0f1115');
-  expect(palette.surface).toBe('#151922');
+  expect(palette.bg).toBe('#080b12');
+  expect(palette.surface).toBe('#101722');
 });
 
 
