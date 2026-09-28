@@ -23,7 +23,7 @@ class ConsoleScriptAssetsContractTest {
         Set<String> scripts = new HashSet<>();
         scripts.addAll(scriptPaths("src/main/resources/static/index.html"));
         scripts.addAll(scriptPaths("src/main/resources/static/settings.html"));
-        scripts.addAll(scriptPaths("src/main/resources/static/operations.html"));
+        scripts.addAll(scriptPaths("src/main/resources/static/operations.html"));\n        scripts.addAll(scriptPaths("src/main/resources/static/conversations.html"));\n        scripts.addAll(scriptPaths("src/main/resources/static/simulator.html"));
 
         for (String script : scripts) {
             assertTrue(
@@ -38,7 +38,7 @@ class ConsoleScriptAssetsContractTest {
         Set<String> stylesheets = new HashSet<>();
         stylesheets.addAll(stylesheetPaths("src/main/resources/static/index.html"));
         stylesheets.addAll(stylesheetPaths("src/main/resources/static/settings.html"));
-        stylesheets.addAll(stylesheetPaths("src/main/resources/static/operations.html"));
+        stylesheets.addAll(stylesheetPaths("src/main/resources/static/operations.html"));\n        stylesheets.addAll(stylesheetPaths("src/main/resources/static/conversations.html"));\n        stylesheets.addAll(stylesheetPaths("src/main/resources/static/simulator.html"));
 
         for (String stylesheet : stylesheets) {
             assertTrue(

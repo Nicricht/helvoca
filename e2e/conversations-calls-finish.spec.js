@@ -103,7 +103,7 @@ test('conversation workspace is searchable and makes human attention obvious', a
   await expect(page.getByRole('searchbox', { name: 'Buscar conversaciones' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Necesita atención' })).toBeVisible();
   await expect(page.getByText('+15550000001')).toBeVisible();
-  await expect(page.getByText('Necesita atención humana')).toBeVisible();
+  await expect(page.locator('#conversationList').getByText('Necesita atención humana')).toBeVisible();
 
   await expect(page.getByRole('heading', { name: 'Qué ocurrió' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Conversación' })).toBeVisible();
