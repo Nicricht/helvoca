@@ -1,0 +1,47 @@
+.account-page{min-height:100vh;background:var(--bg);color:var(--text)}
+.account-brand{color:var(--text);text-decoration:none}
+.account-nav{display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap}
+.account-nav a{display:inline-flex;align-items:center;min-height:40px;padding:8px 11px;border:1px solid transparent;border-radius:10px;color:var(--muted);font-size:14px;font-weight:700;text-decoration:none}
+.account-nav a:hover,.account-nav a:focus-visible{color:var(--text);background:var(--surface-2)}
+.account-main{max-width:1180px;margin:0 auto;padding:40px 20px 72px}
+.account-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:24px}
+.account-heading h1{margin:3px 0 8px;font-size:clamp(30px,5vw,48px);line-height:1.05}
+.account-heading p:not(.eyebrow){max-width:680px;margin:0;color:var(--muted);font-size:16px;line-height:1.6}
+.account-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.75fr);gap:16px}
+.account-plan-card,.account-identity-card,.usage-panel{padding:22px;border-color:var(--border);background:var(--surface)}
+.account-card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}
+.account-card-heading h2{margin:2px 0 0;font-size:22px}
+.account-card-heading .eyebrow{margin:0}
+.usage-copy{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:10px}
+.usage-copy div{display:grid;gap:3px}
+.usage-copy span{color:var(--muted);font-size:14px}
+.usage-copy strong{font-size:20px}
+#voiceUsagePercent{font-weight:800;color:var(--text)}
+.account-progress{height:10px;overflow:hidden;border-radius:999px;background:var(--surface-2);border:1px solid var(--border)}
+.account-progress span{display:block;width:0;height:100%;border-radius:inherit;background:var(--accent);transition:width .2s ease}
+.account-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:20px 0 0}
+.account-facts.identity{grid-template-columns:1fr}
+.account-facts div{min-width:0;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
+.account-facts dt{margin-bottom:5px;color:var(--muted);font-size:12px;font-weight:750;text-transform:uppercase;letter-spacing:.04em}
+.account-facts dd{margin:0;overflow-wrap:anywhere;font-size:14px;font-weight:750}
+.account-connection{margin-top:14px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;color:var(--muted);font-size:14px}
+.account-connection.connected{border-color:rgba(34,197,94,.28);color:var(--text)}
+.account-help{margin:14px 0;color:var(--muted);font-size:14px;line-height:1.55}
+.account-settings-link{width:100%;justify-content:center}
+.usage-panel{margin-top:16px}
+.account-period{color:var(--muted);font-size:14px}
+.account-state,.account-state-inline{display:flex;align-items:center;gap:12px;color:var(--muted)}
+.account-state{padding:20px}
+.account-state p{margin:3px 0 0}
+.account-state-inline{min-height:52px;padding:12px 0}
+.account-spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:account-spin .8s linear infinite}
+@keyframes account-spin{to{transform:rotate(360deg)}}
+.usage-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.usage-item{display:flex;justify-content:space-between;gap:16px;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
+.usage-item div{display:grid;gap:4px}
+.usage-item span,.usage-item small{color:var(--muted);font-size:14px}
+.usage-item strong{font-size:18px}
+.account-note{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);font-size:14px}
+.account-note span{color:var(--muted)}
+@media(max-width:760px){.topbar{align-items:flex-start}.account-nav{order:3;width:100%;justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap}.account-main{padding:28px 14px 56px}.account-heading{align-items:flex-start;flex-direction:column}.account-grid,.usage-list{grid-template-columns:1fr}.account-facts{grid-template-columns:1fr}.account-plan-card,.account-identity-card,.usage-panel{padding:18px}}
+@media(prefers-reduced-motion:reduce){.account-progress span{transition:none}.account-spinner{animation:none}}
