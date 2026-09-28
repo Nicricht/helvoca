@@ -113,7 +113,7 @@
     {"sku":"ELE-CAB-2P5","category":"Electricidad","name":"Cable eléctrico 2,5 mm²","aliases":["cable 2.5","cable dos coma cinco"],"unit":"metro","price":990,"stock":180,"trackInventory":true},
     {"sku":"ELE-CAB-1P5","category":"Electricidad","name":"Cable eléctrico 1,5 mm²","aliases":["cable 1.5","cable uno coma cinco"],"unit":"metro","price":690,"stock":220,"trackInventory":true},
     {"sku":"ELE-ENCH-10A","category":"Electricidad","name":"Enchufe volante 10 A","aliases":["enchufe 10 amperes"],"unit":"unidad","price":2990,"stock":17,"trackInventory":true},
-    {"sku":"ELE-ALZ-6","category":"Electricidad","name":"Alargador 6 tomas 3 m","aliases":["zapatilla 6 tomas","alargador seis"],"unit":"unidad","price":12990,"stock":2,"trackInventory":true},
+    {"sku":"ELE-ALZ-6","category":"Electricidad","name":"Alargador 6 tomas 3 m","aliases":["zapatilla 6 tomas","alargador seis"],"unit":"unidad","price":12990,"stock":1,"trackInventory":true},
     {"sku":"GAS-REG-DUMMY","category":"Gas","name":"Regulador doméstico de referencia demo","aliases":["regulador gas"],"unit":"unidad","price":14990,"stock":0,"trackInventory":true,"restrictedAdvice":true},
     {"sku":"SAN-FLEX-40","category":"Gasfitería","name":"Flexible agua 1/2 pulgada x 40 cm","aliases":["flexible lavamanos","flexible agua"],"unit":"unidad","price":3990,"stock":22,"trackInventory":true},
     {"sku":"SAN-SIF-UNI","category":"Gasfitería","name":"Sifón universal lavaplatos","aliases":["sifón blanco","pieza bajo lavaplatos"],"unit":"unidad","price":7990,"stock":11,"trackInventory":true},
