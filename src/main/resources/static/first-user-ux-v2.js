@@ -110,20 +110,8 @@
     history.replaceState(null, "", "/");
   });
 
-  function syncOptionalModules() {
-    if (!homeWorkspace) return;
-    ["orders", "sales", "requests"].forEach(name => {
-      const tab = homeWorkspace.querySelector(`[data-home-tab="${name}"]`);
-      const countNode = tab?.querySelector("strong");
-      if (!tab || !countNode) return;
-      const count = Number.parseInt(countNode.textContent || "0", 10) || 0;
-      tab.classList.toggle("rv-module-empty", count === 0);
-    });
-  }
-
   const statusObserver = new MutationObserver(() => {
     renderSteps();
-    syncOptionalModules();
   });
   statusObserver.observe(statusGrid, {
     attributes: true,
@@ -135,17 +123,9 @@
     attributeFilter: ["class"]
   });
 
-  if (homeWorkspace) {
-    new MutationObserver(syncOptionalModules).observe(homeWorkspace, {
-      childList: true,
-      subtree: true,
-      characterData: true
-    });
-  }
 
   queueMicrotask(() => {
     renderSteps();
-    syncOptionalModules();
     const hash = window.location.hash.replace("#", "");
     if (hash === "bookings" || hash === "customers") activateHomeTab(hash);
   });
