@@ -1,0 +1,19 @@
+{
+  "commands": {
+    "low": [
+      ["your-lint-or-syntax-command"]
+    ],
+    "medium": [
+      ["your-unit-or-integration-command"]
+    ],
+    "high": [
+      ["your-security-command"],
+      ["your-adversarial-command"]
+    ]
+  },
+  "forbidden_real_effect_markers": [
+    "--live",
+    "--production-provider"
+  ],
+  "allow_real_external_effects": false
+}
