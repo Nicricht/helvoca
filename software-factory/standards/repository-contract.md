@@ -8,7 +8,8 @@ A repository should define:
 - architecture and deployment constraints;
 - project invariants that must never break;
 - unsafe or forbidden real external side effects;
-- required branch and release rules.
+- required branch and release rules;
+- a durable continuity mechanism for long or interrupted work.
 
 ## Preserve stronger checks
 
@@ -17,6 +18,16 @@ Adoption must **preserve stronger** existing quality gates. The universal templa
 ## Invariants
 
 Repositories should keep testable invariants in `docs/engineering/invariants.md`. Relevant changes must demonstrate that affected invariants still hold.
+
+## Continuity and resume
+
+The chat must never be the only source of truth for durable engineering progress.
+
+MEDIUM/HIGH-risk or multi-step work should maintain a **durable checkpoint**, preferably in the Draft Pull Request plus Git history. It must identify the branch, Pull Request or durable work item, exact HEAD, completed blocks, CI/evidence for that HEAD, blockers/rulings, and next step.
+
+Resume by reconstructing repository -> branch -> Pull Request -> HEAD -> CI -> checkpoint -> next step.
+
+Resume must be idempotent: preserve valid evidence, avoid duplicated work and external effects, and rerun verification only when newer state invalidates it or project policy requires a final gate.
 
 ## External side effect safety
 
