@@ -101,7 +101,7 @@ test('conversation workspace is searchable and makes human attention obvious', a
 
   await expect(page.getByRole('heading', { level: 1, name: 'Conversaciones' })).toBeVisible();
   await expect(page.getByRole('searchbox', { name: 'Buscar conversaciones' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Necesita atención' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Necesita atención', exact: true })).toBeVisible();
   await expect(page.getByText('+15550000001')).toBeVisible();
   await expect(page.locator('#conversationList').getByText('Necesita atención humana')).toBeVisible();
 
@@ -119,7 +119,7 @@ test('conversation workspace is searchable and makes human attention obvious', a
   await expect(page.getByText('+15550000001')).toHaveCount(0);
 
   await page.getByRole('searchbox', { name: 'Buscar conversaciones' }).fill('');
-  await page.getByRole('button', { name: 'Necesita atención' }).click();
+  await page.getByRole('button', { name: 'Necesita atención', exact: true }).click();
   await expect(page.getByText('+15550000001')).toBeVisible();
   await expect(page.getByText('+15550000002')).toHaveCount(0);
 });
@@ -196,7 +196,7 @@ test('conversation workspace keeps WhatsApp usable when call history is unavaila
 
   await expect(page.locator('#sourceStatus')).toContainText('historial de llamadas');
   await expect(page.locator('#detailCustomer')).toHaveText('+15550000003');
-  await expect(page.getByText('¿Atienden mañana?')).toBeVisible();
+  await expect(page.getByText('¿Atienden mañana?', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'WhatsApp' })).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
