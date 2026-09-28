@@ -1,0 +1,39 @@
+name: Mercado Pago Subscription Readback
+
+on:
+  push:
+    branches:
+      - cert/saas-billing-sandbox-provider-run-1
+    paths:
+      - ".github/workflows/mercadopago-subscription-readback.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  readback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      MERCADOPAGO_TEST_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
+      PREAPPROVAL_ID: "31d1df7075374596a86cecf49f3f8855"
+    steps:
+      - name: Read subscription and authorized payment metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sub="$(curl --fail-with-body -sS             -H "Authorization: Bearer $MERCADOPAGO_TEST_ACCESS_TOKEN"             "https://api.mercadopago.com/preapproval/$PREAPPROVAL_ID")"
+          echo "SUBSCRIPTION_ID=$(echo "$sub" | jq -r '.id')"
+          echo "SUBSCRIPTION_STATUS=$(echo "$sub" | jq -r '.status')"
+          echo "SUBSCRIPTION_EXTERNAL_REFERENCE=$(echo "$sub" | jq -r '.external_reference')"
+          echo "SUBSCRIPTION_NEXT_PAYMENT_DATE=$(echo "$sub" | jq -r '.next_payment_date // empty')"
+
+          invoices="$(curl --fail-with-body -sS             -H "Authorization: Bearer $MERCADOPAGO_TEST_ACCESS_TOKEN"             "https://api.mercadopago.com/authorized_payments/search?preapproval_id=$PREAPPROVAL_ID")"
+
+          count="$(echo "$invoices" | jq -r '.paging.total // (.results | length) // 0')"
+          echo "AUTHORIZED_PAYMENT_COUNT=$count"
+          echo "$invoices" | jq -r '
+            (.results // [])[] |
+            "AUTHORIZED_PAYMENT id=\(.id) status=\(.status) payment_status=\(.payment.status // "") preapproval_id=\(.preapproval_id // "") debit_date=\(.debit_date // "")"
+          '
