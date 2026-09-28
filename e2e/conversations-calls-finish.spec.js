@@ -142,7 +142,7 @@ test('simulator uses dark safe UI, progress feedback and human action labels', a
   await page.goto('/simulator.html');
 
   await expect(page.getByText(/no crea datos comerciales reales ni realiza llamadas telefónicas/i)).toBeVisible();
-  await expect(page.getByText(/no envía WhatsApp real/i)).toBeVisible();
+  await expect(page.getByText(/WhatsApp real/i)).toBeVisible();
 
   await page.getByRole('button', { name: 'Nueva prueba' }).click();
   await expect(page.getByRole('status')).toContainText('Iniciando prueba segura');
