@@ -15,6 +15,7 @@ class RepositoryTemplateContractTest(unittest.TestCase):
         self.assertIn("project-specific", text)
         self.assertIn("risk", text)
         self.assertIn("final commit", text)
+        self.assertIn("software-factory/skill/first-pass-engineering/SKILL.md", text)
 
     def test_pr_template_captures_evidence_and_risk(self):
         text = self.read("pull_request_template.md").lower()
@@ -40,7 +41,7 @@ class RepositoryTemplateContractTest(unittest.TestCase):
 
     def test_workflow_calls_repository_verifier_without_stack_assumptions(self):
         text = self.read("software-factory.yml")
-        self.assertIn("scripts/verify", text)
+        self.assertIn("bash scripts/verify", text)
         self.assertNotIn("mvn ", text)
         self.assertNotIn("npm test", text)
         self.assertNotIn("pytest", text)
