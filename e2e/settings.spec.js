@@ -186,9 +186,9 @@ async function mockSettings(page, state = {}) {
   await page.route('**/api/v1/services', route => route.fulfill(json([
     { id: 'service-1', name: 'Consulta', durationMinutes: 30, price: 25000, description: 'Consulta general', active: true }
   ])));
-  await page.route('**/api/v1/business/hours', route => route.fulfill(json([
-    { dayOfWeek: 1, openTime: '09:00:00', closeTime: '18:00:00' }
-  ])));
+  await page.route('**/api/v1/business/hours', route => route.fulfill(json(
+    state.hours ?? [{ dayOfWeek: 1, openTime: '09:00:00', closeTime: '18:00:00' }]
+  )));
   await page.route(/\/api\/v1\/business\/schedule-exceptions(?:\/([^/?]+))?$/, async route => {
     const request = route.request();
     const url = new URL(request.url());
@@ -488,6 +488,50 @@ test('settings exposes WhatsApp state and changes it only after an explicit clic
   await expect.poll(() => state.whatsappPatches).toEqual([{ enabled: true }]);
   await expect(page.locator('#phoneMessage')).toContainText('WhatsApp habilitado');
   await expect(page.getByText('WhatsApp activo')).toBeVisible();
+});
+
+test('settings does not invent business hours when the backend has none', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const state = { hours: [] };
+  await mockSettings(page, state);
+  await page.goto('/settings.html?section=hours');
+
+  await expect(page.locator('#hoursGrid .interval-row')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '+ Intervalo', exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
+
+  await expect(page.locator('#setupMessage')).toContainText('Configura al menos un intervalo');
+  expect(state.setupPayloads).toHaveLength(0);
+});
+
+test('manual settings save invalidates an older AI proposal', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const state = {
+    proposal: {
+      businessName: 'Propuesta antigua',
+      timezone: 'America/Santiago',
+      language: 'es',
+      sourceReadable: true,
+      sourceSummary: 'Datos detectados antes del ajuste manual',
+      services: [{ name: 'Servicio IA', durationMinutes: 30, price: 10000 }],
+      hours: [{ dayOfWeek: 1, openTime: '10:00:00', closeTime: '17:00:00' }],
+      knowledge: [],
+      warnings: []
+    }
+  };
+  await mockSettings(page, state);
+  await page.goto('/settings.html');
+
+  await page.getByRole('textbox', { name: 'Web, Instagram o Google Maps' }).fill('https://example.test');
+  await page.getByRole('button', { name: 'Analizar', exact: true }).click();
+  await expect(page.locator('#proposalPanel')).toBeVisible();
+
+  await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
+
+  await expect.poll(() => state.setupPayloads.length).toBe(1);
+  await expect(page.locator('#proposalPanel')).toBeHidden();
+  await expect(page.locator('#setupMessage')).toContainText('Negocio y agente guardados correctamente');
 });
 
 test('settings preserves valid proposal locale values that are not in the suggested lists', async ({ page }) => {
