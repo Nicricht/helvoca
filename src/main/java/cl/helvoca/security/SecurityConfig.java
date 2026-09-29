@@ -21,7 +21,7 @@ public class SecurityConfig {
     static final String[] PUBLIC_CONSOLE_ASSETS = {
             "/", "/index.html", "/app.js", "/phone-provisioning.js", "/commercial-status.js",
             "/voice-selector.js", "/ux-simplification.js", "/first-user-ux-v2.js", "/first-user-ux-v2.css",
-            "/styles.css", "/home-business.js", "/home-business.css",
+            "/styles.css", "/frontend-foundation.css", "/commercial-ui-v3.css", "/home-business.js", "/home-business.css", "/dashboard-finish.css",
             "/business-activation-guide.js", "/pilot-readiness.js", "/pilot-control.js", "/pilot-preflight.js", "/pilot-metrics.js",
             "/pilot-activation.js", "/schedule-exceptions.js", "/payment-sandbox-onboarding.js",
             "/invite.html", "/invite.js", "/team-invitations.js",
@@ -29,9 +29,11 @@ public class SecurityConfig {
             "/sales.html", "/sales.css",
             "/privacy.html", "/terms.html",
             "/pricing.html", "/pricing.js", "/pricing.css",
+            "/account.html", "/account.js", "/account.css",
             "/settings.html", "/settings-page.js",
             "/inventory.html", "/inventory.js", "/inventory.css",
             "/simulator.html", "/simulator.js", "/simulator.css",
+            "/conversations.html", "/conversations.js", "/conversations.css",
             "/manifest.webmanifest", "/service-worker.js", "/recepvoz-icon-192.png", "/recepvoz-icon-512.png",
             "/favicon.ico", "/error"
     };

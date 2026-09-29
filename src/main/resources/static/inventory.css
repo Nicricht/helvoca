@@ -29,7 +29,7 @@
 .inventory-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:11px; margin:18px 0; }
 .inventory-kpi {
     min-height:114px; padding:18px; border:1px solid var(--border); border-radius:16px;
-    background:linear-gradient(180deg,rgba(23,30,43,.88),rgba(16,21,31,.88));
+    background:var(--surface-2);
 }
 .inventory-kpi span,.inventory-kpi small { display:block; }
 .inventory-kpi span { color:var(--muted); font-size:11px; font-weight:750; text-transform:uppercase; letter-spacing:.08em; }
@@ -269,3 +269,118 @@
     .inventory-restock-status { justify-self:start; }
     .inventory-restock-action { justify-content:flex-start; }
 }
+
+
+/* Commerce operations composition. Shared colors and control skins remain owned by the frontend foundation. */
+.inventory-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.inventory-toolbar{display:grid;grid-template-columns:minmax(260px,1fr) minmax(180px,210px) minmax(190px,230px);align-items:end}
+.inventory-search{max-width:none}
+.inventory-filter,.inventory-sort{width:auto;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.inventory-search input,.inventory-filter select,.inventory-sort select{margin-top:6px;min-height:38px;font-size:12px}
+.inventory-price{font-variant-numeric:tabular-nums;font-weight:750;white-space:nowrap}
+.inventory-row-actions{flex-wrap:wrap}
+.inventory-row-actions .inventory-product-edit-btn{order:-2}
+.inventory-row-actions .inventory-adjust-btn{order:-1}
+
+@media(max-width:760px){
+    .inventory-heading-actions{width:100%;justify-content:flex-start}
+    .inventory-heading-actions .button{flex:1 1 160px}
+    .inventory-toolbar{grid-template-columns:1fr}
+    .inventory-search,.inventory-filter,.inventory-sort{width:100%;max-width:none}
+    .inventory-mobile-cards{overflow:visible}
+    .inventory-mobile-cards .inventory-table{display:block;min-width:0;width:100%}
+    .inventory-mobile-cards .inventory-table thead{display:none}
+    .inventory-mobile-cards .inventory-table tbody{display:grid;gap:10px;padding:12px}
+    .inventory-mobile-cards .inventory-table tr{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:2px 14px;
+        padding:12px;
+        border:1px solid var(--border);
+        border-radius:12px;
+        background:rgba(255,255,255,.018)
+    }
+    .inventory-mobile-cards .inventory-table td{
+        display:grid;
+        grid-template-columns:minmax(72px,auto) minmax(0,1fr);
+        gap:8px;
+        align-items:center;
+        min-width:0;
+        padding:6px 0;
+        border:0
+    }
+    .inventory-mobile-cards .inventory-table td::before{
+        content:attr(data-label);
+        color:var(--muted);
+        font-size:9px;
+        font-weight:800;
+        letter-spacing:.06em;
+        text-transform:uppercase
+    }
+    .inventory-mobile-cards .inventory-table td.inventory-product{
+        display:block;
+        grid-column:1/-1;
+        padding-bottom:10px;
+        border-bottom:1px solid var(--border)
+    }
+    .inventory-mobile-cards .inventory-table td.inventory-product::before{content:none}
+    .inventory-mobile-cards .inventory-table td[data-label="Acciones"]{
+        display:block;
+        grid-column:1/-1;
+        padding-top:10px;
+        border-top:1px solid var(--border)
+    }
+    .inventory-mobile-cards .inventory-table td[data-label="Acciones"]::before{
+        display:block;
+        margin-bottom:7px
+    }
+    .inventory-mobile-cards .inventory-row-actions{justify-content:flex-start}
+    .inventory-mobile-cards .inventory-row-actions .button{min-height:36px;flex:1 1 110px}
+}
+
+@media(max-width:460px){
+    .inventory-mobile-cards .inventory-table tr{grid-template-columns:1fr}
+    .inventory-mobile-cards .inventory-table td,
+    .inventory-mobile-cards .inventory-table td.inventory-product,
+    .inventory-mobile-cards .inventory-table td[data-label="Acciones"]{grid-column:1}
+}
+
+/* Integration authority: inventory controls follow the canonical foundation readability contract. */
+.inventory-filter,.inventory-sort{font-size:13px}
+.inventory-search input,.inventory-filter select,.inventory-sort select{min-height:44px;font-size:14px}
+@media(max-width:760px){
+  .inventory-mobile-cards .inventory-table tr{background:var(--surface-2)}
+  .inventory-mobile-cards .inventory-table td::before{font-size:12px}
+  .inventory-mobile-cards .inventory-row-actions .button{min-height:44px}
+}
+
+/* Final inventory readability floor: operational actions and forms stay readable. */
+.inventory-nav a,
+.inventory-row-actions .button,
+.inventory-variant-actions .button,
+.inventory-alert-action .button,
+.inventory-restock-action .button{font-size:14px}
+.inventory-empty span,
+.inventory-form-help,
+.inventory-variants-toolbar p,
+.inventory-alerts-head p,
+.inventory-restock-head p{font-size:13px}
+.inventory-kpi span,
+.inventory-kpi small,
+.inventory-search label,
+.inventory-filter,
+.inventory-sort,
+.inventory-table th,
+.inventory-sku,
+.inventory-state,
+.inventory-history-type,
+.inventory-history-main small,
+.inventory-history-after,
+.inventory-adjust-current span,
+.inventory-variant-name small,
+.inventory-variant-metric span,
+.inventory-variant-options,
+.inventory-alert-main small,
+.inventory-alerts-empty span,
+.inventory-restock-main small,
+.inventory-restock-status{font-size:12px}

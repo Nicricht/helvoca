@@ -664,14 +664,56 @@ aiForm.addEventListener("submit", async event => {
     await analyzeBusiness(sourceUrl, businessName);
 });
 
+function routeSetupValidation(section, target = null) {
+    const opener = window.helvocaOpenSettingsSection;
+    if (typeof opener === "function") {
+        opener(section, { focus: !target });
+    }
+    if (target && typeof target.focus === "function") {
+        window.requestAnimationFrame(() => target.focus());
+    }
+}
+
+setupForm.addEventListener("invalid", event => {
+    const target = event.target;
+    if (!target?.closest) return;
+
+    const panel = target.closest(".ux-config-panel");
+    const section = panel?.id === "configServicesPanel" ? "services"
+        : panel?.id === "configHoursPanel" ? "hours"
+        : panel?.id === "configAgentPanel" ? "receptionist"
+        : panel?.id === "configKnowledgePanel" ? "responses"
+        : "business";
+
+    event.preventDefault();
+    clearMessage(setupMessage);
+    const message = section === "services"
+        ? "Añade al menos un servicio antes de guardar."
+        : "Revisa los campos obligatorios de esta sección antes de guardar.";
+    showMessage(setupMessage, message);
+    routeSetupValidation(section, target);
+}, true);
+
 setupForm.addEventListener("submit", async event => {
     event.preventDefault();
     clearMessage(setupMessage);
     const services = collectServices();
     const hours = collectHours();
-    if (!services.length) { showMessage(setupMessage, "Añade al menos un servicio antes de guardar."); return; }
-    if (!hours.length) { showMessage(setupMessage, "Configura al menos un intervalo de atención."); return; }
-    if (!setupForm.elements.agentGreeting.value.trim()) { showMessage(setupMessage, "Define el saludo inicial del agente."); return; }
+    if (!services.length) {
+        showMessage(setupMessage, "Añade al menos un servicio antes de guardar.");
+        routeSetupValidation("services", $("[data-field=name]", servicesList));
+        return;
+    }
+    if (!hours.length) {
+        showMessage(setupMessage, "Configura al menos un intervalo de atención.");
+        routeSetupValidation("hours");
+        return;
+    }
+    if (!setupForm.elements.agentGreeting.value.trim()) {
+        showMessage(setupMessage, "Define el saludo inicial del agente.");
+        routeSetupValidation("receptionist", setupForm.elements.agentGreeting);
+        return;
+    }
     setBusy(setupForm, true);
     try {
         const payload = {
