@@ -3,5 +3,85 @@
 .search-control input,.filter-chip,.conversation-row,.row-identity small,.row-summary,.status-badge,.attention-badge,.mini-badge,.channel-badge,.list-empty p,.detail-person p,.source-status,.summary-card,.fact dd,.turn-head strong,.turn-card p,.transcript-empty,.timeline-empty,.outcome-block strong,.timeline-head strong,.timeline-content p,.detail-loading,.detail-empty p,.toast{font-size:14px}
 .fact dt,.outcome-block span,.turn-head time,.timeline-head time,.section-count{font-size:12px}
 
+
+/* Readability hardening: customer-facing compact copy never drops below 12px. */
+.rv-brand strong{font-size:13px}
+.rv-brand small,
+.eyebrow,
+.source-status,
+.filter-chip,
+.inbox-head div>span,
+.loading-badge,
+.row-identity small,
+.channel-badge,
+.status-badge,
+.attention-badge,
+.mini-badge,
+.list-empty p,
+.detail-empty p,
+.detail-loading,
+.detail-person p,
+.section-count,
+.fact dt,
+.speaker-avatar,
+.turn-head strong,
+.turn-head time,
+.transcript-empty,
+.timeline-empty,
+.outcome-block span,
+.timeline-head strong,
+.timeline-head time,
+.timeline-content p{font-size:12px}
+.inbox-head strong,
+.row-identity strong,
+.row-summary,
+.fact dd,
+.turn-card p,
+.outcome-block strong,
+.toast{font-size:13px}
+@media(max-width:520px){.rv-nav a{font-size:12px}}
+
+
+/* Final integration readability floor: actions and primary customer copy stay at 14px+. */
+.rv-nav a,
+.search-control input,
+.filter-chip,
+.button,
+.source-status,
+.row-identity strong,
+.row-summary,
+.list-empty p,
+.detail-empty p,
+.detail-loading,
+.summary-card,
+.fact dd,
+.turn-card p,
+.transcript-empty,
+.timeline-empty,
+.outcome-block strong,
+.toast{font-size:14px}
+.rv-brand strong,
+.inbox-head strong,
+.status-badge,
+.attention-badge,
+.channel-badge,
+.mini-badge,
+.detail-person p,
+.turn-head strong,
+.timeline-head strong,
+.timeline-content p{font-size:13px}
+.rv-brand small,
+.eyebrow,
+.inbox-head div>span,
+.loading-badge,
+.fact dt,
+.speaker-avatar,
+.turn-head time,
+.section-count,
+.outcome-block span,
+.timeline-head time{font-size:12px}
+@media(max-width:520px){.rv-nav a{font-size:14px}}
+
+/* Integration-only heading actions. */
 .rv-heading-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.rv-heading-actions .button{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
 @media(max-width:520px){.rv-heading-actions{width:100%}.rv-heading-actions .button{flex:1 1 auto}}

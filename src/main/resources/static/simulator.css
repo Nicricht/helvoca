@@ -2,4 +2,49 @@
 /* Customer-facing simulator controls and trace use the canonical readable type scale. */
 .topbar a,.topbar span,button,.safe-note strong,.safe-note div>span,.sim-feedback,.bubble,.bubble small,.hint,.trace-stat span,.trace-stat strong,.trace-item strong,.trace-item p,.pill,.empty,.toast{font-size:14px}
 
+
+/* Readability hardening: simulator guidance and status copy stay legible. */
+.topbar strong{font-size:13px}
+.topbar span,
+.topbar a,
+.eyebrow,
+.badge,
+button,
+.safe-note strong,
+.safe-note div>span,
+.sim-feedback,
+.bubble,
+.bubble small,
+.hint,
+.trace-stat span,
+.trace-stat strong,
+.trace-item strong,
+.pill,
+.trace-item p,
+.empty,
+.toast{font-size:12px}
+
+
+/* Final simulator readability floor: controls and conversational copy stay readable. */
+.topbar a,
+button,
+.safe-note strong,
+.safe-note div>span,
+.sim-feedback,
+.bubble,
+.empty,
+.toast{font-size:14px}
+.topbar strong,
+.topbar span,
+.hint,
+.trace-stat span,
+.trace-stat strong,
+.trace-item strong,
+.trace-item p{font-size:13px}
+.eyebrow,
+.badge,
+.bubble small,
+.pill{font-size:12px}
+
+/* Integration-only history shortcut. */
 .simulator-history-link{display:inline-flex;align-items:center;justify-content:center;min-height:39px;padding:0 14px;text-decoration:none;font-size:14px}

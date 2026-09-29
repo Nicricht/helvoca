@@ -197,7 +197,7 @@ test('conversation workspace keeps WhatsApp usable when call history is unavaila
   await expect(page.locator('#sourceStatus')).toContainText('historial de llamadas');
   await expect(page.locator('#detailCustomer')).toHaveText('+15550000003');
   await expect(page.getByText('¿Atienden mañana?', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'WhatsApp', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.filter-group button[data-channel="whatsapp"]')).toHaveAttribute('aria-pressed', 'true');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 });
 
@@ -212,4 +212,28 @@ test('conversation workspace has an intentional empty state', async ({ page }) =
 
   await expect(page.getByText('Todavía no hay conversaciones')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Selecciona una conversación' })).toBeVisible();
+});
+
+
+test('customer-facing conversations and simulator keep readable compact type', async ({ page }) => {
+  await mockConversations(page);
+  await page.goto('/conversations.html');
+
+  for (const selector of [
+    '.filter-chip',
+    '.row-summary',
+    '.channel-badge',
+    '.fact dd',
+    '.turn-card p',
+    '.timeline-content p'
+  ]) {
+    const size = await page.locator(selector).first().evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(size, selector).toBeGreaterThanOrEqual(12);
+  }
+
+  await page.goto('/simulator.html');
+  for (const selector of ['.safe-note div > span', '.hint', '.topbar a']) {
+    const size = await page.locator(selector).first().evaluate(element => Number.parseFloat(getComputedStyle(element).fontSize));
+    expect(size, selector).toBeGreaterThanOrEqual(12);
+  }
 });

@@ -95,7 +95,7 @@ test('account keeps the core subscription useful when detailed usage is forbidde
 
   await expect(page.locator('#planName')).toHaveText('Profesional');
   await expect(page.locator('#accountRole')).toHaveText('Operador');
-  await expect(page.locator('#usageState')).toContainText(/solo para administradores/i);
+  await expect(page.locator('#usageState')).toContainText('solo para administradores');
   await expect(page.locator('#accountError')).toBeHidden();
 });
 
