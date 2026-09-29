@@ -730,9 +730,9 @@ test('settings validation opens Services when no valid service remains', async (
   await page.locator('.ux-config-nav [data-settings-section="business"]').click();
   await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
 
-  await expect(page.locator('#setupMessage')).toContainText('Añade al menos un servicio');
   await expect(page.locator('#configServicesPanel')).toBeVisible();
   await expect(page.locator('.ux-config-nav [data-settings-section="services"]')).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('#servicesList [data-field="name"]')).toBeFocused();
 });
 
 test('settings validation opens Horarios when no attention interval remains', async ({ page }) => {
