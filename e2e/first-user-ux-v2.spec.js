@@ -118,7 +118,7 @@ test('new owner gets a four-step guided setup instead of the operational workspa
   await expect(page.locator('#firstUserNextAction')).toHaveText('Continuar con Servicios');
   await expect(page.locator('#firstUserNextAction')).toHaveAttribute('href', '/settings.html?section=services');
   await expect(page.locator('#homeBusinessWorkspace')).toBeHidden();
-  await expect(page.locator('#primaryNav a:visible')).toContainText(['Inicio', 'Reservas', 'Clientes', 'Configuración']);
+  await expect(page.locator('#primaryNav a:visible')).toContainText(['Inicio', 'Agenda', 'Clientes', 'Configuración', 'Facturación']);
   await expect(page.locator('#primaryNav .nav-inventory')).toBeHidden();
 });
 
@@ -142,10 +142,10 @@ test('ready owner lands on a simple daily home with direct reservations and cust
   await expect(page.getByRole('link', { name: 'Probar RecepVoz' })).toBeVisible();
 
   const nav = page.locator('#primaryNav');
-  await expect(nav.locator('a:visible')).toContainText(['Inicio', 'Reservas', 'Clientes', 'Inventario', 'Recepcionista IA', 'Configuración']);
+  await expect(nav.locator('a:visible')).toContainText(['Inicio', 'Conversaciones', 'Agenda', 'Clientes', 'Inventario', 'Configuración', 'Facturación']);
   await expect(nav.getByRole('link', { name: 'Inventario', exact: true })).toHaveAttribute('href', '/inventory.html');
 
-  await nav.getByRole('link', { name: 'Reservas', exact: true }).click();
+  await nav.getByRole('link', { name: 'Agenda', exact: true }).click();
   await expect(page.locator('[data-home-tab="bookings"]')).toHaveClass(/active/);
 
   await nav.getByRole('link', { name: 'Clientes', exact: true }).click();
