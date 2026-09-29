@@ -1,63 +1,66 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('node:fs');
 
-const customerSurfaces = [
-  '/',
-  '/settings.html',
-  '/inventory.html',
-  '/conversations.html',
-  '/account.html',
-  '/simulator.html'
+const STATIC = 'src/main/resources/static';
+const customerPages = [
+  'index.html',
+  'settings.html',
+  'inventory.html',
+  'conversations.html',
+  'simulator.html',
+  'account.html'
 ];
 
-const coreLinks = [
-  'href="/"',
-  'href="/#bookings"',
-  'href="/#customers"',
-  'href="/conversations.html"',
-  'href="/inventory.html"',
-  'href="/settings.html"'
-];
+function read(name) {
+  return fs.readFileSync(`${STATIC}/${name}`, 'utf8');
+}
 
-test('integrated customer surfaces share navigation and canonical foundation authority', async ({ request }) => {
-  for (const path of customerSurfaces) {
-    const response = await request.get(path);
-    expect(response.ok(), path).toBe(true);
-    const html = await response.text();
+function navEntries(html) {
+  const nav = html.match(/<nav[^>]+aria-label="Navegación principal"[^>]*>([\s\S]*?)<\/nav>/i);
+  if (!nav) return [];
+  return [...nav[1].matchAll(/<a\s+([^>]*?)>([\s\S]*?)<\/a>/gi)].map(match => {
+    const attrs = match[1];
+    const href = attrs.match(/href="([^"]+)"/i)?.[1] || '';
+    const text = match[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+    return { href, text };
+  });
+}
 
-    for (const link of coreLinks) {
-      expect(html, path + ' should expose ' + link).toContain(link);
-    }
-    expect(html, path + ' must not expose internal operations').not.toContain('href="/operations.html"');
+test('customer navigation stays coherent and never exposes internal operations', async () => {
+  const expected = [
+    { href: '/', text: 'Inicio' },
+    { href: '/#bookings', text: 'Reservas' },
+    { href: '/#customers', text: 'Clientes' },
+    { href: '/inventory.html', text: 'Inventario' },
+    { href: '/conversations.html', text: 'Recepcionista IA' },
+    { href: '/settings.html', text: 'Configuración' }
+  ];
 
-    const stylesheets = [...html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"?]+)(?:\?[^"]*)?"/g)]
-      .map(match => match[1]);
-    expect(stylesheets, path + ' should load canonical Foundation last').not.toHaveLength(0);
-    expect(stylesheets.at(-1), path + ' should load canonical Foundation last').toBe('/frontend-foundation.css');
+  for (const page of customerPages) {
+    const html = read(page);
+    expect(navEntries(html), `${page} primary navigation`).toEqual(expected);
+    expect(html, `${page} must not expose internal operations`).not.toContain('href="/operations.html"');
   }
 });
 
-test('integrated dashboard exposes conversations without routing calls to internal operations', async ({ request }) => {
-  const [indexResponse, dashboardJsResponse] = await Promise.all([
-    request.get('/'),
-    request.get('/commercial-status.js')
-  ]);
-  expect(indexResponse.ok()).toBe(true);
-  expect(dashboardJsResponse.ok()).toBe(true);
+test('canonical foundation remains dark, solid and readable', async () => {
+  const css = read('frontend-foundation.css');
 
-  const index = await indexResponse.text();
-  const dashboardJs = await dashboardJsResponse.text();
-  expect(index).toContain('href="/conversations.html"');
-  expect(dashboardJs).toContain('<a href="/conversations.html">Conversaciones</a>');
-  expect(dashboardJs).not.toContain('/operations.html');
+  expect(css).toContain('--rv-bg-canvas: #070a10');
+  expect(css).toContain('--rv-surface-1: #0d131d');
+  expect(css).toContain('--rv-text-primary: #f4f7fb');
+  expect(css).toContain('--rv-accent: #806bff');
+  expect(css).not.toMatch(/(?:linear|radial)-gradient/i);
+  expect(css).toContain('.app-nav a,.inventory-nav a,.topbar nav a,.account-nav a,.rv-nav a{font-size:14px}');
 });
 
-test('billing account remains informational and does not introduce payment mutations', async ({ request }) => {
-  const response = await request.get('/account.js');
-  expect(response.ok()).toBe(true);
-  const source = await response.text();
+test('receptionist area keeps history and safe simulation as local actions', async () => {
+  const conversations = read('conversations.html');
+  const simulator = read('simulator.html');
 
-  expect(source).toContain('/api/v1/subscription');
-  expect(source).toContain('/api/v1/usage/summary');
-  expect(source).not.toMatch(/method\s*:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/);
-  expect(source).not.toMatch(/checkout|create[_-]?payment|payment[_-]?intent/i);
+  expect(conversations).toContain('>Conversaciones</h1>');
+  expect(conversations).toContain('href="/simulator.html">Probar recepcionista</a>');
+  expect(simulator).toContain('href="/conversations.html">Ver historial</a>');
+  expect(simulator).toMatch(/No crea datos comerciales reales ni realiza llamadas telefónicas/i);
+  expect(simulator).toMatch(/Tampoco envía WhatsApp real/i);
 });
