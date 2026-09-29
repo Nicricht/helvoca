@@ -6,15 +6,22 @@ Helvoca / RecepVoz puede venderse como **piloto asistido de alcance controlado**
 
 Runbook principal: `docs/FIRST_CUSTOMER_OPERATION.md`.
 
-## Repository review — 2026-09-27
+## Repository and production review — 2026-09-29
 
-La operación comercial de esta rama fue revisada contra `main` en:
+La base funcional recertificada para esta revisión es:
 
 ```text
-67ca6bb78d1664dee139aeced17b779ebfcc6284
+main@8ec4d007c29a5e938140828da8bd6f34c152bbaf
 ```
 
-Esto identifica la base de repositorio revisada, **no certifica por sí solo que ese SHA sea el desplegado en producción**. Antes de aceptar dinero o activar un piloto real, verificar el SHA desplegado, health/readiness y el estado de cada proveedor incluido en el alcance.
+Evidencia observada para ese SHA antes de abrir la recertificación comercial:
+
+- `helvoca/full-verification`: SUCCESS;
+- Railway production deployment: SUCCESS para el mismo SHA;
+- muestra reciente de 301 solicitudes HTTP: 154 x 200, 124 x 401, 20 x 403, 3 x 404 y **0 x 5xx**;
+- 0 Pull Requests abiertas al cerrar el hardening de frontend anterior.
+
+La certificación comercial actual se ejecuta de nuevo sobre una rama dedicada `cert/commercial-readiness-*` y debe demostrar que no está detrás del `main` vigente. Esta evidencia técnica **no activa proveedores ni autoriza por sí sola un cliente real**.
 
 ## Sellable core
 

@@ -3,7 +3,7 @@ name: Commercial Release Readiness Safe CI
 on:
   push:
     branches:
-      - test/commercial-release-readiness-first-business-v1
+      - 'cert/commercial-readiness-*'
 
 permissions:
   contents: read
@@ -33,7 +33,6 @@ jobs:
 
       - name: Run commercial release readiness gate
         env:
-          COMMERCIAL_READINESS_MAIN_SHA: 8dc165d102a4157fdc6e3cd38b51b76b70b388d1
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/ci/commercial-release-readiness-first-business.sh
 
@@ -46,7 +45,11 @@ jobs:
         env:
           DIFF_LINE_COVERAGE: "80"
           DIFF_BRANCH_COVERAGE: "70"
-        run: python3 scripts/ci/check_diff_coverage.py dbba4d7260c96763c13a0c56d4c1cb108d4986ca
+        run: |
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          BASE_SHA="$(git rev-parse refs/remotes/origin/main)"
+          echo "Differential coverage base: $BASE_SHA"
+          python3 scripts/ci/check_diff_coverage.py "$BASE_SHA"
 
       - name: Validate all customer and E2E JavaScript
         run: |
