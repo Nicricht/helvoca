@@ -725,10 +725,9 @@ test('settings validation opens Services when no valid service remains', async (
   await mockSettings(page);
   await page.goto('/settings.html');
 
-  await page.evaluate(() => {
-    const serviceName = document.querySelector('#servicesList [data-field="name"]');
-    if (serviceName) serviceName.value = '';
-  });
+  await page.locator('.ux-config-nav [data-settings-section="services"]').click();
+  await page.locator('#servicesList [data-field="name"]').fill('');
+  await page.locator('.ux-config-nav [data-settings-section="business"]').click();
   await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
 
   await expect(page.locator('#setupMessage')).toContainText('Añade al menos un servicio');
@@ -757,10 +756,9 @@ test('settings validation opens Recepcionista when greeting is missing', async (
   await mockSettings(page);
   await page.goto('/settings.html');
 
-  await page.evaluate(() => {
-    const greeting = document.querySelector('#setupForm [name="agentGreeting"]');
-    if (greeting) greeting.value = '';
-  });
+  await page.locator('.ux-config-nav [data-settings-section="receptionist"]').click();
+  await page.locator('#setupForm [name="agentGreeting"]').fill('');
+  await page.locator('.ux-config-nav [data-settings-section="business"]').click();
   await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
 
   await expect(page.locator('#setupMessage')).toContainText('Define el saludo inicial');
