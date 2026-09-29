@@ -718,3 +718,50 @@ test('settings deep link opens the requested onboarding section', async ({ page 
   await expect(page.locator('#configAgentPanel')).toBeVisible();
   await expect(page).toHaveURL(/section=receptionist/);
 });
+
+
+test('settings validation opens Services when no valid service remains', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockSettings(page);
+  await page.goto('/settings.html');
+
+  await page.locator('.ux-config-nav [data-settings-section="services"]').click();
+  await page.locator('#servicesList [data-field="name"]').fill('');
+  await page.locator('.ux-config-nav [data-settings-section="business"]').click();
+  await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
+
+  await expect(page.locator('#setupMessage')).toContainText('Añade al menos un servicio');
+  await expect(page.locator('#configServicesPanel')).toBeVisible();
+  await expect(page.locator('.ux-config-nav [data-settings-section="services"]')).toHaveAttribute('aria-current', 'page');
+});
+
+test('settings validation opens Horarios when no attention interval remains', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockSettings(page);
+  await page.goto('/settings.html');
+
+  await page.evaluate(() => {
+    const hours = document.querySelector('#hoursGrid');
+    if (hours) hours.innerHTML = '';
+  });
+  await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
+
+  await expect(page.locator('#setupMessage')).toContainText('Configura al menos un intervalo');
+  await expect(page.locator('#configHoursPanel')).toBeVisible();
+  await expect(page.locator('.ux-config-nav [data-settings-section="hours"]')).toHaveAttribute('aria-current', 'page');
+});
+
+test('settings validation opens Recepcionista when greeting is missing', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockSettings(page);
+  await page.goto('/settings.html');
+
+  await page.locator('.ux-config-nav [data-settings-section="receptionist"]').click();
+  await page.locator('#setupForm [name="agentGreeting"]').fill('');
+  await page.locator('.ux-config-nav [data-settings-section="business"]').click();
+  await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
+
+  await expect(page.locator('#setupMessage')).toContainText('Define el saludo inicial');
+  await expect(page.locator('#configAgentPanel')).toBeVisible();
+  await expect(page.locator('.ux-config-nav [data-settings-section="receptionist"]')).toHaveAttribute('aria-current', 'page');
+});
