@@ -46,8 +46,9 @@ import java.util.UUID;
 public class ReceptionistSimulatorService {
     public static final String PROVIDER_ID = "simulator";
     private static final Logger log = LoggerFactory.getLogger(ReceptionistSimulatorService.class);
-    private static final int MAX_TURNS = 24;
+    private static final int MAX_TURNS = 32;
     private static final int MAX_OPENAI_ATTEMPTS = 3;
+    private static final int MAX_TOOL_ROUNDS = 4;
 
     private final TenantProvider tenantProvider;
     private final BusinessRepository businesses;
@@ -157,7 +158,7 @@ public class ReceptionistSimulatorService {
                     reply = geminiFallback.respond(
                             instructions,
                             buildMessagingHistory(sessionId),
-                            simulatorToolNames(),
+                            simulatorToolNames(context),
                             (name, arguments) -> simulatorTools.execute(context, name, arguments));
                     call.setAiProvider("gemini");
                     calls.save(call);
@@ -186,6 +187,9 @@ public class ReceptionistSimulatorService {
                 Las consultas usan la configuración real del negocio, pero toda acción de escritura es una simulación aislada.
                 Nunca afirmes que una reserva, solicitud, cliente o pregunta fue guardada realmente.
                 Cuando una acción simulada tenga éxito, dilo como algo que ocurriría en una llamada real.
+                Para catálogo, stock, zonas y cobertura usa únicamente las herramientas de lectura publicadas.
+                Para pedidos usa quote_order, update_order y create_order: dentro del simulador esas mutaciones quedan aisladas y nunca crean pedidos ni reservas de inventario reales.
+                Si cambia cantidad, producto, retiro o despacho después de una cotización, usa update_order y vuelve a pedir confirmación porque el token anterior deja de ser válido.
                 No menciones nombres de herramientas, UUID, backend, base de datos ni detalles técnicos.
                 Responde en español natural, breve y sin markdown, con un máximo de 55 palabras.
                 Si el cliente quiere reservar y aún no está identificado en la simulación, pregunta su nombre de forma natural.
@@ -201,21 +205,62 @@ public class ReceptionistSimulatorService {
         if (!openAi.hasApiKey()) {
             throw new IllegalStateException("OpenAI simulator request failed because provider is not configured");
         }
-        JSONObject body = new JSONObject()
+
+        JSONObject body = baseOpenAiBody(context, instructions)
+                .put("input", buildHistory(sessionId));
+        List<ToolExecution> lastExecutions = List.of();
+
+        for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
+            JSONObject response = send(body);
+            JSONArray calls = functionCalls(response);
+            if (calls.isEmpty()) {
+                String text = extractOutputText(response);
+                if (text != null && !text.isBlank()) return sanitize(text);
+                break;
+            }
+
+            lastExecutions = executeTools(context, calls);
+            List<String> results = lastExecutions.stream()
+                    .map(ToolExecution::result)
+                    .toList();
+            JSONArray continuation = toolContinuationInput(calls, results);
+            String previousResponseId = response.optString("id", "");
+            if (previousResponseId.isBlank() || continuation.isEmpty()) {
+                return summarize(context, lastExecutions);
+            }
+
+            body = baseOpenAiBody(context, instructions)
+                    .put("previous_response_id", previousResponseId)
+                    .put("input", continuation);
+        }
+
+        if (!lastExecutions.isEmpty()) return summarize(context, lastExecutions);
+        return "No entendí del todo. ¿Puedes decírmelo de otra forma?";
+    }
+
+    private JSONObject baseOpenAiBody(RealtimeCallContext context, String instructions) {
+        return new JSONObject()
                 .put("model", openAi.getTrialModel())
                 .put("instructions", instructions)
-                .put("tools", responseTools())
+                .put("tools", responseTools(context))
                 .put("tool_choice", "auto")
-                .put("input", buildHistory(sessionId))
-                .put("max_output_tokens", 180);
-        JSONObject first = send(body);
-        JSONArray functionCalls = functionCalls(first);
-        String text = extractOutputText(first);
-        if (!functionCalls.isEmpty()) {
-            return summarize(context, executeTools(context, functionCalls));
+                .put("max_output_tokens", 220);
+    }
+
+    static JSONArray toolContinuationInput(JSONArray calls, List<String> results) {
+        JSONArray input = new JSONArray();
+        if (calls == null || results == null) return input;
+        int count = Math.min(calls.length(), results.size());
+        for (int i = 0; i < count; i++) {
+            JSONObject call = calls.optJSONObject(i);
+            String callId = call == null ? "" : call.optString("call_id", "");
+            if (callId.isBlank()) continue;
+            input.put(new JSONObject()
+                    .put("type", "function_call_output")
+                    .put("call_id", callId)
+                    .put("output", results.get(i) == null ? "" : results.get(i)));
         }
-        if (text != null && !text.isBlank()) return sanitize(text);
-        return "No entendí del todo. ¿Puedes decírmelo de otra forma?";
+        return input;
     }
 
     private List<MessagingAiClient.Turn> buildMessagingHistory(UUID callId) {
@@ -230,8 +275,8 @@ public class ReceptionistSimulatorService {
         return history;
     }
 
-    private static Set<String> simulatorToolNames() {
-        JSONArray definitions = RealtimeToolDefinitions.all();
+    private Set<String> simulatorToolNames(RealtimeCallContext context) {
+        JSONArray definitions = simulatorTools.toolDefinitions(context);
         Set<String> names = new HashSet<>();
         for (int i = 0; i < definitions.length(); i++) {
             String name = definitions.getJSONObject(i).optString("name", "");
@@ -336,11 +381,11 @@ public class ReceptionistSimulatorService {
         return clean.length() <= 80 ? clean : clean.substring(0, 80);
     }
 
-    private JSONArray responseTools() {
-        JSONArray realtime = RealtimeToolDefinitions.all();
+    private JSONArray responseTools(RealtimeCallContext context) {
+        JSONArray definitions = simulatorTools.toolDefinitions(context);
         JSONArray out = new JSONArray();
-        for (int i = 0; i < realtime.length(); i++) {
-            JSONObject copy = new JSONObject(realtime.getJSONObject(i).toString());
+        for (int i = 0; i < definitions.length(); i++) {
+            JSONObject copy = new JSONObject(definitions.getJSONObject(i).toString());
             copy.put("strict", false);
             out.put(copy);
         }
@@ -404,6 +449,15 @@ public class ReceptionistSimulatorService {
             case "list_services" -> serviceNames(data);
             case "get_business_information" -> "Estás hablando con " + data.optString("name", "este negocio") + ".";
             case "search_knowledge" -> knowledgeAnswer(data);
+            case "list_catalog" -> catalogSummary(data);
+            case "get_stock" -> stockSummary(data);
+            case "list_delivery_zones" -> deliveryZonesSummary(data);
+            case "validate_delivery_address", "quote_delivery" -> deliverySummary(data);
+            case "create_quote" -> quoteSummary(data);
+            case "quote_order", "update_order" -> orderQuoteSummary(data);
+            case "create_order" -> confirmedOrderSummary(data);
+            case "get_order_status" -> orderStatusSummary(data);
+            case "cancel_order" -> "En una llamada real, ese pedido quedaría cancelado.";
             case "create_request" -> "En una llamada real, la solicitud quedaría registrada para seguimiento del negocio.";
             case "record_unanswered_question" -> "No tengo esa información confirmada. En una llamada real dejaría la pregunta pendiente para que el negocio la responda.";
             case "transfer_to_human" -> "En una llamada real, ahora te transferiría con una persona del negocio.";
@@ -412,6 +466,12 @@ public class ReceptionistSimulatorService {
     }
 
     private ToolExecution preferred(List<ToolExecution> executions) {
+        for (int i = executions.size() - 1; i >= 0; i--) {
+            ToolExecution item = executions.get(i);
+            try {
+                if (!new JSONObject(item.result()).optBoolean("success", false)) return item;
+            } catch (Exception ignored) { }
+        }
         for (int i = executions.size() - 1; i >= 0; i--) {
             ToolExecution item = executions.get(i);
             try {
@@ -461,6 +521,115 @@ public class ReceptionistSimulatorService {
         if (results == null || results.isEmpty()) return "No tengo esa información confirmada.";
         String content = results.getJSONObject(0).optString("content", "");
         return content.isBlank() ? "No tengo esa información confirmada." : sanitize(content);
+    }
+
+    private String catalogSummary(JSONObject data) {
+        JSONArray items = data.optJSONArray("items");
+        if (items == null || items.isEmpty()) return "No hay productos activos configurados.";
+        List<String> values = new ArrayList<>();
+        for (int i = 0; i < Math.min(3, items.length()); i++) {
+            JSONObject item = items.optJSONObject(i);
+            if (item == null) continue;
+            String name = item.optString("name", "Producto");
+            Object price = item.opt("price");
+            if (price == null || price == JSONObject.NULL) {
+                values.add(name);
+            } else {
+                String currency = item.optString("currency", "CLP");
+                if (currency == null || currency.isBlank()) currency = "CLP";
+                values.add(name + " por " + price + " " + currency);
+            }
+        }
+        if (values.isEmpty()) return "No hay productos activos configurados.";
+        return "Tengo " + joinSpanish(values) + ".";
+    }
+
+    private String stockSummary(JSONObject data) {
+        String name = data.optString("productName", "ese producto");
+        if (!data.optBoolean("availabilityKnown", false)) {
+            return "No tengo stock confirmado de " + name + ".";
+        }
+        int available = data.optInt("available", -1);
+        if (available < 0) return "No tengo stock confirmado de " + name + ".";
+        if (available == 0) return name + " está agotado.";
+        if (available == 1) return "Queda 1 unidad disponible de " + name + ".";
+        return "Quedan " + available + " unidades disponibles de " + name + ".";
+    }
+
+    private String deliveryZonesSummary(JSONObject data) {
+        JSONArray zones = data.optJSONArray("zones");
+        if (zones == null || zones.isEmpty()) return "No hay zonas de despacho activas configuradas.";
+        List<String> names = new ArrayList<>();
+        for (int i = 0; i < Math.min(4, zones.length()); i++) {
+            JSONObject zone = zones.optJSONObject(i);
+            if (zone == null) continue;
+            String name = zone.optString("name", "");
+            if (!name.isBlank()) names.add(name);
+        }
+        return names.isEmpty()
+                ? "No hay zonas de despacho activas configuradas."
+                : "Hay despacho en " + joinSpanish(names) + ".";
+    }
+
+    private String deliverySummary(JSONObject data) {
+        if (data.has("covered") && !data.optBoolean("covered", false)) {
+            return "Esa dirección no está dentro de la cobertura configurada.";
+        }
+        String address = data.optString("address", "");
+        Object fee = data.opt("fee");
+        String currency = data.optString("currency", "CLP");
+        if (currency == null || currency.isBlank()) currency = "CLP";
+        if (fee != null && fee != JSONObject.NULL) {
+            if (!address.isBlank()) return "El despacho a " + address + " cuesta " + fee + " " + currency + ".";
+            return "El despacho cuesta " + fee + " " + currency + ".";
+        }
+        String zone = data.optString("deliveryZone", "");
+        if (!zone.isBlank()) return "La dirección está cubierta por " + zone + ".";
+        return "La dirección está dentro de la cobertura configurada.";
+    }
+
+    private String quoteSummary(JSONObject data) {
+        Object amount = data.opt("amount");
+        String status = data.optString("status", "");
+        if (amount == null || amount == JSONObject.NULL) {
+            return "REQUESTED".equalsIgnoreCase(status)
+                    ? "La cotización requiere revisión del negocio antes de dar un monto."
+                    : "La cotización quedó registrada dentro de la simulación.";
+        }
+        String currency = data.optString("currency", "CLP");
+        if (currency == null || currency.isBlank()) currency = "CLP";
+        return "La cotización queda en " + amount + " " + currency + ".";
+    }
+
+    private String orderQuoteSummary(JSONObject data) {
+        Object total = data.opt("total");
+        String currency = data.optString("currency", "CLP");
+        if (currency == null || currency.isBlank()) currency = "CLP";
+        if (total == null || total == JSONObject.NULL) {
+            return "El pedido queda preparado para confirmar dentro de la simulación.";
+        }
+        return "El pedido queda cotizado en " + total + " " + currency + " y espera tu confirmación.";
+    }
+
+    private String confirmedOrderSummary(JSONObject data) {
+        Object total = data.opt("total");
+        String currency = data.optString("currency", "CLP");
+        if (currency == null || currency.isBlank()) currency = "CLP";
+        if (total == null || total == JSONObject.NULL) {
+            return "En una llamada real, el pedido quedaría confirmado.";
+        }
+        return "En una llamada real, el pedido quedaría confirmado por " + total + " " + currency + ".";
+    }
+
+    private String orderStatusSummary(JSONObject data) {
+        JSONArray orders = data.optJSONArray("orders");
+        if (orders != null) {
+            if (orders.isEmpty()) return "No hay pedidos dentro de esta simulación.";
+            return "Hay " + orders.length() + " pedido(s) dentro de esta simulación.";
+        }
+        String status = data.optString("status", "");
+        if (status.isBlank()) return "Encontré el pedido dentro de esta simulación.";
+        return "El pedido está " + status.toLowerCase(Locale.ROOT).replace('_', ' ') + ".";
     }
 
     private String buildHistory(UUID callId) {
