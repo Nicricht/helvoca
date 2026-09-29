@@ -493,3 +493,372 @@ body.home-page:has(#authView:not(.hidden)) .rv-public-footer a:hover {
     transition-duration: .01ms !important;
   }
 }
+
+
+/* Dominant hero phone composition: image asset + real HTML overlays. */
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero {
+  grid-template-columns: minmax(370px, .92fr) minmax(430px, 1.08fr);
+  gap: clamp(14px, 1.4vw, 24px);
+  min-height: 690px;
+  padding: clamp(38px, 3vw, 54px);
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-copy {
+  align-self: center;
+  min-width: 0;
+  max-width: 560px;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-stage {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  height: 610px;
+  overflow: visible;
+  animation: none;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-stage::before {
+  content: "";
+  position: absolute;
+  inset: 8% 3% 5% 6%;
+  z-index: -3;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(22,217,245,.25), rgba(139,92,246,.12) 48%, transparent 72%);
+  filter: blur(20px);
+  opacity: .9;
+  pointer-events: none;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-device {
+  position: relative;
+  z-index: 4;
+  width: min(108%, 560px);
+  max-width: none;
+  height: auto;
+  max-height: 610px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 36px 48px rgba(0,0,0,.45))
+    drop-shadow(0 0 30px rgba(22,217,245,.12));
+  animation: rv-phone-float 6.4s ease-in-out infinite;
+  transform-origin: 50% 58%;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-orbit {
+  position: absolute;
+  z-index: 1;
+  width: 86%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-orbit-one {
+  border: 1px solid rgba(22,217,245,.24);
+  box-shadow: 0 0 45px rgba(22,217,245,.06);
+  transform: rotate(-17deg) scaleY(.42);
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-orbit-two {
+  width: 72%;
+  border: 1px solid rgba(139,92,246,.24);
+  box-shadow: 0 0 42px rgba(139,92,246,.06);
+  transform: rotate(19deg) scaleY(.52);
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble {
+  position: absolute;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 260px;
+  padding: 12px 14px;
+  border: 1px solid rgba(22,217,245,.34);
+  border-radius: 16px;
+  background: rgba(6,22,34,.88);
+  color: #ecfbff;
+  box-shadow: 0 18px 44px rgba(0,0,0,.32);
+  backdrop-filter: blur(16px);
+  font-size: 12px;
+  line-height: 1.42;
+  animation: rv-bubble-in .55s ease both;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-one {
+  top: 13%;
+  left: -2%;
+  animation-delay: .12s;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-two {
+  top: 42%;
+  left: -7%;
+  border-color: rgba(139,92,246,.5);
+  background: rgba(35,23,72,.9);
+  animation-delay: .32s;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-three {
+  left: 1%;
+  bottom: 10%;
+  max-width: 230px;
+  animation-delay: .52s;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-icon {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(22,217,245,.25), rgba(139,92,246,.35));
+  color: #f5fdff;
+  font-weight: 850;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-icon-success {
+  background: rgba(48,234,162,.18);
+  color: #7df5bf;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-wave {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  bottom: 19%;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 82px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-wave i {
+  display: block;
+  width: 6px;
+  height: 34px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #16d9f5, #8b5cf6);
+  box-shadow: 0 0 14px rgba(22,217,245,.42);
+  animation: rv-phone-wave 1.08s ease-in-out infinite;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-wave i:nth-child(2) { animation-delay: .08s; }
+body.home-page:has(#authView:not(.hidden)) .rv-phone-wave i:nth-child(3) { animation-delay: .16s; }
+body.home-page:has(#authView:not(.hidden)) .rv-phone-wave i:nth-child(4) { animation-delay: .24s; }
+body.home-page:has(#authView:not(.hidden)) .rv-phone-wave i:nth-child(5) { animation-delay: .32s; }
+body.home-page:has(#authView:not(.hidden)) .rv-phone-wave i:nth-child(6) { animation-delay: .24s; }
+body.home-page:has(#authView:not(.hidden)) .rv-phone-wave i:nth-child(7) { animation-delay: .16s; }
+body.home-page:has(#authView:not(.hidden)) .rv-phone-wave i:nth-child(8) { animation-delay: .08s; }
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-status {
+  position: absolute;
+  z-index: 9;
+  right: -1%;
+  bottom: 20%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 190px;
+  padding: 11px 13px;
+  border: 1px solid rgba(22,217,245,.32);
+  border-radius: 15px;
+  background: rgba(5,18,29,.9);
+  color: #e9fbff;
+  box-shadow: 0 16px 40px rgba(0,0,0,.3);
+  backdrop-filter: blur(16px);
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-status > i {
+  flex: 0 0 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #30eaa2;
+  box-shadow: 0 0 0 5px rgba(48,234,162,.1), 0 0 16px rgba(48,234,162,.35);
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-status span {
+  display: grid;
+  gap: 2px;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-status strong {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-status small {
+  color: #8ea8b9;
+  font-size: 10px;
+}
+
+@keyframes rv-phone-float {
+  0%, 100% { transform: translateY(0) rotate(-.2deg); }
+  50% { transform: translateY(-12px) rotate(.35deg); }
+}
+
+@keyframes rv-bubble-in {
+  from { opacity: 0; transform: translateY(10px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes rv-phone-wave {
+  0%, 100% { transform: scaleY(.48); opacity: .72; }
+  50% { transform: scaleY(1.65); opacity: 1; }
+}
+
+@media (max-width: 1260px) {
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero {
+    min-height: 610px;
+    grid-template-columns: minmax(0, 1fr);
+    padding-right: clamp(28px, 3vw, 42px);
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-copy {
+    width: min(56%, 520px);
+    max-width: 520px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-stage {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 49%;
+    height: 560px;
+    opacity: 1;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-device {
+    width: min(112%, 500px);
+    max-height: 560px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble {
+    max-width: 210px;
+    padding: 10px 12px;
+    font-size: 10.5px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-one { left: -11%; }
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-two { left: -16%; }
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-three { left: -8%; }
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-status { right: -6%; }
+}
+
+@media (max-width: 900px) {
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero {
+    min-height: auto;
+    padding-bottom: 500px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-copy {
+    width: 100%;
+    max-width: 660px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-stage {
+    right: 50%;
+    bottom: -8px;
+    width: min(92%, 650px);
+    height: 485px;
+    transform: translateX(50%);
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-device {
+    width: min(100%, 430px);
+    max-height: 485px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-one { left: 7%; top: 10%; }
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-two { left: 3%; top: 42%; }
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-three { left: 9%; bottom: 8%; }
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-status { right: 4%; bottom: 17%; }
+}
+
+@media (max-width: 620px) {
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero {
+    padding-bottom: 390px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-stage {
+    width: 100%;
+    height: 370px;
+    bottom: -4px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-device {
+    width: 315px;
+    max-height: 370px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-orbit {
+    width: 76%;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble {
+    max-width: 165px;
+    padding: 8px 9px;
+    border-radius: 12px;
+    font-size: 8.8px;
+    line-height: 1.3;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-icon {
+    flex-basis: 24px;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-one {
+    left: 1%;
+    top: 9%;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-two {
+    left: 0;
+    top: 43%;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-three {
+    left: 4%;
+    bottom: 5%;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-status {
+    right: 1%;
+    bottom: 14%;
+    min-width: 142px;
+    padding: 8px 9px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-status strong { font-size: 9px; }
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-status small { font-size: 8px; }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-wave {
+    bottom: 18%;
+    gap: 3px;
+    height: 56px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-wave i {
+    width: 4px;
+    height: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-device,
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble,
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-wave i {
+    animation: none !important;
+  }
+}
