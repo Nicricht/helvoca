@@ -1,0 +1,79 @@
+name: Commercial Release Readiness Safe CI
+
+on:
+  push:
+    branches:
+      - test/commercial-release-readiness-first-business-v1
+
+permissions:
+  contents: read
+
+jobs:
+  commercial-readiness-safe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Run commercial release readiness gate
+        env:
+          COMMERCIAL_READINESS_MAIN_SHA: 8dc165d102a4157fdc6e3cd38b51b76b70b388d1
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/ci/commercial-release-readiness-first-business.sh
+
+      - name: Run complete backend suite with JaCoCo
+        run: |
+          set -o pipefail
+          mvn --batch-mode --no-transfer-progress -Pcoverage test 2>&1 | tee backend-test.log
+
+      - name: Enforce differential Java coverage
+        env:
+          DIFF_LINE_COVERAGE: "80"
+          DIFF_BRANCH_COVERAGE: "70"
+        run: python3 scripts/ci/check_diff_coverage.py dbba4d7260c96763c13a0c56d4c1cb108d4986ca
+
+      - name: Validate all customer and E2E JavaScript
+        run: |
+          while IFS= read -r file; do
+            node --check "$file"
+          done < <(find src/main/resources/static e2e -type f -name '*.js' | sort)
+
+      - name: Install browser test dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run complete local Playwright suite
+        run: |
+          set -o pipefail
+          npm run test:e2e 2>&1 | tee playwright-test.log
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: commercial-release-readiness-safe-diagnostics
+          path: |
+            backend-test.log
+            playwright-test.log
+            target/surefire-reports/**
+            target/site/jacoco/**
+            test-results/**
+            playwright-report/**
+          if-no-files-found: warn
