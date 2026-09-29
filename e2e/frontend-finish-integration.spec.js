@@ -46,10 +46,10 @@ test('customer navigation stays coherent and never exposes internal operations',
 test('canonical foundation remains dark, solid and readable', async () => {
   const css = read('frontend-foundation.css');
 
-  expect(css).toContain('--rv-bg-canvas: #070a10');
+  expect(css).toContain('--rv-bg-canvas: #06111c');
   expect(css).toContain('--rv-surface-1: #0d131d');
   expect(css).toContain('--rv-text-primary: #f4f7fb');
-  expect(css).toContain('--rv-accent: #806bff');
+  expect(css).toContain('--rv-accent: #16d9f5');
   expect(css).not.toMatch(/(?:linear|radial)-gradient/i);
   expect(css).toContain('.app-nav a,.inventory-nav a,.topbar nav a,.account-nav a,.rv-nav a{font-size:14px}');
 });
