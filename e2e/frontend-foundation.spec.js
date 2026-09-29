@@ -108,7 +108,7 @@ test('canonical foundation owns dark surfaces and interaction states', async ({ 
     const disabled = style('#disabledTarget');
     return {
       canvasToken: root.getPropertyValue('--rv-bg-canvas').trim(),
-      accentToken: root.getPropertyValue('--rv-accent').trim(),
+      accentToken: root.getPropertyValue('--rv-brand-primary').trim(),
       body: body.backgroundColor,
       bodyText: body.color,
       card: card.backgroundColor,
