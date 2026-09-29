@@ -243,8 +243,7 @@ function addHourRow(hour = { dayOfWeek: 1, openTime: "09:00", closeTime: "18:00"
 
 function renderHours(hours = []) {
     hoursGrid.innerHTML = "";
-    if (hours.length) hours.forEach(addHourRow);
-    else for (let day = 1; day <= 5; day++) addHourRow({ dayOfWeek: day, openTime: "09:00", closeTime: "18:00" });
+    hours.forEach(addHourRow);
 }
 
 function ensureAddHourButton() {
@@ -726,6 +725,8 @@ setupForm.addEventListener("submit", async event => {
         await api("/api/v1/onboarding/setup", { method: "PUT", body: JSON.stringify(payload) });
         await saveBusinessProfile();
         await api("/api/v1/ai-agent", { method: "PUT", body: JSON.stringify(collectAgent()) });
+        proposalPanel.classList.add("hidden");
+        currentProposal = null;
         await loadDashboard();
         showMessage(setupMessage, "Negocio y agente guardados correctamente.", "success");
     } catch (error) {
