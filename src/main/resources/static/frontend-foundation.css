@@ -99,10 +99,7 @@ body {
 body.home-page:has(#dashboardView:not(.hidden)),
 body.settings-page,
 body.inventory-page {
-  background:
-    radial-gradient(circle at 8% -12%, rgba(128,107,255,.13), transparent 30%),
-    radial-gradient(circle at 96% 4%, rgba(69,216,154,.055), transparent 24%),
-    var(--rv-bg-canvas);
+  background: var(--rv-bg-canvas);
   color: var(--rv-text-primary);
 }
 
@@ -173,20 +170,20 @@ body.inventory-page .card,
 .inventory-restock-panel {
   border-color: var(--rv-border-default);
   background-color: var(--rv-surface-1);
-  background-image: linear-gradient(180deg, rgba(255,255,255,.018), rgba(255,255,255,0));
+  background-image: none;
   color: var(--rv-text-primary);
   box-shadow: var(--rv-shadow-sm);
 }
 
 #firstUserOnboarding {
   border-color: var(--rv-accent-border);
-  background: linear-gradient(145deg, rgba(128,107,255,.10), rgba(13,19,29,.98));
+  background: var(--rv-surface-1);
   color: var(--rv-text-primary);
 }
 
 .ai-onboarding-card {
   border-color: var(--rv-accent-border) !important;
-  background: linear-gradient(145deg, rgba(128,107,255,.095), rgba(13,19,29,.98)) !important;
+  background: var(--rv-surface-1) !important;
   color: var(--rv-text-primary);
   box-shadow: var(--rv-shadow-sm) !important;
 }
