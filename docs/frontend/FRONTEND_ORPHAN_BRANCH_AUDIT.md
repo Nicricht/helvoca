@@ -2,51 +2,132 @@
 
 Authoritative working ledger for `feat/frontend-orphan-branch-rescue`.
 
-Base integration at audit start:
-`feat/frontend-finish-integration@3d73320848c7d81956701af6eb60f516f9eb1c80`.
+Audit base:
+- `main@8dc165d102a4157fdc6e3cd38b51b76b70b388d1`
+- `feat/frontend-finish-integration@3d73320848c7d81956701af6eb60f516f9eb1c80`
+- integration is **259 commits ahead / 0 behind** `main`.
 
 ## Rules
 
 - The certified integration branch is the canonical frontend reference.
 - Historical branches are never merged wholesale.
-- Rescue only behavior that is still valid for the current product.
+- Rescue only behavior that still belongs in the current product.
 - Production behavior requires RED → GREEN evidence before adoption.
-- Any schema/API/security change is treated as HIGH risk.
+- Schema/API/security changes are HIGH risk.
 - No merge to `main`, deploy, real calls, WhatsApp, payments, orders, deliveries or provisioning during this audit.
 
-## Initial classification
+## Final classification
 
-| Branch | Initial finding | Current classification |
+| Branch / PR | Evidence | Decision |
 | --- | --- | --- |
-| `feat/frontend-foundation-dark` | contained by integration | integrated |
-| `feat/frontend-dashboard-finish` | contained by integration | integrated |
-| `feat/frontend-onboarding-settings-finish` | contained by integration | integrated |
-| `feat/frontend-commerce-operations-finish` | contained by integration | integrated |
-| `feat/frontend-conversations-calls-finish` | contained by integration | integrated |
-| `feat/frontend-billing-account-finish` | contained by integration | integrated |
-| `feat/frontend-final-visual-polish` | zero commits ahead of integration | integrated/superseded |
-| `test/frontend-release-candidate-v1` | identical to integration at audit start | test mirror |
-| `test/release-candidate-first-business-hardening` | two commits ahead, workflow + E2E only | test-only, review separately |
-| `feat/frontend-appearance-themes` | divergent; unique UI/API/schema/auth work | **candidate for selective rescue** |
-| `feat/frontend-finalization-batch-1` | divergent historical UI/assets | pending supersession review |
-| `feat/landing-hero-dark-v1` | divergent historical landing UI | pending supersession review |
-| `feat/frontend-commercial-redesign-v3` | historical branch related to redesign already represented in main/integration | pending delta review |
-| `feat/frontend-operational-redesign` | old operational/backend/UI branch, far behind current line | pending supersession review |
-| `codex/frontend-ux-simplification` | old UX/security branch, far behind current line | pending supersession review |
+| `feat/frontend-foundation-dark` / #625 | source ancestry is fully contained by integration | **integrated** |
+| `feat/frontend-dashboard-finish` / #620 | source ancestry is fully contained by integration | **integrated** |
+| `feat/frontend-onboarding-settings-finish` / #629 | source behavior is represented and certified in integration | **integrated** |
+| `feat/frontend-commerce-operations-finish` / #623 | certified source HEAD is contained by integration | **integrated** |
+| `feat/frontend-conversations-calls-finish` / #621 | certified source HEAD is contained by integration | **integrated** |
+| `feat/frontend-billing-account-finish` / #634 | certified source HEAD is contained by integration | **integrated** |
+| `feat/frontend-final-visual-polish` | zero commits ahead of the integrated line when reviewed; later integration contains it | **integrated / superseded** |
+| `test/frontend-release-candidate-v1` | branch resolved to the same integration HEAD at audit start | **test mirror, no missing product UI** |
+| `test/release-candidate-first-business-hardening` / #641 | current HEAD `dbba4d7260c96763c13a0c56d4c1cb108d4986ca`; production source changes = none; safe CI 118/118 | **valuable test-only hardening; keep as separate PR, do not duplicate** |
+| `feat/frontend-appearance-themes` / #637 | unique tenant theme API/schema/runtime/UI work; PR explicitly says **POST-RC ONLY** and forbids reopening current RC visual scope | **valid future feature, deliberately deferred; do not rescue into current RC** |
+| `feat/landing-hero-dark-v1` / #612 | unique richer public hero, two hero CTAs, conversation card and trust strip; current integration already has the dark canonical hero, Sofía voice preview and certified auth/landing behavior | **superseded for current RC; preserve as future marketing reference only** |
+| `feat/frontend-finalization-batch-1` / #614 | extends #612 and adds `recepvoz-ui.css` + brand asset; also contains a historical “light commercial design” contract that conflicts with the current dark Foundation; onboarding-next-step intent is covered by newer integration tests | **superseded for current RC; do not reintroduce parallel visual system** |
+| `feat/frontend-commercial-redesign-v3` / #610 | PR #610 is merged; current `main` is the merge result | **already merged historically, not orphaned** |
+| `codex/frontend-ux-simplification` / #115 | PR #115 is merged | **already merged historically, not orphaned** |
+| `feat/frontend-operational-redesign` / #135 | PR is closed unmerged and thousands of commits behind; its stated outcomes (operational home, settings, reservation filters, conversation traceability, internal-only operations) are implemented by newer Dashboard / Conversations / Settings integration | **superseded by newer product work; no rescue** |
 
-## Required output before closure
+## Important findings
 
-For every divergent branch, record:
-1. unique behavior/files;
-2. whether current integration already has an equivalent;
-3. rescue decision and rationale;
-4. RED/GREEN evidence for rescued behavior;
-5. exact final HEAD and CI evidence.
+### 1. The main visibility problem is not an orphan branch
+
+The largest reason the current product can look older is simple:
+
+`feat/frontend-finish-integration` is **259 commits ahead of `main`** and remains unmerged.
+
+That integration line contains the certified Foundation, Dashboard, Onboarding/Settings, Commerce, Conversations/Calls, Billing/Account, shared navigation and release-candidate contracts.
+
+Therefore a runtime built from `main` cannot show the complete integrated frontend.
+
+### 2. Appearance Themes is real, but intentionally outside the RC
+
+PR #637 is not accidental lost work. Its own durable ruling says:
+- POST-RC ONLY;
+- do not merge into the frozen frontend RC;
+- resume only as a deliberate later release feature with fresh gates against the then-current integration base.
+
+Unique future scope includes:
+- five curated tenant accent presets;
+- persisted `business.appearance_theme`;
+- admin-only appearance mutation;
+- shared `appearance.js` runtime;
+- Settings appearance UI;
+- tenant/cache/expiry hardening.
+
+This work remains preserved in PR #637 and must not be silently mixed into the current release candidate.
+
+### 3. Landing / Batch 1 preserve useful ideas, not current canonical code
+
+The older landing branches contain:
+- a richer Sofía conversation card;
+- hero CTAs “Probar RecepVoz” and “Ver cómo funciona”;
+- compact trust strip;
+- a dedicated brand asset.
+
+Those are valid future marketing/design references.
+
+However their implementation is not suitable for wholesale rescue because:
+- they predate the final integration;
+- Batch 1 creates a second shared design layer (`recepvoz-ui.css`);
+- parts of its contract explicitly expect the older light commercial system;
+- current Foundation is the canonical dark visual authority;
+- current RC already has certified dark landing/auth behavior and a Sofía preview;
+- current RC hardening explicitly says not to add more cosmetics without a demonstrated defect.
+
+Decision: preserve the ideas, not the old implementation.
+
+### 4. Old operational work is functionally superseded
+
+PR #135 was never merged, but its product objectives are now covered by later certified work:
+- operational Dashboard;
+- customer Conversations/Calls;
+- Settings;
+- reservation/order traceability;
+- internal-only Operations boundary.
+
+Reintroducing the old branch would revive stale backend/UI code from a branch far behind the current product line.
+
+## Rescue result
+
+**No production source from the audited orphan branches qualifies for rescue into the current RC.**
+
+This is intentional, not a no-op:
+- valid current work is already integrated;
+- Appearance Themes is deliberately post-RC;
+- RC hardening is test-only and already has its own certified PR;
+- old visual branches conflict with or are superseded by the canonical dark Foundation;
+- old operational work is superseded by later integrated behavior.
+
+The audit therefore prevents two opposite failure modes:
+1. losing genuinely valuable future work;
+2. blindly merging stale branches and regressing the certified frontend.
+
+## Preserved future candidates
+
+Do not lose these when planning post-RC work:
+1. **Appearance Themes** — resume PR #637 deliberately after RC.
+2. **Public marketing composition** — if a later product review wants a stronger acquisition landing, use #612/#614 only as reference for richer Sofía conversation storytelling, trust strip, CTAs and brand asset. Reimplement on the current Foundation, never by merging those branches.
+3. **RC hardening tests** — review PR #641 separately for integration because it contains no production source changes and already has safe green evidence.
 
 ## Resume checkpoint
 
+- Repository: `Nicricht/helvoca`
 - Branch: `feat/frontend-orphan-branch-rescue`
-- Base at creation: `feat/frontend-finish-integration@3d73320848c7d81956701af6eb60f516f9eb1c80`
-- Risk: HIGH
-- Completed: canonical/contained branches identified; divergent candidates enumerated.
-- Next: deep review `feat/frontend-appearance-themes`, define desired current behavior and establish RED contract on this branch before implementation.
+- PR: #643 — DRAFT
+- Base: `feat/frontend-finish-integration@3d73320848c7d81956701af6eb60f516f9eb1c80`
+- Scope: audit / classification only; no production code rescued.
+- Production-code changes in this PR: **none**.
+- Main finding: current integration is 259 commits ahead / 0 behind `main`.
+- Current unique deferred feature: `feat/frontend-appearance-themes@2112abcd03350516e830c23aaa2327d90f4ab22d` / PR #637 — POST-RC.
+- Current separate test-only hardening: `test/release-candidate-first-business-hardening@dbba4d7260c96763c13a0c56d4c1cb108d4986ca` / PR #641.
+- Next step: human/release decision on when the certified integration line may advance toward `main`; post-RC appearance work remains separate.
+- Safety: no merge, deploy or external business effect performed.
