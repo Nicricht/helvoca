@@ -546,7 +546,9 @@ dialog::backdrop,
 
 /* Integration typography floor for primary customer navigation. */
 .app-nav a,.inventory-nav a,.topbar nav a,.account-nav a,.rv-nav a{font-size:14px}
-@media(min-width:981px){body.home-page:has(#dashboardView:not(.hidden)) #primaryNav a,body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav a{font-size:14px}}
+@media(min-width:981px){
+  body.home-page:has(#dashboardView:not(.hidden)) .topbar>div:first-child{pointer-events:none}
+body.home-page:has(#dashboardView:not(.hidden)) #primaryNav a,body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav a{font-size:14px}}
 
 /* Final visual polish: dark navy product shell with cyan action authority.
    Violet is reserved for AI-specific emphasis. */
