@@ -174,7 +174,9 @@
     return apply(authoritativeTheme);
   }
 
-  const cached = sessionStorage.getItem(CACHE_KEY);
+  const hasAuthenticatedSession = Boolean(sessionStorage.getItem("helvoca_access_token"));
+  const cached = hasAuthenticatedSession ? sessionStorage.getItem(CACHE_KEY) : null;
+  if (!hasAuthenticatedSession) sessionStorage.removeItem(CACHE_KEY);
   apply(cached || DEFAULT_THEME, { cache: false });
 
   window.RecepVozAppearance = Object.freeze({
