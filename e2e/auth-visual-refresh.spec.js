@@ -61,6 +61,31 @@ test.describe('public authentication visual refresh', () => {
     }
   });
 
+  test('gives the phone a dominant visual stage on desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1536, height: 950 });
+    await page.goto('/');
+
+    const heroBox = await page.locator('.rv-auth-hero').boundingBox();
+    const phoneBox = await page.locator('.rv-phone-device').boundingBox();
+
+    expect(heroBox).not.toBeNull();
+    expect(phoneBox).not.toBeNull();
+    expect(phoneBox.width).toBeGreaterThan(320);
+    expect(phoneBox.height).toBeGreaterThan(500);
+    expect(phoneBox.width / heroBox.width).toBeGreaterThan(0.34);
+  });
+
+  test('renders coded conversation layers around the phone', async ({ page }) => {
+    await page.setViewportSize({ width: 1536, height: 950 });
+    await page.goto('/');
+
+    await expect(page.locator('.rv-phone-stage')).toBeVisible();
+    await expect(page.locator('.rv-phone-device')).toHaveAttribute('src', '/recepvoz-phone-hero.svg');
+    await expect(page.locator('.rv-phone-bubble')).toHaveCount(3);
+    await expect(page.locator('.rv-phone-wave i')).toHaveCount(9);
+    await expect(page.locator('.rv-phone-status')).toContainText('Recepcionista disponible');
+  });
+
   test('serves the new visual assets to unauthenticated visitors', async ({ request }) => {
     const css = await request.get('/auth-visual-refresh.css');
     const hero = await request.get('/recepvoz-auth-hero.svg');
