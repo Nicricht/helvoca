@@ -561,7 +561,7 @@ test('ready customer console uses the canonical dark commercial design system', 
     return {
       background: bodyStyle.backgroundColor,
       text: bodyStyle.color,
-      accent: bodyStyle.getPropertyValue('--rv-accent').trim(),
+      accent: bodyStyle.getPropertyValue('--rv-brand-primary').trim(),
       cardBackground: cardStyle?.backgroundColor || null
     };
   });
