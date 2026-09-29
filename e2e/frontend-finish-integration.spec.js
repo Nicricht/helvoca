@@ -54,6 +54,13 @@ test('canonical foundation remains dark, solid and readable', async () => {
   expect(css).toContain('.app-nav a,.inventory-nav a,.topbar nav a,.account-nav a,.rv-nav a{font-size:14px}');
 });
 
+test('shared and public sales styles avoid decorative gradients', async () => {
+  for (const stylesheet of ['styles.css', 'sales.css']) {
+    const css = read(stylesheet);
+    expect(css, stylesheet).not.toMatch(/(?:linear|radial)-gradient/i);
+  }
+});
+
 test('receptionist area keeps history and safe simulation as local actions', async () => {
   const conversations = read('conversations.html');
   const simulator = read('simulator.html');
