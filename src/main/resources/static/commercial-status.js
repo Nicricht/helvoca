@@ -12,7 +12,7 @@
         .commercial-stat { padding: 12px; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; background: rgba(255,255,255,.02); }
         .commercial-stat small, .commercial-stat strong { display: block; }
         .commercial-stat small { margin-bottom: 4px; color: var(--muted); }
-        .commercial-pending { margin-top: 12px; padding: 12px 14px; border: 1px solid rgba(124,92,255,.28); border-radius: 12px; background: rgba(124,92,255,.055); }
+        .commercial-pending { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--rv-brand-border, rgba(124,92,255,.28)); border-radius: 12px; background: var(--rv-brand-soft, rgba(124,92,255,.055)); }
         .commercial-pending strong, .commercial-pending span { display: block; }
         .commercial-pending span { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.5; }
         .commercial-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }
@@ -23,7 +23,7 @@
         .commercial-plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
         .commercial-plan { position: relative; padding: 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 13px; background: rgba(255,255,255,.018); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
         .commercial-plan.current { border-color: rgba(55,205,145,.42); background: rgba(55,205,145,.055); }
-        .commercial-plan.pending { border-color: rgba(124,92,255,.42); background: rgba(124,92,255,.055); }
+        .commercial-plan.pending { border-color: var(--rv-brand-border, rgba(124,92,255,.42)); background: var(--rv-brand-soft, rgba(124,92,255,.055)); }
         .commercial-plan h4 { margin: 0; }
         .commercial-plan-price { font-size: 20px; font-weight: 800; }
         .commercial-plan-price small { display: inline; color: var(--muted); font-size: 11px; font-weight: 600; }
@@ -309,7 +309,7 @@
         '.owner-dashboard-message.hidden { display:none; }',
         '.home-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }',
         '.home-metric { min-height:82px; padding:13px 14px; border:1px solid var(--border); border-radius:12px; background:rgba(255,255,255,.025); color:inherit; text-decoration:none; cursor:pointer; transition:border-color .16s ease,background .16s ease,transform .16s ease; }',
-        '.home-metric:hover { border-color:rgba(124,92,255,.42); background:rgba(124,92,255,.07); transform:translateY(-1px); }',
+        '.home-metric:hover { border-color:var(--rv-brand-border, rgba(124,92,255,.42)); background:var(--rv-brand-soft, rgba(124,92,255,.07)); transform:translateY(-1px); }',
         '.home-metric:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }',
         '.home-metric strong,.home-metric span,.home-metric small { display:block; }',
         '.home-metric strong { font-size:24px; line-height:1; letter-spacing:-.03em; }',
