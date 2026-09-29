@@ -48,7 +48,7 @@
         .ux-config-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
         .ux-config-nav button { min-width: 0; text-align: left; border: 1px solid transparent; border-radius: 12px; padding: 13px 14px; color: var(--text); background: transparent; cursor: pointer; font: inherit; transition: .16s ease; }
         .ux-config-nav button:hover { background: var(--ux-surface); border-color: var(--border); }
-        .ux-config-nav button[aria-expanded="true"] { background: rgba(124,92,255,.12); border-color: rgba(124,92,255,.38); }
+        .ux-config-nav button[aria-expanded="true"] { background: var(--rv-brand-soft, rgba(124,92,255,.12)); border-color: var(--rv-brand-border, rgba(124,92,255,.38)); }
         .ux-config-nav strong, .ux-config-nav small { display: block; }
         .ux-config-nav strong { font-size: 13px; }
         .ux-config-nav small { color: var(--muted); margin-top: 3px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -85,7 +85,7 @@
         #configPhonePanel > p { display: none !important; }
         .ux-phone-modes { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); margin-bottom: 10px; }
         .ux-phone-modes button { min-height: 30px; border: 0; border-radius: 8px; padding: 6px 10px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
-        .ux-phone-modes button.active { color: var(--text); background: rgba(124,92,255,.16); }
+        .ux-phone-modes button.active { color: var(--text); background: var(--rv-brand-soft, rgba(124,92,255,.16)); }
         .ux-phone-path.hidden { display: none !important; }
         .provisioning-panel { margin: 0 !important; }
         .manual-phone-divider { display: none !important; }
