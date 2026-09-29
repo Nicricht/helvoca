@@ -50,6 +50,7 @@ app:
     enabled: ${SEED_ENABLED:false}
     admin-email: ${SEED_ADMIN_EMAIL:admin@helvoca.local}
     admin-password: ${SEED_ADMIN_PASSWORD:ChangeMe123!}
+    preset: ${SEED_PRESET:barbershop}
   security:
     rate-limit:
       enabled: ${HELVOCA_RATE_LIMIT_ENABLED:true}
