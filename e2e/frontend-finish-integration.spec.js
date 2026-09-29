@@ -88,11 +88,33 @@ test('customer surfaces stay contained at required responsive widths', async ({ 
     for (const path of ['/', '/settings.html', '/inventory.html', '/conversations.html', '/simulator.html', '/account.html']) {
       await page.goto(path);
       await page.waitForTimeout(80);
-      const layout = await page.evaluate(() => ({
-        scrollWidth: document.documentElement.scrollWidth,
-        clientWidth: document.documentElement.clientWidth
-      }));
-      expect(layout.scrollWidth, `${path} at ${width}px`).toBeLessThanOrEqual(layout.clientWidth + 1);
+      const layout = await page.evaluate(() => {
+        const clientWidth = document.documentElement.clientWidth;
+        const offenders = [...document.querySelectorAll('body *')]
+          .map(element => {
+            const rect = element.getBoundingClientRect();
+            return {
+              tag: element.tagName.toLowerCase(),
+              id: element.id || '',
+              className: typeof element.className === 'string' ? element.className : '',
+              left: Math.round(rect.left),
+              right: Math.round(rect.right),
+              width: Math.round(rect.width)
+            };
+          })
+          .filter(item => item.width > 0 && (item.right > clientWidth + 1 || item.left < -1))
+          .sort((a, b) => b.right - a.right)
+          .slice(0, 8);
+        return {
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth,
+          offenders
+        };
+      });
+      expect(
+        layout.scrollWidth,
+        `${path} at ${width}px overflow: ${JSON.stringify(layout.offenders)}`
+      ).toBeLessThanOrEqual(layout.clientWidth + 1);
     }
   }
 });
