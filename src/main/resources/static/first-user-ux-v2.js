@@ -4,8 +4,10 @@
   const onboarding = document.querySelector("#firstUserOnboarding");
   const progressText = document.querySelector("#firstUserProgressText");
   const progressBar = document.querySelector("#firstUserProgressBar");
+  const progressMeter = onboarding?.querySelector('[role="progressbar"]');
   const stepsHost = document.querySelector("#firstUserSteps");
   const tryButton = document.querySelector("#tryRecepVozBtn");
+  const nextAction = document.querySelector("#firstUserNextAction");
   const homeWorkspace = document.querySelector("#homeBusinessWorkspace");
   const primaryNav = document.querySelector("#primaryNav");
 
@@ -15,22 +17,30 @@
     {
       key: "businessProfileConfigured",
       label: "Tu negocio",
-      detail: "Nombre y datos básicos"
+      detail: "Nombre y datos básicos",
+      section: "business",
+      actionLabel: "Continuar con Negocio"
     },
     {
       key: "servicesConfigured",
       label: "Servicios",
-      detail: "Qué ofreces y cuánto dura"
+      detail: "Qué ofreces y cuánto dura",
+      section: "services",
+      actionLabel: "Continuar con Servicios"
     },
     {
       key: "scheduleConfigured",
       label: "Horarios",
-      detail: "Cuándo puede reservar la gente"
+      detail: "Cuándo puede reservar la gente",
+      section: "hours",
+      actionLabel: "Continuar con Horarios"
     },
     {
       key: "phoneConfigured",
       label: "Recepcionista",
-      detail: "Voz y canal de atención"
+      detail: "Voz y canal de atención",
+      section: "receptionist",
+      actionLabel: "Continuar con Recepcionista"
     }
   ];
 
@@ -56,15 +66,26 @@
     progressText.textContent = `${completed} de ${states.length} pasos completados`;
     progressBar.style.width = `${Math.round((completed / states.length) * 100)}%`;
     progressBar.setAttribute("aria-valuenow", String(completed));
+    progressMeter?.setAttribute("aria-valuenow", String(completed));
 
     states.forEach((step, index) => {
       const node = stepsHost.querySelector(`[data-step-key="${step.key}"]`);
       if (!node) return;
+      const isNext = !step.complete && index === nextIndex;
       node.classList.toggle("complete", step.complete);
-      node.classList.toggle("next", !step.complete && index === nextIndex);
+      node.classList.toggle("next", isNext);
+      node.setAttribute("data-step-state", step.complete ? "complete" : (isNext ? "current" : "upcoming"));
+      if (isNext) node.setAttribute("aria-current", "step");
+      else node.removeAttribute("aria-current");
       const number = node.querySelector(".first-user-step-number");
       if (number) number.textContent = step.complete ? "✓" : String(index + 1);
     });
+
+    if (nextAction && nextIndex >= 0) {
+      const nextStep = states[nextIndex];
+      nextAction.textContent = nextStep.actionLabel;
+      nextAction.href = `/settings.html?section=${nextStep.section}`;
+    }
 
     onboarding.classList.toggle("hidden", ready);
     document.body.classList.toggle("first-user-onboarding-active", !ready);

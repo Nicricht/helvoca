@@ -234,7 +234,7 @@ async function mockReadyHome(page, roles = ['BUSINESS_ADMIN'], options = {}) {
     callFailuresToday: 0,
     estimatedCallCostTodayUsd: 0.7,
     recentCalls: [{
-      id: 'call-1', callerNumber: '+56911111111', status: 'COMPLETED', resolution: 'Reserva creada',
+      id: 'call-1', callerNumber: '+56911111111', status: 'COMPLETED', resolution: 'BOOKING_CREATED',
       startedAt: '2026-09-17T18:00:00Z', durationSeconds: 95
     }],
     recentRequests: [],
@@ -490,6 +490,10 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#ownerHandoffsToday')).toHaveText('1');
   await expect(page.locator('#ownerFailuresToday')).toHaveText('1');
   await expect(page.locator('#ownerDashboardAttention')).toBeVisible();
+  await expect(page.locator('#ownerRequestsAttentionToday')).toHaveText('1');
+  await expect(page.locator('#ownerRequestsAttentionChip')).toBeVisible();
+  await expect(page.locator('#ownerQuestionsAttentionToday')).toHaveText('2');
+  await expect(page.locator('#ownerQuestionsAttentionChip')).toBeVisible();
   await expect(page.locator('#ownerOrdersAttentionToday')).toHaveText('1');
   await expect(page.locator('#ownerOrdersAttentionChip')).toBeVisible();
   await expect(page.locator('#ownerHandoffsChip')).toBeVisible();
@@ -769,6 +773,9 @@ test('owner commercial dashboard exposes loading and empty states', async ({ pag
   await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'empty');
   await expect(page.locator('#ownerDashboardState')).toHaveText('SIN ACTIVIDAD');
   await expect(page.locator('#ownerDashboardMessage')).toHaveText('Aún no hay actividad comercial hoy.');
+  await expect(page.locator('#ownerAttentionTitle')).toHaveText('Todo bajo control');
+  await expect(page.locator('#ownerAttentionSummary')).toHaveText('No hay pendientes críticos detectados.');
+  await expect(page.locator('#ownerDashboardAttention')).toBeHidden();
   await expect(page.locator('#homeRecentActivity')).toContainText('Todavía no hay actividad reciente.');
 });
 
@@ -790,6 +797,8 @@ test('owner commercial dashboard exposes an error state without hiding the works
   await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'error');
   await expect(page.locator('#ownerDashboardState')).toHaveText('NO DISPONIBLE');
   await expect(page.locator('#ownerDashboardMessage')).toContainText('No pudimos actualizar las métricas');
+  await expect(page.locator('#ownerAttentionTitle')).toHaveText('Atención no verificada');
+  await expect(page.locator('#ownerAttentionSummary')).toHaveText('No pudimos verificar qué requiere atención.');
   await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
 });
 
@@ -2263,3 +2272,45 @@ test('manual booking creation checks availability and adds the reservation', asy
   await expect(page.locator('#homeBookingsList')).toContainText('Manual');
   await expect(page.locator('#homeBookingCreateMessage')).toHaveText('Reserva creada para Ana Reserva ✓');
 });
+
+test('dashboard prioritizes calls, attention, recent activity and quick access', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'dashboard-finish-token'));
+  await mockReadyHome(page);
+  await page.goto('/');
+
+  const overview = page.locator('#operationalOverview');
+  await expect(overview).toBeVisible();
+  await expect(overview).toHaveAttribute('aria-labelledby', 'ownerDashboardTitle');
+  await expect(page.locator('#ownerDashboardTitle')).toHaveText('Qué está pasando hoy');
+
+  await expect(page.locator('#ownerCallsTodayPrimary')).toHaveText('4');
+  expect(await page.locator('#homeCallsMetric').evaluate(element => element.tagName)).toBe('ARTICLE');
+  await expect(page.locator('#homeCallsMetric')).toContainText('Llamadas');
+
+  const attention = page.locator('#ownerAttentionPanel');
+  await expect(attention).toBeVisible();
+  await expect(attention.getByRole('heading', { name: 'Necesita tu atención' })).toBeVisible();
+  await expect(page.locator('#ownerAttentionSummary')).toContainText('requieren revisión');
+  await expect(page.locator('#ownerDashboardAttention')).toBeVisible();
+
+  const quick = page.locator('#ownerQuickActions');
+  await expect(quick).toBeVisible();
+  await expect(quick.getByRole('link', { name: 'Agenda' })).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
+  await expect(quick.getByRole('link', { name: 'Clientes' })).toHaveAttribute('href', '/?tab=customers#homeBusinessWorkspace');
+  await expect(quick.getByRole('link', { name: 'Conversaciones' })).toHaveAttribute('href', '/conversations.html');
+  await expect(quick.getByRole('link', { name: 'Inventario' })).toHaveAttribute('href', '/inventory.html');
+  await expect(quick.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/settings.html');
+  await expect(quick.getByRole('link', { name: 'Facturación' })).toHaveAttribute('href', '/account.html');
+
+  await expect(page.locator('#ownerDashboardState')).toHaveAttribute('role', 'status');
+  await expect(page.locator('#ownerDashboardMessage')).toHaveAttribute('aria-live', 'polite');
+  await expect(page.locator('#homeRecentActivity')).toHaveAttribute('role', 'list');
+  await expect(page.locator('#homeRecentActivity')).toContainText('+56911111111');
+  await expect(page.locator('#homeRecentActivity')).toContainText('Reserva creada');
+  await expect(page.locator('#homeRecentActivity')).not.toContainText('BOOKING_CREATED');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+

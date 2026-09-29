@@ -24,6 +24,9 @@ class ConsoleScriptAssetsContractTest {
         scripts.addAll(scriptPaths("src/main/resources/static/index.html"));
         scripts.addAll(scriptPaths("src/main/resources/static/settings.html"));
         scripts.addAll(scriptPaths("src/main/resources/static/operations.html"));
+        scripts.addAll(scriptPaths("src/main/resources/static/account.html"));
+        scripts.addAll(scriptPaths("src/main/resources/static/conversations.html"));
+        scripts.addAll(scriptPaths("src/main/resources/static/simulator.html"));
 
         for (String script : scripts) {
             assertTrue(
@@ -39,6 +42,9 @@ class ConsoleScriptAssetsContractTest {
         stylesheets.addAll(stylesheetPaths("src/main/resources/static/index.html"));
         stylesheets.addAll(stylesheetPaths("src/main/resources/static/settings.html"));
         stylesheets.addAll(stylesheetPaths("src/main/resources/static/operations.html"));
+        stylesheets.addAll(stylesheetPaths("src/main/resources/static/account.html"));
+        stylesheets.addAll(stylesheetPaths("src/main/resources/static/conversations.html"));
+        stylesheets.addAll(stylesheetPaths("src/main/resources/static/simulator.html"));
 
         for (String stylesheet : stylesheets) {
             assertTrue(

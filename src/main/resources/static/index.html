@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>RecepVoz · Recepcionista virtual con IA para negocios</title>
     <meta name="description" content="RecepVoz automatiza la atención de negocios con IA: llamadas, integración con WhatsApp Business, reservas, pedidos y seguimiento de clientes.">
-    <meta name="theme-color" content="#080b12">
+    <meta name="theme-color" content="#06111c">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="RecepVoz">
@@ -214,7 +214,9 @@
         body.home-page.operational-ready #advancedPanel,
         body.home-page.operational-ready #commercialStatusCard { display: none !important; }
 </style>
-    <link rel="stylesheet" href="/commercial-ui-v3.css?v=20260928-1">
+    <link rel="stylesheet" href="/commercial-ui-v3.css?v=20260928-2">
+    <link rel="stylesheet" href="/dashboard-finish.css?v=20260928-1">
+    <link rel="stylesheet" href="/frontend-foundation.css?v=20260928-1">
 </head>
 <body class="home-page">
 <div class="shell">
@@ -224,11 +226,13 @@
             <div class="subtitle">Recepcionista virtual con IA para negocios</div>
         </div>
         <nav id="primaryNav" class="app-nav" aria-label="Navegación principal">
-            <a class="nav-home active" href="/">Inicio</a>
-            <a class="nav-bookings" data-home-nav="bookings" href="/#bookings">Reservas</a>
+            <a class="nav-home active" href="/" aria-current="page">Inicio</a>
+            <a class="nav-conversations" href="/conversations.html">Conversaciones</a>
+            <a class="nav-bookings" data-home-nav="bookings" href="/#bookings">Agenda</a>
             <a class="nav-customers" data-home-nav="customers" href="/#customers">Clientes</a>
             <a class="nav-inventory" href="/inventory.html">Inventario</a>
             <a class="nav-config" href="/settings.html">Configuración</a>
+            <a class="nav-account" href="/account.html">Facturación</a>
         </nav>
         <div class="top-actions">
             <span id="sessionBadge" class="badge muted">Sin sesión</span>
@@ -247,7 +251,6 @@
                         <span class="rv-live-dot" aria-hidden="true"></span>
                         <div><strong>Sofía está disponible</strong><small>Recepcionista IA · 24/7</small></div>
                     </div>
-                    <div class="rv-wave" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
                     <div class="rv-voice-preview-result"><span>Cliente: “Quiero reservar para mañana”</span><strong>Reserva lista ✓</strong></div>
                 </div>
             </article>
@@ -337,16 +340,16 @@
                 </div>
 
                 <div class="first-user-actions">
-                    <a class="button primary" href="/settings.html">Continuar configuración</a>
+                    <a id="firstUserNextAction" class="button primary" href="/settings.html?section=business">Continuar con Negocio</a>
                     <span>Puedes volver a Inicio cuando quieras. Tu progreso queda guardado.</span>
                 </div>
             </section>
 
             <div class="dashboard-heading">
                 <div>
-                    <div class="eyebrow">Tu negocio</div>
-                    <h1>Tu negocio, de un vistazo</h1>
-                    <p id="welcomeText">Revisa llamadas, reservas, clientes y lo que necesita tu atención.</p>
+                    <div class="eyebrow">Resumen</div>
+                    <h1>Inicio</h1>
+                    <p id="welcomeText">Resumen de tu negocio en tiempo real: llamadas, agenda, clientes y pendientes.</p>
                 </div>
                 <div class="dashboard-heading-actions">
                     <a id="tryRecepVozBtn" class="button primary hidden" href="/simulator.html">Probar RecepVoz</a>
@@ -463,7 +466,28 @@
                     <div id="homeBookingsList" class="home-business-list"><div class="home-business-empty">Cargando reservas…</div></div>
                 </section>
                 <section class="card home-business-panel hidden" data-home-panel="orders">
-                    <div class="home-business-head"><div><div class="eyebrow">Ventas</div><h2>Pedidos</h2><p>Qué compraron, quién hizo el pedido y en qué estado está.</p></div></div>
+                    <div class="home-business-head">
+                        <div><div class="eyebrow">Ventas</div><h2>Pedidos</h2><p>Qué compraron, quién hizo el pedido, su estado y qué acción sigue.</p></div>
+                    </div>
+                    <div class="home-order-filters" aria-label="Filtros de pedidos">
+                        <label class="home-order-search"><span>Buscar</span><input id="homeOrderSearch" type="search" placeholder="Cliente, teléfono o pedido" autocomplete="off"></label>
+                        <label><span>Estado</span><select id="homeOrderStatus">
+                            <option value="all">Todos</option>
+                            <option value="CONFIRMED">Confirmado</option>
+                            <option value="PREPARING">Preparando</option>
+                            <option value="READY">Listo</option>
+                            <option value="DISPATCHED">Despachado</option>
+                            <option value="COMPLETED">Completado</option>
+                            <option value="CANCELLED">Cancelado</option>
+                        </select></label>
+                        <label><span>Orden</span><select id="homeOrderSort">
+                            <option value="newest">Más recientes</option>
+                            <option value="oldest">Más antiguos</option>
+                            <option value="status">Por estado</option>
+                        </select></label>
+                        <button id="homeOrderClearFilters" class="home-filter-clear" type="button">Limpiar</button>
+                    </div>
+                    <p id="homeOrderResult" class="home-order-result" aria-live="polite">0 pedidos</p>
                     <div id="homeOrdersList" class="home-business-list"><div class="home-business-empty">Cargando pedidos…</div></div>
                 </section>
                 <section class="card home-business-panel hidden" data-home-panel="sales">

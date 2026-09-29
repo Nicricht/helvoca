@@ -547,7 +547,7 @@ test('commercial visual layer loads after legacy styles and presents the voice p
   expect(Number.parseFloat(heroStyle.borderRadius)).toBeGreaterThanOrEqual(20);
 });
 
-test('ready customer console uses the light commercial design system', async ({ page }) => {
+test('ready customer console uses the canonical dark commercial design system', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'commercial-ui-token'));
   await mockReadyTenant(page);
 
@@ -561,13 +561,13 @@ test('ready customer console uses the light commercial design system', async ({ 
     return {
       background: bodyStyle.backgroundColor,
       text: bodyStyle.color,
-      accent: bodyStyle.getPropertyValue('--accent').trim(),
+      accent: bodyStyle.getPropertyValue('--rv-accent').trim(),
       cardBackground: cardStyle?.backgroundColor || null
     };
   });
 
-  expect(palette.background).toBe('rgb(247, 248, 252)');
-  expect(palette.text).toBe('rgb(17, 24, 39)');
-  expect(palette.accent).toBe('#635bff');
-  expect(palette.cardBackground).toBe('rgb(255, 255, 255)');
+  expect(palette.background).toBe('rgb(6, 17, 28)');
+  expect(palette.text).toBe('rgb(244, 251, 255)');
+  expect(palette.accent).toBe('#16d9f5');
+  expect(palette.cardBackground).toBe('rgb(11, 27, 41)');
 });

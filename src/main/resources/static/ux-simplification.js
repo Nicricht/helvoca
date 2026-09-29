@@ -48,10 +48,14 @@
         .ux-config-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
         .ux-config-nav button { min-width: 0; text-align: left; border: 1px solid transparent; border-radius: 12px; padding: 13px 14px; color: var(--text); background: transparent; cursor: pointer; font: inherit; transition: .16s ease; }
         .ux-config-nav button:hover { background: var(--ux-surface); border-color: var(--border); }
-        .ux-config-nav button[aria-expanded="true"] { background: rgba(124,92,255,.12); border-color: rgba(124,92,255,.38); }
+        .ux-config-nav button[aria-expanded="true"], .ux-config-nav button[aria-current="page"] { background: rgba(124,92,255,.12); border-color: rgba(124,92,255,.38); }
         .ux-config-nav strong, .ux-config-nav small { display: block; }
         .ux-config-nav strong { font-size: 13px; }
         .ux-config-nav small { color: var(--muted); margin-top: 3px; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ux-config-advanced { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; padding-top: 8px; margin-top: 2px; border-top: 1px solid var(--border); }
+        .ux-config-advanced-label { margin-right: 3px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+        .ux-config-advanced button { width: auto; min-height: 34px; padding: 7px 10px; color: var(--muted); }
+        .ux-config-advanced button[aria-pressed="true"] { color: var(--text); background: var(--ux-surface); border-color: var(--border); }
         .ux-config-body { padding: 0 22px 22px; }
         #setupForm.ux-config-form { border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
         .ux-config-panel { padding-top: 22px; }
@@ -273,12 +277,15 @@
         const shell = document.createElement('div');
         shell.className = 'ux-config-shell';
         shell.dataset.uxEnhanced = 'true';
+
         const heading = document.createElement('div');
         heading.className = 'ux-config-heading';
-        heading.innerHTML = '<div><div class="eyebrow">Configuración</div><h2>Mi negocio</h2></div>';
+        heading.innerHTML = '<div><div class="eyebrow">Configuración</div><h2>Mi negocio</h2><p>Completa lo esencial primero. Las opciones adicionales siguen disponibles cuando las necesites.</p></div>';
+
         const nav = document.createElement('nav');
         nav.className = 'ux-config-nav';
-        nav.setAttribute('aria-label', 'Secciones de Mi negocio');
+        nav.setAttribute('aria-label', 'Configuración principal');
+
         const body = document.createElement('div');
         body.className = 'ux-config-body';
 
@@ -289,44 +296,116 @@
         shell.id = 'advancedPanel';
         shell.classList.add('ux-config-hub');
 
-        const items = [
-            ['🏪 Negocio', businessPanel],
-            ['✂️ Servicios', servicesPanel],
-            ['📅 Horarios', hoursPanel],
-            ['💬 Respuestas', knowledgePanel],
-            ['🤖 Recepcionista', agentPanel],
-            ['📞 Canales', sideCard]
+        const primaryItems = [
+            { key: 'business', label: '🏪 Negocio', panel: businessPanel },
+            { key: 'services', label: '✂️ Servicios', panel: servicesPanel },
+            { key: 'hours', label: '📅 Horarios', panel: hoursPanel },
+            { key: 'receptionist', label: '🤖 Recepcionista', panel: agentPanel }
         ];
+        const advancedItems = [
+            { key: 'responses', label: '💬 Respuestas', panel: knowledgePanel },
+            { key: 'channels', label: '📞 Canales', panel: sideCard }
+        ];
+        const allItems = [...primaryItems, ...advancedItems];
+        const buttonsByKey = new Map();
 
-        const buttons = [];
-        function openPanel(target) {
-            items.forEach(([, panel], index) => {
-                if (!panel) return;
-                const active = panel === target;
-                panel.classList.toggle('hidden', !active);
-                buttons[index]?.setAttribute('aria-expanded', String(active));
-            });
+        function normalizeSection(value) {
+            const section = String(value || '').trim().toLowerCase();
+            const aliases = {
+                negocio: 'business',
+                service: 'services',
+                schedule: 'hours',
+                horarios: 'hours',
+                agent: 'receptionist',
+                recepcionista: 'receptionist',
+                knowledge: 'responses',
+                respuestas: 'responses',
+                phone: 'channels',
+                canales: 'channels'
+            };
+            return aliases[section] || section;
         }
 
-        items.forEach(([label, panel]) => {
+        function updateUrl(key) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('section', key);
+            history.replaceState(null, '', url.pathname + url.search + url.hash);
+        }
+
+        function openSection(section, { updateHistory = true, focus = false } = {}) {
+            const key = normalizeSection(section);
+            const selected = allItems.find(item => item.key === key) || primaryItems[0];
+
+            allItems.forEach(item => {
+                if (!item.panel) return;
+                const active = item === selected;
+                item.panel.classList.toggle('hidden', !active);
+                const button = buttonsByKey.get(item.key);
+                if (!button) return;
+
+                if (primaryItems.includes(item)) {
+                    if (active) button.setAttribute('aria-current', 'page');
+                    else button.removeAttribute('aria-current');
+                    button.setAttribute('aria-expanded', String(active));
+                } else {
+                    button.setAttribute('aria-pressed', String(active));
+                    button.setAttribute('aria-expanded', String(active));
+                }
+            });
+
+            shell.classList.remove('hidden');
+            if (updateHistory) updateUrl(selected.key);
+            if (focus) buttonsByKey.get(selected.key)?.focus();
+            return selected.key;
+        }
+
+        primaryItems.forEach(item => {
             const button = document.createElement('button');
             button.type = 'button';
+            button.dataset.settingsSection = item.key;
             button.setAttribute('aria-expanded', 'false');
-            if (panel?.id) button.setAttribute('aria-controls', panel.id);
-            button.innerHTML = `<strong>${label}</strong>`;
-            button.addEventListener('click', () => openPanel(panel));
+            if (item.panel?.id) button.setAttribute('aria-controls', item.panel.id);
+            button.innerHTML = `<strong>${item.label}</strong>`;
+            button.addEventListener('click', () => openSection(item.key));
             nav.appendChild(button);
-            buttons.push(button);
+            buttonsByKey.set(item.key, button);
         });
-        openPanel(businessPanel);
+
+        const advancedGroup = document.createElement('div');
+        advancedGroup.id = 'uxAdvancedSettings';
+        advancedGroup.className = 'ux-config-advanced';
+        advancedGroup.setAttribute('aria-label', 'Más configuración');
+        const advancedLabel = document.createElement('span');
+        advancedLabel.className = 'ux-config-advanced-label';
+        advancedLabel.textContent = 'Más configuración';
+        advancedGroup.appendChild(advancedLabel);
+
+        advancedItems.forEach(item => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.dataset.settingsAdvanced = item.key;
+            button.setAttribute('aria-expanded', 'false');
+            button.setAttribute('aria-pressed', 'false');
+            if (item.panel?.id) button.setAttribute('aria-controls', item.panel.id);
+            button.innerHTML = `<strong>${item.label}</strong>`;
+            button.addEventListener('click', () => openSection(item.key));
+            advancedGroup.appendChild(button);
+            buttonsByKey.set(item.key, button);
+        });
+        nav.appendChild(advancedGroup);
+
+        window.helvocaOpenSettingsSection = (section, options = {}) =>
+            openSection(section, { updateHistory: options.updateHistory !== false, focus: Boolean(options.focus) });
+
+        const requestedSection = new URLSearchParams(window.location.search).get('section');
+        openSection(requestedSection || 'business', { updateHistory: false });
 
         const legacyToggle = $('#advancedToggleBtn');
         if (legacyToggle) {
             setText(legacyToggle, 'Mi negocio');
             legacyToggle.addEventListener('click', () => {
                 setTimeout(() => {
-                    shell.classList.remove('hidden');
-                    openPanel(businessPanel);
+                    openSection('business', { focus: true });
                     shell.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }, 0);
             }, true);

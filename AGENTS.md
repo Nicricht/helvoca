@@ -2,35 +2,57 @@
 
 These rules are mandatory for implementation work in this repository.
 
+Helvoca follows **First-Pass Engineering**: understand the complete impact before coding, implement the smallest coherent solution, verify the exact final commit, and preserve durable state so interrupted work can resume safely. The user is not the QA system.
+
+Before implementation, read `software-factory/skill/first-pass-engineering/SKILL.md` when it is present so a fresh conversation does not depend on prior chat memory.
+
 ## Goal
 
-Optimize for one short correction loop: design broadly, test cheaply first, and run the expensive certification once.
+Optimize for one short correction loop: design broadly, test cheaply first, run the expensive certification once, and never lose engineering progress because a chat or session ended.
+
+## Risk and impact
+
+Classify each implementation as LOW, MEDIUM, or HIGH risk before coding.
+
+- LOW: copy, isolated styling, and other changes with little or no behavioral blast radius.
+- MEDIUM: normal features, APIs, CRUD, business rules, and stateful UI.
+- HIGH: authentication, authorization, billing/payments, tenant isolation, inventory consistency, migrations, external messaging/telephony, destructive operations, sensitive data, or production infrastructure.
+
+Use verification proportional to the real risk. Before implementation, review the affected path across UI, API, business logic, data, security, integrations, operations, and continuity for long-running work, plus the project invariants in `docs/engineering/invariants.md`.
 
 ## Required workflow
 
 1. Never develop directly on `main`. Refresh `main`, then create a dedicated branch.
 2. Before coding, define acceptance criteria and failure cases for the complete functional block.
 3. Add or update regression tests for every bug fixed. A bug is not closed until a test would fail if it returned.
-4. Run the Fast Gate before requesting or waiting for the Full Gate:
+4. For new behavior and reproducible bugs, use RED -> GREEN -> REFACTOR when applicable: prove the test fails for the intended reason before implementing the fix or behavior.
+5. Run the Fast Gate before requesting or waiting for the Full Gate:
    `bash scripts/ci/fast-gate.sh <base-sha>`
-5. Review the change adversarially before Full Gate: nulls, retries, duplicate calls, stale state, partial success, cross-tenant data, concurrency, provider failures and repeated user input.
-6. Pull requests must pass the Full Gate. The Full Gate runs all backend tests, JaCoCo differential coverage, JavaScript validation and browser E2E.
-7. New or modified executable Java lines must maintain at least 80% differential line coverage and 70% differential branch coverage when branches are present.
-8. Never merge a red or incomplete PR. Re-check that the branch is not behind current `main` immediately before merge.
-9. A complete, exact-HEAD-green PR should be merged promptly instead of being left indefinitely in Draft. Re-check that its head is still current and mergeable immediately before merge.
-10. After merge, require green CI on the exact `main` merge SHA. For production-bound work, normal Railway deployment is allowed once the release gates for that change are satisfied; verify Railway deploys that exact SHA and confirm runtime health before calling the work complete.
-11. Delete or otherwise retire merged source branches once their merge and deployment evidence is durable. Keep a branch open only when it still contains unmerged work, a documented blocker, or deliberately deferred future scope.
-12. Do not impose a blanket `NO MERGE` or `NO DEPLOY` rule on normal engineering work. Use an explicit hold only when the task specifically requires a review/freeze, when release evidence is incomplete, or when deployment would trigger an unsafe/unapproved external effect.
-13. Production calls, payments, messages and other destructive or customer-visible external effects still require their project-specific safety/authorization rules and must never be triggered merely to satisfy a test.
+6. Review the change adversarially before Full Gate: nulls, retries, duplicate calls, stale state, partial success, cross-tenant data, concurrency, provider failures and repeated user input.
+7. Pull requests must pass the Full Gate. The Full Gate runs all backend tests, JaCoCo differential coverage, JavaScript validation and browser E2E.
+8. New or modified executable Java lines must maintain at least 80% differential line coverage and 70% differential branch coverage when branches are present.
+9. Never merge a red or incomplete PR. Re-check that the branch is not behind current `main` immediately before merge.
+10. Completion evidence must belong to the exact final commit. Any implementation or engineering-contract change after certification invalidates the earlier certification and requires fresh verification.
+11. For MEDIUM/HIGH or multi-step work likely to outlive one interaction, maintain a **resume checkpoint** in the Draft PR. It must identify branch, PR, exact HEAD, completed blocks, CI/evidence valid for that HEAD, blockers/rulings, and next step.
+12. On resume, reconstruct repository -> branch -> PR -> HEAD -> CI -> checkpoint -> next step. Do not repeat completed work whose evidence remains valid, and never duplicate external side effects.
+13. Before a long external wait such as Full CI, update the resume checkpoint so a disconnected session can be recovered without user reconstruction.
+14. A complete, exact-HEAD-green PR should be merged promptly instead of being left indefinitely in Draft, unless an explicit task-specific review/freeze or safety hold applies.
+15. After merge, require green CI on the exact `main` merge SHA. For production-bound work, normal Railway deployment is allowed once the release gates for that change are satisfied; verify Railway deploys that exact SHA and confirm runtime health before calling the work complete.
+16. Delete or otherwise retire merged source branches once their merge and deployment evidence is durable. Keep a branch open only when it still contains unmerged work, a documented blocker, or deliberately deferred future scope.
+17. Do not impose a blanket `NO MERGE` or `NO DEPLOY` rule on normal engineering work. Use an explicit hold only when the task specifically requires a review/freeze, when release evidence is incomplete, or when deployment would trigger an unsafe/unapproved external effect.
+18. Production calls, payments, messages and other destructive or customer-visible external effects still require their project-specific safety/authorization rules and must never be triggered merely to satisfy a test.
 
 ## Speed rule
 
 Do not run the complete suite after every small edit. Use targeted tests through Fast Gate while iterating. Run Full Gate once the functional block and its regression tests are complete.
 
+LOW-risk work must not be inflated into HIGH-risk ceremony. HIGH-risk work must not be downgraded to save time. Resume must be idempotent: reuse still-valid evidence instead of repeating expensive work without cause.
+
 ## Truth rule
 
 A successful tool request, proposal, queued action or accepted provider request is not equivalent to a completed business outcome. Tests and application state must prove the terminal outcome explicitly.
 
+Do not claim code is fixed, passing, safe, or complete without fresh verification evidence from the exact state being presented. Chat memory never overrides Git, PR, commit, or CI state.
 
 ## Delivery and branch hygiene
 

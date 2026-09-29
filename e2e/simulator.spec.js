@@ -82,7 +82,8 @@ test('receptionist simulator keeps actions isolated and shows trace', async ({ p
   await expect(page.getByText('Modo seguro')).toBeVisible();
   await expect(page.locator('.topbar > div strong')).toHaveText('NEGOCIO E2E');
   await expect(page.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/settings.html');
-  await expect(page.getByText('No crea datos comerciales reales ni realiza llamadas telefónicas.')).toBeVisible();
+  await expect(page.getByText(/no crea datos comerciales reales ni realiza llamadas telefónicas/i)).toBeVisible();
+  await expect(page.getByText(/WhatsApp real/i)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Finalizar' })).toHaveAttribute('title', 'Inicia una prueba para poder finalizarla.');
   await expect(page.getByRole('button', { name: 'Enviar' })).toHaveAttribute('title', 'Inicia una prueba para poder enviar mensajes.');
 
@@ -95,9 +96,9 @@ test('receptionist simulator keeps actions isolated and shows trace', async ({ p
   await page.getByRole('button', { name: 'Enviar' }).click();
 
   await expect(page.getByText('En una llamada real, la reserva quedaría confirmada para mañana a las 15:00.')).toBeVisible();
-  await expect(page.locator('#resolution')).toHaveText('BOOKING_CREATED');
+  await expect(page.locator('#resolution')).toHaveText('Reserva creada');
   await expect(page.locator('#actionCount')).toHaveText('1');
-  await expect(page.locator('#traceList')).toContainText('BOOKING_CREATED');
+  await expect(page.locator('#traceList')).toContainText('Reserva creada');
   await expect(page.locator('#traceList')).toContainText('Consulta · mañana 15:00');
 
   const finish = page.getByRole('button', { name: 'Finalizar' });

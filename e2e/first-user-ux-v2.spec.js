@@ -115,9 +115,10 @@ test('new owner gets a four-step guided setup instead of the operational workspa
     'Horarios',
     'Recepcionista'
   ]);
-  await expect(page.getByRole('link', { name: 'Continuar configuración' })).toHaveAttribute('href', '/settings.html');
+  await expect(page.locator('#firstUserNextAction')).toHaveText('Continuar con Servicios');
+  await expect(page.locator('#firstUserNextAction')).toHaveAttribute('href', '/settings.html?section=services');
   await expect(page.locator('#homeBusinessWorkspace')).toBeHidden();
-  await expect(page.locator('#primaryNav a')).toContainText(['Inicio', 'Reservas', 'Clientes', 'Configuración']);
+  await expect(page.locator('#primaryNav a:visible')).toContainText(['Inicio', 'Agenda', 'Clientes', 'Configuración', 'Facturación']);
   await expect(page.locator('#primaryNav .nav-inventory')).toBeHidden();
 });
 
@@ -141,10 +142,10 @@ test('ready owner lands on a simple daily home with direct reservations and cust
   await expect(page.getByRole('link', { name: 'Probar RecepVoz' })).toBeVisible();
 
   const nav = page.locator('#primaryNav');
-  await expect(nav.locator('a')).toContainText(['Inicio', 'Reservas', 'Clientes', 'Inventario', 'Configuración']);
+  await expect(nav.locator('a:visible')).toContainText(['Inicio', 'Conversaciones', 'Agenda', 'Clientes', 'Inventario', 'Configuración', 'Facturación']);
   await expect(nav.getByRole('link', { name: 'Inventario', exact: true })).toHaveAttribute('href', '/inventory.html');
 
-  await nav.getByRole('link', { name: 'Reservas', exact: true }).click();
+  await nav.getByRole('link', { name: 'Agenda', exact: true }).click();
   await expect(page.locator('[data-home-tab="bookings"]')).toHaveClass(/active/);
 
   await nav.getByRole('link', { name: 'Clientes', exact: true }).click();
@@ -173,4 +174,51 @@ test('customer-facing entry surfaces consistently present the RecepVoz brand', a
     await expect(page.locator('body')).toContainText(/RecepVoz/i);
     await expect(page.locator('body')).not.toContainText(/Helvoca/i);
   }
+});
+
+
+test('onboarding exposes one dominant next action that follows persisted progress', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockBaseTenant(page, {
+    businessProfileConfigured: true,
+    servicesConfigured: true,
+    scheduleConfigured: false,
+    knowledgeConfigured: false,
+    humanTransferConfigured: false,
+    phoneConfigured: false,
+    readyForCalls: false,
+    nextStep: 'HOURS'
+  });
+
+  await page.goto('/');
+
+  await expect(page.locator('#firstUserProgressText')).toHaveText('2 de 4 pasos completados');
+  await expect(page.locator('#firstUserOnboarding [role="progressbar"]')).toHaveAttribute('aria-valuenow', '2');
+  await expect(page.locator('#firstUserSteps .first-user-step.next')).toHaveCount(1);
+  await expect(page.locator('#firstUserSteps .first-user-step.next')).toContainText('Horarios');
+
+  const nextAction = page.locator('#firstUserNextAction');
+  await expect(nextAction).toBeVisible();
+  await expect(nextAction).toHaveText('Continuar con Horarios');
+  await expect(nextAction).toHaveAttribute('href', '/settings.html?section=hours');
+});
+
+test('onboarding remains usable without horizontal overflow on mobile', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockBaseTenant(page, {
+    businessProfileConfigured: false,
+    servicesConfigured: false,
+    scheduleConfigured: false,
+    knowledgeConfigured: false,
+    humanTransferConfigured: false,
+    phoneConfigured: false,
+    readyForCalls: false,
+    nextStep: 'BUSINESS'
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+
+  await expect(page.locator('#firstUserNextAction')).toHaveText('Continuar con Negocio');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
 });
