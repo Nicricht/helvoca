@@ -352,7 +352,7 @@
         '        <a href="/?tab=bookings#homeBusinessWorkspace">Reservas</a>',
         '        <a href="/?tab=sales#homeBusinessWorkspace">Ventas</a>',
         '        <a href="/?tab=customers#homeBusinessWorkspace">Clientes</a>',
-        '        <a href="/conversations.html">Conversaciones</a>',
+        '        <a href="/conversations.html">Recepcionista IA</a>',
         '        <a href="/inventory.html">Inventario</a>',
         '        <a href="/settings.html">Configuración</a>',
         '      </div>',
