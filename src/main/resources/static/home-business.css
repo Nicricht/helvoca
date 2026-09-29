@@ -56,7 +56,7 @@
 
 .home-detail-open{overflow:hidden}
 .home-detail-backdrop{position:fixed;inset:0;z-index:100;display:flex;justify-content:flex-end;background:rgba(0,0,0,.58);backdrop-filter:blur(3px)}
-.home-detail-drawer{width:min(520px,100%);height:100%;overflow:auto;padding:22px;background:linear-gradient(180deg,#171e2b,#0e131c);border-left:1px solid var(--border);box-shadow:-30px 0 80px rgba(0,0,0,.4)}
+.home-detail-drawer{width:min(520px,100%);height:100%;overflow:auto;padding:22px;background:var(--surface);border-left:1px solid var(--border);box-shadow:-30px 0 80px rgba(0,0,0,.4)}
 .home-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:18px;border-bottom:1px solid rgba(255,255,255,.065)}
 .home-detail-head h2{margin:5px 0 4px;font-size:26px;letter-spacing:-.03em}
 .home-detail-head p{margin:0;color:var(--muted);font-size:11px}
