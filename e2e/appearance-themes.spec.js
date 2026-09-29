@@ -87,3 +87,27 @@ test('appearance runtime uses authenticated session cache only', async ({ page, 
   await expect(page.locator('html')).toHaveAttribute('data-rv-accent-theme', 'cyan');
   expect(await page.evaluate(() => sessionStorage.getItem('recepvoz_appearance_theme'))).toBeNull();
 });
+
+
+test('inventory session expiry clears the cached tenant appearance', async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem('helvoca_access_token', 'expired-token');
+    sessionStorage.setItem('recepvoz_appearance_theme', 'violet');
+  });
+
+  await page.route('**/api/v1/**', route => route.fulfill({
+    status: 401,
+    contentType: 'application/json',
+    body: JSON.stringify({ message: 'Sesión expirada' })
+  }));
+
+  await page.goto('/inventory.html');
+
+  await expect.poll(() => page.evaluate(
+    () => sessionStorage.getItem('helvoca_access_token')
+  )).toBeNull();
+  await expect.poll(() => page.evaluate(
+    () => sessionStorage.getItem('recepvoz_appearance_theme')
+  )).toBeNull();
+  await expect(page.locator('html')).toHaveAttribute('data-rv-accent-theme', 'cyan');
+});
