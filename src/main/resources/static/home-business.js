@@ -6,6 +6,7 @@
 
   const state = { bookings: [], customers: [], services: [], orders: [], sales: [], salesSummary: {}, requests: [], audit: [], auditCatalog: [], roles: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
   const bookingFilters = { query: "", date: "all", serviceId: "all", status: "all", source: "all" };
+  const orderFilters = { query: "", status: "all", sort: "newest" };
   const salesFilters = { stage: "all", channel: "all" };
   const EVENT_LABELS = {
     BOOKING_CREATE: "Reserva creada",
@@ -62,6 +63,23 @@
   const sourceGroup = value => ({VOICE:"CALL",AI_CALL:"CALL",WHATSAPP:"WHATSAPP",AI_WHATSAPP:"WHATSAPP",MANUAL:"MANUAL",ADMIN:"MANUAL",API:"API"})[value] || value || "";
   const status = value => ({CONFIRMED:"Confirmada",CANCELLED:"Cancelada",PREPARING:"Preparando",READY:"Listo",DISPATCHED:"Despachado",COMPLETED:"Completado",OPEN:"Abierta",IN_PROGRESS:"En curso"})[value] || value || "";
   const orderStatus = value => ({CONFIRMED:"Confirmado",CANCELLED:"Cancelado",PREPARING:"Preparando",READY:"Listo",DISPATCHED:"Despachado",COMPLETED:"Completado"})[value] || status(value);
+  const orderStatusClass = value => ({
+    CONFIRMED:"is-confirmed",
+    PREPARING:"is-preparing",
+    READY:"is-ready",
+    DISPATCHED:"is-dispatched",
+    COMPLETED:"is-completed",
+    CANCELLED:"is-cancelled"
+  })[value] || "is-neutral";
+  const orderNextAction = order => {
+    if (order.status === "CONFIRMED") return "Preparar";
+    if (order.status === "PREPARING") return "Marcar listo";
+    if (order.status === "READY") return order.fulfillmentType === "DELIVERY" ? "Despachar" : "Completar";
+    if (order.status === "DISPATCHED") return "Completar";
+    if (order.status === "CANCELLED") return "Sin acciones · cancelado";
+    if (order.status === "COMPLETED") return "Sin acciones · completado";
+    return "Revisar detalle";
+  };
 
   function eventLabel(value) {
     return EVENT_LABELS[value] || String(value || "").toLowerCase().replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
@@ -1068,13 +1086,88 @@
     });
   }
 
+  function bindOrderFilters() {
+    const searchInput = document.querySelector("#homeOrderSearch");
+    const statusSelect = document.querySelector("#homeOrderStatus");
+    const sortSelect = document.querySelector("#homeOrderSort");
+    if (!searchInput || !statusSelect || !sortSelect) return;
+
+    searchInput.value = orderFilters.query;
+    statusSelect.value = orderFilters.status;
+    sortSelect.value = orderFilters.sort;
+
+    searchInput.addEventListener("input", event => {
+      orderFilters.query = event.target.value;
+      renderOrders();
+    });
+    statusSelect.addEventListener("change", event => {
+      orderFilters.status = event.target.value;
+      renderOrders();
+    });
+    sortSelect.addEventListener("change", event => {
+      orderFilters.sort = event.target.value;
+      renderOrders();
+    });
+    document.querySelector("#homeOrderClearFilters")?.addEventListener("click", () => {
+      Object.assign(orderFilters, { query: "", status: "all", sort: "newest" });
+      searchInput.value = "";
+      statusSelect.value = "all";
+      sortSelect.value = "newest";
+      renderOrders();
+      searchInput.focus();
+    });
+  }
+
+  function visibleOrders() {
+    const query = orderFilters.query.trim().toLowerCase();
+    const items = state.orders.filter(item => {
+      if (orderFilters.status !== "all" && item.status !== orderFilters.status) return false;
+      if (!query) return true;
+      return [
+        item.id,
+        item.contactName,
+        item.contactPhone,
+        item.source,
+        source(item.source),
+        item.status,
+        orderStatus(item.status),
+        item.fulfillmentType,
+        item.fulfillmentType === "DELIVERY" ? "delivery" : "retiro"
+      ].filter(Boolean).join(" ").toLowerCase().includes(query);
+    });
+
+    if (orderFilters.sort === "oldest") {
+      return items.sort((a,b)=>new Date(a.createdAt||0)-new Date(b.createdAt||0));
+    }
+    if (orderFilters.sort === "status") {
+      return items.sort((a,b)=>
+        orderStatus(a.status).localeCompare(orderStatus(b.status), "es")
+        || new Date(b.createdAt||0)-new Date(a.createdAt||0));
+    }
+    return items.sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));
+  }
+
   function renderOrders() {
-    const items=[...state.orders].sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0));
-    document.querySelector("#homeBusinessOrdersCount").textContent=String(items.length);
+    const total = state.orders.length;
+    const items = visibleOrders();
+    document.querySelector("#homeBusinessOrdersCount").textContent=String(total);
+    const result = document.querySelector("#homeOrderResult");
+    if (result) result.textContent = total === items.length
+      ? `${total} ${total === 1 ? "pedido" : "pedidos"}`
+      : `${items.length} de ${total} pedidos`;
+
     const host=document.querySelector("#homeOrdersList");
-    if(!items.length){ host.innerHTML='<div class="home-business-empty">Todavía no hay pedidos registrados.</div>'; return; }
-    host.innerHTML=`<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Pedido</th><th>Cliente</th><th>Total</th><th>Entrega</th><th>Estado</th><th>Origen</th></tr></thead><tbody>${items.map(item=>`<tr tabindex="0" data-home-order-id="${esc(item.id)}"><td><strong>#${esc(String(item.id||"").slice(0,8))}</strong></td><td><strong>${esc(item.contactName||item.contactPhone||"Cliente")}</strong></td><td>${esc(money(item.total,item.currency))}</td><td>${item.fulfillmentType==="DELIVERY"?"Delivery":"Retiro"}</td><td><span class="home-pill">${esc(orderStatus(item.status))}</span></td><td>${esc(source(item.source))}</td></tr>`).join("")}</tbody></table></div>
-    <div class="home-business-mobile-list">${items.map(item=>`<article class="home-business-mobile-card" tabindex="0" data-home-order-id="${esc(item.id)}"><strong>${esc(item.contactName||item.contactPhone||"Cliente")}</strong><span>${esc(money(item.total,item.currency))} · ${esc(orderStatus(item.status))}</span></article>`).join("")}</div>`;
+    if(!total){
+      host.innerHTML='<div class="home-business-empty"><strong>Todavía no hay pedidos.</strong><span>Cuando una venta genere un pedido aparecerá aquí con su estado y siguiente acción.</span></div>';
+      return;
+    }
+    if(!items.length){
+      host.innerHTML='<div class="home-business-empty"><strong>No hay coincidencias.</strong><span>Prueba otro cliente, estado o criterio de búsqueda.</span></div>';
+      return;
+    }
+
+    host.innerHTML=`<div class="home-business-table-shell"><table class="home-business-table home-order-table"><thead><tr><th>Pedido</th><th>Cliente</th><th>Total</th><th>Entrega</th><th>Estado</th><th>Siguiente acción</th><th>Origen</th></tr></thead><tbody>${items.map(item=>`<tr tabindex="0" data-home-order-id="${esc(item.id)}"><td><strong>#${esc(String(item.id||"").slice(0,8))}</strong><small>${esc(fmtCompact(item.createdAt))}</small></td><td><strong>${esc(item.contactName||item.contactPhone||"Cliente")}</strong><small>${esc(item.contactPhone||"Sin teléfono")}</small></td><td><strong>${esc(money(item.total,item.currency))}</strong></td><td>${item.fulfillmentType==="DELIVERY"?"Delivery":"Retiro"}</td><td><span class="home-pill home-order-status ${orderStatusClass(item.status)}">${esc(orderStatus(item.status))}</span></td><td><strong class="home-order-next">${esc(orderNextAction(item))}</strong></td><td>${esc(source(item.source))}</td></tr>`).join("")}</tbody></table></div>
+    <div class="home-business-mobile-list">${items.map(item=>`<article class="home-business-mobile-card home-order-card" tabindex="0" data-home-order-id="${esc(item.id)}"><div class="home-order-card-head"><div><strong>${esc(item.contactName||item.contactPhone||"Cliente")}</strong><span>#${esc(String(item.id||"").slice(0,8))} · ${esc(fmtCompact(item.createdAt))}</span></div><strong>${esc(money(item.total,item.currency))}</strong></div><div class="home-order-card-meta"><span>${item.fulfillmentType==="DELIVERY"?"Delivery":"Retiro"} · ${esc(source(item.source))}</span><span class="home-pill home-order-status ${orderStatusClass(item.status)}">${esc(orderStatus(item.status))}</span></div><div class="home-order-card-next"><span>Siguiente</span><strong class="home-order-next">${esc(orderNextAction(item))}</strong></div></article>`).join("")}</div>`;
     bindOrderOpeners();
   }
 
@@ -2340,6 +2433,7 @@
   new MutationObserver(()=>{ if(!dashboard.classList.contains("hidden")) queueMicrotask(load); }).observe(dashboard,{attributes:true,attributeFilter:["class"]});
   document.querySelector("#refreshBtn")?.addEventListener("click",load);
   ensureBookingDrawer();
+  bindOrderFilters();
   const requestedTab = new URLSearchParams(window.location.search).get("tab");
   setTab(["bookings","orders","sales","requests","customers"].includes(requestedTab) ? requestedTab : "bookings");
   queueMicrotask(load);

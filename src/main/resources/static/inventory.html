@@ -48,7 +48,10 @@
                     <h1>Inventario</h1>
                     <p>Lo que la IA puede prometer depende de estos números. El stock disponible se calcula como físico menos reservado.</p>
                 </div>
-                <button id="inventoryRefreshBtn" class="button ghost" type="button">Actualizar</button>
+                <div class="inventory-heading-actions">
+                    <button id="inventoryAddProductBtn" class="button primary hidden" type="button">Nuevo producto</button>
+                    <button id="inventoryRefreshBtn" class="button ghost" type="button">Actualizar</button>
+                </div>
             </div>
 
             <div id="inventoryMessage" class="message hidden" role="status"></div>
@@ -128,14 +131,24 @@
                             <option value="UNCONFIGURED">Sin configurar</option>
                         </select>
                     </label>
+                    <label class="inventory-sort">
+                        Orden
+                        <select id="inventorySort">
+                            <option value="ATTENTION">Atención primero</option>
+                            <option value="NAME_ASC">Nombre A–Z</option>
+                            <option value="AVAILABLE_ASC">Disponible: menor a mayor</option>
+                            <option value="AVAILABLE_DESC">Disponible: mayor a menor</option>
+                        </select>
+                    </label>
                 </div>
 
-                <div class="inventory-table-wrap">
+                <div class="inventory-table-wrap inventory-mobile-cards">
                     <table class="inventory-table">
                         <thead>
                         <tr>
                             <th>Producto</th>
                             <th>SKU</th>
+                            <th>Precio</th>
                             <th>Físico</th>
                             <th>Reservado</th>
                             <th>Disponible</th>
@@ -163,6 +176,39 @@
         </section>
     </main>
 </div>
+
+<dialog id="inventoryProductDialog" class="inventory-dialog">
+    <form id="inventoryProductForm" method="dialog">
+        <div class="inventory-dialog-head">
+            <div>
+                <div class="eyebrow">Catálogo</div>
+                <h2 id="inventoryProductTitle">Nuevo producto</h2>
+            </div>
+            <button class="inventory-dialog-close" type="button" data-close-dialog aria-label="Cerrar">×</button>
+        </div>
+        <input name="catalogItemId" type="hidden">
+        <div class="inventory-form-grid">
+            <label>Nombre
+                <input name="name" maxlength="160" required autocomplete="off" placeholder="Taladro percutor">
+            </label>
+            <label>Precio
+                <input name="price" type="number" min="0" step="1" inputmode="decimal" required placeholder="54990">
+            </label>
+            <label class="inventory-form-wide">Descripción
+                <input name="description" maxlength="500" autocomplete="off" placeholder="Detalle breve para clientes y recepcionista">
+            </label>
+            <label>Moneda
+                <input name="currency" maxlength="3" pattern="[A-Za-z]{3}" value="CLP" required autocomplete="off">
+            </label>
+        </div>
+        <p class="inventory-form-help">El producto se guarda en el catálogo. El stock se configura por separado para mantener clara la diferencia entre precio y existencias.</p>
+        <div id="inventoryProductMessage" class="message hidden" role="status"></div>
+        <div class="inventory-dialog-actions">
+            <button class="button ghost" type="button" data-close-dialog>Cancelar</button>
+            <button id="inventoryProductSave" class="button primary" type="submit">Crear producto</button>
+        </div>
+    </form>
+</dialog>
 
 <dialog id="inventoryConfigDialog" class="inventory-dialog">
     <form id="inventoryConfigForm" method="dialog">
