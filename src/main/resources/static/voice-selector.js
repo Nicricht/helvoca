@@ -180,7 +180,15 @@
             font-size: 11px !important;
         }
 
-        #configHoursPanel > .section-heading { display: none !important; }
+        #configHoursPanel > .section-heading {
+            display: flex !important;
+            justify-content: flex-end !important;
+            align-items: center !important;
+            margin: 0 0 6px !important;
+            padding: 0 !important;
+            border: 0 !important;
+        }
+        #configHoursPanel > .section-heading > div { display: none !important; }
         #configHoursPanel #hoursGrid { gap: 2px !important; }
         #configHoursPanel .hour-row {
             grid-template-columns: minmax(105px, 1.1fr) minmax(92px, 1fr) 14px minmax(92px, 1fr) 28px !important;
