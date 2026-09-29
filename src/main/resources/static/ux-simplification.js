@@ -244,6 +244,7 @@
         const hoursHeading = hoursGrid?.previousElementSibling;
         const knowledgeHeading = $('#addKnowledgeBtn')?.closest('.section-heading');
         const knowledgeList = $('#knowledgeList', form);
+        const appearanceSettings = $('#appearanceSettings', form);
         const setupMessage = $('#setupMessage', form);
         const submit = $('button[type="submit"]', form);
 
@@ -252,6 +253,7 @@
         const servicesPanel = wrapPanel(form, 'configServicesPanel', [serviceHeading, servicesList]);
         const hoursPanel = wrapPanel(form, 'configHoursPanel', [hoursHeading, hoursGrid]);
         const knowledgePanel = wrapPanel(form, 'configKnowledgePanel', [knowledgeHeading, knowledgeList]);
+        const appearancePanel = wrapPanel(form, 'configAppearancePanel', [appearanceSettings]);
 
         if (serviceHeading) {
             setText($('h2', serviceHeading), 'Servicios');
@@ -295,6 +297,7 @@
             ['📅 Horarios', hoursPanel],
             ['💬 Respuestas', knowledgePanel],
             ['🤖 Recepcionista', agentPanel],
+            ['🎨 Apariencia', appearancePanel],
             ['📞 Canales', sideCard]
         ];
 
