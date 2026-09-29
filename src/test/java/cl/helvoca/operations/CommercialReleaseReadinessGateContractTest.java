@@ -45,6 +45,17 @@ class CommercialReleaseReadinessGateContractTest {
         assertTrue(script.contains("COMMERCIAL RELEASE READINESS FIRST BUSINESS: PASS"),
                 "gate must expose an unambiguous PASS marker");
 
+        String workflow = Files.readString(Path.of(
+                ".github/workflows/commercial-release-readiness-safe-ci.yml"));
+        assertTrue(workflow.contains("cert/commercial-readiness-*"),
+                "commercial readiness CI must be reusable from dedicated certification branches");
+        assertFalse(workflow.contains("8dc165d102a4157fdc6e3cd38b51b76b70b388d1"),
+                "commercial readiness CI must not pin an obsolete main SHA");
+        assertFalse(workflow.contains("dbba4d7260c96763c13a0c56d4c1cb108d4986ca"),
+                "differential coverage must not pin an obsolete RC SHA");
+        assertTrue(workflow.contains("git rev-parse refs/remotes/origin/main"),
+                "commercial readiness CI must derive differential coverage from current main");
+
         String readiness = Files.readString(Path.of(
                 "docs/COMMERCIAL_RELEASE_READINESS_FIRST_BUSINESS_V1.md"));
         assertTrue(readiness.contains("PROVIDER TEST ROUND-TRIP PENDING"),
