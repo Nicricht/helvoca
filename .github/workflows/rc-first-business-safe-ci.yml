@@ -1,0 +1,87 @@
+name: RC First Business Safe CI
+
+on:
+  push:
+    branches:
+      - test/release-candidate-first-business-hardening
+
+permissions:
+  contents: read
+
+jobs:
+  rc-safe-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Run targeted Fast Gate
+        run: bash scripts/ci/fast-gate.sh 3d73320848c7d81956701af6eb60f516f9eb1c80
+
+      - name: Run sandbox Golden Journey contracts
+        run: bash scripts/ci/pilot-e2e-certification.sh
+
+      - name: Validate customer frontend JavaScript
+        run: |
+          node --check src/main/resources/static/app.js
+          node --check src/main/resources/static/phone-provisioning.js
+          node --check src/main/resources/static/commercial-status.js
+          node --check src/main/resources/static/voice-selector.js
+          node --check src/main/resources/static/ux-simplification.js
+          node --check src/main/resources/static/pricing.js
+          node --check src/main/resources/static/home-business.js
+          node --check src/main/resources/static/settings-page.js
+          node --check src/main/resources/static/simulator.js
+          node --check e2e/frontend-release-candidate.spec.js
+          node --check e2e/frontend-release-candidate-hardening.spec.js
+
+      - name: Run complete backend suite with JaCoCo
+        run: |
+          set -o pipefail
+          mvn --batch-mode --no-transfer-progress -Pcoverage test 2>&1 | tee backend-test.log
+
+      - name: Enforce differential Java coverage
+        env:
+          DIFF_LINE_COVERAGE: "80"
+          DIFF_BRANCH_COVERAGE: "70"
+        run: python3 scripts/ci/check_diff_coverage.py 3d73320848c7d81956701af6eb60f516f9eb1c80
+
+      - name: Install browser test dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run complete local frontend E2E
+        run: |
+          set -o pipefail
+          npm run test:e2e 2>&1 | tee playwright-test.log
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc-first-business-safe-ci-diagnostics
+          path: |
+            backend-test.log
+            playwright-test.log
+            target/surefire-reports/**
+            target/site/jacoco/**
+            test-results/**
+            playwright-report/**
+          if-no-files-found: warn
