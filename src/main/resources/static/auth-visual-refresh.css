@@ -433,6 +433,7 @@ body.home-page:has(#authView:not(.hidden)) .rv-public-footer a:hover {
   }
 
   body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-copy {
+    width: 100%;
     max-width: 100%;
   }
 
