@@ -1,0 +1,486 @@
+/* Public authentication/marketing refresh.
+   Scoped to the unauthenticated home surface so the operational console remains untouched. */
+
+body.home-page:has(#authView:not(.hidden)) {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(22, 217, 245, .09), transparent 28%),
+    radial-gradient(circle at 72% 16%, rgba(139, 92, 246, .11), transparent 30%),
+    linear-gradient(180deg, #06111c 0%, #050c15 72%, #06111c 100%);
+}
+
+body.home-page:has(#authView:not(.hidden)) .shell {
+  max-width: 1480px;
+  margin: 0 auto;
+}
+
+body.home-page:has(#authView:not(.hidden)) .topbar {
+  min-height: 66px;
+  border-bottom-color: rgba(111, 139, 158, .16);
+  background: rgba(6, 17, 28, .78);
+  backdrop-filter: blur(18px);
+}
+
+body.home-page:has(#authView:not(.hidden)) .topbar .brand {
+  color: #f4fbff;
+  font-size: 18px;
+  letter-spacing: .11em;
+}
+
+body.home-page:has(#authView:not(.hidden)) .topbar .subtitle {
+  color: #7f9aad;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell {
+  width: min(100%, 1380px);
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: clamp(28px, 4vw, 58px) clamp(18px, 3vw, 44px) 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(360px, .82fr);
+  gap: clamp(20px, 2.5vw, 34px);
+  align-items: stretch;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero {
+  position: relative;
+  min-height: 570px;
+  padding: clamp(32px, 4.4vw, 62px);
+  display: grid;
+  grid-template-columns: minmax(0, .92fr) minmax(300px, 1.08fr);
+  gap: clamp(20px, 3vw, 44px);
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(22, 217, 245, .18);
+  border-radius: 28px;
+  background:
+    linear-gradient(135deg, rgba(16, 36, 52, .96), rgba(8, 24, 37, .96) 58%, rgba(13, 24, 54, .96));
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, .28),
+    inset 0 1px 0 rgba(255, 255, 255, .035);
+  text-align: left;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero::before {
+  content: "";
+  position: absolute;
+  width: 440px;
+  height: 440px;
+  right: -140px;
+  top: -160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 92, 246, .2), rgba(22, 217, 245, .06) 45%, transparent 70%);
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-copy {
+  position: relative;
+  z-index: 2;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero .eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  margin: 0 0 18px;
+  padding: 8px 12px;
+  border: 1px solid rgba(22, 217, 245, .26);
+  border-radius: 999px;
+  background: rgba(22, 217, 245, .08);
+  color: #8eefff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero h1 {
+  max-width: 610px;
+  margin: 0;
+  color: #f4fbff;
+  font-size: clamp(44px, 5.2vw, 72px);
+  line-height: .98;
+  letter-spacing: -.055em;
+  text-wrap: balance;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-hero-emphasis {
+  margin-top: 2px;
+  color: #16d9f5;
+  font-size: clamp(44px, 5.2vw, 72px);
+  font-weight: 850;
+  line-height: .98;
+  letter-spacing: -.055em;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero p {
+  max-width: 570px;
+  margin: 22px 0 0;
+  color: #b8ccd8;
+  font-size: clamp(15px, 1.25vw, 18px);
+  line-height: 1.65;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-benefit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px 16px;
+  margin-top: 26px;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-benefit-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #d9e8f0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-benefit-row span::before {
+  content: "✓";
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(22, 217, 245, .11);
+  color: #39e7ff;
+  font-size: 12px;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-visual {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  animation: rv-auth-float 7s ease-in-out infinite;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-visual img {
+  width: min(100%, 520px);
+  max-height: 500px;
+  object-fit: contain;
+  filter: drop-shadow(0 30px 45px rgba(0, 0, 0, .35));
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-visual-status {
+  position: absolute;
+  right: 2%;
+  bottom: 10%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 13px;
+  border: 1px solid rgba(22, 217, 245, .28);
+  border-radius: 13px;
+  background: rgba(6, 17, 28, .88);
+  color: #dff9ff;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .28);
+  backdrop-filter: blur(14px);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-visual-status i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #30eaa2;
+  box-shadow: 0 0 0 5px rgba(48, 234, 162, .10);
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card {
+  align-self: center;
+  min-height: 510px;
+  padding: clamp(24px, 3vw, 34px);
+  border: 1px solid rgba(111, 139, 158, .18);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(15, 30, 46, .96), rgba(9, 23, 35, .98));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .24);
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card .tabs {
+  padding: 5px;
+  margin-bottom: 26px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .035);
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card .tab {
+  min-height: 42px;
+  border-radius: 10px;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card .tab.active {
+  border-color: rgba(22, 217, 245, .22);
+  background: linear-gradient(135deg, rgba(22, 217, 245, .16), rgba(139, 92, 246, .14));
+  color: #f4fbff;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-card-head {
+  margin-bottom: 22px;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-card-head h2 {
+  margin: 0 0 7px;
+  color: #f4fbff;
+  font-size: clamp(24px, 2.2vw, 31px);
+  letter-spacing: -.035em;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-card-head p {
+  margin: 0;
+  color: #8fa8b8;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+body.home-page:has(#authView:not(.hidden)) #registerForm,
+body.home-page:has(#authView:not(.hidden)) #loginForm {
+  gap: 16px;
+}
+
+body.home-page:has(#authView:not(.hidden)) #registerForm {
+  grid-template-columns: 1fr;
+}
+
+body.home-page:has(#authView:not(.hidden)) #registerForm > label:first-of-type,
+body.home-page:has(#authView:not(.hidden)) #registerForm > button,
+body.home-page:has(#authView:not(.hidden)) #registerForm > .form-hint {
+  grid-column: 1;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card label {
+  gap: 7px;
+  color: #c9d8e2;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card input {
+  min-height: 48px;
+  padding: 0 14px;
+  border-color: #24485e;
+  border-radius: 11px;
+  background: rgba(5, 16, 26, .72);
+  color: #f4fbff;
+  font-size: 14px;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card input:focus {
+  border-color: #16d9f5;
+  box-shadow: 0 0 0 3px rgba(22, 217, 245, .12);
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card .button.primary {
+  min-height: 50px;
+  margin-top: 3px;
+  border-radius: 11px;
+  background: linear-gradient(110deg, #16d9f5 0%, #2bd7e8 55%, #8b5cf6 100%);
+  color: #04111a;
+  font-size: 14px;
+  font-weight: 850;
+  box-shadow: 0 12px 34px rgba(22, 217, 245, .14);
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card .button.primary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow: 0 16px 38px rgba(22, 217, 245, .2);
+}
+
+body.home-page:has(#authView:not(.hidden)) #authView .form-hint {
+  color: #7892a4;
+  font-size: 11px;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature-strip {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 4px 0 0;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature {
+  min-height: 112px;
+  padding: 18px;
+  border: 1px solid rgba(111, 139, 158, .15);
+  border-radius: 16px;
+  background: rgba(11, 27, 41, .72);
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature:hover {
+  transform: translateY(-2px);
+  border-color: rgba(22, 217, 245, .24);
+  background: rgba(16, 36, 52, .82);
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #effaff;
+  font-size: 13px;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature span {
+  color: #8da6b7;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(22, 217, 245, .18);
+  border-radius: 11px;
+  background: rgba(22, 217, 245, .08);
+  color: #3fe6fb;
+  font-size: 17px;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-public-footer {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 2px 0;
+  color: #718b9c;
+  font-size: 11px;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-public-footer a {
+  color: #9db5c4;
+  text-decoration: none;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-public-footer a:hover {
+  color: #e9f9ff;
+}
+
+@keyframes rv-auth-float {
+  0%, 100% { transform: translateY(0) rotate(-.15deg); }
+  50% { transform: translateY(-9px) rotate(.25deg); }
+}
+
+@media (max-width: 1120px) {
+  body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell {
+    grid-template-columns: minmax(0, 1fr) minmax(330px, 410px);
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero {
+    grid-template-columns: 1fr;
+    min-height: 540px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-visual {
+    position: absolute;
+    right: 1%;
+    bottom: -7%;
+    width: min(52%, 420px);
+    opacity: .82;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-copy {
+    max-width: 68%;
+  }
+}
+
+@media (max-width: 900px) {
+  body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell {
+    grid-template-columns: 1fr;
+    padding-top: 24px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero {
+    min-height: 500px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card {
+    min-height: auto;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-feature-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell {
+    padding: 16px 12px 28px;
+    gap: 14px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero {
+    min-height: auto;
+    padding: 26px 22px 260px;
+    border-radius: 20px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-copy {
+    max-width: 100%;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero h1,
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-hero-emphasis {
+    font-size: clamp(38px, 11.4vw, 52px);
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero p {
+    margin-top: 16px;
+    font-size: 14px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-benefit-row {
+    display: grid;
+    gap: 9px;
+    margin-top: 20px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-visual {
+    width: 290px;
+    right: 50%;
+    bottom: -16px;
+    transform: translateX(50%);
+    animation: none;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-visual-status {
+    right: 0;
+    bottom: 16%;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card {
+    padding: 20px 16px;
+    border-radius: 18px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-feature-strip {
+    grid-template-columns: 1fr;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-feature {
+    min-height: 0;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-public-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-visual,
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-card .button.primary,
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-feature {
+    animation: none !important;
+    transition-duration: .01ms !important;
+  }
+}
