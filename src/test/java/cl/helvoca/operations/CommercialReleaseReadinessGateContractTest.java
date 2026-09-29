@@ -51,7 +51,7 @@ class CommercialReleaseReadinessGateContractTest {
                 "Mercado Pago provider round trip must remain an explicit external gate");
         assertTrue(readiness.contains("CUSTOMER-SPECIFIC ACTIVATION PENDING"),
                 "first customer activation must remain tenant-specific");
-        assertTrue(readiness.contains("Real-customer activation: NOT AUTHORIZED"),
+        assertTrue(readiness.contains("**Real-customer activation:** NOT AUTHORIZED"),
                 "green software must not auto-authorize a real customer");
         assertTrue(readiness.contains("readiness evidence only"),
                 "GO must not be treated as provider activation");

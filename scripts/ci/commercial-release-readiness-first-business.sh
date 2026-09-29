@@ -54,13 +54,18 @@ if merge_base != expected_base:
 print(f"GitHub compare ancestry PASS: status={status} behind_by={behind} merge_base={merge_base}")
 PY
 
+echo "Verifying required release-readiness evidence..."
 for required in   docs/COMMERCIAL_EXTERNAL_GATES_V1.md   docs/CONTROLLED_REAL_BUSINESS_PILOT_V1.md   docs/FIRST_CUSTOMER_ONBOARDING_FORM.md   docs/FIRST_CUSTOMER_OPERATION.md   docs/FIRST_CUSTOMER_ROLLBACK_SUPPORT.md   docs/SAAS_BILLING_COMMERCIAL_READINESS.md   docs/COMMERCIAL_RELEASE_READINESS_FIRST_BUSINESS_V1.md; do
-  test -s "$required"
+  if [[ ! -s "$required" ]]; then
+    echo "Missing required readiness evidence: $required" >&2
+    exit 1
+  fi
 done
 
-grep -Fq "PROVIDER TEST ROUND-TRIP PENDING" docs/COMMERCIAL_RELEASE_READINESS_FIRST_BUSINESS_V1.md
-grep -Fq "CUSTOMER-SPECIFIC ACTIVATION PENDING" docs/COMMERCIAL_RELEASE_READINESS_FIRST_BUSINESS_V1.md
-grep -Fq "Real-customer activation: NOT AUTHORIZED" docs/COMMERCIAL_RELEASE_READINESS_FIRST_BUSINESS_V1.md
+READINESS_DOC="docs/COMMERCIAL_RELEASE_READINESS_FIRST_BUSINESS_V1.md"
+grep -Fq "PROVIDER TEST ROUND-TRIP PENDING" "$READINESS_DOC"
+grep -Fq "CUSTOMER-SPECIFIC ACTIVATION PENDING" "$READINESS_DOC"
+grep -Fq "**Real-customer activation:** NOT AUTHORIZED" "$READINESS_DOC"
 
 FOCUSED_TESTS=(
   CommercialReleaseReadinessGateContractTest
