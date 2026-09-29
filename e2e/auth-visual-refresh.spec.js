@@ -7,7 +7,7 @@ test.describe('public authentication visual refresh', () => {
     await expect(page.locator('#authView')).toBeVisible();
     await expect(page.getByRole('heading', { level: 1, name: 'No pierdas otra llamada.' })).toBeVisible();
     await expect(page.locator('.rv-hero-emphasis')).toHaveText('de tu negocio');
-    await expect(page.locator('.rv-auth-visual img')).toHaveAttribute('src', '/recepvoz-auth-hero.svg');
+    await expect(page.locator('.rv-auth-visual img')).toHaveAttribute('src', '/recepvoz-phone-hero.svg');
     await expect(page.locator('.rv-benefit-row')).toContainText('Atiende llamadas 24/7');
     await expect(page.locator('.rv-benefit-row')).toContainText('Agenda citas');
     await expect(page.locator('.rv-benefit-row')).toContainText('WhatsApp Business');
@@ -61,14 +61,42 @@ test.describe('public authentication visual refresh', () => {
     }
   });
 
+  test('gives the phone a dominant visual stage on desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1536, height: 950 });
+    await page.goto('/');
+
+    const heroBox = await page.locator('.rv-auth-hero').boundingBox();
+    const phoneBox = await page.locator('.rv-phone-device').boundingBox();
+
+    expect(heroBox).not.toBeNull();
+    expect(phoneBox).not.toBeNull();
+    expect(phoneBox.width).toBeGreaterThan(320);
+    expect(phoneBox.height).toBeGreaterThan(500);
+    expect(phoneBox.width / heroBox.width).toBeGreaterThan(0.34);
+  });
+
+  test('renders coded conversation layers around the phone', async ({ page }) => {
+    await page.setViewportSize({ width: 1536, height: 950 });
+    await page.goto('/');
+
+    await expect(page.locator('.rv-phone-stage')).toBeVisible();
+    await expect(page.locator('.rv-phone-device')).toHaveAttribute('src', '/recepvoz-phone-hero.svg');
+    await expect(page.locator('.rv-phone-bubble')).toHaveCount(3);
+    await expect(page.locator('.rv-phone-wave i')).toHaveCount(9);
+    await expect(page.locator('.rv-phone-status')).toContainText('Recepcionista disponible');
+  });
+
   test('serves the new visual assets to unauthenticated visitors', async ({ request }) => {
     const css = await request.get('/auth-visual-refresh.css');
     const hero = await request.get('/recepvoz-auth-hero.svg');
+    const phone = await request.get('/recepvoz-phone-hero.svg');
 
     expect(css.status()).toBe(200);
     expect(hero.status()).toBe(200);
+    expect(phone.status()).toBe(200);
     expect(css.headers()['content-type']).toContain('text/css');
     expect(hero.headers()['content-type']).toContain('image/svg+xml');
+    expect(phone.headers()['content-type']).toContain('image/svg+xml');
   });
 
   test('motion remains nonessential when reduced motion is requested', async ({ page }) => {
