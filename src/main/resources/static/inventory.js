@@ -455,7 +455,7 @@
         [...rows.querySelectorAll(".inventory-product-edit-btn")].forEach(button => {
             button.addEventListener("click", () => openProductForm(button.dataset.id));
         });
-        $(".inventory-variants-btn", rows).forEach(button => {
+        [...rows.querySelectorAll(".inventory-variants-btn")].forEach(button => {
             button.addEventListener("click", () => openVariants(button.dataset.id));
         });
         $$(".inventory-config-btn", rows).forEach(button => {
