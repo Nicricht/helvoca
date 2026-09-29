@@ -10,7 +10,7 @@
     .pilot-metrics-head p { margin:0; color:var(--muted); font-size:12px; line-height:1.45; }
     .pilot-period-switch { display:inline-flex; gap:4px; padding:3px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,.02); }
     .pilot-period-switch button { border:0; border-radius:7px; padding:6px 9px; background:transparent; color:var(--muted); font:inherit; font-size:10px; font-weight:800; cursor:pointer; }
-    .pilot-period-switch button.active { background:rgba(124,92,255,.16); color:var(--text); }
+    .pilot-period-switch button.active { background:var(--rv-brand-soft, rgba(124,92,255,.16)); color:var(--text); }
     .pilot-funnel { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
     .pilot-funnel-step { position:relative; min-width:0; padding:12px; border:1px solid var(--border); border-radius:11px; background:rgba(255,255,255,.025); }
     .pilot-funnel-step strong { display:block; font-size:22px; line-height:1; }
