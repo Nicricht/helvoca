@@ -217,6 +217,7 @@
     <link rel="stylesheet" href="/commercial-ui-v3.css?v=20260928-2">
     <link rel="stylesheet" href="/dashboard-finish.css?v=20260928-1">
     <link rel="stylesheet" href="/frontend-foundation.css?v=20260928-1">
+    <link rel="stylesheet" href="/auth-visual-refresh.css?v=20260929-1">
 </head>
 <body class="home-page">
 <div class="shell">
@@ -241,24 +242,42 @@
     </header>
 
     <main>
-        <section id="authView" class="auth-grid">
-            <article class="card hero-card">
-                <div class="eyebrow">Tu negocio siempre contesta</div>
-                <h1>No pierdas otra llamada.</h1>
-                <p>RecepVoz responde a tus clientes, resuelve consultas y crea reservas mientras tú sigues trabajando.</p>
-                <div class="rv-voice-preview" aria-label="Vista previa de la recepcionista virtual">
-                    <div class="rv-voice-preview-head">
-                        <span class="rv-live-dot" aria-hidden="true"></span>
-                        <div><strong>Sofía está disponible</strong><small>Recepcionista IA · 24/7</small></div>
+        <section id="authView" class="auth-grid rv-auth-shell">
+            <article class="card hero-card rv-auth-hero">
+                <div class="rv-auth-copy">
+                    <div class="eyebrow">Tu negocio siempre contesta</div>
+                    <h1>No pierdas otra llamada.</h1>
+                    <div class="rv-hero-emphasis">de tu negocio</div>
+                    <p>RecepVoz responde a tus clientes, resuelve consultas y crea reservas mientras tú sigues trabajando.</p>
+                    <div class="rv-benefit-row" aria-label="Beneficios principales">
+                        <span>Atiende llamadas 24/7</span>
+                        <span>Agenda citas</span>
+                        <span>WhatsApp Business</span>
                     </div>
-                    <div class="rv-voice-preview-result"><span>Cliente: “Quiero reservar para mañana”</span><strong>Reserva lista ✓</strong></div>
+                    <div class="rv-voice-preview" aria-label="Vista previa de la recepcionista virtual">
+                        <div class="rv-voice-preview-head">
+                            <span class="rv-live-dot" aria-hidden="true"></span>
+                            <div><strong>Sofía está disponible</strong><small>Recepcionista IA · 24/7</small></div>
+                        </div>
+                        <div class="rv-voice-preview-result"><span>Cliente: “Quiero reservar para mañana”</span><strong>Reserva lista ✓</strong></div>
+                    </div>
+                </div>
+
+                <div class="rv-auth-visual" aria-label="RecepVoz atendiendo una llamada y creando una reserva">
+                    <img src="/recepvoz-auth-hero.svg" alt="Teléfono con RecepVoz atendiendo una llamada y confirmando una reserva" width="760" height="760">
+                    <div class="rv-visual-status"><i aria-hidden="true"></i><span>Recepcionista disponible</span></div>
                 </div>
             </article>
 
-            <article class="card auth-card">
+            <article class="card auth-card rv-auth-card">
                 <div class="tabs" role="tablist">
                     <button class="tab active" id="registerTab" type="button" aria-selected="true">Crear cuenta</button>
                     <button class="tab" id="loginTab" type="button" aria-selected="false">Ingresar</button>
+                </div>
+
+                <div class="rv-auth-card-head">
+                    <h2>Comienza con RecepVoz</h2>
+                    <p>Crea tu cuenta y configura lo esencial de tu recepcionista virtual.</p>
                 </div>
 
                 <form id="registerForm" class="stack">
@@ -277,24 +296,33 @@
                 <div id="authMessage" class="message hidden"></div>
             </article>
 
-            <article class="card public-company-card" aria-label="Información comercial de RecepVoz">
-                <div class="eyebrow">RecepVoz</div>
-                <h2>Una sola plataforma para atender y operar.</h2>
-                <p>Recepcionista virtual con IA para negocios que necesitan responder clientes sin depender siempre del teléfono.</p>
-                <div class="public-capabilities">
-                    <span>☎ Atención de llamadas</span>
-                    <span>◉ Integración con WhatsApp Business</span>
-                    <span>▣ Reservas y agenda</span>
-                    <span>✓ Pedidos, solicitudes y seguimiento</span>
-                </div>
-                <div class="public-company-bottom">
-                    <div class="public-contact"><strong>Contacto</strong><a href="tel:+14355652512">+1 435 565 2512</a></div>
-                    <nav class="public-legal" aria-label="Información legal">
-                        <a href="/privacy.html">Privacidad</a>
-                        <a href="/terms.html">Términos</a>
-                    </nav>
-                </div>
-            </article>
+            <section class="rv-auth-feature-strip" aria-label="Capacidades principales de RecepVoz">
+                <article class="rv-auth-feature">
+                    <span class="rv-auth-feature-icon" aria-hidden="true">☎</span>
+                    <strong>Llamadas con IA</strong>
+                    <span>Responde consultas y mantiene a tus clientes atendidos.</span>
+                </article>
+                <article class="rv-auth-feature">
+                    <span class="rv-auth-feature-icon" aria-hidden="true">▣</span>
+                    <strong>Agenda y reservas</strong>
+                    <span>Convierte solicitudes de clientes en citas organizadas.</span>
+                </article>
+                <article class="rv-auth-feature">
+                    <span class="rv-auth-feature-icon" aria-hidden="true">◉</span>
+                    <strong>WhatsApp Business</strong>
+                    <span>Mantén la conversación y el seguimiento en un mismo flujo.</span>
+                </article>
+                <article class="rv-auth-feature">
+                    <span class="rv-auth-feature-icon" aria-hidden="true">↗</span>
+                    <strong>Seguimiento</strong>
+                    <span>Centraliza solicitudes, clientes y actividad del negocio.</span>
+                </article>
+            </section>
+
+            <footer class="rv-public-footer">
+                <span>RecepVoz · Recepcionista virtual con IA para negocios</span>
+                <span><a href="tel:+14355652512">Contacto</a> · <a href="/privacy.html">Privacidad</a> · <a href="/terms.html">Términos</a></span>
+            </footer>
         </section>
 
         <section id="dashboardView" class="hidden">
