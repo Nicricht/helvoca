@@ -10,10 +10,7 @@ if [[ -z "$BASE_MAIN" ]]; then
   BASE_MAIN="$(git rev-parse origin/main)"
 fi
 
-echo "Fetching current main for ancestry verification..."
-if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
-  git fetch --no-tags --unshallow origin
-fi
+echo "Fetching current main for release freshness verification..."
 git fetch --no-tags origin main:refs/remotes/origin/main
 CURRENT_MAIN="$(git rev-parse refs/remotes/origin/main)"
 echo "Audited main: $BASE_MAIN"
@@ -22,7 +19,40 @@ if [[ -n "$BASE_MAIN" && "$CURRENT_MAIN" != "$BASE_MAIN" ]]; then
   echo "main moved after the commercial-readiness audit; refresh the candidate and recertify."
   exit 1
 fi
-git merge-base --is-ancestor "$CURRENT_MAIN" HEAD
+
+if [[ -z "${GITHUB_REPOSITORY:-}" || -z "${GITHUB_SHA:-}" || -z "${GH_TOKEN:-}" ]]; then
+  echo "GitHub compare context is required to prove the release ancestry."
+  exit 1
+fi
+
+COMPARE_JSON="$(mktemp)"
+curl --fail-with-body -sS -L \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $GH_TOKEN" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "https://api.github.com/repos/$GITHUB_REPOSITORY/compare/$CURRENT_MAIN...$GITHUB_SHA" > "$COMPARE_JSON"
+
+python3 - "$COMPARE_JSON" "$CURRENT_MAIN" <<'PY'
+import json
+import sys
+
+path, expected_base = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as fh:
+    data = json.load(fh)
+
+status = data.get("status")
+behind = data.get("behind_by")
+merge_base = (data.get("merge_base_commit") or {}).get("sha")
+
+if status not in {"ahead", "identical"}:
+    raise SystemExit(f"candidate is not ahead/identical to audited main: status={status}")
+if behind != 0:
+    raise SystemExit(f"candidate is behind audited main by {behind} commits")
+if merge_base != expected_base:
+    raise SystemExit(f"unexpected merge base: {merge_base} != {expected_base}")
+
+print(f"GitHub compare ancestry PASS: status={status} behind_by={behind} merge_base={merge_base}")
+PY
 
 for required in   docs/COMMERCIAL_EXTERNAL_GATES_V1.md   docs/CONTROLLED_REAL_BUSINESS_PILOT_V1.md   docs/FIRST_CUSTOMER_ONBOARDING_FORM.md   docs/FIRST_CUSTOMER_OPERATION.md   docs/FIRST_CUSTOMER_ROLLBACK_SUPPORT.md   docs/SAAS_BILLING_COMMERCIAL_READINESS.md   docs/COMMERCIAL_RELEASE_READINESS_FIRST_BUSINESS_V1.md; do
   test -s "$required"
