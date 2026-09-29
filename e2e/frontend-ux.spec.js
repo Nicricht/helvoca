@@ -568,6 +568,6 @@ test('ready customer console uses the canonical dark commercial design system', 
 
   expect(palette.background).toBe('rgb(7, 10, 16)');
   expect(palette.text).toBe('rgb(244, 247, 251)');
-  expect(palette.accent).toBe('#806bff');
+  expect(palette.accent).toBe('#22c7d6');
   expect(palette.cardBackground).toBe('rgb(13, 19, 29)');
 });
