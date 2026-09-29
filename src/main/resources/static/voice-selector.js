@@ -11,7 +11,7 @@
         #advancedPanel .ux-config-save .button.primary,
         #configPhonePanel form .button.primary {
             font-weight: 900 !important;
-            box-shadow: 0 8px 22px rgba(124,92,255,.20) !important;
+            box-shadow: 0 8px 22px var(--rv-brand-soft, rgba(124,92,255,.20)) !important;
         }
 
         #dashboardView #refreshBtn,
@@ -79,8 +79,8 @@
             border-color: rgba(255,255,255,.14) !important;
         }
         #advancedPanel .ux-config-nav button[aria-expanded="true"] {
-            background: rgba(124,92,255,.13) !important;
-            border-color: rgba(124,92,255,.34) !important;
+            background: var(--rv-brand-soft, rgba(124,92,255,.13)) !important;
+            border-color: var(--rv-brand-border, rgba(124,92,255,.34)) !important;
         }
         #advancedPanel .ux-config-nav button strong { font-size: 11px !important; }
         #advancedPanel .ux-config-nav button small { display: none !important; }
