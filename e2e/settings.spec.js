@@ -740,10 +740,12 @@ test('settings validation opens Horarios when no attention interval remains', as
   await mockSettings(page);
   await page.goto('/settings.html');
 
-  await page.evaluate(() => {
-    const hours = document.querySelector('#hoursGrid');
-    if (hours) hours.innerHTML = '';
-  });
+  await page.locator('.ux-config-nav [data-settings-section="hours"]').click();
+  const removeIntervals = page.locator('#hoursGrid .remove-row');
+  while (await removeIntervals.count()) {
+    await removeIntervals.first().click();
+  }
+  await page.locator('.ux-config-nav [data-settings-section="business"]').click();
   await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
 
   await expect(page.locator('#setupMessage')).toContainText('Configura al menos un intervalo');
