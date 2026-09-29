@@ -42,6 +42,7 @@ test('all curated themes preserve primary-action contrast and semantic status co
       const style = getComputedStyle(document.documentElement);
       return {
         primary: style.getPropertyValue('--rv-brand-primary').trim(),
+        strong: style.getPropertyValue('--rv-brand-strong').trim(),
         onPrimary: style.getPropertyValue('--rv-brand-contrast').trim(),
         success: style.getPropertyValue('--rv-success').trim(),
         warning: style.getPropertyValue('--rv-warning').trim(),
@@ -50,7 +51,8 @@ test('all curated themes preserve primary-action contrast and semantic status co
       };
     });
 
-    expect(contrastRatio(tokens.primary, tokens.onPrimary), theme).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(tokens.primary, tokens.onPrimary), theme + ' primary').toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(tokens.strong, tokens.onPrimary), theme + ' strong').toBeGreaterThanOrEqual(4.5);
 
     const semantic = {
       success: tokens.success,
