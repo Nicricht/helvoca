@@ -812,7 +812,8 @@ body.inventory-page .inventory-dialog-close:hover {
 
 
 /* Keep first-time setup deliberately narrow; operational tools appear once ready. */
-body.first-user-onboarding-active #primaryNav .nav-inventory {
+body.first-user-onboarding-active #primaryNav .nav-inventory,
+body.first-user-onboarding-active #primaryNav .nav-conversations {
   display: none !important;
 }
 
