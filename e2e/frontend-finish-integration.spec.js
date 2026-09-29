@@ -29,11 +29,12 @@ function navEntries(html) {
 test('customer navigation stays coherent and never exposes internal operations', async () => {
   const expected = [
     { href: '/', text: 'Inicio' },
-    { href: '/#bookings', text: 'Reservas' },
+    { href: '/conversations.html', text: 'Conversaciones' },
+    { href: '/#bookings', text: 'Agenda' },
     { href: '/#customers', text: 'Clientes' },
     { href: '/inventory.html', text: 'Inventario' },
-    { href: '/conversations.html', text: 'Recepcionista IA' },
-    { href: '/settings.html', text: 'Configuración' }
+    { href: '/settings.html', text: 'Configuración' },
+    { href: '/account.html', text: 'Facturación' }
   ];
 
   for (const page of customerPages) {
@@ -110,7 +111,7 @@ test('primary customer navigation remains keyboard reachable at required widths'
 
     const nav = page.getByRole('navigation', { name: 'Navegación principal' });
     const links = nav.getByRole('link');
-    await expect(links).toHaveCount(6);
+    await expect(links).toHaveCount(7);
 
     await links.nth(0).focus();
     await expect(links.nth(0)).toBeFocused();
