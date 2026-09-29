@@ -105,12 +105,6 @@ test('new ferretería owner is guided to the first incomplete setup step without
     bookingsCreated: 0,
     requiresAttention: 0
   })));
-  await page.route('**/api/v1/**', route => route.fulfill({
-    status: 404,
-    contentType: 'application/json',
-    body: JSON.stringify({ message: 'RC hardening mock endpoint not defined' })
-  }));
-
   await page.goto('/');
 
   await expect(page.locator('#firstUserOnboarding')).toBeVisible();
