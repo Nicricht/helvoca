@@ -771,6 +771,7 @@ test('appearance save failure restores authoritative theme and operators cannot 
 
   await page.getByRole('button', { name: '🎨 Apariencia', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-rv-accent-theme', 'amber');
-  await expect(panel.locator('[data-appearance-theme]')).toBeDisabled();
+  await expect(panel.locator('[data-appearance-theme]')).toHaveCount(5);
+  await expect(panel.locator('[data-appearance-theme]:not(:disabled)')).toHaveCount(0);
   expect(state.appearancePuts).toEqual([]);
 });
