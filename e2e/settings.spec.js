@@ -739,6 +739,7 @@ test('settings validation opens Horarios when no attention interval remains', as
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockSettings(page);
   await page.goto('/settings.html');
+  await expect(page.locator('#hoursGrid .interval-row').first()).toBeVisible();
 
   await page.evaluate(() => {
     const hours = document.querySelector('#hoursGrid');
