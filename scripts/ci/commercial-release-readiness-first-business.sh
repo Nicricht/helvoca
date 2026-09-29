@@ -10,8 +10,16 @@ if [[ -z "$BASE_MAIN" ]]; then
   BASE_MAIN="$(git rev-parse origin/main)"
 fi
 
-echo "Verifying current main is an ancestor of the candidate: $BASE_MAIN"
-git merge-base --is-ancestor "$BASE_MAIN" HEAD
+echo "Fetching current main for ancestry verification..."
+git fetch --no-tags origin main:refs/remotes/origin/main
+CURRENT_MAIN="$(git rev-parse refs/remotes/origin/main)"
+echo "Audited main: $BASE_MAIN"
+echo "Fetched main: $CURRENT_MAIN"
+if [[ -n "$BASE_MAIN" && "$CURRENT_MAIN" != "$BASE_MAIN" ]]; then
+  echo "main moved after the commercial-readiness audit; refresh the candidate and recertify."
+  exit 1
+fi
+git merge-base --is-ancestor "$CURRENT_MAIN" HEAD
 
 for required in   docs/COMMERCIAL_EXTERNAL_GATES_V1.md   docs/CONTROLLED_REAL_BUSINESS_PILOT_V1.md   docs/FIRST_CUSTOMER_ONBOARDING_FORM.md   docs/FIRST_CUSTOMER_OPERATION.md   docs/FIRST_CUSTOMER_ROLLBACK_SUPPORT.md   docs/SAAS_BILLING_COMMERCIAL_READINESS.md   docs/COMMERCIAL_RELEASE_READINESS_FIRST_BUSINESS_V1.md; do
   test -s "$required"
