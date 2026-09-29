@@ -61,6 +61,40 @@ test.describe('public authentication visual refresh', () => {
     }
   });
 
+  test('keeps the 1280px desktop composition inside its cards', async ({ page }) => {
+    for (const viewport of [
+      { width: 1280, height: 720 },
+      { width: 1278, height: 690 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/');
+
+      const metrics = await page.evaluate(() => {
+        const box = (selector) => {
+          const rect = document.querySelector(selector).getBoundingClientRect();
+          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
+        };
+        return {
+          viewportWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          topbar: box('.topbar'),
+          hero: box('.rv-auth-hero'),
+          copy: box('.rv-auth-copy'),
+          phone: box('.rv-phone-stage'),
+          authCard: box('.rv-auth-card')
+        };
+      });
+
+      expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+      expect(metrics.hero.left).toBeGreaterThanOrEqual(12);
+      expect(metrics.copy.left - metrics.hero.left).toBeGreaterThanOrEqual(28);
+      expect(metrics.hero.right).toBeLessThanOrEqual(metrics.authCard.left - 12);
+      expect(metrics.copy.right).toBeLessThanOrEqual(metrics.phone.left + 18);
+      expect(metrics.authCard.right).toBeLessThanOrEqual(metrics.viewportWidth - 12);
+      expect(metrics.hero.top - metrics.topbar.bottom).toBeLessThanOrEqual(48);
+    }
+  });
+
   test('gives the phone a dominant visual stage on desktop', async ({ page }) => {
     await page.setViewportSize({ width: 1536, height: 950 });
     await page.goto('/');
