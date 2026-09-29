@@ -764,10 +764,10 @@ test('appearance save failure restores authoritative theme and operators cannot 
   await expect(page.locator('html')).toHaveAttribute('data-rv-accent-theme', 'amber');
   await expect(page.locator('#appearanceMessage')).toContainText('No se pudo guardar la apariencia');
 
-  await page.reload();
   state.roles = ['OPERATOR'];
   state.appearanceError = null;
   state.appearancePuts.length = 0;
+  await page.reload();
 
   await page.getByRole('button', { name: '🎨 Apariencia', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-rv-accent-theme', 'amber');
