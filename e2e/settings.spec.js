@@ -8,6 +8,8 @@ async function mockSettings(page, state = {}) {
     active: true, whatsappEnabled: false, whatsappCertifiedAt: null
   };
   state.whatsappPatches = [];
+  state.appearancePuts = [];
+  state.appearanceTheme = state.appearanceTheme || 'cyan';
   state.setupPayloads = [];
   state.profilePayloads = [];
   state.scheduleExceptionPuts = [];
@@ -138,8 +140,31 @@ async function mockSettings(page, state = {}) {
     }
     await route.fulfill(json(state.profile));
   });
+  await page.route('**/api/v1/business/appearance', async route => {
+    if (route.request().method() !== 'PUT') {
+      await route.fulfill({ status: 405, body: '' });
+      return;
+    }
+    const payload = route.request().postDataJSON();
+    state.appearancePuts.push(payload);
+    if (state.appearanceError) {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: state.appearanceError })
+      });
+      return;
+    }
+    state.appearanceTheme = payload.theme;
+    await route.fulfill(json({ theme: state.appearanceTheme }));
+  });
   await page.route(/\/api\/v1\/business$/, route => route.fulfill(json({
-    name: 'Negocio E2E', timezone: 'America/Santiago', language: 'es', humanTransferPhone: '+56999999999'
+    id: 'business-1',
+    name: 'Negocio E2E',
+    timezone: 'America/Santiago',
+    language: 'es',
+    humanTransferPhone: '+56999999999',
+    appearanceTheme: state.appearanceTheme
   })));
   await page.route('**/api/v1/onboarding/status', route => route.fulfill(json({
     businessProfileConfigured: true, servicesConfigured: true, scheduleConfigured: true,
@@ -290,7 +315,8 @@ test('settings exposes the Mi negocio sections with simple navigation', async ({
   await expect(page.locator('.dashboard-heading h1')).toHaveText('Mi negocio');
   const nav = page.locator('#advancedPanel .ux-config-nav');
   await expect(nav.getByRole('button')).toHaveText([
-    '🏪 Negocio', '✂️ Servicios', '📅 Horarios', '💬 Respuestas', '🤖 Recepcionista', '📞 Canales'
+    '🏪 Negocio', '✂️ Servicios', '📅 Horarios', '💬 Respuestas',
+    '🤖 Recepcionista', '🎨 Apariencia', '📞 Canales'
   ]);
   await expect(page.locator('#configBusinessPanel')).toBeVisible();
   await expect(page.locator('#configAgentPanel')).toBeHidden();
@@ -680,4 +706,71 @@ test('settings lets operators review schedule exceptions without mutation contro
   await expect(page.locator('[data-exception-date="2026-12-25"]').getByRole('button', { name: 'Eliminar' })).toHaveCount(0);
   expect(state.scheduleExceptionPuts).toEqual([]);
   expect(state.scheduleExceptionDeletes).toEqual([]);
+});
+
+
+test('business admin previews and persists a curated appearance theme', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const state = { appearanceTheme: 'violet' };
+  await mockSettings(page, state);
+  await page.goto('/settings.html');
+
+  await page.getByRole('button', { name: '🎨 Apariencia', exact: true }).click();
+
+  const panel = page.locator('#configAppearancePanel');
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('[data-appearance-theme]')).toHaveCount(5);
+  await expect(page.locator('html')).toHaveAttribute('data-rv-accent-theme', 'violet');
+  await expect(panel.locator('[data-appearance-theme="violet"]')).toHaveAttribute('aria-pressed', 'true');
+
+  const semanticBefore = await page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement);
+    return {
+      success: style.getPropertyValue('--rv-success').trim(),
+      warning: style.getPropertyValue('--rv-warning').trim(),
+      danger: style.getPropertyValue('--rv-danger').trim()
+    };
+  });
+
+  await panel.getByRole('button', { name: /Cyan Voice/i }).click();
+
+  await expect(page.locator('html')).toHaveAttribute('data-rv-accent-theme', 'cyan');
+  await expect.poll(() => state.appearancePuts).toEqual([{ theme: 'cyan' }]);
+  await expect(panel.locator('[data-appearance-theme="cyan"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#appearanceMessage')).toContainText('Apariencia guardada');
+
+  const semanticAfter = await page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement);
+    return {
+      success: style.getPropertyValue('--rv-success').trim(),
+      warning: style.getPropertyValue('--rv-warning').trim(),
+      danger: style.getPropertyValue('--rv-danger').trim()
+    };
+  });
+  expect(semanticAfter).toEqual(semanticBefore);
+});
+
+test('appearance save failure restores authoritative theme and operators cannot mutate it', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const state = { appearanceTheme: 'amber', appearanceError: 'No se pudo guardar la apariencia' };
+  await mockSettings(page, state);
+  await page.goto('/settings.html');
+
+  await page.getByRole('button', { name: '🎨 Apariencia', exact: true }).click();
+  const panel = page.locator('#configAppearancePanel');
+  await panel.getByRole('button', { name: /Violet AI/i }).click();
+
+  await expect.poll(() => state.appearancePuts).toEqual([{ theme: 'violet' }]);
+  await expect(page.locator('html')).toHaveAttribute('data-rv-accent-theme', 'amber');
+  await expect(page.locator('#appearanceMessage')).toContainText('No se pudo guardar la apariencia');
+
+  await page.reload();
+  state.roles = ['OPERATOR'];
+  state.appearanceError = null;
+  state.appearancePuts.length = 0;
+
+  await page.getByRole('button', { name: '🎨 Apariencia', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-rv-accent-theme', 'amber');
+  await expect(panel.locator('[data-appearance-theme]')).toBeDisabled();
+  expect(state.appearancePuts).toEqual([]);
 });
