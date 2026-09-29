@@ -21,10 +21,7 @@
 
 /* Public entry surface: premium, focused and voice-first. */
 body.home-page:has(#authView:not(.hidden)) {
-  background:
-    radial-gradient(circle at 12% 0%, rgba(99, 91, 255, .28), transparent 34%),
-    radial-gradient(circle at 92% 16%, rgba(54, 230, 176, .12), transparent 28%),
-    #080b12;
+  background: #080b12;
   color: var(--text);
 }
 
@@ -55,9 +52,7 @@ body.home-page:has(#authView:not(.hidden)) #authView .hero-card {
   text-align: left;
   border: 1px solid rgba(255,255,255,.08);
   border-radius: 28px;
-  background:
-    radial-gradient(circle at 82% 18%, rgba(99,91,255,.25), transparent 30%),
-    linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
+  background: #0d131d;
   box-shadow: 0 32px 90px rgba(0,0,0,.28);
   overflow: hidden;
 }
@@ -161,7 +156,7 @@ body.home-page:has(#authView:not(.hidden)) .public-company-card {
 .rv-wave span {
   width: 4px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #8f86ff, #635bff);
+  background: #806bff;
   opacity: .9;
 }
 
@@ -407,9 +402,7 @@ body.settings-page .dashboard-heading p {
 /* First-time setup. */
 #firstUserOnboarding {
   border-color: rgba(124,108,255,.28);
-  background:
-    radial-gradient(circle at 100% 0, rgba(99,91,255,.09), transparent 34%),
-    #fff;
+  background: #0d131d;
   box-shadow: var(--rv3-shadow-lg);
 }
 
@@ -633,7 +626,7 @@ body.home-page:has(#dashboardView:not(.hidden)) #configPermissionsPanel .agent-c
 
 .ai-onboarding-card {
   border-color: rgba(124,108,255,.28) !important;
-  background: linear-gradient(135deg, #fff, #faf9ff) !important;
+  background: #0d131d !important;
 }
 
 .ai-chip {
