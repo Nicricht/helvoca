@@ -281,7 +281,7 @@ body.inventory-page .card,
 .ai-chip {
   border-color: var(--rv-accent-border);
   background-color: var(--rv-accent-soft);
-  color: #ddd9ff;
+  color: var(--rv-brand-accent-2);
 }
 
 .home-pill.bad,
@@ -405,7 +405,7 @@ textarea::placeholder {
 .inventory-nav a[aria-current="page"] {
   border-color: var(--rv-accent-border);
   background-color: var(--rv-accent-soft);
-  color: #ddd9ff;
+  color: var(--rv-brand-accent-2);
 }
 
 .home-business-table-shell,
