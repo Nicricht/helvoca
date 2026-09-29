@@ -64,3 +64,24 @@ test('receptionist area keeps history and safe simulation as local actions', asy
   expect(simulator).toMatch(/No crea datos comerciales reales ni realiza llamadas telefónicas/i);
   expect(simulator).toMatch(/Tampoco envía WhatsApp real/i);
 });
+
+test('customer surfaces stay contained at tablet width', async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await page.route('https://cdn.jsdelivr.net/**', route => route.abort());
+  await page.route('**/api/v1/**', route => route.fulfill({
+    status: 404,
+    contentType: 'application/json',
+    body: '{}'
+  }));
+
+  for (const path of ['/', '/settings.html', '/inventory.html', '/conversations.html', '/simulator.html', '/account.html']) {
+    await page.goto(path);
+    await page.waitForTimeout(80);
+    const layout = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth
+    }));
+    expect(layout.scrollWidth, path).toBeLessThanOrEqual(layout.clientWidth + 1);
+  }
+});
