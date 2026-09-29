@@ -71,6 +71,17 @@
         #configServicesPanel .section-heading h2 { margin: 0 !important; font-size: 15px !important; }
         #configServicesPanel #addServiceBtn { min-height: 30px; padding: 0 9px; font-size: 11px; }
         #configServicesPanel #servicesList { gap: 6px !important; }
+
+        #configHoursPanel .section-heading { align-items: center !important; margin-bottom: 8px !important; }
+        #configHoursPanel #addHourBtn {
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            min-height: 30px;
+            padding: 0 9px;
+            font-size: 11px;
+        }
+
         #configServicesPanel .service-row {
             display: grid !important;
             grid-template-columns: minmax(170px, 1.35fr) 86px 105px minmax(180px, 1.55fr) 30px;
