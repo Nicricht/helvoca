@@ -34,10 +34,13 @@ Use verification proportional to the real risk. Before implementation, review th
 9. Never merge a red or incomplete PR. Re-check that the branch is not behind current `main` immediately before merge.
 10. Completion evidence must belong to the exact final commit. Any implementation or engineering-contract change after certification invalidates the earlier certification and requires fresh verification.
 11. For MEDIUM/HIGH or multi-step work likely to outlive one interaction, maintain a **resume checkpoint** in the Draft PR. It must identify branch, PR, exact HEAD, completed blocks, CI/evidence valid for that HEAD, blockers/rulings, and next step.
-12. On resume, reconstruct repository -> branch -> PR -> HEAD -> CI -> checkpoint -> next step. Do not repeat completed work whose evidence is still valid, and never duplicate external side effects.
+12. On resume, reconstruct repository -> branch -> PR -> HEAD -> CI -> checkpoint -> next step. Do not repeat completed work whose evidence remains valid, and never duplicate external side effects.
 13. Before a long external wait such as Full CI, update the resume checkpoint so a disconnected session can be recovered without user reconstruction.
-14. After merge, verify the exact commit deployed to Railway and confirm runtime readiness before calling the work complete.
-15. Production calls, payments, messages and destructive operations require the project-specific safety rules and must never be triggered merely to satisfy a test.
+14. A complete, exact-HEAD-green PR should be merged promptly instead of being left indefinitely in Draft, unless an explicit task-specific review/freeze or safety hold applies.
+15. After merge, require green CI on the exact `main` merge SHA. For production-bound work, normal Railway deployment is allowed once the release gates for that change are satisfied; verify Railway deploys that exact SHA and confirm runtime health before calling the work complete.
+16. Delete or otherwise retire merged source branches once their merge and deployment evidence is durable. Keep a branch open only when it still contains unmerged work, a documented blocker, or deliberately deferred future scope.
+17. Do not impose a blanket `NO MERGE` or `NO DEPLOY` rule on normal engineering work. Use an explicit hold only when the task specifically requires a review/freeze, when release evidence is incomplete, or when deployment would trigger an unsafe/unapproved external effect.
+18. Production calls, payments, messages and other destructive or customer-visible external effects still require their project-specific safety/authorization rules and must never be triggered merely to satisfy a test.
 
 ## Speed rule
 
@@ -50,3 +53,15 @@ LOW-risk work must not be inflated into HIGH-risk ceremony. HIGH-risk work must 
 A successful tool request, proposal, queued action or accepted provider request is not equivalent to a completed business outcome. Tests and application state must prove the terminal outcome explicitly.
 
 Do not claim code is fixed, passing, safe, or complete without fresh verification evidence from the exact state being presented. Chat memory never overrides Git, PR, commit, or CI state.
+
+## Delivery and branch hygiene
+
+The default lifecycle is:
+
+`branch -> Draft PR -> RED/GREEN implementation -> Fast Gate -> Full Gate on exact HEAD -> merge -> main CI -> Railway exact-SHA deployment when production-bound -> runtime verification -> source-branch cleanup`.
+
+Draft is a working state, not a permanent parking state.
+
+Prefer integrating completed stacked work into the designated integration branch as soon as its exact HEAD is certified. Once the integration branch itself is certified and releaseable, merge it through the normal protected-branch workflow instead of accumulating another generation of completed feature branches.
+
+A temporary hold is valid only when it has a concrete reason and next step. Record that reason in the PR checkpoint. “Do not merge/deploy” must never be copied forward mechanically from an older task.
