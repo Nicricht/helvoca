@@ -13,12 +13,12 @@
 <body>
 <header class="rv-topbar">
   <a class="rv-brand" href="/" aria-label="RecepVoz, ir al inicio"><span class="rv-brand-mark" aria-hidden="true">R</span><span><strong>RECEPVOZ</strong><small>Atención con IA</small></span></a>
-  <nav class="rv-nav" aria-label="Navegación principal"><a href="/">Inicio</a><a href="/#bookings">Reservas</a><a href="/#customers">Clientes</a><a class="active" href="/conversations.html" aria-current="page">Conversaciones</a><a href="/inventory.html">Inventario</a><a href="/simulator.html">Probar</a><a href="/settings.html">Configuración</a></nav>
+  <nav class="rv-nav" aria-label="Navegación principal"><a href="/">Inicio</a><a href="/#bookings">Reservas</a><a href="/#customers">Clientes</a><a href="/inventory.html">Inventario</a><a class="active" href="/conversations.html" aria-current="page">Recepcionista IA</a><a href="/settings.html">Configuración</a></nav>
 </header>
 <main class="rv-shell">
   <section class="rv-heading">
     <div><p class="eyebrow">HISTORIAL DE ATENCIÓN</p><h1>Conversaciones</h1><p id="conversationContext">Revisa lo que ocurrió, el resultado y lo que todavía necesita seguimiento.</p></div>
-    <button id="refreshBtn" class="button secondary" type="button">Actualizar</button>
+    <div class="rv-heading-actions"><a class="button secondary" href="/simulator.html">Probar recepcionista</a><button id="refreshBtn" class="button secondary" type="button">Actualizar</button></div>
   </section>
   <div id="sourceStatus" class="source-status hidden" role="status" aria-live="polite"></div>
   <section class="conversation-toolbar" aria-label="Buscar y filtrar conversaciones">
