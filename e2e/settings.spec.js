@@ -505,6 +505,11 @@ test('settings does not invent business hours when the backend has none', async 
 
   await expect(page.locator('#setupMessage')).toContainText('Configura al menos un intervalo');
   expect(state.setupPayloads).toHaveLength(0);
+
+  await page.locator('#addHourBtn').click();
+  await expect(page.locator('#hoursGrid .interval-row')).toHaveCount(1);
+  await expect(page.locator('#hoursGrid [data-field="openTime"]')).toHaveValue('09:00');
+  await expect(page.locator('#hoursGrid [data-field="closeTime"]')).toHaveValue('18:00');
 });
 
 test('manual settings save invalidates an older AI proposal', async ({ page }) => {
