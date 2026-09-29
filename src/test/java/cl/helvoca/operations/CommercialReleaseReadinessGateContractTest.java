@@ -36,8 +36,10 @@ class CommercialReleaseReadinessGateContractTest {
             assertTrue(script.contains(required), "readiness gate must include " + required);
         }
 
-        assertTrue(script.contains("git merge-base --is-ancestor"),
-                "candidate must prove current main is an ancestor");
+        assertTrue(script.contains("api.github.com/repos"),
+                "candidate must prove ancestry through GitHub compare");
+        assertTrue(script.contains("behind_by"),
+                "candidate must fail if it is behind audited main");
         assertTrue(script.contains("no deploy, real calls, real WhatsApp, real payments, provisioning or production mutation"),
                 "gate must keep real external effects outside certification");
         assertTrue(script.contains("COMMERCIAL RELEASE READINESS FIRST BUSINESS: PASS"),
