@@ -36,8 +36,8 @@ jobs:
           npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
 
-      - name: Run visual contract gate
-        run: npx playwright test e2e/frontend-final-visual.spec.js e2e/frontend-foundation.spec.js e2e/frontend-finish-integration.spec.js
+      - name: Run full frontend E2E
+        run: npm run test:e2e
 
       - name: Upload diagnostics
         if: failure()
