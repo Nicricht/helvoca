@@ -34,6 +34,7 @@ jobs:
       - name: Run commercial release readiness gate
         env:
           COMMERCIAL_READINESS_MAIN_SHA: 8dc165d102a4157fdc6e3cd38b51b76b70b388d1
+          GH_TOKEN: ${{ github.token }}
         run: bash scripts/ci/commercial-release-readiness-first-business.sh
 
       - name: Run complete backend suite with JaCoCo
