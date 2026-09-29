@@ -449,13 +449,22 @@ test('primary and public navigation fit desktop tablet and mobile viewports', as
 
       await page.goto('/');
       await expect(page.locator('#primaryNav')).toBeVisible();
+      await expect(page.locator('.nav-inventory')).toHaveAttribute('href', '/inventory.html');
       await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
       await expectNoPageOverflow();
 
       await page.goto('/settings.html');
+      await expect(page.locator('.nav-inventory')).toHaveAttribute('href', '/inventory.html');
       await expect(page.locator('.nav-config')).toHaveClass(/active/);
       await page.getByRole('button', { name: '🏪 Negocio', exact: true }).click();
       await expect(page.locator('#configBusinessPanel')).toBeVisible();
+      await expectNoPageOverflow();
+
+      await page.goto('/inventory.html');
+      await expect(page.locator('.nav-inventory')).toHaveClass(/active/);
+      await expect(page.locator('.nav-bookings')).toHaveAttribute('href', '/#bookings');
+      await expect(page.locator('.nav-customers')).toHaveAttribute('href', '/#customers');
+      await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
       await expectNoPageOverflow();
 
       await page.goto('/sales.html');
@@ -506,4 +515,59 @@ test('authentication and phone administration fit all target viewports', async (
       await expectNoPageOverflow();
     });
   }
+});
+
+
+test('commercial visual layer loads after legacy styles and presents the voice product clearly', async ({ page }) => {
+  await page.goto('/');
+
+  await expect(page.getByRole('heading', { level: 1, name: 'No pierdas otra llamada.' })).toBeVisible();
+  await expect(page.locator('.rv-voice-preview')).toBeVisible();
+  await expect(page.locator('.rv-voice-preview')).toContainText('Sofía está disponible');
+  await expect(page.locator('.rv-voice-preview')).toContainText('Reserva lista');
+
+  const stylesheets = await page.locator('link[rel="stylesheet"]').evaluateAll(
+    links => links.map(link => new URL(link.href).pathname)
+  );
+  const commercialIndex = stylesheets.indexOf('/commercial-ui-v3.css');
+  const homeIndex = stylesheets.indexOf('/home-business.css');
+  const firstUserIndex = stylesheets.indexOf('/first-user-ux-v2.css');
+
+  expect(commercialIndex).toBeGreaterThan(homeIndex);
+  expect(commercialIndex).toBeGreaterThan(firstUserIndex);
+
+  const heroStyle = await page.locator('#authView .hero-card').evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      textAlign: style.textAlign,
+      borderRadius: style.borderRadius
+    };
+  });
+  expect(heroStyle.textAlign).toBe('left');
+  expect(Number.parseFloat(heroStyle.borderRadius)).toBeGreaterThanOrEqual(20);
+});
+
+test('ready customer console uses the canonical dark commercial design system', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'commercial-ui-token'));
+  await mockReadyTenant(page);
+
+  await page.goto('/');
+  await expect(page.locator('#dashboardView')).toBeVisible();
+
+  const palette = await page.evaluate(() => {
+    const bodyStyle = getComputedStyle(document.body);
+    const card = document.querySelector('.home-business-panel:not(.hidden)');
+    const cardStyle = card ? getComputedStyle(card) : null;
+    return {
+      background: bodyStyle.backgroundColor,
+      text: bodyStyle.color,
+      accent: bodyStyle.getPropertyValue('--rv-accent').trim(),
+      cardBackground: cardStyle?.backgroundColor || null
+    };
+  });
+
+  expect(palette.background).toBe('rgb(6, 17, 28)');
+  expect(palette.text).toBe('rgb(244, 251, 255)');
+  expect(palette.accent).toBe('#16d9f5');
+  expect(palette.cardBackground).toBe('rgb(11, 27, 41)');
 });

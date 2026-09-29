@@ -302,45 +302,7 @@
     style.id = 'helvoca-operational-home-styles';
     style.textContent = [
         '#dashboardView #statusGrid.ux-ready-hidden { display: none !important; }',
-        '#operationalOverview { margin: 0 0 18px; padding: 18px; }',
-        '.owner-dashboard-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:14px; }',
-        '.owner-dashboard-head h2 { margin:3px 0 0; font-size:20px; }',
-        '.owner-dashboard-message { margin:0 0 12px; color:var(--muted); font-size:12px; line-height:1.45; }',
-        '.owner-dashboard-message.hidden { display:none; }',
-        '.home-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }',
-        '.home-metric { min-height:82px; padding:13px 14px; border:1px solid var(--border); border-radius:12px; background:rgba(255,255,255,.025); color:inherit; text-decoration:none; cursor:pointer; transition:border-color .16s ease,background .16s ease,transform .16s ease; }',
-        '.home-metric:hover { border-color:rgba(124,92,255,.42); background:rgba(124,92,255,.07); transform:translateY(-1px); }',
-        '.home-metric:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }',
-        '.home-metric strong,.home-metric span,.home-metric small { display:block; }',
-        '.home-metric strong { font-size:24px; line-height:1; letter-spacing:-.03em; }',
-        '.home-metric span { margin-top:7px; color:var(--muted); font-size:11px; }',
-        '.home-metric small { margin-top:4px; color:var(--muted); font-size:9px; line-height:1.35; }',
-        '.owner-dashboard-attention { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }',
-        '.owner-dashboard-attention.hidden { display:none; }',
-        '.owner-dashboard-attention-title { flex-basis:100%; color:var(--text); font-size:11px; }',
-        '.owner-dashboard-chip { display:inline-flex; align-items:center; gap:6px; min-height:30px; padding:6px 9px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:10px; text-decoration:none; }',
-        '.owner-dashboard-chip strong { color:var(--text); font-size:11px; }',
-        '.owner-dashboard-chip.warn { border-color:rgba(244,166,54,.34); background:rgba(244,166,54,.055); }',
-        '.owner-dashboard-chip.hidden { display:none; }',
-        '.owner-plan-row { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:12px; padding:11px 12px; border:1px solid var(--border); border-radius:11px; background:rgba(255,255,255,.018); }',
-        '.owner-plan-row.hidden { display:none; }',
-        '.owner-seven-day { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px; color:var(--muted); font-size:10px; }',
-        '.owner-seven-day strong { color:var(--text); font-size:11px; }',
-        '.owner-seven-day.hidden { display:none; }',
-        'body.home-page.operational-ready #pilotMetricsCard { display:none!important; }',
-        '.owner-plan-row strong,.owner-plan-row span { display:block; }',
-        '.owner-plan-row span { color:var(--muted); font-size:10px; margin-top:2px; }',
-        '.owner-recent { margin-top:14px; padding-top:12px; border-top:1px solid var(--border); }',
-        '.owner-recent h3 { margin:0 0 9px; font-size:13px; }',
-        '.owner-activity-list { display:grid; gap:6px; }',
-        '.owner-activity-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.05); }',
-        '.owner-activity-row:last-child { border-bottom:0; }',
-        '.owner-activity-row strong { display:block; font-size:11px; }',
-        '.owner-activity-row span { display:block; margin-top:2px; color:var(--muted); font-size:10px; }',
-        '.owner-activity-row time { flex:0 0 auto; color:var(--muted); font-size:9px; }',
-        '.owner-empty { color:var(--muted); font-size:11px; padding:8px 0; }',
-        '@media (max-width:900px) { .home-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } }',
-        '@media (max-width:520px) { #operationalOverview { padding:14px; } .owner-dashboard-head,.owner-plan-row { align-items:flex-start; flex-direction:column; } .home-metrics { grid-template-columns:1fr 1fr; } .owner-activity-row { align-items:flex-start; } }'
+        'body.home-page.operational-ready #pilotMetricsCard { display: none !important; }'
     ].join('\n');
     document.head.appendChild(style);
 
@@ -348,38 +310,63 @@
     overview.id = 'operationalOverview';
     overview.className = 'card hidden owner-commercial-dashboard';
     overview.dataset.state = 'loading';
-    overview.setAttribute('aria-label', 'Valor generado por RecepVoz');
+    overview.setAttribute('aria-labelledby', 'ownerDashboardTitle');
     overview.setAttribute('aria-busy', 'true');
     overview.innerHTML = [
         '<div class="owner-dashboard-head">',
-        '  <div><div class="eyebrow">Hoy</div><h2>Valor generado</h2></div>',
-        '  <span id="ownerDashboardState" class="badge muted">Cargando</span>',
+        '  <div><div class="eyebrow">Hoy</div><h2 id="ownerDashboardTitle">Qué está pasando hoy</h2><p>Lo importante para atender, resolver y seguir operando.</p></div>',
+        '  <span id="ownerDashboardState" class="badge muted" role="status" aria-live="polite">Cargando</span>',
         '</div>',
-        '<div id="ownerDashboardMessage" class="owner-dashboard-message">Actualizando actividad confirmada…</div>',
-        '<div class="home-metrics" aria-label="Actividad comercial de hoy">',
-        '  <article id="homeCallsMetric" class="home-metric" aria-label="Conversaciones atendidas"><strong id="homeConversationsToday">–</strong><span>Conversaciones</span><small id="homeConversationBreakdown">–</small></article>',
-        '  <a id="homeBookingsMetric" class="home-metric" href="/?tab=bookings#homeBusinessWorkspace" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>Reservas</span><small>Generadas hoy</small></a>',
-        '  <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver solicitudes pendientes"><strong id="homeRequestsToday">–</strong><span>Pendientes</span><small>Solicitudes por resolver</small></a>',
-        '  <a id="ownerOrdersMetric" class="home-metric hidden" href="/?tab=sales#homeBusinessWorkspace" aria-label="Ver pedidos y ventas"><strong id="ownerOrdersToday">–</strong><span>Pedidos</span><small id="ownerOrdersHint">Generados hoy</small></a>',
+        '<div id="ownerDashboardMessage" class="owner-dashboard-message" aria-live="polite">Actualizando actividad confirmada…</div>',
+        '<div class="owner-dashboard-layout">',
+        '  <div class="owner-dashboard-main">',
+        '    <div class="home-metrics" aria-label="Actividad de hoy">',
+        '      <article id="homeCallsMetric" class="home-metric" aria-label="Llamadas recibidas"><strong id="ownerCallsTodayPrimary">–</strong><span>Llamadas</span><small id="homeConversationBreakdown">–</small></article>',
+        '      <a id="homeBookingsMetric" class="home-metric" href="/?tab=bookings#homeBusinessWorkspace" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>Reservas</span><small>Generadas hoy</small></a>',
+        '      <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver solicitudes pendientes"><strong id="homeRequestsToday">–</strong><span>Pendientes</span><small>Solicitudes por resolver</small></a>',
+        '      <a id="ownerOrdersMetric" class="home-metric hidden" href="/?tab=sales#homeBusinessWorkspace" aria-label="Ver pedidos y ventas"><strong id="ownerOrdersToday">–</strong><span>Pedidos</span><small id="ownerOrdersHint">Generados hoy</small></a>',
+        '    </div>',
+        '    <section class="owner-recent" aria-labelledby="ownerRecentTitle">',
+        '      <div class="owner-section-heading"><div><div class="eyebrow">Últimos movimientos</div><h3 id="ownerRecentTitle">Actividad reciente</h3></div></div>',
+        '      <div id="homeRecentActivity" class="owner-activity-list" role="list"><div class="owner-empty">Cargando actividad…</div></div>',
+        '    </section>',
+        '  </div>',
+        '  <aside class="owner-dashboard-side" aria-label="Prioridades y accesos">',
+        '    <section id="ownerAttentionPanel" class="owner-attention-panel" aria-labelledby="ownerAttentionTitle" data-state="loading">',
+        '      <div class="eyebrow">Prioridad</div>',
+        '      <h3 id="ownerAttentionTitle">Necesita tu atención</h3>',
+        '      <p id="ownerAttentionSummary" aria-live="polite">Revisando pendientes…</p>',
+        '      <div id="ownerDashboardAttention" class="owner-dashboard-attention hidden" aria-label="Señales que requieren atención">',
+        '        <a id="ownerRequestsAttentionChip" class="owner-dashboard-chip warn hidden" href="/?tab=requests#homeBusinessWorkspace"><strong id="ownerRequestsAttentionToday">–</strong> solicitudes abiertas</a>',
+        '        <a id="ownerOrdersAttentionChip" class="owner-dashboard-chip warn hidden" href="/?tab=sales#homeBusinessWorkspace"><strong id="ownerOrdersAttentionToday">–</strong> ventas por revisar</a>',
+        '        <span id="ownerHandoffsChip" class="owner-dashboard-chip hidden"><strong id="ownerHandoffsToday">–</strong> derivaciones</span>',
+        '        <span id="ownerQuestionsAttentionChip" class="owner-dashboard-chip hidden"><strong id="ownerQuestionsAttentionToday">–</strong> preguntas sin respuesta</span>',
+        '        <span id="ownerFailuresChip" class="owner-dashboard-chip hidden"><strong id="ownerFailuresToday">–</strong> fallos de llamada</span>',
+        '        <span id="ownerBookingChangesChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingChangesToday">–</strong> reprogramadas</span>',
+        '        <span id="ownerBookingCancelsChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingCancelsToday">–</strong> canceladas</span>',
+        '      </div>',
+        '    </section>',
+        '    <nav id="ownerQuickActions" class="owner-quick-actions" aria-label="Accesos principales">',
+        '      <div class="owner-section-heading"><div><div class="eyebrow">Accesos</div><h3>Ir a</h3></div></div>',
+        '      <div class="owner-quick-grid">',
+        '        <a href="/?tab=bookings#homeBusinessWorkspace">Agenda</a>',
+        '        <a href="/?tab=sales#homeBusinessWorkspace">Ventas</a>',
+        '        <a href="/?tab=customers#homeBusinessWorkspace">Clientes</a>',
+        '        <a href="/conversations.html">Conversaciones</a>',
+        '        <a href="/inventory.html">Inventario</a>',
+        '        <a href="/settings.html">Configuración</a>',
+        '        <a href="/account.html">Facturación</a>',
+        '      </div>',
+        '    </nav>',
+        '    <div id="ownerSevenDayRow" class="owner-seven-day hidden"><strong>Últimos 7 días</strong><span id="ownerSevenDaySummary">–</span></div>',
+        '    <div id="ownerPlanRow" class="owner-plan-row hidden">',
+        '      <div><strong id="ownerPlanName">–</strong><span>Plan actual</span></div>',
+        '      <div><strong id="ownerPlanUsage">–</strong><span>Minutos usados del periodo</span></div>',
+        '    </div>',
+        '  </aside>',
         '</div>',
-        '<div id="ownerDashboardAttention" class="owner-dashboard-attention hidden" aria-label="Señales que requieren atención">',
-        '  <strong class="owner-dashboard-attention-title">Necesita tu atención</strong>',
-        '  <a id="ownerOrdersAttentionChip" class="owner-dashboard-chip warn hidden" href="/?tab=sales#homeBusinessWorkspace"><strong id="ownerOrdersAttentionToday">–</strong> ventas por revisar</a>',
-        '  <span id="ownerHandoffsChip" class="owner-dashboard-chip hidden"><strong id="ownerHandoffsToday">–</strong> derivaciones</span>',
-        '  <span id="ownerFailuresChip" class="owner-dashboard-chip hidden"><strong id="ownerFailuresToday">–</strong> fallos de llamada</span>',
-        '  <span id="ownerBookingChangesChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingChangesToday">–</strong> reprogramadas</span>',
-        '  <span id="ownerBookingCancelsChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingCancelsToday">–</strong> canceladas</span>',
-        '</div>',
-        '<div id="ownerSevenDayRow" class="owner-seven-day hidden"><strong>Últimos 7 días</strong><span id="ownerSevenDaySummary">–</span></div>',
-        '<div id="ownerPlanRow" class="owner-plan-row hidden">',
-        '  <div><strong id="ownerPlanName">–</strong><span>Plan actual</span></div>',
-        '  <div><strong id="ownerPlanUsage">–</strong><span>Minutos usados del periodo</span></div>',
-        '</div>',
-        '<section class="owner-recent" aria-label="Actividad reciente">',
-        '  <h3>Actividad reciente</h3>',
-        '  <div id="homeRecentActivity" class="owner-activity-list"><div class="owner-empty">Cargando actividad…</div></div>',
-        '</section>',
         '<div hidden aria-hidden="true">',
+        '  <span id="homeConversationsToday">–</span>',
         '  <span id="homeCallsToday">–</span>',
         '  <span id="homeWhatsAppToday">–</span>',
         '  <span id="homeCustomersToday">–</span>',
@@ -445,6 +432,29 @@
         return labels[key] || String(value || '').replaceAll('_', ' ').toLowerCase();
     }
 
+    function labelCallResolution(value, status) {
+        const raw = String(value || '').trim();
+        const labels = {
+            INFORMATION_ONLY: 'Información entregada',
+            CUSTOMER_REGISTERED: 'Cliente registrado',
+            UNANSWERED_QUESTION: 'Pregunta pendiente registrada',
+            REQUEST_CREATED: 'Solicitud creada',
+            QUOTE_CREATED: 'Cotización creada',
+            LEAD_CREATED: 'Oportunidad registrada',
+            BOOKING_CREATED: 'Reserva creada',
+            BOOKING_RESCHEDULED: 'Reserva reprogramada',
+            BOOKING_CANCELLED: 'Reserva cancelada',
+            ORDER_CREATED: 'Pedido creado',
+            ORDER_CANCELLED: 'Pedido cancelado',
+            HUMAN_TRANSFERRED: 'Derivada a una persona',
+            FAILED: 'Llamada fallida'
+        };
+        const key = raw.toUpperCase();
+        if (labels[key]) return labels[key];
+        if (raw && !/^[A-Z0-9_]+$/.test(raw)) return raw;
+        return labelStage(status) || 'Atención telefónica';
+    }
+
     function setDashboardState(state, text, detail) {
         overview.dataset.state = state;
         overview.setAttribute('aria-busy', state === 'loading' ? 'true' : 'false');
@@ -459,34 +469,38 @@
         (operations.recentCalls || []).forEach(item => events.push({
             at: item.startedAt,
             kind: 'Llamada',
-            title: item.resolution || labelStage(item.status) || 'Atención telefónica'
+            title: labelCallResolution(item.resolution, item.status),
+            detail: item.callerNumber || ''
         }));
         (operations.recentRequests || []).forEach(item => events.push({
             at: item.createdAt,
             kind: 'Solicitud',
-            title: item.title || labelStage(item.status) || 'Solicitud del cliente'
+            title: item.title || labelStage(item.status) || 'Solicitud del cliente',
+            detail: item.contactName || item.description || ''
         }));
         ((pipeline && pipeline.items) || []).forEach(item => events.push({
             at: item.updatedAt,
             kind: item.product ? 'Venta' : 'Conversación',
-            title: [item.product || item.customerName || 'Actividad comercial', labelStage(item.commercialStage || item.paymentStatus)].filter(Boolean).join(' · ')
+            title: [item.product || item.customerName || 'Actividad comercial', labelStage(item.commercialStage || item.paymentStatus)].filter(Boolean).join(' · '),
+            detail: item.customerName || item.customerPhone || ''
         }));
 
         events.sort((a, b) => new Date(b.at || 0).getTime() - new Date(a.at || 0).getTime());
         recent.innerHTML = '';
         if (!events.length) {
-            recent.innerHTML = '<div class="owner-empty">Todavía no hay actividad reciente.</div>';
+            recent.innerHTML = '<div class="owner-empty" role="listitem">Todavía no hay actividad reciente.</div>';
             return 0;
         }
-        events.slice(0, 4).forEach(item => {
+        events.slice(0, 5).forEach(item => {
             const row = document.createElement('div');
             row.className = 'owner-activity-row';
+            row.setAttribute('role', 'listitem');
             const copy = document.createElement('div');
             const titleNode = document.createElement('strong');
             const meta = document.createElement('span');
             const time = document.createElement('time');
             titleNode.textContent = item.title;
-            meta.textContent = item.kind;
+            meta.textContent = [item.kind, item.detail].filter(Boolean).join(' · ');
             time.textContent = formatTime(item.at, timeZone);
             copy.append(titleNode, meta);
             row.append(copy, time);
@@ -507,13 +521,16 @@
         const bookings = pilotToday ? numeric(pilotToday.bookings) : numeric(operations.bookingsToday);
         const orders = pilotToday ? numeric(pilotToday.orders) : numeric(pipeline?.total);
         const openRequests = numeric(operations.openRequests);
+        const unanswered = numeric(operations.unansweredQuestions);
         const handoffs = pilotToday ? numeric(pilotToday.humanTransfers) : 0;
         const failures = pilotToday ? numeric(pilotToday.callFailures) : numeric(operations.callFailuresToday);
         const pipelineNeedsAction = numeric(pipeline?.needsAction);
 
+        overview.querySelector('#ownerCallsTodayPrimary').textContent = String(calls);
         overview.querySelector('#homeConversationsToday').textContent = String(conversations);
-        overview.querySelector('#homeConversationBreakdown').textContent =
-            String(calls) + ' llamadas' + (pilotToday ? ' · ' + String(whatsapp) + ' WhatsApp' : '');
+        overview.querySelector('#homeConversationBreakdown').textContent = pilotToday
+            ? String(whatsapp) + ' WhatsApp · ' + String(conversations) + ' conversaciones'
+            : String(conversations) + ' conversaciones registradas';
         overview.querySelector('#homeBookingsToday').textContent = String(bookings);
         overview.querySelector('#homeRequestsToday').textContent = String(openRequests);
         overview.querySelector('#ownerOrdersToday').textContent = String(orders);
@@ -523,8 +540,12 @@
 
         const ordersMetric = overview.querySelector('#ownerOrdersMetric');
         ordersMetric.classList.toggle('hidden', !(orders > 0 || numeric(pipeline?.total) > 0));
+        overview.querySelector('#ownerRequestsAttentionToday').textContent = String(openRequests);
+        overview.querySelector('#ownerRequestsAttentionChip').classList.toggle('hidden', openRequests <= 0);
         overview.querySelector('#ownerOrdersAttentionToday').textContent = String(pipelineNeedsAction);
         overview.querySelector('#ownerOrdersAttentionChip').classList.toggle('hidden', pipelineNeedsAction <= 0);
+        overview.querySelector('#ownerQuestionsAttentionToday').textContent = String(unanswered);
+        overview.querySelector('#ownerQuestionsAttentionChip').classList.toggle('hidden', unanswered <= 0);
 
         overview.querySelector('#ownerHandoffsToday').textContent = String(handoffs);
         overview.querySelector('#ownerFailuresToday').textContent = String(failures);
@@ -546,16 +567,22 @@
             });
             overview.querySelector('#ownerBookingChangesToday').textContent = String(rescheduled);
             overview.querySelector('#ownerBookingCancelsToday').textContent = String(cancelled);
-            overview.querySelector('#ownerBookingChangesChip').classList.toggle('hidden', rescheduled <= 0);
-            overview.querySelector('#ownerBookingCancelsChip').classList.toggle('hidden', cancelled <= 0);
-            overview.querySelector('#ownerBookingChangesChip').classList.toggle('warn', rescheduled > 0);
-            overview.querySelector('#ownerBookingCancelsChip').classList.toggle('warn', cancelled > 0);
+            overview.querySelector('#ownerBookingChangesChip').classList.add('hidden');
+            overview.querySelector('#ownerBookingCancelsChip').classList.add('hidden');
         } else {
             overview.querySelector('#ownerBookingChangesChip').classList.add('hidden');
             overview.querySelector('#ownerBookingCancelsChip').classList.add('hidden');
         }
 
-        const attentionCount = pipelineNeedsAction + handoffs + failures + rescheduled + cancelled;
+        const attentionCount = openRequests + pipelineNeedsAction + unanswered + handoffs + failures;
+        const attentionPanel = overview.querySelector('#ownerAttentionPanel');
+        const attentionTitle = overview.querySelector('#ownerAttentionTitle');
+        const attentionSummary = overview.querySelector('#ownerAttentionSummary');
+        attentionPanel.dataset.state = attentionCount > 0 ? 'attention' : 'clear';
+        attentionTitle.textContent = attentionCount > 0 ? 'Necesita tu atención' : 'Todo bajo control';
+        attentionSummary.textContent = attentionCount > 0
+            ? 'Hay asuntos que requieren revisión.'
+            : 'No hay pendientes críticos detectados.';
         overview.querySelector('#ownerDashboardAttention').classList.toggle('hidden', attentionCount <= 0);
 
         const sevenDay = pilotMetrics?.last7Days || null;
@@ -600,7 +627,7 @@
             minimumFractionDigits: 2, maximumFractionDigits: 4
         }).format(numeric(operations.estimatedCallCostTodayUsd));
 
-        const totalSignal = conversations + bookings + orders + openRequests + handoffs + failures + rescheduled + cancelled;
+        const totalSignal = conversations + bookings + orders + openRequests + unanswered + handoffs + failures;
         if (totalSignal === 0 && recentCount === 0) {
             setDashboardState('empty', 'SIN ACTIVIDAD', 'Aún no hay actividad comercial hoy.');
         } else {
@@ -610,13 +637,22 @@
 
     function renderError() {
         setDashboardState('error', 'NO DISPONIBLE', 'No pudimos actualizar las métricas. Usa “Actualizar estado” para reintentar.');
-        recent.innerHTML = '<div class="owner-empty">La actividad reciente no está disponible.</div>';
+        const attentionPanel = overview.querySelector('#ownerAttentionPanel');
+        attentionPanel.dataset.state = 'error';
+        overview.querySelector('#ownerAttentionTitle').textContent = 'Atención no verificada';
+        overview.querySelector('#ownerAttentionSummary').textContent = 'No pudimos verificar qué requiere atención.';
+        overview.querySelector('#ownerDashboardAttention').classList.add('hidden');
+        recent.innerHTML = '<div class="owner-empty" role="listitem">La actividad reciente no está disponible.</div>';
     }
 
     async function loadOperational(force = false) {
         if (loading || dashboard.classList.contains('hidden') || !isReady() || !sessionStorage.getItem('helvoca_access_token')) return;
         if (!force && Date.now() - lastLoadedAt < 1500) return;
         loading = true;
+        overview.querySelector('#ownerAttentionPanel').dataset.state = 'loading';
+        overview.querySelector('#ownerAttentionTitle').textContent = 'Revisando prioridades';
+        overview.querySelector('#ownerAttentionSummary').textContent = 'Revisando pendientes…';
+        overview.querySelector('#ownerDashboardAttention').classList.add('hidden');
         setDashboardState('loading', 'CARGANDO', 'Actualizando actividad confirmada…');
         try {
             let canReadAudit = false;

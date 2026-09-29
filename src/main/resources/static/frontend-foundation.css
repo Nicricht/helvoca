@@ -1,0 +1,685 @@
+/*
+ * RecepVoz canonical frontend foundation
+ * Dark-first shared visual contract. Feature styles may own composition,
+ * but shared color, surface, control and interaction primitives live here.
+ */
+
+:root {
+  color-scheme: dark;
+
+  --rv-bg-canvas: #06111c;
+  --rv-bg-shell: #081825;
+  --rv-surface-1: #0b1b29;
+  --rv-surface-2: #102434;
+  --rv-surface-3: #153047;
+  --rv-surface-hover: #183b52;
+
+  --rv-border-subtle: #163549;
+  --rv-border-default: #1f465d;
+  --rv-border-strong: #2b617c;
+
+  --rv-text-primary: #f4fbff;
+  --rv-text-secondary: #a7bdcc;
+  --rv-text-tertiary: #6f8b9e;
+  --rv-text-disabled: #536c7d;
+
+  --rv-accent: #16d9f5;
+  --rv-accent-hover: #42e3f7;
+  --rv-accent-soft: rgba(22, 217, 245, .12);
+  --rv-accent-border: rgba(22, 217, 245, .34);
+
+  --rv-ai-accent: #8b5cf6;
+  --rv-ai-accent-hover: #a678ff;
+  --rv-ai-accent-soft: rgba(139, 92, 246, .14);
+  --rv-ai-accent-border: rgba(139, 92, 246, .34);
+  --rv-sidebar-width: 220px;
+
+  --rv-success: #3ddc97;
+  --rv-warning: #f5b94c;
+  --rv-danger: #ff667d;
+  --rv-info: #46bff7;
+
+  --rv-space-1: 4px;
+  --rv-space-2: 8px;
+  --rv-space-3: 12px;
+  --rv-space-4: 16px;
+  --rv-space-5: 20px;
+  --rv-space-6: 24px;
+  --rv-space-8: 32px;
+  --rv-space-10: 40px;
+  --rv-space-12: 48px;
+  --rv-space-16: 64px;
+
+  --rv-radius-sm: 8px;
+  --rv-radius-md: 12px;
+  --rv-radius-lg: 16px;
+  --rv-radius-xl: 20px;
+  --rv-radius-pill: 999px;
+
+  --rv-shadow-sm: 0 8px 24px rgba(0, 0, 0, .20);
+  --rv-shadow-md: 0 18px 48px rgba(0, 0, 0, .28);
+  --rv-shadow-overlay: 0 28px 88px rgba(0, 0, 0, .46);
+  --rv-focus-ring: 0 0 0 3px rgba(22, 217, 245, .22);
+
+  /* Compatibility aliases for the existing static frontend. */
+  --bg: var(--rv-bg-canvas);
+  --bg-elevated: var(--rv-bg-shell);
+  --surface: var(--rv-surface-1);
+  --surface-2: var(--rv-surface-2);
+  --surface-3: var(--rv-surface-3);
+  --surface-soft: rgba(255,255,255,.035);
+  --surface-hover: var(--rv-surface-hover);
+  --border: var(--rv-border-default);
+  --border-strong: var(--rv-border-strong);
+  --text: var(--rv-text-primary);
+  --text-strong: #ffffff;
+  --muted: var(--rv-text-secondary);
+  --subtle: var(--rv-text-tertiary);
+  --accent: var(--rv-accent);
+  --accent-hover: var(--rv-accent-hover);
+  --accent-strong: #08b9d4;
+  --accent-2: var(--rv-ai-accent);
+  --accent-soft: var(--rv-accent-soft);
+  --success: var(--rv-success);
+  --warning: var(--rv-warning);
+  --danger: var(--rv-danger);
+  --info: var(--rv-info);
+  --focus-ring: var(--rv-focus-ring);
+  --radius-sm: var(--rv-radius-sm);
+  --radius-md: var(--rv-radius-md);
+  --radius-lg: var(--rv-radius-lg);
+  --radius-xl: var(--rv-radius-xl);
+  --radius-pill: var(--rv-radius-pill);
+}
+
+html {
+  background: var(--rv-bg-canvas);
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--rv-bg-canvas);
+  color: var(--rv-text-primary);
+}
+
+body.home-page:has(#dashboardView:not(.hidden)),
+body.settings-page,
+body.inventory-page {
+  background: var(--rv-bg-canvas);
+  color: var(--rv-text-primary);
+}
+
+::selection {
+  background: rgba(128,107,255,.30);
+  color: #fff;
+}
+
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--rv-accent-hover);
+  outline-offset: 2px;
+  box-shadow: var(--rv-focus-ring);
+}
+
+:where(button, .button, input, textarea, select):disabled,
+:where(.button, [role="button"])[aria-disabled="true"] {
+  opacity: .52;
+  cursor: not-allowed;
+  transform: none;
+  filter: saturate(.65);
+}
+
+a {
+  color: inherit;
+}
+
+.brand,
+h1, h2, h3,
+.dashboard-heading h1,
+.home-business-head h2,
+.inventory-dialog-head h2 {
+  color: var(--rv-text-primary);
+}
+
+.subtitle,
+.muted,
+.muted-text,
+.dashboard-heading p,
+.section-heading p,
+.home-business-head p,
+.form-hint,
+.hint {
+  color: var(--rv-text-secondary);
+}
+
+.eyebrow {
+  color: #bbb4ff;
+}
+
+body.home-page:has(#dashboardView:not(.hidden)) .topbar,
+body.settings-page .topbar,
+body.inventory-page .topbar,
+.operations-shell .operations-top,
+.sim-grid ~ .topbar,
+body > .topbar {
+  border-color: var(--rv-border-subtle);
+  background-color: rgba(7, 10, 16, .88);
+}
+
+body.home-page:has(#dashboardView:not(.hidden)) .card,
+body.settings-page .card,
+body.inventory-page .card,
+.card,
+.panel,
+.home-business-panel,
+.inventory-workspace,
+.inventory-alerts-panel,
+.inventory-restock-panel {
+  border-color: var(--rv-border-default);
+  background-color: var(--rv-surface-1);
+  background-image: none;
+  color: var(--rv-text-primary);
+  box-shadow: var(--rv-shadow-sm);
+}
+
+#firstUserOnboarding {
+  border-color: var(--rv-accent-border);
+  background: var(--rv-surface-1);
+  color: var(--rv-text-primary);
+}
+
+.ai-onboarding-card {
+  border-color: var(--rv-accent-border) !important;
+  background: var(--rv-surface-1) !important;
+  color: var(--rv-text-primary);
+  box-shadow: var(--rv-shadow-sm) !important;
+}
+
+.status-card,
+.first-user-step,
+.repeat-row,
+.agent-toggle,
+.agent-capability,
+.proposal-summary-item,
+.proposal-box,
+.home-business-mobile-card,
+.home-simple-row,
+.home-detail-facts > div,
+.home-detail-fact-link,
+.home-detail-note,
+.home-detail-section,
+.home-detail-message,
+.inventory-switch {
+  border-color: var(--rv-border-subtle);
+  background-color: var(--rv-surface-2);
+  color: var(--rv-text-primary);
+}
+
+.status-card.done,
+.first-user-step.complete,
+.home-detail-message.assistant {
+  border-color: rgba(69,216,154,.24);
+  background-color: rgba(69,216,154,.07);
+}
+
+.ready-banner,
+.badge.online,
+.home-pill {
+  border-color: rgba(69,216,154,.30);
+  background-color: rgba(69,216,154,.10);
+  color: #9df0ca;
+}
+
+.next-banner,
+.home-business-tab.active,
+.ai-chip {
+  border-color: var(--rv-accent-border);
+  background-color: var(--rv-accent-soft);
+  color: #ddd9ff;
+}
+
+.home-pill.bad,
+.message.error,
+.operations-error {
+  border-color: rgba(255,113,135,.30);
+  background-color: rgba(255,113,135,.09);
+  color: #ffa0af;
+}
+
+.badge.warning {
+  border-color: rgba(242,184,100,.32);
+  background-color: rgba(242,184,100,.10);
+  color: #ffd79e;
+}
+
+.button,
+button,
+input,
+textarea,
+select {
+  transition:
+    border-color .14s ease,
+    background-color .14s ease,
+    color .14s ease,
+    box-shadow .14s ease,
+    opacity .14s ease,
+    transform .14s ease;
+}
+
+body.home-page:has(#dashboardView:not(.hidden)) input,
+body.home-page:has(#dashboardView:not(.hidden)) textarea,
+body.home-page:has(#dashboardView:not(.hidden)) select,
+body.settings-page input,
+body.settings-page textarea,
+body.settings-page select,
+body.inventory-page input,
+body.inventory-page textarea,
+body.inventory-page select,
+.sim-grid input,
+.sim-grid textarea,
+.sim-grid select,
+input,
+textarea,
+select {
+  border-color: var(--rv-border-default);
+  background-color: #0b111a;
+  color: var(--rv-text-primary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--rv-text-tertiary);
+  opacity: 1;
+}
+
+:where(input, textarea, select):hover:not(:disabled) {
+  border-color: var(--rv-border-strong);
+}
+
+:where(input, textarea, select):focus,
+:where(input, textarea, select):focus-visible {
+  border-color: var(--rv-accent);
+  background-color: #0c131e;
+}
+
+.button.primary,
+.home-booking-primary,
+.home-order-primary {
+  border-color: rgba(128,107,255,.46);
+  background: var(--rv-accent);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(128,107,255,.16);
+}
+
+.button.primary:hover,
+.home-booking-primary:hover,
+.home-order-primary:hover {
+  background: var(--rv-accent-hover);
+}
+
+.button.secondary {
+  border-color: rgba(69,216,154,.28);
+  background-color: rgba(69,216,154,.09);
+  color: #9df0ca;
+}
+
+.button.ghost,
+.inventory-dialog-close,
+.home-filter-clear {
+  border-color: var(--rv-border-default);
+  background-color: rgba(255,255,255,.035);
+  color: #d8e0eb;
+}
+
+.button.ghost:hover,
+.inventory-dialog-close:hover,
+.home-filter-clear:hover {
+  border-color: var(--rv-border-strong);
+  background-color: var(--rv-surface-hover);
+  color: #fff;
+}
+
+.app-nav a,
+.inventory-nav a,
+.topbar nav a {
+  color: var(--rv-text-secondary);
+}
+
+.app-nav a:hover,
+.inventory-nav a:hover,
+.topbar nav a:hover {
+  background-color: rgba(255,255,255,.045);
+  color: var(--rv-text-primary);
+}
+
+.app-nav a.active,
+.inventory-nav a.active,
+.topbar nav a.active,
+.app-nav a[aria-current="page"],
+.inventory-nav a[aria-current="page"] {
+  border-color: var(--rv-accent-border);
+  background-color: var(--rv-accent-soft);
+  color: #ddd9ff;
+}
+
+.home-business-table-shell,
+.inventory-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border-color: var(--rv-border-subtle);
+  background-color: var(--rv-surface-1);
+  scrollbar-color: var(--rv-border-strong) transparent;
+}
+
+table,
+.home-business-table,
+.inventory-table {
+  color: var(--rv-text-primary);
+}
+
+thead th,
+.home-business-table th,
+.inventory-table th {
+  border-bottom-color: var(--rv-border-default);
+  background-color: var(--rv-surface-2);
+  color: var(--rv-text-secondary);
+}
+
+tbody td,
+.home-business-table td,
+.inventory-table td {
+  border-bottom-color: var(--rv-border-subtle);
+  color: #dce4ef;
+}
+
+tbody tr:hover,
+.home-business-table tbody tr:hover,
+.inventory-table tbody tr:hover {
+  background-color: rgba(128,107,255,.055);
+}
+
+dialog,
+.inventory-dialog,
+.home-detail-drawer {
+  color: var(--rv-text-primary);
+  border-color: var(--rv-border-default);
+  background-color: var(--rv-surface-1);
+  box-shadow: var(--rv-shadow-overlay);
+}
+
+dialog,
+.inventory-dialog {
+  width: min(680px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+}
+
+dialog::backdrop,
+.inventory-dialog::backdrop {
+  background: rgba(2,5,9,.74);
+  backdrop-filter: blur(5px);
+}
+
+.home-detail-order-actions {
+  background-color: rgba(13,19,29,.96);
+}
+
+.sim-grid .panel,
+.trace-panel,
+.safe-note,
+.chat,
+.composer {
+  border-color: var(--rv-border-default);
+  background-color: var(--rv-surface-1);
+  color: var(--rv-text-primary);
+}
+
+.safe-note {
+  background-color: rgba(69,216,154,.07);
+  border-color: rgba(69,216,154,.24);
+}
+
+.chat .empty,
+.trace-list .empty {
+  color: var(--rv-text-secondary);
+}
+
+.operations-note {
+  border-color: var(--rv-border-default);
+  background-color: var(--rv-surface-1);
+  color: var(--rv-text-secondary);
+}
+
+@media (min-width: 981px) {
+  body.home-page:has(#dashboardView:not(.hidden)) #primaryNav,
+  body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav {
+    border-color: var(--rv-border-default);
+    background-color: rgba(13,19,29,.97);
+    box-shadow: var(--rv-shadow-md);
+  }
+}
+
+@media (max-width: 980px) {
+  .shell {
+    width: min(100% - 28px, 100%);
+  }
+
+  #primaryNav,
+  .app-nav,
+  .inventory-nav,
+  .topbar nav {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+  }
+
+  .topbar {
+    gap: var(--rv-space-3);
+  }
+
+  .home-business-table-shell,
+  .inventory-table-wrap {
+    width: 100%;
+  }
+}
+
+@media (max-width: 620px) {
+  .shell {
+    width: min(100% - 20px, 100%);
+  }
+
+  main {
+    padding-top: var(--rv-space-5);
+  }
+
+  .card,
+  .panel,
+  .home-business-panel,
+  .inventory-workspace,
+  .inventory-alerts-panel,
+  .inventory-restock-panel {
+    border-radius: var(--rv-radius-md);
+  }
+
+  .button,
+  button,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  #primaryNav,
+  .app-nav,
+  .inventory-nav {
+    gap: var(--rv-space-1);
+  }
+
+  #primaryNav a,
+  .app-nav a,
+  .inventory-nav a {
+    flex: 0 0 auto;
+    min-height: 42px;
+  }
+
+  dialog,
+  .inventory-dialog {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    margin: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+
+/* Integration typography floor for primary customer navigation. */
+.app-nav a,.inventory-nav a,.topbar nav a,.account-nav a,.rv-nav a{font-size:14px}
+@media(min-width:981px){
+  body.home-page:has(#dashboardView:not(.hidden)) .topbar>div:first-child{pointer-events:none}
+body.home-page:has(#dashboardView:not(.hidden)) #primaryNav a,body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav a{font-size:14px}}
+
+/* Final visual polish: dark navy product shell with cyan action authority.
+   Violet is reserved for AI-specific emphasis. */
+body{background:var(--rv-bg-canvas);color:var(--rv-text-primary);-webkit-font-smoothing:antialiased}
+::selection{background:rgba(22,217,245,.24);color:#fff}
+.eyebrow{color:#67e9fa}
+.brand,.rv-brand strong,.account-brand{letter-spacing:.02em}
+.card,.panel,.home-business-panel,.inventory-workspace,.inventory-alerts-panel,.inventory-restock-panel,.account-plan-card,.account-identity-card,.usage-panel{border-color:var(--rv-border-subtle);background:var(--rv-surface-1);background-image:none;box-shadow:none}
+.button.primary,.home-booking-primary,.home-order-primary,#startBtn,#sendBtn{border-color:rgba(22,217,245,.44);background:var(--rv-accent);color:#021116;box-shadow:0 8px 22px rgba(22,217,245,.10)}
+.button.primary:hover,.home-booking-primary:hover,.home-order-primary:hover,#startBtn:hover:not(:disabled),#sendBtn:hover:not(:disabled){background:var(--rv-accent-hover)}
+.button.secondary{border-color:rgba(22,217,245,.24);background:rgba(22,217,245,.075);color:#c9f9ff}
+.button.secondary:hover{border-color:rgba(22,217,245,.38);background:rgba(22,217,245,.12)}
+.ai-chip{border-color:var(--rv-ai-accent-border);background:var(--rv-ai-accent-soft);color:#dfd2ff}
+.ai-onboarding-card{border-color:var(--rv-ai-accent-border)!important}
+.next-banner,.home-business-tab.active{border-color:var(--rv-accent-border);background:var(--rv-accent-soft);color:#c8f8ff}
+input,textarea,select{background:#081724;border-color:var(--rv-border-default)}
+:where(input,textarea,select):focus,:where(input,textarea,select):focus-visible{border-color:var(--rv-accent);background:#0a1b29}
+.app-nav a.active,.inventory-nav a.active,.account-nav a.active,.rv-nav a.active,.topbar nav a.active,.app-nav a[aria-current="page"],.inventory-nav a[aria-current="page"],.account-nav a[aria-current="page"],.rv-nav a[aria-current="page"]{border-color:var(--rv-accent-border);background:var(--rv-accent-soft);color:#d7fbff}
+tbody tr:hover,.home-business-table tbody tr:hover,.inventory-table tbody tr:hover{background-color:rgba(22,217,245,.045)}
+
+body.home-page:has(#authView:not(.hidden)) .auth-grid{grid-template-columns:minmax(0,1.3fr) minmax(330px,.7fr);gap:16px;max-width:1240px;padding-top:20px}
+body.home-page:has(#authView:not(.hidden)) .hero-card{min-height:520px;padding:clamp(34px,5vw,62px);border-color:rgba(22,217,245,.18);background:#081825}
+body.home-page:has(#authView:not(.hidden)) .hero-card h1{max-width:680px;font-size:clamp(42px,5vw,66px)}
+body.home-page:has(#authView:not(.hidden)) .hero-card>p{max-width:620px;font-size:17px}
+body.home-page:has(#authView:not(.hidden)) .rv-voice-preview{margin-top:34px;border-color:rgba(22,217,245,.24);background:#0b2131;box-shadow:none}
+body.home-page:has(#authView:not(.hidden)) .auth-card{align-self:stretch;padding:30px;background:var(--rv-surface-1)}
+body.home-page:has(#authView:not(.hidden)) .public-company-card{grid-column:1/-1;background:#081825;box-shadow:none}
+
+@media(min-width:981px){
+  body.home-page:has(#dashboardView:not(.hidden)) .shell,body.settings-page:has(#dashboardView:not(.hidden)) .shell,body.inventory-page .shell,body.account-page .shell{width:100%;max-width:none;margin:0;padding-bottom:56px}
+  body.home-page:has(#dashboardView:not(.hidden)) .topbar,body.settings-page:has(#dashboardView:not(.hidden)) .topbar,body.inventory-page .topbar,body.account-page .topbar,body.conversations-page .rv-topbar,body.simulator-page>.topbar{position:sticky;z-index:30;top:0;min-height:64px;padding:10px 24px 10px calc(var(--rv-sidebar-width) + 58px);border-bottom:1px solid var(--rv-border-subtle);background:rgba(6,17,28,.96);box-shadow:none;backdrop-filter:blur(14px)}
+  body.home-page:has(#dashboardView:not(.hidden)) .topbar,body.settings-page:has(#dashboardView:not(.hidden)) .topbar,body.inventory-page .topbar,body.account-page .topbar{justify-content:flex-end}
+  body.home-page:has(#dashboardView:not(.hidden)) .topbar>div:first-child,body.settings-page:has(#dashboardView:not(.hidden)) .topbar>div:first-child,body.inventory-page .topbar>div:first-child,body.account-page .topbar>div:first-child,body.simulator-page>.topbar>div:first-child,body.conversations-page .rv-brand{position:fixed;z-index:42;top:16px;left:24px;width:190px}
+  body.conversations-page .rv-brand-mark{width:34px;height:34px;border-radius:10px;background:var(--rv-accent);color:#021116;box-shadow:none}
+  body.home-page:has(#dashboardView:not(.hidden)) #primaryNav,body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav,body.inventory-page .inventory-nav,body.account-page .account-nav,body.conversations-page .rv-nav,body.simulator-page>.topbar nav{position:fixed;z-index:35;top:88px;bottom:18px;left:18px;width:var(--rv-sidebar-width);height:auto;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:5px;padding:10px;overflow-y:auto;overflow-x:hidden;border:1px solid var(--rv-border-subtle);border-radius:14px;background:#081825;box-shadow:none}
+  body.home-page:has(#dashboardView:not(.hidden)) #primaryNav a,body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav a,body.inventory-page .inventory-nav a,body.account-page .account-nav a,body.conversations-page .rv-nav a,body.simulator-page>.topbar nav a{width:100%;min-height:42px;display:inline-flex;align-items:center;justify-content:flex-start;padding:0 12px;border:1px solid transparent;border-radius:9px;font-size:14px;font-weight:720;text-decoration:none;white-space:nowrap}
+  body.home-page:has(#dashboardView:not(.hidden)) #primaryNav a.active,body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav a.active,body.inventory-page .inventory-nav a.active,body.account-page .account-nav a.active,body.conversations-page .rv-nav a.active,body.simulator-page>.topbar nav a.active{border-color:rgba(22,217,245,.22);background:rgba(22,217,245,.12);color:#e4fcff;box-shadow:inset 3px 0 0 var(--rv-accent)}
+  body.home-page:has(#dashboardView:not(.hidden)) #dashboardView,body.settings-page:has(#dashboardView:not(.hidden)) #dashboardView,body.inventory-page .inventory-main,body.account-page .account-main,body.conversations-page .rv-shell,body.simulator-page main{width:auto;max-width:1440px;margin-left:calc(var(--rv-sidebar-width) + 52px);margin-right:24px}
+  body.conversations-page .rv-shell,body.simulator-page main{padding-top:30px}
+}
+
+.dashboard-heading h1,.inventory-heading h1,.rv-heading h1,.account-heading h1{font-size:clamp(30px,3vw,38px);line-height:1.08;letter-spacing:-.035em}
+.dashboard-heading p,.inventory-heading p,.rv-heading p:not(.eyebrow),.account-heading p:not(.eyebrow){font-size:14px;line-height:1.55}
+#dashboardView #operationalOverview{padding:0;border:0;background:transparent;box-shadow:none}
+#operationalOverview .owner-dashboard-head{margin-bottom:16px}
+#operationalOverview .owner-dashboard-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.72fr);gap:14px}
+#operationalOverview .home-metrics{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+#operationalOverview .home-metric{min-height:118px;padding:17px;border:1px solid var(--rv-border-subtle);border-radius:13px;background:var(--rv-surface-1);box-shadow:none}
+#operationalOverview a.home-metric:hover{border-color:rgba(22,217,245,.35);background:var(--rv-surface-2)}
+#operationalOverview .owner-recent,#operationalOverview .owner-attention-panel,#operationalOverview .owner-quick-actions{border:1px solid var(--rv-border-subtle);border-radius:13px;background:var(--rv-surface-1)}
+#operationalOverview .owner-recent{margin-top:12px;padding:16px}
+#operationalOverview .owner-dashboard-side{gap:10px;padding-left:0;border-left:0}
+#operationalOverview .owner-attention-panel,#operationalOverview .owner-quick-actions{padding:16px}
+#operationalOverview .owner-quick-actions{border-top:1px solid var(--rv-border-subtle)}
+#operationalOverview .owner-quick-grid a{border-color:var(--rv-border-subtle);background:var(--rv-surface-2)}
+.home-business-tabs{gap:4px;padding:4px;border:1px solid var(--rv-border-subtle);border-radius:12px;background:#081825}
+.home-business-tab{border-radius:9px}
+.home-business-tab.active{border-color:rgba(22,217,245,.24);background:rgba(22,217,245,.11);color:#e3fcff}
+.home-business-panel{border-radius:14px}
+
+body.conversations-page .conversation-toolbar{padding:10px;border:1px solid var(--rv-border-subtle);border-radius:13px;background:#081825}
+body.conversations-page .filter-chip.active,body.conversations-page .filter-chip[aria-pressed="true"]{border-color:rgba(22,217,245,.32);background:rgba(22,217,245,.11);color:#d9fbff}
+body.conversations-page .conversation-layout{grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:12px}
+body.conversations-page .panel{border-radius:14px;box-shadow:none}
+body.conversations-page .conversation-row.active{background:rgba(22,217,245,.065);box-shadow:inset 3px 0 0 var(--rv-accent)}
+body.conversations-page .channel-badge:not(.whatsapp){background:var(--rv-ai-accent-soft);color:#ded2ff}
+body.conversations-page .transcript-turn.assistant .speaker-avatar,body.conversations-page .transcript-turn.assistant .turn-card{border-color:var(--rv-ai-accent-border);background:rgba(139,92,246,.08)}
+
+.inventory-kpis{gap:10px}
+.inventory-kpi{min-height:106px;border-color:var(--rv-border-subtle);border-radius:13px;background:var(--rv-surface-1)}
+.inventory-workspace,.inventory-alerts-panel,.inventory-restock-panel{border-radius:14px}
+.inventory-toolbar{padding:12px;border-bottom:1px solid var(--rv-border-subtle);background:#081825}
+.inventory-table th{background:#0d2130}
+.inventory-row-actions .button{border-radius:9px}
+
+.ux-config-nav{gap:4px;padding:4px;border:1px solid var(--rv-border-subtle);border-radius:12px;background:#081825}
+.ux-config-nav [data-settings-section]{min-height:40px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--rv-text-secondary);font-size:14px}
+.ux-config-nav [data-settings-section][aria-current="page"]{border-color:rgba(22,217,245,.24);background:rgba(22,217,245,.11);color:#e3fcff}
+.ux-config-panel{border-color:var(--rv-border-subtle);border-radius:14px;background:var(--rv-surface-1)}
+.ux-config-panel label,#configKnowledgePanel .knowledge-row label,#configServicesPanel .service-row label{font-size:13px!important}
+#configKnowledgePanel #addKnowledgeBtn,#configServicesPanel #addServiceBtn,#configPermissionsPanel .agent-capability{font-size:13px!important}
+
+.account-grid{grid-template-columns:minmax(0,1.55fr) minmax(280px,.7fr);gap:12px}
+.account-plan-card,.account-identity-card,.usage-panel{border-radius:14px}
+.account-plan-card{border-color:rgba(22,217,245,.22)}
+.account-progress{border-color:rgba(22,217,245,.18);background:#071521}
+.account-progress span{background:var(--rv-accent)}
+.usage-item,.account-facts div,.account-note{border-color:var(--rv-border-subtle);background:var(--rv-surface-2)}
+
+@media(max-width:980px){
+  body.home-page:has(#dashboardView:not(.hidden)) .topbar,body.settings-page:has(#dashboardView:not(.hidden)) .topbar,body.inventory-page .topbar,body.account-page .topbar,body.conversations-page .rv-topbar,body.simulator-page>.topbar{position:sticky;padding:10px 14px;align-items:flex-start;flex-wrap:wrap;gap:10px}
+  body.home-page:has(#dashboardView:not(.hidden)) .topbar>div:first-child,body.settings-page:has(#dashboardView:not(.hidden)) .topbar>div:first-child,body.inventory-page .topbar>div:first-child,body.account-page .topbar>div:first-child,body.simulator-page>.topbar>div:first-child,body.conversations-page .rv-brand{position:static;width:auto}
+  body.home-page:has(#dashboardView:not(.hidden)) #primaryNav,body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav,body.inventory-page .inventory-nav,body.account-page .account-nav,body.conversations-page .rv-nav,body.simulator-page>.topbar nav{position:static;width:100%;height:auto;display:flex;flex-direction:row;align-items:center;gap:4px;padding:0 0 2px;overflow-x:auto;overflow-y:hidden;border:0;border-radius:0;background:transparent;box-shadow:none}
+  body.home-page:has(#dashboardView:not(.hidden)) #primaryNav a,body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav a,body.inventory-page .inventory-nav a,body.account-page .account-nav a,body.conversations-page .rv-nav a,body.simulator-page>.topbar nav a{width:auto;flex:0 0 auto;min-height:42px;padding:0 11px}
+  body.home-page:has(#dashboardView:not(.hidden)) #dashboardView,body.settings-page:has(#dashboardView:not(.hidden)) #dashboardView,body.inventory-page .inventory-main,body.account-page .account-main,body.conversations-page .rv-shell,body.simulator-page main{width:auto;max-width:none;margin-left:14px;margin-right:14px}
+  #operationalOverview .owner-dashboard-layout{grid-template-columns:1fr}
+  #operationalOverview .owner-dashboard-side{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #operationalOverview .home-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:620px){
+  body.home-page:has(#authView:not(.hidden)) .auth-grid{grid-template-columns:1fr;padding-top:8px}
+  body.home-page:has(#authView:not(.hidden)) .hero-card{min-height:auto;padding:28px 22px}
+  body.home-page:has(#authView:not(.hidden)) .hero-card h1{font-size:42px}
+  #operationalOverview .owner-dashboard-side,.account-grid{grid-template-columns:1fr}
+  #operationalOverview .home-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.conversations-page .conversation-toolbar{padding:8px}
+}
+
+/* Compact conversations containment: keep horizontal nav scrolling inside its rail. */
+@media(max-width:980px){
+  body.conversations-page .conversation-layout{grid-template-columns:1fr}
+  body.conversations-page .rv-topbar{width:100%;max-width:100%;min-width:0}
+  body.conversations-page .rv-topbar>*{max-width:100%;min-width:0}
+  body.conversations-page .rv-nav{width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-inline:contain}
+  body.conversations-page .rv-heading,
+  body.conversations-page .rv-heading-actions,
+  body.conversations-page .conversation-toolbar,
+  body.conversations-page .filter-group{max-width:100%;min-width:0}
+}
+@media(max-width:620px){
+  body.conversations-page .rv-heading-actions{width:100%;display:flex;flex-wrap:wrap}
+  body.conversations-page .conversation-toolbar{overflow:hidden}
+  body.conversations-page .filter-group{width:100%;overflow-x:auto}
+}
+
+/* High-specificity legacy states may not override the cyan product navigation. */
+body.settings-page:has(#configuration:target) .app-nav .nav-config,
+body.home-page:has(#dashboardView:not(.hidden)):has(#configuration:target) .app-nav .nav-config{
+  border-color:rgba(22,217,245,.22);
+  background:rgba(22,217,245,.12);
+  color:#e4fcff;
+  box-shadow:inset 3px 0 0 var(--rv-accent);
+}
+

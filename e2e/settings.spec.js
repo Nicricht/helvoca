@@ -289,9 +289,11 @@ test('settings exposes the Mi negocio sections with simple navigation', async ({
 
   await expect(page.locator('.dashboard-heading h1')).toHaveText('Mi negocio');
   const nav = page.locator('#advancedPanel .ux-config-nav');
-  await expect(nav.getByRole('button')).toHaveText([
-    '🏪 Negocio', '✂️ Servicios', '📅 Horarios', '💬 Respuestas', '🤖 Recepcionista', '📞 Canales'
+  await expect(nav.locator('[data-settings-section]')).toContainText([
+    'Negocio', 'Servicios', 'Horarios', 'Recepcionista'
   ]);
+  await expect(page.locator('#uxAdvancedSettings')).toContainText('Respuestas');
+  await expect(page.locator('#uxAdvancedSettings')).toContainText('Canales');
   await expect(page.locator('#configBusinessPanel')).toBeVisible();
   await expect(page.locator('#configAgentPanel')).toBeHidden();
 
@@ -680,4 +682,121 @@ test('settings lets operators review schedule exceptions without mutation contro
   await expect(page.locator('[data-exception-date="2026-12-25"]').getByRole('button', { name: 'Eliminar' })).toHaveCount(0);
   expect(state.scheduleExceptionPuts).toEqual([]);
   expect(state.scheduleExceptionDeletes).toEqual([]);
+});
+
+
+test('settings presents human setup categories with accessible selected state', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockSettings(page);
+  await page.goto('/settings.html');
+
+  const nav = page.locator('.ux-config-nav');
+  await expect(nav).toBeVisible();
+
+  const primary = nav.locator('[data-settings-section]');
+  await expect(primary).toContainText(['Negocio', 'Servicios', 'Horarios', 'Recepcionista']);
+
+  const selected = nav.locator('[aria-current="page"]');
+  await expect(selected).toHaveCount(1);
+  await expect(selected).toContainText('Negocio');
+
+  await expect(page.locator('#uxAdvancedSettings')).toBeVisible();
+  await expect(page.locator('#uxAdvancedSettings')).toContainText('Respuestas');
+  await expect(page.locator('#uxAdvancedSettings')).toContainText('Canales');
+});
+
+test('settings deep link opens the requested onboarding section', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockSettings(page);
+  await page.goto('/settings.html?section=hours');
+
+  await expect(page.locator('#configHoursPanel')).toBeVisible();
+  await expect(page.locator('#configBusinessPanel')).toBeHidden();
+  await expect(page.locator('.ux-config-nav [data-settings-section="hours"]')).toHaveAttribute('aria-current', 'page');
+
+  await page.locator('.ux-config-nav [data-settings-section="receptionist"]').click();
+  await expect(page.locator('#configAgentPanel')).toBeVisible();
+  await expect(page).toHaveURL(/section=receptionist/);
+});
+
+
+test('settings validation opens Services when no valid service remains', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockSettings(page);
+  await page.goto('/settings.html');
+
+  await page.locator('.ux-config-nav [data-settings-section="services"]').click();
+  await page.locator('#servicesList [data-field="name"]').fill('');
+  await page.locator('.ux-config-nav [data-settings-section="business"]').click();
+  await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
+
+  await expect(page.locator('#setupMessage')).toContainText('Añade al menos un servicio');
+  await expect(page.locator('#configServicesPanel')).toBeVisible();
+  await expect(page.locator('.ux-config-nav [data-settings-section="services"]')).toHaveAttribute('aria-current', 'page');
+});
+
+test('settings validation opens Horarios when no attention interval remains', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockSettings(page);
+  await page.goto('/settings.html');
+  await expect(page.locator('#hoursGrid .interval-row')).toHaveCount(1);
+
+  await page.evaluate(() => {
+    const hours = document.querySelector('#hoursGrid');
+    if (hours) hours.innerHTML = '';
+  });
+  await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
+
+  await expect(page.locator('#setupMessage')).toContainText('Configura al menos un intervalo');
+  await expect(page.locator('#configHoursPanel')).toBeVisible();
+  await expect(page.locator('.ux-config-nav [data-settings-section="hours"]')).toHaveAttribute('aria-current', 'page');
+});
+
+test('settings validation opens Recepcionista when greeting is missing', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockSettings(page);
+  await page.goto('/settings.html');
+
+  await page.locator('.ux-config-nav [data-settings-section="receptionist"]').click();
+  await page.locator('#setupForm [name="agentGreeting"]').fill('');
+  await page.locator('.ux-config-nav [data-settings-section="business"]').click();
+  await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
+
+  await expect(page.locator('#setupMessage')).toContainText('Define el saludo inicial');
+  await expect(page.locator('#configAgentPanel')).toBeVisible();
+  await expect(page.locator('.ux-config-nav [data-settings-section="receptionist"]')).toHaveAttribute('aria-current', 'page');
+});
+
+test('settings core navigation remains usable at 390 768 and 1440 widths', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockSettings(page);
+
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/settings.html');
+
+    expect(await page.evaluate(() =>
+      document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
+    )).toBe(true);
+
+    const business = page.locator('.ux-config-nav [data-settings-section="business"]');
+    const services = page.locator('.ux-config-nav [data-settings-section="services"]');
+    const hours = page.locator('.ux-config-nav [data-settings-section="hours"]');
+    const receptionist = page.locator('.ux-config-nav [data-settings-section="receptionist"]');
+
+    await expect(business).toBeVisible();
+    await expect(services).toBeVisible();
+    await expect(hours).toBeVisible();
+    await expect(receptionist).toBeVisible();
+    await expect(page.getByRole('button', { name: '💾 Guardar cambios', exact: true })).toBeVisible();
+
+    await business.focus();
+    await expect(business).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(services).toBeFocused();
+
+    await hours.click();
+    await expect(page.locator('#configHoursPanel')).toBeVisible();
+    await expect(hours).toHaveAttribute('aria-current', 'page');
+  }
 });

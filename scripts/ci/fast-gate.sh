@@ -28,6 +28,7 @@ JAVA_CHANGED=false
 POM_CHANGED=false
 RUN_CHAOS=false
 RUN_PILOT=false
+RUN_SOFTWARE_FACTORY=false
 
 add_tests_from_dir() {
   local dir="$1"
@@ -101,6 +102,9 @@ for file in "${CHANGED[@]}"; do
     scripts/ci/pilot-e2e-certification.sh|docs/PILOT_END_TO_END_CERTIFICATION_V1.md)
       RUN_PILOT=true
       ;;
+    software-factory/*|software-factory/**/*)
+      RUN_SOFTWARE_FACTORY=true
+      ;;
     src/main/resources/static/*.js|src/main/resources/static/**/*.js|e2e/*.js|e2e/**/*.js)
       echo "Syntax check: $file"
       node --check "$file"
@@ -133,6 +137,11 @@ fi
 if [[ "$RUN_PILOT" == true ]]; then
   echo "Pilot certification surface changed. Running Pilot End-to-End Certification V1..."
   bash scripts/ci/pilot-e2e-certification.sh
+fi
+
+if [[ "$RUN_SOFTWARE_FACTORY" == true ]]; then
+  echo "Software Factory surface changed. Running contract tests..."
+  python3 -m unittest discover -s software-factory/tests -p 'test_*.py' -v
 fi
 
 echo "Fast Gate passed."

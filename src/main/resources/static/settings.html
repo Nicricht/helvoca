@@ -196,6 +196,8 @@
         }
         @media (max-width: 720px) { .agent-capability-grid, #configPermissionsPanel .agent-capability-grid { grid-template-columns: 1fr; } }
     </style>
+    <link rel="stylesheet" href="/commercial-ui-v3.css?v=20260928-2">
+    <link rel="stylesheet" href="/frontend-foundation.css?v=20260928-1">
 </head>
 <body class="settings-page">
 <div class="shell">
@@ -206,9 +208,12 @@
         </div>
         <nav id="primaryNav" class="app-nav" aria-label="Navegación principal">
             <a class="nav-home" href="/">Inicio</a>
-            <a class="nav-bookings" href="/#bookings">Reservas</a>
+            <a class="nav-conversations" href="/conversations.html">Conversaciones</a>
+            <a class="nav-bookings" href="/#bookings">Agenda</a>
             <a class="nav-customers" href="/#customers">Clientes</a>
-            <a class="nav-config active" href="/settings.html">Configuración</a>
+            <a class="nav-inventory" href="/inventory.html">Inventario</a>
+            <a class="nav-config active" href="/settings.html" aria-current="page">Configuración</a>
+            <a class="nav-account" href="/account.html">Facturación</a>
         </nav>
         <div class="top-actions">
             <span id="sessionBadge" class="badge muted">Sin sesión</span>
@@ -251,10 +256,13 @@
             <div class="dashboard-heading">
                 <div>
                     <div class="eyebrow">Tu negocio</div>
-                    <h1>Prepara tu negocio en minutos</h1>
-                    <p id="welcomeText">Pega una fuente pública y deja que preparemos la configuración.</p>
+                    <h1>Configura RecepVoz</h1>
+                    <p id="welcomeText">Ajusta tu negocio, servicios, horarios y recepcionista desde un solo lugar.</p>
                 </div>
-                <button id="refreshBtn" class="button ghost" type="button">Actualizar estado</button>
+                <div class="top-actions">
+                    <a class="button ghost" href="/account.html">Plan y facturación</a>
+                    <button id="refreshBtn" class="button ghost" type="button">Actualizar estado</button>
+                </div>
             </div>
 
             <div class="status-grid" id="statusGrid">
