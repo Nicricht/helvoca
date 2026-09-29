@@ -116,3 +116,50 @@ Do not call the production lifecycle complete until both reach terminal success 
 5. Retire the 504 exact-merged-head branches.
 6. Review the 5 post-merge-advanced branches.
 7. Reconcile the remaining deliberate open work (#637, #611/#615, #609, #644) separately rather than bulk-merging stale history.
+
+
+## Deep comparison of closed/untracked historical branches
+
+The 86 historical branches that were neither represented by an open PR nor by a current head matching a merged PR were compared against current `main`.
+
+### Content-equivalent retirement candidates
+
+The following branches have **no effective file delta** against current `main` and may be retired without losing repository content:
+
+- `diag/whatsapp-booking-flow-state`
+- `feat/frontend-foundation-dark`
+- `feat/frontend-onboarding-settings-finish`
+- `feat/inventory-admin-alerts-restock-v1`
+- `feat/omnichannel-core`
+- `feat/omnichannel-inventory-integration-v1`
+- `feat/owner-commercial-timeline-v1`
+- `feat/platform-assisted-onboarding`
+- `fix/whatsapp-separate-twilio-credentials-20260919`
+- `release/recepvoz-v1-pilot`
+- `release/recepvoz-v1.0`
+- `test/frontend-foundation-red-ci`
+- `test/rc-preflight-red-base`
+- `test/rc-preflight-red-v1`
+- `verify/main-recepvoz-v1-final` — commit-only divergence, zero file delta
+- `verify-main-post-rc-529` — commit-only divergence, zero file delta
+- `verify-main-post-v6-534` — commit-only divergence, zero file delta
+
+This adds **17** safe retirement candidates beyond the branches whose current heads exactly match merged PR heads.
+
+### Historical branches with real remaining deltas
+
+The remaining historical branches still have a non-zero file delta against current `main`. They are **not bulk-delete candidates**. Their differences may be obsolete, superseded, diagnostic-only, or genuinely useful, so each must be classified by intent before retirement.
+
+Known examples include old voice/certification experiments, Meta/WhatsApp diagnostics, previous release candidates, old Twilio provisioning work, historical inventory foundations and commercial-demo certification branches.
+
+The branch count must therefore be reduced by evidence, not by deleting every branch that is old.
+
+### Current minimum safe-retirement pool
+
+At this point the repository has at least:
+
+- **504** branch heads that exactly match a merged PR head;
+- **17** additional content-equivalent historical branches;
+- `docs/recepvoz-engineering-operating-system` is separately superseded by the current First-Pass Engineering governance and PR #616 has been closed.
+
+That means **at least 522 historical branches are already classified as safely retireable**, before closing the currently consumed documentation/audit PRs.
