@@ -28,6 +28,39 @@ test.describe('public authentication visual refresh', () => {
     }
   });
 
+  test('keeps hero words intact at common desktop widths', async ({ page }) => {
+    for (const viewport of [
+      { width: 1536, height: 950 },
+      { width: 1366, height: 768 },
+      { width: 1180, height: 820 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/');
+
+      const fragmentedWords = await page.locator('.rv-auth-copy').evaluate((root) => {
+        const targets = ['pierdas', 'llamada', 'negocio'];
+        const textNodes = [];
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+        return targets.filter((target) => {
+          for (const node of textNodes) {
+            const source = node.textContent || '';
+            const index = source.toLowerCase().indexOf(target);
+            if (index < 0) continue;
+            const range = document.createRange();
+            range.setStart(node, index);
+            range.setEnd(node, index + target.length);
+            return range.getClientRects().length > 1;
+          }
+          return true;
+        });
+      });
+
+      expect(fragmentedWords, `hero words must not split at ${viewport.width}px`).toEqual([]);
+    }
+  });
+
   test('serves the new visual assets to unauthenticated visitors', async ({ request }) => {
     const css = await request.get('/auth-visual-refresh.css');
     const hero = await request.get('/recepvoz-auth-hero.svg');
