@@ -27,6 +27,15 @@ public class BusinessController {
         return service.update(request);
     }
 
+
+    @PutMapping("/appearance")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public BusinessAppearanceResponse updateAppearance(
+            @Valid @RequestBody BusinessAppearanceRequest request
+    ) {
+        return service.updateAppearance(request.theme());
+    }
+
     @GetMapping("/profile")
     @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
     public BusinessProfileResponse profile() {
