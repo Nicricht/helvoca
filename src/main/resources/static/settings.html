@@ -457,6 +457,17 @@
                         <label class="agent-capability"><input type="checkbox" name="agentCapability" value="TRANSFER_TO_HUMAN"> Transferir a persona</label>
                     </div>
 
+                    <div id="appearanceSettings" class="appearance-settings">
+                        <div class="appearance-settings-copy">
+                            <div class="eyebrow">Apariencia</div>
+                            <h2>Elige el color de tu RecepVoz</h2>
+                            <p>La estructura, el modo oscuro y los colores de estado se mantienen. Solo cambia el acento de marca de tu negocio.</p>
+                        </div>
+                        <div id="appearanceThemeGrid" class="appearance-theme-grid" role="group" aria-label="Color de acento"></div>
+                        <p id="appearanceReadonly" class="hidden">Solo un administrador del negocio puede cambiar esta preferencia.</p>
+                        <div id="appearanceMessage" class="message hidden" role="status" aria-live="polite"></div>
+                    </div>
+
                     <div class="section-heading divider"><div><div class="eyebrow">Servicios</div><h2>Qué puede reservar un cliente</h2></div><button id="addServiceBtn" class="button small ghost" type="button">+ Servicio</button></div>
                     <div id="servicesList" class="repeat-list"></div>
 
