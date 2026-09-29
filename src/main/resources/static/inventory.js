@@ -91,6 +91,7 @@
         if (!response.ok) {
             if (response.status === 401) {
                 sessionStorage.removeItem(TOKEN_KEY);
+                window.RecepVozAppearance?.clearCache();
                 showAuthRequired();
             }
             const text = payload?.message || payload?.detail || payload?.error ||
