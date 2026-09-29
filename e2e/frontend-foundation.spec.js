@@ -76,7 +76,7 @@ async function mountFoundation(page, request) {
 test('canonical dark foundation is served and loaded after legacy styles', async ({ request }) => {
   const foundation = await getText(request, '/frontend-foundation.css');
   expect(foundation).toContain('--rv-bg-canvas: #070a10');
-  expect(foundation).toContain('--rv-accent: #806bff');
+  expect(foundation).toContain('--rv-accent: var(--rv-brand-primary)');
 
   for (const path of [
     '/', '/settings.html', '/inventory.html', '/simulator.html', '/operations.html',
@@ -120,7 +120,7 @@ test('canonical foundation owns dark surfaces and interaction states', async ({ 
   });
 
   expect(computed.canvasToken).toBe('#070a10');
-  expect(computed.accentToken).toBe('#806bff');
+  expect(computed.accentToken).toBe('#22c7d6');
   expect(computed.body).not.toBe('rgba(0, 0, 0, 0)');
   expect(computed.card).not.toBe('rgba(0, 0, 0, 0)');
   expect(computed.input).not.toBe('rgba(0, 0, 0, 0)');
