@@ -248,7 +248,7 @@
         grid.querySelector('#commercialMinutes').textContent = `${used} usados · ${remaining} restantes`;
         grid.querySelector('#commercialOverage').textContent = `${overage} min`;
 
-        badge.textContent = subscription.serviceAllowed ? 'SERVICIO HABILITADO' : 'SERVICIO BLOQUEADO';
+        badge.textContent = subscription.serviceAllowed ? 'SUSCRIPCIÓN HABILITADA' : 'SUSCRIPCIÓN BLOQUEADA';
         badge.className = `badge ${subscription.serviceAllowed ? 'online' : 'muted'}`;
 
         renderPending();
