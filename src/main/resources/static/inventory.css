@@ -344,3 +344,35 @@
     .inventory-mobile-cards .inventory-table td.inventory-product,
     .inventory-mobile-cards .inventory-table td[data-label="Acciones"]{grid-column:1}
 }
+
+
+/* Final inventory readability floor: operational actions and forms stay readable. */
+.inventory-nav a,
+.inventory-row-actions .button,
+.inventory-variant-actions .button,
+.inventory-alert-action .button,
+.inventory-restock-action .button{font-size:14px}
+.inventory-empty span,
+.inventory-form-help,
+.inventory-variants-toolbar p,
+.inventory-alerts-head p,
+.inventory-restock-head p{font-size:13px}
+.inventory-kpi span,
+.inventory-kpi small,
+.inventory-search label,
+.inventory-filter,
+.inventory-sort,
+.inventory-table th,
+.inventory-sku,
+.inventory-state,
+.inventory-history-type,
+.inventory-history-main small,
+.inventory-history-after,
+.inventory-adjust-current span,
+.inventory-variant-name small,
+.inventory-variant-metric span,
+.inventory-variant-options,
+.inventory-alert-main small,
+.inventory-alerts-empty span,
+.inventory-restock-main small,
+.inventory-restock-status{font-size:12px}
