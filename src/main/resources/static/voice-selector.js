@@ -271,6 +271,7 @@
             configHoursPanel: '📅 Horarios',
             configKnowledgePanel: '💬 Respuestas',
             configAgentPanel: '🤖 Recepcionista',
+            configAppearancePanel: '🎨 Apariencia',
             configPhonePanel: '📞 Canales'
         };
         Object.entries(labels).forEach(([panelId, label]) => {
