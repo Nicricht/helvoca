@@ -309,3 +309,48 @@
   .home-order-card-head,.home-order-card-meta,.home-order-card-next{align-items:flex-start}
   .home-order-card-head{flex-wrap:wrap}
 }
+
+
+/* Final commerce readability floor: actions/forms/customer copy stay readable. */
+.home-business-tab,
+.home-booking-create-trigger,
+.home-booking-create-form select,
+.home-filter-clear,
+.home-detail-close,
+.home-detail-link,
+.home-booking-primary,
+.home-booking-reschedule select,
+.home-booking-danger,
+.home-order-primary,
+.home-incident-trigger,
+.home-incident-preview-btn,
+.home-incident-footer button,
+.home-incident-history-head button,
+.home-incident-history-actions button,
+.home-export-button,
+.home-audit-filters input,
+.home-audit-filters select,
+.home-incident-history-toggle,
+.home-incident-delivery-result button,
+.home-customer-create-form input,
+.home-sales-filters select,
+.home-order-filters input,
+.home-order-filters select{font-size:14px}
+.home-business-head p,
+.home-business-empty,
+.home-detail-muted,
+.home-detail-loading,
+.home-detail-lines>div,
+.home-order-next{font-size:14px}
+.home-booking-create-form label,
+.home-booking-filters label>span,
+.home-detail-facts span,
+.home-detail-note>span,
+.home-booking-reschedule label,
+.home-incident-form label,
+.home-audit-filters label,
+.home-customer-create-form label,
+.home-sales-filters label>span,
+.home-order-filters label>span,
+.home-business-table th,
+.home-pill{font-size:12px}
