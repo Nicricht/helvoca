@@ -239,4 +239,192 @@ class HardwareStoreDemoInitializerTest {
         assertEquals(6, hourStore.size());
         verify(subscriptions, times(2)).startBasicTrial(businessId);
     }
+
+    @Test
+    void repairsExistingHardwareStoreArtifactsAndCoversStableScheduleBranch() {
+        UUID businessId = UUID.randomUUID();
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        DevDataInitializer initializer = new DevDataInitializer(businesses, users, roles, encoder);
+
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        CatalogItemRepository catalog = mock(CatalogItemRepository.class);
+        InventoryStockRepository stocks = mock(InventoryStockRepository.class);
+        DeliveryZoneRepository zones = mock(DeliveryZoneRepository.class);
+        BusinessHourRepository hours = mock(BusinessHourRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+
+        ServiceItem staleService = new ServiceItem();
+        staleService.setActive(true);
+
+        CatalogItem staleProduct = new CatalogItem();
+        staleProduct.setKind(CatalogItem.Kind.PRODUCT);
+        staleProduct.setName("Producto viejo");
+        staleProduct.setActive(true);
+
+        when(services.findAllByBusinessIdOrderByNameAsc(businessId))
+                .thenReturn(List.of(staleService));
+        when(services.saveAndFlush(any(ServiceItem.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        when(catalog.findAllByBusinessIdOrderByNameAsc(businessId))
+                .thenReturn(List.of(staleProduct));
+        when(catalog.saveAndFlush(any(CatalogItem.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        initializer.setDemoCatalogRepositories(services, catalog);
+        ReflectionTestUtils.invokeMethod(
+                initializer, "ensureHardwareStoreCatalogAndInventory", businessId);
+
+        assertFalse(staleProduct.isActive());
+        assertFalse(staleService.isActive());
+        verify(catalog, atLeastOnce()).saveAndFlush(staleProduct);
+        verify(services).saveAndFlush(staleService);
+
+        CatalogItem existingCatalogItem = new CatalogItem();
+        ReflectionTestUtils.setField(existingCatalogItem, "id", UUID.randomUUID());
+        HardwareStoreDemoData.Product product = HardwareStoreDemoData.products().get(0);
+
+        InventoryStock existingStock = new InventoryStock();
+        existingStock.setSku("SKU-ANTIGUO");
+        existingStock.setTrackingEnabled(false);
+        existingStock.setReorderThreshold(0);
+
+        when(stocks.findByBusinessIdAndCatalogItemId(
+                businessId, existingCatalogItem.getId()))
+                .thenReturn(Optional.of(existingStock));
+
+        initializer.setHardwareStoreRepositories(stocks, zones);
+        ReflectionTestUtils.invokeMethod(
+                initializer,
+                "ensureHardwareStoreStock",
+                businessId,
+                existingCatalogItem,
+                product);
+
+        assertEquals(product.sku(), existingStock.getSku());
+        assertTrue(existingStock.isTrackingEnabled());
+        assertEquals(5, existingStock.getReorderThreshold());
+        verify(stocks).saveAndFlush(existingStock);
+
+        clearInvocations(stocks);
+        ReflectionTestUtils.invokeMethod(
+                initializer,
+                "ensureHardwareStoreStock",
+                businessId,
+                existingCatalogItem,
+                product);
+        verify(stocks, never()).saveAndFlush(any(InventoryStock.class));
+
+        List<BusinessHour> correctHours = new ArrayList<>();
+        for (int day = 1; day <= 5; day++) {
+            BusinessHour value = mock(BusinessHour.class);
+            when(value.getDayOfWeek()).thenReturn(day);
+            when(value.getOpenTime()).thenReturn(LocalTime.of(8, 0));
+            when(value.getCloseTime()).thenReturn(LocalTime.of(18, 30));
+            correctHours.add(value);
+        }
+        BusinessHour saturday = mock(BusinessHour.class);
+        when(saturday.getDayOfWeek()).thenReturn(6);
+        when(saturday.getOpenTime()).thenReturn(LocalTime.of(9, 0));
+        when(saturday.getCloseTime()).thenReturn(LocalTime.of(14, 0));
+        correctHours.add(saturday);
+
+        when(hours.findAllByBusinessIdOrderByDayOfWeekAscOpenTimeAsc(businessId))
+                .thenReturn(correctHours);
+        initializer.setDemoScheduleRepository(hours);
+        ReflectionTestUtils.invokeMethod(
+                initializer, "ensureHardwareStoreSchedule", businessId);
+        verify(hours, never()).deleteAllByBusinessId(any(UUID.class));
+
+        KnowledgeItem staleKnowledge = new KnowledgeItem();
+        staleKnowledge.setTitle("Política obsoleta");
+        staleKnowledge.setActive(true);
+        when(knowledge.findAllByBusinessIdOrderByTitleAsc(businessId))
+                .thenReturn(List.of(staleKnowledge));
+        when(knowledge.existsByBusinessIdAndTitleIgnoreCase(
+                eq(businessId), anyString())).thenReturn(true);
+        when(knowledge.saveAndFlush(any(KnowledgeItem.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        initializer.setDemoKnowledgeRepository(knowledge);
+        ReflectionTestUtils.invokeMethod(
+                initializer, "ensureHardwareStoreKnowledge", businessId);
+
+        assertFalse(staleKnowledge.isActive());
+        verify(knowledge).saveAndFlush(staleKnowledge);
+
+        DeliveryZone staleZone = new DeliveryZone();
+        staleZone.setName("Zona obsoleta");
+        staleZone.setActive(true);
+        when(zones.findAllByBusinessIdOrderByNameAsc(businessId))
+                .thenReturn(List.of(staleZone));
+        when(zones.saveAndFlush(any(DeliveryZone.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ReflectionTestUtils.invokeMethod(
+                initializer, "ensureHardwareStoreDeliveryZones", businessId);
+
+        assertFalse(staleZone.isActive());
+        verify(zones, atLeastOnce()).saveAndFlush(staleZone);
+    }
+
+    @Test
+    void hardwareStoreReadinessFailsClosedWhenRequiredDataIsIncomplete() {
+        UUID businessId = UUID.randomUUID();
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        DevDataInitializer initializer = new DevDataInitializer(businesses, users, roles, encoder);
+
+        assertDoesNotThrow(() -> ReflectionTestUtils.invokeMethod(
+                initializer, "validateHardwareStoreReadiness", businessId));
+
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        CatalogItemRepository catalog = mock(CatalogItemRepository.class);
+        BusinessHourRepository hours = mock(BusinessHourRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        AiAgentRepository agents = mock(AiAgentRepository.class);
+        BusinessProfileRepository profiles = mock(BusinessProfileRepository.class);
+        InventoryStockRepository stocks = mock(InventoryStockRepository.class);
+        DeliveryZoneRepository zones = mock(DeliveryZoneRepository.class);
+
+        initializer.setDemoCatalogRepositories(services, catalog);
+        initializer.setDemoScheduleRepository(hours);
+        initializer.setDemoKnowledgeRepository(knowledge);
+        initializer.setDemoAgentRepository(agents);
+        initializer.setDemoBusinessProfileRepository(profiles);
+        initializer.setHardwareStoreRepositories(stocks, zones);
+
+        when(profiles.findById(businessId)).thenReturn(Optional.empty());
+        when(catalog.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId))
+                .thenReturn(List.of());
+        when(stocks.findAllByBusinessIdOrderByUpdatedAtDesc(businessId))
+                .thenReturn(List.of());
+        when(hours.countByBusinessId(businessId)).thenReturn(0L);
+        when(knowledge.findAllByBusinessIdAndActiveTrueOrderByTitleAsc(businessId))
+                .thenReturn(List.of());
+        when(zones.findAllByBusinessIdAndActiveTrueOrderByNameAsc(businessId))
+                .thenReturn(List.of());
+        when(agents.findByBusinessId(businessId)).thenReturn(Optional.empty());
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> ReflectionTestUtils.invokeMethod(
+                        initializer, "validateHardwareStoreReadiness", businessId));
+
+        assertTrue(error.getMessage().contains("BUSINESS_PROFILE"));
+        assertTrue(error.getMessage().contains("CATALOG"));
+        assertTrue(error.getMessage().contains("INVENTORY"));
+        assertTrue(error.getMessage().contains("SCHEDULE"));
+        assertTrue(error.getMessage().contains("KNOWLEDGE"));
+        assertTrue(error.getMessage().contains("DELIVERY"));
+        assertTrue(error.getMessage().contains("AI_AGENT"));
+    }
+
 }
