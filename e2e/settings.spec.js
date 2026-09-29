@@ -496,8 +496,10 @@ test('settings does not invent business hours when the backend has none', async 
   await mockSettings(page, state);
   await page.goto('/settings.html?section=hours');
 
+  await expect(page.locator('#setupForm [name="businessName"]')).toHaveValue('Negocio E2E');
+  await expect(page.locator('#configHoursPanel')).toBeVisible();
   await expect(page.locator('#hoursGrid .interval-row')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '+ Intervalo', exact: true })).toBeVisible();
+  await expect(page.locator('#addHourBtn')).toBeVisible();
 
   await page.getByRole('button', { name: '💾 Guardar cambios', exact: true }).click();
 
