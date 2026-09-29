@@ -144,34 +144,7 @@ body.home-page:has(#authView:not(.hidden)) .public-company-card {
   box-shadow: 0 0 0 6px rgba(54,230,176,.10), 0 0 24px rgba(54,230,176,.48);
 }
 
-.rv-wave {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: 54px;
-  margin: 17px 0;
-  padding: 0 4px;
-}
 
-.rv-wave span {
-  width: 4px;
-  border-radius: 999px;
-  background: #806bff;
-  opacity: .9;
-}
-
-.rv-wave span:nth-child(1),
-.rv-wave span:nth-child(12) { height: 12px; }
-.rv-wave span:nth-child(2),
-.rv-wave span:nth-child(11) { height: 22px; }
-.rv-wave span:nth-child(3),
-.rv-wave span:nth-child(10) { height: 34px; }
-.rv-wave span:nth-child(4),
-.rv-wave span:nth-child(9) { height: 20px; }
-.rv-wave span:nth-child(5),
-.rv-wave span:nth-child(8) { height: 44px; }
-.rv-wave span:nth-child(6) { height: 28px; }
-.rv-wave span:nth-child(7) { height: 50px; }
 
 .rv-voice-preview-result {
   justify-content: space-between;
