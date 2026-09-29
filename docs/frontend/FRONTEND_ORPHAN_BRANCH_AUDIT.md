@@ -5,7 +5,7 @@ Authoritative working ledger for `feat/frontend-orphan-branch-rescue`.
 Audit base:
 - `main@8dc165d102a4157fdc6e3cd38b51b76b70b388d1`
 - `feat/frontend-finish-integration@3d73320848c7d81956701af6eb60f516f9eb1c80`
-- integration is **259 commits ahead / 0 behind** `main`.
+- integration is **260 commits ahead / 0 behind** `main`.
 
 ## Rules
 
@@ -28,7 +28,7 @@ Audit base:
 | `feat/frontend-billing-account-finish` / #634 | certified source HEAD is contained by integration | **integrated** |
 | `feat/frontend-final-visual-polish` | zero commits ahead of the integrated line when reviewed; later integration contains it | **integrated / superseded** |
 | `test/frontend-release-candidate-v1` | branch resolved to the same integration HEAD at audit start | **test mirror, no missing product UI** |
-| `test/release-candidate-first-business-hardening` / #641 | current HEAD `dbba4d7260c96763c13a0c56d4c1cb108d4986ca`; production source changes = none; safe CI 118/118 | **valuable test-only hardening; keep as separate PR, do not duplicate** |
+| `test/release-candidate-first-business-hardening` / #641 | five safe RC scenarios, no production source; selectively copied into canonical integration at `4af59d475c9e00ccb6bd6c5851d8f5a5d8571b00` | **consumed into integration; PR #641 closed unmerged** |
 | `feat/frontend-appearance-themes` / #637 | unique tenant theme API/schema/runtime/UI work; PR explicitly says **POST-RC ONLY** and forbids reopening current RC visual scope | **valid future feature, deliberately deferred; do not rescue into current RC** |
 | `feat/landing-hero-dark-v1` / #612 | unique richer public hero, two hero CTAs, conversation card and trust strip; current integration already has the dark canonical hero, Sofía voice preview and certified auth/landing behavior | **superseded for current RC; preserve as future marketing reference only** |
 | `feat/frontend-finalization-batch-1` / #614 | extends #612 and adds `recepvoz-ui.css` + brand asset; also contains a historical “light commercial design” contract that conflicts with the current dark Foundation; onboarding-next-step intent is covered by newer integration tests | **superseded for current RC; do not reintroduce parallel visual system** |
@@ -42,9 +42,11 @@ Audit base:
 
 The largest reason the current product can look older is simple:
 
-`feat/frontend-finish-integration` is **259 commits ahead of `main`** and remains unmerged.
+`feat/frontend-finish-integration@4af59d475c9e00ccb6bd6c5851d8f5a5d8571b00` is **260 commits ahead of `main`** and remains unmerged.
 
 That integration line contains the certified Foundation, Dashboard, Onboarding/Settings, Commerce, Conversations/Calls, Billing/Account, shared navigation and release-candidate contracts.
+
+Fresh exact-HEAD Full CI: `36524973203` — SUCCESS, backend **1330/1330**, browser E2E **118/118**.
 
 Therefore a runtime built from `main` cannot show the complete integrated frontend.
 
@@ -103,7 +105,7 @@ Reintroducing the old branch would revive stale backend/UI code from a branch fa
 This is intentional, not a no-op:
 - valid current work is already integrated;
 - Appearance Themes is deliberately post-RC;
-- RC hardening is test-only and already has its own certified PR;
+- RC hardening is test-only and has now been preserved in the canonical integration;
 - old visual branches conflict with or are superseded by the canonical dark Foundation;
 - old operational work is superseded by later integrated behavior.
 
@@ -116,7 +118,7 @@ The audit therefore prevents two opposite failure modes:
 Do not lose these when planning post-RC work:
 1. **Appearance Themes** — resume PR #637 deliberately after RC.
 2. **Public marketing composition** — if a later product review wants a stronger acquisition landing, use #612/#614 only as reference for richer Sofía conversation storytelling, trust strip, CTAs and brand asset. Reimplement on the current Foundation, never by merging those branches.
-3. **RC hardening tests** — review PR #641 separately for integration because it contains no production source changes and already has safe green evidence.
+3. **RC hardening tests** — preserved in the canonical integration at `4af59d475c9e00ccb6bd6c5851d8f5a5d8571b00`; PR #641 is closed unmerged.
 
 ## Resume checkpoint
 
@@ -126,8 +128,8 @@ Do not lose these when planning post-RC work:
 - Base: `feat/frontend-finish-integration@3d73320848c7d81956701af6eb60f516f9eb1c80`
 - Scope: audit / classification only; no production code rescued.
 - Production-code changes in this PR: **none**.
-- Main finding: current integration is 259 commits ahead / 0 behind `main`.
+- Main finding: current integration is 260 commits ahead / 0 behind `main`.
 - Current unique deferred feature: `feat/frontend-appearance-themes@2112abcd03350516e830c23aaa2327d90f4ab22d` / PR #637 — POST-RC.
-- Current separate test-only hardening: `test/release-candidate-first-business-hardening@dbba4d7260c96763c13a0c56d4c1cb108d4986ca` / PR #641.
+- RC hardening: consumed into canonical integration at `4af59d475c9e00ccb6bd6c5851d8f5a5d8571b00`; PR #641 closed unmerged.
 - Next step: human/release decision on when the certified integration line may advance toward `main`; post-RC appearance work remains separate.
 - Safety: no merge, deploy or external business effect performed.
