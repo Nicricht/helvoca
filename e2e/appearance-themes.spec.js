@@ -68,7 +68,7 @@ test('appearance runtime uses authenticated session cache only', async ({ page, 
   expect(scriptResponse.ok()).toBeTruthy();
   const script = await scriptResponse.text();
 
-  await page.goto('/');
+  await page.goto('/terms.html');
   await page.evaluate(() => {
     sessionStorage.setItem('helvoca_access_token', 'test-token');
     sessionStorage.setItem('recepvoz_appearance_theme', 'blue');
