@@ -65,8 +65,7 @@ test('receptionist area keeps history and safe simulation as local actions', asy
   expect(simulator).toMatch(/Tampoco envía WhatsApp real/i);
 });
 
-test('customer surfaces stay contained at tablet width', async ({ page }) => {
-  await page.setViewportSize({ width: 768, height: 1024 });
+test('customer surfaces stay contained at required responsive widths', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await page.route('https://cdn.jsdelivr.net/**', route => route.abort());
   await page.route('**/api/v1/**', route => route.fulfill({
@@ -75,13 +74,40 @@ test('customer surfaces stay contained at tablet width', async ({ page }) => {
     body: '{}'
   }));
 
-  for (const path of ['/', '/settings.html', '/inventory.html', '/conversations.html', '/simulator.html', '/account.html']) {
-    await page.goto(path);
-    await page.waitForTimeout(80);
-    const layout = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth
-    }));
-    expect(layout.scrollWidth, path).toBeLessThanOrEqual(layout.clientWidth + 1);
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1024 });
+
+    for (const path of ['/', '/settings.html', '/inventory.html', '/conversations.html', '/simulator.html', '/account.html']) {
+      await page.goto(path);
+      await page.waitForTimeout(80);
+      const layout = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth
+      }));
+      expect(layout.scrollWidth, `${path} at ${width}px`).toBeLessThanOrEqual(layout.clientWidth + 1);
+    }
+  }
+});
+
+test('primary customer navigation remains keyboard reachable at required widths', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await page.route('**/api/v1/**', route => route.fulfill({
+    status: 404,
+    contentType: 'application/json',
+    body: '{}'
+  }));
+
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1024 });
+    await page.goto('/conversations.html');
+
+    const nav = page.getByRole('navigation', { name: 'Navegación principal' });
+    const links = nav.getByRole('link');
+    await expect(links).toHaveCount(6);
+
+    await links.nth(0).focus();
+    await expect(links.nth(0)).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(links.nth(1)).toBeFocused();
   }
 });
