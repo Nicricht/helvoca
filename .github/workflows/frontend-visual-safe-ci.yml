@@ -1,0 +1,50 @@
+name: Frontend Visual Safe CI
+
+on:
+  push:
+    branches:
+      - feat/frontend-final-visual-polish
+
+permissions:
+  contents: read
+
+jobs:
+  visual-safe-gate:
+    if: contains(github.event.head_commit.message, '[visual-polish-safe-ci]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Validate changed frontend JavaScript
+        run: |
+          node --check src/main/resources/static/app.js
+          node --check src/main/resources/static/home-business.js
+          node --check src/main/resources/static/commercial-status.js
+          node --check src/main/resources/static/inventory.js
+          node --check src/main/resources/static/conversations.js
+          node --check src/main/resources/static/account.js
+
+      - name: Install frontend test dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run visual contract gate
+        run: npx playwright test e2e/frontend-final-visual.spec.js e2e/frontend-foundation.spec.js e2e/frontend-finish-integration.spec.js
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-visual-safe-ci-diagnostics
+          path: |
+            test-results/**
+            playwright-report/**
+          if-no-files-found: warn
