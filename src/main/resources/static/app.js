@@ -34,7 +34,10 @@ let currentBusinessName = "Tu negocio";
 function setToken(value) {
     token = value || "";
     if (token) sessionStorage.setItem(TOKEN_KEY, token);
-    else sessionStorage.removeItem(TOKEN_KEY);
+    else {
+        sessionStorage.removeItem(TOKEN_KEY);
+        window.RecepVozAppearance?.clearCache();
+    }
 }
 
 function detectedTimezone() {
@@ -101,6 +104,24 @@ function showDashboardShell() {
     const badge = $("#sessionBadge");
     badge.textContent = "Sesión activa";
     badge.className = "badge online";
+}
+
+
+function syncBusinessAppearance(me = {}, business = {}) {
+    const appearance = window.RecepVozAppearance;
+    if (!appearance) return;
+    if (document.body.classList.contains("settings-page")) {
+        appearance.configure({
+            theme: business.appearanceTheme,
+            canManage: Array.isArray(me.roles) && me.roles.includes("BUSINESS_ADMIN"),
+            save: theme => api("/api/v1/business/appearance", {
+                method: "PUT",
+                body: JSON.stringify({ theme })
+            })
+        });
+        return;
+    }
+    appearance.syncFromBusiness(business);
 }
 
 function applyBusinessIdentity(business = {}) {
@@ -367,6 +388,7 @@ async function loadDashboard() {
             api("/api/v1/onboarding/status"), api("/api/v1/services"), api("/api/v1/business/hours"),
             api("/api/v1/knowledge?activeOnly=false"), api("/api/v1/phone-numbers"), api("/api/v1/ai-agent")
         ]);
+        syncBusinessAppearance(me, business);
         applyBusinessIdentity(business);
         $("#welcomeText").textContent = `${me.email} · Los cambios se guardan solo cuando tú los confirmas.`;
         setupForm.elements.businessName.value = business.name || "";
