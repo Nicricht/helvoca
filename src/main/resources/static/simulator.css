@@ -23,3 +23,25 @@ button,
 .trace-item p,
 .empty,
 .toast{font-size:12px}
+
+
+/* Final simulator readability floor: controls and conversational copy stay readable. */
+.topbar a,
+button,
+.safe-note strong,
+.safe-note div>span,
+.sim-feedback,
+.bubble,
+.empty,
+.toast{font-size:14px}
+.topbar strong,
+.topbar span,
+.hint,
+.trace-stat span,
+.trace-stat strong,
+.trace-item strong,
+.trace-item p{font-size:13px}
+.eyebrow,
+.badge,
+.bubble small,
+.pill{font-size:12px}
