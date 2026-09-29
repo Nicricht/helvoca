@@ -2,3 +2,6 @@
 /* Customer-facing readability contract: normal controls, statuses, transcript and follow-up copy stay readable. */
 .search-control input,.filter-chip,.conversation-row,.row-identity small,.row-summary,.status-badge,.attention-badge,.mini-badge,.channel-badge,.list-empty p,.detail-person p,.source-status,.summary-card,.fact dd,.turn-head strong,.turn-card p,.transcript-empty,.timeline-empty,.outcome-block strong,.timeline-head strong,.timeline-content p,.detail-loading,.detail-empty p,.toast{font-size:14px}
 .fact dt,.outcome-block span,.turn-head time,.timeline-head time,.section-count{font-size:12px}
+
+.rv-heading-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.rv-heading-actions .button{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+@media(max-width:520px){.rv-heading-actions{width:100%}.rv-heading-actions .button{flex:1 1 auto}}
