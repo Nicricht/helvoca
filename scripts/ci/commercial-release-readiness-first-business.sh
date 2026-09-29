@@ -11,6 +11,9 @@ if [[ -z "$BASE_MAIN" ]]; then
 fi
 
 echo "Fetching current main for ancestry verification..."
+if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+  git fetch --no-tags --unshallow origin
+fi
 git fetch --no-tags origin main:refs/remotes/origin/main
 CURRENT_MAIN="$(git rev-parse refs/remotes/origin/main)"
 echo "Audited main: $BASE_MAIN"
