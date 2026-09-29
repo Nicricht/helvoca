@@ -288,6 +288,7 @@ window.addEventListener("beforeunload", () => {
 async function loadBusinessIdentity() {
   try {
     const business = await api("/api/v1/business");
+    window.RecepVozAppearance?.syncFromBusiness(business);
     businessName = business?.name || "Tu negocio";
     document.querySelector(".topbar > div strong")?.replaceChildren(document.createTextNode(businessName.toUpperCase()));
     document.title = `${businessName} · Probar recepcionista`;
