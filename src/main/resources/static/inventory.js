@@ -807,6 +807,7 @@
             state.roles = Array.isArray(me?.roles) ? me.roles.map(String) : [];
             state.canManage = state.roles.includes("BUSINESS_ADMIN");
             state.business = business || {};
+            window.RecepVozAppearance?.syncFromBusiness(state.business);
             state.catalog = Array.isArray(catalog) ? catalog : [];
             state.inventory = Array.isArray(inventory) ? inventory : [];
             state.alerts = Array.isArray(alerts) ? alerts : [];
@@ -858,6 +859,7 @@
 
     $("#inventoryLogoutBtn").addEventListener("click", () => {
         sessionStorage.removeItem(TOKEN_KEY);
+        window.RecepVozAppearance?.clearCache();
         location.replace("/");
     });
 
