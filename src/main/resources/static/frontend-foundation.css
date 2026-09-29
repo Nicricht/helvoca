@@ -302,7 +302,7 @@ textarea::placeholder {
 .home-booking-primary,
 .home-order-primary {
   border-color: rgba(128,107,255,.46);
-  background: linear-gradient(135deg, var(--rv-accent), #6956f3);
+  background: var(--rv-accent);
   color: #fff;
   box-shadow: 0 8px 22px rgba(128,107,255,.16);
 }
@@ -310,7 +310,7 @@ textarea::placeholder {
 .button.primary:hover,
 .home-booking-primary:hover,
 .home-order-primary:hover {
-  background: linear-gradient(135deg, var(--rv-accent-hover), #7563fa);
+  background: var(--rv-accent-hover);
 }
 
 .button.secondary {
@@ -539,3 +539,8 @@ dialog::backdrop,
     animation-iteration-count: 1 !important;
   }
 }
+
+
+/* Integration typography floor for primary customer navigation. */
+.app-nav a,.inventory-nav a,.topbar nav a,.account-nav a,.rv-nav a{font-size:14px}
+@media(min-width:981px){body.home-page:has(#dashboardView:not(.hidden)) #primaryNav a,body.settings-page:has(#dashboardView:not(.hidden)) #primaryNav a{font-size:14px}}
