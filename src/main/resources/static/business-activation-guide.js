@@ -17,7 +17,7 @@
     .activation-guide-list { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:7px; }
     .activation-guide-step { min-width:0; padding:9px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,.02); }
     .activation-guide-step.complete { border-color:rgba(55,205,145,.3); background:rgba(55,205,145,.04); }
-    .activation-guide-step.next { border-color:rgba(124,92,255,.45); background:rgba(124,92,255,.08); }
+    .activation-guide-step.next { border-color:var(--rv-brand-border, rgba(124,92,255,.45)); background:var(--rv-brand-soft, rgba(124,92,255,.08)); }
     .activation-guide-step span { display:flex; align-items:center; gap:5px; font-size:9px; font-weight:850; }
     .activation-guide-step span::before { content:''; width:7px; height:7px; border-radius:50%; background:#f4a636; flex:0 0 auto; }
     .activation-guide-step.complete span::before { background:#37cd91; }
