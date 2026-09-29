@@ -452,7 +452,7 @@
     }
 
     function bindRowActions() {
-        $(".inventory-product-edit-btn", rows).forEach(button => {
+        [...rows.querySelectorAll(".inventory-product-edit-btn")].forEach(button => {
             button.addEventListener("click", () => openProductForm(button.dataset.id));
         });
         $(".inventory-variants-btn", rows).forEach(button => {
