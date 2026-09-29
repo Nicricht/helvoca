@@ -862,3 +862,147 @@ body.home-page:has(#authView:not(.hidden)) .rv-phone-status small {
     animation: none !important;
   }
 }
+
+
+/* Medium desktop: keep the 1280px family composed instead of forcing the wide two-column hero internals. */
+@media (min-width: 901px) and (max-width: 1400px) {
+  body.home-page:has(#authView:not(.hidden)) .shell {
+    width: min(100%, calc(100% - 24px));
+  }
+
+  body.home-page:has(#authView:not(.hidden)) main {
+    padding-top: 0;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell {
+    width: 100%;
+    max-width: 1320px;
+    padding: 20px 12px 34px;
+    grid-template-columns: minmax(0, 1fr) 350px;
+    gap: 18px;
+    align-items: center;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero {
+    min-height: 610px;
+    padding: 36px;
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-copy {
+    width: min(47%, 400px);
+    max-width: 400px;
+    align-self: center;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero h1,
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-hero-emphasis {
+    font-size: clamp(48px, 4vw, 56px);
+    line-height: .98;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero p {
+    margin-top: 18px;
+    font-size: 14px;
+    line-height: 1.58;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-benefit-row {
+    gap: 8px 12px;
+    margin-top: 20px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-benefit-row span {
+    font-size: 11px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-voice-preview {
+    width: 100%;
+    margin-top: 24px;
+    padding: 14px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-stage {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 48%;
+    height: 560px;
+    opacity: 1;
+    transform: none;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-device {
+    width: min(108%, 490px);
+    max-height: 560px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble {
+    max-width: 200px;
+    padding: 9px 11px;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-one {
+    top: 12%;
+    left: 1%;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-two {
+    top: 43%;
+    left: 0;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-three {
+    left: 3%;
+    bottom: 8%;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-status {
+    right: 1%;
+    bottom: 19%;
+    min-width: 170px;
+    padding: 9px 11px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card {
+    min-height: 500px;
+    padding: 26px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-card .tabs {
+    margin-bottom: 22px;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell {
+    grid-template-columns: minmax(0, 1fr) 330px;
+    gap: 14px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero {
+    padding: 32px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-copy {
+    width: min(49%, 360px);
+  }
+
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero h1,
+  body.home-page:has(#authView:not(.hidden)) #authView .rv-hero-emphasis {
+    font-size: clamp(44px, 4.4vw, 52px);
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-stage {
+    width: 47%;
+    height: 535px;
+  }
+
+  body.home-page:has(#authView:not(.hidden)) .rv-phone-device {
+    width: min(106%, 455px);
+    max-height: 535px;
+  }
+}
