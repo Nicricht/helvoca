@@ -21,7 +21,11 @@ async function api(path, options = {}) {
   if (type.includes("application/json")) { try { payload = await response.json(); } catch (_) {} }
   else if (response.status !== 204) { try { payload = await response.text(); } catch (_) {} }
   if (!response.ok) {
-    if (response.status === 401) { sessionStorage.removeItem(TOKEN_KEY); location.replace("/"); }
+    if (response.status === 401) {
+      sessionStorage.removeItem(TOKEN_KEY);
+      window.RecepVozAppearance?.clearCache();
+      location.replace("/");
+    }
     throw new Error(payload?.message || payload?.detail || payload?.error || (typeof payload === "string" && payload) || `HTTP ${response.status}`);
   }
   return payload;
