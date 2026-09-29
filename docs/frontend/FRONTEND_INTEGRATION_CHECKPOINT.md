@@ -1,18 +1,17 @@
 # Frontend Finish Integration — Resume Checkpoint
 
-## Repository state
+## Authority and safety
 - Repository: `Nicricht/helvoca`
 - Integration branch: `feat/frontend-finish-integration`
 - Draft PR: #618
-- PR base: `chore/first-pass-engineering-system`
-- Certified foundation adopted: `feat/frontend-foundation-dark@f9e2585a5715095269a7ad2bc7cfeace0d24ec0b`
-- Foundation evidence: GitHub Actions run `36495438839` — SUCCESS
-- Safety: NO MERGE, NO DEPLOY, NO real calls, WhatsApp, payments, provisioning, or destructive external effects.
+- Base: `chore/first-pass-engineering-system`
+- Risk: **HIGH**
+- Status: final certification stage.
+- **NO MERGE. NO DEPLOY.**
+- **NO real calls, WhatsApp, payments, checkout, phone provisioning, or destructive external effects.**
+- The PR body is the completion authority for the exact final HEAD and exact final CI run, because recording a run ID inside this file would itself create a new HEAD.
 
-## First-Pass Engineering
-Overall integration risk: **HIGH**.
-
-Selected perspectives:
+## First-Pass Engineering perspectives
 - Product / Functional Analysis
 - UX / UI / Accessibility
 - Frontend Engineering / Architecture
@@ -22,58 +21,98 @@ Selected perspectives:
 - Operations / Release
 - Continuity
 
-## Completed
-1. Repository rules, First-Pass skill, standards and invariants reviewed.
-2. Prior frontend evidence audited. PR #614 rejected because its exact HEAD had 5 Playwright failures.
-3. Cross-product visual baseline audited and the light/white competing theme problem identified.
-4. Canonical frontend specification from PR #613 reviewed.
-5. Dark Foundation PR #625 reviewed and accepted as the visual base:
-   - canonical `frontend-foundation.css`;
-   - canonical dark tokens and shared primitives;
-   - all static pages load the authority layer last;
-   - obsolete light-console contract replaced;
-   - responsive/accessibility hardening;
-   - exact-HEAD Fast Gate + Golden Journey + Full CI green.
-6. Integration branch rebased by ref onto the certified Foundation HEAD without merging any PR; this checkpoint was recreated on top.
+## Accepted source evidence
 
-## Source branch status at this checkpoint
+### Foundation — PR #625
+- Accepted SHA: `f9e2585a5715095269a7ad2bc7cfeace0d24ec0b`
+- CI run: `36495438839` — SUCCESS
+- Canonical dark visual authority: `frontend-foundation.css`.
+
 ### Dashboard — PR #620
-- Base is current Foundation.
-- 0 commits behind Foundation; source branch is ahead.
-- Earlier integrator findings were addressed in the PR narrative, including not routing customer calls to internal `/operations.html`.
-- No automatic PR CI exists on its non-main base, so exact integrated verification is still required.
-- Must re-audit current diff before acceptance.
+- Accepted SHA: `ac4103024d152992346a782aeea8379b1a7fb760`
+- CI run: `36498467081` — SUCCESS
+- Fast Gate, Golden Journey and Full `test` all green.
 
-### Conversations / Calls — PR #621
-- Synced to current Foundation and ahead of it.
-- Customer-facing `/conversations.html` workspace and simulator finishing work exist.
-- CI companion PR #622 is running on the moving head.
-- Must accept only an exact HEAD with green Full CI and no mergeability/conflict issue.
+### Conversations / Calls / Simulator — PR #621
+- Accepted SHA: `fb694b5692367a4cbe42e048bd44c2e054ed6c22`
+- CI run: `36501385724` — SUCCESS
+- Fast Gate, Golden Journey and Full `test` all green.
+
+### Commerce / Inventory / Orders — PR #623
+- Accepted SHA: `a79b9e7410be45b970e1c1b72b34cc5019d18ad6`
+- CI run: `36501913483` — SUCCESS
+- Fast Gate, Golden Journey and Full `test` all green.
 
 ### Onboarding / Settings — PR #629
-- Feature work exists, but current branch is still behind the certified Foundation and therefore stale for integration.
-- CI run `36496481817`: Fast Gate + Golden Journey green; Full Gate was still running at last inspection.
-- Must synchronize to Foundation and recertify exact HEAD.
+- Current certified source SHA: `a9d400383b1a728686a6fb6c7675f04a66e3b183`
+- CI run: `36504914245` — SUCCESS
+- Fast Gate, Golden Journey and Full `test` all green.
+- The integration contains equivalent or stronger validation routing for hidden invalid controls, deep links and section focus. Do not overwrite the integrated implementation merely to match source ancestry.
 
-### Commerce / Operations — PR #623
-- REJECTED at current HEAD `0834768f77790a2a81142a85056696a39c0a2b9a`.
-- CI run `36495741055`: Fast Gate + Golden Journey green, Full `test` failed with 4 Playwright regressions.
-- Two existing home tests fail because `.home-filter-result` is duplicated.
-- Existing inventory admin-adjustment and read-only operator contracts regress.
-- Branch is also 29 commits behind certified Foundation.
-- Integrator feedback posted to #623; do not integrate until synchronized and green.
+### Billing / Account — PR #634
+- Accepted SHA: `ece222b811c4da6b9ec1bda3e8ccd269d5fc7c3c`
+- CI run: `36501207170` — SUCCESS
+- Read-only customer account surface. The browser client uses GET-only account/subscription/usage reads and does not create charges or checkout.
 
-### Billing / Account
-- Required branch `feat/frontend-billing-account-finish` has not been published yet.
+## Integrated product decisions
+- Customer navigation is exactly:
+  **Inicio · Reservas · Clientes · Inventario · Recepcionista IA · Configuración**.
+- `/operations.html` remains internal and is not exposed in normal customer navigation.
+- “Conversaciones” remains the history screen title inside the **Recepcionista IA** area.
+- Safe simulation is a local action inside that area, not a seventh global navigation category.
+- First-time onboarding deliberately hides operational areas until setup is ready.
+- Raw backend/tool enums are humanized before customer display.
+- Billing/account is informational and read-only.
+- Simulator explicitly states that it creates no real commercial data, places no real calls, and sends no real WhatsApp.
+- Foundation is the final shared visual authority. Feature CSS owns local composition only.
+- Shared primary customer navigation has a 14px readability floor.
+- Customer-facing controls/actions and operational copy received readability hardening; compact metadata is kept secondary.
+- Decorative Foundation gradients were removed. The obsolete decorative waveform markup and styles were removed. Functional state indicators and loading shimmer may remain.
 
-## Product rulings
-- `/operations.html` remains an internal operation/certification surface, never the normal customer Calls destination.
-- Customer calls/conversation history belongs in the customer-facing conversations experience.
-- Raw backend/tool enums must not appear in customer UI.
-- Final visual authority is the certified Foundation; vertical CSS may own composition/local components, not a competing theme.
-- Critical/actionable copy must remain readable; tiny 9–11px UI text requires scrutiny.
-- Final customer navigation stays coherent and excludes internal diagnostics.
-- No source branch is accepted merely because its own PR says GREEN; final evidence must belong to the integrated exact HEAD.
+## Cross-product regression protection
+`e2e/frontend-finish-integration.spec.js` enforces:
+- identical six-area customer navigation across Home, Settings, Inventory, Conversations, Simulator and Account;
+- no customer link to internal `/operations.html`;
+- dark solid canonical Foundation;
+- Recepcionista IA local history/simulator semantics;
+- no horizontal overflow at **390, 768 and 1440 px** across all principal customer surfaces;
+- keyboard reachability of primary customer navigation at **390, 768 and 1440 px**.
 
-## Next step
-Re-audit Dashboard and current Conversations exact heads; capture current companion CI. Accept only source changes that are synchronized to the certified Foundation. Continue monitoring Onboarding sync/final CI and Commerce repair. When Billing appears, audit it with the same standard. Then run cross-product Playwright, responsive 390/768/1440, keyboard/focus/accessibility, Fast Gate, Golden Journey and Full Gate on the exact final #618 HEAD.
+Existing vertical E2E additionally covers:
+- Dashboard loading/ready/empty/error and attention hierarchy;
+- Onboarding progression, Settings deep links and validation routing;
+- inventory/product/variant/admin/operator behavior;
+- order filtering/status/next-action behavior;
+- conversation history/filter/detail/transcript/error/deep-link behavior;
+- simulator safe semantics and accessibility;
+- Billing/account admin/operator/error/read-only behavior.
+
+## Certification history
+A previously integrated HEAD `712f01e22816f42392bc1adfe0afa47491c7ab2c` passed repository CI run `36504319532`:
+- Fast Gate — SUCCESS
+- Golden Journey — SUCCESS
+- Full `test` — SUCCESS
+- browser E2E — 105/105 GREEN
+
+That evidence became stale after final hardening. Changes after that certified HEAD are limited to:
+- required-width integration coverage expanded to 390/768/1440;
+- keyboard navigation integration coverage;
+- removal of obsolete waveform CSS;
+- removal of the temporary integration-only workflow.
+
+Implementation parent immediately before this checkpoint: `1060aa314ae644c0c5d8b8911a0422d1015c09c9`.
+
+## Resume protocol
+1. Read this checkpoint and PR #618 before changing code.
+2. Read current PR #618 HEAD from GitHub; do not infer it from chat.
+3. Treat all evidence as stale after any code/contract commit.
+4. Accept completion only when the **exact final #618 HEAD** has:
+   - Fast Gate GREEN;
+   - Golden Journey GREEN;
+   - Full `test` GREEN;
+   - required frontend verification GREEN when triggered.
+5. Record exact final HEAD + run/job evidence in PR #618 body.
+6. Keep PR Draft. Do not merge or deploy.
+
+## Remaining work at this checkpoint
+Only exact-final-HEAD certification and evidence recording remain. If a gate fails, fix the actual defect, rerun on the new exact HEAD, and update the PR body. Do not weaken behavioral contracts merely to obtain green CI.
