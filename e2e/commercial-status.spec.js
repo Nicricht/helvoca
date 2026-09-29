@@ -115,7 +115,7 @@ test('commercial dashboard stays compact until the customer manages the plan', a
   await expect(card.locator('#commercialSubscriptionStatus')).toHaveText('TRIALING');
   await expect(card.locator('#commercialMinutes')).toHaveText('37 usados · 63 restantes');
   await expect(card.locator('#commercialOverage')).toHaveText('0 min');
-  await expect(card.locator('#commercialStateBadge')).toHaveText('SERVICIO HABILITADO');
+  await expect(card.locator('#commercialStateBadge')).toHaveText('SUSCRIPCIÓN HABILITADA');
   await expect(card).toContainText('Plan pendiente: Negocio');
   await expect(card).toContainText('hasta que el backend reciba y verifique un cobro aprobado');
   await expect(card.getByRole('button', { name: 'Continuar checkout' })).toBeVisible();
