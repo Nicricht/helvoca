@@ -566,8 +566,8 @@ test('ready customer console uses the canonical dark commercial design system', 
     };
   });
 
-  expect(palette.background).toBe('rgb(7, 10, 16)');
-  expect(palette.text).toBe('rgb(244, 247, 251)');
-  expect(palette.accent).toBe('#806bff');
-  expect(palette.cardBackground).toBe('rgb(13, 19, 29)');
+  expect(palette.background).toBe('rgb(6, 17, 28)');
+  expect(palette.text).toBe('rgb(244, 251, 255)');
+  expect(palette.accent).toBe('#16d9f5');
+  expect(palette.cardBackground).toBe('rgb(11, 27, 41)');
 });
