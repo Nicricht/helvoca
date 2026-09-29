@@ -657,6 +657,7 @@ body.conversations-page .transcript-turn.assistant .speaker-avatar,body.conversa
 
 /* Compact conversations containment: keep horizontal nav scrolling inside its rail. */
 @media(max-width:980px){
+  body.conversations-page .conversation-layout{grid-template-columns:1fr}
   body.conversations-page .rv-topbar{width:100%;max-width:100%;min-width:0}
   body.conversations-page .rv-topbar>*{max-width:100%;min-width:0}
   body.conversations-page .rv-nav{width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-inline:contain}
