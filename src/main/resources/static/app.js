@@ -663,14 +663,58 @@ aiForm.addEventListener("submit", async event => {
     await analyzeBusiness(sourceUrl, businessName);
 });
 
+function openSettingsValidationSection(section, target = null) {
+    if (typeof window.helvocaOpenSettingsSection === "function") {
+        window.helvocaOpenSettingsSection(section);
+    }
+    if (target && typeof target.focus === "function") {
+        requestAnimationFrame(() => {
+            if (!target.isConnected) return;
+            target.focus();
+            target.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+    }
+}
+
+function settingsSectionForInvalidControl(control) {
+    if (!control || !setupForm.contains(control)) return null;
+    if (control.closest("#servicesList")) return "services";
+    if (control.closest("#hoursGrid")) return "hours";
+    if (control.closest("#knowledgeList")) return "responses";
+    if (control.name === "agentGreeting" ||
+        control.name === "agentName" ||
+        control.name === "agentVoice" ||
+        control.name === "agentInstructions" ||
+        control.name === "agentActive" ||
+        control.name === "agentCapability") return "receptionist";
+    return "business";
+}
+
+setupForm.addEventListener("invalid", event => {
+    const section = settingsSectionForInvalidControl(event.target);
+    if (section) openSettingsValidationSection(section, event.target);
+}, true);
+
 setupForm.addEventListener("submit", async event => {
     event.preventDefault();
     clearMessage(setupMessage);
     const services = collectServices();
     const hours = collectHours();
-    if (!services.length) { showMessage(setupMessage, "Añade al menos un servicio antes de guardar."); return; }
-    if (!hours.length) { showMessage(setupMessage, "Configura al menos un intervalo de atención."); return; }
-    if (!setupForm.elements.agentGreeting.value.trim()) { showMessage(setupMessage, "Define el saludo inicial del agente."); return; }
+    if (!services.length) {
+        showMessage(setupMessage, "Añade al menos un servicio antes de guardar.");
+        openSettingsValidationSection("services", $("#servicesList [data-field=name]"));
+        return;
+    }
+    if (!hours.length) {
+        showMessage(setupMessage, "Configura al menos un intervalo de atención.");
+        openSettingsValidationSection("hours", $("#addHourBtn"));
+        return;
+    }
+    if (!setupForm.elements.agentGreeting.value.trim()) {
+        showMessage(setupMessage, "Define el saludo inicial del agente.");
+        openSettingsValidationSection("receptionist", setupForm.elements.agentGreeting);
+        return;
+    }
     setBusy(setupForm, true);
     try {
         const payload = {
