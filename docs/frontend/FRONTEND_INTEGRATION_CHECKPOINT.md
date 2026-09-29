@@ -67,7 +67,7 @@
 - Foundation is the final shared visual authority. Feature CSS owns local composition only.
 - Shared primary customer navigation has a 14px readability floor.
 - Customer-facing controls/actions and operational copy received readability hardening; compact metadata is kept secondary.
-- Decorative Foundation gradients were removed. The obsolete decorative waveform markup and styles were removed. Functional state indicators and loading shimmer may remain.
+- Decorative gradients were removed from Foundation, shared legacy styles and the public Sales surface. The obsolete decorative waveform markup and styles were removed. Functional state indicators and loading shimmer may remain.
 
 ## Cross-product regression protection
 `e2e/frontend-finish-integration.spec.js` enforces:
@@ -76,7 +76,8 @@
 - dark solid canonical Foundation;
 - Recepcionista IA local history/simulator semantics;
 - no horizontal overflow at **390, 768 and 1440 px** across all principal customer surfaces;
-- keyboard reachability of primary customer navigation at **390, 768 and 1440 px**.
+- keyboard reachability of primary customer navigation at **390, 768 and 1440 px**;
+- no decorative gradients in shared `styles.css` or public `sales.css`.
 
 Existing vertical E2E additionally covers:
 - Dashboard loading/ready/empty/error and attention hierarchy;
@@ -94,13 +95,17 @@ A previously integrated HEAD `712f01e22816f42392bc1adfe0afa47491c7ab2c` passed r
 - Full `test` — SUCCESS
 - browser E2E — 105/105 GREEN
 
-That evidence became stale after final hardening. Changes after that certified HEAD are limited to:
+That evidence became stale after final hardening. Changes after that certified HEAD include:
 - required-width integration coverage expanded to 390/768/1440;
 - keyboard navigation integration coverage;
 - removal of obsolete waveform CSS;
-- removal of the temporary integration-only workflow.
+- removal of the temporary integration-only workflow;
+- final human-review cleanup of decorative gradients in shared legacy styles and the public Sales surface;
+- an integration contract preventing those gradients from returning.
 
-Implementation parent immediately before this checkpoint: `1060aa314ae644c0c5d8b8911a0422d1015c09c9`.
+Final human/integration review treated enum mapping keys as implementation details, verified simulator POST requests remain confined to safe simulator session endpoints, and found no customer navigation link to internal Operations.
+
+Implementation parent immediately before this checkpoint: `cda4f3e58723f561ae1fe8bdacfb73e6319067be`.
 
 ## Resume protocol
 1. Read this checkpoint and PR #618 before changing code.
