@@ -28,6 +28,16 @@ test.describe('public authentication visual refresh', () => {
     }
   });
 
+  test('serves the new visual assets to unauthenticated visitors', async ({ request }) => {
+    const css = await request.get('/auth-visual-refresh.css');
+    const hero = await request.get('/recepvoz-auth-hero.svg');
+
+    expect(css.status()).toBe(200);
+    expect(hero.status()).toBe(200);
+    expect(css.headers()['content-type']).toContain('text/css');
+    expect(hero.headers()['content-type']).toContain('image/svg+xml');
+  });
+
   test('motion remains nonessential when reduced motion is requested', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
