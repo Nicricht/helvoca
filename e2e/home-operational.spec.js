@@ -2295,11 +2295,12 @@ test('dashboard prioritizes calls, attention, recent activity and quick access',
 
   const quick = page.locator('#ownerQuickActions');
   await expect(quick).toBeVisible();
-  await expect(quick.getByRole('link', { name: 'Reservas' })).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
+  await expect(quick.getByRole('link', { name: 'Agenda' })).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
   await expect(quick.getByRole('link', { name: 'Clientes' })).toHaveAttribute('href', '/?tab=customers#homeBusinessWorkspace');
-  await expect(quick.getByRole('link', { name: 'Recepcionista IA' })).toHaveAttribute('href', '/conversations.html');
+  await expect(quick.getByRole('link', { name: 'Conversaciones' })).toHaveAttribute('href', '/conversations.html');
   await expect(quick.getByRole('link', { name: 'Inventario' })).toHaveAttribute('href', '/inventory.html');
   await expect(quick.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/settings.html');
+  await expect(quick.getByRole('link', { name: 'Facturación' })).toHaveAttribute('href', '/account.html');
 
   await expect(page.locator('#ownerDashboardState')).toHaveAttribute('role', 'status');
   await expect(page.locator('#ownerDashboardMessage')).toHaveAttribute('aria-live', 'polite');
