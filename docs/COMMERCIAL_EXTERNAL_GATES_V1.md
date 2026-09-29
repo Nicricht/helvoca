@@ -4,13 +4,15 @@
 
 Automated application certification is not the same as permission to activate external providers.
 
-This document tracks the remaining gates that depend on a human, an external provider account, or repository administration.
+This document tracks gates that depend on a human, an external provider account, repository administration, or tenant-specific launch approval.
 
 ## Gate A — Human voice / carrier certification
 
-Status: **PENDING EXTERNAL AUTHORIZATION**
+Status: **CONTROLLED HUMAN CALL COMPLETE / FULL TENANT-SPECIFIC CARRIER MATRIX STILL REQUIRED WHEN VOICE IS IN SCOPE**
 
-The automated voice lifecycle suite proves the software contract. A human-controlled real call must still confirm:
+A controlled human call was completed on September 27, 2026 using Gemini Live, Sulafat and Hybrid VAD. The repository records Sulafat consistency, acceptable perceived response latency, a complete farewell and clean `end_call`; the human listening final also selected Sulafat as the primary youthful female production voice.
+
+That evidence closes voice selection and the basic controlled-call gate. It does **not** by itself prove that every carrier/interaction condition below was exercised and recorded for the specific first-customer tenant. If real voice is included in that pilot, the authorized tenant-specific channel certification must confirm:
 
 - Sulafat remains the same female voice throughout;
 - Chilean Spanish sounds natural for the target customer;
@@ -23,7 +25,7 @@ The automated voice lifecycle suite proves the software contract. A human-contro
 - carrier hangup occurs after the last audible word;
 - no residual audio occurs after hangup.
 
-Do not run this gate while real-call certification is prohibited.
+Do not place another real call merely to satisfy CI. Tenant-specific real-carrier confirmation is allowed only inside an explicitly authorized launch window with the pilot safety cage active.
 
 ## Gate B — Mercado Pago SaaS sandbox provider round-trip
 
