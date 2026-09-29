@@ -156,8 +156,8 @@ test('simulator uses dark safe UI, progress feedback and human action labels', a
     bg: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
     surface: getComputedStyle(document.documentElement).getPropertyValue('--surface').trim()
   }));
-  expect(palette.bg).toBe('#070a10');
-  expect(palette.surface).toBe('#0d131d');
+  expect(palette.bg).toBe('#06111c');
+  expect(palette.surface).toBe('#0b1b29');
 });
 
 
