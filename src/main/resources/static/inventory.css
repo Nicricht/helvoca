@@ -29,7 +29,7 @@
 .inventory-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:11px; margin:18px 0; }
 .inventory-kpi {
     min-height:114px; padding:18px; border:1px solid var(--border); border-radius:16px;
-    background:linear-gradient(180deg,rgba(23,30,43,.88),rgba(16,21,31,.88));
+    background:var(--surface-2);
 }
 .inventory-kpi span,.inventory-kpi small { display:block; }
 .inventory-kpi span { color:var(--muted); font-size:11px; font-weight:750; text-transform:uppercase; letter-spacing:.08em; }
