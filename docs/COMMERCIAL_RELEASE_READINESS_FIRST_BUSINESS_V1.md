@@ -10,15 +10,15 @@ Technical readiness and permission to activate are separate decisions.
 
 ## Certified software baseline
 
-- main ancestor: `8dc165d102a4157fdc6e3cd38b51b76b70b388d1`
-- certified frontend / first-business RC source: `dbba4d7260c96763c13a0c56d4c1cb108d4986ca`
-- RC safe CI: `36522962888` — SUCCESS
-- backend: 1330 / 1330
-- Golden Journey sandbox: 59 / 59
-- browser E2E: 118 / 118
-- production source changes in RC hardening: none
+The commercial recertification now targets the current reviewed and deployed application baseline:
 
-The RC source is a descendant of the current reviewed `main` baseline, not a divergent branch.
+- production application baseline: `main@8ec4d007c29a5e938140828da8bd6f34c152bbaf`;
+- `helvoca/full-verification`: SUCCESS on that baseline;
+- Railway deployment: SUCCESS for that exact SHA;
+- recent production HTTP sample: 301 requests with 0 responses in the 5xx class;
+- current commercial certification workflow derives its comparison and differential-coverage base from live `origin/main`, rather than historical hardcoded SHAs.
+
+The reusable safe gate runs only on dedicated `cert/commercial-readiness-*` branches and still performs the focused launch-cage contracts, commercial rehearsal, complete backend suite, JavaScript validation and browser E2E before certification is accepted.
 
 ## Commercial gates
 
@@ -38,6 +38,8 @@ The repository does not contain explicit recorded human evidence for every carri
 ### B. Mercado Pago SaaS billing
 
 **PROVIDER TEST ROUND-TRIP PENDING**
+
+Production configuration review on 2026-09-29 confirms the automated checkout must remain fail-closed: Mercado Pago enablement/access-token variables are present, while the webhook secret and back URL are not currently present in the Railway production variable set. No credentials were read and no provider transaction was attempted.
 
 The fail-closed sandbox harness and billing state machine are tested. The missing proof is an authorized Mercado Pago TEST-account round trip with:
 - TEST credentials;
