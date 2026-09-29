@@ -6,7 +6,7 @@
 
     const style = document.createElement('style');
     style.textContent = `
-        .provisioning-panel { margin: 8px 0 10px; padding: 10px; border: 1px solid rgba(124,92,255,.24); border-radius: 11px; background: rgba(124,92,255,.055); }
+        .provisioning-panel { margin: 8px 0 10px; padding: 10px; border: 1px solid var(--rv-brand-border, rgba(124,92,255,.24)); border-radius: 11px; background: var(--rv-brand-soft, rgba(124,92,255,.055)); }
         .provisioning-panel h3 { margin: 0 0 4px; font-size: 13px; }
         .provisioning-panel p { margin: 0 0 8px; font-size: 11px; line-height: 1.4; }
         .provisioning-status { display: inline-flex; min-height: 26px; margin-bottom: 8px; font-size: 10px; }
