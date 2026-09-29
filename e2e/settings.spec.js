@@ -765,3 +765,38 @@ test('settings validation opens Recepcionista when greeting is missing', async (
   await expect(page.locator('#configAgentPanel')).toBeVisible();
   await expect(page.locator('.ux-config-nav [data-settings-section="receptionist"]')).toHaveAttribute('aria-current', 'page');
 });
+
+
+test('settings core navigation remains usable at 390 768 and 1440 widths', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockSettings(page);
+
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/settings.html');
+
+    expect(await page.evaluate(() =>
+      document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
+    )).toBe(true);
+
+    const business = page.locator('.ux-config-nav [data-settings-section="business"]');
+    const services = page.locator('.ux-config-nav [data-settings-section="services"]');
+    const hours = page.locator('.ux-config-nav [data-settings-section="hours"]');
+    const receptionist = page.locator('.ux-config-nav [data-settings-section="receptionist"]');
+
+    await expect(business).toBeVisible();
+    await expect(services).toBeVisible();
+    await expect(hours).toBeVisible();
+    await expect(receptionist).toBeVisible();
+    await expect(page.getByRole('button', { name: '💾 Guardar cambios', exact: true })).toBeVisible();
+
+    await business.focus();
+    await expect(business).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(services).toBeFocused();
+
+    await hours.click();
+    await expect(page.locator('#configHoursPanel')).toBeVisible();
+    await expect(hours).toHaveAttribute('aria-current', 'page');
+  }
+});
