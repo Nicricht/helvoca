@@ -69,6 +69,14 @@ test.describe('RecepVoz frontend frame contract', () => {
     expect(template).toContain('Cross-screen evidence');
   });
 
+  test('Fast Gate enforces the frame seal before Full Gate', async () => {
+    const fastGate = read('scripts/ci/fast-gate.sh');
+    const checker = path.join(ROOT, 'scripts', 'ci', 'check-frontend-frame-contract.js');
+
+    expect(fs.existsSync(checker)).toBeTruthy();
+    expect(fastGate).toContain('check-frontend-frame-contract.js');
+  });
+
   test('canonical foundation exclusively owns the protected frame namespace', async () => {
     const foundation = read('src/main/resources/static/frontend-foundation.css');
 
