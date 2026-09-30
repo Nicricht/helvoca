@@ -2,6 +2,8 @@ package cl.helvoca.onboarding;
 
 import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.security.TenantProvider;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
@@ -97,9 +99,9 @@ class BusinessImportPreviewServiceCoverageTest {
         HttpClient http = mock(HttpClient.class);
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(200);
-        when(response.body()).thenReturn("""
-                {"output_text":"{\"products\":[{\"name\":\"Doble Bacon\",\"price\":8490,\"currency\":\"CLP\",\"sku\":\"BAC-01\",\"onHand\":7,\"category\":\"Hamburguesas\",\"confidence\":0.9}],\"warnings\":[]}"}
-                """);
+        when(response.body()).thenReturn(new JSONObject()
+                .put("output_text", "{\"products\":[{\"name\":\"Doble Bacon\",\"price\":8490,\"currency\":\"CLP\",\"sku\":\"BAC-01\",\"onHand\":7,\"category\":\"Hamburguesas\",\"confidence\":0.9}],\"warnings\":[]}")
+                .toString());
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
 
         BusinessImportPreviewService service =
@@ -127,9 +129,12 @@ class BusinessImportPreviewServiceCoverageTest {
         HttpClient http = mock(HttpClient.class);
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(200);
-        when(response.body()).thenReturn("""
-                {"output":[{"content":[{"type":"output_text","text":"{\"products\":[],\"warnings\":[\"Solo horarios visibles\"]}"}]}]}
-                """);
+        when(response.body()).thenReturn(new JSONObject()
+                .put("output", new JSONArray().put(new JSONObject()
+                        .put("content", new JSONArray().put(new JSONObject()
+                                .put("type", "output_text")
+                                .put("text", "{\"products\":[],\"warnings\":[\"Solo horarios visibles\"]}")))))
+                .toString());
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
 
         BusinessImportPreviewService service =
