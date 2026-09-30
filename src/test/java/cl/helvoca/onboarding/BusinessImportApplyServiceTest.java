@@ -4,6 +4,9 @@ import cl.helvoca.catalog.CatalogItem;
 import cl.helvoca.catalog.UniversalCatalogService;
 import cl.helvoca.inventory.InventoryService;
 import cl.helvoca.security.TenantProvider;
+import cl.helvoca.servicecatalog.ServiceCatalogService;
+import cl.helvoca.servicecatalog.ServiceItemRequest;
+import cl.helvoca.servicecatalog.ServiceItemResponse;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -139,13 +142,15 @@ class BusinessImportApplyServiceTest {
         TenantProvider tenant = mock(TenantProvider.class);
         UniversalCatalogService catalog = mock(UniversalCatalogService.class);
         InventoryService inventory = mock(InventoryService.class);
+        ServiceCatalogService services = mock(ServiceCatalogService.class);
         when(tenant.requireBusinessId()).thenReturn(businessId);
         when(catalog.list()).thenReturn(List.of());
         when(inventory.list()).thenReturn(List.of());
-        when(catalog.create(any())).thenAnswer(inv -> {
-            UniversalCatalogService.ItemInput input = inv.getArgument(0);
-            return new UniversalCatalogService.ItemView(serviceId, input.kind(), input.name(), input.description(),
-                    input.price(), input.currency(), input.durationMinutes(), input.metadataJson(), true, null);
+        when(services.list()).thenReturn(List.of());
+        when(services.create(any())).thenAnswer(inv -> {
+            ServiceItemRequest input = inv.getArgument(0);
+            return new ServiceItemResponse(serviceId, input.name(), input.description(),
+                    input.durationMinutes(), input.price(), true, null, null);
         });
 
         BusinessImportApplyService.ProductInput serviceInput =
@@ -156,15 +161,16 @@ class BusinessImportApplyServiceTest {
                         .newInstance("Consulta Veterinaria", "Evaluación general", new BigDecimal("20000"), "CLP",
                                 null, null, "Consulta", CatalogItem.Kind.SERVICE, 30, "servicios.csv");
 
-        var service = new BusinessImportApplyService(catalog, inventory, tenant);
+        var service = businessImportService(catalog, inventory, tenant, services);
         var result = service.apply(new BusinessImportApplyService.ApplyRequest(List.of(serviceInput)));
 
         assertEquals(1, result.created());
         assertEquals(0, result.inventoryConfigured());
-        verify(catalog).create(argThat(input ->
-                input.kind() == CatalogItem.Kind.SERVICE
-                        && Integer.valueOf(30).equals(input.durationMinutes())
-                        && input.name().equals("Consulta Veterinaria")));
+        verify(services).create(argThat(input ->
+                Integer.valueOf(30).equals(input.durationMinutes())
+                        && input.name().equals("Consulta Veterinaria")
+                        && input.price().compareTo(new BigDecimal("20000")) == 0));
+        verify(catalog, never()).create(any());
         verify(inventory, never()).configure(any(), any());
     }
 
@@ -175,17 +181,17 @@ class BusinessImportApplyServiceTest {
         TenantProvider tenant = mock(TenantProvider.class);
         UniversalCatalogService catalog = mock(UniversalCatalogService.class);
         InventoryService inventory = mock(InventoryService.class);
+        ServiceCatalogService services = mock(ServiceCatalogService.class);
         when(tenant.requireBusinessId()).thenReturn(businessId);
-
-        UniversalCatalogService.ItemView existing = new UniversalCatalogService.ItemView(
-                serviceId, CatalogItem.Kind.SERVICE, "Consulta Veterinaria", null,
-                new BigDecimal("18000"), "CLP", 20, null, true, null);
-        when(catalog.list()).thenReturn(List.of(existing));
+        when(catalog.list()).thenReturn(List.of());
         when(inventory.list()).thenReturn(List.of());
-        when(catalog.update(eq(serviceId), any())).thenAnswer(inv -> {
-            UniversalCatalogService.ItemInput input = inv.getArgument(1);
-            return new UniversalCatalogService.ItemView(serviceId, input.kind(), input.name(), input.description(),
-                    input.price(), input.currency(), input.durationMinutes(), input.metadataJson(), true, null);
+        when(services.list()).thenReturn(List.of(new ServiceItemResponse(
+                serviceId, "Consulta Veterinaria", null, 20,
+                new BigDecimal("18000"), true, null, null)));
+        when(services.update(eq(serviceId), any())).thenAnswer(inv -> {
+            ServiceItemRequest input = inv.getArgument(1);
+            return new ServiceItemResponse(serviceId, input.name(), input.description(),
+                    input.durationMinutes(), input.price(), true, null, null);
         });
 
         BusinessImportApplyService.ProductInput serviceInput =
@@ -196,16 +202,29 @@ class BusinessImportApplyServiceTest {
                         .newInstance("Consulta Veterinaria", null, new BigDecimal("20000"), "CLP",
                                 null, null, "Consulta", CatalogItem.Kind.SERVICE, 30, "servicios.csv");
 
-        var service = new BusinessImportApplyService(catalog, inventory, tenant);
+        var service = businessImportService(catalog, inventory, tenant, services);
         var result = service.apply(new BusinessImportApplyService.ApplyRequest(List.of(serviceInput)));
 
         assertEquals(0, result.created());
         assertEquals(1, result.updated());
-        verify(catalog, never()).create(any());
-        verify(catalog).update(eq(serviceId), argThat(input ->
-                input.kind() == CatalogItem.Kind.SERVICE
-                        && Integer.valueOf(30).equals(input.durationMinutes())
+        verify(services, never()).create(any());
+        verify(services).update(eq(serviceId), argThat(input ->
+                Integer.valueOf(30).equals(input.durationMinutes())
                         && input.price().compareTo(new BigDecimal("20000")) == 0));
+        verify(catalog, never()).update(any(), any());
         verify(inventory, never()).configure(any(), any());
     }
+    private static BusinessImportApplyService businessImportService(
+            UniversalCatalogService catalog,
+            InventoryService inventory,
+            TenantProvider tenant,
+            ServiceCatalogService services) throws Exception {
+        return BusinessImportApplyService.class.getDeclaredConstructor(
+                        UniversalCatalogService.class,
+                        InventoryService.class,
+                        TenantProvider.class,
+                        ServiceCatalogService.class)
+                .newInstance(catalog, inventory, tenant, services);
+    }
+
 }
