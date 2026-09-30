@@ -25,12 +25,14 @@ class BookingLifecycleServiceTest {
         TenantProvider tenant = mock(TenantProvider.class);
         AuditService audit = mock(AuditService.class);
 
-        Booking booking = mock(Booking.class);
-        when(booking.getId()).thenReturn(bookingId);
-        when(booking.getBusinessId()).thenReturn(businessId);
-        when(booking.getOperationId()).thenReturn(operationId);
-        when(booking.getStatus()).thenReturn(BookingStatus.CONFIRMED, BookingStatus.COMPLETED);
-        when(booking.getStartAt()).thenReturn(Instant.now().minusSeconds(3600));
+        Booking booking = new Booking();
+        booking.setBusinessId(businessId);
+        booking.setOperationId(operationId);
+        booking.setCustomerId(UUID.randomUUID());
+        booking.setServiceId(UUID.randomUUID());
+        booking.setStartAt(Instant.now().minusSeconds(3600));
+        booking.setEndAt(Instant.now().minusSeconds(1800));
+        booking.setStatus(BookingStatus.CONFIRMED);
 
         BusinessOperation operation = new BusinessOperation();
         operation.setId(operationId);
@@ -46,7 +48,7 @@ class BookingLifecycleServiceTest {
         BookingLifecycleService service = new BookingLifecycleService(bookings, operations, tenant, audit);
         service.complete(bookingId);
 
-        verify(booking).setStatus(BookingStatus.COMPLETED);
+        assertEquals(BookingStatus.COMPLETED, booking.getStatus());
         assertEquals(BusinessOperation.Status.COMPLETED, operation.getStatus());
         assertEquals("COMPLETED", operation.getMetadata().get("attendanceStatus"));
         verify(operations).saveAndFlush(operation);
