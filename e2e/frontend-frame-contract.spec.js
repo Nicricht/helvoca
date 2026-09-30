@@ -115,6 +115,18 @@ test.describe('RecepVoz frontend frame contract', () => {
     expect(violations).toEqual([]);
   });
 
+
+  test('desktop authenticated rail paints readable navigation labels explicitly', async () => {
+    const foundation = read('src/main/resources/static/frontend-foundation.css');
+
+    expect(foundation).toContain('/* Desktop authenticated rail label visibility contract. */');
+    expect(foundation).toContain('color:var(--rv-text-secondary)');
+    expect(foundation).toContain('opacity:1');
+    expect(foundation).toContain('visibility:visible');
+    expect(foundation).toContain('text-indent:0');
+    expect(foundation).toContain('-webkit-text-fill-color:currentColor');
+  });
+
   test('frame primitives stay contained at canonical viewports', async ({ page }) => {
     const foundation = read('src/main/resources/static/frontend-foundation.css');
 
