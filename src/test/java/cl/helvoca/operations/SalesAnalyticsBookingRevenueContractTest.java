@@ -57,8 +57,8 @@ class SalesAnalyticsBookingRevenueContractTest {
         booking.setSource(BusinessOrder.Source.WHATSAPP);
         booking.setTotal(new BigDecimal("15000"));
         booking.setCurrency("CLP");
-        when(operations.findByIdAndBusinessId(bookingOperationId, businessId))
-                .thenReturn(Optional.of(booking));
+        when(operations.findAllById(anyCollection()))
+                .thenReturn(List.of(booking));
 
         SalesAnalyticsService service = SalesAnalyticsService.class
                 .getConstructor(
@@ -117,8 +117,8 @@ class SalesAnalyticsBookingRevenueContractTest {
         noShow.setSource(BusinessOrder.Source.MANUAL);
         noShow.setTotal(new BigDecimal("15000"));
         noShow.setCurrency("CLP");
-        when(operations.findByIdAndBusinessId(bookingOperationId, businessId))
-                .thenReturn(Optional.of(noShow));
+        when(operations.findAllById(anyCollection()))
+                .thenReturn(List.of(noShow));
 
         SalesAnalyticsService service = SalesAnalyticsService.class
                 .getConstructor(
