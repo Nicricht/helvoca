@@ -22,6 +22,8 @@ test('release candidate captures exact-head visual evidence for every canonical 
   const rc = read('e2e/frontend-release-candidate.spec.js');
 
   expect(rc).toContain('visual-evidence');
+  expect(rc).toContain('process.env.VISUAL_EVIDENCE_SHA');
+  expect(rc).not.toContain("process.env.GITHUB_SHA || 'local'");
 
   for (const width of [1536, 1440, 1366, 1280, 768, 390]) {
     expect(rc).toContain(`width: ${width}`);
@@ -46,4 +48,5 @@ test('full CI always uploads visual evidence even when the test suite passes', a
   expect(workflow).toMatch(/- name: Upload frontend visual evidence\n\s+if: always\(\)/);
   expect(workflow).toContain('name: frontend-visual-evidence');
   expect(workflow).toContain('test-results/visual-evidence/**');
+  expect(workflow).toContain('VISUAL_EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}');
 });
