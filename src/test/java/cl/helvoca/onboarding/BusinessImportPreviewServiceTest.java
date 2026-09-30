@@ -127,4 +127,32 @@ class BusinessImportPreviewServiceTest {
         assertEquals(120, proposal.getClass().getMethod("durationMinutes").invoke(proposal));
         assertTrue(preview.warnings().stream().anyMatch(w -> w.toLowerCase().contains("desde")));
     }
+    @Test
+    void semanticServicePreservesKindDurationAndDropsInventoryFacts() {
+        String json = """
+                {
+                  "products":[
+                    {"name":"Consulta veterinaria","kind":"SERVICE","durationMinutes":45,
+                     "price":20000,"currency":"CLP","sku":"SHOULD-NOT-EXIST","onHand":99,
+                     "category":"Consulta","confidence":0.91}
+                  ],
+                  "warnings":[]
+                }
+                """;
+
+        BusinessImportPreviewService.SemanticResult result =
+                BusinessImportPreviewService.parseSemanticResult(json, "tarifario.pdf");
+
+        assertEquals(1, result.products().size());
+        Object proposal = result.products().getFirst();
+        try {
+            assertEquals("SERVICE", String.valueOf(proposal.getClass().getMethod("kind").invoke(proposal)));
+            assertEquals(45, proposal.getClass().getMethod("durationMinutes").invoke(proposal));
+            assertNull(proposal.getClass().getMethod("sku").invoke(proposal));
+            assertNull(proposal.getClass().getMethod("onHand").invoke(proposal));
+        } catch (ReflectiveOperationException e) {
+            fail(e);
+        }
+    }
+
 }
