@@ -88,6 +88,35 @@ class BusinessImportRealWorldCorpusTest {
                 w.toLowerCase().contains("procedimiento") || w.toLowerCase().contains("precio")));
     }
 
+    @Test
+    void serviceWithUnrecognizedDurationKeepsDurationUnknownAndAddsReviewWarning() {
+        String csv = """
+                Servicio;Precio;Duración
+                Evaluación especial;$25.000;depende del caso
+                """;
+
+        var result = new BusinessImportSpreadsheetParser().parse(file("duracion-rara.csv", csv));
+
+        assertEquals(BusinessImportSpreadsheetParser.DatasetKind.SERVICES, result.kind());
+        assertNull(result.products().getFirst().durationMinutes());
+        assertTrue(result.warnings().stream().anyMatch(w -> w.toLowerCase().contains("duración no reconocida")));
+    }
+
+    @Test
+    void durationNormalizerCoversHumanHourMinuteFormatsAndRejectsInvalidValues() {
+        assertNull(BusinessImportSpreadsheetParser.parseDurationMinutes(null));
+        assertNull(BusinessImportSpreadsheetParser.parseDurationMinutes("  "));
+        assertEquals(120, BusinessImportSpreadsheetParser.parseDurationMinutes("2 horas"));
+        assertEquals(30, BusinessImportSpreadsheetParser.parseDurationMinutes("30 minutos"));
+        assertEquals(90, BusinessImportSpreadsheetParser.parseDurationMinutes("1 h 30 min"));
+        assertEquals(45, BusinessImportSpreadsheetParser.parseDurationMinutes("45"));
+        assertNull(BusinessImportSpreadsheetParser.parseDurationMinutes("0 h"));
+        assertNull(BusinessImportSpreadsheetParser.parseDurationMinutes("0 min"));
+        assertNull(BusinessImportSpreadsheetParser.parseDurationMinutes("1 h 70 min"));
+        assertNull(BusinessImportSpreadsheetParser.parseDurationMinutes("depende"));
+        assertNull(BusinessImportSpreadsheetParser.parseDurationMinutes("999999999999999999999999 h"));
+    }
+
     private static MockMultipartFile file(String name, String csv) {
         return new MockMultipartFile(
                 "files", name, "text/csv", csv.getBytes(StandardCharsets.UTF_8));
