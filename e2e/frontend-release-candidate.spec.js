@@ -331,7 +331,7 @@ test('release candidate captures exact-head visual evidence for every canonical 
   await mockReleaseCandidate(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
 
-  const head = (process.env.GITHUB_SHA || 'local').slice(0, 12);
+  const head = (process.env.VISUAL_EVIDENCE_SHA || 'local').slice(0, 12);
   const evidenceDir = path.resolve('test-results', 'visual-evidence', head);
   fs.mkdirSync(evidenceDir, { recursive: true });
 
