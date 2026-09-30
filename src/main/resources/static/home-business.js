@@ -34,6 +34,23 @@
   let loading = false;
   let incidentDraft = null;
 
+  const workspaceTabValues = ["bookings", "orders", "sales", "requests", "customers", "audit"];
+  const workspaceHashTabs = {
+    "#bookings": "bookings",
+    "#orders": "orders",
+    "#sales": "sales",
+    "#requests": "requests",
+    "#customers": "customers",
+    "#audit": "audit"
+  };
+  const workspaceParams = new URLSearchParams(window.location.search);
+  const queryWorkspaceTab = workspaceParams.get("tab");
+  const requestedTab = workspaceTabValues.includes(queryWorkspaceTab)
+    ? queryWorkspaceTab
+    : (workspaceHashTabs[window.location.hash] || null);
+  const workspaceExplicitlyRequested = Boolean(requestedTab) || window.location.hash === "#homeBusinessWorkspace";
+  root.classList.toggle("owner-collapsed", !workspaceExplicitlyRequested);
+
   const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;" }[c]));
   const fmt = value => {
     if (!value) return "";
@@ -2651,7 +2668,6 @@
   ensureBookingDrawer();
   bindOrderFilters();
   bindSalesAnalyticsPeriod();
-  const requestedTab = new URLSearchParams(window.location.search).get("tab");
-  setTab(["bookings","orders","sales","requests","customers"].includes(requestedTab) ? requestedTab : "bookings");
+  setTab(workspaceTabValues.includes(requestedTab) ? requestedTab : "bookings");
   queueMicrotask(load);
 })();
