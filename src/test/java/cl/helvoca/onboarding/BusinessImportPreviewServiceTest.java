@@ -102,4 +102,29 @@ class BusinessImportPreviewServiceTest {
         assertEquals(1.0, result.products().get(1).confidence());
         assertTrue(result.warnings().contains("Revisar promoción"));
     }
+
+    @Test
+    void spreadsheetServicePreviewPreservesCatalogKindDurationAndWarnings() throws Exception {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), new OpenAiRealtimeProperties(), tenant);
+
+        MockMultipartFile services = new MockMultipartFile(
+                "files", "servicios.csv", "text/csv", """
+                Servicio;Precio;Duración;Categoría
+                Balayage;Desde $100.000;2 h;Coloración
+                """.getBytes(StandardCharsets.UTF_8));
+
+        BusinessImportPreviewService.Preview preview =
+                service.preview("Salón Aurora", List.of(services));
+
+        assertEquals(BusinessImportSpreadsheetParser.DatasetKind.SERVICES, preview.sources().getFirst().kind());
+        assertEquals(1, preview.products().size());
+        Object proposal = preview.products().getFirst();
+        assertEquals("SERVICE", String.valueOf(proposal.getClass().getMethod("kind").invoke(proposal)));
+        assertEquals(120, proposal.getClass().getMethod("durationMinutes").invoke(proposal));
+        assertTrue(preview.warnings().stream().anyMatch(w -> w.toLowerCase().contains("desde")));
+    }
 }
