@@ -8,6 +8,7 @@ import cl.helvoca.payment.BusinessPayment;
 import cl.helvoca.payment.BusinessPaymentRepository;
 import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
