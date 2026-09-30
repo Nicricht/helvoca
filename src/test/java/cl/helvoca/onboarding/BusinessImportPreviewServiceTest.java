@@ -155,4 +155,24 @@ class BusinessImportPreviewServiceTest {
         }
     }
 
+    @Test
+    void semanticServiceWithoutExplicitDurationStaysNullAndWarnsForReview() {
+        String json = """
+                {
+                  "products":[
+                    {"name":"Cirugía veterinaria","kind":"SERVICE","price":null,"currency":"CLP","confidence":0.8}
+                  ],
+                  "warnings":[]
+                }
+                """;
+
+        BusinessImportPreviewService.SemanticResult result =
+                BusinessImportPreviewService.parseSemanticResult(json, "tarifario.pdf");
+
+        assertEquals(1, result.products().size());
+        assertNull(result.products().getFirst().durationMinutes());
+        assertTrue(result.warnings().stream().anyMatch(w ->
+                w.toLowerCase().contains("duración") && w.contains("Cirugía veterinaria")));
+    }
+
 }
