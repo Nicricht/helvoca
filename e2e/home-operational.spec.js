@@ -2413,7 +2413,9 @@ test('sales analytics turns paid orders into decision-ready business statistics'
   await expect(page.locator('#homeSalesTopProducts')).toContainText('Hamburguesa Doble');
   await expect(page.locator('#homeSalesTopProducts')).toContainText('42 unidades');
   await expect(page.locator('#homeSalesTopRevenue')).toContainText('Combo Familiar');
-  await expect(page.locator('#homeSalesTopRevenue')).toContainText('
+  await expect(page.locator('#homeSalesTopRevenue')).toContainText('$');
+  await expect(page.locator('#homeSalesChannels')).toContainText('WhatsApp');
+  await expect(page.locator('#homeSalesChannels')).toContainText('58,5%');
   await expect(page.locator('#homeSalesPeak')).toContainText('Sábado');
   await expect(page.locator('#homeSalesPeak')).toContainText('19:00');
   await expect(page.locator('#homeSalesRecepVozImpact')).toContainText('73');
