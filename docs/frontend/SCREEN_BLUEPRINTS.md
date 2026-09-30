@@ -109,61 +109,62 @@ It must not reduce the landing experience to “large empty card + login box”.
 
 ### User question
 
-“What is happening in my business right now?”
+“What is happening in my business right now, what needs attention, and where should I go next?”
 
 ### Header
 
 Title: **Inicio**
 
-Supporting text: short operational summary, e.g. “Resumen de tu negocio en tiempo real”.
+The first operational heading is **Qué está pasando hoy**. The screen is an owner cockpit, not a generic analytics wall.
 
-Top-right context:
+### Primary hierarchy
 
-- date/window selector, e.g. Últimos 7 días;
-- no unnecessary settings clutter.
+The current composition must preserve this order of importance:
 
-### First row: KPI cards
+1. **Qué está pasando hoy** — a compact operational summary of the day;
+2. **Necesita tu atención** — unresolved items or exceptions that require the owner;
+3. **Actividad reciente** — recent calls, bookings and business events in human language;
+4. **Accesos rápidos** — direct routes to Agenda, Clientes, Conversaciones, Inventario, Configuración and Facturación.
 
-Reference structure uses four equally legible KPI cards:
+Daily metrics may support the summary, but they must not recreate the obsolete four-equal-KPI dashboard or overpower owner action.
 
-- Llamadas recibidas;
-- Citas agendadas;
-- Clientes nuevos;
-- Tasa de conversión.
+### Ventas y rendimiento
 
-Each card contains:
+**Ventas y rendimiento** lives inside the authenticated home workspace as a dedicated decision surface.
 
-- label;
-- dominant metric;
-- trend/delta where meaningful;
-- one restrained semantic icon.
+It includes:
 
-Metrics are visually dominant. Icons support the metric; they do not become decoration.
+- confirmed collections;
+- paid orders;
+- units sold;
+- average ticket;
+- 7 / 30 / 90 day period controls;
+- **Ventas en el tiempo**;
+- “Más pedidos” and “Mayor facturación” product rankings;
+- channel mix;
+- strongest weekday/hour;
+- **Gestionado por voz y WhatsApp**;
+- concise measured insights.
 
-### Second row
+The voice/WhatsApp impact block describes orders whose recorded source was Voice or WhatsApp. It must not present that number as causal ROI.
 
-Left, larger analytical panel:
-
-**Llamadas y citas**
-- simple chart;
-- two series;
-- restrained grid;
-- readable labels;
-- enough height to scan weekly behavior.
-
-Right:
-
-**Últimas conversaciones**
-- 4–6 recent items;
-- channel/avatar cue;
-- phone/name;
-- short preview;
-- relative time;
-- “Ver todas”.
+If multiple currencies exist, currency totals remain separated and aggregate revenue, average ticket or trend must not imply a false common currency.
 
 ### Empty/error states
 
-If there is no data, preserve the layout but replace values with useful empty guidance. Do not collapse the entire screen into one giant empty card.
+If operational data is absent, preserve the hierarchy and explain the next useful action. Do not collapse Inicio into a giant empty card.
+
+If sales analytics is unavailable, keep the workspace stable and show a bounded error/empty state without breaking Reservas, Pedidos, Clientes or other home tabs.
+
+### Responsive behavior
+
+At tablet/mobile widths:
+
+- attention follows the daily summary;
+- recent activity remains readable;
+- quick access becomes a touch-friendly stack/grid;
+- sales metrics and charts stack deliberately;
+- no page-level horizontal overflow is allowed.
 
 ## 4. Conversaciones
 
