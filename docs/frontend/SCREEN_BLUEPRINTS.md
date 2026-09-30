@@ -111,59 +111,58 @@ It must not reduce the landing experience to “large empty card + login box”.
 
 “What is happening in my business right now?”
 
-### Header
+### Header and first-order owner summary
 
 Title: **Inicio**
 
-Supporting text: short operational summary, e.g. “Resumen de tu negocio en tiempo real”.
+The first-order heading is **“Qué está pasando hoy”**. The screen should answer the owner’s immediate operational question before exposing deeper reports.
 
-Top-right context:
+The owner summary prioritizes:
 
-- date/window selector, e.g. Últimos 7 días;
-- no unnecessary settings clutter.
+- calls handled today;
+- **Necesita tu atención** for unresolved or risky items;
+- **Actividad reciente** in human business language;
+- **Accesos rápidos** to Agenda, Clientes, Conversaciones, Inventario, Configuración and Facturación.
 
-### First row: KPI cards
+The attention panel is not a decorative KPI card. It must make pending work and the next review target obvious.
 
-Reference structure uses four equally legible KPI cards:
+### Operational workspaces
 
-- Llamadas recibidas;
-- Citas agendadas;
-- Clientes nuevos;
-- Tasa de conversión.
+Below the owner summary, Inicio can expose the business workspaces already implemented by the product:
 
-Each card contains:
+- Reservas;
+- Pedidos;
+- Ventas;
+- Solicitudes;
+- Clientes;
+- Auditoría.
 
-- label;
-- dominant metric;
-- trend/delta where meaningful;
-- one restrained semantic icon.
+These workspaces stay inside the same protected frame. Switching tabs must feel like changing local business context, not changing products.
 
-Metrics are visually dominant. Icons support the metric; they do not become decoration.
+### Ventas y rendimiento
 
-### Second row
+**Ventas y rendimiento** is the analytical workspace for confirmed commercial outcomes.
 
-Left, larger analytical panel:
+Required decision-ready information:
 
-**Llamadas y citas**
-- simple chart;
-- two series;
-- restrained grid;
-- readable labels;
-- enough height to scan weekly behavior.
+- selectable 7 / 30 / 90 day window;
+- confirmed collections;
+- paid orders;
+- units sold;
+- average ticket when a single currency makes the value meaningful;
+- previous-period trend;
+- sales over time;
+- top products by units and confirmed revenue;
+- channel mix;
+- strongest weekday/hour;
+- paid orders whose recorded source is Voz or WhatsApp;
+- measured insights grounded in the selected period.
 
-Right:
-
-**Últimas conversaciones**
-- 4–6 recent items;
-- channel/avatar cue;
-- phone/name;
-- short preview;
-- relative time;
-- “Ver todas”.
+The UI must not imply causal ROI from the recorded channel source. Mixed currencies remain separated instead of being collapsed into a misleading aggregate.
 
 ### Empty/error states
 
-If there is no data, preserve the layout but replace values with useful empty guidance. Do not collapse the entire screen into one giant empty card.
+If there is no operational data, preserve the hierarchy and provide useful empty guidance for attention, recent activity and the active workspace. Do not collapse Inicio into one giant empty card or resurrect a generic four-KPI dashboard.
 
 ## 4. Conversaciones
 
