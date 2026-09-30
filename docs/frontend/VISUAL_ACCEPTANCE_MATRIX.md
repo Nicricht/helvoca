@@ -71,6 +71,8 @@ Example:
 
 Screenshots used for certification must belong to the exact implementation HEAD being reviewed.
 
+The Full Gate stores deterministic implementation screenshots under `test-results/visual-evidence/<HEAD>/` and uploads them as the `frontend-visual-evidence` artifact even when the suite passes. These images prove the exact application HEAD rendered the canonical seeded states; they do **not** replace the separate post-deploy production screenshot check in section 22.
+
 ## 5. Comparison dimensions
 
 Each screen receives PASS/FAIL for all applicable dimensions.
@@ -165,21 +167,37 @@ Required:
 
 ## 8. Inicio acceptance
 
+The current owner home answers one question first: **“¿Qué necesita mi atención ahora?”**
+
 Required:
 
-- four KPI cards form one coherent first row on desktop;
-- metrics dominate labels/icons;
-- analytical chart gets more area than recent-list secondary panel;
-- latest conversations remain scannable;
-- page title and date context visible;
-- cards align;
-- no giant empty whitespace.
+- the page title **Inicio** and owner summary **Qué está pasando hoy** are immediately visible;
+- the operational summary surfaces calls and current business activity without turning the page into a KPI mosaic;
+- **Necesita tu atención** is visually prominent whenever there are unresolved items;
+- **Actividad reciente** remains scannable and translates technical events into human language;
+- **Accesos rápidos** provides direct navigation to Agenda, Clientes, Conversaciones, Inventario, Configuración and Facturación;
+- ready, empty and degraded states preserve the same hierarchy instead of replacing the page with a giant blank card;
+- no giant empty whitespace or duplicate global navigation.
+
+### Ventas y rendimiento
+
+The Ventas workspace is part of the authenticated home workspace but is visually secondary to the owner’s daily Inicio summary.
+
+Required:
+
+- **Ventas y rendimiento** exposes confirmed collections, paid orders, units sold and average ticket for the selected 7/30/90-day period;
+- **Ventas en el tiempo** receives enough space to make trend direction readable;
+- product ranking distinguishes “Más pedidos” from “Mayor facturación”;
+- channel mix and strongest demand window are readable without decorative chart noise;
+- **Gestionado por voz y WhatsApp** is explicitly described as recorded order origin, not causal ROI;
+- useful measured insights remain concise and evidence-based;
+- mixed currencies are never visually combined into a false aggregate.
 
 Tablet/mobile:
 
-- KPI cards reflow logically;
-- chart remains readable or transforms appropriately;
-- recent conversations do not overflow.
+- owner summary, attention, recent activity and quick access reflow in task order;
+- sales metrics and trend remain readable without page-level horizontal overflow;
+- tables/charts may stack or scroll inside their own containers but must not widen the page.
 
 ## 9. Conversaciones acceptance
 
