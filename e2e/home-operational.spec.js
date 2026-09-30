@@ -2412,6 +2412,31 @@ test('sales analytics turns paid orders into decision-ready business statistics'
   await expect(page.locator('#homeSalesTrendChart svg')).toBeVisible();
   await expect(page.locator('#homeSalesTopProducts')).toContainText('Hamburguesa Doble');
   await expect(page.locator('#homeSalesTopProducts')).toContainText('42 unidades');
+  await expect(page.locator('#homeSalesTopRevenue')).toContainText('Combo Familiar');
+  await expect(page.locator('#homeSalesTopRevenue')).toContainText('  await expect(page.locator('#homeSalesChannels')).toContainText('58,5%');
+  await expect(page.locator('#homeSalesPeak')).toContainText('Sábado');
+  await expect(page.locator('#homeSalesPeak')).toContainText('19:00');
+  await expect(page.locator('#homeSalesRecepVozImpact')).toContainText('73');
+  await expect(page.locator('#homeSalesRecepVozImpact')).toContainText('$');
+  await expect(page.locator('#homeSalesInsights')).toContainText('Hamburguesa Doble');
+
+  await page.getByRole('button', { name: '7 días' }).click();
+  await expect(page.locator('#homeSalesPaidOrders')).toHaveText('19');
+  await expect.poll(() => requestedPeriods.includes('7')).toBe(true);
+
+  const frameBefore = await page.locator('#dashboardView').evaluate(element => ({
+    left: element.getBoundingClientRect().left,
+    right: element.getBoundingClientRect().right
+  }));
+  await page.getByRole('tab', { name: /Reservas/ }).click();
+  const frameAfter = await page.locator('#dashboardView').evaluate(element => ({
+    left: element.getBoundingClientRect().left,
+    right: element.getBoundingClientRect().right
+  }));
+  expect(Math.abs(frameBefore.left - frameAfter.left)).toBeLessThanOrEqual(1);
+  expect(Math.abs(frameBefore.right - frameAfter.right)).toBeLessThanOrEqual(1);
+});
+);
   await expect(page.locator('#homeSalesChannels')).toContainText('WhatsApp');
   await expect(page.locator('#homeSalesChannels')).toContainText('58,5%');
   await expect(page.locator('#homeSalesPeak')).toContainText('Sábado');
