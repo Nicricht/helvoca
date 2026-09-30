@@ -483,17 +483,30 @@
         };
     }
 
-    function managedTotals(analytics) {
-        const totals = new Map();
+    function managedRevenueDisplay(analytics) {
         const orderCurrency = normalizedCurrency(analytics?.primaryCurrency);
         const bookingCurrency = normalizedCurrency(analytics?.bookingCurrency);
         const orderAmount = numeric(analytics?.recepVozRevenue);
         const bookingAmount = numeric(analytics?.recepVozBookingRevenue);
+        const hasOrderImpact = numeric(analytics?.recepVozOrders) > 0 || orderAmount > 0;
+        const hasBookingImpact = numeric(analytics?.recepVozPaidBookings) > 0 || bookingAmount > 0;
+
+        // If a source-attributed cohort exists but its currency cannot be represented by one
+        // authoritative currency, do not publish a misleading partial monetary total.
+        if ((hasOrderImpact && !orderCurrency) || (hasBookingImpact && !bookingCurrency)) {
+            return {
+                primary: 'No consolidable',
+                detail: 'Origen Voz / WhatsApp registrado en más de una moneda.',
+                mixed: true
+            };
+        }
+
+        const totals = new Map();
         if (orderCurrency && orderAmount > 0) totals.set(orderCurrency, orderAmount);
         if (bookingCurrency && bookingAmount > 0) {
             totals.set(bookingCurrency, (totals.get(bookingCurrency) || 0) + bookingAmount);
         }
-        return totals;
+        return displayTotals(totals);
     }
 
     function renderRevenueTrend(container, analytics) {
@@ -554,7 +567,7 @@
         const orderTotals = totalsMap(analytics.currencyTotals, analytics.primaryCurrency, analytics.totalRevenue);
         const bookingTotals = totalsMap(analytics.bookingCurrencyTotals, analytics.bookingCurrency, analytics.bookingRevenue);
         const combined = displayTotals(mergeTotals(orderTotals, bookingTotals));
-        const managedDisplay = displayTotals(managedTotals(analytics));
+        const managedDisplay = managedRevenueDisplay(analytics);
         const paidOrders = numeric(analytics.paidOrders);
         const paidBookings = numeric(analytics.paidBookings);
         const providerBooking = numeric(analytics.providerVerifiedBookingRevenue);
