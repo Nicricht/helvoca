@@ -1371,6 +1371,25 @@
         </div>`).join("")
       : '<div class="home-sales-empty">Aún no hay productos pagados para rankear.</div>';
 
+    const topRevenue = document.querySelector("#homeSalesTopRevenue");
+    if (topRevenue) {
+      if (!currency) {
+        topRevenue.innerHTML = '<div class="home-sales-empty">La facturación por producto no se combina cuando existen monedas distintas.</div>';
+      } else {
+        const revenueRows = [...topProducts]
+          .filter(item => item.revenue != null)
+          .sort((a,b) => Number(b.revenue||0)-Number(a.revenue||0))
+          .slice(0,8);
+        topRevenue.innerHTML = revenueRows.length
+          ? revenueRows.map((item,index) => `<div class="home-sales-rank-row">
+              <span class="home-sales-rank-index">${index+1}</span>
+              <div class="home-sales-rank-copy"><strong>${esc(item.name||"Producto")}</strong><span>${esc(item.units||0)} unidades</span></div>
+              <span class="home-sales-rank-value">${esc(money(item.revenue,currency))}</span>
+            </div>`).join("")
+          : '<div class="home-sales-empty">Aún no hay facturación por producto para rankear.</div>';
+      }
+    }
+
     const channels = document.querySelector("#homeSalesChannels");
     const channelRows = Array.isArray(data.channels) ? data.channels : [];
     if (channels) channels.innerHTML = channelRows.length
