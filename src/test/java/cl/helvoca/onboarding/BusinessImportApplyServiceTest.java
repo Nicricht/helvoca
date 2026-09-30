@@ -227,4 +227,130 @@ class BusinessImportApplyServiceTest {
                 .newInstance(catalog, inventory, tenant, services);
     }
 
+    @Test
+    void serviceImportWithoutInjectedServiceCatalogFailsClosed() {
+        TenantProvider tenant = mock(TenantProvider.class);
+        UniversalCatalogService catalog = mock(UniversalCatalogService.class);
+        InventoryService inventory = mock(InventoryService.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        when(catalog.list()).thenReturn(List.of());
+        when(inventory.list()).thenReturn(List.of());
+
+        var subject = new BusinessImportApplyService(catalog, inventory, tenant);
+        var input = new BusinessImportApplyService.ProductInput(
+                "Consulta", null, null, "CLP", null, null, null,
+                CatalogItem.Kind.SERVICE, 30, "servicios.csv");
+
+        assertThrows(IllegalStateException.class,
+                () -> subject.apply(new BusinessImportApplyService.ApplyRequest(List.of(input))));
+    }
+
+    @Test
+    void serviceImportPreservesExistingOptionalFactsWhenReimportLeavesThemBlank() throws Exception {
+        UUID serviceId = UUID.randomUUID();
+        TenantProvider tenant = mock(TenantProvider.class);
+        UniversalCatalogService catalog = mock(UniversalCatalogService.class);
+        InventoryService inventory = mock(InventoryService.class);
+        ServiceCatalogService services = mock(ServiceCatalogService.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        when(catalog.list()).thenReturn(List.of());
+        when(inventory.list()).thenReturn(List.of());
+        when(services.list()).thenReturn(List.of(new ServiceItemResponse(
+                serviceId, "Consulta", "Descripción existente", 20,
+                new BigDecimal("18000"), true, null, null)));
+        when(services.update(eq(serviceId), any())).thenAnswer(inv -> {
+            ServiceItemRequest input = inv.getArgument(1);
+            return new ServiceItemResponse(serviceId, input.name(), input.description(),
+                    input.durationMinutes(), input.price(), true, null, null);
+        });
+
+        var subject = businessImportService(catalog, inventory, tenant, services);
+        var input = new BusinessImportApplyService.ProductInput(
+                "Consulta", null, null, "CLP", null, null, null,
+                CatalogItem.Kind.SERVICE, 30, "servicios.csv");
+
+        subject.apply(new BusinessImportApplyService.ApplyRequest(List.of(input)));
+
+        verify(services).update(eq(serviceId), argThat(value ->
+                "Descripción existente".equals(value.description())
+                        && value.price().compareTo(new BigDecimal("18000")) == 0));
+    }
+
+    @Test
+    void serviceImportAllowsUnknownPriceAndDescriptionOnCreate() throws Exception {
+        UUID serviceId = UUID.randomUUID();
+        TenantProvider tenant = mock(TenantProvider.class);
+        UniversalCatalogService catalog = mock(UniversalCatalogService.class);
+        InventoryService inventory = mock(InventoryService.class);
+        ServiceCatalogService services = mock(ServiceCatalogService.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        when(catalog.list()).thenReturn(List.of());
+        when(inventory.list()).thenReturn(List.of());
+        when(services.list()).thenReturn(List.of());
+        when(services.create(any())).thenAnswer(inv -> {
+            ServiceItemRequest input = inv.getArgument(0);
+            return new ServiceItemResponse(serviceId, input.name(), input.description(),
+                    input.durationMinutes(), input.price(), true, null, null);
+        });
+
+        var subject = businessImportService(catalog, inventory, tenant, services);
+        var input = new BusinessImportApplyService.ProductInput(
+                "Cirugía", null, null, "CLP", null, null, null,
+                CatalogItem.Kind.SERVICE, 240, "tarifario.csv");
+
+        subject.apply(new BusinessImportApplyService.ApplyRequest(List.of(input)));
+
+        verify(services).create(argThat(value ->
+                value.description() == null && value.price() == null && value.durationMinutes() == 240));
+    }
+
+    @Test
+    void serviceValidationFailsClosedForMissingOrInvalidDuration() throws Exception {
+        var subject = validationSubject();
+        var missing = new BusinessImportApplyService.ProductInput(
+                "Consulta sin duración", null, null, "CLP", null, null, null,
+                CatalogItem.Kind.SERVICE, null, "servicios.csv");
+        var zero = new BusinessImportApplyService.ProductInput(
+                "Consulta cero", null, null, "CLP", null, null, null,
+                CatalogItem.Kind.SERVICE, 0, "servicios.csv");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.apply(new BusinessImportApplyService.ApplyRequest(List.of(missing))));
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.apply(new BusinessImportApplyService.ApplyRequest(List.of(zero))));
+    }
+
+    @Test
+    void serviceValidationRejectsSkuStockAndForeignCurrency() throws Exception {
+        var subject = validationSubject();
+        var withSku = new BusinessImportApplyService.ProductInput(
+                "Servicio SKU", null, null, "CLP", "NOPE", null, null,
+                CatalogItem.Kind.SERVICE, 30, "servicios.csv");
+        var withStock = new BusinessImportApplyService.ProductInput(
+                "Servicio stock", null, null, "CLP", null, 1, null,
+                CatalogItem.Kind.SERVICE, 30, "servicios.csv");
+        var withUsd = new BusinessImportApplyService.ProductInput(
+                "Servicio USD", null, new BigDecimal("10"), "USD", null, null, null,
+                CatalogItem.Kind.SERVICE, 30, "servicios.csv");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.apply(new BusinessImportApplyService.ApplyRequest(List.of(withSku))));
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.apply(new BusinessImportApplyService.ApplyRequest(List.of(withStock))));
+        assertThrows(IllegalArgumentException.class,
+                () -> subject.apply(new BusinessImportApplyService.ApplyRequest(List.of(withUsd))));
+    }
+
+    private static BusinessImportApplyService validationSubject() throws Exception {
+        TenantProvider tenant = mock(TenantProvider.class);
+        UniversalCatalogService catalog = mock(UniversalCatalogService.class);
+        InventoryService inventory = mock(InventoryService.class);
+        ServiceCatalogService services = mock(ServiceCatalogService.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        when(catalog.list()).thenReturn(List.of());
+        when(inventory.list()).thenReturn(List.of());
+        when(services.list()).thenReturn(List.of());
+        return businessImportService(catalog, inventory, tenant, services);
+    }
+
 }
