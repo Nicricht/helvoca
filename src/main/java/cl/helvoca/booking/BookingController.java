@@ -16,14 +16,20 @@ public class BookingController {
     private final BookingService service;
     private final BookingContextService contextService;
     private final BookingActivityService activityService;
+    private final BookingLifecycleService lifecycleService;
+    private final BookingPaymentService paymentService;
 
     public BookingController(
             BookingService service,
             BookingContextService contextService,
-            BookingActivityService activityService) {
+            BookingActivityService activityService,
+            BookingLifecycleService lifecycleService,
+            BookingPaymentService paymentService) {
         this.service = service;
         this.contextService = contextService;
         this.activityService = activityService;
+        this.lifecycleService = lifecycleService;
+        this.paymentService = paymentService;
     }
 
     @GetMapping
@@ -57,6 +63,30 @@ public class BookingController {
             @PathVariable UUID id,
             @Valid @RequestBody RescheduleBookingRequest request) {
         return service.reschedule(id, request);
+    }
+
+    @PostMapping("/{id}/complete")
+    public BookingResponse complete(@PathVariable UUID id) {
+        return lifecycleService.complete(id);
+    }
+
+    @PostMapping("/{id}/no-show")
+    public BookingResponse noShow(@PathVariable UUID id) {
+        return lifecycleService.noShow(id);
+    }
+
+    @GetMapping("/{id}/payment")
+    public BookingPaymentService.BookingPaymentSummary payment(@PathVariable UUID id) {
+        return paymentService.summary(id);
+    }
+
+    @PostMapping("/{id}/payments/manual")
+    @ResponseStatus(HttpStatus.CREATED)
+    public BookingPaymentService.ManualPaymentResponse recordManualPayment(
+            @PathVariable UUID id,
+            @RequestHeader(name = "Idempotency-Key") String idempotencyKey,
+            @RequestBody BookingPaymentService.ManualPaymentRequest request) {
+        return paymentService.recordManual(id, request, idempotencyKey);
     }
 
     @DeleteMapping("/{id}")

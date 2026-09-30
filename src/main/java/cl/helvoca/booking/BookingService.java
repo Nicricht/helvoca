@@ -116,8 +116,8 @@ public class BookingService {
         UUID businessId = tenantProvider.requireBusinessId();
         validateFuture(request.startAt());
         Booking booking = requireBooking(id, businessId);
-        if (booking.getStatus() == BookingStatus.CANCELLED) {
-            throw new ConflictException("Cancelled bookings cannot be rescheduled");
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new ConflictException("Only confirmed bookings can be rescheduled");
         }
 
         ServiceItem service = catalog.requireActiveEntity(booking.getServiceId(), businessId);
@@ -147,17 +147,19 @@ public class BookingService {
     public void cancel(UUID id) {
         UUID businessId = tenantProvider.requireBusinessId();
         Booking booking = requireBooking(id, businessId);
-        if (booking.getStatus() != BookingStatus.CANCELLED) {
-            Map<String, Object> beforeState = auditSnapshot(booking);
-            booking.setStatus(BookingStatus.CANCELLED);
-            auditService.humanSuccess(
-                    businessId,
-                    "BOOKING_CANCEL",
-                    "BOOKING",
-                    id,
-                    beforeState,
-                    auditSnapshot(booking));
+        if (booking.getStatus() == BookingStatus.CANCELLED) return;
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new ConflictException("Only confirmed bookings can be cancelled");
         }
+        Map<String, Object> beforeState = auditSnapshot(booking);
+        booking.setStatus(BookingStatus.CANCELLED);
+        auditService.humanSuccess(
+                businessId,
+                "BOOKING_CANCEL",
+                "BOOKING",
+                id,
+                beforeState,
+                auditSnapshot(booking));
     }
 
     private Booking requireBooking(UUID id, UUID businessId) {

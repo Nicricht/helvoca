@@ -118,6 +118,11 @@ public class PaymentWebhookService {
             }
 
             payment.setStatus(result.status());
+            payment.setVerificationMethod(BusinessPayment.VerificationMethod.PROVIDER);
+            payment.setPaymentMethod(BusinessPayment.PaymentMethod.ONLINE);
+            if (result.status() == BusinessPayment.Status.SUCCEEDED && payment.getVerifiedAt() == null) {
+                payment.setVerifiedAt(Instant.now());
+            }
             payment.setMetadata(merge(payment.getMetadata(), result.metadata()));
             payment = payments.saveAndFlush(payment);
             settleInventory(payment);
