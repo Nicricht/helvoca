@@ -43,7 +43,7 @@ class SalesAnalyticsServiceTest {
         BusinessPayment p2 = payment(op2, new BigDecimal("15000"), "CLP", BusinessOrder.Source.VOICE, now.minusSeconds(1800));
         BusinessPayment duplicate = payment(op1, new BigDecimal("25000"), "CLP", BusinessOrder.Source.WHATSAPP, now.minusSeconds(7200));
         BusinessPayment failed = payment(UUID.randomUUID(), new BigDecimal("99999"), "CLP", BusinessOrder.Source.API, now.minusSeconds(900));
-        failed.setStatus(BusinessPayment.Status.FAILED);
+        when(failed.getStatus()).thenReturn(BusinessPayment.Status.FAILED);
 
         BusinessPayment previous = payment(UUID.randomUUID(), new BigDecimal("20000"), "CLP", BusinessOrder.Source.MANUAL, now.minusSeconds(10 * 86400L));
 
