@@ -359,6 +359,7 @@ public class BusinessImportSpreadsheetParser {
                 .replaceAll("\\p{M}+", "")
                 .replace('_', ' ')
                 .replace('-', ' ')
+                .replace('.', ' ')
                 .replaceAll("\\s+", " ");
         return normalized;
     }
