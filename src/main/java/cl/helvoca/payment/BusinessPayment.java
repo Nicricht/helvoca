@@ -23,6 +23,19 @@ public class BusinessPayment {
         REFUNDED
     }
 
+    public enum VerificationMethod {
+        PROVIDER,
+        MANUAL_BUSINESS
+    }
+
+    public enum PaymentMethod {
+        ONLINE,
+        CASH,
+        CARD,
+        TRANSFER,
+        OTHER
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -64,6 +77,17 @@ public class BusinessPayment {
     @Column(nullable = false, length = 30)
     private Status status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_method", nullable = false, length = 30)
+    private VerificationMethod verificationMethod = VerificationMethod.PROVIDER;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false, length = 30)
+    private PaymentMethod paymentMethod = PaymentMethod.ONLINE;
+
+    @Column(name = "verified_at")
+    private Instant verifiedAt;
+
     @Column(name = "checkout_url", columnDefinition = "text")
     private String checkoutUrl;
 
@@ -86,6 +110,9 @@ public class BusinessPayment {
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;
+        if (verificationMethod == null) verificationMethod = VerificationMethod.PROVIDER;
+        if (paymentMethod == null) paymentMethod = PaymentMethod.ONLINE;
+        if (status == Status.SUCCEEDED && verifiedAt == null) verifiedAt = now;
     }
 
     @PreUpdate
@@ -119,6 +146,12 @@ public class BusinessPayment {
     public void setCurrency(String currency) { this.currency = currency; }
     public Status getStatus() { return status; }
     public void setStatus(Status status) { this.status = status; }
+    public VerificationMethod getVerificationMethod() { return verificationMethod; }
+    public void setVerificationMethod(VerificationMethod verificationMethod) { this.verificationMethod = verificationMethod; }
+    public PaymentMethod getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(PaymentMethod paymentMethod) { this.paymentMethod = paymentMethod; }
+    public Instant getVerifiedAt() { return verifiedAt; }
+    public void setVerifiedAt(Instant verifiedAt) { this.verifiedAt = verifiedAt; }
     public String getCheckoutUrl() { return checkoutUrl; }
     public void setCheckoutUrl(String checkoutUrl) { this.checkoutUrl = checkoutUrl; }
     public BusinessOrder.Source getSource() { return source; }
