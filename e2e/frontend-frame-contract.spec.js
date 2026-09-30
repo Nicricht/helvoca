@@ -127,6 +127,61 @@ test.describe('RecepVoz frontend frame contract', () => {
     expect(foundation).toContain('-webkit-text-fill-color:currentColor');
   });
 
+
+  test('desktop Conversations rail keeps all labels present, painted and hit-testable', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/conversations.html');
+    await page.waitForLoadState('domcontentloaded');
+
+    const diagnostics = await page.locator('.rv-nav a').evaluateAll(links => links.map(link => {
+      const style = getComputedStyle(link);
+      const rect = link.getBoundingClientRect();
+      const range = document.createRange();
+      range.selectNodeContents(link);
+      const textRect = range.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        Math.min(textRect.right - 1, textRect.left + Math.max(1, textRect.width / 2)),
+        Math.min(textRect.bottom - 1, textRect.top + Math.max(1, textRect.height / 2))
+      );
+      return {
+        textContent: link.textContent,
+        innerText: link.innerText,
+        color: style.color,
+        webkitTextFillColor: style.webkitTextFillColor,
+        opacity: style.opacity,
+        visibility: style.visibility,
+        fontSize: style.fontSize,
+        lineHeight: style.lineHeight,
+        rect: { width: rect.width, height: rect.height },
+        textRect: { width: textRect.width, height: textRect.height },
+        hitInsideLink: hit === link || link.contains(hit)
+      };
+    }));
+
+    console.log('DESKTOP_NAV_DIAGNOSTICS', JSON.stringify(diagnostics));
+
+    expect(diagnostics.map(item => item.innerText.trim())).toEqual([
+      'Inicio',
+      'Conversaciones',
+      'Agenda',
+      'Clientes',
+      'Inventario',
+      'Configuración',
+      'Facturación'
+    ]);
+    for (const item of diagnostics) {
+      expect(item.rect.width).toBeGreaterThan(40);
+      expect(item.rect.height).toBeGreaterThanOrEqual(40);
+      expect(item.textRect.width).toBeGreaterThan(20);
+      expect(item.textRect.height).toBeGreaterThan(10);
+      expect(item.opacity).toBe('1');
+      expect(item.visibility).toBe('visible');
+      expect(item.color).not.toBe('rgba(0, 0, 0, 0)');
+      expect(item.webkitTextFillColor).not.toBe('rgba(0, 0, 0, 0)');
+      expect(item.hitInsideLink).toBeTruthy();
+    }
+  });
+
   test('frame primitives stay contained at canonical viewports', async ({ page }) => {
     const foundation = read('src/main/resources/static/frontend-foundation.css');
 
