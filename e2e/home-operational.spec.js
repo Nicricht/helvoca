@@ -144,6 +144,46 @@ async function mockReadyHome(page, roles = ['BUSINESS_ADMIN'], options = {}) {
       }
     ]
   })));
+  await page.route('**/api/v1/commercial/analytics**', route => route.fulfill(json({
+    days: 30,
+    timezone: 'America/Santiago',
+    primaryCurrency: 'CLP',
+    totalRevenue: 1284500,
+    paidOrders: 82,
+    unitsSold: 214,
+    averageTicket: 15665,
+    revenueChangePercent: 18.2,
+    currencyTotals: [{ currency: 'CLP', amount: 1284500 }],
+    salesOverTime: [
+      { date: '2026-09-24', paidOrders: 8, revenue: 112000 },
+      { date: '2026-09-25', paidOrders: 11, revenue: 168000 },
+      { date: '2026-09-26', paidOrders: 14, revenue: 224000 },
+      { date: '2026-09-27', paidOrders: 10, revenue: 154000 },
+      { date: '2026-09-28', paidOrders: 16, revenue: 278000 },
+      { date: '2026-09-29', paidOrders: 12, revenue: 198000 },
+      { date: '2026-09-30', paidOrders: 11, revenue: 150500 }
+    ],
+    topProducts: [
+      { catalogItemId: 'prod-1', name: 'Hamburguesa Doble', units: 42, revenue: 315000, currency: 'CLP' },
+      { catalogItemId: 'prod-2', name: 'Combo Familiar', units: 31, revenue: 384900, currency: 'CLP' },
+      { catalogItemId: 'prod-3', name: 'Papas Grandes', units: 26, revenue: 117000, currency: 'CLP' }
+    ],
+    channels: [
+      { channel: 'WHATSAPP', orders: 48, sharePercent: 58.5 },
+      { channel: 'VOICE', orders: 25, sharePercent: 30.5 },
+      { channel: 'MANUAL', orders: 9, sharePercent: 11.0 }
+    ],
+    peakWeekday: 'SATURDAY',
+    peakHour: 19,
+    recepVozOrders: 73,
+    recepVozRevenue: 742400,
+    insights: [
+      'Hamburguesa Doble es el producto más pedido del período.',
+      'WhatsApp concentra la mayor cantidad de pedidos pagados.',
+      'La mayor actividad ocurre los sábados alrededor de las 19:00.'
+    ]
+  })));
+
   await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([
     { id: 'o1', operationId: 'op1', sourceReferenceId: 'wa-order', status: 'CONFIRMED', fulfillmentType: 'DELIVERY', contactName: 'Juan Pedido', contactPhone: '+56933333333', deliveryAddress: 'Av. Demo 123, Santiago', subtotal: 15990, deliveryFee: 3000, total: 18990, currency: 'CLP', source: 'WHATSAPP', createdAt: '2026-09-17T17:30:00Z', lines: [{ name: 'Producto demo', quantity: 1, unitPrice: 15990, lineTotal: 15990 }] }
   ])));
@@ -2314,3 +2354,85 @@ test('dashboard prioritizes calls, attention, recent activity and quick access',
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
+
+
+test('sales analytics turns paid orders into decision-ready business statistics', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  const requestedPeriods = [];
+  await mockReadyHome(page);
+  await page.unroute('**/api/v1/commercial/analytics**');
+  await page.route('**/api/v1/commercial/analytics**', route => {
+    const url = new URL(route.request().url());
+    requestedPeriods.push(url.searchParams.get('days'));
+    const days = Number(url.searchParams.get('days') || 30);
+    return route.fulfill(json({
+      days,
+      timezone: 'America/Santiago',
+      primaryCurrency: 'CLP',
+      totalRevenue: days === 7 ? 284500 : 1284500,
+      paidOrders: days === 7 ? 19 : 82,
+      unitsSold: days === 7 ? 51 : 214,
+      averageTicket: days === 7 ? 14974 : 15665,
+      revenueChangePercent: days === 7 ? 12.4 : 18.2,
+      currencyTotals: [{ currency: 'CLP', amount: days === 7 ? 284500 : 1284500 }],
+      salesOverTime: [
+        { date: '2026-09-28', paidOrders: 4, revenue: 62000 },
+        { date: '2026-09-29', paidOrders: 7, revenue: 104000 },
+        { date: '2026-09-30', paidOrders: 8, revenue: days === 7 ? 118500 : 150500 }
+      ],
+      topProducts: [
+        { catalogItemId: 'prod-1', name: 'Hamburguesa Doble', units: 42, revenue: 315000, currency: 'CLP' },
+        { catalogItemId: 'prod-2', name: 'Combo Familiar', units: 31, revenue: 384900, currency: 'CLP' }
+      ],
+      channels: [
+        { channel: 'WHATSAPP', orders: 48, sharePercent: 58.5 },
+        { channel: 'VOICE', orders: 25, sharePercent: 30.5 }
+      ],
+      peakWeekday: 'SATURDAY',
+      peakHour: 19,
+      recepVozOrders: 73,
+      recepVozRevenue: 742400,
+      insights: [
+        'Hamburguesa Doble es el producto más pedido del período.',
+        'WhatsApp concentra la mayor cantidad de pedidos pagados.'
+      ]
+    }));
+  });
+
+  await page.goto('/');
+  await page.getByRole('tab', { name: /Ventas/ }).click();
+
+  await expect(page.getByRole('heading', { name: 'Ventas y rendimiento' })).toBeVisible();
+  await expect(page.locator('#homeSalesRevenue')).toContainText('$');
+  await expect(page.locator('#homeSalesPaidOrders')).toHaveText('82');
+  await expect(page.locator('#homeSalesUnits')).toHaveText('214');
+  await expect(page.locator('#homeSalesAverageTicket')).toContainText('$');
+  await expect(page.locator('#homeSalesRevenueTrend')).toContainText('+18,2%');
+
+  await expect(page.locator('#homeSalesTrendChart svg')).toBeVisible();
+  await expect(page.locator('#homeSalesTopProducts')).toContainText('Hamburguesa Doble');
+  await expect(page.locator('#homeSalesTopProducts')).toContainText('42 unidades');
+  await expect(page.locator('#homeSalesChannels')).toContainText('WhatsApp');
+  await expect(page.locator('#homeSalesChannels')).toContainText('58,5%');
+  await expect(page.locator('#homeSalesPeak')).toContainText('Sábado');
+  await expect(page.locator('#homeSalesPeak')).toContainText('19:00');
+  await expect(page.locator('#homeSalesRecepVozImpact')).toContainText('73');
+  await expect(page.locator('#homeSalesRecepVozImpact')).toContainText('$');
+  await expect(page.locator('#homeSalesInsights')).toContainText('Hamburguesa Doble');
+
+  await page.getByRole('button', { name: '7 días' }).click();
+  await expect(page.locator('#homeSalesPaidOrders')).toHaveText('19');
+  await expect.poll(() => requestedPeriods.includes('7')).toBe(true);
+
+  const frameBefore = await page.locator('#dashboardView').evaluate(element => ({
+    left: element.getBoundingClientRect().left,
+    right: element.getBoundingClientRect().right
+  }));
+  await page.getByRole('tab', { name: /Reservas/ }).click();
+  const frameAfter = await page.locator('#dashboardView').evaluate(element => ({
+    left: element.getBoundingClientRect().left,
+    right: element.getBoundingClientRect().right
+  }));
+  expect(Math.abs(frameBefore.left - frameAfter.left)).toBeLessThanOrEqual(1);
+  expect(Math.abs(frameBefore.right - frameAfter.right)).toBeLessThanOrEqual(1);
+});
