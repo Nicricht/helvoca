@@ -42,6 +42,23 @@ Use verification proportional to the real risk. Before implementation, review th
 17. Do not impose a blanket `NO MERGE` or `NO DEPLOY` rule on normal engineering work. Use an explicit hold only when the task specifically requires a review/freeze, when release evidence is incomplete, or when deployment would trigger an unsafe/unapproved external effect.
 18. Production calls, payments, messages and other destructive or customer-visible external effects still require their project-specific safety/authorization rules and must never be triggered merely to satisfy a test.
 
+## Frontend frame contract
+
+For any frontend, UI, layout, visual, responsive, styling, navigation, or component task, read `docs/frontend/FRAME_CONTRACT.md` before implementation.
+
+The default for ordinary screen work is `FRAME CHANGE: NO`.
+
+When `FRAME CHANGE: NO`:
+- identify the affected screen and editable slot(s);
+- keep protected `--rv-frame-*` tokens unchanged;
+- do not redefine reserved `.rv-frame-*` or `.rv-page-*` primitives outside `frontend-foundation.css`;
+- do not alter global shell, topbar, sidebar, page gutters, canonical breakpoints, or shared visual primitives to solve a local screen problem;
+- do not modify unrelated principal screens.
+
+Use `FRAME CHANGE: YES` only when the task intentionally changes the shared product frame. A frame change requires cross-screen evidence at the canonical viewports defined in `docs/frontend/FRAME_CONTRACT.json`.
+
+If a supposedly local change cannot be completed without touching protected frame territory, promote it explicitly to `FRAME CHANGE: YES` instead of making an implicit global redesign.
+
 ## Speed rule
 
 Do not run the complete suite after every small edit. Use targeted tests through Fast Gate while iterating. Run Full Gate once the functional block and its regression tests are complete.

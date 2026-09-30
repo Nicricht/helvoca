@@ -17,10 +17,13 @@ Because chat attachments are not a durable repository dependency, this document 
 Authority order when visual requirements conflict:
 
 1. this visual product specification and its screen blueprints;
-2. explicit product behavior/security invariants;
-3. current canonical design tokens in `frontend-foundation.css`;
-4. older frontend design documents;
-5. legacy CSS and historical production appearance.
+2. the protected shared-frame boundary in `FRAME_CONTRACT.md`;
+3. explicit product behavior/security invariants;
+4. current canonical design tokens and frame primitives in `frontend-foundation.css`;
+5. older frontend design documents;
+6. legacy CSS and historical production appearance.
+
+Local screen work is additionally constrained by `FRAME_CONTRACT.md`: a local visual request does not authorize an implicit global shell redesign.
 
 The currently deployed `main` frontend is **not** a visual reference. It is historical implementation state.
 
