@@ -550,17 +550,129 @@
                     <p id="homeOrderResult" class="home-order-result" aria-live="polite">0 pedidos</p>
                     <div id="homeOrdersList" class="home-business-list"><div class="home-business-empty">Cargando pedidos…</div></div>
                 </section>
-                <section class="card home-business-panel hidden" data-home-panel="sales">
-                    <div class="home-business-head">
-                        <div><div class="eyebrow">Pipeline</div><h2>Ventas</h2><p>De la conversación al pago, con producto, canal e inventario en una sola vista.</p></div>
+                <section class="card home-business-panel hidden home-sales-workspace" data-home-panel="sales">
+                    <div class="home-business-head home-sales-head">
+                        <div>
+                            <div class="eyebrow">Rendimiento comercial</div>
+                            <h2>Ventas y rendimiento</h2>
+                            <p>Qué vendiste, qué está funcionando y cuánto negocio fue gestionado por RecepVoz.</p>
+                        </div>
+                        <div class="home-sales-period" role="group" aria-label="Período de estadísticas">
+                            <button type="button" data-sales-days="7">7 días</button>
+                            <button type="button" class="active" data-sales-days="30">30 días</button>
+                            <button type="button" data-sales-days="90">90 días</button>
+                        </div>
                     </div>
-                    <div id="homeSalesSummary" class="home-sales-summary"></div>
-                    <div class="home-sales-filters" aria-label="Filtros de ventas">
-                        <label><span>Etapa</span><select id="homeSalesStage"><option value="all">Todas</option></select></label>
-                        <label><span>Canal</span><select id="homeSalesChannel"><option value="all">Todos</option><option value="VOICE">Llamada</option><option value="WHATSAPP">WhatsApp</option></select></label>
-                        <button id="homeSalesClear" class="home-filter-clear" type="button">Limpiar</button>
-                    </div>
-                    <div id="homeSalesList" class="home-business-list"><div class="home-business-empty">Cargando ventas…</div></div>
+
+                    <section id="homeSalesAnalytics" class="home-sales-analytics" aria-live="polite">
+                        <div id="homeSalesAnalyticsMessage" class="home-sales-analytics-message">Cargando estadísticas…</div>
+
+                        <div class="home-sales-kpis" aria-label="Resumen de ventas">
+                            <article>
+                                <span>Cobros confirmados</span>
+                                <strong id="homeSalesRevenue">—</strong>
+                                <small id="homeSalesRevenueTrend">Período seleccionado</small>
+                            </article>
+                            <article>
+                                <span>Pedidos pagados</span>
+                                <strong id="homeSalesPaidOrders">—</strong>
+                                <small>Pedidos con pago confirmado</small>
+                            </article>
+                            <article>
+                                <span>Unidades vendidas</span>
+                                <strong id="homeSalesUnits">—</strong>
+                                <small>Productos en pedidos pagados</small>
+                            </article>
+                            <article>
+                                <span>Ticket promedio</span>
+                                <strong id="homeSalesAverageTicket">—</strong>
+                                <small>Promedio por pedido pagado</small>
+                            </article>
+                        </div>
+
+                        <div class="home-sales-primary-grid">
+                            <section class="home-sales-card home-sales-trend-card" aria-labelledby="homeSalesTrendTitle">
+                                <div class="home-sales-card-head">
+                                    <div>
+                                        <span class="home-sales-kicker">Evolución</span>
+                                        <h3 id="homeSalesTrendTitle">Ventas en el tiempo</h3>
+                                    </div>
+                                    <span id="homeSalesTrendMode" class="home-sales-card-note">Cobros confirmados</span>
+                                </div>
+                                <div id="homeSalesTrendChart" class="home-sales-trend-chart"></div>
+                            </section>
+
+                            <section class="home-sales-card home-sales-impact-card" aria-labelledby="homeSalesImpactTitle">
+                                <div class="home-sales-card-head">
+                                    <div>
+                                        <span class="home-sales-kicker">Impacto RecepVoz</span>
+                                        <h3 id="homeSalesImpactTitle">Gestionado por voz y WhatsApp</h3>
+                                    </div>
+                                </div>
+                                <div id="homeSalesRecepVozImpact" class="home-sales-impact"></div>
+                                <p>Cuenta pedidos pagados cuyo origen registrado fue Voz o WhatsApp. No representa causalidad ni ROI.</p>
+                            </section>
+                        </div>
+
+                        <div class="home-sales-secondary-grid">
+                            <section class="home-sales-card">
+                                <div class="home-sales-card-head">
+                                    <div>
+                                        <span class="home-sales-kicker">Productos</span>
+                                        <h3>Más pedidos</h3>
+                                    </div>
+                                </div>
+                                <div id="homeSalesTopProducts" class="home-sales-ranking"></div>
+                            </section>
+
+                            <section class="home-sales-card">
+                                <div class="home-sales-card-head">
+                                    <div>
+                                        <span class="home-sales-kicker">Canales</span>
+                                        <h3>De dónde vienen</h3>
+                                    </div>
+                                </div>
+                                <div id="homeSalesChannels" class="home-sales-ranking"></div>
+                            </section>
+
+                            <section class="home-sales-card">
+                                <div class="home-sales-card-head">
+                                    <div>
+                                        <span class="home-sales-kicker">Demanda</span>
+                                        <h3>Momento más fuerte</h3>
+                                    </div>
+                                </div>
+                                <div id="homeSalesPeak" class="home-sales-peak"></div>
+                            </section>
+                        </div>
+
+                        <section class="home-sales-insights-card" aria-labelledby="homeSalesInsightsTitle">
+                            <div class="home-sales-card-head">
+                                <div>
+                                    <span class="home-sales-kicker">RecepVoz detectó</span>
+                                    <h3 id="homeSalesInsightsTitle">Lecturas útiles del período</h3>
+                                </div>
+                            </div>
+                            <div id="homeSalesInsights" class="home-sales-insights"></div>
+                        </section>
+                    </section>
+
+                    <section class="home-sales-pipeline">
+                        <div class="home-business-head home-sales-pipeline-head">
+                            <div>
+                                <div class="eyebrow">Detalle comercial</div>
+                                <h3>Embudo y operaciones</h3>
+                                <p>Revisa cada oportunidad desde la conversación hasta el pago, canal e inventario.</p>
+                            </div>
+                        </div>
+                        <div id="homeSalesSummary" class="home-sales-summary"></div>
+                        <div class="home-sales-filters" aria-label="Filtros de ventas">
+                            <label><span>Etapa</span><select id="homeSalesStage"><option value="all">Todas</option></select></label>
+                            <label><span>Canal</span><select id="homeSalesChannel"><option value="all">Todos</option><option value="VOICE">Llamada</option><option value="WHATSAPP">WhatsApp</option></select></label>
+                            <button id="homeSalesClear" class="home-filter-clear" type="button">Limpiar</button>
+                        </div>
+                        <div id="homeSalesList" class="home-business-list"><div class="home-business-empty">Cargando ventas…</div></div>
+                    </section>
                 </section>
                 <section class="card home-business-panel hidden" data-home-panel="requests">
                     <div class="home-business-head"><div><div class="eyebrow">Seguimiento</div><h2>Solicitudes</h2><p>Casos que necesitan seguimiento humano.</p></div></div>
