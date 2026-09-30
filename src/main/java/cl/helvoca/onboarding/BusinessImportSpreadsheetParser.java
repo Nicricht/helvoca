@@ -209,9 +209,11 @@ public class BusinessImportSpreadsheetParser {
         boolean receipt = containsAny(headers, RECEIPT_HEADERS);
         boolean customer = containsAny(headers, CUSTOMER_HEADERS);
 
-        if (name && productSignals) return DatasetKind.PRODUCTS;
+        // Transaction evidence has priority over product-like columns.
+        // Sales exports often contain Producto/Precio/Cantidad per receipt line and must never become live catalog/stock.
         if (date && total && receipt) return DatasetKind.SALES;
         if (receipt && total) return DatasetKind.RECEIPTS;
+        if (name && productSignals) return DatasetKind.PRODUCTS;
         if (customer && !productSignals && (name || headers.contains("cliente") || headers.contains("nombre cliente"))) {
             return DatasetKind.CUSTOMERS;
         }
