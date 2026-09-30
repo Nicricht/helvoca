@@ -333,7 +333,7 @@
         '      </div>',
         '      <div class="owner-value-metrics" aria-label="Valor comercial confirmado">',
         '        <article><strong id="ownerConfirmedRevenue">–</strong><span>Ingresos confirmados</span><small id="ownerRevenueCurrencyHint">Solo pagos comprobados</small></article>',
-        '        <article><strong id="ownerPaidOutcomes">–</strong><span>Resultados pagados</span><small>Pedidos + servicios completados</small></article>',
+        '        <article><strong id="ownerPaidOutcomes">–</strong><span>Resultados con cobro</span><small>Pedidos pagados + servicios completados con cobro</small></article>',
         '        <article><strong id="ownerManagedRevenue">–</strong><span>Con origen Voz / WhatsApp</span><small>No es una estimación causal de ROI</small></article>',
         '      </div>',
         '      <div class="owner-value-chart-head"><div><strong>Evolución de cobros</strong><span>Pedidos confirmados por día</span></div></div>',
@@ -511,6 +511,11 @@
 
     function renderRevenueTrend(container, analytics) {
         if (!container) return;
+        const orderCurrencies = totalsMap(analytics?.currencyTotals, analytics?.primaryCurrency, analytics?.totalRevenue);
+        if (orderCurrencies.size > 1) {
+            container.innerHTML = '<div class="owner-empty">La tendencia diaria no se consolida porque hay cobros en varias monedas.</div>';
+            return;
+        }
         const points = (Array.isArray(analytics?.salesOverTime) ? analytics.salesOverTime : [])
             .map(item => ({ date: String(item?.date || ''), revenue: Math.max(0, numeric(item?.revenue)) }))
             .filter(item => item.date);
@@ -591,7 +596,7 @@
 
         const evidenceParts = [
             String(paidOrders) + ' pedidos pagados',
-            String(paidBookings) + ' servicios completados y pagados'
+            String(paidBookings) + ' servicios completados con cobro confirmado'
         ];
         if (paidBookings > 0 && analytics.bookingCurrency) {
             evidenceParts.push(
@@ -826,6 +831,7 @@
     }
 
     function renderError() {
+        renderOwnerValue(null);
         setDashboardState('error', 'NO DISPONIBLE', 'No pudimos actualizar las métricas. Usa “Actualizar estado” para reintentar.');
         const attentionPanel = overview.querySelector('#ownerAttentionPanel');
         attentionPanel.dataset.state = 'error';

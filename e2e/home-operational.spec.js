@@ -2415,6 +2415,7 @@ test('owner value keeps mixed currencies separate and refuses partial managed-re
   await expect(page.locator('#ownerConfirmedRevenue')).toHaveText('Varias monedas');
   await expect(page.locator('#ownerRevenueCurrencyHint')).toContainText('separados por moneda');
   await expect(page.locator('#ownerManagedRevenue')).toHaveText('No consolidable');
+  await expect(page.locator('#ownerRevenueTrend')).toContainText('varias monedas');
   await expect(page.locator('#ownerRevenueEvidence')).toContainText('no una estimación causal de ROI');
 });
 
