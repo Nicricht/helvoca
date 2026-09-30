@@ -116,15 +116,11 @@ test.describe('RecepVoz frontend frame contract', () => {
   });
 
 
-  test('desktop authenticated rail paints readable navigation labels explicitly', async () => {
+  test('desktop authenticated rail reserves the full viewport column', async () => {
     const foundation = read('src/main/resources/static/frontend-foundation.css');
 
-    expect(foundation).toContain('/* Desktop authenticated rail label visibility contract. */');
-    expect(foundation).toContain('color:var(--rv-text-secondary)');
-    expect(foundation).toContain('opacity:1');
-    expect(foundation).toContain('visibility:visible');
-    expect(foundation).toContain('text-indent:0');
-    expect(foundation).toContain('-webkit-text-fill-color:currentColor');
+    expect(foundation).toContain('height:calc(100dvh - 106px)');
+    expect(foundation).toContain('overflow-y:auto');
   });
 
 
