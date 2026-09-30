@@ -112,7 +112,7 @@ class BusinessImportPreviewServiceCoverageTest {
 
         var preview = service.preview("Don\nPepe", List.of(image, pdf));
 
-        assertTrue(preview.aiUsed());
+        assertTrue(preview.aiUsed(), preview.warnings().toString());
         assertEquals(1, preview.products().size());
         assertEquals("Doble Bacon", preview.products().getFirst().name());
         assertEquals(7, preview.products().getFirst().onHand());
@@ -138,7 +138,7 @@ class BusinessImportPreviewServiceCoverageTest {
 
         var preview = service.preview("Negocio", List.of(jpg));
 
-        assertTrue(preview.aiUsed());
+        assertTrue(preview.aiUsed(), preview.warnings().toString());
         assertTrue(preview.products().isEmpty());
         assertTrue(preview.warnings().contains("Solo horarios visibles"));
         assertEquals(BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN, preview.sources().getFirst().kind());
