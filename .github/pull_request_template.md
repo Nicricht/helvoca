@@ -24,6 +24,20 @@
 - [ ] Affected invariants are identified.
 - [ ] Tenant/security/financial/inventory boundaries were reviewed when applicable.
 
+## Frontend frame contract
+
+<!-- Required for frontend/UI changes. Use N/A only when no frontend surface is touched. See docs/frontend/FRAME_CONTRACT.md. -->
+
+- FRAME CHANGE: NO / YES / N/A
+- Screen:
+- Editable slot(s):
+- Global frame unchanged: YES / NO / N/A
+- Cross-screen evidence:
+
+- [ ] A local UI request changes only its declared editable slot(s).
+- [ ] Protected `--rv-frame-*` tokens and reserved frame primitives are unchanged when FRAME CHANGE: NO.
+- [ ] Cross-screen evidence is recorded when FRAME CHANGE: YES.
+
 ## Regression protection
 
 - [ ] Every reproducible bug fixed has a regression test.

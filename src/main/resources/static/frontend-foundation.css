@@ -34,6 +34,14 @@
   --rv-ai-accent-border: rgba(139, 92, 246, .34);
   --rv-sidebar-width: 220px;
 
+  /* Protected frame contract. Page-specific CSS may consume but never redefine these. */
+  --rv-frame-sidebar-width: 220px;
+  --rv-frame-topbar-height: 64px;
+  --rv-frame-content-max: 1420px;
+  --rv-frame-gutter-desktop: 24px;
+  --rv-frame-gutter-compact: 20px;
+  --rv-frame-gutter-mobile: 12px;
+
   --rv-success: #3ddc97;
   --rv-warning: #f5b94c;
   --rv-danger: #ff667d;
@@ -683,3 +691,116 @@ body.home-page:has(#dashboardView:not(.hidden)):has(#configuration:target) .app-
   box-shadow:inset 3px 0 0 var(--rv-accent);
 }
 
+
+
+/* =========================================================
+   RECEPVOZ FRAME CONTRACT v1
+   Protected primitives. Feature styles may compose inside
+   .rv-frame-slot but must not redefine this namespace.
+   ========================================================= */
+
+.rv-frame-shell {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  background: var(--rv-bg-canvas);
+  color: var(--rv-text-primary);
+}
+
+.rv-frame-topbar {
+  min-width: 0;
+  min-height: var(--rv-frame-topbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rv-space-4);
+  padding: 10px var(--rv-frame-gutter-desktop);
+  border-bottom: 1px solid var(--rv-border-subtle);
+  background: rgba(6, 17, 28, .96);
+}
+
+.rv-page-frame {
+  width: min(var(--rv-frame-content-max), calc(100% - 48px));
+  min-width: 0;
+  margin-inline: auto;
+  padding-block: var(--rv-space-6) var(--rv-space-12);
+}
+
+.rv-page-header {
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--rv-space-6);
+  margin-bottom: var(--rv-space-6);
+}
+
+.rv-page-header > * {
+  min-width: 0;
+}
+
+.rv-page-header h1 {
+  margin: 0;
+  color: var(--rv-text-primary);
+  font-size: clamp(30px, 3vw, 40px);
+  line-height: 1.08;
+  letter-spacing: -.035em;
+}
+
+.rv-page-header p {
+  max-width: 760px;
+  margin: var(--rv-space-2) 0 0;
+  color: var(--rv-text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.rv-page-grid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--rv-space-6);
+}
+
+.rv-frame-slot {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 980px) {
+  .rv-frame-topbar {
+    min-height: var(--rv-frame-topbar-height);
+    flex-wrap: wrap;
+    padding-inline: var(--rv-frame-gutter-compact);
+  }
+
+  .rv-page-frame {
+    width: calc(100% - 40px);
+  }
+}
+
+@media (max-width: 620px) {
+  .rv-frame-topbar {
+    padding-inline: var(--rv-frame-gutter-mobile);
+  }
+
+  .rv-page-frame {
+    width: calc(100% - 24px);
+    padding-block: var(--rv-space-5) var(--rv-space-8);
+  }
+
+  .rv-page-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--rv-space-4);
+    margin-bottom: var(--rv-space-5);
+  }
+
+  .rv-page-header h1 {
+    font-size: clamp(28px, 9vw, 36px);
+  }
+
+  .rv-page-grid {
+    gap: var(--rv-space-4);
+  }
+}

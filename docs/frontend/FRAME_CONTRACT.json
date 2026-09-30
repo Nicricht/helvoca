@@ -1,0 +1,108 @@
+{
+  "version": "1.0.0",
+  "status": "canonical",
+  "authority": "docs/frontend/FRAME_CONTRACT.md",
+  "parentAuthority": "docs/frontend/VISUAL_PRODUCT_SOURCE_OF_TRUTH.md",
+  "protectedNamespace": "--rv-frame-",
+  "protectedSelectors": [
+    ".rv-frame-shell",
+    ".rv-frame-topbar",
+    ".rv-page-frame",
+    ".rv-page-header",
+    ".rv-page-grid",
+    ".rv-frame-slot"
+  ],
+  "breakpoints": {
+    "desktopMin": 981,
+    "compactMax": 980,
+    "mobileMax": 620
+  },
+  "geometry": {
+    "sidebarWidth": 220,
+    "topbarHeight": 64,
+    "contentMax": 1420,
+    "gutterDesktop": 24,
+    "gutterCompact": 20,
+    "gutterMobile": 12
+  },
+  "screens": {
+    "dashboard": [
+      "page-header",
+      "kpi-grid",
+      "analytics",
+      "recent-activity",
+      "quick-actions"
+    ],
+    "conversations": [
+      "page-header",
+      "conversation-list",
+      "conversation-detail",
+      "customer-inspector",
+      "conversation-actions"
+    ],
+    "agenda": [
+      "page-header",
+      "agenda-toolbar",
+      "calendar",
+      "appointment-detail",
+      "agenda-actions"
+    ],
+    "clients": [
+      "page-header",
+      "customer-search",
+      "customer-list",
+      "customer-detail",
+      "customer-actions"
+    ],
+    "inventory": [
+      "page-header",
+      "inventory-summary",
+      "inventory-toolbar",
+      "product-table",
+      "product-inspector",
+      "inventory-actions"
+    ],
+    "settings": [
+      "page-header",
+      "settings-navigation",
+      "settings-form",
+      "integration-panel",
+      "settings-actions"
+    ],
+    "billing": [
+      "page-header",
+      "plan-summary",
+      "usage-summary",
+      "invoice-list",
+      "billing-actions"
+    ]
+  },
+  "canonicalViewports": [
+    [
+      1536,
+      950
+    ],
+    [
+      1440,
+      900
+    ],
+    [
+      1366,
+      768
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      768,
+      1024
+    ],
+    [
+      390,
+      844
+    ]
+  ],
+  "localChangeDefault": "FRAME CHANGE: NO",
+  "globalChangeValue": "FRAME CHANGE: YES"
+}

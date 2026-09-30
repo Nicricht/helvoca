@@ -1,7 +1,7 @@
 # RecepVoz Visual Acceptance Matrix
 
 **Status:** Required visual QA contract  
-**Authority:** `VISUAL_PRODUCT_SOURCE_OF_TRUTH.md`, `SCREEN_BLUEPRINTS.md`, `COMPONENT_CONTRACTS.md`  
+**Authority:** `VISUAL_PRODUCT_SOURCE_OF_TRUTH.md`, `FRAME_CONTRACT.md`, `SCREEN_BLUEPRINTS.md`, `COMPONENT_CONTRACTS.md`  
 **Purpose:** Make visual completion observable, repeatable and reviewable.
 
 ## 1. Why this exists
@@ -25,11 +25,14 @@ Every principal customer surface must be reviewed at minimum at:
 
 | Target | Width | Height | Purpose |
 | --- | ---: | ---: | --- |
+| Wide desktop | 1536 | 950 | Large-shell containment |
 | Desktop | 1440 | 900 | Primary reference comparison |
+| Common laptop | 1366 | 768 | Real-world desktop density |
+| Compact desktop | 1280 | 720 | Breakpoint/collision protection |
 | Tablet | 768 | 1024 | Layout transition and density |
 | Mobile | 390 | 844 | Compact/touch contract |
 
-Marketing may additionally be reviewed at 1920 × 1080 when hero composition materially changes.
+These are the canonical frame viewports from `FRAME_CONTRACT.json`. Bug-specific widths may be added when real production evidence exposes a gap. Marketing may additionally be reviewed at 1920 × 1080 when hero composition materially changes.
 
 ## 3. Required routes
 

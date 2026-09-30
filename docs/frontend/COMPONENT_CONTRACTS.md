@@ -1,7 +1,8 @@
 # RecepVoz Frontend Component Contracts
 
 **Status:** Canonical reusable UI contract  
-**Parent authority:** `VISUAL_PRODUCT_SOURCE_OF_TRUTH.md`
+**Parent authority:** `VISUAL_PRODUCT_SOURCE_OF_TRUTH.md`  
+**Shared frame authority:** `FRAME_CONTRACT.md`
 
 This document prevents each screen from inventing its own visual system. Feature CSS may control composition, but shared component behavior and visual roles must remain consistent.
 
@@ -436,3 +437,17 @@ Feature CSS owns:
 
 A feature stylesheet must not introduce a second global design system.
 
+
+
+## 27. Frame boundary rule
+
+The shell, global page geometry and protected `--rv-frame-*` / `.rv-frame-*` / `.rv-page-*` namespace are governed by `FRAME_CONTRACT.md`.
+
+For ordinary page work:
+
+- declare `FRAME CHANGE: NO`;
+- name the screen and editable slot(s);
+- keep shared frame primitives unchanged;
+- use feature CSS only inside the declared local region.
+
+A component change that requires changing shared shell geometry must be promoted to `FRAME CHANGE: YES` and reviewed across principal screens.
