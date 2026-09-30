@@ -249,7 +249,7 @@ public class BusinessImportPreviewService {
                 if (name == null) continue;
                 BigDecimal price = nonNegativeDecimal(item.opt("price"));
                 Integer onHand = nonNegativeInteger(item.opt("onHand"));
-                String currency = clean(item.optString("currency", "CLP"), 3);
+                String currency = clean(item.optString("currency", "CLP"), 16);
                 if (currency == null || !currency.toUpperCase(Locale.ROOT).matches("[A-Z]{3}")) currency = "CLP";
                 else currency = currency.toUpperCase(Locale.ROOT);
 
