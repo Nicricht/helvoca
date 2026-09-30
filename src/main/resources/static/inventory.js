@@ -947,6 +947,7 @@
             roleBadge.textContent = state.canManage ? "Administrador" : "Solo lectura";
             roleBadge.className = `badge ${state.canManage ? "online" : "muted"}`;
             $("#inventoryAddProductBtn").classList.toggle("hidden", !state.canManage);
+            $("#inventoryImportBtn")?.classList.toggle("hidden", !state.canManage);
 
             mergeProducts();
             render();
