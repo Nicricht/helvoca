@@ -2375,6 +2375,50 @@ test('dashboard prioritizes calls, attention, recent activity and quick access',
 
 
 
+test('owner value keeps mixed currencies separate and refuses partial managed-revenue totals', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'mixed-currency-token'));
+  await mockReadyHome(page);
+  await page.unroute('**/api/v1/commercial/analytics**');
+  await page.route('**/api/v1/commercial/analytics**', route => route.fulfill(json({
+    days: 7,
+    timezone: 'America/Santiago',
+    primaryCurrency: null,
+    totalRevenue: null,
+    paidOrders: 2,
+    unitsSold: 2,
+    averageTicket: null,
+    revenueChangePercent: null,
+    currencyTotals: [
+      { currency: 'CLP', amount: 100000 },
+      { currency: 'USD', amount: 100 }
+    ],
+    salesOverTime: [],
+    topProducts: [],
+    channels: [],
+    peakWeekday: null,
+    peakHour: null,
+    recepVozOrders: 2,
+    recepVozRevenue: null,
+    bookingCurrency: 'CLP',
+    paidBookings: 1,
+    bookingRevenue: 30000,
+    providerVerifiedBookingRevenue: 30000,
+    manualRecordedBookingRevenue: 0,
+    recepVozPaidBookings: 1,
+    recepVozBookingRevenue: 30000,
+    bookingCurrencyTotals: [{ currency: 'CLP', amount: 30000 }],
+    insights: []
+  })));
+
+  await page.goto('/');
+
+  await expect(page.locator('#ownerConfirmedRevenue')).toHaveText('Varias monedas');
+  await expect(page.locator('#ownerRevenueCurrencyHint')).toContainText('separados por moneda');
+  await expect(page.locator('#ownerManagedRevenue')).toHaveText('No consolidable');
+  await expect(page.locator('#ownerRevenueEvidence')).toContainText('no una estimación causal de ROI');
+});
+
+
 test('sales analytics turns paid orders into decision-ready business statistics', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   const requestedPeriods = [];
