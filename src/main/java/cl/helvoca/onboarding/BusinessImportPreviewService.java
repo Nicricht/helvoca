@@ -4,6 +4,7 @@ import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.security.TenantProvider;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -34,6 +35,7 @@ public class BusinessImportPreviewService {
     private final TenantProvider tenantProvider;
     private final HttpClient http;
 
+    @Autowired
     public BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
                                         OpenAiRealtimeProperties openAi,
                                         TenantProvider tenantProvider) {
