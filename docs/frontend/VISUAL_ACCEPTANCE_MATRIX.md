@@ -71,6 +71,8 @@ Example:
 
 Screenshots used for certification must belong to the exact implementation HEAD being reviewed.
 
+The Full Gate stores deterministic implementation screenshots under `test-results/visual-evidence/<HEAD>/` and uploads them as the `frontend-visual-evidence` artifact even when the suite passes. These images prove the exact application HEAD rendered the canonical seeded states; they do **not** replace the separate post-deploy production screenshot check in section 22.
+
 ## 5. Comparison dimensions
 
 Each screen receives PASS/FAIL for all applicable dimensions.
@@ -167,19 +169,22 @@ Required:
 
 Required:
 
-- four KPI cards form one coherent first row on desktop;
-- metrics dominate labels/icons;
-- analytical chart gets more area than recent-list secondary panel;
-- latest conversations remain scannable;
-- page title and date context visible;
-- cards align;
-- no giant empty whitespace.
+- page title and the owner question **“Qué está pasando hoy”** establish the first-order hierarchy;
+- the first screenful prioritizes current calls, **Necesita tu atención**, **Actividad reciente** and **Accesos rápidos**;
+- attention items are visually stronger than secondary reporting and explain what the owner needs to review;
+- recent activity translates technical events into human-readable business language and stays scannable;
+- quick access exposes Agenda, Clientes, Conversaciones, Inventario, Configuración and Facturación without duplicating the global shell;
+- the operational workspaces for Reservas, Pedidos, Ventas, Solicitudes, Clientes and Auditoría remain below the owner summary instead of competing with it;
+- **Ventas y rendimiento** exposes 7/30/90-day periods, confirmed collections, paid orders, units, average ticket, trend, top products, channels, peak demand and measured RecepVoz-origin orders;
+- mixed currencies are not presented as a false combined revenue or average-ticket total;
+- no giant empty whitespace or decorative cards without an owner decision attached.
 
 Tablet/mobile:
 
-- KPI cards reflow logically;
-- chart remains readable or transforms appropriately;
-- recent conversations do not overflow.
+- attention, activity and quick access stack in a clear priority order;
+- operational tabs remain reachable without body-level horizontal overflow;
+- sales cards and chart reflow without losing labels, period controls or currency meaning;
+- the screen preserves the same owner question instead of degrading into a generic KPI mosaic.
 
 ## 9. Conversaciones acceptance
 
