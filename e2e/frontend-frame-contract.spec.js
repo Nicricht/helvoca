@@ -115,6 +115,15 @@ test.describe('RecepVoz frontend frame contract', () => {
     expect(violations).toEqual([]);
   });
 
+
+  test('desktop authenticated rail reserves the full viewport column', async () => {
+    const foundation = read('src/main/resources/static/frontend-foundation.css');
+
+    expect(foundation).toContain('height:calc(100dvh - 106px)');
+    expect(foundation).toContain('overflow-y:auto');
+  });
+
+
   test('frame primitives stay contained at canonical viewports', async ({ page }) => {
     const foundation = read('src/main/resources/static/frontend-foundation.css');
 

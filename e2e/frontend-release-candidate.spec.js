@@ -363,6 +363,7 @@ test('release candidate captures exact-head visual evidence for every canonical 
         await expect(page.locator('#firstUserOnboarding')).toBeHidden();
       } else if (surface.name === 'conversations') {
         await expect(page.locator('#conversationList')).toContainText('+56955556666');
+
       } else if (surface.name === 'inventory') {
         await expect(page.locator('[data-inventory-product-id="product-rc"]')).toContainText('Taladro percutor');
       } else if (surface.name === 'settings') {
@@ -371,6 +372,65 @@ test('release candidate captures exact-head visual evidence for every canonical 
         await expect(page.locator('#planName')).toHaveText('Profesional');
       } else if (surface.name === 'simulator') {
         await expect(page.locator('#startBtn')).toBeVisible();
+      }
+
+      if (viewport.width >= 1280) {
+        const railSelector = {
+          home: '#primaryNav',
+          conversations: '.rv-nav',
+          inventory: '.inventory-nav',
+          settings: '#primaryNav',
+          billing: '.account-nav',
+          simulator: '.topbar nav'
+        }[surface.name];
+
+        const railState = await page.locator(railSelector).evaluate(nav => {
+          const navStyle = getComputedStyle(nav);
+          const navRect = nav.getBoundingClientRect();
+          return {
+            position: navStyle.position,
+            flexDirection: navStyle.flexDirection,
+            height: navRect.height,
+            links: [...nav.querySelectorAll('a')].map(link => {
+              const style = getComputedStyle(link);
+              const rect = link.getBoundingClientRect();
+              const range = document.createRange();
+              range.selectNodeContents(link);
+              const textRect = range.getBoundingClientRect();
+              return {
+                text: link.innerText.trim(),
+                width: rect.width,
+                height: rect.height,
+                textWidth: textRect.width,
+                textHeight: textRect.height,
+                opacity: style.opacity,
+                visibility: style.visibility
+              };
+            })
+          };
+        });
+
+        expect(railState.links.map(link => link.text), `${surface.name} rail labels`).toEqual([
+          'Inicio',
+          'Conversaciones',
+          'Agenda',
+          'Clientes',
+          'Inventario',
+          'Configuración',
+          'Facturación'
+        ]);
+        expect(railState.position, `${surface.name} rail position`).toBe('fixed');
+        expect(railState.flexDirection, `${surface.name} rail direction`).toBe('column');
+        expect(railState.height, `${surface.name} rail height`).toBeGreaterThan(400);
+
+        for (const link of railState.links) {
+          expect(link.width, `${surface.name} ${link.text} width`).toBeGreaterThan(100);
+          expect(link.height, `${surface.name} ${link.text} height`).toBeGreaterThanOrEqual(40);
+          expect(link.textWidth, `${surface.name} ${link.text} text width`).toBeGreaterThan(20);
+          expect(link.textHeight, `${surface.name} ${link.text} text height`).toBeGreaterThan(10);
+          expect(link.opacity, `${surface.name} ${link.text} opacity`).toBe('1');
+          expect(link.visibility, `${surface.name} ${link.text} visibility`).toBe('visible');
+        }
       }
 
       const layout = await page.evaluate(() => ({
