@@ -455,3 +455,202 @@
     transition: none;
   }
 }
+
+
+/* Owner value cockpit: screen-local analytics slot, FRAME CHANGE: NO */
+#operationalOverview .owner-value-panel {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 36%),
+    var(--surface-2);
+}
+
+#operationalOverview .owner-value-panel[data-state="mixed"] {
+  border-color: var(--warning);
+}
+
+#operationalOverview .owner-value-head,
+#operationalOverview .owner-value-actions,
+#operationalOverview .owner-value-chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+#operationalOverview .owner-value-head h3 {
+  margin: 4px 0 0;
+  font-size: clamp(19px, 2vw, 24px);
+  letter-spacing: -.02em;
+}
+
+#operationalOverview .owner-value-head p {
+  max-width: 680px;
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#operationalOverview .owner-value-actions {
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+#operationalOverview .owner-value-actions a,
+#operationalOverview .owner-value-actions button {
+  display: inline-flex;
+  min-height: 36px;
+  padding: 0 11px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+#operationalOverview .owner-value-actions a {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+#operationalOverview .owner-value-actions a:hover,
+#operationalOverview .owner-value-actions button:hover {
+  border-color: var(--accent);
+}
+
+#operationalOverview .owner-value-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+#operationalOverview .owner-value-metrics article {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+}
+
+#operationalOverview .owner-value-metrics strong,
+#operationalOverview .owner-value-metrics span,
+#operationalOverview .owner-value-metrics small {
+  display: block;
+}
+
+#operationalOverview .owner-value-metrics strong {
+  overflow-wrap: anywhere;
+  font-size: clamp(20px, 2.3vw, 30px);
+  line-height: 1.05;
+  letter-spacing: -.035em;
+}
+
+#operationalOverview .owner-value-metrics span {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+#operationalOverview .owner-value-metrics small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+#operationalOverview .owner-value-chart-head {
+  align-items: end;
+  margin-top: 16px;
+}
+
+#operationalOverview .owner-value-chart-head strong,
+#operationalOverview .owner-value-chart-head span {
+  display: block;
+}
+
+#operationalOverview .owner-value-chart-head strong {
+  font-size: 12px;
+}
+
+#operationalOverview .owner-value-chart-head span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+#operationalOverview .owner-value-chart {
+  min-height: 126px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+
+#operationalOverview .owner-value-chart svg {
+  display: block;
+  width: 100%;
+  height: 126px;
+  overflow: visible;
+}
+
+#operationalOverview .owner-value-line {
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+#operationalOverview .owner-value-point {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+#operationalOverview .owner-value-evidence {
+  margin: 11px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  #operationalOverview .owner-value-head {
+    flex-direction: column;
+  }
+
+  #operationalOverview .owner-value-actions {
+    width: 100%;
+  }
+
+  #operationalOverview .owner-value-actions a,
+  #operationalOverview .owner-value-actions button {
+    flex: 1 1 0;
+  }
+
+  #operationalOverview .owner-value-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  #operationalOverview .owner-value-actions {
+    flex-direction: column;
+  }
+
+  #operationalOverview .owner-value-actions a,
+  #operationalOverview .owner-value-actions button {
+    width: 100%;
+  }
+}

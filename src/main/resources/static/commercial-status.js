@@ -326,6 +326,20 @@
         '      <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver solicitudes pendientes"><strong id="homeRequestsToday">–</strong><span>Pendientes</span><small>Solicitudes por resolver</small></a>',
         '      <a id="ownerOrdersMetric" class="home-metric hidden" href="/?tab=sales#homeBusinessWorkspace" aria-label="Ver pedidos y ventas"><strong id="ownerOrdersToday">–</strong><span>Pedidos</span><small id="ownerOrdersHint">Generados hoy</small></a>',
         '    </div>',
+        '    <section id="ownerValuePanel" class="owner-value-panel" aria-labelledby="ownerValueTitle" data-state="loading">',
+        '      <div class="owner-value-head">',
+        '        <div><div class="eyebrow">Últimos 7 días</div><h3 id="ownerValueTitle">RecepVoz esta semana</h3><p id="ownerValueNarrative">Midiendo resultados confirmados…</p></div>',
+        '        <div class="owner-value-actions"><a href="/?tab=sales#homeBusinessWorkspace">Ver ventas</a><button id="ownerWorkspaceToggle" type="button" aria-controls="homeBusinessWorkspace" aria-expanded="false">Ver operación detallada</button></div>',
+        '      </div>',
+        '      <div class="owner-value-metrics" aria-label="Valor comercial confirmado">',
+        '        <article><strong id="ownerConfirmedRevenue">–</strong><span>Ingresos confirmados</span><small id="ownerRevenueCurrencyHint">Solo pagos comprobados</small></article>',
+        '        <article><strong id="ownerPaidOutcomes">–</strong><span>Resultados con cobro</span><small>Pedidos pagados + servicios completados con cobro</small></article>',
+        '        <article><strong id="ownerManagedRevenue">–</strong><span>Con origen Voz / WhatsApp</span><small>No es una estimación causal de ROI</small></article>',
+        '      </div>',
+        '      <div class="owner-value-chart-head"><div><strong>Evolución de cobros</strong><span>Pedidos confirmados por día</span></div></div>',
+        '      <div id="ownerRevenueTrend" class="owner-value-chart" aria-label="Evolución de cobros confirmados"><div class="owner-empty">Cargando tendencia…</div></div>',
+        '      <p id="ownerRevenueEvidence" class="owner-value-evidence">Verificando evidencia de pagos…</p>',
+        '    </section>',
         '    <section class="owner-recent" aria-labelledby="ownerRecentTitle">',
         '      <div class="owner-section-heading"><div><div class="eyebrow">Últimos movimientos</div><h3 id="ownerRecentTitle">Actividad reciente</h3></div></div>',
         '      <div id="homeRecentActivity" class="owner-activity-list" role="list"><div class="owner-empty">Cargando actividad…</div></div>',
@@ -346,16 +360,13 @@
         '        <span id="ownerBookingCancelsChip" class="owner-dashboard-chip hidden"><strong id="ownerBookingCancelsToday">–</strong> canceladas</span>',
         '      </div>',
         '    </section>',
-        '    <nav id="ownerQuickActions" class="owner-quick-actions" aria-label="Accesos principales">',
-        '      <div class="owner-section-heading"><div><div class="eyebrow">Accesos</div><h3>Ir a</h3></div></div>',
+        '    <nav id="ownerQuickActions" class="owner-quick-actions" aria-label="Acciones principales">',
+        '      <div class="owner-section-heading"><div><div class="eyebrow">Acciones</div><h3>Resolver ahora</h3></div></div>',
         '      <div class="owner-quick-grid">',
         '        <a href="/?tab=bookings#homeBusinessWorkspace">Agenda</a>',
-        '        <a href="/?tab=sales#homeBusinessWorkspace">Ventas</a>',
-        '        <a href="/?tab=customers#homeBusinessWorkspace">Clientes</a>',
+        '        <a href="/?tab=requests#homeBusinessWorkspace">Pendientes</a>',
         '        <a href="/conversations.html">Conversaciones</a>',
         '        <a href="/inventory.html">Inventario</a>',
-        '        <a href="/settings.html">Configuración</a>',
-        '        <a href="/account.html">Facturación</a>',
         '      </div>',
         '    </nav>',
         '    <div id="ownerSevenDayRow" class="owner-seven-day hidden"><strong>Últimos 7 días</strong><span id="ownerSevenDaySummary">–</span></div>',
@@ -413,6 +424,189 @@
     function numeric(value) {
         const number = Number(value || 0);
         return Number.isFinite(number) ? number : 0;
+    }
+
+    function normalizedCurrency(value) {
+        const currency = String(value || '').trim().toUpperCase();
+        return /^[A-Z]{3}$/.test(currency) ? currency : '';
+    }
+
+    function formatMoney(value, currency) {
+        const code = normalizedCurrency(currency);
+        if (!code || !Number.isFinite(Number(value))) return '–';
+        try {
+            return new Intl.NumberFormat('es-CL', {
+                style: 'currency',
+                currency: code,
+                maximumFractionDigits: code === 'CLP' ? 0 : 2
+            }).format(Number(value));
+        } catch (_) {
+            return String(value) + ' ' + code;
+        }
+    }
+
+    function totalsMap(items, fallbackCurrency, fallbackAmount) {
+        const totals = new Map();
+        (Array.isArray(items) ? items : []).forEach(item => {
+            const currency = normalizedCurrency(item?.currency);
+            const amount = numeric(item?.amount);
+            if (!currency || amount <= 0) return;
+            totals.set(currency, (totals.get(currency) || 0) + amount);
+        });
+        if (!totals.size) {
+            const currency = normalizedCurrency(fallbackCurrency);
+            const amount = numeric(fallbackAmount);
+            if (currency && amount > 0) totals.set(currency, amount);
+        }
+        return totals;
+    }
+
+    function mergeTotals(...maps) {
+        const merged = new Map();
+        maps.forEach(map => map.forEach((amount, currency) => {
+            merged.set(currency, (merged.get(currency) || 0) + numeric(amount));
+        }));
+        return merged;
+    }
+
+    function displayTotals(totals) {
+        const entries = [...totals.entries()].filter(([, amount]) => amount > 0);
+        if (!entries.length) return { primary: 'Sin cobros', detail: 'No hay pagos confirmados en el período.', mixed: false };
+        if (entries.length === 1) {
+            const [currency, amount] = entries[0];
+            return { primary: formatMoney(amount, currency), detail: currency, mixed: false };
+        }
+        return {
+            primary: 'Varias monedas',
+            detail: entries.map(([currency, amount]) => formatMoney(amount, currency)).join(' · '),
+            mixed: true
+        };
+    }
+
+    function managedRevenueDisplay(analytics) {
+        const orderCurrency = normalizedCurrency(analytics?.primaryCurrency);
+        const bookingCurrency = normalizedCurrency(analytics?.bookingCurrency);
+        const orderAmount = numeric(analytics?.recepVozRevenue);
+        const bookingAmount = numeric(analytics?.recepVozBookingRevenue);
+        const hasOrderImpact = numeric(analytics?.recepVozOrders) > 0 || orderAmount > 0;
+        const hasBookingImpact = numeric(analytics?.recepVozPaidBookings) > 0 || bookingAmount > 0;
+
+        // If a source-attributed cohort exists but its currency cannot be represented by one
+        // authoritative currency, do not publish a misleading partial monetary total.
+        if ((hasOrderImpact && !orderCurrency) || (hasBookingImpact && !bookingCurrency)) {
+            return {
+                primary: 'No consolidable',
+                detail: 'Origen Voz / WhatsApp registrado en más de una moneda.',
+                mixed: true
+            };
+        }
+
+        const totals = new Map();
+        if (orderCurrency && orderAmount > 0) totals.set(orderCurrency, orderAmount);
+        if (bookingCurrency && bookingAmount > 0) {
+            totals.set(bookingCurrency, (totals.get(bookingCurrency) || 0) + bookingAmount);
+        }
+        return displayTotals(totals);
+    }
+
+    function renderRevenueTrend(container, analytics) {
+        if (!container) return;
+        const orderCurrencies = totalsMap(analytics?.currencyTotals, analytics?.primaryCurrency, analytics?.totalRevenue);
+        if (orderCurrencies.size > 1) {
+            container.innerHTML = '<div class="owner-empty">La tendencia diaria no se consolida porque hay cobros en varias monedas.</div>';
+            return;
+        }
+        const points = (Array.isArray(analytics?.salesOverTime) ? analytics.salesOverTime : [])
+            .map(item => ({ date: String(item?.date || ''), revenue: Math.max(0, numeric(item?.revenue)) }))
+            .filter(item => item.date);
+        if (!points.length) {
+            container.innerHTML = '<div class="owner-empty">Aún no hay cobros diarios para graficar.</div>';
+            return;
+        }
+
+        const width = 560;
+        const height = 126;
+        const padX = 12;
+        const padY = 14;
+        const max = Math.max(1, ...points.map(item => item.revenue));
+        const usableW = width - (padX * 2);
+        const usableH = height - (padY * 2);
+        const coords = points.map((item, index) => {
+            const x = points.length === 1 ? width / 2 : padX + ((usableW * index) / (points.length - 1));
+            const y = height - padY - ((item.revenue / max) * usableH);
+            return { ...item, x, y };
+        });
+        const polyline = coords.map(point => point.x.toFixed(1) + ',' + point.y.toFixed(1)).join(' ');
+        const currency = normalizedCurrency(analytics?.primaryCurrency);
+        container.innerHTML =
+            '<svg viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="Cobros confirmados por día">' +
+            '<polyline class="owner-value-line" fill="none" points="' + polyline + '"></polyline>' +
+            coords.map(point => '<circle class="owner-value-point" cx="' + point.x.toFixed(1) + '" cy="' + point.y.toFixed(1) + '" r="3"><title>' +
+                point.date + ': ' + formatMoney(point.revenue, currency) + '</title></circle>').join('') +
+            '</svg>';
+    }
+
+    function renderOwnerValue(analytics) {
+        const panel = overview.querySelector('#ownerValuePanel');
+        const confirmed = overview.querySelector('#ownerConfirmedRevenue');
+        const paid = overview.querySelector('#ownerPaidOutcomes');
+        const managed = overview.querySelector('#ownerManagedRevenue');
+        const hint = overview.querySelector('#ownerRevenueCurrencyHint');
+        const narrative = overview.querySelector('#ownerValueNarrative');
+        const evidence = overview.querySelector('#ownerRevenueEvidence');
+        const trend = overview.querySelector('#ownerRevenueTrend');
+        if (!panel || !confirmed || !paid || !managed || !hint || !narrative || !evidence || !trend) return;
+
+        if (!analytics) {
+            panel.dataset.state = 'unavailable';
+            confirmed.textContent = 'No disponible';
+            paid.textContent = '–';
+            managed.textContent = 'No disponible';
+            hint.textContent = 'No pudimos verificar los cobros';
+            narrative.textContent = 'La operación sigue disponible, pero el resumen comercial no pudo actualizarse.';
+            evidence.textContent = 'Los ingresos no se estiman cuando falta evidencia confirmada.';
+            trend.innerHTML = '<div class="owner-empty">La tendencia comercial no está disponible.</div>';
+            return;
+        }
+
+        const orderTotals = totalsMap(analytics.currencyTotals, analytics.primaryCurrency, analytics.totalRevenue);
+        const bookingTotals = totalsMap(analytics.bookingCurrencyTotals, analytics.bookingCurrency, analytics.bookingRevenue);
+        const combined = displayTotals(mergeTotals(orderTotals, bookingTotals));
+        const managedDisplay = managedRevenueDisplay(analytics);
+        const paidOrders = numeric(analytics.paidOrders);
+        const paidBookings = numeric(analytics.paidBookings);
+        const providerBooking = numeric(analytics.providerVerifiedBookingRevenue);
+        const manualBooking = numeric(analytics.manualRecordedBookingRevenue);
+
+        panel.dataset.state = combined.mixed ? 'mixed' : 'ready';
+        confirmed.textContent = combined.primary;
+        paid.textContent = String(paidOrders + paidBookings);
+        managed.textContent = managedDisplay.primary;
+        hint.textContent = combined.mixed
+            ? 'Cobros confirmados separados por moneda'
+            : (combined.detail === 'No hay pagos confirmados en el período.' ? combined.detail : 'Moneda ' + combined.detail);
+
+        if (combined.mixed) {
+            narrative.textContent = 'Hay cobros confirmados en distintas monedas. RecepVoz los mantiene separados para no inflar el resultado.';
+        } else if ((paidOrders + paidBookings) > 0) {
+            narrative.textContent = 'Pedidos pagados y servicios completados con pago confirmado, sin convertir reservas pendientes en ventas.';
+        } else {
+            narrative.textContent = 'Todavía no hay resultados pagados confirmados en este período.';
+        }
+
+        const evidenceParts = [
+            String(paidOrders) + ' pedidos pagados',
+            String(paidBookings) + ' servicios completados con cobro confirmado'
+        ];
+        if (paidBookings > 0 && analytics.bookingCurrency) {
+            evidenceParts.push(
+                formatMoney(providerBooking, analytics.bookingCurrency) + ' verificados por proveedor',
+                formatMoney(manualBooking, analytics.bookingCurrency) + ' registrados por el negocio'
+            );
+        }
+        evidence.textContent = 'Pagos confirmados: ' + evidenceParts.join(' · ') +
+            '. El bloque Voz / WhatsApp describe el origen registrado, no una estimación causal de ROI.';
+        renderRevenueTrend(trend, analytics);
     }
 
     function labelStage(value) {
@@ -509,7 +703,7 @@
         return events.length;
     }
 
-    function renderOperational(operations, pilotMetrics, pipeline, subscription, audit) {
+    function renderOperational(operations, pilotMetrics, pipeline, subscription, audit, analytics) {
         currentBusinessName = operations.businessName || window.helvocaBusinessName || currentBusinessName || 'Tu negocio';
         const timeZone = operations.timezone || pilotMetrics?.timezone || 'UTC';
         const todayKey = dateKey(operations.localNow || pilotMetrics?.localNow || new Date().toISOString(), timeZone);
@@ -613,6 +807,7 @@
             planRow.classList.add('hidden');
         }
 
+        renderOwnerValue(analytics);
         const recentCount = renderRecentActivity(operations, pipeline, timeZone);
 
         overview.querySelector('#homeCallsToday').textContent = String(numeric(operations.callsToday));
@@ -636,6 +831,7 @@
     }
 
     function renderError() {
+        renderOwnerValue(null);
         setDashboardState('error', 'NO DISPONIBLE', 'No pudimos actualizar las métricas. Usa “Actualizar estado” para reintentar.');
         const attentionPanel = overview.querySelector('#ownerAttentionPanel');
         attentionPanel.dataset.state = 'error';
@@ -663,12 +859,13 @@
                 canReadAudit = false;
             }
             const auditRequest = canReadAudit ? api('/api/v1/audit') : Promise.resolve(null);
-            const [operationsResult, pilotResult, pipelineResult, subscriptionResult, auditResult] = await Promise.allSettled([
+            const [operationsResult, pilotResult, pipelineResult, subscriptionResult, auditResult, analyticsResult] = await Promise.allSettled([
                 api('/api/v1/operations/dashboard'),
                 api('/api/v1/operations/pilot-metrics'),
                 api('/api/v1/commercial/pipeline'),
                 api('/api/v1/subscription'),
-                auditRequest
+                auditRequest,
+                api('/api/v1/commercial/analytics?days=7')
             ]);
             if (operationsResult.status !== 'fulfilled') throw operationsResult.reason;
             renderOperational(
@@ -676,7 +873,8 @@
                 pilotResult.status === 'fulfilled' ? pilotResult.value : null,
                 pipelineResult.status === 'fulfilled' ? pipelineResult.value : null,
                 subscriptionResult.status === 'fulfilled' ? subscriptionResult.value : null,
-                auditResult.status === 'fulfilled' ? auditResult.value : null
+                auditResult.status === 'fulfilled' ? auditResult.value : null,
+                analyticsResult.status === 'fulfilled' ? analyticsResult.value : null
             );
             lastLoadedAt = Date.now();
         } catch (_) {
@@ -714,6 +912,27 @@
             if (title.textContent !== operationalTitle) title.textContent = operationalTitle;
         }
     }).observe(title, { childList: true, characterData: true, subtree: true });
+
+    const workspace = document.querySelector('#homeBusinessWorkspace');
+    const workspaceToggle = overview.querySelector('#ownerWorkspaceToggle');
+    function syncWorkspaceToggle() {
+        if (!workspace || !workspaceToggle) return;
+        const collapsed = workspace.classList.contains('owner-collapsed');
+        workspaceToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        workspaceToggle.textContent = collapsed ? 'Ver operación detallada' : 'Ocultar operación detallada';
+    }
+    workspaceToggle?.addEventListener('click', () => {
+        if (!workspace) return;
+        workspace.classList.toggle('owner-collapsed');
+        syncWorkspaceToggle();
+        if (!workspace.classList.contains('owner-collapsed')) {
+            workspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+    if (workspace) {
+        new MutationObserver(syncWorkspaceToggle).observe(workspace, { attributes: true, attributeFilter: ['class'] });
+    }
+    syncWorkspaceToggle();
 
     document.querySelector('#refreshBtn')?.addEventListener('click', () => loadOperational(true));
     queueMicrotask(applyReadyState);

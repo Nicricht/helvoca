@@ -177,6 +177,14 @@ async function mockReadyHome(page, roles = ['BUSINESS_ADMIN'], options = {}) {
     peakHour: 19,
     recepVozOrders: 73,
     recepVozRevenue: 742400,
+    bookingCurrency: 'CLP',
+    paidBookings: 11,
+    bookingRevenue: 231000,
+    providerVerifiedBookingRevenue: 190000,
+    manualRecordedBookingRevenue: 41000,
+    recepVozPaidBookings: 9,
+    recepVozBookingRevenue: 178000,
+    bookingCurrencyTotals: [{ currency: 'CLP', amount: 231000 }],
     insights: [
       { type: 'TOP_PRODUCT', text: 'Hamburguesa Doble es el producto más pedido del período.' },
       { type: 'TOP_CHANNEL', text: 'WhatsApp concentra la mayor cantidad de pedidos pagados.' },
@@ -515,6 +523,16 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#ownerSevenDaySummary')).toContainText('50 conversaciones');
   await expect(page.locator('#ownerSevenDaySummary')).toContainText('12 reservas');
   await expect(page.locator('#ownerSevenDaySummary')).toContainText('10 pedidos');
+  await expect(page.locator('#ownerValuePanel')).toBeVisible();
+  await expect(page.locator('#ownerValuePanel')).toContainText('RecepVoz esta semana');
+  await expect(page.locator('#ownerConfirmedRevenue')).toContainText('$');
+  await expect(page.locator('#ownerPaidOutcomes')).toHaveText('93');
+  await expect(page.locator('#ownerManagedRevenue')).toContainText('$');
+  await expect(page.locator('#ownerRevenueTrend')).toBeVisible();
+  await expect(page.locator('#ownerRevenueTrend svg')).toHaveCount(1);
+  await expect(page.locator('#ownerRevenueEvidence')).toContainText('confirmados');
+  await expect(page.locator('#homeBusinessWorkspace')).toHaveClass(/owner-collapsed/);
+  await expect(page.locator('#ownerWorkspaceToggle')).toBeVisible();
   await expect(page.locator('#operationalOverview')).toHaveAttribute('data-state', 'ready');
   await expect(page.locator('#ownerDashboardState')).toHaveText('AL DÍA');
   await expect(page.locator('#homeRecentActivity')).toBeVisible();
@@ -548,6 +566,8 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeRequestsMetric')).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
   await expect(page.locator('#ownerOrdersMetric')).toHaveAttribute('href', '/?tab=sales#homeBusinessWorkspace');
   await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
+  await page.locator('#ownerWorkspaceToggle').click();
+  await expect(page.locator('#homeBusinessWorkspace')).not.toHaveClass(/owner-collapsed/);
 
   await page.locator('#homeIncidentToggle').click();
   await expect(page.locator('#homeIncidentPanel')).toBeVisible();
@@ -849,7 +869,7 @@ test('reservation filters drawer and embedded conversation work', async ({ page 
   let releaseBookingContext;
   const bookingContextGate = new Promise(resolve => { releaseBookingContext = resolve; });
   await mockReadyHome(page, ['BUSINESS_ADMIN'], { bookingContextGate });
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
 
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
   await expect(page.locator('#homeBookingsList')).toContainText('Bruno Masaje');
@@ -933,7 +953,7 @@ test('orders list drawer and conversation work', async ({ page }) => {
   test.setTimeout(45000);
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
 
   await expect(page.locator('#operationalOverview')).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -990,7 +1010,7 @@ test('orders status transition works', async ({ page }) => {
     }]));
   });
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('tab', { name: /Pedidos/ }).click();
   const orderOpener = page.locator('#homeOrdersList .home-business-table [data-home-order-id="o1"]');
   await orderOpener.focus();
@@ -1026,7 +1046,7 @@ test('requests workspace renders active requests', async ({ page }) => {
     unanswered: []
   })));
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('tab', { name: /Solicitudes/ }).click();
   await expect(page.locator('#homeRequestsList')).toContainText('Confirmar dirección');
   await expect(page.locator('#homeRequestsList')).toContainText('Cliente pidió cambiar dirección de entrega');
@@ -1036,7 +1056,7 @@ test('requests workspace renders active requests', async ({ page }) => {
 test('requests workspace renders its empty state', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
 
   await page.getByRole('tab', { name: /Solicitudes/ }).click();
   await expect(page.locator('#homeRequestsList')).toHaveText('No hay solicitudes recientes.');
@@ -1049,7 +1069,7 @@ test('operator cannot see audit or export controls but keeps reservations and cu
     if (request.url().includes('/api/v1/audit')) auditRequests += 1;
   });
   await mockReadyHome(page, ['OPERATOR']);
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
 
   await expect(page.getByRole('tab', { name: /Auditoría/ })).toBeHidden();
   await page.getByRole('tab', { name: /Clientes/ }).click();
@@ -1064,7 +1084,7 @@ test('operator cannot see audit or export controls but keeps reservations and cu
 test('audit workspace shows actor role resource and before after changes', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
 
   await page.getByRole('tab', { name: /Auditoría/ }).click();
   await expect(page.locator('#homeAuditList .home-audit-row')).toHaveCount(2);
@@ -1146,7 +1166,7 @@ test('new customer booking lifecycle appears in audit workspace', async ({ page 
     }
   ])));
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('tab', { name: /Auditoría/ }).click();
 
   const audit = page.locator('#homeAuditList');
@@ -1187,7 +1207,7 @@ test('audit filters query by actor action resource and date range', async ({ pag
     ]));
   });
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('tab', { name: /Auditoría/ }).click();
   await page.getByLabel('Usuario').fill('Carolina');
   await page.getByLabel('Acción').selectOption('BOOKING_RESCHEDULE');
@@ -1235,7 +1255,7 @@ test('audit exports preserve active filters in csv and xlsx', async ({ page }) =
     });
   });
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('tab', { name: /Auditoría/ }).click();
   await page.getByLabel('Usuario').fill('Carolina');
   await page.getByLabel('Acción').selectOption('BOOKING_RESCHEDULE');
@@ -1269,7 +1289,7 @@ test('audit exports preserve active filters in csv and xlsx', async ({ page }) =
 test('customer exports download csv and xlsx', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('tab', { name: /Clientes/ }).click();
 
   const csvPromise = page.waitForEvent('download');
@@ -1325,7 +1345,7 @@ test('newly created customer is included in csv and xlsx exports', async ({ page
     body: Buffer.from('PK Helvoca Excel Carla Nueva +56977777777 carla@example.cl', 'utf8')
   }));
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('tab', { name: /Clientes/ }).click();
   await page.getByRole('button', { name: 'Nuevo cliente' }).click();
   await page.locator('#homeCustomerCreateName').fill('Carla Nueva');
@@ -1390,7 +1410,7 @@ test('manual customer creation adds customer and updates booking selector', asyn
     });
   });
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('tab', { name: /Clientes/ }).click();
   await page.getByRole('button', { name: 'Nuevo cliente' }).click();
 
@@ -1484,7 +1504,7 @@ test('newly created customer can receive a manual booking', async ({ page }) => 
     });
   });
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('tab', { name: /Clientes/ }).click();
   await page.getByRole('button', { name: 'Nuevo cliente' }).click();
   await page.locator('#homeCustomerCreateName').fill('Carla Nueva');
@@ -1625,7 +1645,7 @@ test('newly created booking can be rescheduled from the agenda', async ({ page }
     }));
   });
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('tab', { name: /Clientes/ }).click();
   await page.getByRole('button', { name: 'Nuevo cliente' }).click();
   await page.locator('#homeCustomerCreateName').fill('Carla Nueva');
@@ -1762,7 +1782,7 @@ test('newly created booking can be cancelled from the agenda', async ({ page }) 
     await route.fulfill({ status: 204, body: '' });
   });
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('tab', { name: /Clientes/ }).click();
   await page.getByRole('button', { name: 'Nuevo cliente' }).click();
   await page.locator('#homeCustomerCreateName').fill('Carla Nueva');
@@ -1915,7 +1935,7 @@ test('cancelled new booking appears in the customer history', async ({ page }) =
     await route.fulfill({ status: 204, body: '' });
   });
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
 
   await page.getByRole('tab', { name: /Clientes/ }).click();
   await page.getByRole('button', { name: 'Nuevo cliente' }).click();
@@ -1964,7 +1984,7 @@ test('cancelled new booking appears in the customer history', async ({ page }) =
 test('customers workspace sorts and renders contact data', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
 
   await page.getByRole('tab', { name: /Clientes/ }).click();
   const customers = page.locator('#homeCustomersList .home-simple-row strong');
@@ -1997,7 +2017,7 @@ test('customers workspace sorts and renders contact data', async ({ page }) => {
 test('sales pipeline shows cross-channel commercial state and opens customer CRM', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
 
   await page.getByRole('tab', { name: /Ventas/ }).click();
 
@@ -2031,7 +2051,7 @@ test('orders requests customers remain operable on mobile', async ({ page }) => 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyHome(page);
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
 
   await expect(page.locator('#operationalOverview')).toBeVisible();
   const ownerDashboardBox = await page.locator('#operationalOverview').boundingBox();
@@ -2069,7 +2089,7 @@ test('booking cancellation from drawer works', async ({ page }) => {
     await route.fulfill({ status: 204, body: '' });
   });
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.locator('#homeBookingStatus').selectOption('CONFIRMED');
   await page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]').click();
 
@@ -2131,7 +2151,7 @@ test('booking reschedule checks availability and updates the drawer', async ({ p
     }));
   });
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   const bookingOpener = page.locator('#homeBookingsList .home-business-table [data-home-booking-id="b1"]');
   await bookingOpener.focus();
   await bookingOpener.click();
@@ -2254,7 +2274,7 @@ test('manual booking creation checks availability and adds the reservation', asy
     });
   });
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('button', { name: '＋ Nueva reserva' }).click();
 
   await expect(page.locator('#homeBookingCreatePanel')).toBeVisible();
@@ -2335,12 +2355,11 @@ test('dashboard prioritizes calls, attention, recent activity and quick access',
 
   const quick = page.locator('#ownerQuickActions');
   await expect(quick).toBeVisible();
+  await expect(quick.getByRole('link')).toHaveCount(4);
   await expect(quick.getByRole('link', { name: 'Agenda' })).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
-  await expect(quick.getByRole('link', { name: 'Clientes' })).toHaveAttribute('href', '/?tab=customers#homeBusinessWorkspace');
+  await expect(quick.getByRole('link', { name: 'Pendientes' })).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
   await expect(quick.getByRole('link', { name: 'Conversaciones' })).toHaveAttribute('href', '/conversations.html');
   await expect(quick.getByRole('link', { name: 'Inventario' })).toHaveAttribute('href', '/inventory.html');
-  await expect(quick.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/settings.html');
-  await expect(quick.getByRole('link', { name: 'Facturación' })).toHaveAttribute('href', '/account.html');
 
   await expect(page.locator('#ownerDashboardState')).toHaveAttribute('role', 'status');
   await expect(page.locator('#ownerDashboardMessage')).toHaveAttribute('aria-live', 'polite');
@@ -2354,6 +2373,51 @@ test('dashboard prioritizes calls, attention, recent activity and quick access',
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
+
+
+test('owner value keeps mixed currencies separate and refuses partial managed-revenue totals', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'mixed-currency-token'));
+  await mockReadyHome(page);
+  await page.unroute('**/api/v1/commercial/analytics**');
+  await page.route('**/api/v1/commercial/analytics**', route => route.fulfill(json({
+    days: 7,
+    timezone: 'America/Santiago',
+    primaryCurrency: null,
+    totalRevenue: null,
+    paidOrders: 2,
+    unitsSold: 2,
+    averageTicket: null,
+    revenueChangePercent: null,
+    currencyTotals: [
+      { currency: 'CLP', amount: 100000 },
+      { currency: 'USD', amount: 100 }
+    ],
+    salesOverTime: [],
+    topProducts: [],
+    channels: [],
+    peakWeekday: null,
+    peakHour: null,
+    recepVozOrders: 2,
+    recepVozRevenue: null,
+    bookingCurrency: 'CLP',
+    paidBookings: 1,
+    bookingRevenue: 30000,
+    providerVerifiedBookingRevenue: 30000,
+    manualRecordedBookingRevenue: 0,
+    recepVozPaidBookings: 1,
+    recepVozBookingRevenue: 30000,
+    bookingCurrencyTotals: [{ currency: 'CLP', amount: 30000 }],
+    insights: []
+  })));
+
+  await page.goto('/');
+
+  await expect(page.locator('#ownerConfirmedRevenue')).toHaveText('Varias monedas');
+  await expect(page.locator('#ownerRevenueCurrencyHint')).toContainText('separados por moneda');
+  await expect(page.locator('#ownerManagedRevenue')).toHaveText('No consolidable');
+  await expect(page.locator('#ownerRevenueTrend')).toContainText('varias monedas');
+  await expect(page.locator('#ownerRevenueEvidence')).toContainText('no una estimación causal de ROI');
+});
 
 
 test('sales analytics turns paid orders into decision-ready business statistics', async ({ page }) => {
@@ -2399,7 +2463,7 @@ test('sales analytics turns paid orders into decision-ready business statistics'
     }));
   });
 
-  await page.goto('/');
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
   await page.getByRole('tab', { name: /Ventas/ }).click();
 
   await expect(page.getByRole('heading', { name: 'Ventas y rendimiento' })).toBeVisible();
