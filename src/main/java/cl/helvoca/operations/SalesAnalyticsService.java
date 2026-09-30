@@ -27,6 +27,19 @@ import java.util.UUID;
 @Service
 public class SalesAnalyticsService {
     private static final DateTimeFormatter DAY_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final Map<String, String> CHANNEL_LABELS = Map.of(
+            "WHATSAPP", "WhatsApp",
+            "VOICE", "Llamadas",
+            "MANUAL", "Gestión manual",
+            "API", "API");
+    private static final Map<String, String> WEEKDAY_LABELS = Map.of(
+            "MONDAY", "los lunes",
+            "TUESDAY", "los martes",
+            "WEDNESDAY", "los miércoles",
+            "THURSDAY", "los jueves",
+            "FRIDAY", "los viernes",
+            "SATURDAY", "los sábados",
+            "SUNDAY", "los domingos");
 
     private final BusinessRepository businesses;
     private final BusinessPaymentRepository payments;
@@ -401,24 +414,11 @@ public class SalesAnalyticsService {
     }
 
     private static String channelLabel(String value) {
-        if ("WHATSAPP".equals(value)) return "WhatsApp";
-        if ("VOICE".equals(value)) return "Llamadas";
-        if ("MANUAL".equals(value)) return "Gestión manual";
-        if ("API".equals(value)) return "API";
-        return "Otros canales";
+        return CHANNEL_LABELS.getOrDefault(value, "Otros canales");
     }
 
     private static String weekdayLabel(String value) {
-        return switch (value) {
-            case "MONDAY" -> "los lunes";
-            case "TUESDAY" -> "los martes";
-            case "WEDNESDAY" -> "los miércoles";
-            case "THURSDAY" -> "los jueves";
-            case "FRIDAY" -> "los viernes";
-            case "SATURDAY" -> "los sábados";
-            case "SUNDAY" -> "los domingos";
-            default -> "en el período";
-        };
+        return WEEKDAY_LABELS.getOrDefault(value, "en el período");
     }
 
     private static String formatPercent(double value) {
