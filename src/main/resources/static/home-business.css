@@ -389,7 +389,7 @@
 #homeSalesRevenueTrend.is-positive{color:#9df0ca}
 #homeSalesRevenueTrend.is-negative{color:#ff9bad}
 .home-sales-primary-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(260px,.75fr);gap:12px}
-.home-sales-secondary-grid{display:grid;grid-template-columns:1.2fr 1fr .8fr;gap:12px}
+.home-sales-secondary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .home-sales-card,.home-sales-insights-card{min-width:0;padding:17px;border:1px solid var(--rv-border-subtle);border-radius:14px;background:var(--rv-surface-1)}
 .home-sales-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
 .home-sales-card-head h3{margin:3px 0 0;color:var(--rv-text-primary);font-size:16px}
@@ -439,7 +439,6 @@
   .home-sales-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
   .home-sales-primary-grid{grid-template-columns:1fr}
   .home-sales-secondary-grid{grid-template-columns:1fr 1fr}
-  .home-sales-secondary-grid>.home-sales-card:last-child{grid-column:1/-1}
 }
 @media(max-width:760px){
   .home-sales-head{align-items:flex-start}
@@ -447,7 +446,6 @@
   .home-sales-period button{flex:1 0 auto}
   .home-sales-kpis{grid-template-columns:1fr 1fr}
   .home-sales-secondary-grid{grid-template-columns:1fr}
-  .home-sales-secondary-grid>.home-sales-card:last-child{grid-column:auto}
   .home-sales-insights{grid-template-columns:1fr}
   .home-sales-trend-chart,.home-sales-trend-chart svg{min-height:190px;height:190px}
 }
