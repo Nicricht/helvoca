@@ -220,6 +220,8 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run browser E2E
+        env:
+          VISUAL_EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -o pipefail
           npm run test:e2e 2>&1 | tee playwright-test.log
