@@ -347,7 +347,7 @@ test('release candidate captures exact-head visual evidence for every canonical 
     { name: 'home', route: '/' },
     { name: 'conversations', route: '/conversations.html' },
     { name: 'inventory', route: '/inventory.html' },
-    { name: 'settings', route: '/settings.html?section=business' },
+    { name: 'settings', route: '/settings.html' },
     { name: 'billing', route: '/account.html' },
     { name: 'simulator', route: '/simulator.html' }
   ];
