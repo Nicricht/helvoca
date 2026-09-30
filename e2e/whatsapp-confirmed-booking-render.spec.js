@@ -149,6 +149,13 @@ test('confirmed WhatsApp booking is visible as WhatsApp and Confirmada', async (
 
   await page.goto('/');
 
+  // Inicio keeps operational detail collapsed by default. Open it explicitly before
+  // asserting the detailed reservation row so this test validates the booking
+  // projection, not the dashboard's presentation preference.
+  await expect(page.locator('#ownerWorkspaceToggle')).toBeVisible();
+  await page.locator('#ownerWorkspaceToggle').click();
+  await expect(page.locator('#homeBusinessWorkspace')).not.toHaveClass(/owner-collapsed/);
+
   const row = page.locator('#homeBookingsList .home-business-table [data-home-booking-id="wa-confirmed"]');
   await expect(row).toBeVisible();
   await expect(row).toContainText('Cliente WhatsApp');
