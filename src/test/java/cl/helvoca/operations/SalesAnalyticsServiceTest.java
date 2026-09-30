@@ -176,6 +176,60 @@ class SalesAnalyticsServiceTest {
         verify(lines, never()).findAllByOrderIdInOrderByCreatedAtAsc(anyCollection());
     }
 
+    @Test
+    void reportsNegativeTrendAndHandlesSparseProductLinesWithoutInventingValues() {
+        UUID businessId = UUID.randomUUID();
+        UUID currentOperation = UUID.randomUUID();
+        UUID previousOperation = UUID.randomUUID();
+        UUID currentOrderId = UUID.randomUUID();
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        BusinessPaymentRepository payments = mock(BusinessPaymentRepository.class);
+        BusinessOrderRepository orders = mock(BusinessOrderRepository.class);
+        BusinessOrderLineRepository lines = mock(BusinessOrderLineRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        Business business = new Business();
+        business.setTimezone("America/Santiago");
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business));
+
+        Instant now = Instant.now();
+        BusinessPayment currentPayment = payment(
+                currentOperation, new BigDecimal("10000"), "CLP", BusinessOrder.Source.MANUAL, now.minusSeconds(600));
+        BusinessPayment previousPayment = payment(
+                previousOperation, new BigDecimal("20000"), "CLP", BusinessOrder.Source.MANUAL, now.minusSeconds(10 * 86400L));
+        when(payments.findAllByBusinessIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+                eq(businessId), any(Instant.class), any(Instant.class)))
+                .thenReturn(List.of(currentPayment), List.of(previousPayment));
+
+        BusinessOrder currentOrder = order(
+                currentOrderId, currentOperation, BusinessOrder.Source.MANUAL, BusinessOrder.Status.COMPLETED, "CLP");
+        BusinessOrder previousOrder = order(
+                UUID.randomUUID(), previousOperation, BusinessOrder.Source.MANUAL, BusinessOrder.Status.COMPLETED, "CLP");
+        when(orders.findAllByBusinessIdAndOperationIdIn(eq(businessId), anyCollection()))
+                .thenReturn(List.of(currentOrder), List.of(previousOrder));
+
+        BusinessOrderLine sparse = mock(BusinessOrderLine.class);
+        when(sparse.getOrderId()).thenReturn(currentOrderId);
+        when(sparse.getCatalogItemId()).thenReturn(null);
+        when(sparse.getItemName()).thenReturn(null);
+        when(sparse.getQuantity()).thenReturn(null);
+        when(sparse.getLineTotal()).thenReturn(null);
+        when(lines.findAllByOrderIdInOrderByCreatedAtAsc(anyCollection())).thenReturn(List.of(sparse));
+
+        SalesAnalyticsService.AnalyticsResponse result =
+                new SalesAnalyticsService(businesses, payments, orders, lines, tenant).analytics(7);
+
+        assertEquals(-50.0, result.revenueChangePercent());
+        assertEquals(0, result.unitsSold());
+        assertEquals("Producto sin nombre", result.topProducts().getFirst().name());
+        assertEquals(0, BigDecimal.ZERO.compareTo(result.topProducts().getFirst().revenue()));
+        assertEquals(0, result.recepVozOrders());
+        assertTrue(result.insights().stream()
+                .anyMatch(insight -> insight.text().contains("bajaron 50%")));
+    }
+
     private static BusinessPayment payment(UUID targetOperationId,
                                            BigDecimal amount,
                                            String currency,
