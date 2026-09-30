@@ -1,4 +1,6 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const json = body => ({
   status: 200,
@@ -320,5 +322,72 @@ test('release candidate principal surfaces remain usable on a 390px customer vie
       clientWidth: document.documentElement.clientWidth
     }));
     expect(layout.scrollWidth, path).toBeLessThanOrEqual(layout.clientWidth + 1);
+  }
+});
+
+
+test('release candidate captures exact-head visual evidence for every canonical viewport', async ({ page }) => {
+  test.setTimeout(120000);
+  await mockReleaseCandidate(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+
+  const head = (process.env.GITHUB_SHA || 'local').slice(0, 12);
+  const evidenceDir = path.resolve('test-results', 'visual-evidence', head);
+  fs.mkdirSync(evidenceDir, { recursive: true });
+
+  const viewports = [
+    { width: 1536, height: 950 },
+    { width: 1440, height: 900 },
+    { width: 1366, height: 768 },
+    { width: 1280, height: 720 },
+    { width: 768, height: 1024 },
+    { width: 390, height: 844 }
+  ];
+  const surfaces = [
+    { name: 'home', route: '/' },
+    { name: 'conversations', route: '/conversations.html' },
+    { name: 'inventory', route: '/inventory.html' },
+    { name: 'settings', route: '/settings.html?section=business' },
+    { name: 'billing', route: '/account.html' },
+    { name: 'simulator', route: '/simulator.html' }
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+
+    for (const surface of surfaces) {
+      await page.goto(surface.route);
+
+      if (surface.name === 'home') {
+        await expect(page.locator('#dashboardView')).toBeVisible();
+        await expect(page.locator('#firstUserOnboarding')).toBeHidden();
+      } else if (surface.name === 'conversations') {
+        await expect(page.locator('#conversationList')).toContainText('+56955556666');
+      } else if (surface.name === 'inventory') {
+        await expect(page.locator('[data-inventory-product-id="product-rc"]')).toContainText('Taladro percutor');
+      } else if (surface.name === 'settings') {
+        await expect(page.locator('.dashboard-heading h1')).toHaveText('Mi negocio');
+      } else if (surface.name === 'billing') {
+        await expect(page.locator('#planName')).toHaveText('Profesional');
+      } else if (surface.name === 'simulator') {
+        await expect(page.locator('#startBtn')).toBeVisible();
+      }
+
+      const layout = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth
+      }));
+      expect(layout.scrollWidth, `${surface.route} at ${viewport.width}px`)
+        .toBeLessThanOrEqual(layout.clientWidth + 1);
+
+      await page.screenshot({
+        path: path.join(
+          evidenceDir,
+          `${surface.name}-${viewport.width}x${viewport.height}.png`
+        ),
+        fullPage: false,
+        animations: 'disabled'
+      });
+    }
   }
 });
