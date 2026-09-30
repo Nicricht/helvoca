@@ -144,4 +144,7 @@ if [[ "$RUN_SOFTWARE_FACTORY" == true ]]; then
   python3 -m unittest discover -s software-factory/tests -p 'test_*.py' -v
 fi
 
+echo "Checking protected frontend frame contract..."
+node scripts/ci/check-frontend-frame-contract.js
+
 echo "Fast Gate passed."
