@@ -4,7 +4,7 @@
   const statusGrid = document.querySelector("#statusGrid");
   if (!root || !dashboard || !statusGrid || typeof api !== "function") return;
 
-  const state = { bookings: [], customers: [], services: [], orders: [], sales: [], salesSummary: {}, requests: [], audit: [], auditCatalog: [], roles: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
+  const state = { bookings: [], customers: [], services: [], orders: [], sales: [], salesSummary: {}, salesAnalytics: null, salesAnalyticsDays: 30, requests: [], audit: [], auditCatalog: [], roles: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
   const bookingFilters = { query: "", date: "all", serviceId: "all", status: "all", source: "all" };
   const orderFilters = { query: "", status: "all", sort: "newest" };
   const salesFilters = { stage: "all", channel: "all" };
@@ -1240,6 +1240,220 @@
     });
   }
 
+  function salesChannelLabel(value) {
+    return ({ WHATSAPP:"WhatsApp", VOICE:"Llamadas", MANUAL:"Gestión manual", API:"API", UNKNOWN:"Otros" })[value] || value || "Otros";
+  }
+
+  function salesWeekdayLabel(value) {
+    return ({
+      MONDAY:"Lunes", TUESDAY:"Martes", WEDNESDAY:"Miércoles", THURSDAY:"Jueves",
+      FRIDAY:"Viernes", SATURDAY:"Sábado", SUNDAY:"Domingo"
+    })[value] || "Sin datos";
+  }
+
+  function salesPercent(value) {
+    if (value == null || Number.isNaN(Number(value))) return "—";
+    return new Intl.NumberFormat("es-CL", { maximumFractionDigits: 1 }).format(Number(value));
+  }
+
+  function renderSalesTrendChart(data, primaryCurrency) {
+    const host = document.querySelector("#homeSalesTrendChart");
+    const mode = document.querySelector("#homeSalesTrendMode");
+    if (!host) return;
+    const points = Array.isArray(data) ? data : [];
+    if (!points.length) {
+      host.innerHTML = '<div class="home-sales-empty">Todavía no hay suficientes ventas para mostrar una tendencia.</div>';
+      if (mode) mode.textContent = "Sin datos";
+      return;
+    }
+
+    const useRevenue = Boolean(primaryCurrency) && points.some(point => point.revenue != null);
+    const values = points.map(point => Number(useRevenue ? point.revenue || 0 : point.paidOrders || 0));
+    const max = Math.max(1, ...values);
+    const width = 760;
+    const height = 220;
+    const left = 28;
+    const right = 18;
+    const top = 18;
+    const bottom = 42;
+    const plotWidth = width - left - right;
+    const plotHeight = height - top - bottom;
+    const x = index => left + (points.length <= 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth);
+    const y = value => top + plotHeight - (Number(value || 0) / max) * plotHeight;
+    const coords = values.map((value,index) => [x(index),y(value)]);
+    const line = coords.map(([px,py],index) => `${index===0?"M":"L"} ${px.toFixed(1)} ${py.toFixed(1)}`).join(" ");
+    const area = coords.length
+      ? `${line} L ${coords.at(-1)[0].toFixed(1)} ${(top+plotHeight).toFixed(1)} L ${coords[0][0].toFixed(1)} ${(top+plotHeight).toFixed(1)} Z`
+      : "";
+    const labelStep = Math.max(1, Math.ceil(points.length / 6));
+    const labels = points.map((point,index) => {
+      if (index % labelStep !== 0 && index !== points.length - 1) return "";
+      const date = new Date(`${point.date}T12:00:00Z`);
+      const label = Number.isNaN(date.getTime())
+        ? point.date
+        : new Intl.DateTimeFormat("es-CL",{day:"numeric",month:"short",timeZone:"UTC"}).format(date);
+      return `<text class="home-sales-chart-label" x="${x(index).toFixed(1)}" y="${height-13}" text-anchor="middle">${esc(label)}</text>`;
+    }).join("");
+    const dots = coords.map(([px,py],index) => {
+      const value = values[index];
+      const formatted = useRevenue ? money(value,primaryCurrency) : `${value} pedidos`;
+      return `<circle class="home-sales-chart-dot" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="4"><title>${esc(points[index].date)} · ${esc(formatted)}</title></circle>`;
+    }).join("");
+    const grid = [0,.25,.5,.75,1].map(ratio => {
+      const gy = top + plotHeight - plotHeight * ratio;
+      return `<line class="home-sales-chart-grid" x1="${left}" y1="${gy.toFixed(1)}" x2="${width-right}" y2="${gy.toFixed(1)}"></line>`;
+    }).join("");
+
+    host.innerHTML = `<svg role="img" aria-label="${useRevenue?"Cobros confirmados":"Pedidos pagados"} en el tiempo" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+      ${grid}
+      <path class="home-sales-chart-area" d="${area}"></path>
+      <path class="home-sales-chart-line" d="${line}"></path>
+      ${dots}
+      ${labels}
+    </svg>`;
+    if (mode) mode.textContent = useRevenue ? `Cobros confirmados · ${primaryCurrency}` : "Pedidos pagados";
+  }
+
+  function renderSalesAnalytics() {
+    const root = document.querySelector("#homeSalesAnalytics");
+    const message = document.querySelector("#homeSalesAnalyticsMessage");
+    const data = state.salesAnalytics;
+    if (!root) return;
+
+    if (!data) {
+      root.dataset.state = "empty";
+      if (message) message.textContent = "Todavía no hay estadísticas de ventas disponibles.";
+      return;
+    }
+
+    root.dataset.state = "ready";
+    if (message) message.textContent = "";
+    const currency = data.primaryCurrency || null;
+    const currencyCount = Array.isArray(data.currencyTotals) ? data.currencyTotals.length : 0;
+    const revenue = document.querySelector("#homeSalesRevenue");
+    const orders = document.querySelector("#homeSalesPaidOrders");
+    const units = document.querySelector("#homeSalesUnits");
+    const average = document.querySelector("#homeSalesAverageTicket");
+    const trend = document.querySelector("#homeSalesRevenueTrend");
+
+    if (revenue) revenue.textContent = currency && data.totalRevenue != null
+      ? money(data.totalRevenue,currency)
+      : currencyCount > 1 ? `${currencyCount} monedas` : money(0,"CLP");
+    if (orders) orders.textContent = String(data.paidOrders ?? 0);
+    if (units) units.textContent = String(data.unitsSold ?? 0);
+    if (average) average.textContent = currency && data.averageTicket != null
+      ? money(data.averageTicket,currency)
+      : "—";
+
+    if (trend) {
+      trend.classList.remove("is-positive","is-negative");
+      if (!currency && currencyCount > 1) {
+        trend.textContent = "No se mezclan monedas distintas";
+        trend.classList.add("home-sales-currency-note");
+      } else if (data.revenueChangePercent == null) {
+        trend.textContent = "Sin período anterior comparable";
+      } else {
+        const positive = Number(data.revenueChangePercent) >= 0;
+        trend.textContent = `${positive?"+":""}${salesPercent(data.revenueChangePercent)}% vs. período anterior`;
+        trend.classList.add(positive ? "is-positive" : "is-negative");
+      }
+    }
+
+    renderSalesTrendChart(data.salesOverTime,currency);
+
+    const products = document.querySelector("#homeSalesTopProducts");
+    const topProducts = Array.isArray(data.topProducts) ? data.topProducts : [];
+    if (products) products.innerHTML = topProducts.length
+      ? topProducts.map((item,index) => `<div class="home-sales-rank-row">
+          <span class="home-sales-rank-index">${index+1}</span>
+          <div class="home-sales-rank-copy"><strong>${esc(item.name||"Producto")}</strong><span>${esc(item.units||0)} unidades${currency&&item.revenue!=null?` · ${esc(money(item.revenue,currency))}`:""}</span></div>
+          <span class="home-sales-rank-value">${esc(item.units||0)}</span>
+        </div>`).join("")
+      : '<div class="home-sales-empty">Aún no hay productos pagados para rankear.</div>';
+
+    const topRevenue = document.querySelector("#homeSalesTopRevenue");
+    if (topRevenue) {
+      if (!currency) {
+        topRevenue.innerHTML = '<div class="home-sales-empty">La facturación por producto no se combina cuando existen monedas distintas.</div>';
+      } else {
+        const revenueRows = [...topProducts]
+          .filter(item => item.revenue != null)
+          .sort((a,b) => Number(b.revenue||0)-Number(a.revenue||0))
+          .slice(0,8);
+        topRevenue.innerHTML = revenueRows.length
+          ? revenueRows.map((item,index) => `<div class="home-sales-rank-row">
+              <span class="home-sales-rank-index">${index+1}</span>
+              <div class="home-sales-rank-copy"><strong>${esc(item.name||"Producto")}</strong><span>${esc(item.units||0)} unidades</span></div>
+              <span class="home-sales-rank-value">${esc(money(item.revenue,currency))}</span>
+            </div>`).join("")
+          : '<div class="home-sales-empty">Aún no hay facturación por producto para rankear.</div>';
+      }
+    }
+
+    const channels = document.querySelector("#homeSalesChannels");
+    const channelRows = Array.isArray(data.channels) ? data.channels : [];
+    if (channels) channels.innerHTML = channelRows.length
+      ? channelRows.map((item,index) => `<div class="home-sales-rank-row">
+          <span class="home-sales-rank-index">${index+1}</span>
+          <div class="home-sales-rank-copy"><strong>${esc(salesChannelLabel(item.channel))}</strong><span>${esc(item.orders||0)} pedidos pagados</span></div>
+          <span class="home-sales-rank-value">${salesPercent(item.sharePercent)}%</span>
+          <div class="home-sales-channel-bar"><span style="width:${Math.max(0,Math.min(100,Number(item.sharePercent)||0))}%"></span></div>
+        </div>`).join("")
+      : '<div class="home-sales-empty">Aún no hay canales con ventas pagadas.</div>';
+
+    const peak = document.querySelector("#homeSalesPeak");
+    if (peak) {
+      const hasPeak = data.peakWeekday && data.peakHour != null;
+      const hour = hasPeak ? String(data.peakHour).padStart(2,"0") : null;
+      const nextHour = hasPeak ? String((Number(data.peakHour)+1)%24).padStart(2,"0") : null;
+      peak.innerHTML = hasPeak
+        ? `<strong>${esc(salesWeekdayLabel(data.peakWeekday))}</strong><span>${hour}:00–${nextHour}:00</span><small>Momento con mayor cantidad de pagos confirmados en el período.</small>`
+        : '<div class="home-sales-empty">Todavía no hay un patrón horario suficiente.</div>';
+    }
+
+    const impact = document.querySelector("#homeSalesRecepVozImpact");
+    if (impact) impact.innerHTML = `<div class="home-sales-impact-main">
+      <strong>${esc(data.recepVozOrders ?? 0)}</strong>
+      <span>pedidos pagados originados en Voz o WhatsApp</span>
+      <strong class="home-sales-impact-money">${currency&&data.recepVozRevenue!=null?esc(money(data.recepVozRevenue,currency)):"Valor no combinado"}</strong>
+    </div>`;
+
+    const insights = document.querySelector("#homeSalesInsights");
+    const insightRows = Array.isArray(data.insights) ? data.insights : [];
+    if (insights) insights.innerHTML = insightRows.length
+      ? insightRows.map(item => `<article class="home-sales-insight"><span class="home-sales-insight-mark">✦</span><p>${esc(item.text||"")}</p></article>`).join("")
+      : '<div class="home-sales-empty">Cuando haya más ventas, RecepVoz destacará patrones medidos aquí.</div>';
+  }
+
+  async function loadSalesAnalytics(days = state.salesAnalyticsDays || 30) {
+    const safeDays = [7,30,90].includes(Number(days)) ? Number(days) : 30;
+    state.salesAnalyticsDays = safeDays;
+    document.querySelectorAll("[data-sales-days]").forEach(button => {
+      const active = Number(button.dataset.salesDays) === safeDays;
+      button.classList.toggle("active",active);
+      button.setAttribute("aria-pressed",String(active));
+    });
+    const root = document.querySelector("#homeSalesAnalytics");
+    const message = document.querySelector("#homeSalesAnalyticsMessage");
+    if (root) root.dataset.state = "loading";
+    if (message) message.textContent = "Actualizando estadísticas…";
+    try {
+      state.salesAnalytics = await api(`/api/v1/commercial/analytics?days=${safeDays}`);
+      renderSalesAnalytics();
+    } catch (error) {
+      if (root) root.dataset.state = "error";
+      if (message) message.textContent = "No pudimos cargar las estadísticas de ventas. El detalle comercial sigue disponible.";
+    }
+  }
+
+  function bindSalesAnalyticsPeriod() {
+    document.querySelectorAll("[data-sales-days]").forEach(button => {
+      if (button.dataset.analyticsBound === "true") return;
+      button.dataset.analyticsBound = "true";
+      button.addEventListener("click", () => loadSalesAnalytics(Number(button.dataset.salesDays)));
+    });
+  }
+
   function bindSalesFilters() {
     const stage = document.querySelector("#homeSalesStage");
     const channel = document.querySelector("#homeSalesChannel");
@@ -2404,12 +2618,13 @@
       state.roles = Array.isArray(me?.roles) ? me.roles.map(String) : [];
       applyRoleVisibility();
       const auditRequest = isBusinessAdmin() ? api("/api/v1/audit") : Promise.resolve([]);
-      const [bookings,customers,services,orders,sales,ops,audit]=await Promise.allSettled([
+      const [bookings,customers,services,orders,sales,analytics,ops,audit]=await Promise.allSettled([
         api("/api/v1/bookings"),
         api("/api/v1/customers"),
         api("/api/v1/services"),
         api("/api/v1/commercial/orders"),
         api("/api/v1/commercial/pipeline"),
+        api(`/api/v1/commercial/analytics?days=${state.salesAnalyticsDays}`),
         api("/api/v1/operations/dashboard"),
         auditRequest
       ]);
@@ -2419,12 +2634,13 @@
       state.orders=orders.status==="fulfilled"&&Array.isArray(orders.value)?orders.value:[];
       state.sales=sales.status==="fulfilled"&&Array.isArray(sales.value?.items)?sales.value.items:[];
       state.salesSummary=sales.status==="fulfilled"&&sales.value?{active:sales.value.active,paid:sales.value.paid,needsAction:sales.value.needsAction}:{};
+      state.salesAnalytics=analytics.status==="fulfilled"&&analytics.value?analytics.value:null;
       state.requests=ops.status==="fulfilled"&&Array.isArray(ops.value?.recentRequests)?ops.value.recentRequests:[];
       state.audit=audit.status==="fulfilled"&&Array.isArray(audit.value)?audit.value:[];
       state.auditCatalog=[...state.audit];
       state.businessName=ops.status==="fulfilled"&&ops.value?.businessName?String(ops.value.businessName):(window.helvocaBusinessName||state.businessName||"Tu negocio");
       state.businessTimezone=ops.status==="fulfilled"&&ops.value?.timezone?String(ops.value.timezone):"America/Santiago";
-      renderBookings(); renderOrders(); renderSales(); renderRequests(); renderCustomers(); renderAudit(); populateAuditFilterOptions(); bindSalesFilters(); if (isBusinessAdmin()) { bindCustomerExports(); bindAuditFilters(); } bindCustomerCreate(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
+      renderBookings(); renderOrders(); renderSales(); renderSalesAnalytics(); renderRequests(); renderCustomers(); renderAudit(); populateAuditFilterOptions(); bindSalesFilters(); bindSalesAnalyticsPeriod(); if (isBusinessAdmin()) { bindCustomerExports(); bindAuditFilters(); } bindCustomerCreate(); bindBookingCreate(); bindIncidentResolver(); populateIncidentDateSelector(); syncIncidentImpact();
     } finally { loading=false; }
   }
 
@@ -2434,6 +2650,7 @@
   document.querySelector("#refreshBtn")?.addEventListener("click",load);
   ensureBookingDrawer();
   bindOrderFilters();
+  bindSalesAnalyticsPeriod();
   const requestedTab = new URLSearchParams(window.location.search).get("tab");
   setTab(["bookings","orders","sales","requests","customers"].includes(requestedTab) ? requestedTab : "bookings");
   queueMicrotask(load);

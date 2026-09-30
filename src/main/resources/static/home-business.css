@@ -367,3 +367,89 @@
 .home-order-filters label>span,
 .home-business-table th,
 .home-pill{font-size:12px}
+
+
+/* Sales analytics workspace: FRAME CHANGE NO, scoped to Inicio > Ventas. */
+.home-sales-workspace{display:grid;gap:18px}
+.home-sales-head{align-items:flex-end;margin-bottom:0}
+.home-sales-period{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--rv-border-subtle);border-radius:12px;background:#081825}
+.home-sales-period button{min-height:36px;padding:0 12px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--rv-text-secondary);font-size:13px;font-weight:800}
+.home-sales-period button:hover{color:var(--rv-text-primary);background:rgba(255,255,255,.04)}
+.home-sales-period button.active{border-color:var(--rv-accent-border);background:var(--rv-accent-soft);color:#e3fcff}
+.home-sales-analytics{display:grid;gap:14px}
+.home-sales-analytics-message{display:none;padding:12px 14px;border:1px solid var(--rv-border-subtle);border-radius:12px;background:var(--rv-surface-2);color:var(--rv-text-secondary);font-size:13px}
+.home-sales-analytics-message:not(:empty){display:block}
+.home-sales-analytics[data-state="ready"] .home-sales-analytics-message{display:none}
+.home-sales-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.home-sales-kpis article{min-width:0;padding:18px;border:1px solid var(--rv-border-subtle);border-radius:14px;background:var(--rv-surface-1)}
+.home-sales-kpis span,.home-sales-kpis strong,.home-sales-kpis small{display:block}
+.home-sales-kpis span{color:var(--rv-text-secondary);font-size:12px;font-weight:750}
+.home-sales-kpis strong{margin-top:7px;color:var(--rv-text-primary);font-size:clamp(26px,3vw,34px);line-height:1;letter-spacing:-.04em}
+.home-sales-kpis small{margin-top:8px;color:var(--rv-text-tertiary);font-size:12px;line-height:1.4}
+#homeSalesRevenueTrend.is-positive{color:#9df0ca}
+#homeSalesRevenueTrend.is-negative{color:#ff9bad}
+.home-sales-primary-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(260px,.75fr);gap:12px}
+.home-sales-secondary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.home-sales-card,.home-sales-insights-card{min-width:0;padding:17px;border:1px solid var(--rv-border-subtle);border-radius:14px;background:var(--rv-surface-1)}
+.home-sales-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}
+.home-sales-card-head h3{margin:3px 0 0;color:var(--rv-text-primary);font-size:16px}
+.home-sales-kicker{display:block;color:#67e9fa;font-size:11px;font-weight:850;letter-spacing:.07em;text-transform:uppercase}
+.home-sales-card-note{color:var(--rv-text-tertiary);font-size:11px}
+.home-sales-trend-chart{min-height:220px}
+.home-sales-trend-chart svg{display:block;width:100%;height:220px;overflow:visible}
+.home-sales-chart-grid{stroke:rgba(167,189,204,.10);stroke-width:1}
+.home-sales-chart-area{fill:rgba(22,217,245,.08)}
+.home-sales-chart-line{fill:none;stroke:var(--rv-accent);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.home-sales-chart-dot{fill:#06111c;stroke:var(--rv-accent-hover);stroke-width:2}
+.home-sales-chart-label{fill:var(--rv-text-tertiary);font-size:10px}
+.home-sales-chart-value{fill:var(--rv-text-secondary);font-size:10px;font-weight:700}
+.home-sales-impact-card{background:linear-gradient(180deg,rgba(22,217,245,.055),rgba(139,92,246,.035)),var(--rv-surface-1)}
+.home-sales-impact{display:grid;gap:10px}
+.home-sales-impact-main{display:grid;gap:3px;padding:15px;border:1px solid rgba(22,217,245,.18);border-radius:12px;background:rgba(22,217,245,.045)}
+.home-sales-impact-main strong{font-size:30px;letter-spacing:-.04em}
+.home-sales-impact-main span{color:var(--rv-text-secondary);font-size:12px}
+.home-sales-impact-money{color:#baf8ff!important;font-size:16px!important}
+.home-sales-impact-card>p{margin:12px 0 0;color:var(--rv-text-tertiary);font-size:11px;line-height:1.5}
+.home-sales-ranking{display:grid;gap:8px}
+.home-sales-rank-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--rv-border-subtle)}
+.home-sales-rank-row:last-child{border-bottom:0}
+.home-sales-rank-index{display:grid;place-items:center;width:26px;height:26px;border-radius:8px;background:var(--rv-surface-2);color:var(--rv-text-secondary);font-size:11px;font-weight:900}
+.home-sales-rank-copy{min-width:0}
+.home-sales-rank-copy strong,.home-sales-rank-copy span{display:block}
+.home-sales-rank-copy strong{overflow:hidden;color:var(--rv-text-primary);font-size:13px;text-overflow:ellipsis;white-space:nowrap}
+.home-sales-rank-copy span{margin-top:2px;color:var(--rv-text-tertiary);font-size:11px}
+.home-sales-rank-value{text-align:right;color:#c9f9ff;font-size:12px;font-weight:850}
+.home-sales-channel-bar{grid-column:2/4;height:5px;margin-top:-3px;border-radius:999px;background:var(--rv-surface-2);overflow:hidden}
+.home-sales-channel-bar span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--rv-accent),var(--rv-ai-accent))}
+.home-sales-peak{display:grid;gap:8px}
+.home-sales-peak strong,.home-sales-peak span{display:block}
+.home-sales-peak strong{font-size:26px;letter-spacing:-.03em}
+.home-sales-peak span{color:var(--rv-text-secondary);font-size:13px}
+.home-sales-peak small{color:var(--rv-text-tertiary);font-size:11px;line-height:1.45}
+.home-sales-insights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.home-sales-insight{display:flex;gap:9px;align-items:flex-start;padding:11px;border:1px solid var(--rv-border-subtle);border-radius:11px;background:var(--rv-surface-2)}
+.home-sales-insight-mark{flex:0 0 auto;color:var(--rv-accent);font-size:15px;line-height:1.2}
+.home-sales-insight p{margin:0;color:var(--rv-text-secondary);font-size:12px;line-height:1.5}
+.home-sales-empty{padding:18px;border:1px dashed var(--rv-border-default);border-radius:12px;color:var(--rv-text-secondary);font-size:12px;text-align:center}
+.home-sales-pipeline{padding-top:4px;border-top:1px solid var(--rv-border-subtle)}
+.home-sales-pipeline-head{margin:12px 0}
+.home-sales-pipeline-head h3{margin:3px 0 4px;font-size:16px}
+.home-sales-currency-note{display:block;margin-top:5px;color:var(--rv-warning);font-size:11px;line-height:1.45}
+@media(max-width:1100px){
+  .home-sales-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .home-sales-primary-grid{grid-template-columns:1fr}
+  .home-sales-secondary-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:760px){
+  .home-sales-head{align-items:flex-start}
+  .home-sales-period{width:100%;overflow-x:auto}
+  .home-sales-period button{flex:1 0 auto}
+  .home-sales-kpis{grid-template-columns:1fr 1fr}
+  .home-sales-secondary-grid{grid-template-columns:1fr}
+  .home-sales-insights{grid-template-columns:1fr}
+  .home-sales-trend-chart,.home-sales-trend-chart svg{min-height:190px;height:190px}
+}
+@media(max-width:480px){
+  .home-sales-kpis{grid-template-columns:1fr}
+  .home-sales-card,.home-sales-insights-card,.home-sales-kpis article{padding:14px}
+}
