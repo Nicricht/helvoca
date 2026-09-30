@@ -224,6 +224,15 @@ jobs:
           set -o pipefail
           npm run test:e2e 2>&1 | tee playwright-test.log
 
+      - name: Upload frontend visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-visual-evidence
+          path: test-results/visual-evidence/**
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload Playwright diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
