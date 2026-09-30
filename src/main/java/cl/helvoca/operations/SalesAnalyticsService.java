@@ -5,6 +5,7 @@ import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.payment.BusinessPayment;
 import cl.helvoca.payment.BusinessPaymentRepository;
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +46,7 @@ public class SalesAnalyticsService {
     private final BusinessPaymentRepository payments;
     private final BusinessOrderRepository orders;
     private final BusinessOrderLineRepository lines;
+    private final BusinessOperationRepository operations;
     private final TenantProvider tenant;
 
     public SalesAnalyticsService(BusinessRepository businesses,
@@ -52,10 +54,21 @@ public class SalesAnalyticsService {
                                  BusinessOrderRepository orders,
                                  BusinessOrderLineRepository lines,
                                  TenantProvider tenant) {
+        this(businesses, payments, orders, lines, null, tenant);
+    }
+
+    @Autowired
+    public SalesAnalyticsService(BusinessRepository businesses,
+                                 BusinessPaymentRepository payments,
+                                 BusinessOrderRepository orders,
+                                 BusinessOrderLineRepository lines,
+                                 BusinessOperationRepository operations,
+                                 TenantProvider tenant) {
         this.businesses = businesses;
         this.payments = payments;
         this.orders = orders;
         this.lines = lines;
+        this.operations = operations;
         this.tenant = tenant;
     }
 
@@ -111,6 +124,21 @@ public class SalesAnalyticsService {
         Peak peak = peak(current.payments, zone);
 
         Impact impact = recepVozImpact(current.payments, current.ordersByOperation, primaryCurrency);
+        BookingRevenue bookingRevenue = bookingRevenue(
+                current.bookingPayments,
+                current.completedBookingsByOperation);
+        String bookingCurrency = bookingRevenue.currencyTotals.size() == 1
+                ? bookingRevenue.currencyTotals.keySet().iterator().next()
+                : null;
+        BigDecimal bookingRevenueTotal = bookingRevenue.currencyTotals.isEmpty()
+                ? BigDecimal.ZERO
+                : bookingCurrency == null ? null : bookingRevenue.currencyTotals.get(bookingCurrency);
+        BigDecimal providerVerifiedBookingRevenue = evidenceAmount(
+                bookingRevenue.providerTotals, bookingCurrency);
+        BigDecimal manualRecordedBookingRevenue = evidenceAmount(
+                bookingRevenue.manualTotals, bookingCurrency);
+        BigDecimal recepVozBookingRevenue = evidenceAmount(
+                bookingRevenue.recepVozTotals, bookingCurrency);
 
         List<Insight> insights = buildInsights(topProducts, channels, peak, revenueChangePercent);
 
@@ -134,6 +162,17 @@ public class SalesAnalyticsService {
                 peak.hour,
                 impact.orders,
                 impact.revenue,
+                bookingCurrency,
+                bookingRevenue.paidBookingTargets,
+                bookingRevenueTotal,
+                providerVerifiedBookingRevenue,
+                manualRecordedBookingRevenue,
+                bookingRevenue.recepVozBookingTargets,
+                recepVozBookingRevenue,
+                bookingRevenue.currencyTotals.entrySet().stream()
+                        .sorted(Map.Entry.comparingByKey())
+                        .map(entry -> new CurrencyTotal(entry.getKey(), entry.getValue()))
+                        .toList(),
                 insights);
     }
 
@@ -142,23 +181,26 @@ public class SalesAnalyticsService {
                 .findAllByBusinessIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
                         businessId, start, end);
 
-        Map<UUID, BusinessPayment> latestSucceededByTarget = new LinkedHashMap<>();
-        candidates.stream()
+        List<BusinessPayment> succeededCandidates = candidates.stream()
                 .filter(payment -> payment != null
                         && payment.getStatus() == BusinessPayment.Status.SUCCEEDED
                         && payment.getTargetOperationId() != null
                         && payment.getAmount() != null
-                        && payment.getAmount().signum() >= 0
+                        && payment.getAmount().signum() > 0
                         && payment.getCurrency() != null
                         && !payment.getCurrency().isBlank())
                 .sorted(Comparator.comparing(
                         SalesAnalyticsService::paymentMoment,
                         Comparator.nullsLast(Comparator.reverseOrder())))
-                .forEach(payment -> latestSucceededByTarget.putIfAbsent(payment.getTargetOperationId(), payment));
+                .toList();
 
-        if (latestSucceededByTarget.isEmpty()) {
+        if (succeededCandidates.isEmpty()) {
             return PeriodData.empty();
         }
+
+        Map<UUID, BusinessPayment> latestSucceededByTarget = new LinkedHashMap<>();
+        succeededCandidates.forEach(payment ->
+                latestSucceededByTarget.putIfAbsent(payment.getTargetOperationId(), payment));
 
         List<UUID> operationIds = List.copyOf(latestSucceededByTarget.keySet());
         Map<UUID, BusinessOrder> ordersByOperation = new LinkedHashMap<>();
@@ -171,9 +213,30 @@ public class SalesAnalyticsService {
             ordersByOperation.put(order.getOperationId(), order);
         }
 
+        Map<UUID, BusinessOperation> completedBookingsByOperation = new LinkedHashMap<>();
+        if (operations != null) {
+            for (BusinessOperation operation : operations.findAllById(operationIds)) {
+                if (operation == null
+                        || operation.getId() == null
+                        || !businessId.equals(operation.getBusinessId())
+                        || operation.getType() != BusinessOperation.Type.BOOKING
+                        || operation.getStatus() != BusinessOperation.Status.COMPLETED) {
+                    continue;
+                }
+                completedBookingsByOperation.put(operation.getId(), operation);
+            }
+        }
+
         List<BusinessPayment> acceptedPayments = latestSucceededByTarget.entrySet().stream()
                 .filter(entry -> ordersByOperation.containsKey(entry.getKey()))
                 .map(Map.Entry::getValue)
+                .toList();
+
+        List<BusinessPayment> acceptedBookingPayments = succeededCandidates.stream()
+                .filter(payment -> completedBookingsByOperation.containsKey(payment.getTargetOperationId()))
+                .sorted(Comparator.comparing(
+                        SalesAnalyticsService::paymentMoment,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
 
         Map<String, BigDecimal> totals = new LinkedHashMap<>();
@@ -203,7 +266,9 @@ public class SalesAnalyticsService {
 
         return new PeriodData(
                 acceptedPayments,
+                acceptedBookingPayments,
                 ordersByOperation,
+                completedBookingsByOperation,
                 orderLines,
                 totals,
                 unitsSold);
@@ -378,6 +443,70 @@ public class SalesAnalyticsService {
         return new Impact(count, primaryCurrency == null ? null : revenue);
     }
 
+    private static BookingRevenue bookingRevenue(
+            List<BusinessPayment> bookingPayments,
+            Map<UUID, BusinessOperation> completedBookingsByOperation) {
+        Map<UUID, BigDecimal> paidByTarget = new LinkedHashMap<>();
+        Map<String, BigDecimal> currencyTotals = new LinkedHashMap<>();
+        Map<String, BigDecimal> providerTotals = new LinkedHashMap<>();
+        Map<String, BigDecimal> manualTotals = new LinkedHashMap<>();
+        Map<String, BigDecimal> recepVozTotals = new LinkedHashMap<>();
+        java.util.Set<UUID> paidTargets = new java.util.LinkedHashSet<>();
+        java.util.Set<UUID> recepVozTargets = new java.util.LinkedHashSet<>();
+
+        for (BusinessPayment payment : bookingPayments) {
+            BusinessOperation booking = completedBookingsByOperation.get(payment.getTargetOperationId());
+            if (booking == null || booking.getTotal() == null || booking.getTotal().signum() <= 0) continue;
+
+            String operationCurrency = normalizedCurrency(booking.getCurrency());
+            String paymentCurrency = normalizedCurrency(payment.getCurrency());
+            if (operationCurrency == null || !operationCurrency.equals(paymentCurrency)) continue;
+
+            BigDecimal paid = paidByTarget.getOrDefault(booking.getId(), BigDecimal.ZERO);
+            BigDecimal remaining = booking.getTotal().subtract(paid);
+            if (remaining.signum() <= 0) continue;
+
+            BigDecimal contribution = payment.getAmount().min(remaining);
+            if (contribution.signum() <= 0) continue;
+
+            paidByTarget.put(booking.getId(), paid.add(contribution));
+            paidTargets.add(booking.getId());
+            currencyTotals.merge(operationCurrency, contribution, BigDecimal::add);
+
+            if (payment.getVerificationMethod() == BusinessPayment.VerificationMethod.MANUAL_BUSINESS) {
+                manualTotals.merge(operationCurrency, contribution, BigDecimal::add);
+            } else {
+                providerTotals.merge(operationCurrency, contribution, BigDecimal::add);
+            }
+
+            if (booking.getSource() == BusinessOrder.Source.VOICE
+                    || booking.getSource() == BusinessOrder.Source.WHATSAPP) {
+                recepVozTargets.add(booking.getId());
+                recepVozTotals.merge(operationCurrency, contribution, BigDecimal::add);
+            }
+        }
+
+        return new BookingRevenue(
+                currencyTotals,
+                providerTotals,
+                manualTotals,
+                recepVozTotals,
+                paidTargets.size(),
+                recepVozTargets.size());
+    }
+
+    private static String normalizedCurrency(String value) {
+        if (value == null || value.isBlank()) return null;
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        return normalized.length() == 3 ? normalized : null;
+    }
+
+    private static BigDecimal evidenceAmount(Map<String, BigDecimal> totals, String primaryCurrency) {
+        if (totals.isEmpty()) return BigDecimal.ZERO;
+        if (primaryCurrency == null) return null;
+        return totals.getOrDefault(primaryCurrency, BigDecimal.ZERO);
+    }
+
     private static List<Insight> buildInsights(List<ProductStat> products,
                                                List<ChannelStat> channels,
                                                Peak peak,
@@ -446,6 +575,14 @@ public class SalesAnalyticsService {
             Integer peakHour,
             long recepVozOrders,
             BigDecimal recepVozRevenue,
+            String bookingCurrency,
+            long paidBookings,
+            BigDecimal bookingRevenue,
+            BigDecimal providerVerifiedBookingRevenue,
+            BigDecimal manualRecordedBookingRevenue,
+            long recepVozPaidBookings,
+            BigDecimal recepVozBookingRevenue,
+            List<CurrencyTotal> bookingCurrencyTotals,
             List<Insight> insights) {}
 
     public record CurrencyTotal(String currency, BigDecimal amount) {}
@@ -457,14 +594,24 @@ public class SalesAnalyticsService {
     private record Peak(String weekday, Integer hour) {}
     private record Impact(long orders, BigDecimal revenue) {}
 
+    private record BookingRevenue(
+            Map<String, BigDecimal> currencyTotals,
+            Map<String, BigDecimal> providerTotals,
+            Map<String, BigDecimal> manualTotals,
+            Map<String, BigDecimal> recepVozTotals,
+            long paidBookingTargets,
+            long recepVozBookingTargets) {}
+
     private record PeriodData(
             List<BusinessPayment> payments,
+            List<BusinessPayment> bookingPayments,
             Map<UUID, BusinessOrder> ordersByOperation,
+            Map<UUID, BusinessOperation> completedBookingsByOperation,
             List<BusinessOrderLine> orderLines,
             Map<String, BigDecimal> currencyTotals,
             long unitsSold) {
         static PeriodData empty() {
-            return new PeriodData(List.of(), Map.of(), List.of(), Map.of(), 0);
+            return new PeriodData(List.of(), List.of(), Map.of(), Map.of(), List.of(), Map.of(), 0);
         }
     }
 

@@ -1,5 +1,8 @@
 package cl.helvoca.payment;
 
+import cl.helvoca.booking.Booking;
+import cl.helvoca.booking.BookingRepository;
+import cl.helvoca.booking.BookingStatus;
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationRepository;
 import cl.helvoca.operations.BusinessOperationItem;
@@ -19,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +43,9 @@ public class PaymentWorkflowService {
 
     @Autowired(required = false)
     private InventoryService inventory;
+
+    @Autowired(required = false)
+    private BookingRepository bookingRepository;
 
     @Autowired(required = false)
     private BusinessOperationItemRepository operationItems;
@@ -294,6 +301,9 @@ public class PaymentWorkflowService {
         payment.setAmount(recalculated.amount());
         payment.setCurrency(recalculated.currency());
         payment.setStatus(providerResult.status());
+        payment.setVerificationMethod(BusinessPayment.VerificationMethod.PROVIDER);
+        payment.setPaymentMethod(BusinessPayment.PaymentMethod.ONLINE);
+        if (providerResult.status() == BusinessPayment.Status.SUCCEEDED) payment.setVerifiedAt(Instant.now());
         payment.setCheckoutUrl(blank(providerResult.checkoutUrl()) ? null : providerResult.checkoutUrl());
         payment.setSource(source == null ? operation.getSource() : source);
         payment.setMetadata(providerResult.metadata());
@@ -466,6 +476,11 @@ public class PaymentWorkflowService {
                             businessId, payment.getExternalId(), payment.getIdempotencyKey()));
             if (result != null && result.status() != null) {
                 payment.setStatus(result.status());
+                payment.setVerificationMethod(BusinessPayment.VerificationMethod.PROVIDER);
+                payment.setPaymentMethod(BusinessPayment.PaymentMethod.ONLINE);
+                if (result.status() == BusinessPayment.Status.SUCCEEDED && payment.getVerifiedAt() == null) {
+                    payment.setVerifiedAt(Instant.now());
+                }
                 payment.setMetadata(mergeMetadata(payment.getMetadata(), result.metadata()));
                 payments.saveAndFlush(payment);
             }
@@ -526,6 +541,11 @@ public class PaymentWorkflowService {
             payment.setCheckoutUrl(blank(recovered.checkoutUrl()) ? null : recovered.checkoutUrl());
             payment.setIdempotencyKey(recoveryKey);
             payment.setStatus(recovered.status());
+            payment.setVerificationMethod(BusinessPayment.VerificationMethod.PROVIDER);
+            payment.setPaymentMethod(BusinessPayment.PaymentMethod.ONLINE);
+            if (recovered.status() == BusinessPayment.Status.SUCCEEDED && payment.getVerifiedAt() == null) {
+                payment.setVerifiedAt(Instant.now());
+            }
 
             Map<String, Object> recoveryMetadata = new LinkedHashMap<>();
             if (recovered.metadata() != null) recoveryMetadata.putAll(recovered.metadata());
@@ -701,10 +721,24 @@ public class PaymentWorkflowService {
                     "PAYMENT_TARGET_NOT_FOUND",
                     "No encuentro esa operación entre las operaciones del cliente actual.");
         }
-        if (target.getStatus() != BusinessOperation.Status.CONFIRMED) {
+        boolean payableStatus = target.getStatus() == BusinessOperation.Status.CONFIRMED
+                || (target.getType() == BusinessOperation.Type.BOOKING
+                    && target.getStatus() == BusinessOperation.Status.COMPLETED);
+        if (!payableStatus) {
             throw new PaymentRuleException(
                     "PAYMENT_TARGET_NOT_PAYABLE",
-                    "La operación debe estar confirmada antes de iniciar su pago.");
+                    "La operación debe estar confirmada o ser una reserva completada antes de iniciar su pago.");
+        }
+        if (target.getType() == BusinessOperation.Type.BOOKING && bookingRepository != null) {
+            Booking booking = bookingRepository.findByOperationIdAndBusinessId(targetOperationId, businessId)
+                    .orElseThrow(() -> new PaymentRuleException(
+                            "PAYMENT_TARGET_NOT_FOUND",
+                            "La reserva asociada al pago no existe."));
+            if (booking.getStatus() == BookingStatus.CANCELLED || booking.getStatus() == BookingStatus.NO_SHOW) {
+                throw new PaymentRuleException(
+                        "PAYMENT_TARGET_NOT_PAYABLE",
+                        "Una reserva cancelada o marcada como no asistida no admite un nuevo cobro.");
+            }
         }
         if (target.getTotal() == null || target.getTotal().compareTo(BigDecimal.ZERO) <= 0) {
             throw new PaymentRuleException(

@@ -10,6 +10,7 @@ import java.util.UUID;
 public interface BusinessPaymentRepository extends JpaRepository<BusinessPayment, UUID> {
     Optional<BusinessPayment> findByIdAndBusinessId(UUID id, UUID businessId);
     Optional<BusinessPayment> findByOperationIdAndBusinessId(UUID operationId, UUID businessId);
+    Optional<BusinessPayment> findByBusinessIdAndIdempotencyKey(UUID businessId, String idempotencyKey);
     long countByBusinessIdAndOperationId(UUID businessId, UUID operationId);
     long countByBusinessIdAndTargetOperationId(UUID businessId, UUID targetOperationId);
     Optional<BusinessPayment> findByBusinessIdAndProviderIgnoreCaseAndExternalId(
