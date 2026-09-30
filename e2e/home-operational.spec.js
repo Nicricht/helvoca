@@ -178,9 +178,9 @@ async function mockReadyHome(page, roles = ['BUSINESS_ADMIN'], options = {}) {
     recepVozOrders: 73,
     recepVozRevenue: 742400,
     insights: [
-      'Hamburguesa Doble es el producto más pedido del período.',
-      'WhatsApp concentra la mayor cantidad de pedidos pagados.',
-      'La mayor actividad ocurre los sábados alrededor de las 19:00.'
+      { type: 'TOP_PRODUCT', text: 'Hamburguesa Doble es el producto más pedido del período.' },
+      { type: 'TOP_CHANNEL', text: 'WhatsApp concentra la mayor cantidad de pedidos pagados.' },
+      { type: 'PEAK_TIME', text: 'La mayor actividad ocurre los sábados alrededor de las 19:00.' }
     ]
   })));
 
@@ -2393,8 +2393,8 @@ test('sales analytics turns paid orders into decision-ready business statistics'
       recepVozOrders: 73,
       recepVozRevenue: 742400,
       insights: [
-        'Hamburguesa Doble es el producto más pedido del período.',
-        'WhatsApp concentra la mayor cantidad de pedidos pagados.'
+        { type: 'TOP_PRODUCT', text: 'Hamburguesa Doble es el producto más pedido del período.' },
+        { type: 'TOP_CHANNEL', text: 'WhatsApp concentra la mayor cantidad de pedidos pagados.' }
       ]
     }));
   });
