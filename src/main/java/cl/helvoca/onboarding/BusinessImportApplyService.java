@@ -5,7 +5,11 @@ import cl.helvoca.catalog.UniversalCatalogService;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.inventory.InventoryService;
 import cl.helvoca.security.TenantProvider;
+import cl.helvoca.servicecatalog.ServiceCatalogService;
+import cl.helvoca.servicecatalog.ServiceItemRequest;
+import cl.helvoca.servicecatalog.ServiceItemResponse;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,13 +31,23 @@ public class BusinessImportApplyService {
     private final UniversalCatalogService catalog;
     private final InventoryService inventory;
     private final TenantProvider tenantProvider;
+    private final ServiceCatalogService services;
+
+    @Autowired
+    public BusinessImportApplyService(UniversalCatalogService catalog,
+                                      InventoryService inventory,
+                                      TenantProvider tenantProvider,
+                                      ServiceCatalogService services) {
+        this.catalog = catalog;
+        this.inventory = inventory;
+        this.tenantProvider = tenantProvider;
+        this.services = services;
+    }
 
     public BusinessImportApplyService(UniversalCatalogService catalog,
                                       InventoryService inventory,
                                       TenantProvider tenantProvider) {
-        this.catalog = catalog;
-        this.inventory = inventory;
-        this.tenantProvider = tenantProvider;
+        this(catalog, inventory, tenantProvider, null);
     }
 
     @Transactional
@@ -68,13 +82,57 @@ public class BusinessImportApplyService {
             }
         }
 
+        Map<String, ServiceItemResponse> serviceByName = new HashMap<>();
+        if (services != null) {
+            for (ServiceItemResponse service : services.list()) {
+                serviceByName.put(normalizeName(service.name()), service);
+            }
+        }
+
         int created = 0;
         int updated = 0;
         int inventoryConfigured = 0;
         List<ItemResult> results = new ArrayList<>();
 
         for (ProductInput input : request.products()) {
+            CatalogItem.Kind kind = effectiveKind(input);
             String normalizedName = normalizeName(input.name());
+
+            if (kind == CatalogItem.Kind.SERVICE) {
+                if (services == null) {
+                    throw new IllegalStateException("Service catalog is unavailable for service imports");
+                }
+                ServiceItemResponse existingService = serviceByName.get(normalizedName);
+                ServiceItemRequest serviceRequest = new ServiceItemRequest(
+                        input.name().trim(),
+                        input.description() == null
+                                ? existingService == null ? null : existingService.description()
+                                : blankToNull(input.description()),
+                        input.durationMinutes(),
+                        input.price() == null
+                                ? existingService == null ? null : existingService.price()
+                                : input.price(),
+                        true);
+                ServiceItemResponse savedService;
+                boolean wasCreated;
+                if (existingService == null) {
+                    savedService = services.create(serviceRequest);
+                    created++;
+                    wasCreated = true;
+                } else {
+                    savedService = services.update(existingService.id(), serviceRequest);
+                    updated++;
+                    wasCreated = false;
+                }
+                serviceByName.put(normalizedName, savedService);
+                results.add(new ItemResult(
+                        savedService.id(),
+                        savedService.name(),
+                        wasCreated ? "CREATED" : "UPDATED",
+                        false));
+                continue;
+            }
+
             String normalizedSku = input.sku() == null || input.sku().isBlank()
                     ? null : normalizeSku(input.sku());
 
@@ -207,17 +265,34 @@ public class BusinessImportApplyService {
                 throw new IllegalArgumentException("Imported stock cannot be negative");
             }
 
-            String nameKey = normalizeName(input.name());
-            if (!names.add(nameKey)) {
-                throw new ConflictException("The import contains duplicate product names");
+            CatalogItem.Kind kind = effectiveKind(input);
+            if (kind == CatalogItem.Kind.SERVICE) {
+                if (input.durationMinutes() == null || input.durationMinutes() <= 0) {
+                    throw new IllegalArgumentException("Every imported service requires a positive duration");
+                }
+                if ((input.sku() != null && !input.sku().isBlank()) || input.onHand() != null) {
+                    throw new IllegalArgumentException("Services cannot import SKU or stock");
+                }
+                if (!"CLP".equals(normalizeCurrency(input.currency(), "CLP"))) {
+                    throw new IllegalArgumentException("Imported services currently support CLP pricing only");
+                }
             }
-            if (input.sku() != null && !input.sku().isBlank()) {
+
+            String nameKey = kind.name() + ":" + normalizeName(input.name());
+            if (!names.add(nameKey)) {
+                throw new ConflictException("The import contains duplicate catalog item names for the same type");
+            }
+            if (kind == CatalogItem.Kind.PRODUCT && input.sku() != null && !input.sku().isBlank()) {
                 String skuKey = normalizeSku(input.sku());
                 if (!skus.add(skuKey)) {
                     throw new ConflictException("The import contains duplicate SKUs");
                 }
             }
         }
+    }
+
+    private static CatalogItem.Kind effectiveKind(ProductInput input) {
+        return input.kind() == null ? CatalogItem.Kind.PRODUCT : input.kind();
     }
 
     private static String mergeMetadata(String existingJson, String category, String sourceName) {
@@ -284,8 +359,22 @@ public class BusinessImportApplyService {
             String sku,
             Integer onHand,
             String category,
+            CatalogItem.Kind kind,
+            Integer durationMinutes,
             String sourceName
-    ) {}
+    ) {
+        public ProductInput(String name,
+                            String description,
+                            BigDecimal price,
+                            String currency,
+                            String sku,
+                            Integer onHand,
+                            String category,
+                            String sourceName) {
+            this(name, description, price, currency, sku, onHand, category,
+                    CatalogItem.Kind.PRODUCT, null, sourceName);
+        }
+    }
 
     public record ItemResult(UUID catalogItemId, String name, String action, boolean inventoryConfigured) {}
 
