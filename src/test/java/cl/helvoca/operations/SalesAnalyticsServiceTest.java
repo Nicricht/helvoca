@@ -60,11 +60,11 @@ class SalesAnalyticsServiceTest {
 
         UUID burger = UUID.randomUUID();
         UUID fries = UUID.randomUUID();
-        when(lines.findAllByOrderIdInOrderByCreatedAtAsc(anyCollection())).thenReturn(List.of(
-                line(orderId1, burger, "Hamburguesa Doble", 2, "10000", "20000"),
-                line(orderId2, burger, "Hamburguesa Doble", 1, "10000", "10000"),
-                line(orderId2, fries, "Papas Grandes", 1, "5000", "5000")
-        ));
+        BusinessOrderLine burgerOne = line(orderId1, burger, "Hamburguesa Doble", 2, "10000", "20000");
+        BusinessOrderLine burgerTwo = line(orderId2, burger, "Hamburguesa Doble", 1, "10000", "10000");
+        BusinessOrderLine friesLine = line(orderId2, fries, "Papas Grandes", 1, "5000", "5000");
+        when(lines.findAllByOrderIdInOrderByCreatedAtAsc(anyCollection()))
+                .thenReturn(List.of(burgerOne, burgerTwo, friesLine));
 
         SalesAnalyticsService service = new SalesAnalyticsService(businesses, payments, orders, lines, tenant);
         SalesAnalyticsService.AnalyticsResponse result = service.analytics(7);
@@ -115,12 +115,13 @@ class SalesAnalyticsServiceTest {
         when(businesses.findById(businessId)).thenReturn(Optional.of(business));
 
         Instant now = Instant.now();
+        BusinessPayment clpPayment = payment(
+                op1, new BigDecimal("10000"), "CLP", BusinessOrder.Source.WHATSAPP, now.minusSeconds(300));
+        BusinessPayment usdPayment = payment(
+                op2, new BigDecimal("20"), "USD", BusinessOrder.Source.API, now.minusSeconds(200));
         when(payments.findAllByBusinessIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
                 eq(businessId), any(Instant.class), any(Instant.class)))
-                .thenReturn(List.of(
-                        payment(op1, new BigDecimal("10000"), "CLP", BusinessOrder.Source.WHATSAPP, now.minusSeconds(300)),
-                        payment(op2, new BigDecimal("20"), "USD", BusinessOrder.Source.API, now.minusSeconds(200))
-                ), List.of());
+                .thenReturn(List.of(clpPayment, usdPayment), List.of());
 
         BusinessOrder clp = order(UUID.randomUUID(), op1, BusinessOrder.Source.WHATSAPP, BusinessOrder.Status.COMPLETED, "CLP");
         BusinessOrder usd = order(UUID.randomUUID(), op2, BusinessOrder.Source.API, BusinessOrder.Status.COMPLETED, "USD");
