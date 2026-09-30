@@ -50,6 +50,15 @@ test.describe('RecepVoz frontend frame contract', () => {
     expect(document).toContain('Inventario');
   });
 
+  test('repository guardrails default frontend work to local frame changes', async () => {
+    const agents = read('AGENTS.md');
+
+    expect(agents).toContain('docs/frontend/FRAME_CONTRACT.md');
+    expect(agents).toContain('FRAME CHANGE: NO');
+    expect(agents).toContain('FRAME CHANGE: YES');
+    expect(agents).toContain('editable slot');
+  });
+
   test('PR template requires an explicit frame-change seal', async () => {
     const template = read('.github/pull_request_template.md');
 
