@@ -109,60 +109,62 @@ It must not reduce the landing experience to “large empty card + login box”.
 
 ### User question
 
-“What is happening in my business right now?”
+“What is happening in my business right now, what needs attention, and where should I go next?”
 
-### Header and first-order owner summary
+### Header
 
 Title: **Inicio**
 
-The first-order heading is **“Qué está pasando hoy”**. The screen should answer the owner’s immediate operational question before exposing deeper reports.
+The first operational heading is **Qué está pasando hoy**. The screen is an owner cockpit, not a generic analytics wall.
 
-The owner summary prioritizes:
+### Primary hierarchy
 
-- calls handled today;
-- **Necesita tu atención** for unresolved or risky items;
-- **Actividad reciente** in human business language;
-- **Accesos rápidos** to Agenda, Clientes, Conversaciones, Inventario, Configuración and Facturación.
+The current composition must preserve this order of importance:
 
-The attention panel is not a decorative KPI card. It must make pending work and the next review target obvious.
+1. **Qué está pasando hoy** — a compact operational summary of the day;
+2. **Necesita tu atención** — unresolved items or exceptions that require the owner;
+3. **Actividad reciente** — recent calls, bookings and business events in human language;
+4. **Accesos rápidos** — direct routes to Agenda, Clientes, Conversaciones, Inventario, Configuración and Facturación.
 
-### Operational workspaces
-
-Below the owner summary, Inicio can expose the business workspaces already implemented by the product:
-
-- Reservas;
-- Pedidos;
-- Ventas;
-- Solicitudes;
-- Clientes;
-- Auditoría.
-
-These workspaces stay inside the same protected frame. Switching tabs must feel like changing local business context, not changing products.
+Daily metrics may support the summary, but they must not recreate the obsolete four-equal-KPI dashboard or overpower owner action.
 
 ### Ventas y rendimiento
 
-**Ventas y rendimiento** is the analytical workspace for confirmed commercial outcomes.
+**Ventas y rendimiento** lives inside the authenticated home workspace as a dedicated decision surface.
 
-Required decision-ready information:
+It includes:
 
-- selectable 7 / 30 / 90 day window;
 - confirmed collections;
 - paid orders;
 - units sold;
-- average ticket when a single currency makes the value meaningful;
-- previous-period trend;
-- sales over time;
-- top products by units and confirmed revenue;
+- average ticket;
+- 7 / 30 / 90 day period controls;
+- **Ventas en el tiempo**;
+- “Más pedidos” and “Mayor facturación” product rankings;
 - channel mix;
 - strongest weekday/hour;
-- paid orders whose recorded source is Voz or WhatsApp;
-- measured insights grounded in the selected period.
+- **Gestionado por voz y WhatsApp**;
+- concise measured insights.
 
-The UI must not imply causal ROI from the recorded channel source. Mixed currencies remain separated instead of being collapsed into a misleading aggregate.
+The voice/WhatsApp impact block describes orders whose recorded source was Voice or WhatsApp. It must not present that number as causal ROI.
+
+If multiple currencies exist, currency totals remain separated and aggregate revenue, average ticket or trend must not imply a false common currency.
 
 ### Empty/error states
 
-If there is no operational data, preserve the hierarchy and provide useful empty guidance for attention, recent activity and the active workspace. Do not collapse Inicio into one giant empty card or resurrect a generic four-KPI dashboard.
+If operational data is absent, preserve the hierarchy and explain the next useful action. Do not collapse Inicio into a giant empty card.
+
+If sales analytics is unavailable, keep the workspace stable and show a bounded error/empty state without breaking Reservas, Pedidos, Clientes or other home tabs.
+
+### Responsive behavior
+
+At tablet/mobile widths:
+
+- attention follows the daily summary;
+- recent activity remains readable;
+- quick access becomes a touch-friendly stack/grid;
+- sales metrics and charts stack deliberately;
+- no page-level horizontal overflow is allowed.
 
 ## 4. Conversaciones
 
