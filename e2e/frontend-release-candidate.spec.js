@@ -363,6 +363,78 @@ test('release candidate captures exact-head visual evidence for every canonical 
         await expect(page.locator('#firstUserOnboarding')).toBeHidden();
       } else if (surface.name === 'conversations') {
         await expect(page.locator('#conversationList')).toContainText('+56955556666');
+
+        if (viewport.width >= 1280) {
+          const railDiagnostics = await page.locator('.rv-nav').evaluate(nav => {
+            const navStyle = getComputedStyle(nav);
+            const navRect = nav.getBoundingClientRect();
+            return {
+              bodyClass: document.body.className,
+              navText: nav.textContent,
+              navChildCount: nav.children.length,
+              navStyle: {
+                position: navStyle.position,
+                display: navStyle.display,
+                flexDirection: navStyle.flexDirection,
+                width: navStyle.width,
+                height: navStyle.height,
+                overflowX: navStyle.overflowX,
+                overflowY: navStyle.overflowY,
+                color: navStyle.color
+              },
+              navRect: {
+                x: navRect.x,
+                y: navRect.y,
+                width: navRect.width,
+                height: navRect.height
+              },
+              links: [...nav.querySelectorAll('a')].map(link => {
+                const style = getComputedStyle(link);
+                const rect = link.getBoundingClientRect();
+                const range = document.createRange();
+                range.selectNodeContents(link);
+                const textRect = range.getBoundingClientRect();
+                return {
+                  textContent: link.textContent,
+                  innerText: link.innerText,
+                  display: style.display,
+                  position: style.position,
+                  color: style.color,
+                  webkitTextFillColor: style.webkitTextFillColor,
+                  opacity: style.opacity,
+                  visibility: style.visibility,
+                  fontSize: style.fontSize,
+                  lineHeight: style.lineHeight,
+                  width: rect.width,
+                  height: rect.height,
+                  textWidth: textRect.width,
+                  textHeight: textRect.height
+                };
+              })
+            };
+          });
+          console.log('AUTH_DESKTOP_NAV_DIAGNOSTICS', JSON.stringify(railDiagnostics));
+          expect(railDiagnostics.links.map(link => link.innerText.trim())).toEqual([
+            'Inicio',
+            'Conversaciones',
+            'Agenda',
+            'Clientes',
+            'Inventario',
+            'Configuración',
+            'Facturación'
+          ]);
+          expect(railDiagnostics.navStyle.position).toBe('fixed');
+          expect(railDiagnostics.navStyle.flexDirection).toBe('column');
+          expect(railDiagnostics.navRect.height).toBeGreaterThan(400);
+          for (const link of railDiagnostics.links) {
+            expect(link.width).toBeGreaterThan(100);
+            expect(link.height).toBeGreaterThanOrEqual(40);
+            expect(link.textWidth).toBeGreaterThan(20);
+            expect(link.textHeight).toBeGreaterThan(10);
+            expect(link.opacity).toBe('1');
+            expect(link.visibility).toBe('visible');
+          }
+        }
       } else if (surface.name === 'inventory') {
         await expect(page.locator('[data-inventory-product-id="product-rc"]')).toContainText('Taladro percutor');
       } else if (surface.name === 'settings') {
