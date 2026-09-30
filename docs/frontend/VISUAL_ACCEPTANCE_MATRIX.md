@@ -167,24 +167,37 @@ Required:
 
 ## 8. Inicio acceptance
 
+The current owner home answers one question first: **“¿Qué necesita mi atención ahora?”**
+
 Required:
 
-- page title and the owner question **“Qué está pasando hoy”** establish the first-order hierarchy;
-- the first screenful prioritizes current calls, **Necesita tu atención**, **Actividad reciente** and **Accesos rápidos**;
-- attention items are visually stronger than secondary reporting and explain what the owner needs to review;
-- recent activity translates technical events into human-readable business language and stays scannable;
-- quick access exposes Agenda, Clientes, Conversaciones, Inventario, Configuración and Facturación without duplicating the global shell;
-- the operational workspaces for Reservas, Pedidos, Ventas, Solicitudes, Clientes and Auditoría remain below the owner summary instead of competing with it;
-- **Ventas y rendimiento** exposes 7/30/90-day periods, confirmed collections, paid orders, units, average ticket, trend, top products, channels, peak demand and measured RecepVoz-origin orders;
-- mixed currencies are not presented as a false combined revenue or average-ticket total;
-- no giant empty whitespace or decorative cards without an owner decision attached.
+- the page title **Inicio** and owner summary **Qué está pasando hoy** are immediately visible;
+- the operational summary surfaces calls and current business activity without turning the page into a KPI mosaic;
+- **Necesita tu atención** is visually prominent whenever there are unresolved items;
+- **Actividad reciente** remains scannable and translates technical events into human language;
+- **Accesos rápidos** provides direct navigation to Agenda, Clientes, Conversaciones, Inventario, Configuración and Facturación;
+- ready, empty and degraded states preserve the same hierarchy instead of replacing the page with a giant blank card;
+- no giant empty whitespace or duplicate global navigation.
+
+### Ventas y rendimiento
+
+The Ventas workspace is part of the authenticated home workspace but is visually secondary to the owner’s daily Inicio summary.
+
+Required:
+
+- **Ventas y rendimiento** exposes confirmed collections, paid orders, units sold and average ticket for the selected 7/30/90-day period;
+- **Ventas en el tiempo** receives enough space to make trend direction readable;
+- product ranking distinguishes “Más pedidos” from “Mayor facturación”;
+- channel mix and strongest demand window are readable without decorative chart noise;
+- **Gestionado por voz y WhatsApp** is explicitly described as recorded order origin, not causal ROI;
+- useful measured insights remain concise and evidence-based;
+- mixed currencies are never visually combined into a false aggregate.
 
 Tablet/mobile:
 
-- attention, activity and quick access stack in a clear priority order;
-- operational tabs remain reachable without body-level horizontal overflow;
-- sales cards and chart reflow without losing labels, period controls or currency meaning;
-- the screen preserves the same owner question instead of degrading into a generic KPI mosaic.
+- owner summary, attention, recent activity and quick access reflow in task order;
+- sales metrics and trend remain readable without page-level horizontal overflow;
+- tables/charts may stack or scroll inside their own containers but must not widen the page.
 
 ## 9. Conversaciones acceptance
 
