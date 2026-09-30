@@ -32,14 +32,23 @@ public class BusinessImportPreviewService {
     private final BusinessImportSpreadsheetParser spreadsheets;
     private final OpenAiRealtimeProperties openAi;
     private final TenantProvider tenantProvider;
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build();
+    private final HttpClient http;
 
     public BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
                                         OpenAiRealtimeProperties openAi,
                                         TenantProvider tenantProvider) {
+        this(spreadsheets, openAi, tenantProvider,
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
+    }
+
+    BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
+                                 OpenAiRealtimeProperties openAi,
+                                 TenantProvider tenantProvider,
+                                 HttpClient http) {
         this.spreadsheets = spreadsheets;
         this.openAi = openAi;
         this.tenantProvider = tenantProvider;
+        this.http = http;
     }
 
     public Preview preview(String businessName, List<MultipartFile> files) {
