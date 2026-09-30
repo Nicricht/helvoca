@@ -52,6 +52,24 @@ class BusinessImportSpreadsheetParserTest {
     }
 
     @Test
+    void salesRowsWithProductColumnsRemainHistorical() {
+        String csv = """
+                Fecha,Nro Boleta,Producto,Precio,Cantidad,Total
+                2026-09-01,1001,Hamburguesa clásica,6990,2,13980
+                """;
+        MockMultipartFile file = new MockMultipartFile(
+                "files", "ventas_detalle.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+
+        BusinessImportSpreadsheetParser.ParseResult result =
+                new BusinessImportSpreadsheetParser().parse(file);
+
+        assertTrue(result.recognized());
+        assertEquals(BusinessImportSpreadsheetParser.DatasetKind.SALES, result.kind());
+        assertTrue(result.products().isEmpty());
+        assertEquals(1, result.rowCount());
+    }
+
+    @Test
     void malformedOrUnrecognizedSpreadsheetFailsClosed() {
         String csv = """
                 Columna rara,Otra cosa
