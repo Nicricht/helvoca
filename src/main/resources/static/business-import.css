@@ -62,13 +62,16 @@
 .import-warnings span { display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 20px; border-radius: 50%; background: rgba(243,179,75,.13); color: #edc27d; font-weight: 800; font-size: 11px; }
 .import-warnings p { margin: 1px 0 0; color: #cfc6b5; font-size: 11px; line-height: 1.45; }
 .import-table-wrap { overflow-x: auto; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; }
-.import-table { width: 100%; min-width: 1040px; border-collapse: collapse; }
+.import-table { width: 100%; min-width: 1220px; border-collapse: collapse; }
 .import-table th { padding: 9px 8px; text-align: left; background: rgba(255,255,255,.025); color: var(--muted); font-size: 10px; letter-spacing: .02em; font-weight: 750; }
 .import-table td { padding: 7px 8px; border-top: 1px solid rgba(255,255,255,.05); vertical-align: middle; }
 .import-table tr:hover td { background: rgba(255,255,255,.012); }
 .import-row-check { accent-color: #7c5cff; }
 .import-cell { width: 100%; min-height: 34px; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text); font-size: 11px; }
 .import-cell:hover, .import-cell:focus { border-color: rgba(124,92,255,.25); background: rgba(255,255,255,.025); outline: none; }
+.import-cell:disabled { color: rgba(213,219,231,.38); cursor: not-allowed; background: rgba(255,255,255,.012); border-color: transparent; }
+.import-kind { min-width: 92px; }
+.import-duration { min-width: 78px; }
 .import-description { margin-top: 3px; color: var(--muted); font-size: 10px; }
 .import-origin strong, .import-origin span { display: block; }
 .import-origin strong { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }

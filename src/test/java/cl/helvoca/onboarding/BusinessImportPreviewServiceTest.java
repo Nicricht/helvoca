@@ -102,4 +102,77 @@ class BusinessImportPreviewServiceTest {
         assertEquals(1.0, result.products().get(1).confidence());
         assertTrue(result.warnings().contains("Revisar promoción"));
     }
+
+    @Test
+    void spreadsheetServicePreviewPreservesCatalogKindDurationAndWarnings() throws Exception {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), new OpenAiRealtimeProperties(), tenant);
+
+        MockMultipartFile services = new MockMultipartFile(
+                "files", "servicios.csv", "text/csv", """
+                Servicio;Precio;Duración;Categoría
+                Balayage;Desde $100.000;2 h;Coloración
+                """.getBytes(StandardCharsets.UTF_8));
+
+        BusinessImportPreviewService.Preview preview =
+                service.preview("Salón Aurora", List.of(services));
+
+        assertEquals(BusinessImportSpreadsheetParser.DatasetKind.SERVICES, preview.sources().getFirst().kind());
+        assertEquals(1, preview.products().size());
+        Object proposal = preview.products().getFirst();
+        assertEquals("SERVICE", String.valueOf(proposal.getClass().getMethod("kind").invoke(proposal)));
+        assertEquals(120, proposal.getClass().getMethod("durationMinutes").invoke(proposal));
+        assertTrue(preview.warnings().stream().anyMatch(w -> w.toLowerCase().contains("desde")));
+    }
+    @Test
+    void semanticServicePreservesKindDurationAndDropsInventoryFacts() {
+        String json = """
+                {
+                  "products":[
+                    {"name":"Consulta veterinaria","kind":"SERVICE","durationMinutes":45,
+                     "price":20000,"currency":"CLP","sku":"SHOULD-NOT-EXIST","onHand":99,
+                     "category":"Consulta","confidence":0.91}
+                  ],
+                  "warnings":[]
+                }
+                """;
+
+        BusinessImportPreviewService.SemanticResult result =
+                BusinessImportPreviewService.parseSemanticResult(json, "tarifario.pdf");
+
+        assertEquals(1, result.products().size());
+        Object proposal = result.products().getFirst();
+        try {
+            assertEquals("SERVICE", String.valueOf(proposal.getClass().getMethod("kind").invoke(proposal)));
+            assertEquals(45, proposal.getClass().getMethod("durationMinutes").invoke(proposal));
+            assertNull(proposal.getClass().getMethod("sku").invoke(proposal));
+            assertNull(proposal.getClass().getMethod("onHand").invoke(proposal));
+        } catch (ReflectiveOperationException e) {
+            fail(e);
+        }
+    }
+
+    @Test
+    void semanticServiceWithoutExplicitDurationStaysNullAndWarnsForReview() {
+        String json = """
+                {
+                  "products":[
+                    {"name":"Cirugía veterinaria","kind":"SERVICE","price":null,"currency":"CLP","confidence":0.8}
+                  ],
+                  "warnings":[]
+                }
+                """;
+
+        BusinessImportPreviewService.SemanticResult result =
+                BusinessImportPreviewService.parseSemanticResult(json, "tarifario.pdf");
+
+        assertEquals(1, result.products().size());
+        assertNull(result.products().getFirst().durationMinutes());
+        assertTrue(result.warnings().stream().anyMatch(w ->
+                w.toLowerCase().contains("duración") && w.contains("Cirugía veterinaria")));
+    }
+
 }

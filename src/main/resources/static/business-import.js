@@ -122,6 +122,7 @@
     function sourceKindLabel(kind) {
         return {
             PRODUCTS: "Productos",
+            SERVICES: "Servicios",
             SALES: "Ventas históricas",
             RECEIPTS: "Boletas/documentos",
             CUSTOMERS: "Clientes",
@@ -166,30 +167,67 @@
 
     function renderProducts() {
         const products = state.preview?.products || [];
-        $("#importDetectedCount").textContent = `${products.length} producto${products.length === 1 ? "" : "s"}`;
+        $("#importDetectedCount").textContent = `${products.length} elemento${products.length === 1 ? "" : "s"}`;
         $("#importNoProducts").classList.toggle("hidden", products.length > 0);
         rows.innerHTML = products.map((product, index) => {
             const confidence = Math.round(Number(product.confidence || 0) * 100);
+            const kind = product.kind === "SERVICE" ? "SERVICE" : "PRODUCT";
+            const service = kind === "SERVICE";
             return `
                 <tr data-import-row="${index}">
                     <td data-label="Importar"><input class="import-row-check" type="checkbox" checked aria-label="Importar ${escapeHtml(product.name)}"></td>
-                    <td data-label="Producto">
+                    <td data-label="Tipo">
+                        <select class="import-cell import-kind" aria-label="Tipo de ${escapeHtml(product.name)}">
+                            <option value="PRODUCT" ${kind === "PRODUCT" ? "selected" : ""}>Producto</option>
+                            <option value="SERVICE" ${kind === "SERVICE" ? "selected" : ""}>Servicio</option>
+                        </select>
+                    </td>
+                    <td data-label="Nombre">
                         <input class="import-cell import-name" maxlength="150" value="${escapeHtml(product.name)}">
                         <input class="import-cell import-description" maxlength="500" placeholder="Descripción opcional" value="${escapeHtml(product.description || "")}">
                     </td>
                     <td data-label="Categoría"><input class="import-cell import-category" maxlength="120" value="${escapeHtml(product.category || "")}" placeholder="Sin categoría"></td>
-                    <td data-label="SKU"><input class="import-cell import-sku" maxlength="80" value="${escapeHtml(product.sku || "")}" placeholder="Opcional"></td>
+                    <td data-label="Duración"><input class="import-cell import-duration" type="number" min="1" step="1" value="${escapeHtml(service ? product.durationMinutes ?? "" : "")}" placeholder="${service ? "minutos" : "No aplica"}" ${service ? "" : "disabled"}></td>
+                    <td data-label="SKU"><input class="import-cell import-sku" maxlength="80" value="${escapeHtml(service ? "" : product.sku || "")}" placeholder="${service ? "No aplica" : "Opcional"}" ${service ? "disabled" : ""}></td>
                     <td data-label="Precio"><input class="import-cell import-price" type="number" min="0" step="0.01" value="${escapeHtml(moneyValue(product.price))}" placeholder="Sin dato"></td>
-                    <td data-label="Stock"><input class="import-cell import-stock" type="number" min="0" step="1" value="${escapeHtml(stockValue(product.onHand))}" placeholder="Sin dato"></td>
+                    <td data-label="Stock"><input class="import-cell import-stock" type="number" min="0" step="1" value="${escapeHtml(service ? "" : stockValue(product.onHand))}" placeholder="${service ? "No aplica" : "Sin dato"}" ${service ? "disabled" : ""}></td>
                     <td data-label="Origen">
                         <div class="import-origin"><strong>${escapeHtml(product.sourceName || "archivo")}</strong><span>${confidence}% confianza</span></div>
                     </td>
                 </tr>`;
         }).join("");
 
+        rows.querySelectorAll(".import-kind").forEach(select => {
+            select.addEventListener("change", () => {
+                syncRowKind(select.closest("[data-import-row]"));
+                updateSelected();
+            });
+        });
         rows.querySelectorAll(".import-row-check").forEach(input => input.addEventListener("change", updateSelected));
         rows.querySelectorAll(".import-cell").forEach(input => input.addEventListener("input", updateSelected));
         updateSelected();
+    }
+
+    function syncRowKind(row) {
+        if (!row) return;
+        const service = row.querySelector(".import-kind")?.value === "SERVICE";
+        const duration = row.querySelector(".import-duration");
+        const sku = row.querySelector(".import-sku");
+        const stock = row.querySelector(".import-stock");
+
+        duration.disabled = !service;
+        duration.placeholder = service ? "minutos" : "No aplica";
+        sku.disabled = service;
+        stock.disabled = service;
+        sku.placeholder = service ? "No aplica" : "Opcional";
+        stock.placeholder = service ? "No aplica" : "Sin dato";
+
+        if (service) {
+            sku.value = "";
+            stock.value = "";
+        } else {
+            duration.value = "";
+        }
     }
 
     function selectedRows() {
@@ -251,13 +289,21 @@
         const products = [];
         for (const row of selectedRows()) {
             const name = row.querySelector(".import-name").value.trim();
+            const kind = row.querySelector(".import-kind").value === "SERVICE" ? "SERVICE" : "PRODUCT";
+            const service = kind === "SERVICE";
             const price = parseOptionalNumber(row.querySelector(".import-price").value);
-            const stock = parseOptionalNumber(row.querySelector(".import-stock").value);
-            if (!name) throw new Error("Todos los productos seleccionados necesitan nombre.");
+            const stock = service ? null : parseOptionalNumber(row.querySelector(".import-stock").value);
+            const duration = service ? parseOptionalNumber(row.querySelector(".import-duration").value) : null;
+
+            if (!name) throw new Error("Todos los elementos seleccionados necesitan nombre.");
             if (Number.isNaN(price)) throw new Error(`Precio inválido en ${name}.`);
-            if (Number.isNaN(stock) || (stock !== null && !Number.isInteger(stock))) {
+            if (!service && (Number.isNaN(stock) || (stock !== null && !Number.isInteger(stock)))) {
                 throw new Error(`El stock de ${name} debe ser un entero igual o mayor que cero.`);
             }
+            if (service && (Number.isNaN(duration) || duration === null || !Number.isInteger(duration) || duration <= 0)) {
+                throw new Error(`La duración de ${name} debe ser un número entero de minutos mayor que cero.`);
+            }
+
             const index = Number(row.dataset.importRow);
             const original = state.preview.products[index];
             products.push({
@@ -265,9 +311,11 @@
                 description: row.querySelector(".import-description").value.trim() || null,
                 price,
                 currency: original.currency || "CLP",
-                sku: row.querySelector(".import-sku").value.trim() || null,
-                onHand: stock,
+                sku: service ? null : row.querySelector(".import-sku").value.trim() || null,
+                onHand: service ? null : stock,
                 category: row.querySelector(".import-category").value.trim() || null,
+                kind,
+                durationMinutes: service ? duration : null,
                 sourceName: original.sourceName || null
             });
         }
@@ -284,7 +332,7 @@
             return;
         }
         if (!payload.products.length) {
-            showMessage("Selecciona al menos un producto.");
+            showMessage("Selecciona al menos un producto o servicio.");
             return;
         }
 

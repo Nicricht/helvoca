@@ -27,8 +27,13 @@ public class BusinessImportSpreadsheetParser {
     private static final int MAX_COLUMNS = 80;
     private static final int MAX_EXTRACTED_CHARS = 200_000;
 
+    private static final Set<String> PRODUCT_NAME_HEADERS = Set.of(
+            "producto", "product", "nombre", "nombre producto", "articulo", "item");
+    private static final Set<String> SERVICE_NAME_HEADERS = Set.of(
+            "servicio", "service", "tratamiento", "procedimiento");
     private static final Set<String> NAME_HEADERS = Set.of(
-            "producto", "product", "nombre", "nombre producto", "articulo", "item", "servicio");
+            "producto", "product", "nombre", "nombre producto", "articulo", "item",
+            "servicio", "service", "tratamiento", "procedimiento");
     private static final Set<String> PRICE_HEADERS = Set.of(
             "precio", "price", "valor", "precio venta", "precio unitario", "p venta");
     private static final Set<String> SKU_HEADERS = Set.of(
@@ -39,6 +44,8 @@ public class BusinessImportSpreadsheetParser {
             "categoria", "category", "familia", "grupo", "rubro");
     private static final Set<String> DESCRIPTION_HEADERS = Set.of(
             "descripcion", "description", "detalle", "observacion", "observaciones");
+    private static final Set<String> DURATION_HEADERS = Set.of(
+            "duracion", "duration", "tiempo", "duracion estimada", "tiempo estimado");
     private static final Set<String> DATE_HEADERS = Set.of(
             "fecha", "date", "fecha venta", "fecha emision");
     private static final Set<String> TOTAL_HEADERS = Set.of(
@@ -136,7 +143,7 @@ public class BusinessImportSpreadsheetParser {
     }
 
     private ParseResult parseTable(String sourceName, String sheetName, List<List<String>> rows) {
-        int headerIndex = firstUsefulRow(rows);
+        int headerIndex = findHeaderRow(rows);
         if (headerIndex < 0) return unknown("La planilla no contiene encabezados utilizables.");
 
         List<String> headers = rows.get(headerIndex);
@@ -144,6 +151,7 @@ public class BusinessImportSpreadsheetParser {
         DatasetKind kind = classify(columns.keySet());
 
         List<ProductRow> products = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
         int dataRows = 0;
         StringBuilder extracted = new StringBuilder();
         appendLimited(extracted, String.join(" | ", headers) + "\n");
@@ -154,17 +162,16 @@ public class BusinessImportSpreadsheetParser {
             if (row.stream().allMatch(String::isBlank)) continue;
             dataRows++;
             appendLimited(extracted, String.join(" | ", row) + "\n");
-            if (kind == DatasetKind.PRODUCTS || kind == DatasetKind.MIXED) {
-                ProductRow product = productFromRow(sourceName, sheetName, i + 1, columns, row);
+            if (kind == DatasetKind.PRODUCTS || kind == DatasetKind.SERVICES) {
+                ProductRow product = productFromRow(sourceName, sheetName, i + 1, kind, columns, row, warnings);
                 if (product != null) products.add(product);
             }
         }
 
-        List<String> warnings = new ArrayList<>();
         if (kind == DatasetKind.UNKNOWN) {
-            warnings.add("No reconocí columnas de productos, ventas, boletas o clientes.");
-        } else if ((kind == DatasetKind.PRODUCTS || kind == DatasetKind.MIXED) && products.isEmpty()) {
-            warnings.add("La hoja parece contener productos, pero no encontré filas con nombre válido.");
+            warnings.add("No reconocí columnas de productos, servicios, ventas, boletas o clientes.");
+        } else if ((kind == DatasetKind.PRODUCTS || kind == DatasetKind.SERVICES) && products.isEmpty()) {
+            warnings.add("La hoja parece contener catálogo, pero no encontré filas con nombre válido.");
         }
 
         return new ParseResult(kind != DatasetKind.UNKNOWN, kind, List.copyOf(products),
@@ -174,15 +181,35 @@ public class BusinessImportSpreadsheetParser {
     private static ProductRow productFromRow(String sourceName,
                                              String sheetName,
                                              int sourceRow,
+                                             DatasetKind datasetKind,
                                              Map<String, Integer> columns,
-                                             List<String> row) {
+                                             List<String> row,
+                                             List<String> warnings) {
         String name = value(row, first(columns, NAME_HEADERS));
         if (name == null || name.isBlank()) return null;
 
         String rawPrice = value(row, first(columns, PRICE_HEADERS));
         String rawStock = value(row, first(columns, STOCK_HEADERS));
+        String rawDuration = value(row, first(columns, DURATION_HEADERS));
         BigDecimal price = parseDecimal(rawPrice);
-        Integer onHand = parseInteger(rawStock);
+        Integer onHand = datasetKind == DatasetKind.SERVICES ? null : parseInteger(rawStock);
+        Integer durationMinutes = datasetKind == DatasetKind.SERVICES ? parseDurationMinutes(rawDuration) : null;
+
+        if (rawPrice != null && !rawPrice.isBlank()) {
+            String normalizedPrice = normalize(rawPrice);
+            if (price == null) {
+                warnings.add("Precio no numérico en " + sourceLocation(sheetName, sourceRow)
+                        + " (" + truncate(rawPrice.trim(), 80) + "); requiere revisión.");
+            } else if (normalizedPrice.contains("desde") || normalizedPrice.contains("a partir")) {
+                warnings.add("Precio desde detectado en " + sourceLocation(sheetName, sourceRow)
+                        + "; se importó el valor mínimo y requiere revisión.");
+            }
+        }
+        if (datasetKind == DatasetKind.SERVICES && rawDuration != null && !rawDuration.isBlank()
+                && durationMinutes == null) {
+            warnings.add("Duración no reconocida en " + sourceLocation(sheetName, sourceRow)
+                    + " (" + truncate(rawDuration.trim(), 80) + "); requiere revisión.");
+        }
 
         return new ProductRow(
                 truncate(name.trim(), 150),
@@ -192,6 +219,8 @@ public class BusinessImportSpreadsheetParser {
                 nullable(value(row, first(columns, SKU_HEADERS)), 80),
                 onHand,
                 nullable(value(row, first(columns, CATEGORY_HEADERS)), 120),
+                datasetKind == DatasetKind.SERVICES ? ItemKind.SERVICE : ItemKind.PRODUCT,
+                durationMinutes,
                 sourceName,
                 sheetName,
                 sourceRow
@@ -200,10 +229,15 @@ public class BusinessImportSpreadsheetParser {
 
     private static DatasetKind classify(Set<String> headers) {
         boolean name = containsAny(headers, NAME_HEADERS);
-        boolean productSignals = containsAny(headers, PRICE_HEADERS)
-                || containsAny(headers, SKU_HEADERS)
-                || containsAny(headers, STOCK_HEADERS)
-                || containsAny(headers, CATEGORY_HEADERS);
+        boolean productName = containsAny(headers, PRODUCT_NAME_HEADERS);
+        boolean serviceName = containsAny(headers, SERVICE_NAME_HEADERS);
+        boolean price = containsAny(headers, PRICE_HEADERS);
+        boolean sku = containsAny(headers, SKU_HEADERS);
+        boolean stock = containsAny(headers, STOCK_HEADERS);
+        boolean category = containsAny(headers, CATEGORY_HEADERS);
+        boolean description = containsAny(headers, DESCRIPTION_HEADERS);
+        boolean duration = containsAny(headers, DURATION_HEADERS);
+        boolean productSignals = price || sku || stock || category;
         boolean date = containsAny(headers, DATE_HEADERS);
         boolean total = containsAny(headers, TOTAL_HEADERS);
         boolean receipt = containsAny(headers, RECEIPT_HEADERS);
@@ -213,7 +247,8 @@ public class BusinessImportSpreadsheetParser {
         // Sales exports often contain Producto/Precio/Cantidad per receipt line and must never become live catalog/stock.
         if (date && total && receipt) return DatasetKind.SALES;
         if (receipt && total) return DatasetKind.RECEIPTS;
-        if (name && productSignals) return DatasetKind.PRODUCTS;
+        if (serviceName && !sku && !stock && (price || category || description || duration)) return DatasetKind.SERVICES;
+        if ((productName || name) && productSignals) return DatasetKind.PRODUCTS;
         if (customer && !productSignals && (name || headers.contains("cliente") || headers.contains("nombre cliente"))) {
             return DatasetKind.CUSTOMERS;
         }
@@ -239,12 +274,17 @@ public class BusinessImportSpreadsheetParser {
         return columns;
     }
 
-    private static int firstUsefulRow(List<List<String>> rows) {
+    private static int findHeaderRow(List<List<String>> rows) {
+        int fallback = -1;
         for (int i = 0; i < Math.min(rows.size(), 20); i++) {
-            long nonBlank = rows.get(i).stream().filter(v -> v != null && !v.isBlank()).count();
-            if (nonBlank >= 2) return i;
+            List<String> row = rows.get(i);
+            long nonBlank = row.stream().filter(v -> v != null && !v.isBlank()).count();
+            if (fallback < 0 && nonBlank >= 2) fallback = i;
+            if (nonBlank < 2) continue;
+            Map<String, Integer> columns = normalizedColumns(row);
+            if (classify(columns.keySet()) != DatasetKind.UNKNOWN) return i;
         }
-        return -1;
+        return fallback;
     }
 
     private static List<List<String>> parseDelimitedRows(String text, char delimiter) {
@@ -282,6 +322,23 @@ public class BusinessImportSpreadsheetParser {
     }
 
     private static char detectDelimiter(String text) {
+        char best = ',';
+        int bestScore = -1;
+        for (char candidate : new char[]{',', ';', '\t'}) {
+            List<List<String>> rows = parseDelimitedRows(text, candidate);
+            int headerIndex = findHeaderRow(rows);
+            if (headerIndex < 0) continue;
+            Map<String, Integer> columns = normalizedColumns(rows.get(headerIndex));
+            DatasetKind kind = classify(columns.keySet());
+            int score = kind == DatasetKind.UNKNOWN ? 0 : 100;
+            score += columns.size();
+            if (score > bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+        if (bestScore > 0) return best;
+
         String first = text.lines().filter(line -> !line.isBlank()).findFirst().orElse("");
         int commas = count(first, ',');
         int semicolons = count(first, ';');
@@ -302,6 +359,7 @@ public class BusinessImportSpreadsheetParser {
                 .replaceAll("\\p{M}+", "")
                 .replace('_', ' ')
                 .replace('-', ' ')
+                .replace('.', ' ')
                 .replaceAll("\\s+", " ");
         return normalized;
     }
@@ -364,6 +422,45 @@ public class BusinessImportSpreadsheetParser {
         }
     }
 
+    static Integer parseDurationMinutes(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String value = normalize(raw)
+                .replace("horas", "h")
+                .replace("hora", "h")
+                .replace("hrs", "h")
+                .replace("hr", "h")
+                .replace("minutos", "min")
+                .replace("minuto", "min");
+        try {
+            if (value.matches("^\\d+\\s*h$")) {
+                int hours = Integer.parseInt(value.replace("h", "").trim());
+                return hours > 0 ? Math.multiplyExact(hours, 60) : null;
+            }
+            if (value.matches("^\\d+\\s*min$")) {
+                int minutes = Integer.parseInt(value.replace("min", "").trim());
+                return minutes > 0 ? minutes : null;
+            }
+            if (value.matches("^\\d+\\s*h\\s*\\d+\\s*min$")) {
+                int h = value.indexOf('h');
+                int hours = Integer.parseInt(value.substring(0, h).trim());
+                int minutes = Integer.parseInt(value.substring(h + 1).replace("min", "").trim());
+                if (hours < 0 || minutes < 0 || minutes >= 60) return null;
+                return Math.addExact(Math.multiplyExact(hours, 60), minutes);
+            }
+            if (value.matches("^\\d+$")) {
+                int minutes = Integer.parseInt(value);
+                return minutes > 0 ? minutes : null;
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private static String sourceLocation(String sheetName, int sourceRow) {
+        return (sheetName == null || sheetName.isBlank() ? "fila " : "hoja " + sheetName + ", fila ") + sourceRow;
+    }
+
     private static void appendLimited(StringBuilder target, String value) {
         if (value == null || target.length() >= MAX_EXTRACTED_CHARS) return;
         int remaining = MAX_EXTRACTED_CHARS - target.length();
@@ -403,11 +500,17 @@ public class BusinessImportSpreadsheetParser {
 
     public enum DatasetKind {
         PRODUCTS,
+        SERVICES,
         SALES,
         RECEIPTS,
         CUSTOMERS,
         MIXED,
         UNKNOWN
+    }
+
+    public enum ItemKind {
+        PRODUCT,
+        SERVICE
     }
 
     public record ProductRow(
@@ -418,6 +521,8 @@ public class BusinessImportSpreadsheetParser {
             String sku,
             Integer onHand,
             String category,
+            ItemKind itemKind,
+            Integer durationMinutes,
             String sourceName,
             String sheetName,
             int sourceRow
