@@ -131,7 +131,9 @@ export function PlanConsumptionPage() {
     Math.max(0, Math.round(model.usageStatus.data?.usagePercent ?? percentFromSubscription))
   );
 
-  const detailsAvailable = model.canViewDetailedUsage && !model.usage.isError;
+  const detailsAvailable = model.canViewDetailedUsage && model.usage.isSuccess;
+  const detailsLoading = model.canViewDetailedUsage && model.usage.isPending;
+  const detailsUnavailable = !model.canViewDetailedUsage || model.usage.isError;
   const metrics = usageMetrics(model.usage.data, used);
   const projectionData = projection(subscription);
 
@@ -150,7 +152,7 @@ export function PlanConsumptionPage() {
           <div>
             <p className="eyebrow">CUENTA</p>
             <h1>Plan y consumo</h1>
-            <p>Tu plan y el consumo de este período, sin ruido innecesario.</p>
+            <p>Tu plan y consumo de este período.</p>
           </div>
         </header>
 
@@ -170,7 +172,7 @@ export function PlanConsumptionPage() {
               </div>
             </div>
             <div className={styles.headerActions}>
-              <a className="button primary" href="/pricing.html">Cambiar plan</a>
+              <a className="button primary" href="/pricing.html">Ver planes</a>
             </div>
           </div>
 
@@ -206,7 +208,7 @@ export function PlanConsumptionPage() {
           <div className={styles.planFooter}>
             <div className={styles.remaining} data-testid="remaining-minutes">
               <strong>{Math.round(remaining)} min disponibles</strong>
-              <span>Se renuevan automáticamente con tu período</span>
+              <span>Disponibles hasta el fin del período</span>
             </div>
             <span className={styles.renewal}>Renueva {formatDate(subscription.currentPeriodEnd)}</span>
           </div>
@@ -217,24 +219,24 @@ export function PlanConsumptionPage() {
           <div className={styles.metrics}>
             <Metric
               icon={<PhoneCall size={18} />}
-              value={detailsAvailable ? String(metrics.calls) : "—"}
+              value={detailsAvailable ? String(metrics.calls) : detailsLoading ? "…" : "—"}
               label="Llamadas"
               testId="metric-calls"
             />
             <Metric
               icon={<Timer size={18} />}
-              value={detailsAvailable ? `${metrics.minutes} min` : `${Math.round(used)} min`}
+              value={detailsAvailable ? `${metrics.minutes} min` : detailsLoading ? "…" : `${Math.round(used)} min`}
               label="Voz"
               testId="metric-minutes"
             />
             <Metric
               icon={<MessageSquareText size={18} />}
-              value={detailsAvailable ? String(metrics.messages) : "—"}
+              value={detailsAvailable ? String(metrics.messages) : detailsLoading ? "…" : "—"}
               label="Mensajes"
               testId="metric-messages"
             />
           </div>
-          {!detailsAvailable && (
+          {detailsUnavailable && (
             <p className={styles.restricted} data-testid="usage-restricted">
               El detalle de llamadas y mensajes está disponible para propietarios y administradores.
             </p>
