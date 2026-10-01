@@ -98,18 +98,20 @@ Saludos.
 6. Ofrecer una demo breve aplicada al negocio.
 7. Cerrar una siguiente acción concreta: demo o definición de piloto.
 
-## Demo de 5–10 minutos
+## Demo inicial de 3 minutos
 
-1. Mostrar `/sales.html`.
-2. Conectar con el problema que el prospecto acaba de describir.
-3. Mostrar un tenant demo configurado.
-4. Hacer una consulta real de información/precio.
-5. Ejecutar la acción principal del caso de uso.
-6. Corregir un dato para demostrar que la nueva versión reemplaza a la anterior.
-7. Mostrar el resultado persistido.
-8. Mostrar un caso desconocido manejado sin inventar.
-9. Mostrar `/pricing.html`.
-10. Preguntar si quiere definir un piloto con sus propios datos.
+Abrir `/demo.html`, elegir el rubro y completar únicamente las tres escenas guiadas.
+
+- escena 1: responde con contexto del negocio;
+- escena 2: mantiene contexto y aplica un cambio;
+- escena 3: no inventa cuando falta información o corresponde derivar;
+- cierre: **“¿Quieres que lo probemos con los datos de tu negocio?”**
+
+No abrir pricing, configuración, dashboard, inventario ni integraciones durante estos tres minutos salvo que el prospecto lo pida.
+
+### Demo completa después del interés
+
+Solo si acepta seguir, abrir `/simulator.html` y un tenant demo configurado para mostrar el flujo completo, persistencia, pricing y definición de piloto.
 
 Si se demuestra voz o WhatsApp real, ese canal debe estar previamente configurado y probado. Nunca improvisar una integración externa durante una reunión comercial. No demostrar merchant payment LIVE.
 
