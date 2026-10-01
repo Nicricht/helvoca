@@ -38,6 +38,8 @@ body.home-page:has(#authView:not(.hidden)) .rv-brand-wave rect:nth-child(4) { an
 body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell {
   position: relative;
   isolation: isolate;
+  /* Decorative glows and floating layers must never enlarge the page canvas. */
+  overflow: clip;
 }
 body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell::before,
 body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell::after {
@@ -289,9 +291,16 @@ body.home-page:has(#authView:not(.hidden)) .rv-feature-analytics .rv-art-arrow {
 }
 
 @media (prefers-reduced-motion: reduce){
-  body.home-page:has(#authView:not(.hidden)) *,
-  body.home-page:has(#authView:not(.hidden)) *::before,
-  body.home-page:has(#authView:not(.hidden)) *::after {
+  /*
+   * Include #authView explicitly to outrank component-level !important
+   * animations while keeping this preference isolated to the public entry.
+   */
+  body.home-page:has(#authView:not(.hidden)) #authView,
+  body.home-page:has(#authView:not(.hidden)) #authView::before,
+  body.home-page:has(#authView:not(.hidden)) #authView::after,
+  body.home-page:has(#authView:not(.hidden)) #authView *,
+  body.home-page:has(#authView:not(.hidden)) #authView *::before,
+  body.home-page:has(#authView:not(.hidden)) #authView *::after {
     animation:none !important;
     transition-duration:.01ms !important;
     scroll-behavior:auto !important;
