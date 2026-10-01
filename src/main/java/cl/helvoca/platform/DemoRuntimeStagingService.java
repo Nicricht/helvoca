@@ -18,6 +18,7 @@ import cl.helvoca.schedule.BusinessHour;
 import cl.helvoca.schedule.BusinessHourRepository;
 import cl.helvoca.security.TenantDatabaseContext;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,7 @@ public class DemoRuntimeStagingService {
     private final AiAgentRepository agents;
     private final BusinessOperationCapabilityRepository operationCapabilities;
     private final TenantDatabaseContext databaseContext;
+    private final DemoRuntimeProperties properties;
 
     public DemoRuntimeStagingService(
             BusinessRepository businesses,
@@ -44,6 +46,19 @@ public class DemoRuntimeStagingService {
             AiAgentRepository agents,
             BusinessOperationCapabilityRepository operationCapabilities,
             TenantDatabaseContext databaseContext) {
+        this(businesses, catalog, hours, knowledge, agents, operationCapabilities, databaseContext, null);
+    }
+
+    @Autowired
+    public DemoRuntimeStagingService(
+            BusinessRepository businesses,
+            CatalogItemRepository catalog,
+            BusinessHourRepository hours,
+            KnowledgeItemRepository knowledge,
+            AiAgentRepository agents,
+            BusinessOperationCapabilityRepository operationCapabilities,
+            TenantDatabaseContext databaseContext,
+            DemoRuntimeProperties properties) {
         this.businesses = businesses;
         this.catalog = catalog;
         this.hours = hours;
@@ -51,6 +66,7 @@ public class DemoRuntimeStagingService {
         this.agents = agents;
         this.operationCapabilities = operationCapabilities;
         this.databaseContext = databaseContext;
+        this.properties = properties;
     }
 
     /**
@@ -61,6 +77,12 @@ public class DemoRuntimeStagingService {
     public void stage(DemoProfile profile, UUID runtimeBusinessId) {
         if (profile == null) throw new IllegalArgumentException("Demo profile is required");
         if (runtimeBusinessId == null) throw new IllegalArgumentException("Demo runtime is required");
+        if (properties != null) {
+            UUID configured = properties.runtimeBusinessUuid();
+            if (configured == null || !configured.equals(runtimeBusinessId)) {
+                throw new IllegalStateException("Only the server-owned DEMO runtime can be staged");
+            }
+        }
 
         try (TenantDatabaseContext.Scope ignored = databaseContext.useSystem()) {
             Business runtime = businesses.findById(runtimeBusinessId)
