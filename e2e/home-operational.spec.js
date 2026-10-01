@@ -2174,14 +2174,15 @@ test('agenda keeps the table central and animates the selected reservation flow'
   await firstRow.click();
   await expect(firstRow).toHaveClass(/is-selected/);
   await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
-  await expect(page.locator('.home-agenda-detail-tabs')).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Resumen' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('tab', { name: 'Conversación' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Cliente' })).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Actividad' })).toBeVisible();
+  const detailTabs = page.locator('.home-agenda-detail-tabs');
+  await expect(detailTabs).toBeVisible();
+  await expect(detailTabs.getByRole('tab', { name: 'Resumen', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(detailTabs.getByRole('tab', { name: 'Conversación', exact: true })).toBeVisible();
+  await expect(detailTabs.getByRole('tab', { name: 'Cliente', exact: true })).toBeVisible();
+  await expect(detailTabs.getByRole('tab', { name: 'Actividad', exact: true })).toBeVisible();
 
-  await page.getByRole('tab', { name: 'Conversación' }).click();
-  await expect(page.getByRole('tab', { name: 'Conversación' })).toHaveAttribute('aria-selected', 'true');
+  await detailTabs.getByRole('tab', { name: 'Conversación', exact: true }).click();
+  await expect(detailTabs.getByRole('tab', { name: 'Conversación', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('[data-booking-detail-panel="conversation"]')).toBeVisible();
 
   await page.locator('#homeBookingDetailClose').click();
