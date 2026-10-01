@@ -184,7 +184,8 @@ test('inventory UI merges catalog with stock and allows an admin adjustment', as
 
   await expect(page.locator('#inventoryBrand')).toHaveText('BARBERÍA NORTE');
   await expect(page.locator('#inventoryProductsCount')).toHaveText('2');
-  await expect(page.locator('#inventoryConfiguredCount')).toHaveText('1 con seguimiento');
+  await expect(page.locator('#inventoryConfiguredCount')).toHaveText('1 con stock configurado');
+  await expect(page.locator('#inventoryAvailableTotal')).toHaveText('6');
   await expect(page.locator('#inventoryAlertsCount')).toHaveText('1 pendiente');
   await expect(page.locator('#inventoryRestockCount')).toHaveText('1 esperando');
   await expect(page.locator('#inventoryPendingNotificationCount')).toHaveText('0 avisos listos');
@@ -207,8 +208,8 @@ test('inventory UI merges catalog with stock and allows an admin adjustment', as
   await expect(shampoo).toContainText('6');
 
   const wax = page.locator('[data-inventory-product-id="22222222-2222-2222-2222-222222222222"]');
-  await expect(wax).toContainText('Sin seguimiento');
-  await expect(wax.getByRole('button', { name: 'Configurar' })).toBeVisible();
+  await expect(wax).toContainText('Sin configurar');
+  await expect(wax.getByRole('button', { name: 'Configurar stock' })).toBeVisible();
 
   await shampoo.getByRole('button', { name: 'Ajustar' }).click();
   await page.locator('#inventoryAdjustForm input[name="delta"]').fill('3');
@@ -216,7 +217,7 @@ test('inventory UI merges catalog with stock and allows an admin adjustment', as
   await page.getByRole('button', { name: 'Aplicar ajuste' }).click();
 
   await expect(shampoo).toContainText('9');
-  await expect(page.locator('#inventoryOnHandTotal')).toHaveText('11');
+  await expect(page.locator('#inventoryAvailableTotal')).toHaveText('9');
   await expect(page.locator('#inventoryRestockCount')).toHaveText('0 esperando');
   await expect(page.locator('#inventoryPendingNotificationCount')).toHaveText('1 aviso listo');
   await expect(page.locator('[data-restock-notification-id="99999999-9999-9999-9999-999999999999"]'))
@@ -308,4 +309,51 @@ test('operator inventory is read only', async ({ page }) => {
     .toContainText('Azul / M');
   await expect(page.locator('.variant-edit-btn')).toHaveCount(0);
   await expect(page.locator('.variant-adjust-btn')).toHaveCount(0);
+});
+
+
+test('inventory distinguishes unconfigured stock from zero stock and keeps empty automation compact', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'inventory-token'));
+
+  await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+    email: 'admin@demo.cl',
+    roles: ['BUSINESS_ADMIN']
+  })));
+  await page.route('**/api/v1/business', route => route.fulfill(json({ name: 'Restaurant Demo' })));
+  await page.route('**/api/v1/catalog', route => route.fulfill(json([{
+    id: '44444444-4444-4444-4444-444444444444',
+    kind: 'PRODUCT',
+    name: 'Hamburguesa clásica',
+    description: 'Pan, carne y queso',
+    price: 7990,
+    currency: 'CLP',
+    active: true
+  }])));
+  await page.route('**/api/v1/inventory', route => route.fulfill(json([])));
+  await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([])));
+  await page.route('**/api/v1/inventory/restock-subscriptions', route => route.fulfill(json([])));
+  await page.route('**/api/v1/inventory/restock-subscriptions/notifications', route => route.fulfill(json([])));
+
+  await page.goto('/inventory.html');
+
+  await expect(page.locator('#inventoryProductsCount')).toHaveText('1');
+  await expect(page.locator('#inventoryConfiguredCount')).toHaveText('0 con stock configurado');
+  await expect(page.locator('#inventoryAvailableTotal')).toHaveText('—');
+  await expect(page.locator('#inventoryReservedTotal')).toHaveText('—');
+  await expect(page.locator('#inventorySetupNotice')).toBeVisible();
+  await expect(page.locator('#inventorySetupNotice')).toContainText('1 producto sin stock configurado');
+
+  const product = page.locator('[data-inventory-product-id="44444444-4444-4444-4444-444444444444"]');
+  await expect(product).toContainText('Sin configurar');
+  await expect(product.getByRole('button', { name: 'Configurar stock' })).toBeVisible();
+
+  await expect(page.locator('#inventoryAlertsPanel')).toHaveClass(/is-empty/);
+  await expect(page.locator('#inventoryRestockPanel')).toHaveClass(/is-empty/);
+
+  const workspaceBeforeAlerts = await page.evaluate(() => {
+    const workspace = document.querySelector('#inventoryWorkspace');
+    const alerts = document.querySelector('#inventoryAlertsPanel');
+    return Boolean(workspace && alerts && (workspace.compareDocumentPosition(alerts) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  expect(workspaceBeforeAlerts).toBe(true);
 });
