@@ -22,7 +22,7 @@ class PlatformCommercialEconomicsServiceTest {
         when(repository.currentBusinesses()).thenReturn(List.of(
                 new PlatformCommercialEconomicsRepository.BusinessEconomicsSource(
                         businessId, "Barbería Norte", "BASIC", "Emprende", "ACTIVE",
-                        24_990, new BigDecimal("6000"), new BigDecimal("6300"),
+                        24_990, false, new BigDecimal("6000"), new BigDecimal("6300"),
                         new BigDecimal("60"), 149, new BigDecimal("5.000000"))
         ));
         when(repository.providerBreakdown()).thenReturn(List.of(
@@ -56,6 +56,28 @@ class PlatformCommercialEconomicsServiceTest {
     }
 
     @Test
+    void customPricingReferenceIsNotCountedAsCommercialValue() {
+        PlatformCommercialEconomicsRepository repository = mock(PlatformCommercialEconomicsRepository.class);
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setUsdToClpRate(new BigDecimal("900"));
+
+        when(repository.currentBusinesses()).thenReturn(List.of(
+                new PlatformCommercialEconomicsRepository.BusinessEconomicsSource(
+                        UUID.randomUUID(), "Enterprise", "ENTERPRISE", "Enterprise", "ACTIVE",
+                        119_990, true, new BigDecimal("60000"), BigDecimal.ZERO,
+                        null, null, new BigDecimal("1.000000"))
+        ));
+        when(repository.providerBreakdown()).thenReturn(List.of());
+
+        var report = new PlatformCommercialEconomicsService(repository, properties).portfolio();
+
+        assertEquals(1, report.businessesWithUnknownCommercialValue());
+        assertEquals(0L, report.basePlanValueClp());
+        assertNull(report.businesses().getFirst().estimatedCommercialValueClp());
+        assertTrue(report.businesses().getFirst().commercialValueUnknown());
+    }
+
+    @Test
     void doesNotInventClpMarginWhenExchangeRateIsUnavailable() {
         PlatformCommercialEconomicsRepository repository = mock(PlatformCommercialEconomicsRepository.class);
         CallCommercialProperties properties = new CallCommercialProperties();
@@ -64,7 +86,7 @@ class PlatformCommercialEconomicsServiceTest {
         when(repository.currentBusinesses()).thenReturn(List.of(
                 new PlatformCommercialEconomicsRepository.BusinessEconomicsSource(
                         UUID.randomUUID(), "Negocio", "PRO", "Negocio", "ACTIVE",
-                        39_990, new BigDecimal("15000"), BigDecimal.ZERO,
+                        39_990, false, new BigDecimal("15000"), BigDecimal.ZERO,
                         new BigDecimal("60"), 129, new BigDecimal("2.500000"))
         ));
         when(repository.providerBreakdown()).thenReturn(List.of());
