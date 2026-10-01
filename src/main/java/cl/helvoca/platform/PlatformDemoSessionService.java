@@ -61,7 +61,9 @@ public class PlatformDemoSessionService {
             throw new ConflictException("Another live demo session is already prepared or active");
         }
         if (session != null
-                && (session.getState() == DemoSessionState.READY || session.getState() == DemoSessionState.ACTIVE)) {
+                && (session.getState() == DemoSessionState.PREPARING
+                    || session.getState() == DemoSessionState.READY
+                    || session.getState() == DemoSessionState.ACTIVE)) {
             return response(session, readiness.readiness());
         }
 
@@ -74,7 +76,7 @@ public class PlatformDemoSessionService {
                 if (!matches(existing, profileId, revision)) {
                     throw new ConflictException("Another live demo session won concurrent preparation");
                 }
-                session = existing;
+                return response(existing, readiness.readiness());
             }
             audit.platformHumanSuccess(
                     runtimeId,
