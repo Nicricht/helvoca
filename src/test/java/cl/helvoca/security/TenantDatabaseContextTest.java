@@ -14,7 +14,7 @@ class TenantDatabaseContextTest {
 
         assertEquals(
                 TenantDatabaseContext.Mode.DENIED,
-                context.currentOrInternalSystem().mode());
+                context.currentOrDenied().mode());
     }
 
     @Test
@@ -23,15 +23,15 @@ class TenantDatabaseContextTest {
         UUID businessId = UUID.randomUUID();
 
         try (TenantDatabaseContext.Scope tenant = context.useTenant(businessId)) {
-            assertEquals(TenantDatabaseContext.Mode.TENANT, context.currentOrInternalSystem().mode());
+            assertEquals(TenantDatabaseContext.Mode.TENANT, context.currentOrDenied().mode());
 
             try (TenantDatabaseContext.Scope system = context.useSystem()) {
-                assertEquals(TenantDatabaseContext.Mode.SYSTEM, context.currentOrInternalSystem().mode());
+                assertEquals(TenantDatabaseContext.Mode.SYSTEM, context.currentOrDenied().mode());
             }
 
-            assertEquals(TenantDatabaseContext.Mode.TENANT, context.currentOrInternalSystem().mode());
+            assertEquals(TenantDatabaseContext.Mode.TENANT, context.currentOrDenied().mode());
         }
 
-        assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrInternalSystem().mode());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrDenied().mode());
     }
 }
