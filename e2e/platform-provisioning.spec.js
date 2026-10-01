@@ -17,6 +17,46 @@ test('platform admin provisions a tenant and hands onboarding to an invited busi
     businessId: ''
   })));
 
+  await page.route('**/api/v1/platform/economics', route => route.fulfill(json({
+    businessCount: 1,
+    basePlanValueClp: 24990,
+    estimatedOverageValueClp: 745,
+    estimatedCommercialValueClp: 25735,
+    estimatedPlatformCostUsd: 5,
+    estimatedPlatformCostClp: 4500,
+    estimatedGrossMarginClp: 21235,
+    estimatedGrossMarginPercent: 82.5,
+    usdToClpRate: 900,
+    businessesWithUnknownCommercialValue: 0,
+    businesses: [{
+      businessId: '11111111-2222-3333-4444-555555555555',
+      businessName: 'Clínica Norte',
+      planCode: 'BASIC',
+      planName: 'Emprende',
+      status: 'ACTIVE',
+      includedMinutes: 100,
+      usedMinutes: 105,
+      usageAlertLevel: 'OVERAGE',
+      basePlanValueClp: 24990,
+      estimatedOverageValueClp: 745,
+      estimatedCommercialValueClp: 25735,
+      estimatedPlatformCostUsd: 5,
+      estimatedPlatformCostClp: 4500,
+      estimatedGrossMarginClp: 21235,
+      estimatedGrossMarginPercent: 82.5,
+      commercialValueUnknown: false
+    }],
+    providers: [{
+      aiProvider: 'gemini',
+      aiModel: 'gemini-3.8-live',
+      callCount: 4,
+      minutes: 105,
+      estimatedTelephonyCostUsd: 1.1,
+      estimatedAiCostUsd: 3.9,
+      estimatedTotalCostUsd: 5,
+      estimatedTotalCostClp: 4500
+    }]
+  })));
   await page.route('**/api/v1/platform/businesses', async route => {
     submitted = route.request().postDataJSON();
     await route.fulfill({
@@ -39,6 +79,14 @@ test('platform admin provisions a tenant and hands onboarding to an invited busi
   });
 
   await page.goto('/platform.html');
+
+  await expect(page.locator('#platformCommercialValue')).toContainText('25.735');
+  await expect(page.locator('#platformPlatformCost')).toContainText('4.500');
+  await expect(page.locator('#platformGrossMargin')).toContainText('21.235');
+  await expect(page.locator('#platformGrossMarginPercent')).toHaveText('82.5%');
+  await expect(page.locator('#platformEconomicsBusinesses')).toContainText('Clínica Norte');
+  await expect(page.locator('#platformEconomicsProviders')).toContainText('gemini');
+  await expect(page.locator('#platformEconomicsProviders')).toContainText('gemini-3.8-live');
 
   await page.locator('input[name="businessName"]').fill('Clínica Norte');
   await page.locator('input[name="timezone"]').fill('America/Santiago');
