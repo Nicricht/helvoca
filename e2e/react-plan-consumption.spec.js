@@ -88,7 +88,7 @@ async function bootAuthenticated(page, options = {}) {
 test.describe('React Plan y consumo pilot', () => {
   test('renders the simplified real-data plan experience', async ({ page }) => {
     await bootAuthenticated(page);
-    await page.goto('/app/plan');
+    await page.goto('/app/index.html');
 
     await expect(page.getByRole('heading', { level: 1, name: 'Plan y consumo' })).toBeVisible();
     await expect(page.getByTestId('plan-name')).toHaveText('Pro');
@@ -125,7 +125,7 @@ test.describe('React Plan y consumo pilot', () => {
       await route.fulfill(json(subscription()));
     });
 
-    await page.goto('/app/plan');
+    await page.goto('/app/index.html');
     await expect(page.getByRole('status')).toContainText('Cargando');
     await expect.poll(() => typeof releaseSubscription).toBe('function');
 
@@ -134,7 +134,7 @@ test.describe('React Plan y consumo pilot', () => {
 
   test('keeps the screen useful when detailed usage is restricted', async ({ page }) => {
     await bootAuthenticated(page, { roles: ['OPERATOR'], usageForbidden: true });
-    await page.goto('/app/plan');
+    await page.goto('/app/index.html');
 
     await expect(page.getByTestId('plan-name')).toHaveText('Pro');
     await expect(page.getByTestId('usage-restricted')).toContainText('propietarios y administradores');
@@ -144,7 +144,7 @@ test.describe('React Plan y consumo pilot', () => {
 
   test('shows a recoverable subscription error without inventing billing data', async ({ page }) => {
     await bootAuthenticated(page, { subscriptionError: true });
-    await page.goto('/app/plan');
+    await page.goto('/app/index.html');
 
     await expect(page.getByRole('alert')).toContainText('No pudimos cargar tu plan');
     await expect(page.getByTestId('billing-state')).not.toContainText('$');
@@ -159,7 +159,7 @@ test.describe('React Plan y consumo pilot', () => {
     }));
     await page.route('**/api/v1/subscription', route => route.fulfill(json(subscription())));
 
-    await page.goto('/app/plan');
+    await page.goto('/app/index.html');
     await expect(page).toHaveURL('http://127.0.0.1:4173/');
   });
 
@@ -172,7 +172,7 @@ test.describe('React Plan y consumo pilot', () => {
       { width: 390, height: 844 }
     ]) {
       await page.setViewportSize(viewport);
-      await page.goto('/app/plan');
+      await page.goto('/app/index.html');
 
       await expect(page.getByTestId('plan-name')).toBeVisible();
       expect(await page.evaluate(() =>
