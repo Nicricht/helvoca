@@ -12,6 +12,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -35,6 +36,7 @@ class PermissionJwtContractTest {
         when(properties.issuer()).thenReturn("recepvoz-test");
 
         AppUser user = new AppUser();
+        ReflectionTestUtils.setField(user, "id", java.util.UUID.randomUUID());
         user.setName("Cocina");
         user.setEmail("cocina@example.cl");
         Role kitchen = new Role();
