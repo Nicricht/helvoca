@@ -62,6 +62,8 @@ public class RegistrationService {
 
         var businessOwner = roles.findByCode(RoleCode.BUSINESS_OWNER)
                 .orElseThrow(() -> new IllegalStateException("BUSINESS_OWNER role is not configured"));
+        var businessAdmin = roles.findByCode(RoleCode.BUSINESS_ADMIN)
+                .orElseThrow(() -> new IllegalStateException("BUSINESS_ADMIN role is not configured"));
 
         AppUser user = new AppUser();
         user.setBusiness(business);
@@ -69,6 +71,7 @@ public class RegistrationService {
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.getRoles().add(businessOwner);
+        user.getRoles().add(businessAdmin);
         users.saveAndFlush(user);
 
         return authService.login(new LoginRequest(email, request.password()));
