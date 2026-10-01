@@ -12,6 +12,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.core.GrantedAuthority;
+
+import java.util.ArrayList;
+import java.util.Collection;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -56,11 +60,23 @@ public class SecurityConfig {
 
     @Bean
     JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter scopes = new JwtGrantedAuthoritiesConverter();
-        scopes.setAuthoritiesClaimName("roles");
-        scopes.setAuthorityPrefix("ROLE_");
+        JwtGrantedAuthoritiesConverter roles = new JwtGrantedAuthoritiesConverter();
+        roles.setAuthoritiesClaimName("roles");
+        roles.setAuthorityPrefix("ROLE_");
+
+        JwtGrantedAuthoritiesConverter permissions = new JwtGrantedAuthoritiesConverter();
+        permissions.setAuthoritiesClaimName("permissions");
+        permissions.setAuthorityPrefix("PERM_");
+
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        converter.setJwtGrantedAuthoritiesConverter(scopes);
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            Collection<GrantedAuthority> combined = new ArrayList<>();
+            Collection<GrantedAuthority> roleAuthorities = roles.convert(jwt);
+            Collection<GrantedAuthority> permissionAuthorities = permissions.convert(jwt);
+            if (roleAuthorities != null) combined.addAll(roleAuthorities);
+            if (permissionAuthorities != null) combined.addAll(permissionAuthorities);
+            return combined;
+        });
         return converter;
     }
 
