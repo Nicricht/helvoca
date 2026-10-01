@@ -27,12 +27,15 @@ class PlatformDemoSessionControllerTest {
         UUID sessionId = UUID.randomUUID();
         PlatformDemoSessionResponse expected = mock(PlatformDemoSessionResponse.class);
         when(service.prepare(profileId)).thenReturn(expected);
+        when(service.current()).thenReturn(expected);
         when(service.get(sessionId)).thenReturn(expected);
 
         PlatformDemoSessionController controller = new PlatformDemoSessionController(service);
         assertSame(expected, controller.prepare(profileId));
+        assertSame(expected, controller.current());
         assertSame(expected, controller.get(sessionId));
         verify(service).prepare(profileId);
+        verify(service).current();
         verify(service).get(sessionId);
     }
 }
