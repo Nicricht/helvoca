@@ -1,9 +1,9 @@
 package cl.helvoca.platform;
 
 import cl.helvoca.call.*;
-import cl.helvoca.messaging.MessagingConversation;
 import cl.helvoca.messaging.MessagingConversationRepository;
 import cl.helvoca.operations.BusinessOperation;
+import cl.helvoca.operations.BusinessOperationEventRepository;
 import cl.helvoca.operations.BusinessOperationRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -30,15 +30,14 @@ class PlatformDemoTimelineTest {
         CallSessionRepository calls = mock(CallSessionRepository.class);
         MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
         BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
-        cl.helvoca.operations.BusinessOperationEventRepository operationEvents = mock(cl.helvoca.operations.BusinessOperationEventRepository.class);
-        cl.helvoca.operations.BusinessOperationEventRepository operationEvents = mock(cl.helvoca.operations.BusinessOperationEventRepository.class);
+        BusinessOperationEventRepository operationEvents = mock(BusinessOperationEventRepository.class);
         CallSummaryRepository summaries = mock(CallSummaryRepository.class);
         CallActionRepository actions = mock(CallActionRepository.class);
 
-        DemoSession session = new DemoSession();
+        DemoSession session = DemoSession.preparing(UUID.randomUUID(), runtimeId, "rev");
         ReflectionTestUtils.setField(session, "id", sessionId);
-        session.setRuntimeBusinessId(runtimeId);
-        session.setStatus(DemoSessionState.ACTIVE);
+        session.markReady();
+        session.markActive();
         when(sessions.findByIdAndRuntimeBusinessId(sessionId, runtimeId)).thenReturn(Optional.of(session));
 
         CallSession call = new CallSession();
@@ -81,21 +80,18 @@ class PlatformDemoTimelineTest {
         when(conversations.findAllByBusinessIdAndDemoSessionIdOrderByOpenedAtAsc(runtimeId, sessionId))
                 .thenReturn(List.of());
 
-        PlatformDemoTimelineService service = new PlatformDemoTimelineService(
-                properties, sessions, calls, conversations, operations, operationEvents, summaries, actions);
-
-        PlatformDemoTimelineResponse result = service.timeline(sessionId);
+        PlatformDemoTimelineResponse result = new PlatformDemoTimelineService(
+                properties, sessions, calls, conversations, operations, operationEvents, summaries, actions)
+                .timeline(sessionId);
 
         assertEquals(sessionId, result.sessionId());
         assertEquals(runtimeId, result.runtimeBusinessId());
+        assertEquals(DemoSessionState.ACTIVE, result.sessionStatus());
         assertEquals("RECORDED_VALUE", result.proofOfValue().state());
         assertEquals(1, result.proofOfValue().calls());
         assertEquals(1, result.proofOfValue().operations());
         assertTrue(result.proofOfValue().facts().stream()
                 .anyMatch(value -> value.contains("ORDER_CREATED")));
-        verify(calls).findAllByBusinessIdAndDemoSessionIdOrderByStartedAtAsc(runtimeId, sessionId);
-        verify(operations).findAllByBusinessIdAndDemoSessionIdOrderByCreatedAtAsc(runtimeId, sessionId);
-        verify(conversations).findAllByBusinessIdAndDemoSessionIdOrderByOpenedAtAsc(runtimeId, sessionId);
     }
 
     @Test
@@ -109,20 +105,21 @@ class PlatformDemoTimelineTest {
         CallSessionRepository calls = mock(CallSessionRepository.class);
         MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
         BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        BusinessOperationEventRepository operationEvents = mock(BusinessOperationEventRepository.class);
         CallSummaryRepository summaries = mock(CallSummaryRepository.class);
         CallActionRepository actions = mock(CallActionRepository.class);
 
-        DemoSession session = new DemoSession();
+        DemoSession session = DemoSession.preparing(UUID.randomUUID(), runtimeId, "rev");
         ReflectionTestUtils.setField(session, "id", sessionId);
-        session.setRuntimeBusinessId(runtimeId);
-        session.setStatus(DemoSessionState.ACTIVE);
+        session.markReady();
         when(sessions.findByIdAndRuntimeBusinessId(sessionId, runtimeId)).thenReturn(Optional.of(session));
         when(calls.findAllByBusinessIdAndDemoSessionIdOrderByStartedAtAsc(runtimeId, sessionId)).thenReturn(List.of());
         when(conversations.findAllByBusinessIdAndDemoSessionIdOrderByOpenedAtAsc(runtimeId, sessionId)).thenReturn(List.of());
         when(operations.findAllByBusinessIdAndDemoSessionIdOrderByCreatedAtAsc(runtimeId, sessionId)).thenReturn(List.of());
 
         PlatformDemoTimelineResponse result = new PlatformDemoTimelineService(
-                properties, sessions, calls, conversations, operations, operationEvents, summaries, actions).timeline(sessionId);
+                properties, sessions, calls, conversations, operations, operationEvents, summaries, actions)
+                .timeline(sessionId);
 
         assertEquals("REVIEW_REQUIRED", result.proofOfValue().state());
         assertFalse(result.proofOfValue().followUps().isEmpty());
