@@ -146,7 +146,7 @@ public class PlatformDemoSessionService {
     public PlatformDemoSessionResponse current() {
         UUID runtimeId = properties.runtimeBusinessUuid();
         if (runtimeId == null) throw new IllegalStateException("No dedicated DEMO runtime is configured");
-        return sessions.findPreparedForRuntime(runtimeId)
+        return sessions.findFirstByRuntimeBusinessIdOrderByCreatedAtDesc(runtimeId)
                 .map(session -> response(session, readiness.readiness()))
                 .orElse(null);
     }
