@@ -81,4 +81,37 @@ class RolePermissionCatalogTest {
     void platformAdminDoesNotReceiveTenantBusinessPermissions() {
         assertTrue(RolePermissionCatalog.permissionsFor(Set.of(RoleCode.PLATFORM_ADMIN)).isEmpty());
     }
+
+    @Test
+    void remainingReusableRolesHaveExpectedBoundaries() {
+        var admin = RolePermissionCatalog.permissionsFor(Set.of(RoleCode.BUSINESS_ADMIN));
+        assertEquals(PermissionCode.businessPermissions(), admin);
+
+        var manager = RolePermissionCatalog.permissionsFor(Set.of(RoleCode.MANAGER));
+        assertTrue(manager.contains(PermissionCode.OPERATIONS_MANAGE));
+        assertFalse(manager.contains(PermissionCode.TEAM_MANAGE));
+        assertFalse(manager.contains(PermissionCode.BILLING_MANAGE));
+
+        var staff = RolePermissionCatalog.permissionsFor(Set.of(RoleCode.STAFF));
+        assertTrue(staff.contains(PermissionCode.ORDERS_READ));
+        assertFalse(staff.contains(PermissionCode.ORDERS_MANAGE));
+
+        var dispatch = RolePermissionCatalog.permissionsFor(Set.of(RoleCode.DISPATCH));
+        assertTrue(dispatch.contains(PermissionCode.DELIVERIES_MANAGE));
+        assertFalse(dispatch.contains(PermissionCode.INVENTORY_MANAGE));
+
+        var sales = RolePermissionCatalog.permissionsFor(Set.of(RoleCode.SALES));
+        assertTrue(sales.contains(PermissionCode.LEADS_MANAGE));
+        assertTrue(sales.contains(PermissionCode.QUOTES_MANAGE));
+        assertFalse(sales.contains(PermissionCode.BILLING_MANAGE));
+    }
+
+    @Test
+    void nullInputsNeverGainPermissions() {
+        assertTrue(RolePermissionCatalog.permissionsFor((Set<RoleCode>) null).isEmpty());
+        assertTrue(RolePermissionCatalog.permissionsFor((RoleCode) null).isEmpty());
+        assertTrue(RolePermissionCatalog.permissionsFor(new java.util.HashSet<>(java.util.Arrays.asList(RoleCode.STAFF, null)))
+                .contains(PermissionCode.ORDERS_READ));
+    }
+
 }
