@@ -23,6 +23,11 @@ public class PlatformDemoProfileController {
         return service.list();
     }
 
+    @GetMapping("/{id}")
+    public PlatformDemoProfileResponse get(@PathVariable UUID id) {
+        return service.get(id);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public PlatformDemoProfileResponse create(@Valid @RequestBody PlatformDemoProfileRequest request) {
