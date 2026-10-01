@@ -1,0 +1,360 @@
+/* Dashboard Motion System V1
+   FRAME CHANGE: NO
+   Scope: Inicio / dashboard editable slots only.
+   Motion communicates an active digital receptionist while preserving readable data. */
+
+#dashboardView:not(.hidden) #operationalOverview {
+  position: relative;
+  isolation: isolate;
+}
+
+#dashboardView:not(.hidden) #operationalOverview::before,
+#dashboardView:not(.hidden) #operationalOverview::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  filter: blur(82px);
+  opacity: .09;
+  pointer-events: none;
+}
+
+#dashboardView:not(.hidden) #operationalOverview::before {
+  top: -170px;
+  left: -150px;
+  background: #16d9f5;
+  animation: rv-dashboard-ambient-a 16s ease-in-out infinite alternate;
+}
+
+#dashboardView:not(.hidden) #operationalOverview::after {
+  right: -170px;
+  bottom: -180px;
+  background: #8b5cf6;
+  animation: rv-dashboard-ambient-b 19s ease-in-out infinite alternate;
+}
+
+#dashboardView:not(.hidden) #operationalOverview > * {
+  position: relative;
+  z-index: 1;
+}
+
+#dashboardView:not(.hidden) #ownerDashboardState {
+  position: relative;
+  overflow: hidden;
+  animation: rv-dashboard-status-breathe 3.8s ease-in-out infinite;
+}
+
+#dashboardView:not(.hidden) #ownerDashboardState::after {
+  content: "";
+  position: absolute;
+  inset: -80% -35%;
+  background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.22) 50%, transparent 58%);
+  transform: translateX(-60%);
+  animation: rv-dashboard-status-sheen 5.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .home-metric {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform .22s ease,
+    border-color .22s ease,
+    box-shadow .22s ease;
+  animation: rv-dashboard-card-breathe 7s ease-in-out infinite;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .home-metric:nth-child(2) { animation-delay: -1.4s; }
+#dashboardView:not(.hidden) #operationalOverview .home-metric:nth-child(3) { animation-delay: -2.8s; }
+#dashboardView:not(.hidden) #operationalOverview .home-metric:nth-child(4) { animation-delay: -4.2s; }
+
+#dashboardView:not(.hidden) #operationalOverview .home-metric::before {
+  content: "";
+  position: absolute;
+  inset: -40% -25%;
+  background: linear-gradient(110deg, transparent 42%, rgba(22,217,245,.08) 49%, rgba(139,92,246,.08) 52%, transparent 59%);
+  transform: translateX(-70%);
+  animation: rv-dashboard-card-sheen 8.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .home-metric:nth-child(2)::before { animation-delay: -2.2s; }
+#dashboardView:not(.hidden) #operationalOverview .home-metric:nth-child(3)::before { animation-delay: -4.4s; }
+#dashboardView:not(.hidden) #operationalOverview .home-metric:nth-child(4)::before { animation-delay: -6.6s; }
+
+#dashboardView:not(.hidden) #operationalOverview a.home-metric:hover {
+  transform: translateY(-4px) scale(1.012);
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--border));
+  box-shadow: 0 18px 38px rgba(0,0,0,.22), 0 0 24px rgba(22,217,245,.08);
+}
+
+#dashboardView:not(.hidden) #operationalOverview .home-metric strong {
+  animation: rv-dashboard-number-glow 6.2s ease-in-out infinite;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-value-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-value-panel::before {
+  content: "";
+  position: absolute;
+  inset: -70% -20%;
+  background: linear-gradient(112deg, transparent 39%, rgba(22,217,245,.055) 47%, rgba(139,92,246,.07) 53%, transparent 61%);
+  transform: translateX(-55%);
+  animation: rv-dashboard-panel-sweep 11s ease-in-out infinite;
+  pointer-events: none;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-value-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-value-metrics article {
+  transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease;
+  animation: rv-dashboard-value-float 8s ease-in-out infinite;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-value-metrics article:nth-child(2) { animation-delay: -2.6s; }
+#dashboardView:not(.hidden) #operationalOverview .owner-value-metrics article:nth-child(3) { animation-delay: -5.2s; }
+
+#dashboardView:not(.hidden) #operationalOverview .owner-value-metrics article:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--accent) 54%, var(--border));
+  box-shadow: 0 14px 30px rgba(0,0,0,.18);
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-value-line {
+  stroke-dasharray: 12 8;
+  filter: drop-shadow(0 0 5px rgba(22,217,245,.32));
+  animation: rv-dashboard-chart-flow 4.2s linear infinite;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-value-point {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rv-dashboard-chart-point 3.6s ease-in-out infinite;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-value-point:nth-of-type(2n) { animation-delay: -1.2s; }
+#dashboardView:not(.hidden) #operationalOverview .owner-value-point:nth-of-type(3n) { animation-delay: -2.4s; }
+
+#dashboardView:not(.hidden) #operationalOverview .owner-activity-row {
+  position: relative;
+  border-radius: 8px;
+  background-image: linear-gradient(90deg, transparent, rgba(22,217,245,.025), rgba(139,92,246,.03), transparent);
+  background-size: 240% 100%;
+  animation: rv-dashboard-activity-wave 10s linear infinite;
+  transition: background-color .2s ease, transform .2s ease;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-activity-row:nth-child(2) { animation-delay: -2s; }
+#dashboardView:not(.hidden) #operationalOverview .owner-activity-row:nth-child(3) { animation-delay: -4s; }
+#dashboardView:not(.hidden) #operationalOverview .owner-activity-row:nth-child(4) { animation-delay: -6s; }
+#dashboardView:not(.hidden) #operationalOverview .owner-activity-row:nth-child(5) { animation-delay: -8s; }
+
+#dashboardView:not(.hidden) #operationalOverview .owner-activity-row:hover {
+  transform: translateX(3px);
+  background-color: rgba(255,255,255,.025);
+}
+
+#dashboardView:not(.hidden) #ownerAttentionPanel[data-state="attention"] {
+  position: relative;
+  overflow: hidden;
+  animation: rv-dashboard-attention-pulse 4.5s ease-in-out infinite;
+}
+
+#dashboardView:not(.hidden) #ownerAttentionPanel[data-state="attention"]::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--warning) 60%, transparent);
+  opacity: .45;
+  animation: rv-dashboard-attention-ring 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-dashboard-chip:not(.hidden) {
+  transition: transform .2s ease, border-color .2s ease, background-color .2s ease;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-dashboard-chip.warn:not(.hidden) {
+  animation: rv-dashboard-chip-breathe 5s ease-in-out infinite;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-dashboard-chip:hover,
+#dashboardView:not(.hidden) #operationalOverview .owner-quick-grid a:hover {
+  transform: translateX(3px);
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-quick-grid a {
+  position: relative;
+  overflow: hidden;
+  transition: transform .2s ease, border-color .2s ease, background-color .2s ease;
+}
+
+#dashboardView:not(.hidden) #operationalOverview .owner-quick-grid a::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 35%, rgba(22,217,245,.06) 50%, transparent 65%);
+  transform: translateX(-110%);
+  animation: rv-dashboard-quick-sheen 9s ease-in-out infinite;
+  pointer-events: none;
+}
+
+#dashboardView:not(.hidden) #tryRecepVozBtn:not(.hidden) {
+  position: relative;
+  overflow: hidden;
+  animation: rv-dashboard-cta-breathe 4.8s ease-in-out infinite;
+}
+
+#dashboardView:not(.hidden) #tryRecepVozBtn:not(.hidden)::after {
+  content: "";
+  position: absolute;
+  inset: -80% -25%;
+  background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.28) 50%, transparent 58%);
+  transform: translateX(-70%);
+  animation: rv-dashboard-cta-sheen 5.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+#dashboardView:not(.hidden) #firstUserOnboarding:not(.hidden) .progress-bar {
+  background-size: 220% 100%;
+  animation: rv-dashboard-progress-flow 3s linear infinite;
+}
+
+#dashboardView:not(.hidden) #firstUserOnboarding:not(.hidden) .first-user-step.next {
+  animation: rv-dashboard-next-step 4.2s ease-in-out infinite;
+}
+
+@keyframes rv-dashboard-ambient-a {
+  from { transform: translate3d(-2%, -2%, 0) scale(.96); opacity: .07; }
+  to { transform: translate3d(24%, 14%, 0) scale(1.08); opacity: .12; }
+}
+
+@keyframes rv-dashboard-ambient-b {
+  from { transform: translate3d(3%, 2%, 0) scale(1); opacity: .07; }
+  to { transform: translate3d(-22%, -16%, 0) scale(1.12); opacity: .12; }
+}
+
+@keyframes rv-dashboard-status-breathe {
+  0%, 100% { box-shadow: 0 0 0 rgba(22,217,245,0); }
+  50% { box-shadow: 0 0 18px rgba(22,217,245,.13); }
+}
+
+@keyframes rv-dashboard-status-sheen {
+  0%, 70% { transform: translateX(-65%); }
+  100% { transform: translateX(70%); }
+}
+
+@keyframes rv-dashboard-card-breathe {
+  0%, 100% { box-shadow: 0 0 0 rgba(22,217,245,0); }
+  50% { box-shadow: 0 9px 26px rgba(0,0,0,.12), 0 0 18px rgba(22,217,245,.045); }
+}
+
+@keyframes rv-dashboard-card-sheen {
+  0%, 62% { transform: translateX(-72%); }
+  100% { transform: translateX(78%); }
+}
+
+@keyframes rv-dashboard-number-glow {
+  0%, 100% { text-shadow: 0 0 0 rgba(22,217,245,0); }
+  50% { text-shadow: 0 0 12px rgba(22,217,245,.13); }
+}
+
+@keyframes rv-dashboard-panel-sweep {
+  0%, 64% { transform: translateX(-58%); }
+  100% { transform: translateX(66%); }
+}
+
+@keyframes rv-dashboard-value-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.5px); }
+}
+
+@keyframes rv-dashboard-chart-flow {
+  to { stroke-dashoffset: -40; }
+}
+
+@keyframes rv-dashboard-chart-point {
+  0%, 100% { transform: scale(.92); opacity: .82; }
+  50% { transform: scale(1.22); opacity: 1; }
+}
+
+@keyframes rv-dashboard-activity-wave {
+  from { background-position: 100% 0; }
+  to { background-position: -140% 0; }
+}
+
+@keyframes rv-dashboard-attention-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(242,184,100,0); }
+  50% { box-shadow: 0 0 24px rgba(242,184,100,.10); }
+}
+
+@keyframes rv-dashboard-attention-ring {
+  0%, 100% { opacity: .26; }
+  50% { opacity: .62; }
+}
+
+@keyframes rv-dashboard-chip-breathe {
+  0%, 100% { background-color: var(--surface); }
+  50% { background-color: color-mix(in srgb, var(--warning) 7%, var(--surface)); }
+}
+
+@keyframes rv-dashboard-quick-sheen {
+  0%, 72% { transform: translateX(-110%); }
+  100% { transform: translateX(115%); }
+}
+
+@keyframes rv-dashboard-cta-breathe {
+  0%, 100% { box-shadow: 0 0 0 rgba(124,92,255,0); }
+  50% { box-shadow: 0 0 24px rgba(124,92,255,.22); }
+}
+
+@keyframes rv-dashboard-cta-sheen {
+  0%, 68% { transform: translateX(-70%); }
+  100% { transform: translateX(75%); }
+}
+
+@keyframes rv-dashboard-progress-flow {
+  from { background-position: 100% 0; }
+  to { background-position: -120% 0; }
+}
+
+@keyframes rv-dashboard-next-step {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(124,92,255,.12), 0 0 0 rgba(124,92,255,0); }
+  50% { box-shadow: inset 0 0 0 1px rgba(124,92,255,.18), 0 0 22px rgba(124,92,255,.10); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #dashboardView:not(.hidden) #operationalOverview::before,
+  #dashboardView:not(.hidden) #operationalOverview::after,
+  #dashboardView:not(.hidden) #ownerDashboardState,
+  #dashboardView:not(.hidden) #ownerDashboardState::after,
+  #dashboardView:not(.hidden) #operationalOverview .home-metric,
+  #dashboardView:not(.hidden) #operationalOverview .home-metric::before,
+  #dashboardView:not(.hidden) #operationalOverview .home-metric strong,
+  #dashboardView:not(.hidden) #operationalOverview .owner-value-panel::before,
+  #dashboardView:not(.hidden) #operationalOverview .owner-value-metrics article,
+  #dashboardView:not(.hidden) #operationalOverview .owner-value-line,
+  #dashboardView:not(.hidden) #operationalOverview .owner-value-point,
+  #dashboardView:not(.hidden) #operationalOverview .owner-activity-row,
+  #dashboardView:not(.hidden) #ownerAttentionPanel[data-state="attention"],
+  #dashboardView:not(.hidden) #ownerAttentionPanel[data-state="attention"]::after,
+  #dashboardView:not(.hidden) #operationalOverview .owner-dashboard-chip.warn:not(.hidden),
+  #dashboardView:not(.hidden) #operationalOverview .owner-quick-grid a::before,
+  #dashboardView:not(.hidden) #tryRecepVozBtn:not(.hidden),
+  #dashboardView:not(.hidden) #tryRecepVozBtn:not(.hidden)::after,
+  #dashboardView:not(.hidden) #firstUserOnboarding:not(.hidden) .progress-bar,
+  #dashboardView:not(.hidden) #firstUserOnboarding:not(.hidden) .first-user-step.next {
+    animation: none !important;
+    transition-duration: .01ms !important;
+    transform: none !important;
+  }
+}

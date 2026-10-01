@@ -31,6 +31,16 @@ let currentProposal = null;
 let currentStatus = null;
 let currentBusinessName = "Tu negocio";
 
+if ("scrollRestoration" in history) {
+    history.scrollRestoration = "manual";
+}
+
+function resetDashboardScroll() {
+    const reset = () => window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    reset();
+    window.requestAnimationFrame(reset);
+}
+
 function setToken(value) {
     token = value || "";
     if (token) sessionStorage.setItem(TOKEN_KEY, token);
@@ -94,13 +104,14 @@ function showAuth() {
     badge.className = "badge muted";
 }
 
-function showDashboardShell() {
+function showDashboardShell({ resetScroll = false } = {}) {
     authView.classList.add("hidden");
     dashboardView.classList.remove("hidden");
     $("#logoutBtn").classList.remove("hidden");
     const badge = $("#sessionBadge");
     badge.textContent = "Sesión activa";
     badge.className = "badge online";
+    if (resetScroll) resetDashboardScroll();
 }
 
 function applyBusinessIdentity(business = {}) {
@@ -358,8 +369,8 @@ async function loadBusinessProfile() {
     }
 }
 
-async function loadDashboard() {
-    showDashboardShell();
+async function loadDashboard({ resetScroll = false } = {}) {
+    showDashboardShell({ resetScroll });
     try {
         const [me, business, profile, status, services, hours, knowledge, phones, agent] = await Promise.all([
             api("/api/v1/auth/me"), api("/api/v1/business"), loadBusinessProfile(),
@@ -624,7 +635,7 @@ registerForm.addEventListener("submit", async event => {
         };
         const result = await api("/api/v1/auth/register", { method: "POST", body: JSON.stringify(payload) }, false);
         setToken(result.accessToken);
-        await loadDashboard();
+        await loadDashboard({ resetScroll: true });
         showMessage(aiMessage, "Cuenta creada. Sigue la ruta de activación: RecepVoz te mostrará un solo siguiente paso a la vez.", "success");
     } catch (error) {
         showMessage(authMessage, error.message || "No fue posible crear la empresa.");
@@ -645,7 +656,7 @@ loginForm.addEventListener("submit", async event => {
         }, false);
         setToken(result.accessToken);
         if (redirectPlatformAdmin(result?.user?.roles)) return;
-        await loadDashboard();
+        await loadDashboard({ resetScroll: true });
     } catch (error) {
         showMessage(authMessage, error.message || "Credenciales inválidas.");
     } finally {
@@ -776,6 +787,10 @@ $("#advancedToggleBtn").addEventListener("click", () => {
     const hidden = advancedPanel.classList.toggle("hidden");
     $("#advancedToggleBtn").textContent = hidden ? "Editar manualmente" : "Ocultar edición manual";
 });
+document.querySelector("#primaryNav .nav-home")?.addEventListener("click", () => {
+    if (!dashboardView.classList.contains("hidden")) resetDashboardScroll();
+});
+
 $("#refreshBtn").addEventListener("click", async event => {
     const button = event.currentTarget;
     button.disabled = true;
@@ -795,7 +810,7 @@ $("#logoutBtn").addEventListener("click", () => {
     try {
         const me = await api("/api/v1/auth/me");
         if (redirectPlatformAdmin(me?.roles)) return;
-        await loadDashboard();
+        await loadDashboard({ resetScroll: true });
     } catch (_) {
         if (token) handleExpiredSession();
     }
