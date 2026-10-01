@@ -37,7 +37,7 @@ Rate precedence is:
 2. AI provider-specific rate;
 3. legacy generic AI rate.
 
-Telephony cost uses a provider-specific rate when available and otherwise the legacy generic telephony rate.
+Telephony cost uses a provider-specific rate when available and otherwise the legacy generic telephony rate. Internal portfolio economics also adds `HELVOCA_TWILIO_NUMBER_MONTHLY_COST_USD` for each active Twilio voice number so fixed number rent is not hidden from gross-margin estimates.
 
 Deployment variables:
 
@@ -46,6 +46,7 @@ HELVOCA_COST_USD_TO_CLP
 HELVOCA_TELEPHONY_COST_PER_MINUTE_USD
 HELVOCA_AI_COST_PER_MINUTE_USD
 HELVOCA_TWILIO_COST_PER_MINUTE_USD
+HELVOCA_TWILIO_NUMBER_MONTHLY_COST_USD
 HELVOCA_GEMINI_COST_PER_MINUTE_USD
 HELVOCA_GEMINI_3_8_LIVE_COST_PER_MINUTE_USD
 HELVOCA_OPENAI_LIVE_COST_PER_MINUTE_USD
