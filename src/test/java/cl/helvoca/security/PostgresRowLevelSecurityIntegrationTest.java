@@ -63,6 +63,7 @@ class PostgresRowLevelSecurityIntegrationTest {
         ownerJdbc.update("DELETE FROM inventory_restock_notification");
         ownerJdbc.update("DELETE FROM inventory_restock_subscription");
         ownerJdbc.update("DELETE FROM customer");
+        ownerJdbc.update("UPDATE call_session SET demo_session_id = NULL WHERE demo_session_id IS NOT NULL");
         ownerJdbc.update("DELETE FROM demo_session");
         ownerJdbc.update("DELETE FROM demo_profile");
         ownerJdbc.update("DELETE FROM business");
