@@ -1091,11 +1091,13 @@
     if (!allItems.length) {
       host.innerHTML = overview + controls + '<div class="home-business-empty">Todavía no hay reservas registradas.</div>';
       bindBookingFilters();
+      bindBookingOpeners();
       return;
     }
     if (!items.length) {
       host.innerHTML = overview + controls + '<div class="home-business-empty">No hay reservas que coincidan con estos filtros.</div>';
       bindBookingFilters();
+      bindBookingOpeners();
       return;
     }
 
