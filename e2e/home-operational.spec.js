@@ -2133,8 +2133,9 @@ test('agenda gives the owner a decision-ready today week and day view', async ({
   await page.locator('[data-agenda-day="2026-10-02"]').click();
   await expect(page.locator('[data-agenda-day="2026-10-02"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.home-filter-result')).toContainText('1 de 4');
-  await expect(page.locator('#homeBookingsList')).toContainText('Bruno Masaje');
-  await expect(page.locator('#homeBookingsList')).not.toContainText('Ana Reserva');
+  const focusedRows = page.locator('#homeBookingsList .home-business-table tbody');
+  await expect(focusedRows).toContainText('Bruno Masaje');
+  await expect(focusedRows).not.toContainText('Ana Reserva');
 
   await page.locator('[data-agenda-period="all"]').click();
   await expect(page.locator('[data-agenda-period="all"]')).toHaveAttribute('aria-pressed', 'true');
