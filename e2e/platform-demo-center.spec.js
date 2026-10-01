@@ -32,26 +32,56 @@ test('platform admin sees the Demo Center without any countdown and can create a
     if (!liveSession) return route.fulfill({ status: 204, body: '' });
     return route.fulfill(json(liveSession));
   });
-  await page.route('**/api/v1/platform/demo-sessions/*/timeline', route => route.fulfill(json({
-    sessionId: liveSession?.id || null,
-    runtimeBusinessId: '99999999-8888-7777-6666-555555555555',
-    sessionStatus: liveSession?.state || 'READY',
-    events: liveSession ? [{
+  await page.route('**/api/v1/platform/demo-sessions/*/timeline', route => {
+    const events = liveSession ? [{
       at: '2026-10-01T06:30:00Z',
       type: 'SESSION',
       entityId: liveSession.id,
       status: liveSession.state,
       detail: 'Persisted demo session'
-    }] : [],
-    proofOfValue: {
-      state: liveSession?.state === 'FINISHED' ? 'RECORDED_VALUE' : 'REVIEW_REQUIRED',
-      calls: liveSession?.state === 'FINISHED' ? 1 : 0,
-      conversations: 0,
-      operations: liveSession?.state === 'FINISHED' ? 1 : 0,
-      facts: liveSession?.state === 'FINISHED' ? ['ORDER: CONFIRMED'] : [],
-      followUps: liveSession?.state === 'FINISHED' ? [] : ['No persisted outcome evidence yet.']
+    }] : [];
+    if (liveSession?.state === 'ACTIVE' || liveSession?.state === 'FINISHED') {
+      events.push({
+        at: '2026-10-01T06:31:00Z',
+        type: 'CALL',
+        entityId: 'call-demo-1',
+        status: liveSession.state === 'FINISHED' ? 'COMPLETED' : 'IN_PROGRESS',
+        detail: 'Llamada recibida'
+      }, {
+        at: '2026-10-01T06:31:10Z',
+        type: 'TRANSCRIPT',
+        entityId: 'turn-demo-1',
+        status: 'USER',
+        detail: 'Quiero dos sakes'
+      }, {
+        at: '2026-10-01T06:31:15Z',
+        type: 'TRANSCRIPT',
+        entityId: 'turn-demo-2',
+        status: 'ASSISTANT',
+        detail: 'Confirmo dos sakes.'
+      }, {
+        at: '2026-10-01T06:31:20Z',
+        type: 'OPERATION',
+        entityId: 'operation-demo-1',
+        status: 'CONFIRMED',
+        detail: 'ORDER: CONFIRMED'
+      });
     }
-  })));
+    return route.fulfill(json({
+      sessionId: liveSession?.id || null,
+      runtimeBusinessId: '99999999-8888-7777-6666-555555555555',
+      sessionStatus: liveSession?.state || 'READY',
+      events,
+      proofOfValue: {
+        state: liveSession?.state === 'FINISHED' ? 'RECORDED_VALUE' : 'REVIEW_REQUIRED',
+        calls: liveSession?.state === 'ACTIVE' || liveSession?.state === 'FINISHED' ? 1 : 0,
+        conversations: 0,
+        operations: liveSession?.state === 'ACTIVE' || liveSession?.state === 'FINISHED' ? 1 : 0,
+        facts: liveSession?.state === 'FINISHED' ? ['ORDER: CONFIRMED'] : [],
+        followUps: liveSession?.state === 'FINISHED' ? [] : ['No persisted terminal outcome evidence yet.']
+      }
+    }));
+  });
   await page.route('**/api/v1/platform/demo-sessions/*/start', route => {
     liveSession = { ...liveSession, state: 'ACTIVE', startedAt: '2026-10-01T06:31:00Z' };
     return route.fulfill(json(liveSession));
@@ -180,10 +210,20 @@ test('platform admin sees the Demo Center without any countdown and can create a
   await expect(page.locator('#platformDemoSession')).toContainText('DISARMED');
   await expect(page.locator('#platformDemoSession')).toContainText('SANDBOX_ONLY');
 
-  await page.getByRole('button', { name: 'Iniciar demo' }).click();
-  await expect(page.locator('#platformDemoSession')).toContainText('ACTIVE');
-  await page.getByRole('button', { name: 'Finalizar demo' }).click();
-  await expect(page.locator('#platformDemoSession')).toContainText('FINISHED');
+  await expect(page.locator('#platformDemoSessionState')).toContainText('Esperando llamada');
+  await expect(page.getByText('Controles manuales de respaldo')).toBeVisible();
+
+  liveSession = { ...liveSession, state: 'ACTIVE', startedAt: '2026-10-01T06:31:00Z' };
+  await expect(page.locator('#platformDemoSession')).toContainText('ACTIVE', { timeout: 7000 });
+  await expect(page.locator('#platformDemoSessionState')).toContainText('Llamada detectada');
+  await expect(page.locator('#platformDemoTimeline')).toContainText('TRANSCRIPT · USER');
+  await expect(page.locator('#platformDemoTimeline')).toContainText('Quiero dos sakes');
+  await expect(page.locator('#platformDemoTimeline')).toContainText('TRANSCRIPT · ASSISTANT');
+  await expect(page.locator('#platformDemoTimeline')).toContainText('ORDER: CONFIRMED');
+
+  liveSession = { ...liveSession, state: 'FINISHED', finishedAt: '2026-10-01T06:33:00Z' };
+  await expect(page.locator('#platformDemoSession')).toContainText('FINISHED', { timeout: 7000 });
+  await expect(page.locator('#platformDemoSessionState')).toContainText('se cerró automáticamente');
   await expect(page.locator('#platformDemoProof')).toContainText('RECORDED_VALUE');
   await expect(page.locator('#platformDemoProof')).toContainText('ORDER: CONFIRMED');
 
