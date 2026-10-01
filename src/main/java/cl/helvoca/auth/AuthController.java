@@ -35,6 +35,7 @@ public class AuthController {
                 "userId", jwt.getSubject(),
                 "email", jwt.getClaimAsString("email"),
                 "roles", jwt.getClaimAsStringList("roles"),
+                "permissions", jwt.getClaimAsStringList("permissions"),
                 "businessId", jwt.hasClaim("business_id") ? jwt.getClaimAsString("business_id") : ""));
     }
 }
