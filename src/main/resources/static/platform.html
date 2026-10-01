@@ -57,6 +57,14 @@
     .platform-capabilities input { width:auto; }
     .platform-demo-truth { margin-top:12px; padding:10px 11px; border:1px solid var(--border); border-radius:10px; color:var(--muted); font-size:10px; line-height:1.5; }
     .platform-demo-truth strong { color:var(--text); }
+    .platform-demo-readiness { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:0 0 12px; }
+    .platform-demo-readiness-item { min-width:0; padding:10px 11px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); }
+    .platform-demo-readiness-item > span { display:block; color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.04em; }
+    .platform-demo-readiness-state { display:block; margin-top:5px; font-size:11px; overflow-wrap:anywhere; }
+    .platform-demo-readiness-state.ready { color:#37cd91; }
+    .platform-demo-readiness-state.sandbox_only,.platform-demo-readiness-state.disarmed,.platform-demo-readiness-state.not_configured { color:#e8c96a; }
+    .platform-demo-readiness-state.unavailable,.platform-demo-readiness-state.failed { color:#f28d8d; }
+    .platform-demo-readiness-item small { display:block; margin-top:5px; color:var(--muted); font-size:9px; line-height:1.4; overflow-wrap:anywhere; }
 
     .platform-section-title { margin:22px 0 10px; }
     .platform-section-title h2 { margin:2px 0 4px; font-size:17px; }
@@ -81,31 +89,13 @@
     .platform-alert { display:inline-flex; margin-left:5px; padding:2px 5px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:8px; font-weight:800; }
     .platform-economics-note { margin-top:10px; color:var(--muted); font-size:10px; line-height:1.5; }
 
-    .platform-demos { margin-bottom:16px; }
-    .platform-demos-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:14px; }
-    .platform-demos-head p { margin:4px 0 0; color:var(--muted); font-size:11px; line-height:1.5; }
-    .platform-demo-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
-    .platform-demo-item { padding:13px; border:1px solid var(--border); border-radius:12px; background:var(--surface-2); }
-    .platform-demo-item strong { display:block; font-size:13px; }
-    .platform-demo-item p { margin:5px 0 0; color:var(--muted); font-size:10px; line-height:1.45; }
-    .platform-demo-badge { display:inline-flex; margin-top:9px; padding:3px 7px; border:1px solid var(--border); border-radius:999px; color:#37cd91; font-size:9px; font-weight:800; letter-spacing:.05em; }
-    .platform-demo-form { margin-top:12px; padding-top:14px; border-top:1px solid var(--border); }
-    .platform-demo-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .platform-demo-form-grid label { display:grid; gap:5px; color:var(--muted); font-size:10px; font-weight:800; }
-    .platform-demo-form-grid label.wide { grid-column:1/-1; }
-    .platform-demo-form-grid input,.platform-demo-form-grid select,.platform-demo-form-grid textarea { width:100%; box-sizing:border-box; }
-    .platform-demo-form-grid textarea { min-height:82px; resize:vertical; }
-    .platform-demo-actions { grid-column:1/-1; display:flex; justify-content:flex-end; gap:8px; }
-    .platform-demo-message { margin-top:10px; font-size:11px; }
-    .platform-demo-message.error { color:#f28d8d; }
-    .platform-demo-message.success { color:#37cd91; }
     @media(max-width:900px){
-      .platform-demo-profiles{grid-template-columns:repeat(2,minmax(0,1fr));}
+      .platform-demo-profiles,.platform-demo-readiness{grid-template-columns:repeat(2,minmax(0,1fr));}
       .platform-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}
       .platform-economics-grid{grid-template-columns:1fr;}
     }
     @media(max-width:760px){
-      .platform-grid,.platform-demo-profiles{grid-template-columns:1fr;}
+      .platform-grid,.platform-demo-profiles,.platform-demo-readiness{grid-template-columns:1fr;}
       .platform-form{grid-template-columns:1fr;}
       .platform-form label.wide,.platform-actions,.platform-capabilities{grid-column:auto;}
       .platform-top,.platform-demos-head{align-items:flex-start;}
