@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06111c">
+  <title>Demo 3 minutos · RecepVoz</title>
+  <meta name="description" content="Demo segura de tres minutos para mostrar cómo RecepVoz responde, ejecuta una acción y maneja cambios o límites sin tocar datos reales.">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/demo-3min.css?v=20261001-1">
+</head>
+<body class="demo-express-page">
+  <header class="demo-topbar">
+    <a class="demo-brand" href="/sales.html" aria-label="RecepVoz">RECEPVOZ</a>
+    <div class="demo-topbar-status">
+      <span class="demo-safe-dot" aria-hidden="true"></span>
+      <span>Demo segura</span>
+      <strong id="demoTimer" aria-label="Tiempo restante">3:00</strong>
+    </div>
+  </header>
+
+  <main class="demo-shell">
+    <section id="demoIntro" class="demo-intro">
+      <div class="demo-intro-copy">
+        <p class="demo-eyebrow">DEMO SEGURA · 3 MINUTOS</p>
+        <h1>Muéstrale lo esencial de RecepVoz en 3 minutos.</h1>
+        <p class="demo-lead">Elige el tipo de negocio. La demo enseña solo tres cosas: responde con contexto, ejecuta una acción útil y sabe frenar cuando no debe inventar.</p>
+      </div>
+
+      <div class="demo-picker" aria-labelledby="demoPickerTitle">
+        <div>
+          <p class="demo-eyebrow">1 · ELIGE EL RUBRO</p>
+          <h2 id="demoPickerTitle">¿Qué negocio tienes enfrente?</h2>
+        </div>
+        <div class="demo-presets" role="group" aria-label="Rubros de demostración">
+          <button type="button" data-preset="sushi">Sushi</button>
+          <button type="button" data-preset="pizzeria">Pizzería</button>
+          <button type="button" data-preset="carniceria">Carnicería</button>
+          <button type="button" data-preset="peluqueria">Peluquería</button>
+          <button type="button" data-preset="veterinaria">Veterinaria</button>
+          <button type="button" data-preset="clinica">Clínica</button>
+          <button type="button" data-preset="taller">Taller</button>
+        </div>
+      </div>
+
+      <article class="demo-preview" aria-live="polite">
+        <div>
+          <span id="presetIcon" class="demo-preset-icon" aria-hidden="true">🍣</span>
+          <div>
+            <p class="demo-eyebrow">LISTO PARA MOSTRAR</p>
+            <h2 id="presetTitle">Sushi · pedidos y cambios</h2>
+            <p id="presetSummary">Cliente consulta una promo, cambia el pedido y hace una pregunta que el sistema no debe inventar.</p>
+          </div>
+        </div>
+        <button id="startDemoBtn" class="demo-primary" type="button">Empezar demo</button>
+      </article>
+
+      <div class="demo-safety">
+        <strong>✓ Demo segura</strong>
+        <span>Usa datos ficticios. No realiza llamadas reales, no envía WhatsApp, no cobra y no modifica clientes, reservas o pedidos reales.</span>
+      </div>
+    </section>
+
+    <section id="demoStage" class="demo-stage hidden" aria-live="polite">
+      <div class="demo-stage-head">
+        <div>
+          <p class="demo-eyebrow">DEMO EN CURSO · <span id="stagePresetLabel">Sushi</span></p>
+          <h1 id="stageHeadline">Cliente pregunta</h1>
+        </div>
+        <div class="demo-progress" aria-label="Progreso de la demo">
+          <span id="stepCounter">1 de 3</span>
+          <div class="demo-progress-track"><i id="progressBar"></i></div>
+        </div>
+      </div>
+
+      <div class="demo-grid">
+        <article class="demo-conversation-card">
+          <div class="demo-card-head">
+            <span>Conversación del cliente</span>
+            <strong id="stageBusiness">Sushi Demo</strong>
+          </div>
+
+          <div class="demo-chat">
+            <div class="demo-bubble customer">
+              <small>CLIENTE</small>
+              <p id="customerBubble"></p>
+            </div>
+            <div class="demo-bubble assistant">
+              <small>RECEPVOZ</small>
+              <p id="assistantBubble"></p>
+            </div>
+          </div>
+        </article>
+
+        <aside class="demo-proof-card">
+          <p class="demo-eyebrow">LO QUE ESTÁS DEMOSTRANDO</p>
+          <h2 id="proofTitle"></h2>
+          <p id="proofCopy"></p>
+          <div id="proofBadge" class="demo-proof-badge"></div>
+          <div class="demo-presenter-line">
+            <span>TÚ DICES</span>
+            <strong id="presenterLine"></strong>
+          </div>
+        </aside>
+      </div>
+
+      <div class="demo-stage-actions">
+        <button id="resetDemoBtn" class="demo-secondary" type="button">Reiniciar</button>
+        <button id="nextDemoBtn" class="demo-primary" type="button">Siguiente</button>
+      </div>
+    </section>
+
+    <section id="demoOutcome" class="demo-outcome hidden">
+      <p class="demo-eyebrow">CIERRE · NO SIGAS MOSTRANDO PANTALLAS</p>
+      <h1>Esto es lo que acaba de demostrar RecepVoz.</h1>
+      <p class="demo-outcome-lead" id="outcomeLead"></p>
+
+      <div class="demo-outcome-grid">
+        <article><strong>Respondió</strong><span>con información del negocio</span></article>
+        <article><strong id="outcomeAction">1 acción</strong><span id="outcomeActionLabel">útil y trazable</span></article>
+        <article><strong>1 cambio</strong><span>sin duplicar la intención</span></article>
+        <article><strong>0 inventos</strong><span>ante información no confirmada</span></article>
+      </div>
+
+      <div class="demo-close">
+        <span>LA ÚNICA PREGUNTA QUE HACES AHORA</span>
+        <h2>¿Quieres que lo probemos con los datos de tu negocio?</h2>
+        <p>Si acepta, recién ahí pasas a la demo completa, cargas sus datos y explicas el resto del producto.</p>
+        <div class="demo-close-actions">
+          <a class="demo-primary demo-link" href="/simulator.html">Ver demo completa</a>
+          <button id="restartOutcomeBtn" class="demo-secondary" type="button">Mostrar a otro negocio</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/demo-3min.js?v=20261001-1" defer></script>
+</body>
+</html>
