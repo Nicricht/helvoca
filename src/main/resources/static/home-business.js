@@ -1071,11 +1071,14 @@
       `<option value="${value}" ${bookingFilters.source === value ? "selected" : ""}>${label}</option>`
     ).join("");
 
+    const exactDayOption = bookingFilters.dayKey
+      ? `<option value="day">${esc(agendaScopeLabel())}</option>`
+      : "";
     const controls = `
       <div class="home-booking-filters" aria-label="Filtros de reservas">
         <label class="home-filter-search"><span>Buscar</span><input id="homeBookingSearch" type="search" value="${esc(bookingFilters.query)}" placeholder="Cliente, teléfono o servicio"></label>
         <label><span>Fecha</span><select id="homeBookingDate">
-          <option value="all">Todas</option><option value="today">Hoy</option><option value="tomorrow">Mañana</option>
+          ${exactDayOption}<option value="all">Todas</option><option value="today">Hoy</option><option value="tomorrow">Mañana</option>
           <option value="week">Esta semana</option><option value="upcoming">Próximas</option><option value="past">Pasadas</option>
         </select></label>
         <label><span>Servicio</span><select id="homeBookingService"><option value="all">Todos</option>${serviceOptions}</select></label>
@@ -1139,7 +1142,7 @@
     const service = document.querySelector("#homeBookingService");
     const statusFilter = document.querySelector("#homeBookingStatus");
     const sourceFilter = document.querySelector("#homeBookingSource");
-    if (date) date.value = bookingFilters.date;
+    if (date) date.value = bookingFilters.dayKey ? "day" : bookingFilters.date;
     if (service) service.value = bookingFilters.serviceId;
     if (statusFilter) statusFilter.value = bookingFilters.status;
     if (sourceFilter) sourceFilter.value = bookingFilters.source;
