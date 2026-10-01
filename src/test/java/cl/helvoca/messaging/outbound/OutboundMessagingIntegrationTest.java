@@ -1,5 +1,7 @@
 package cl.helvoca.messaging.outbound;
 
+import cl.helvoca.testsupport.ExplicitSystemDatabaseScopeSupport;
+
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.catalog.CatalogItem;
@@ -32,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @Testcontainers
 @SpringBootTest
 @Transactional
-class OutboundMessagingIntegrationTest {
+class OutboundMessagingIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
     @Container static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
     @DynamicPropertySource
