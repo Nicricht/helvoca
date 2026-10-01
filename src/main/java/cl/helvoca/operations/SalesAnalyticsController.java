@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/commercial/analytics")
-@PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+@PreAuthorize("hasAuthority('PERM_ANALYTICS_READ')")
 public class SalesAnalyticsController {
     private final SalesAnalyticsService service;
 

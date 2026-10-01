@@ -54,7 +54,7 @@ public class PlatformBusinessProvisioningService {
 
         TeamInvitationResponse invitation = invitations.createForPlatform(
                 business.getId(),
-                new InviteUserRequest(adminName, adminEmail, RoleCode.BUSINESS_ADMIN));
+                new InviteUserRequest(adminName, adminEmail, RoleCode.BUSINESS_OWNER));
 
         audit.platformHumanSuccess(
                 business.getId(),

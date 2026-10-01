@@ -13,7 +13,17 @@ import java.util.List;
 
 @Service
 public class UserAdminService {
-    private static final EnumSet<RoleCode> BUSINESS_ROLES = EnumSet.of(RoleCode.BUSINESS_ADMIN, RoleCode.OPERATOR);
+    private static final EnumSet<RoleCode> BUSINESS_ROLES = EnumSet.of(
+            RoleCode.BUSINESS_ADMIN,
+            RoleCode.MANAGER,
+            RoleCode.RECEPTION,
+            RoleCode.STAFF,
+            RoleCode.KITCHEN,
+            RoleCode.DISPATCH,
+            RoleCode.PROFESSIONAL,
+            RoleCode.WAREHOUSE,
+            RoleCode.SALES,
+            RoleCode.OPERATOR);
 
     private final AppUserRepository users;
     private final RoleRepository roles;
@@ -45,7 +55,7 @@ public class UserAdminService {
             throw new IllegalArgumentException("Email is already registered");
         }
         if (!BUSINESS_ROLES.containsAll(request.roles())) {
-            throw new IllegalArgumentException("Business administrators may only assign BUSINESS_ADMIN or OPERATOR");
+            throw new IllegalArgumentException("Role cannot be assigned to a business team member");
         }
 
         var business = businesses.findById(businessId)

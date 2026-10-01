@@ -43,7 +43,7 @@ class PlatformBusinessProvisioningServiceTest {
                         "Clínica Norte",
                         "Ana Pérez",
                         "ana@clinica.cl",
-                        "BUSINESS_ADMIN",
+                        "BUSINESS_OWNER",
                         Instant.now().plusSeconds(3600),
                         "PENDING",
                         "/invite.html?businessId=" + businessId + "&token=one-time"));
@@ -67,7 +67,7 @@ class PlatformBusinessProvisioningServiceTest {
         verify(subscriptions).startBasicTrial(businessId);
         verify(invitations).createForPlatform(
                 eq(businessId),
-                argThat(request -> request.role() == RoleCode.BUSINESS_ADMIN
+                argThat(request -> request.role() == RoleCode.BUSINESS_OWNER
                         && "Ana Pérez".equals(request.name())
                         && "ana@clinica.cl".equals(request.email())));
         verify(audit).platformHumanSuccess(

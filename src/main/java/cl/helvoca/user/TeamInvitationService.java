@@ -28,7 +28,17 @@ import java.util.UUID;
 @Service
 public class TeamInvitationService {
     private static final EnumSet<RoleCode> INVITABLE_ROLES =
-            EnumSet.of(RoleCode.BUSINESS_ADMIN, RoleCode.OPERATOR);
+            EnumSet.of(
+                    RoleCode.BUSINESS_ADMIN,
+                    RoleCode.MANAGER,
+                    RoleCode.RECEPTION,
+                    RoleCode.STAFF,
+                    RoleCode.KITCHEN,
+                    RoleCode.DISPATCH,
+                    RoleCode.PROFESSIONAL,
+                    RoleCode.WAREHOUSE,
+                    RoleCode.SALES,
+                    RoleCode.OPERATOR);
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final long EXPIRY_HOURS = 72;
 
@@ -83,8 +93,9 @@ public class TeamInvitationService {
                                                      InviteUserRequest request,
                                                      boolean platformAudit) {
         String email = normalizeEmail(request.email());
-        if (!INVITABLE_ROLES.contains(request.role())) {
-            throw new IllegalArgumentException("Only BUSINESS_ADMIN or OPERATOR may be invited");
+        boolean principalOwner = platformAudit && request.role() == RoleCode.BUSINESS_OWNER;
+        if (!principalOwner && !INVITABLE_ROLES.contains(request.role())) {
+            throw new IllegalArgumentException("Role cannot be invited into a business team");
         }
         if (users.existsByEmailIgnoreCase(email)) {
             throw new ConflictException("An account with that email already exists");
@@ -172,6 +183,10 @@ public class TeamInvitationService {
         Role role = roles.findByCode(invitation.getRoleCode())
                 .orElseThrow(() -> new IllegalStateException(
                         "Role not seeded: " + invitation.getRoleCode()));
+        Role compatibilityAdmin = invitation.getRoleCode() == RoleCode.BUSINESS_OWNER
+                ? roles.findByCode(RoleCode.BUSINESS_ADMIN)
+                    .orElseThrow(() -> new IllegalStateException("BUSINESS_ADMIN role is not configured"))
+                : null;
 
         AppUser user = new AppUser();
         user.setBusiness(invitation.getBusiness());
@@ -179,6 +194,7 @@ public class TeamInvitationService {
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.getRoles().add(role);
+        if (compatibilityAdmin != null) user.getRoles().add(compatibilityAdmin);
         users.saveAndFlush(user);
 
         invitation.setAcceptedAt(Instant.now());

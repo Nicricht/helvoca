@@ -18,7 +18,16 @@
     INACTIVE: "Inactivo"
   };
   const roleLabels = {
+    BUSINESS_OWNER: "Propietario",
     BUSINESS_ADMIN: "Administrador",
+    MANAGER: "Encargado",
+    RECEPTION: "Recepción / Caja",
+    STAFF: "Personal",
+    KITCHEN: "Preparación / Cocina",
+    DISPATCH: "Despacho",
+    PROFESSIONAL: "Profesional",
+    WAREHOUSE: "Bodega / Inventario",
+    SALES: "Ventas",
     OPERATOR: "Operador",
     ADMIN: "Administrador"
   };

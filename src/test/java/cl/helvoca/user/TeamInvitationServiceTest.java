@@ -117,6 +117,43 @@ class TeamInvitationServiceTest {
         verifyNoInteractions(invitations, businesses, passwordEncoder, authService);
     }
 
+
+    @Test
+    void kitchenCanBeInvitedAsARestrictedBusinessRole() {
+        when(users.existsByEmailIgnoreCase("cocina@negocio.cl")).thenReturn(false);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business));
+        when(invitations.findAllByBusinessIdAndEmailIgnoreCaseAndAcceptedAtIsNullAndRevokedAtIsNull(
+                businessId, "cocina@negocio.cl")).thenReturn(List.of());
+        when(invitations.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TeamInvitationResponse result = service.create(
+                new InviteUserRequest("Equipo Cocina", "cocina@negocio.cl", RoleCode.KITCHEN));
+
+        assertEquals("KITCHEN", result.role());
+    }
+
+    @Test
+    void businessOwnerCannotBeInvitedByAnotherBusinessUser() {
+        assertThrows(IllegalArgumentException.class, () -> service.create(
+                new InviteUserRequest("Otro dueño", "owner2@example.cl", RoleCode.BUSINESS_OWNER)));
+        verifyNoInteractions(invitations, businesses, passwordEncoder, authService);
+    }
+
+    @Test
+    void platformProvisioningMayCreatePrincipalOwnerInvitation() {
+        when(users.existsByEmailIgnoreCase("owner@negocio.cl")).thenReturn(false);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business));
+        when(invitations.findAllByBusinessIdAndEmailIgnoreCaseAndAcceptedAtIsNullAndRevokedAtIsNull(
+                businessId, "owner@negocio.cl")).thenReturn(List.of());
+        when(invitations.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TeamInvitationResponse result = service.createForPlatform(
+                businessId,
+                new InviteUserRequest("Dueño", "owner@negocio.cl", RoleCode.BUSINESS_OWNER));
+
+        assertEquals("BUSINESS_OWNER", result.role());
+    }
+
     @Test
     void acceptCreatesUserWithOwnPasswordAndConsumesInvitation() {
         String rawToken = "very-secret-invitation-token";
@@ -150,6 +187,39 @@ class TeamInvitationServiceTest {
         assertEquals("operador@negocio.cl", user.getValue().getEmail());
         assertEquals("bcrypt-hash", user.getValue().getPasswordHash());
         assertTrue(user.getValue().getRoles().contains(operator));
+    }
+
+    @Test
+    void principalOwnerAcceptanceAddsLegacyAdminCompatibilityRole() {
+        String rawToken = "principal-owner-token";
+        TeamInvitation invitation = invitation(rawToken, RoleCode.BUSINESS_OWNER, Instant.now().plusSeconds(3600));
+        invitation.setName("Dueño Principal");
+        invitation.setEmail("owner@negocio.cl");
+        Role owner = mock(Role.class);
+        Role admin = mock(Role.class);
+
+        when(invitations.findByBusinessIdAndTokenHash(
+                businessId, TeamInvitationService.hash(rawToken))).thenReturn(Optional.of(invitation));
+        when(users.existsByEmailIgnoreCase("owner@negocio.cl")).thenReturn(false);
+        when(roles.findByCode(RoleCode.BUSINESS_OWNER)).thenReturn(Optional.of(owner));
+        when(roles.findByCode(RoleCode.BUSINESS_ADMIN)).thenReturn(Optional.of(admin));
+        when(passwordEncoder.encode("UnaClaveMuySegura123")).thenReturn("bcrypt-hash");
+        when(users.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+        when(invitations.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+        when(authService.login(new LoginRequest("owner@negocio.cl", "UnaClaveMuySegura123")))
+                .thenReturn(new LoginResponse(
+                        "jwt-owner", "Bearer", 3600,
+                        new LoginResponse.UserInfo(UUID.randomUUID(), businessId, "Dueño Principal",
+                                "owner@negocio.cl", List.of("BUSINESS_ADMIN", "BUSINESS_OWNER"))));
+
+        LoginResponse result = service.accept(
+                businessId, rawToken, new AcceptInvitationRequest("UnaClaveMuySegura123"));
+
+        assertEquals("jwt-owner", result.accessToken());
+        ArgumentCaptor<AppUser> user = ArgumentCaptor.forClass(AppUser.class);
+        verify(users).saveAndFlush(user.capture());
+        assertTrue(user.getValue().getRoles().contains(owner));
+        assertTrue(user.getValue().getRoles().contains(admin));
     }
 
     @Test

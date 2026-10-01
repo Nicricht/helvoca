@@ -17,19 +17,19 @@ public class InventoryController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_READ')")
     public ResponseEntity<List<InventoryService.StockView>> list() {
         return ResponseEntity.ok(service.list());
     }
 
     @GetMapping("/{catalogItemId}")
-    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_READ')")
     public ResponseEntity<InventoryService.StockView> get(@PathVariable UUID catalogItemId) {
         return ResponseEntity.ok(service.get(catalogItemId));
     }
 
     @PutMapping("/{catalogItemId}")
-    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_MANAGE')")
     public ResponseEntity<InventoryService.StockView> configure(
             @PathVariable UUID catalogItemId,
             @RequestBody InventoryService.ConfigureInput input) {
@@ -37,7 +37,7 @@ public class InventoryController {
     }
 
     @PostMapping("/{catalogItemId}/adjustments")
-    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_MANAGE')")
     public ResponseEntity<InventoryService.StockView> adjust(
             @PathVariable UUID catalogItemId,
             @RequestBody InventoryService.AdjustmentInput input) {
@@ -45,7 +45,7 @@ public class InventoryController {
     }
 
     @PostMapping("/{catalogItemId}/reservations")
-    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_MANAGE')")
     public ResponseEntity<InventoryService.ReservationView> reserve(
             @PathVariable UUID catalogItemId,
             @RequestBody InventoryService.ReservationInput input) {
@@ -53,7 +53,7 @@ public class InventoryController {
     }
 
     @PostMapping("/reservations/{reservationId}/release")
-    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_MANAGE')")
     public ResponseEntity<InventoryService.ReservationView> release(
             @PathVariable UUID reservationId,
             @RequestBody(required = false) NoteInput input) {
@@ -61,7 +61,7 @@ public class InventoryController {
     }
 
     @PostMapping("/reservations/{reservationId}/consume")
-    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_MANAGE')")
     public ResponseEntity<InventoryService.ReservationView> consume(
             @PathVariable UUID reservationId,
             @RequestBody(required = false) NoteInput input) {
@@ -69,7 +69,7 @@ public class InventoryController {
     }
 
     @GetMapping("/{catalogItemId}/movements")
-    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_READ')")
     public ResponseEntity<List<InventoryService.MovementView>> history(@PathVariable UUID catalogItemId) {
         return ResponseEntity.ok(service.history(catalogItemId));
     }

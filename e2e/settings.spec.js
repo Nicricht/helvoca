@@ -73,7 +73,11 @@ async function mockSettings(page, state = {}) {
     usesReservations: false
   };
 
-  await page.route('**/api/v1/auth/me', route => route.fulfill(json({ email: 'admin@demo.cl', roles: state.roles || ['BUSINESS_ADMIN'] })));
+  await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+    email: 'admin@demo.cl',
+    roles: state.roles || ['BUSINESS_ADMIN'],
+    permissions: state.permissions || ['TEAM_MANAGE']
+  })));
   await page.route('**/api/v1/admin/invitations/*', async route => {
     if (route.request().method() === 'DELETE') {
       const id = route.request().url().split('/').pop();
@@ -323,16 +327,21 @@ test('business admin creates a one-time team invitation without choosing another
 
   const card = page.locator('#teamInvitationsCard');
   await expect(card).toBeVisible();
+  const roleSelect = card.locator('select[name="role"]');
+  for (const role of ['BUSINESS_ADMIN','MANAGER','RECEPTION','STAFF','KITCHEN','DISPATCH','PROFESSIONAL','WAREHOUSE','SALES','OPERATOR']) {
+    await expect(roleSelect.locator(`option[value="${role}"]`)).toHaveCount(1);
+  }
+  await expect(roleSelect.locator('option[value="BUSINESS_OWNER"]')).toHaveCount(0);
   await card.locator('input[name="name"]').fill('Camila Soto');
   await card.locator('input[name="email"]').fill('camila@negocio.cl');
-  await card.locator('select[name="role"]').selectOption('OPERATOR');
+  await roleSelect.selectOption('KITCHEN');
   await card.getByRole('button', { name: 'Generar invitación' }).click();
 
   await expect.poll(() => state.invitationCreates.length).toBe(1);
   expect(state.invitationCreates[0]).toEqual({
     name: 'Camila Soto',
     email: 'camila@negocio.cl',
-    role: 'OPERATOR'
+    role: 'KITCHEN'
   });
   await expect(page.locator('#teamInviteUrl')).toHaveValue(/invite\.html\?businessId=.*&token=test-token/);
   await expect(page.locator('#teamInviteMessage')).toContainText('Comparte este enlace');

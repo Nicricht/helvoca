@@ -47,7 +47,7 @@
     <form id="teamInviteForm" class="team-invite-form">
       <label>Nombre<input name="name" maxlength="150" required placeholder="Camila Soto"></label>
       <label>Email<input name="email" type="email" maxlength="180" required placeholder="camila@negocio.cl"></label>
-      <label>Rol<select name="role"><option value="OPERATOR">Operador</option><option value="BUSINESS_ADMIN">Administrador</option></select></label>
+      <label>Rol<select name="role"><option value="BUSINESS_ADMIN">Administrador</option><option value="MANAGER">Encargado</option><option value="RECEPTION">Recepción / Caja</option><option value="STAFF">Personal</option><option value="KITCHEN">Preparación / Cocina</option><option value="DISPATCH">Despacho</option><option value="PROFESSIONAL">Profesional</option><option value="WAREHOUSE">Bodega / Inventario</option><option value="SALES">Ventas</option><option value="OPERATOR">Operador (legado)</option></select></label>
       <button class="button small primary" type="submit">Generar invitación</button>
     </form>
     <div id="teamInviteLink" class="team-invite-link hidden">
@@ -86,6 +86,22 @@
     }[status] || status || '';
   }
 
+  function roleLabel(role) {
+    return {
+      BUSINESS_OWNER:'Propietario',
+      BUSINESS_ADMIN:'Administrador',
+      MANAGER:'Encargado',
+      RECEPTION:'Recepción / Caja',
+      STAFF:'Personal',
+      KITCHEN:'Preparación / Cocina',
+      DISPATCH:'Despacho',
+      PROFESSIONAL:'Profesional',
+      WAREHOUSE:'Bodega / Inventario',
+      SALES:'Ventas',
+      OPERATOR:'Operador'
+    }[role] || role || 'Sin rol';
+  }
+
   function renderMembers(items) {
     members.replaceChildren();
     if (!Array.isArray(items) || !items.length) {
@@ -106,7 +122,7 @@
       name.textContent = item.name || item.email || 'Miembro';
       const detail = document.createElement('small');
       const roles = Array.isArray(item.roles) ? item.roles : [];
-      detail.textContent = `${item.email || ''} · ${roles.includes('BUSINESS_ADMIN') ? 'Administrador' : 'Operador'}`;
+      detail.textContent = `${item.email || ''} · ${roles.map(roleLabel).join(', ') || 'Sin rol'}`;
       info.append(name, detail);
 
       const state = document.createElement('span');
@@ -136,7 +152,7 @@
       const name = document.createElement('strong');
       name.textContent = item.name || item.email;
       const detail = document.createElement('small');
-      detail.textContent = `${item.email} · ${item.role === 'BUSINESS_ADMIN' ? 'Administrador' : 'Operador'}`;
+      detail.textContent = `${item.email} · ${roleLabel(item.role)}`;
       info.append(name, detail);
 
       const status = document.createElement('span');
@@ -173,8 +189,12 @@
     loading = true;
     try {
       const me = await api('/api/v1/auth/me');
-      const admin = Array.isArray(me?.roles) && me.roles.includes('BUSINESS_ADMIN');
-      if (!admin) {
+      const permissions = Array.isArray(me?.permissions) ? me.permissions : [];
+      const roles = Array.isArray(me?.roles) ? me.roles : [];
+      const canManageTeam = permissions.includes('TEAM_MANAGE')
+        || roles.includes('BUSINESS_OWNER')
+        || roles.includes('BUSINESS_ADMIN');
+      if (!canManageTeam) {
         card.classList.add('hidden');
         return;
       }
@@ -204,7 +224,7 @@
         body:JSON.stringify({
           name:String(f.get('name') || '').trim(),
           email:String(f.get('email') || '').trim(),
-          role:String(f.get('role') || 'OPERATOR')
+          role:String(f.get('role') || 'STAFF')
         })
       });
       const url = new URL(result.invitePath, location.origin).href;
