@@ -74,6 +74,89 @@ class PlatformDemoConversionTest {
         }
     }
 
+    @Test
+    void missingRuntimeAndMissingSessionFailClosed() {
+        DemoRuntimeProperties missing = new DemoRuntimeProperties();
+        PlatformDemoConversionService noRuntime = new PlatformDemoConversionService(
+                missing,
+                mock(DemoSessionRepository.class),
+                mock(DemoProfileRepository.class),
+                mock(BusinessRepository.class),
+                mock(PlatformBusinessProvisioningService.class),
+                mock(DemoRuntimeStagingService.class),
+                mock(AuditService.class));
+        assertThrows(IllegalStateException.class, () ->
+                noRuntime.convert(UUID.randomUUID(), new PlatformDemoConversionRequest("Ana", "ana@example.cl")));
+
+        UUID runtimeId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        when(sessions.findForUpdateByIdAndRuntimeBusinessId(any(), eq(runtimeId))).thenReturn(Optional.empty());
+        PlatformDemoConversionService missingSession = new PlatformDemoConversionService(
+                properties, sessions, mock(DemoProfileRepository.class), mock(BusinessRepository.class),
+                mock(PlatformBusinessProvisioningService.class), mock(DemoRuntimeStagingService.class),
+                mock(AuditService.class));
+        assertThrows(cl.helvoca.common.NotFoundException.class, () ->
+                missingSession.convert(UUID.randomUUID(),
+                        new PlatformDemoConversionRequest("Ana", "ana@example.cl")));
+    }
+
+    @Test
+    void replayRejectsMissingOrNonPilotRecordedBusiness() {
+        Fixture f = fixture(DemoSessionState.FINISHED);
+        UUID pilotId = UUID.randomUUID();
+        f.session.setConvertedPilotBusinessId(pilotId);
+
+        when(f.businesses.findById(pilotId)).thenReturn(Optional.empty());
+        assertThrows(IllegalStateException.class, () ->
+                f.service.convert(f.sessionId,
+                        new PlatformDemoConversionRequest("Ana", "ana@example.cl")));
+
+        Business customer = new Business();
+        ReflectionTestUtils.setField(customer, "id", pilotId);
+        customer.setMode(BusinessMode.CUSTOMER);
+        when(f.businesses.findById(pilotId)).thenReturn(Optional.of(customer));
+        assertThrows(IllegalStateException.class, () ->
+                f.service.convert(f.sessionId,
+                        new PlatformDemoConversionRequest("Ana", "ana@example.cl")));
+    }
+
+    @Test
+    void missingProfileAndRuntimeReuseAreRejectedBeforePilotStaging() {
+        Fixture f = fixture(DemoSessionState.READY);
+        when(f.profiles.findById(f.profile.getId())).thenReturn(Optional.empty());
+        assertThrows(cl.helvoca.common.NotFoundException.class, () ->
+                f.service.convert(f.sessionId,
+                        new PlatformDemoConversionRequest("Ana", "ana@example.cl")));
+
+        when(f.profiles.findById(f.profile.getId())).thenReturn(Optional.of(f.profile));
+        when(f.provisioning.provisionPilot(any())).thenReturn(new PlatformBusinessProvisioningResponse(
+                f.runtimeId, "Sushi Akira", "America/Santiago", "es",
+                "Ana", "ana@example.cl", UUID.randomUUID(), "PENDING",
+                Instant.parse("2026-10-04T06:00:00Z"), "/invite.html?token=one-time", "/"));
+        assertThrows(IllegalStateException.class, () ->
+                f.service.convert(f.sessionId,
+                        new PlatformDemoConversionRequest("Ana", "ana@example.cl")));
+        verify(f.staging, never()).stagePilot(any(), any());
+    }
+
+    @Test
+    void readySessionCanConvertWithoutBeingStarted() {
+        Fixture f = fixture(DemoSessionState.READY);
+        UUID pilotId = UUID.randomUUID();
+        when(f.provisioning.provisionPilot(any())).thenReturn(new PlatformBusinessProvisioningResponse(
+                pilotId, "Sushi Akira", "America/Santiago", "es",
+                "Ana", "ana@example.cl", UUID.randomUUID(), "PENDING",
+                Instant.parse("2026-10-04T06:00:00Z"), "/invite.html?token=one-time", "/"));
+
+        PlatformDemoConversionResponse result = f.service.convert(
+                f.sessionId, new PlatformDemoConversionRequest("Ana", "ana@example.cl"));
+
+        assertEquals(pilotId, result.pilotBusinessId());
+        verify(f.staging).stagePilot(f.profile, pilotId);
+    }
+
     private static Fixture fixture(DemoSessionState state) {
         UUID runtimeId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
@@ -114,7 +197,7 @@ class PlatformDemoConversionTest {
         PlatformDemoConversionService service = new PlatformDemoConversionService(
                 properties, sessions, profiles, businesses, provisioning, staging, audit);
         return new Fixture(service, runtimeId, sessionId, session, profile,
-                businesses, provisioning, staging);
+                businesses, provisioning, staging, profiles);
     }
 
     private record Fixture(
@@ -125,5 +208,6 @@ class PlatformDemoConversionTest {
             DemoProfile profile,
             BusinessRepository businesses,
             PlatformBusinessProvisioningService provisioning,
-            DemoRuntimeStagingService staging) {}
+            DemoRuntimeStagingService staging,
+            DemoProfileRepository profiles) {}
 }
