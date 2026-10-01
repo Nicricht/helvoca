@@ -131,7 +131,7 @@ public class CallLifecycleService {
                     .ifPresent(call::setCustomerId);
         }
         if (demoSessions != null) {
-            demoSessions.activeSessionIdForBusiness(businessId)
+            demoSessions.activeOrActivateForInboundVoice(businessId)
                     .ifPresent(call::setDemoSessionId);
         }
         CallSession saved = calls.saveAndFlush(call);
@@ -251,6 +251,9 @@ public class CallLifecycleService {
             }
         }
         calls.saveAndFlush(call);
+        if (demoSessions != null) {
+            demoSessions.finishIfTerminal(call);
+        }
     }
 
     private void updateEstimatedCost(CallSession call) {

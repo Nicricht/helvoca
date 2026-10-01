@@ -5,6 +5,8 @@ import cl.helvoca.call.CallActionRepository;
 import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.call.CallSummaryRepository;
+import cl.helvoca.call.CallTranscript;
+import cl.helvoca.call.CallTranscriptRepository;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.messaging.MessagingConversation;
 import cl.helvoca.messaging.MessagingConversationRepository;
@@ -12,6 +14,7 @@ import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.BusinessOperationEvent;
 import cl.helvoca.operations.BusinessOperationEventRepository;
 import cl.helvoca.operations.BusinessOperationRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +33,7 @@ public class PlatformDemoTimelineService {
     private final BusinessOperationEventRepository operationEvents;
     private final CallSummaryRepository summaries;
     private final CallActionRepository actions;
+    private CallTranscriptRepository transcripts;
 
     public PlatformDemoTimelineService(DemoRuntimeProperties properties,
                                        DemoSessionRepository sessions,
@@ -47,6 +51,11 @@ public class PlatformDemoTimelineService {
         this.operationEvents = operationEvents;
         this.summaries = summaries;
         this.actions = actions;
+    }
+
+    @Autowired
+    void setTranscripts(CallTranscriptRepository transcripts) {
+        this.transcripts = transcripts;
     }
 
     @Transactional(readOnly = true)
@@ -86,6 +95,18 @@ public class PlatformDemoTimelineService {
                         detail == null ? "Persisted call summary" : detail));
                 if (outcome != null) facts.add("Call outcome: " + outcome);
             });
+
+            if (transcripts != null) {
+                for (CallTranscript transcript : transcripts.findAllByCallIdOrderBySequenceNumberAsc(call.getId())) {
+                    String speaker = clean(transcript.getSpeaker());
+                    String detail = clean(transcript.getContent());
+                    if (detail != null) {
+                        events.add(new PlatformDemoTimelineResponse.TimelineEvent(
+                                transcript.getCreatedAt(), "TRANSCRIPT", transcript.getId(),
+                                speaker, detail));
+                    }
+                }
+            }
 
             for (CallAction action : actions.findAllByBusinessIdAndCallIdOrderByCreatedAtAsc(
                     runtimeId, call.getId())) {
