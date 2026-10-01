@@ -1,5 +1,7 @@
 package cl.helvoca.messaging.meta;
 
+import cl.helvoca.testsupport.ExplicitSystemDatabaseScopeSupport;
+
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.messaging.MessagingMessage;
@@ -26,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
 @SpringBootTest
-class WhatsAppAudioRecoveryTransactionIntegrationTest {
+class WhatsAppAudioRecoveryTransactionIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
     @Container
     static final PostgreSQLContainer<?> postgres =
             new PostgreSQLContainer<>("postgres:16-alpine");
