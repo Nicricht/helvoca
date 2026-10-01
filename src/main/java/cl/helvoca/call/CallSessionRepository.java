@@ -17,6 +17,8 @@ public interface CallSessionRepository extends JpaRepository<CallSession, UUID> 
     Optional<CallSession> findByProviderCallId(String providerCallId);
     Optional<CallSession> findByStreamSid(String streamSid);
     Optional<CallSession> findByIdAndBusinessId(UUID id, UUID businessId);
+    List<CallSession> findAllByBusinessIdAndDemoSessionIdOrderByStartedAtAsc(
+            UUID businessId, UUID demoSessionId);
     Optional<CallSession> findFirstByBusinessIdAndCertificationTrueOrderByStartedAtDesc(UUID businessId);
     List<CallSession> findTop20ByBusinessIdAndCustomerIdAndCertificationFalseOrderByStartedAtDesc(
             UUID businessId, UUID customerId);
