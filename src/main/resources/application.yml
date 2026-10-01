@@ -82,6 +82,7 @@ app:
       telephony-cost-per-minute-usd: ${HELVOCA_TELEPHONY_COST_PER_MINUTE_USD:0}
       ai-cost-per-minute-usd: ${HELVOCA_AI_COST_PER_MINUTE_USD:0}
       usd-to-clp-rate: ${HELVOCA_COST_USD_TO_CLP:0}
+      twilio-number-monthly-cost-usd: ${HELVOCA_TWILIO_NUMBER_MONTHLY_COST_USD:0}
       telephony-provider-cost-per-minute-usd:
         twilio: ${HELVOCA_TWILIO_COST_PER_MINUTE_USD:${HELVOCA_TELEPHONY_COST_PER_MINUTE_USD:0}}
       ai-provider-cost-per-minute-usd:
