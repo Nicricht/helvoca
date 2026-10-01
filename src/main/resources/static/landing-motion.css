@@ -1,0 +1,308 @@
+/*
+ * RecepVoz public landing motion layer.
+ * Keeps the authenticated product frame untouched.
+ */
+body.home-page:has(#authView:not(.hidden)) #authView .rv-auth-hero {
+  --rv-motion-ready: 1;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 170px;
+  color: #f4fbff;
+  font-size: 20px !important;
+  letter-spacing: -.035em !important;
+  filter: drop-shadow(0 0 14px rgba(22,217,245,.14));
+  animation: rv-brand-breathe 5.4s ease-in-out infinite;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-brand-logo {
+  width: 44px;
+  height: 30px;
+  overflow: visible;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-brand-word {
+  font-weight: 900;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-brand-word > span { color: #16d9f5; }
+body.home-page:has(#authView:not(.hidden)) .rv-brand-wave rect { animation: rv-brand-wave 1.9s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+body.home-page:has(#authView:not(.hidden)) .rv-brand-wave rect:nth-child(2),
+body.home-page:has(#authView:not(.hidden)) .rv-brand-wave rect:nth-child(6) { animation-delay: -.2s; }
+body.home-page:has(#authView:not(.hidden)) .rv-brand-wave rect:nth-child(3),
+body.home-page:has(#authView:not(.hidden)) .rv-brand-wave rect:nth-child(5) { animation-delay: -.4s; }
+body.home-page:has(#authView:not(.hidden)) .rv-brand-wave rect:nth-child(4) { animation-delay: -.6s; }
+
+body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell {
+  position: relative;
+  isolation: isolate;
+  /* Decorative glows and floating layers must never enlarge the page canvas. */
+  overflow: clip;
+}
+body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell::before,
+body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell::after {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  width: 430px;
+  height: 430px;
+  border-radius: 50%;
+  filter: blur(78px);
+  opacity: .12;
+  pointer-events: none;
+}
+body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell::before {
+  top: 1%;
+  left: -10%;
+  background: #16d9f5;
+  animation: rv-ambient-one 11s ease-in-out infinite alternate;
+}
+body.home-page:has(#authView:not(.hidden)) #authView.auth-grid.rv-auth-shell::after {
+  right: -11%;
+  bottom: 3%;
+  background: #8b5cf6;
+  animation: rv-ambient-two 13s ease-in-out infinite alternate;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-hero {
+  box-shadow: 0 30px 90px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.05);
+}
+body.home-page:has(#authView:not(.hidden)) .rv-auth-hero::after {
+  content: "";
+  position: absolute;
+  inset: -38%;
+  z-index: 0;
+  background: conic-gradient(from 140deg at 58% 48%, transparent 0 31%, rgba(22,217,245,.07) 38%, transparent 47% 68%, rgba(139,92,246,.09) 76%, transparent 85%);
+  animation: rv-hero-aurora 18s linear infinite;
+  pointer-events: none;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-auth-copy,
+body.home-page:has(#authView:not(.hidden)) .rv-phone-stage { z-index: 2; }
+body.home-page:has(#authView:not(.hidden)) .rv-auth-copy .eyebrow { animation: rv-chip-float 4.8s ease-in-out infinite; }
+body.home-page:has(#authView:not(.hidden)) .rv-hero-emphasis {
+  background: linear-gradient(100deg, #12dff5 0%, #70efff 42%, #9a68ff 56%, #16d9f5 100%);
+  background-size: 180% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  animation: rv-title-shimmer 5.2s ease-in-out infinite;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-benefit-row span { animation: rv-benefit-float 5.4s ease-in-out infinite; }
+body.home-page:has(#authView:not(.hidden)) .rv-benefit-row span:nth-child(2) { animation-delay: -.9s; }
+body.home-page:has(#authView:not(.hidden)) .rv-benefit-row span:nth-child(3) { animation-delay: -1.8s; }
+
+body.home-page:has(#authView:not(.hidden)) .rv-voice-preview {
+  position: relative;
+  overflow: hidden;
+  animation: rv-preview-breathe 6.8s ease-in-out infinite;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-voice-preview::after {
+  content:"";
+  position:absolute;
+  inset:-60% -25%;
+  background: linear-gradient(110deg, transparent 42%, rgba(108,239,255,.13) 50%, transparent 58%);
+  transform: translateX(-52%);
+  animation: rv-preview-sweep 6s ease-in-out infinite;
+  pointer-events:none;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-live-dot { animation: rv-live-pulse 1.7s ease-in-out infinite; }
+
+body.home-page:has(#authView:not(.hidden)) .rv-phone-stage::before {
+  animation: rv-stage-glow 5.6s ease-in-out infinite !important;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-phone-device {
+  animation: rv-phone-premium-float 6.4s ease-in-out infinite !important;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-phone-orbit-one {
+  animation: rv-orbit-one 10s linear infinite;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-phone-orbit-two {
+  animation: rv-orbit-two 13s linear infinite reverse;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-one { animation: rv-bubble-drift-one 5.6s ease-in-out infinite; }
+body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-two { animation: rv-bubble-drift-two 6.2s ease-in-out infinite; }
+body.home-page:has(#authView:not(.hidden)) .rv-phone-bubble-three { animation: rv-bubble-drift-three 5.9s ease-in-out infinite; }
+body.home-page:has(#authView:not(.hidden)) .rv-phone-status { animation: rv-status-float 5s ease-in-out infinite; }
+body.home-page:has(#authView:not(.hidden)) .rv-phone-status > i { animation: rv-live-pulse 1.7s ease-in-out infinite; }
+
+body.home-page:has(#authView:not(.hidden)) .rv-ai-head {
+  position:absolute;
+  z-index:10;
+  right: 2%;
+  top: 5%;
+  width: 102px;
+  height: 82px;
+  filter: drop-shadow(0 18px 30px rgba(0,0,0,.32)) drop-shadow(0 0 16px rgba(22,217,245,.18));
+  animation: rv-ai-float 5.8s ease-in-out infinite;
+  pointer-events:none;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-ai-head-art { width:100%; height:100%; overflow:visible; }
+body.home-page:has(#authView:not(.hidden)) .rv-ai-eye { transform-box: fill-box; transform-origin:center; animation: rv-ai-blink 5.2s ease-in-out infinite; }
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-card {
+  position:relative;
+  overflow:hidden;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-auth-card::after {
+  content:"";
+  position:absolute;
+  inset:-1px;
+  border-radius:inherit;
+  background: linear-gradient(120deg, transparent 15%, rgba(22,217,245,.08) 45%, rgba(139,92,246,.08) 55%, transparent 85%);
+  transform: translateX(-95%);
+  animation: rv-card-sheen 9s ease-in-out infinite;
+  pointer-events:none;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-auth-card .button.primary {
+  position:relative;
+  overflow:hidden;
+  animation: rv-cta-pulse 4.8s ease-in-out infinite;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-auth-card .button.primary::after {
+  content:"";
+  position:absolute;
+  inset:-60% -20%;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.32) 50%, transparent 60%);
+  transform: translateX(-55%);
+  animation: rv-cta-sheen 4.8s ease-in-out infinite;
+}
+
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature-strip {
+  perspective: 1100px;
+  gap: 14px !important;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature {
+  position:relative;
+  min-height: 210px !important;
+  padding: 12px 16px 18px !important;
+  overflow:hidden;
+  transform-style:preserve-3d;
+  border-color: rgba(73,181,230,.19) !important;
+  background:
+    radial-gradient(circle at 50% 8%, rgba(22,217,245,.10), transparent 42%),
+    linear-gradient(180deg, rgba(12,31,49,.86), rgba(8,23,37,.78)) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 18px 42px rgba(0,0,0,.14);
+  transition: transform .32s ease, border-color .32s ease, box-shadow .32s ease !important;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature::after {
+  content:"";
+  position:absolute;
+  width:90px;
+  height:90px;
+  top:-32px;
+  right:-28px;
+  border-radius:50%;
+  background:rgba(139,92,246,.12);
+  filter:blur(26px);
+  animation:rv-feature-glow 6s ease-in-out infinite;
+  pointer-events:none;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature:hover {
+  transform: translateY(-8px) rotateX(2deg) scale(1.015) !important;
+  border-color: rgba(61,227,255,.4) !important;
+  box-shadow: 0 26px 55px rgba(0,0,0,.26), 0 0 28px rgba(22,217,245,.06);
+}
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature-visual {
+  height: 122px;
+  display:grid;
+  place-items:center;
+  margin:-4px 0 2px;
+  pointer-events:none;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature-art {
+  display:block;
+  width:min(100%, 205px);
+  height:118px;
+  overflow:visible;
+  filter: drop-shadow(0 16px 18px rgba(0,0,0,.24)) drop-shadow(0 0 10px rgba(22,217,245,.08));
+  animation:rv-feature-art-float 5.8s ease-in-out infinite;
+}
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature[data-feature="calendar"] .rv-auth-feature-art { animation-delay:-1.1s; }
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature[data-feature="whatsapp"] .rv-auth-feature-art { animation-delay:-2.2s; }
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature[data-feature="analytics"] .rv-auth-feature-art { animation-delay:-3.3s; }
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature strong { font-size:14px !important; margin-bottom:5px !important; }
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature > span:not(.rv-auth-feature-icon) { font-size:11.5px !important; line-height:1.45; }
+body.home-page:has(#authView:not(.hidden)) .rv-auth-feature-icon { display:none !important; }
+
+body.home-page:has(#authView:not(.hidden)) .rv-feature-calls .rv-art-signal { animation:rv-signal-pulse 2s ease-in-out infinite; transform-origin:center; }
+body.home-page:has(#authView:not(.hidden)) .rv-feature-calls .rv-art-wave rect { animation:rv-mini-wave 1.4s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
+body.home-page:has(#authView:not(.hidden)) .rv-feature-calls .rv-art-wave rect:nth-child(2) { animation-delay:-.2s; }
+body.home-page:has(#authView:not(.hidden)) .rv-feature-calls .rv-art-wave rect:nth-child(3) { animation-delay:-.4s; }
+body.home-page:has(#authView:not(.hidden)) .rv-feature-calendar .rv-art-check { animation:rv-check-pop 2.8s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
+body.home-page:has(#authView:not(.hidden)) .rv-feature-whatsapp .rv-art-chat-bubbles { animation:rv-chat-bob 3.2s ease-in-out infinite; }
+body.home-page:has(#authView:not(.hidden)) .rv-feature-analytics .rv-art-bars rect { animation:rv-bars-rise 2.6s ease-in-out infinite; transform-box:fill-box; transform-origin:bottom; }
+body.home-page:has(#authView:not(.hidden)) .rv-feature-analytics .rv-art-bars rect:nth-child(2){animation-delay:-.3s}
+body.home-page:has(#authView:not(.hidden)) .rv-feature-analytics .rv-art-bars rect:nth-child(3){animation-delay:-.6s}
+body.home-page:has(#authView:not(.hidden)) .rv-feature-analytics .rv-art-bars rect:nth-child(4){animation-delay:-.9s}
+body.home-page:has(#authView:not(.hidden)) .rv-feature-analytics .rv-art-arrow { stroke-dasharray:220; stroke-dashoffset:220; animation:rv-arrow-draw 3.4s ease-in-out infinite; }
+
+@keyframes rv-brand-breathe{0%,100%{filter:drop-shadow(0 0 10px rgba(22,217,245,.12))}50%{filter:drop-shadow(0 0 20px rgba(22,217,245,.26))}}
+@keyframes rv-brand-wave{0%,100%{transform:scaleY(.68)}50%{transform:scaleY(1.08)}}
+@keyframes rv-ambient-one{from{transform:translate3d(0,0,0) scale(.9);opacity:.08}to{transform:translate3d(130px,75px,0) scale(1.08);opacity:.15}}
+@keyframes rv-ambient-two{from{transform:translate3d(0,0,0) scale(1.05);opacity:.08}to{transform:translate3d(-110px,-65px,0) scale(.92);opacity:.15}}
+@keyframes rv-hero-aurora{to{transform:rotate(360deg)}}
+@keyframes rv-chip-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes rv-title-shimmer{0%,100%{background-position:0 50%}50%{background-position:100% 50%}}
+@keyframes rv-benefit-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes rv-preview-breathe{0%,100%{box-shadow:0 12px 34px rgba(0,0,0,.14)}50%{box-shadow:0 16px 40px rgba(22,217,245,.08)}}
+@keyframes rv-preview-sweep{0%,55%{transform:translateX(-62%)}82%,100%{transform:translateX(65%)}}
+@keyframes rv-live-pulse{0%,100%{transform:scale(.88);opacity:.72}50%{transform:scale(1.15);opacity:1}}
+@keyframes rv-stage-glow{0%,100%{opacity:.7;filter:blur(21px)}50%{opacity:1;filter:blur(27px)}}
+@keyframes rv-phone-premium-float{0%,100%{transform:translateY(0) rotate(-.35deg) scale(1)}50%{transform:translateY(-14px) rotate(.45deg) scale(1.012)}}
+@keyframes rv-orbit-one{from{transform:rotate(-17deg) scaleY(.42)}to{transform:rotate(343deg) scaleY(.42)}}
+@keyframes rv-orbit-two{from{transform:rotate(19deg) scaleY(.52)}to{transform:rotate(379deg) scaleY(.52)}}
+@keyframes rv-bubble-drift-one{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(-4px,-8px,0)}}
+@keyframes rv-bubble-drift-two{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(5px,-6px,0)}}
+@keyframes rv-bubble-drift-three{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(-3px,7px,0)}}
+@keyframes rv-status-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes rv-ai-float{0%,100%{transform:translate3d(0,0,0) rotate(-3deg)}50%{transform:translate3d(-5px,-10px,0) rotate(3deg)}}
+@keyframes rv-ai-blink{0%,44%,50%,100%{transform:scaleY(1)}47%{transform:scaleY(.12)}}
+@keyframes rv-card-sheen{0%,60%{transform:translateX(-105%)}85%,100%{transform:translateX(105%)}}
+@keyframes rv-cta-pulse{0%,100%{box-shadow:0 12px 34px rgba(22,217,245,.14)}50%{box-shadow:0 15px 42px rgba(22,217,245,.26)}}
+@keyframes rv-cta-sheen{0%,58%{transform:translateX(-70%)}82%,100%{transform:translateX(70%)}}
+@keyframes rv-feature-glow{0%,100%{transform:scale(.85);opacity:.45}50%{transform:scale(1.15);opacity:.75}}
+@keyframes rv-feature-art-float{0%,100%{transform:translateY(2px) rotate(-.4deg)}50%{transform:translateY(-8px) rotate(.6deg)}}
+@keyframes rv-signal-pulse{0%,100%{opacity:.55;transform:scale(.95)}50%{opacity:1;transform:scale(1.04)}}
+@keyframes rv-mini-wave{0%,100%{transform:scaleY(.62)}50%{transform:scaleY(1.18)}}
+@keyframes rv-check-pop{0%,100%{transform:scale(.92)}50%{transform:scale(1.08)}}
+@keyframes rv-chat-bob{0%,100%{transform:translateY(2px)}50%{transform:translateY(-6px)}}
+@keyframes rv-bars-rise{0%,100%{transform:scaleY(.72)}50%{transform:scaleY(1)}}
+@keyframes rv-arrow-draw{0%{stroke-dashoffset:220;opacity:.25}45%,80%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:-220;opacity:.25}}
+
+@media (min-width:901px) and (max-width:1400px){
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-feature { min-height:184px !important; padding:10px 13px 15px !important; }
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-feature-visual { height:98px; }
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-feature-art { width:min(100%,170px);height:98px; }
+  body.home-page:has(#authView:not(.hidden)) .rv-ai-head { width:86px;height:68px;right:1%; }
+}
+@media (max-width:900px){
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-feature { min-height:190px !important; }
+  body.home-page:has(#authView:not(.hidden)) .rv-ai-head { width:82px;height:64px;right:8%;top:3%; }
+}
+@media (max-width:620px){
+  body.home-page:has(#authView:not(.hidden)) .rv-brand-mark { min-width:145px;font-size:18px !important;gap:7px; }
+  body.home-page:has(#authView:not(.hidden)) .rv-brand-logo { width:36px;height:26px; }
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-feature { min-height:176px !important; }
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-feature-visual { height:92px; }
+  body.home-page:has(#authView:not(.hidden)) .rv-auth-feature-art { height:92px;width:185px; }
+  body.home-page:has(#authView:not(.hidden)) .rv-ai-head { width:66px;height:54px;right:2%;top:7%; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  /*
+   * Include #authView explicitly to outrank component-level !important
+   * animations while keeping this preference isolated to the public entry.
+   */
+  body.home-page:has(#authView:not(.hidden)) #authView,
+  body.home-page:has(#authView:not(.hidden)) #authView::before,
+  body.home-page:has(#authView:not(.hidden)) #authView::after,
+  body.home-page:has(#authView:not(.hidden)) #authView *,
+  body.home-page:has(#authView:not(.hidden)) #authView *::before,
+  body.home-page:has(#authView:not(.hidden)) #authView *::after {
+    animation:none !important;
+    transition-duration:.01ms !important;
+    scroll-behavior:auto !important;
+  }
+}
