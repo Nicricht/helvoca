@@ -55,13 +55,13 @@ public class CommercialOperationsAdminController {
     }
 
     @GetMapping("/quotes")
-    @PreAuthorize("hasAuthority('PERM_DELIVERIES_READ')")
+    @PreAuthorize("hasAuthority('PERM_QUOTES_READ')")
     public ResponseEntity<List<CommercialOperationsAdminService.QuoteView>> quotes() {
         return ResponseEntity.ok(service.quotes());
     }
 
     @PatchMapping("/quotes/{id}/status")
-    @PreAuthorize("hasAuthority('PERM_DELIVERIES_MANAGE')")
+    @PreAuthorize("hasAuthority('PERM_QUOTES_MANAGE')")
     public ResponseEntity<CommercialOperationsAdminService.QuoteView> updateQuoteStatus(
             @PathVariable UUID id,
             @RequestBody QuoteStatusRequest request) {
@@ -69,13 +69,13 @@ public class CommercialOperationsAdminController {
     }
 
     @GetMapping("/leads")
-    @PreAuthorize("hasAuthority('PERM_DELIVERIES_READ')")
+    @PreAuthorize("hasAuthority('PERM_LEADS_READ')")
     public ResponseEntity<List<CommercialOperationsAdminService.LeadView>> leads() {
         return ResponseEntity.ok(service.leads());
     }
 
     @PatchMapping("/leads/{id}/status")
-    @PreAuthorize("hasAuthority('PERM_DELIVERIES_MANAGE')")
+    @PreAuthorize("hasAuthority('PERM_LEADS_MANAGE')")
     public ResponseEntity<CommercialOperationsAdminService.LeadView> updateLeadStatus(
             @PathVariable UUID id,
             @RequestBody LeadStatusRequest request) {
