@@ -62,6 +62,22 @@ class VoiceCallRouterCertificationOverrideTest {
     }
 
     @Test
+    void configuredCertificationProviderMustAlsoExistInProductionProviderOrder() {
+        VoiceProviderProperties properties = new VoiceProviderProperties();
+        properties.setProviderOrder(List.of("gemini"));
+        VoiceAiProviderRegistry providers = mock(VoiceAiProviderRegistry.class);
+        VoiceProviderHealthRegistry health = new VoiceProviderHealthRegistry();
+        TwilioMediaStreamTwimlFactory media = mock(TwilioMediaStreamTwimlFactory.class);
+        OpenAiLiveSipService openAi = mock(OpenAiLiveSipService.class);
+
+        VoiceCallRouter router = new VoiceCallRouter(properties, providers, health, media, openAi);
+
+        assertTrue(router.route(
+                "+14355652512", "+56911111111", CALL_SID, "openai-live", null).isEmpty());
+        verifyNoInteractions(providers, media, openAi);
+    }
+
+    @Test
     void unsupportedCertificationProviderFailsClosed() {
         VoiceProviderProperties properties = new VoiceProviderProperties();
         VoiceAiProviderRegistry providers = mock(VoiceAiProviderRegistry.class);
