@@ -437,6 +437,25 @@ class CommercialOperationsAdminServiceTest {
         verify(deliveries, never()).saveAndFlush(any());
     }
 
+    @Test
+    void preparationPermissionCannotCancelOrCompleteOrders() {
+        TenantProvider tenant = mock(TenantProvider.class);
+        CommercialOperationsAdminService service = service(
+                mock(BusinessOrderRepository.class),
+                mock(BusinessOrderLineRepository.class),
+                tenant,
+                mock(BusinessDeliveryRepository.class),
+                mock(BusinessOperationRepository.class));
+
+        UUID orderId = UUID.randomUUID();
+        assertThrows(IllegalArgumentException.class,
+                () -> service.updateOrderPreparationStatus(orderId, BusinessOrder.Status.CANCELLED));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.updateOrderPreparationStatus(orderId, BusinessOrder.Status.COMPLETED));
+
+        verifyNoInteractions(tenant);
+    }
+
     private static CommercialOperationsAdminService service(BusinessOrderRepository orders,
                                                             BusinessOrderLineRepository lines,
                                                             TenantProvider tenant,
