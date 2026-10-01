@@ -18,6 +18,7 @@
   const demoSessionState = document.querySelector('#platformDemoSessionState');
   const demoSession = document.querySelector('#platformDemoSession');
   const demoTimelineState = document.querySelector('#platformDemoTimelineState');
+  const demoTimelineMeta = document.querySelector('#platformDemoTimelineMeta');
   const demoTimeline = document.querySelector('#platformDemoTimeline');
   let demoPollBusy = false;
 
@@ -188,6 +189,10 @@
       demoTimeline.classList.add('hidden');
       demoTimelineState.textContent = 'Esperando evidencia real de la llamada DEMO…';
       demoTimelineState.classList.remove('hidden');
+      if (demoTimelineMeta) {
+        demoTimelineMeta.textContent = '0 llamadas · ' + String(data.state || 'READY').toUpperCase();
+        demoTimelineMeta.classList.remove('hidden');
+      }
       return;
     }
 
@@ -208,10 +213,15 @@
         </article>`;
     }).join('');
 
+    const callCount = Number(data.callCount || 0);
     demoTimelineState.textContent = live
       ? 'Evidencia en vivo de la sesión actual.'
-      : `${Number(data.callCount || 0)} llamada(s) correlacionada(s) con esta demo.`;
+      : `${callCount} llamada(s) correlacionada(s) con esta demo.`;
     demoTimelineState.classList.remove('hidden');
+    if (demoTimelineMeta) {
+      demoTimelineMeta.textContent = `${callCount} ${callCount === 1 ? 'llamada' : 'llamadas'} · ${String(data.state || 'READY').toUpperCase()}`;
+      demoTimelineMeta.classList.remove('hidden');
+    }
     demoTimeline.classList.remove('hidden');
   }
 
