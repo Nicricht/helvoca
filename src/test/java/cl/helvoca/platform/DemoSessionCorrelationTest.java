@@ -50,7 +50,7 @@ class DemoSessionCorrelationTest {
 
         DemoSessionRepository sessions = mock(DemoSessionRepository.class);
         CallSessionRepository calls = mock(CallSessionRepository.class);
-        PlatformDemoReadinessService readiness = mock(PlatformDemoReadinessService.class);
+        DemoInboundSafetyReadiness readiness = mock(DemoInboundSafetyReadiness.class);
         AuditService audit = mock(AuditService.class);
 
         DemoSession ready = DemoSession.preparing(UUID.randomUUID(), runtimeId, "rev");
@@ -62,11 +62,11 @@ class DemoSessionCorrelationTest {
         when(sessions.findForUpdateByIdAndRuntimeBusinessId(sessionId, runtimeId))
                 .thenReturn(Optional.of(ready));
         when(sessions.saveAndFlush(ready)).thenReturn(ready);
-        when(readiness.readiness()).thenReturn(safeReadiness(runtimeId));
+        when(readiness.safeSnapshot(runtimeId)).thenReturn(Optional.of(safeSnapshot(runtimeId)));
 
         DemoSessionCorrelationService service = new DemoSessionCorrelationService(
                 properties, sessions, calls, mock(MessagingConversationRepository.class));
-        service.setReadiness(readiness);
+        service.setInboundSafety(readiness);
         service.setAudit(audit);
 
         assertEquals(Optional.of(sessionId), service.activeOrActivateForInboundVoice(runtimeId));
@@ -83,7 +83,7 @@ class DemoSessionCorrelationTest {
         properties.setRuntimeBusinessId(runtimeId.toString());
 
         DemoSessionRepository sessions = mock(DemoSessionRepository.class);
-        PlatformDemoReadinessService readiness = mock(PlatformDemoReadinessService.class);
+        DemoInboundSafetyReadiness readiness = mock(DemoInboundSafetyReadiness.class);
         AuditService audit = mock(AuditService.class);
 
         DemoSession ready = DemoSession.preparing(UUID.randomUUID(), runtimeId, "rev");
@@ -91,20 +91,52 @@ class DemoSessionCorrelationTest {
         ready.markReady();
         when(sessions.findPreparedForRuntime(runtimeId)).thenReturn(Optional.of(ready));
 
-        PlatformDemoReadinessResponse unsafe = new PlatformDemoReadinessResponse(
-                true, runtimeId,
-                item("READY"), item("READY"), item("UNAVAILABLE"), item("READY"), item("READY"),
-                item("NOT_CONFIGURED"), item("SANDBOX_ONLY"), item("DISARMED"));
-        when(readiness.readiness()).thenReturn(unsafe);
+        when(readiness.safeSnapshot(runtimeId)).thenReturn(Optional.empty());
 
         DemoSessionCorrelationService service = new DemoSessionCorrelationService(
                 properties, sessions, mock(CallSessionRepository.class),
                 mock(MessagingConversationRepository.class));
-        service.setReadiness(readiness);
+        service.setInboundSafety(readiness);
         service.setAudit(audit);
 
         assertTrue(service.activeOrActivateForInboundVoice(runtimeId).isEmpty());
         assertEquals(DemoSessionState.READY, ready.getState());
+        verify(sessions, never()).saveAndFlush(any());
+        verifyNoInteractions(audit);
+    }
+
+
+    @Test
+    void inboundVoiceRechecksSafetyAfterLockAndFailsClosedIfReadinessDegrades() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        DemoInboundSafetyReadiness readiness = mock(DemoInboundSafetyReadiness.class);
+        AuditService audit = mock(AuditService.class);
+
+        DemoSession ready = DemoSession.preparing(UUID.randomUUID(), runtimeId, "rev");
+        ReflectionTestUtils.setField(ready, "id", sessionId);
+        ready.markStaged();
+        ready.markReady();
+
+        when(sessions.findPreparedForRuntime(runtimeId)).thenReturn(Optional.of(ready));
+        when(sessions.findForUpdateByIdAndRuntimeBusinessId(sessionId, runtimeId))
+                .thenReturn(Optional.of(ready));
+        when(readiness.safeSnapshot(runtimeId))
+                .thenReturn(Optional.of(safeSnapshot(runtimeId)), Optional.empty());
+
+        DemoSessionCorrelationService service = new DemoSessionCorrelationService(
+                properties, sessions, mock(CallSessionRepository.class),
+                mock(MessagingConversationRepository.class));
+        service.setInboundSafety(readiness);
+        service.setAudit(audit);
+
+        assertTrue(service.activeOrActivateForInboundVoice(runtimeId).isEmpty());
+        assertEquals(DemoSessionState.READY, ready.getState());
+        verify(readiness, times(2)).safeSnapshot(runtimeId);
         verify(sessions, never()).saveAndFlush(any());
         verifyNoInteractions(audit);
     }
@@ -182,14 +214,16 @@ class DemoSessionCorrelationTest {
         active.markFinished();
         assertTrue(service.resolveForSource(runtimeId, callId).isEmpty());
     }
-    private static PlatformDemoReadinessResponse safeReadiness(UUID runtimeId) {
-        return new PlatformDemoReadinessResponse(
-                true, runtimeId,
-                item("READY"), item("READY"), item("READY"), item("READY"), item("READY"),
-                item("NOT_CONFIGURED"), item("SANDBOX_ONLY"), item("DISARMED"));
-    }
-
-    private static PlatformDemoReadinessResponse.ReadinessItem item(String state) {
-        return new PlatformDemoReadinessResponse.ReadinessItem(state, state);
+    private static java.util.Map<String, Object> safeSnapshot(UUID runtimeId) {
+        java.util.LinkedHashMap<String, Object> snapshot = new java.util.LinkedHashMap<>();
+        snapshot.put("runtimeBusinessId", runtimeId);
+        snapshot.put("runtime", "READY");
+        snapshot.put("voiceNumber", "READY");
+        snapshot.put("voiceAi", "READY");
+        snapshot.put("businessData", "READY");
+        snapshot.put("operations", "READY");
+        snapshot.put("payment", "SANDBOX_ONLY");
+        snapshot.put("externalEffects", "DISARMED");
+        return snapshot;
     }
 }
