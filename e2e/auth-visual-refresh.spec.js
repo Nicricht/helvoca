@@ -7,17 +7,16 @@ test.describe('public authentication visual refresh', () => {
     await expect(page.locator('#authView')).toBeVisible();
     await expect(page.getByRole('heading', { level: 1, name: 'No pierdas otra llamada.' })).toBeVisible();
     await expect(page.locator('.rv-hero-emphasis')).toHaveText('de tu negocio');
-    await expect(page.locator('.rv-brand-mark img')).toHaveAttribute('src', '/recepvoz-logo-3d.webp');
-    await expect(page.locator('.rv-auth-visual img.rv-phone-device')).toHaveAttribute('src', '/recepvoz-hero-phone-3d.webp');
+    await expect(page.locator('.rv-brand-mark .rv-brand-logo')).toBeVisible();
+    await expect(page.locator('.rv-auth-visual img.rv-phone-device')).toHaveAttribute('src', '/recepvoz-phone-hero.svg');
     await expect(page.locator('.rv-benefit-row')).toContainText('Atiende llamadas 24/7');
     await expect(page.locator('.rv-benefit-row')).toContainText('Agenda citas');
     await expect(page.locator('.rv-benefit-row')).toContainText('WhatsApp Business');
     await expect(page.locator('.rv-auth-feature-strip')).toBeVisible();
-    await expect(page.locator('.rv-auth-feature img.rv-auth-feature-art')).toHaveCount(4);
-    await expect(page.locator('.rv-auth-feature[data-feature="calls"] img')).toHaveAttribute('src', '/recepvoz-feature-calls.webp');
-    await expect(page.locator('.rv-auth-feature[data-feature="calendar"] img')).toHaveAttribute('src', '/recepvoz-feature-calendar.webp');
-    await expect(page.locator('.rv-auth-feature[data-feature="whatsapp"] img')).toHaveAttribute('src', '/recepvoz-feature-whatsapp.webp');
-    await expect(page.locator('.rv-auth-feature[data-feature="analytics"] img')).toHaveAttribute('src', '/recepvoz-feature-analytics.webp');
+    await expect(page.locator('.rv-auth-feature svg.rv-auth-feature-art')).toHaveCount(4);
+    for (const feature of ['calls', 'calendar', 'whatsapp', 'analytics']) {
+      await expect(page.locator(`.rv-auth-feature[data-feature="${feature}"] .rv-auth-feature-art`)).toBeVisible();
+    }
     await expect(page.locator('#registerForm')).toBeVisible();
   });
 
@@ -120,7 +119,7 @@ test.describe('public authentication visual refresh', () => {
     await page.goto('/');
 
     await expect(page.locator('.rv-phone-stage')).toBeVisible();
-    await expect(page.locator('.rv-phone-device')).toHaveAttribute('src', '/recepvoz-hero-phone-3d.webp');
+    await expect(page.locator('.rv-phone-device')).toHaveAttribute('src', '/recepvoz-phone-hero.svg');
     await expect(page.locator('.rv-phone-bubble')).toHaveCount(3);
     await expect(page.locator('.rv-phone-wave i')).toHaveCount(9);
     await expect(page.locator('.rv-phone-status')).toContainText('Recepcionista disponible');
@@ -128,19 +127,15 @@ test.describe('public authentication visual refresh', () => {
 
   test('serves the new visual assets to unauthenticated visitors', async ({ request }) => {
     const css = await request.get('/auth-visual-refresh.css');
-    const logo = await request.get('/recepvoz-logo-3d.webp');
-    const phone = await request.get('/recepvoz-hero-phone-3d.webp');
-    const calls = await request.get('/recepvoz-feature-calls.webp');
-    const calendar = await request.get('/recepvoz-feature-calendar.webp');
-    const whatsapp = await request.get('/recepvoz-feature-whatsapp.webp');
-    const analytics = await request.get('/recepvoz-feature-analytics.webp');
+    const motionCss = await request.get('/landing-motion.css');
+    const phone = await request.get('/recepvoz-phone-hero.svg');
 
     expect(css.status()).toBe(200);
-    for (const asset of [logo, phone, calls, calendar, whatsapp, analytics]) {
-      expect(asset.status()).toBe(200);
-      expect(asset.headers()['content-type']).toContain('image/webp');
-    }
+    expect(motionCss.status()).toBe(200);
+    expect(phone.status()).toBe(200);
     expect(css.headers()['content-type']).toContain('text/css');
+    expect(motionCss.headers()['content-type']).toContain('text/css');
+    expect(phone.headers()['content-type']).toContain('image/svg+xml');
   });
 
   test('keeps the public surface visually alive without relying on user interaction', async ({ page }) => {
