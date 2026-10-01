@@ -33,6 +33,7 @@ class PlatformCommercialEconomicsRepositoryTest {
         when(rs.getObject("used_seconds")).thenReturn(new BigDecimal("4200"));
         when(rs.getObject("overage_unit_size")).thenReturn(new BigDecimal("60"));
         when(rs.getObject("overage_price_clp")).thenReturn(149);
+        when(rs.getInt("active_voice_number_count")).thenReturn(1);
         when(rs.getObject("estimated_cost_usd")).thenReturn(new BigDecimal("1.25"));
 
         when(jdbc.query(anyString(), any(RowMapper.class))).thenAnswer(invocation -> {
@@ -48,6 +49,7 @@ class PlatformCommercialEconomicsRepositoryTest {
         assertEquals("Negocio", row.businessName());
         assertEquals(24990, row.monthlyPriceClp());
         assertFalse(row.customPricing());
+        assertEquals(1, row.activeVoiceNumberCount());
         assertEquals(new BigDecimal("1.25"), row.estimatedCostUsd());
     }
 
