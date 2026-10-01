@@ -41,7 +41,7 @@ class PlatformDemoReadinessServiceTest {
         assertEquals("NOT_CONFIGURED", result.voiceAi().state());
         assertEquals("NOT_CONFIGURED", result.businessData().state());
         assertEquals("NOT_CONFIGURED", result.operations().state());
-        assertEquals("NOT_CONFIGURED", result.whatsapp().state());
+        assertEquals("UNAVAILABLE", result.whatsapp().state());
         assertEquals("SANDBOX_ONLY", result.payment().state());
         assertEquals("DISARMED", result.externalEffects().state());
         verifyNoInteractions(businesses, phones, agents, channels);
