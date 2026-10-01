@@ -5,5 +5,6 @@ public enum DemoSessionState {
     READY,
     ACTIVE,
     FINISHED,
-    FAILED
+    FAILED,
+    ABORTED
 }
