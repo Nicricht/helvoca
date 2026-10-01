@@ -9,7 +9,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin/users")
-@PreAuthorize("hasRole('BUSINESS_ADMIN')")
+@PreAuthorize("hasAuthority('PERM_TEAM_MANAGE')")
 public class UserAdminController {
     private final UserAdminService service;
 
