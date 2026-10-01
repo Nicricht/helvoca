@@ -86,6 +86,34 @@ class CallLifecycleServiceTest {
     }
 
     @Test
+    void completedCallUsesModelSpecificAiRateBeforeProviderAndLegacyFallbacks() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setTelephonyCostPerMinuteUsd(new BigDecimal("0.010000"));
+        properties.setAiCostPerMinuteUsd(new BigDecimal("0.030000"));
+        properties.setAiProviderCostPerMinuteUsd(java.util.Map.of(
+                "gemini", new BigDecimal("0.025000")));
+        properties.setAiModelCostPerMinuteUsd(java.util.Map.of(
+                "gemini-3.8-live", new BigDecimal("0.020000")));
+        CallLifecycleService lifecycle = lifecycle(
+                mock(PhoneNumberRepository.class), mock(CustomerRepository.class), calls, properties);
+
+        UUID callId = UUID.randomUUID();
+        CallSession call = new CallSession();
+        call.setStatus(CallStatus.IN_PROGRESS);
+        call.setAiProvider("gemini");
+        call.setAiModel("gemini-3.8-live");
+        call.setStartedAt(Instant.now().minusSeconds(120));
+        when(calls.findById(callId)).thenReturn(Optional.of(call));
+
+        lifecycle.updateStatus(callId, "completed", 120);
+
+        assertEquals(new BigDecimal("0.020000"), call.getEstimatedTelephonyCostUsd());
+        assertEquals(new BigDecimal("0.040000"), call.getEstimatedAiCostUsd());
+        assertEquals(new BigDecimal("0.060000"), call.getEstimatedTotalCostUsd());
+    }
+
+    @Test
     void selectedAiModelIsPersistedAsDiagnosticMetadata() {
         CallSessionRepository calls = mock(CallSessionRepository.class);
         CallLifecycleService lifecycle = lifecycle(
