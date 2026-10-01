@@ -125,6 +125,8 @@
         <button id="platformDemoCreateOpen" class="button small primary" type="button">+ Crear nueva demo</button>
       </div>
 
+      <div id="platformDemoReadinessState" class="platform-empty" role="status" aria-live="polite">Revisando readiness del runtime demo…</div>
+      <div id="platformDemoReadiness" class="platform-demo-readiness hidden" aria-label="Readiness del runtime demo"></div>
       <div id="platformDemoState" class="platform-empty" role="status" aria-live="polite">Cargando perfiles de demo…</div>
       <div id="platformDemoProfiles" class="platform-demo-profiles hidden"></div>
 
@@ -177,7 +179,7 @@
       </div>
 
       <div class="platform-demo-truth">
-        <strong>Estado de esta fase:</strong> perfiles persistentes y aislados de operaciones productivas. Voz, WhatsApp y Pago Sandbox aparecerán con estados factuales cuando la preparación live esté implementada y certificada.
+        <strong>Regla:</strong> esta pantalla muestra readiness factual del runtime dedicado. Un estado READY no arma efectos externos; WhatsApp saliente y cualquier efecto externo permanecen desarmados hasta una concesión explícita de sesión.
       </div>
     </section>
 
