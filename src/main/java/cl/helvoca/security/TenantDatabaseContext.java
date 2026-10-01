@@ -8,17 +8,17 @@ import java.util.function.Supplier;
 /**
  * Explicit database access context consumed by TenantAwareDataSource.
  *
- * HTTP requests always install a scope in TenantDatabaseContextFilter. Internal
- * non-HTTP work defaults to SYSTEM and should narrow to TENANT whenever the
- * business id is known.
+ * HTTP requests install a scope in TenantDatabaseContextFilter. Internal
+ * non-HTTP work is DENIED unless it explicitly opts into SYSTEM or TENANT
+ * access. This prevents a forgotten scope from becoming cross-tenant access.
  */
 @Component
 public class TenantDatabaseContext {
     private final ThreadLocal<Access> current = new ThreadLocal<>();
 
-    public Access currentOrInternalSystem() {
+    public Access currentOrDenied() {
         Access value = current.get();
-        return value == null ? Access.system() : value;
+        return value == null ? Access.denied() : value;
     }
 
     public Scope useTenant(UUID businessId) {
