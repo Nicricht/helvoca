@@ -5,7 +5,7 @@
   if (!root || !dashboard || !statusGrid || typeof api !== "function") return;
 
   const state = { bookings: [], customers: [], services: [], orders: [], sales: [], salesSummary: {}, salesAnalytics: null, salesAnalyticsDays: 30, requests: [], audit: [], auditCatalog: [], roles: [], businessName: "Tu negocio", businessTimezone: "America/Santiago" };
-  const bookingFilters = { query: "", date: "all", serviceId: "all", status: "all", source: "all" };
+  const bookingFilters = { query: "", date: "all", dayKey: "", serviceId: "all", status: "all", source: "all" };
   const orderFilters = { query: "", status: "all", sort: "newest" };
   const salesFilters = { stage: "all", channel: "all" };
   const EVENT_LABELS = {
@@ -883,34 +883,165 @@
     return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}-${String(value.getUTCDate()).padStart(2, "0")}`;
   }
 
+  function agendaWeekBounds(todayKey) {
+    const [year, month, day] = String(todayKey || "").split("-").map(Number);
+    if (!year || !month || !day) return { start: "", end: "" };
+    const todayUtc = new Date(Date.UTC(year, month - 1, day));
+    const mondayOffset = (todayUtc.getUTCDay() + 6) % 7;
+    const start = addDaysToDateKey(todayKey, -mondayOffset);
+    return { start, end: addDaysToDateKey(start, 7) };
+  }
+
+  function bookingDateKey(item) {
+    const when = new Date(item?.startAt || 0);
+    return Number.isNaN(when.getTime()) ? "" : businessDateKey(when);
+  }
+
   function bookingMatchesDate(item) {
-    if (bookingFilters.date === "all") return true;
     const when = new Date(item.startAt || 0);
     if (Number.isNaN(when.getTime())) return false;
 
     const now = new Date();
     const todayKey = businessDateKey(now);
     const itemKey = businessDateKey(when);
-    const tomorrowKey = addDaysToDateKey(todayKey, 1);
 
-    const [year, month, day] = todayKey.split("-").map(Number);
-    const todayUtc = new Date(Date.UTC(year, month - 1, day));
-    const mondayOffset = (todayUtc.getUTCDay() + 6) % 7;
-    const weekStartKey = addDaysToDateKey(todayKey, -mondayOffset);
-    const weekEndKey = addDaysToDateKey(weekStartKey, 7);
+    if (bookingFilters.dayKey) return itemKey === bookingFilters.dayKey;
+    if (bookingFilters.date === "all") return true;
+
+    const tomorrowKey = addDaysToDateKey(todayKey, 1);
+    const week = agendaWeekBounds(todayKey);
 
     if (bookingFilters.date === "today") return itemKey === todayKey;
     if (bookingFilters.date === "tomorrow") return itemKey === tomorrowKey;
-    if (bookingFilters.date === "week") return itemKey >= weekStartKey && itemKey < weekEndKey;
+    if (bookingFilters.date === "week") return itemKey >= week.start && itemKey < week.end;
     if (bookingFilters.date === "upcoming") return when >= now;
     if (bookingFilters.date === "past") return when < now;
     return true;
   }
 
+  function agendaDayLabel(dateKey) {
+    const [year, month, day] = String(dateKey || "").split("-").map(Number);
+    if (!year || !month || !day) return "";
+    const date = new Date(Date.UTC(year, month - 1, day));
+    const weekday = new Intl.DateTimeFormat("es-CL", { weekday: "short", timeZone: "UTC" })
+      .format(date)
+      .replace(".", "");
+    return {
+      weekday: weekday.charAt(0).toUpperCase() + weekday.slice(1),
+      day: String(day),
+      month: new Intl.DateTimeFormat("es-CL", { month: "short", timeZone: "UTC" })
+        .format(date)
+        .replace(".", "")
+    };
+  }
+
+  function agendaScopeLabel() {
+    if (bookingFilters.dayKey) {
+      const label = agendaDayLabel(bookingFilters.dayKey);
+      return label ? `${label.weekday} ${label.day} ${label.month}` : "Día seleccionado";
+    }
+    return ({
+      today: "Hoy",
+      tomorrow: "Mañana",
+      week: "Esta semana",
+      upcoming: "Próximas",
+      past: "Pasadas",
+      all: "Todas"
+    })[bookingFilters.date] || "Todas";
+  }
+
+  function renderAgendaOverview(allItems, customers, services) {
+    const now = new Date();
+    const todayKey = businessDateKey(now);
+    const week = agendaWeekBounds(todayKey);
+    const todayCount = allItems.filter(item => bookingDateKey(item) === todayKey).length;
+    const weekCount = allItems.filter(item => {
+      const key = bookingDateKey(item);
+      return key && key >= week.start && key < week.end;
+    }).length;
+    const confirmedCount = allItems.filter(item => item.status === "CONFIRMED").length;
+    const nextBooking = allItems
+      .filter(item => item.status === "CONFIRMED" && new Date(item.startAt || 0) >= now)
+      .sort((a, b) => new Date(a.startAt || 0) - new Date(b.startAt || 0))[0] || null;
+
+    const nextCustomer = nextBooking
+      ? (customers.get(String(nextBooking.customerId)) || {})
+      : {};
+    const nextService = nextBooking
+      ? (services.get(String(nextBooking.serviceId)) || {})
+      : {};
+
+    const periods = [
+      ["today", "Hoy"],
+      ["week", "Semana"],
+      ["all", "Todas"]
+    ].map(([value, label]) =>
+      `<button type="button" data-agenda-period="${value}" aria-pressed="${!bookingFilters.dayKey && bookingFilters.date === value ? "true" : "false"}">${label}</button>`
+    ).join("");
+
+    const weekDays = Array.from({ length: 7 }, (_, offset) => {
+      const key = addDaysToDateKey(todayKey, offset);
+      const label = agendaDayLabel(key);
+      const count = allItems.filter(item => bookingDateKey(item) === key).length;
+      const active = bookingFilters.dayKey === key;
+      return `<button type="button" class="${active ? "active" : ""}" data-agenda-day="${key}" aria-pressed="${active ? "true" : "false"}" aria-label="${esc(label.weekday)} ${esc(label.day)} de ${esc(label.month)}, ${count} reservas">
+        <span>${esc(label.weekday)}</span>
+        <strong>${esc(label.day)}</strong>
+        <small>${count}</small>
+      </button>`;
+    }).join("");
+
+    const nextContent = nextBooking
+      ? `<div class="home-agenda-next-copy">
+          <span>Próxima atención</span>
+          <strong>${esc(nextCustomer.name || nextCustomer.phone || "Cliente")}</strong>
+          <p>${esc(nextService.name || "Servicio")} · ${esc(fmtCompact(nextBooking.startAt))}</p>
+        </div>
+        <button type="button" class="home-agenda-open-next" data-home-booking-id="${esc(nextBooking.id)}">Ver reserva</button>`
+      : `<div class="home-agenda-next-copy">
+          <span>Próxima atención</span>
+          <strong>Agenda despejada</strong>
+          <p>No hay reservas confirmadas próximas.</p>
+        </div>`;
+
+    return `
+      <section id="homeAgendaOverview" class="home-agenda-overview" aria-label="Resumen de agenda">
+        <div class="home-agenda-commandbar">
+          <div>
+            <span class="home-agenda-label">Vista</span>
+            <div id="homeAgendaPeriod" class="home-agenda-period" aria-label="Período de agenda">${periods}</div>
+          </div>
+          <div class="home-agenda-kpis">
+            <article><span>Hoy</span><strong id="homeAgendaTodayCount">${todayCount}</strong><small>reservas</small></article>
+            <article><span>Semana</span><strong id="homeAgendaWeekCount">${weekCount}</strong><small>reservas</small></article>
+            <article><span>Confirmadas</span><strong id="homeAgendaConfirmedCount">${confirmedCount}</strong><small>en agenda</small></article>
+          </div>
+        </div>
+        <div class="home-agenda-focus-grid">
+          <section id="homeAgendaNext" class="home-agenda-next">${nextContent}</section>
+          <section class="home-agenda-week" aria-label="Próximos siete días">
+            <div class="home-agenda-week-head">
+              <div><span class="home-agenda-label">Calendario</span><strong>Próximos 7 días</strong></div>
+              <small>Selecciona un día para enfocarlo</small>
+            </div>
+            <div id="homeAgendaWeekStrip" class="home-agenda-week-strip">${weekDays}</div>
+          </section>
+        </div>
+      </section>`;
+  }
+
   function renderBookings() {
     const customers = new Map(state.customers.map(x => [String(x.id), x]));
     const services = new Map(state.services.map(x => [String(x.id), x]));
-    const allItems = [...state.bookings].sort((a,b) => new Date(b.startAt || 0) - new Date(a.startAt || 0));
+    const nowMs = Date.now();
+    const allItems = [...state.bookings].sort((a, b) => {
+      const aTime = new Date(a.startAt || 0).getTime();
+      const bTime = new Date(b.startAt || 0).getTime();
+      const aFuture = Number.isFinite(aTime) && aTime >= nowMs;
+      const bFuture = Number.isFinite(bTime) && bTime >= nowMs;
+      if (aFuture !== bFuture) return aFuture ? -1 : 1;
+      return aFuture ? aTime - bTime : bTime - aTime;
+    });
     const query = bookingFilters.query.trim().toLocaleLowerCase("es");
 
     const items = allItems.filter(item => {
@@ -927,6 +1058,7 @@
 
     document.querySelector("#homeBusinessBookingsCount").textContent = String(allItems.length);
     const host = document.querySelector("#homeBookingsList");
+    const overview = renderAgendaOverview(allItems, customers, services);
     const serviceOptions = state.services.map(service =>
       `<option value="${esc(service.id)}" ${bookingFilters.serviceId === String(service.id) ? "selected" : ""}>${esc(service.name)}</option>`
     ).join("");
@@ -939,11 +1071,14 @@
       `<option value="${value}" ${bookingFilters.source === value ? "selected" : ""}>${label}</option>`
     ).join("");
 
+    const exactDayOption = bookingFilters.dayKey
+      ? `<option value="day">${esc(agendaScopeLabel())}</option>`
+      : "";
     const controls = `
       <div class="home-booking-filters" aria-label="Filtros de reservas">
         <label class="home-filter-search"><span>Buscar</span><input id="homeBookingSearch" type="search" value="${esc(bookingFilters.query)}" placeholder="Cliente, teléfono o servicio"></label>
         <label><span>Fecha</span><select id="homeBookingDate">
-          <option value="all">Todas</option><option value="today">Hoy</option><option value="tomorrow">Mañana</option>
+          ${exactDayOption}<option value="all">Todas</option><option value="today">Hoy</option><option value="tomorrow">Mañana</option>
           <option value="week">Esta semana</option><option value="upcoming">Próximas</option><option value="past">Pasadas</option>
         </select></label>
         <label><span>Servicio</span><select id="homeBookingService"><option value="all">Todos</option>${serviceOptions}</select></label>
@@ -953,21 +1088,23 @@
         <label><span>Origen</span><select id="homeBookingSource"><option value="all">Todos</option>${sourceOptions}</select></label>
         <button id="homeBookingClearFilters" class="home-filter-clear" type="button">Limpiar</button>
       </div>
-      <div class="home-filter-result">Mostrando <strong>${items.length}</strong> de <strong>${allItems.length}</strong> reservas</div>
+      <div class="home-filter-result">Mostrando <strong>${items.length}</strong> de <strong>${allItems.length}</strong> reservas · <span>${esc(agendaScopeLabel())}</span></div>
     `;
 
     if (!allItems.length) {
-      host.innerHTML = controls + '<div class="home-business-empty">Todavía no hay reservas registradas.</div>';
+      host.innerHTML = overview + controls + '<div class="home-business-empty">Todavía no hay reservas registradas.</div>';
       bindBookingFilters();
+      bindBookingOpeners();
       return;
     }
     if (!items.length) {
-      host.innerHTML = controls + '<div class="home-business-empty">No hay reservas que coincidan con estos filtros.</div>';
+      host.innerHTML = overview + controls + '<div class="home-business-empty">No hay reservas que coincidan con estos filtros.</div>';
       bindBookingFilters();
+      bindBookingOpeners();
       return;
     }
 
-    host.innerHTML = controls + `<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Fecha / hora</th><th>Cliente</th><th>Servicio</th><th>Contacto</th><th>Origen</th><th>Estado</th></tr></thead><tbody>${items.map(item => {
+    host.innerHTML = overview + controls + `<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Fecha / hora</th><th>Cliente</th><th>Servicio</th><th>Contacto</th><th>Origen</th><th>Estado</th></tr></thead><tbody>${items.map(item => {
       const customer = customers.get(String(item.customerId)) || {};
       const service = services.get(String(item.serviceId)) || {};
       return `<tr tabindex="0" data-home-booking-id="${esc(item.id)}"><td><strong>${esc(fmt(item.startAt))}</strong></td><td><strong>${esc(customer.name || customer.phone || "Cliente")}</strong></td><td>${esc(service.name || "Servicio")}</td><td>${esc(customer.phone || "Sin teléfono")}</td><td>${esc(source(item.source))}</td><td><span class="home-pill ${item.status === "CANCELLED" ? "bad" : ""}">${esc(status(item.status))}</span></td></tr>`;
@@ -981,24 +1118,51 @@
     bindBookingOpeners();
   }
 
+  function bindAgendaControls() {
+    document.querySelectorAll("[data-agenda-period]").forEach(button => {
+      button.addEventListener("click", () => {
+        bookingFilters.dayKey = "";
+        bookingFilters.date = button.dataset.agendaPeriod || "all";
+        renderBookings();
+      });
+    });
+
+    document.querySelectorAll("[data-agenda-day]").forEach(button => {
+      button.addEventListener("click", () => {
+        bookingFilters.dayKey = button.dataset.agendaDay || "";
+        bookingFilters.date = "all";
+        renderBookings();
+      });
+    });
+  }
+
   function bindBookingFilters() {
     const search = document.querySelector("#homeBookingSearch");
     const date = document.querySelector("#homeBookingDate");
     const service = document.querySelector("#homeBookingService");
     const statusFilter = document.querySelector("#homeBookingStatus");
     const sourceFilter = document.querySelector("#homeBookingSource");
-    if (date) date.value = bookingFilters.date;
+    if (date) date.value = bookingFilters.dayKey ? "day" : bookingFilters.date;
     if (service) service.value = bookingFilters.serviceId;
     if (statusFilter) statusFilter.value = bookingFilters.status;
     if (sourceFilter) sourceFilter.value = bookingFilters.source;
 
-    search?.addEventListener("input", event => { bookingFilters.query = event.target.value; renderBookings(); document.querySelector("#homeBookingSearch")?.focus(); });
-    date?.addEventListener("change", event => { bookingFilters.date = event.target.value; renderBookings(); });
+    bindAgendaControls();
+    search?.addEventListener("input", event => {
+      bookingFilters.query = event.target.value;
+      renderBookings();
+      document.querySelector("#homeBookingSearch")?.focus();
+    });
+    date?.addEventListener("change", event => {
+      bookingFilters.dayKey = "";
+      bookingFilters.date = event.target.value;
+      renderBookings();
+    });
     service?.addEventListener("change", event => { bookingFilters.serviceId = event.target.value; renderBookings(); });
     statusFilter?.addEventListener("change", event => { bookingFilters.status = event.target.value; renderBookings(); });
     sourceFilter?.addEventListener("change", event => { bookingFilters.source = event.target.value; renderBookings(); });
     document.querySelector("#homeBookingClearFilters")?.addEventListener("click", () => {
-      Object.assign(bookingFilters, { query: "", date: "all", serviceId: "all", status: "all", source: "all" });
+      Object.assign(bookingFilters, { query: "", date: "all", dayKey: "", serviceId: "all", status: "all", source: "all" });
       renderBookings();
     });
   }

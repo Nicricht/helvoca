@@ -2077,6 +2077,80 @@ test('orders requests customers remain operable on mobile', async ({ page }) => 
 });
 
 
+
+test('agenda gives the owner a decision-ready today week and day view', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'agenda-professional-token'));
+  await mockReadyHome(page);
+
+  await page.unroute('**/api/v1/bookings');
+  await page.route('**/api/v1/bookings', route => route.fulfill(json([
+    {
+      id: 'agenda-pending', customerId: 'cust2', serviceId: 'svc2',
+      startAt: '2026-10-01T22:30:00Z', endAt: '2026-10-01T22:45:00Z',
+      status: 'PENDING', source: 'AI_WHATSAPP'
+    },
+    {
+      id: 'agenda-1', customerId: 'cust1', serviceId: 'svc1',
+      startAt: '2026-10-01T23:00:00Z', endAt: '2026-10-01T23:30:00Z',
+      status: 'CONFIRMED', source: 'AI_CALL'
+    },
+    {
+      id: 'agenda-2', customerId: 'cust2', serviceId: 'svc2',
+      startAt: '2026-10-01T20:00:00Z', endAt: '2026-10-01T21:00:00Z',
+      status: 'CANCELLED', source: 'AI_WHATSAPP'
+    },
+    {
+      id: 'agenda-3', customerId: 'cust2', serviceId: 'svc2',
+      startAt: '2026-10-02T16:00:00Z', endAt: '2026-10-02T17:00:00Z',
+      status: 'CONFIRMED', source: 'ADMIN'
+    },
+    {
+      id: 'agenda-4', customerId: 'cust1', serviceId: 'svc1',
+      startAt: '2026-10-08T15:00:00Z', endAt: '2026-10-08T15:30:00Z',
+      status: 'CONFIRMED', source: 'API'
+    }
+  ])));
+
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
+
+  const overview = page.locator('#homeAgendaOverview');
+  await expect(overview).toBeVisible();
+  await expect(page.locator('#homeAgendaTodayCount')).toHaveText('3');
+  await expect(page.locator('#homeAgendaWeekCount')).toHaveText('4');
+  await expect(page.locator('#homeAgendaConfirmedCount')).toHaveText('3');
+  await expect(page.locator('#homeAgendaNext')).toContainText('Ana Reserva');
+  await expect(page.locator('#homeAgendaNext')).toContainText('Peluquería');
+
+  await expect(page.locator('#homeAgendaWeekStrip [data-agenda-day]')).toHaveCount(7);
+  await expect(page.locator('[data-agenda-period="all"]')).toHaveAttribute('aria-pressed', 'true');
+
+  await page.locator('[data-agenda-period="today"]').click();
+  await expect(page.locator('#homeBookingDate')).toHaveValue('today');
+  await expect(page.locator('.home-filter-result')).toContainText('3 de 5');
+  await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
+  await expect(page.locator('#homeBookingsList')).toContainText('Bruno Masaje');
+
+  await page.locator('[data-agenda-period="week"]').click();
+  await expect(page.locator('#homeBookingDate')).toHaveValue('week');
+  await expect(page.locator('.home-filter-result')).toContainText('4 de 5');
+
+  await page.locator('[data-agenda-day="2026-10-02"]').click();
+  await expect(page.locator('[data-agenda-day="2026-10-02"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.home-filter-result')).toContainText('1 de 5');
+  const focusedRows = page.locator('#homeBookingsList .home-business-table tbody');
+  await expect(focusedRows).toContainText('Bruno Masaje');
+  await expect(focusedRows).not.toContainText('Ana Reserva');
+
+  await page.locator('[data-agenda-period="all"]').click();
+  await expect(page.locator('[data-agenda-period="all"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.home-filter-result')).toContainText('5 de 5');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
 test('booking cancellation from drawer works', async ({ page }) => {
   test.setTimeout(45000);
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
