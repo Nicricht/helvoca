@@ -117,6 +117,43 @@ class TeamInvitationServiceTest {
         verifyNoInteractions(invitations, businesses, passwordEncoder, authService);
     }
 
+
+    @Test
+    void kitchenCanBeInvitedAsARestrictedBusinessRole() {
+        when(users.existsByEmailIgnoreCase("cocina@negocio.cl")).thenReturn(false);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business));
+        when(invitations.findAllByBusinessIdAndEmailIgnoreCaseAndAcceptedAtIsNullAndRevokedAtIsNull(
+                businessId, "cocina@negocio.cl")).thenReturn(List.of());
+        when(invitations.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TeamInvitationResponse result = service.create(
+                new InviteUserRequest("Equipo Cocina", "cocina@negocio.cl", RoleCode.KITCHEN));
+
+        assertEquals("KITCHEN", result.role());
+    }
+
+    @Test
+    void businessOwnerCannotBeInvitedByAnotherBusinessUser() {
+        assertThrows(IllegalArgumentException.class, () -> service.create(
+                new InviteUserRequest("Otro dueño", "owner2@example.cl", RoleCode.BUSINESS_OWNER)));
+        verifyNoInteractions(invitations, businesses, passwordEncoder, authService);
+    }
+
+    @Test
+    void platformProvisioningMayCreatePrincipalOwnerInvitation() {
+        when(users.existsByEmailIgnoreCase("owner@negocio.cl")).thenReturn(false);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business));
+        when(invitations.findAllByBusinessIdAndEmailIgnoreCaseAndAcceptedAtIsNullAndRevokedAtIsNull(
+                businessId, "owner@negocio.cl")).thenReturn(List.of());
+        when(invitations.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TeamInvitationResponse result = service.createForPlatform(
+                businessId,
+                new InviteUserRequest("Dueño", "owner@negocio.cl", RoleCode.BUSINESS_OWNER));
+
+        assertEquals("BUSINESS_OWNER", result.role());
+    }
+
     @Test
     void acceptCreatesUserWithOwnPasswordAndConsumesInvitation() {
         String rawToken = "very-secret-invitation-token";
