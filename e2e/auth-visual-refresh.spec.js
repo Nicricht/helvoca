@@ -7,11 +7,16 @@ test.describe('public authentication visual refresh', () => {
     await expect(page.locator('#authView')).toBeVisible();
     await expect(page.getByRole('heading', { level: 1, name: 'No pierdas otra llamada.' })).toBeVisible();
     await expect(page.locator('.rv-hero-emphasis')).toHaveText('de tu negocio');
-    await expect(page.locator('.rv-auth-visual img')).toHaveAttribute('src', '/recepvoz-phone-hero.svg');
+    await expect(page.locator('.rv-brand-mark .rv-brand-logo')).toBeVisible();
+    await expect(page.locator('.rv-auth-visual img.rv-phone-device')).toHaveAttribute('src', '/recepvoz-phone-hero.svg');
     await expect(page.locator('.rv-benefit-row')).toContainText('Atiende llamadas 24/7');
     await expect(page.locator('.rv-benefit-row')).toContainText('Agenda citas');
     await expect(page.locator('.rv-benefit-row')).toContainText('WhatsApp Business');
     await expect(page.locator('.rv-auth-feature-strip')).toBeVisible();
+    await expect(page.locator('.rv-auth-feature svg.rv-auth-feature-art')).toHaveCount(4);
+    for (const feature of ['calls', 'calendar', 'whatsapp', 'analytics']) {
+      await expect(page.locator(`.rv-auth-feature[data-feature="${feature}"] .rv-auth-feature-art`)).toBeVisible();
+    }
     await expect(page.locator('#registerForm')).toBeVisible();
   });
 
@@ -122,22 +127,43 @@ test.describe('public authentication visual refresh', () => {
 
   test('serves the new visual assets to unauthenticated visitors', async ({ request }) => {
     const css = await request.get('/auth-visual-refresh.css');
-    const hero = await request.get('/recepvoz-auth-hero.svg');
+    const motionCss = await request.get('/landing-motion.css');
     const phone = await request.get('/recepvoz-phone-hero.svg');
 
     expect(css.status()).toBe(200);
-    expect(hero.status()).toBe(200);
+    expect(motionCss.status()).toBe(200);
     expect(phone.status()).toBe(200);
     expect(css.headers()['content-type']).toContain('text/css');
-    expect(hero.headers()['content-type']).toContain('image/svg+xml');
+    expect(motionCss.headers()['content-type']).toContain('text/css');
     expect(phone.headers()['content-type']).toContain('image/svg+xml');
+  });
+
+  test('keeps the public surface visually alive without relying on user interaction', async ({ page }) => {
+    await page.goto('/');
+
+    const motion = await page.evaluate(() => {
+      const hero = getComputedStyle(document.querySelector('.rv-phone-device')).animationName;
+      const feature = getComputedStyle(document.querySelector('.rv-auth-feature-art')).animationName;
+      const glow = getComputedStyle(document.querySelector('.rv-auth-hero')).getPropertyValue('--rv-motion-ready').trim();
+      return { hero, feature, glow };
+    });
+
+    expect(motion.hero).not.toBe('none');
+    expect(motion.feature).not.toBe('none');
+    expect(motion.glow).toBe('1');
   });
 
   test('motion remains nonessential when reduced motion is requested', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
 
-    const animationName = await page.locator('.rv-auth-visual').evaluate(element => getComputedStyle(element).animationName);
-    expect(animationName).toBe('none');
+    const motion = await page.evaluate(() => ({
+      hero: getComputedStyle(document.querySelector('.rv-phone-device')).animationName,
+      feature: getComputedStyle(document.querySelector('.rv-auth-feature-art')).animationName,
+      cardTransition: getComputedStyle(document.querySelector('.rv-auth-feature')).transitionDuration
+    }));
+    expect(motion.hero).toBe('none');
+    expect(motion.feature).toBe('none');
+    expect(parseFloat(motion.cardTransition)).toBeLessThanOrEqual(0.01);
   });
 });
