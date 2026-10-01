@@ -63,6 +63,29 @@ class PermissionJwtContractTest {
     }
 
     @Test
+    void jwtAuthenticationConverterDerivesPermissionsForPreDeploymentTokens() {
+        Instant now = Instant.now();
+        Jwt jwt = new Jwt(
+                "legacy-token",
+                now,
+                now.plusSeconds(300),
+                java.util.Map.of("alg", "HS256"),
+                java.util.Map.of(
+                        "sub", "user-legacy",
+                        "roles", List.of("KITCHEN")));
+
+        var authentication = new SecurityConfig().jwtAuthenticationConverter().convert(jwt);
+        assertNotNull(authentication);
+        var authorities = authentication.getAuthorities().stream().map(Object::toString)
+                .collect(java.util.stream.Collectors.toSet());
+
+        assertTrue(authorities.contains("ROLE_KITCHEN"));
+        assertTrue(authorities.contains("PERM_ORDERS_READ"));
+        assertTrue(authorities.contains("PERM_ORDERS_PREPARE"));
+        assertFalse(authorities.contains("PERM_BILLING_MANAGE"));
+    }
+
+    @Test
     void jwtAuthenticationConverterExposesRoleAndPermissionAuthorities() {
         Instant now = Instant.now();
         Jwt jwt = new Jwt(
