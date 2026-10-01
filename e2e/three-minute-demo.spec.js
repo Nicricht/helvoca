@@ -9,9 +9,9 @@ test('three-minute sales demo is public, safe and ends with one next step', asyn
   await page.goto('/demo.html?rubro=sushi');
 
   await expect(page.getByRole('heading', { level: 1 })).toContainText('3 minutos');
-  await expect(page.getByText(/demo segura/i)).toBeVisible();
-  await expect(page.getByText(/no realiza llamadas reales/i)).toBeVisible();
-  await expect(page.getByText(/Sushi/i)).toBeVisible();
+  await expect(page.locator('.demo-safety')).toContainText('Demo segura');
+  await expect(page.locator('.demo-safety')).toContainText('No realiza llamadas reales');
+  await expect(page.locator('#presetTitle')).toContainText('Sushi');
 
   await page.getByRole('button', { name: /Empezar demo/i }).click();
   await expect(page.locator('[data-demo-step="1"]')).toBeVisible();
