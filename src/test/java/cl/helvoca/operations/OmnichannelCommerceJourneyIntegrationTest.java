@@ -31,7 +31,10 @@ import cl.helvoca.payment.BusinessPayment;
 import cl.helvoca.payment.BusinessPaymentRepository;
 import cl.helvoca.payment.PaymentProviderAdapter;
 import cl.helvoca.payment.PaymentWebhookService;
+import cl.helvoca.security.TenantDatabaseContext;
 import org.json.JSONObject;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,7 +43,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -56,7 +58,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
 @SpringBootTest
-@Transactional
 @Import(OmnichannelCommerceJourneyIntegrationTest.FakePaymentConfiguration.class)
 class OmnichannelCommerceJourneyIntegrationTest {
 
@@ -95,6 +96,19 @@ class OmnichannelCommerceJourneyIntegrationTest {
     @Autowired InventoryReservationRepository inventoryReservations;
     @Autowired BusinessOperationItemRepository operationItems;
     @Autowired BusinessOrderLineRepository orderLines;
+    @Autowired TenantDatabaseContext databaseContext;
+
+    TenantDatabaseContext.Scope systemScope;
+
+    @BeforeEach
+    void enterExplicitSystemFixtureScope() {
+        systemScope = databaseContext.useSystem();
+    }
+
+    @AfterEach
+    void leaveExplicitSystemFixtureScope() {
+        if (systemScope != null) systemScope.close();
+    }
 
     @Test
     void voiceShowcaseContinuesOnWhatsappThroughVerifiedPaymentAndSharedContext() {

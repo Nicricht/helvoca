@@ -1,5 +1,7 @@
 package cl.helvoca.calendar;
 
+import cl.helvoca.testsupport.ExplicitSystemDatabaseScopeSupport;
+
 import cl.helvoca.booking.*;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
@@ -38,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @Testcontainers
 @SpringBootTest
 @Import(CalendarSyncIntegrationTest.ProviderConfig.class)
-class CalendarSyncIntegrationTest {
+class CalendarSyncIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 

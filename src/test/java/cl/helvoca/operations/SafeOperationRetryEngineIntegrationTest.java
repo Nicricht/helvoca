@@ -1,5 +1,7 @@
 package cl.helvoca.operations;
 
+import cl.helvoca.testsupport.ExplicitSystemDatabaseScopeSupport;
+
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import org.json.JSONObject;
@@ -23,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
 @SpringBootTest
-class SafeOperationRetryEngineIntegrationTest {
+class SafeOperationRetryEngineIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
 
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");

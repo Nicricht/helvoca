@@ -1,5 +1,7 @@
 package cl.helvoca.billing;
 
+import cl.helvoca.testsupport.ExplicitSystemDatabaseScopeSupport;
+
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.messaging.MessagingConversation;
@@ -27,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Testcontainers
 @SpringBootTest
 @Transactional
-class MetaWhatsAppUsageMeteringIntegrationTest {
+class MetaWhatsAppUsageMeteringIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
     @Container
     static final PostgreSQLContainer<?> postgres =
             new PostgreSQLContainer<>("postgres:16-alpine");

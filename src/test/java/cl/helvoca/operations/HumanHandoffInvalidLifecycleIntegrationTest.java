@@ -1,5 +1,7 @@
 package cl.helvoca.operations;
 
+import cl.helvoca.testsupport.ExplicitSystemDatabaseScopeSupport;
+
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -24,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @Testcontainers
 @SpringBootTest
-class HumanHandoffInvalidLifecycleIntegrationTest {
+class HumanHandoffInvalidLifecycleIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
 
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
