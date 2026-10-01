@@ -33,16 +33,25 @@ public final class TenantAwareDataSource implements DataSource {
 
     @Override
     public Connection getConnection() throws SQLException {
-        return prepare(delegate.getConnection());
+        TenantDatabaseContext.Access access = requireExplicitAccess();
+        return prepare(delegate.getConnection(), access);
     }
 
     @Override
     public Connection getConnection(String username, String password) throws SQLException {
-        return prepare(delegate.getConnection(username, password));
+        TenantDatabaseContext.Access access = requireExplicitAccess();
+        return prepare(delegate.getConnection(username, password), access);
     }
 
-    private Connection prepare(Connection connection) throws SQLException {
-        TenantDatabaseContext.Access access = context.currentOrInternalSystem();
+    private TenantDatabaseContext.Access requireExplicitAccess() throws SQLException {
+        TenantDatabaseContext.Access access = context.currentOrDenied();
+        if (access.mode() == TenantDatabaseContext.Mode.DENIED) {
+            throw new SQLException("Database access requires an explicit TENANT or SYSTEM scope");
+        }
+        return access;
+    }
+
+    private Connection prepare(Connection connection, TenantDatabaseContext.Access access) throws SQLException {
         try {
             scrubOutsideTransaction(connection);
             String role = access.mode() == TenantDatabaseContext.Mode.SYSTEM ? SYSTEM_ROLE : TENANT_ROLE;
