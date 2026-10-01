@@ -65,6 +65,22 @@
     .platform-demo-readiness-state.sandbox_only,.platform-demo-readiness-state.disarmed,.platform-demo-readiness-state.not_configured { color:#e8c96a; }
     .platform-demo-readiness-state.unavailable,.platform-demo-readiness-state.failed { color:#f28d8d; }
     .platform-demo-readiness-item small { display:block; margin-top:5px; color:var(--muted); font-size:9px; line-height:1.4; overflow-wrap:anywhere; }
+    .platform-demo-timeline { display:grid; gap:8px; margin:12px 0 16px; }
+    .platform-demo-timeline-item { position:relative; display:grid; grid-template-columns:12px minmax(0,1fr) auto; gap:9px; align-items:start; padding:11px 12px; border:1px solid var(--border); border-radius:11px; background:var(--surface-2); overflow:hidden; }
+    .platform-demo-timeline-dot { width:8px; height:8px; margin-top:4px; border-radius:999px; background:currentColor; color:var(--muted); box-shadow:0 0 0 4px rgba(255,255,255,.025); }
+    .platform-demo-timeline-item[data-status="SUCCESS"] .platform-demo-timeline-dot,
+    .platform-demo-timeline-item[data-status="CONNECTED"] .platform-demo-timeline-dot,
+    .platform-demo-timeline-item[data-status="COMPLETED"] .platform-demo-timeline-dot,
+    .platform-demo-timeline-item[data-status="CONFIRMED"] .platform-demo-timeline-dot { color:#37cd91; }
+    .platform-demo-timeline-item[data-status="FAILED"] .platform-demo-timeline-dot { color:#f28d8d; }
+    .platform-demo-timeline-copy { min-width:0; }
+    .platform-demo-timeline-copy strong { display:block; font-size:11px; overflow-wrap:anywhere; }
+    .platform-demo-timeline-copy p { margin:4px 0 0; color:var(--muted); font-size:10px; line-height:1.45; overflow-wrap:anywhere; }
+    .platform-demo-timeline-meta { display:grid; justify-items:end; gap:4px; min-width:72px; }
+    .platform-demo-timeline-meta span { color:var(--muted); font-size:8px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+    .platform-demo-timeline-meta time { color:var(--muted); font-size:9px; white-space:nowrap; }
+    .platform-demo-timeline-live .platform-demo-timeline-dot { animation:platformDemoPulse 1.4s ease-in-out infinite; color:#37cd91; }
+    @keyframes platformDemoPulse { 0%,100%{transform:scale(.82);opacity:.58} 50%{transform:scale(1.18);opacity:1} }
 
     .platform-section-title { margin:22px 0 10px; }
     .platform-section-title h2 { margin:2px 0 4px; font-size:17px; }
@@ -140,6 +156,11 @@
         Ninguna demo está preparada. Elige un perfil y prepara el runtime antes de la llamada.
       </div>
       <div id="platformDemoSession" class="platform-result hidden" aria-label="Sesión live demo actual"></div>
+
+      <div id="platformDemoTimelineState" class="platform-empty" role="status" aria-live="polite">
+        El timeline aparecerá cuando la sesión reciba evidencia real de la llamada.
+      </div>
+      <div id="platformDemoTimeline" class="platform-demo-timeline hidden" aria-label="Timeline en vivo de la demo"></div>
 
       <div id="platformDemoState" class="platform-empty" role="status" aria-live="polite">Cargando perfiles de demo…</div>
       <div id="platformDemoProfiles" class="platform-demo-profiles hidden"></div>
@@ -292,6 +313,6 @@
       </div>
     </section>
   </main>
-  <script src="/platform.js?v=20261001-3" defer></script>
+  <script src="/platform.js?v=20261001-4" defer></script>
 </body>
 </html>
