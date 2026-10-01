@@ -41,6 +41,8 @@ public class SecurityConfig {
             "/inventory.html", "/inventory.js", "/inventory.css",
             "/simulator.html", "/simulator.js", "/simulator.css",
             "/conversations.html", "/conversations.js", "/conversations.css",
+            "/assets/home/recepvoz-robot.png", "/assets/home/recepvoz-wave.png", "/assets/home/recepvoz-nebula.png",
+            "/assets/home/recepvoz-bubble.png", "/assets/home/recepvoz-particles.png", "/assets/home/recepvoz-glow.png", "/assets/home/recepvoz-flare.png",
             "/manifest.webmanifest", "/service-worker.js", "/recepvoz-icon-192.png", "/recepvoz-icon-512.png",
             "/favicon.ico", "/error"
     };

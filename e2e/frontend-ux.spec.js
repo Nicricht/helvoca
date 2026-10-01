@@ -299,7 +299,7 @@ test('ready customer sees operations on home and configuration on settings', asy
 
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Negocio E2E está atendiendo 🟢');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('RecepVoz está atendiendo por ti');
   await expect(page.locator('#readyBanner')).toBeHidden();
   await expect(page.locator('#nextStepBanner')).toBeHidden();
   await expect(page.locator('#advancedPanel')).toBeHidden();

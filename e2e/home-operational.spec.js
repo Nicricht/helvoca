@@ -512,19 +512,20 @@ test('ready customer sees live operational home instead of setup cards', async (
 
   await page.goto('/');
 
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Negocio E2E está atendiendo 🟢');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('RecepVoz está atendiendo por ti');
   await expect(page.locator('#operationalOverview')).toBeVisible();
   await expect(page.locator('#operationalOverview')).toHaveCount(1);
   await expect(page.locator('#pilotReadinessCard')).toHaveCount(0);
   await expect(page.locator('#pilotControlCard')).toHaveCount(0);
   await expect(page.locator('#pilotMetricsCard')).toHaveCount(0);
   expect(internalPilotRequests).toBe(0);
-  await expect(page.locator('#ownerSevenDayRow')).toBeVisible();
-  await expect(page.locator('#ownerSevenDaySummary')).toContainText('50 conversaciones');
-  await expect(page.locator('#ownerSevenDaySummary')).toContainText('12 reservas');
-  await expect(page.locator('#ownerSevenDaySummary')).toContainText('10 pedidos');
+  await expect(page.locator('#operationalOverview .home-pulse-kpi:visible')).toHaveCount(3);
+  await expect(page.locator('#ownerResultsToday')).toHaveText('4');
+  await expect(page.locator('#ownerResultsHint')).toContainText('2 reservas · 2 pedidos');
+  await expect(page.locator('#ownerHeroSummary')).toContainText('7 conversaciones atendidas · 4 resultados conseguidos');
+  await expect(page.locator('#ownerSevenDayRow')).toHaveCount(0);
   await expect(page.locator('#ownerValuePanel')).toBeVisible();
-  await expect(page.locator('#ownerValuePanel')).toContainText('RecepVoz esta semana');
+  await expect(page.locator('#ownerValueTitle')).toHaveText('Esta semana');
   await expect(page.locator('#ownerConfirmedRevenue')).toContainText('$');
   await expect(page.locator('#ownerPaidOutcomes')).toHaveText('93');
   await expect(page.locator('#ownerManagedRevenue')).toContainText('$');
@@ -559,12 +560,13 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#homeQuestionsToday')).toHaveText('2');
   await expect(page.locator('#homeFailuresToday')).toHaveText('0');
   await expect(page.locator('#homeMinutesToday')).toHaveText('8:00');
-  await expect(page.locator('#ownerPlanName')).toHaveText('PRO');
-  await expect(page.locator('#ownerPlanUsage')).toHaveText('23 / 500 min');
-  expect(await page.locator('#homeCallsMetric').evaluate(element => element.tagName)).toBe('ARTICLE');
-  await expect(page.locator('#homeBookingsMetric')).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
-  await expect(page.locator('#homeRequestsMetric')).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
-  await expect(page.locator('#ownerOrdersMetric')).toHaveAttribute('href', '/?tab=sales#homeBusinessWorkspace');
+  await expect(page.locator('#ownerPlanName')).toHaveCount(0);
+  await expect(page.locator('#ownerPlanUsage')).toHaveCount(0);
+  await expect(page.locator('#ownerQuickActions')).toHaveCount(0);
+  await expect(page.locator('#homeCallsMetric')).toHaveCount(0);
+  await expect(page.locator('#homeBookingsMetric')).toHaveCount(0);
+  await expect(page.locator('#homeRequestsMetric')).toHaveCount(0);
+  await expect(page.locator('#ownerOrdersMetric')).toHaveCount(0);
   await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
   await page.locator('#ownerWorkspaceToggle').click();
   await expect(page.locator('#homeBusinessWorkspace')).not.toHaveClass(/owner-collapsed/);
@@ -2333,7 +2335,7 @@ test('manual booking creation checks availability and adds the reservation', asy
   await expect(page.locator('#homeBookingCreateMessage')).toHaveText('Reserva creada para Ana Reserva ✓');
 });
 
-test('dashboard prioritizes calls, attention, recent activity and quick access', async ({ page }) => {
+test('dashboard prioritizes business pulse, attention and recent activity without duplicate navigation', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'dashboard-finish-token'));
   await mockReadyHome(page);
   await page.goto('/');
@@ -2341,11 +2343,12 @@ test('dashboard prioritizes calls, attention, recent activity and quick access',
   const overview = page.locator('#operationalOverview');
   await expect(overview).toBeVisible();
   await expect(overview).toHaveAttribute('aria-labelledby', 'ownerDashboardTitle');
-  await expect(page.locator('#ownerDashboardTitle')).toHaveText('Qué está pasando hoy');
+  await expect(page.locator('#ownerDashboardTitle')).toHaveText('RecepVoz está trabajando');
 
   await expect(page.locator('#ownerCallsTodayPrimary')).toHaveText('4');
-  expect(await page.locator('#homeCallsMetric').evaluate(element => element.tagName)).toBe('ARTICLE');
-  await expect(page.locator('#homeCallsMetric')).toContainText('Llamadas');
+  await expect(page.locator('#homeConversationsToday')).toHaveText('7');
+  await expect(page.locator('#ownerResultsToday')).toHaveText('4');
+  await expect(page.locator('#operationalOverview .home-pulse-kpi:visible')).toHaveCount(3);
 
   const attention = page.locator('#ownerAttentionPanel');
   await expect(attention).toBeVisible();
@@ -2353,13 +2356,9 @@ test('dashboard prioritizes calls, attention, recent activity and quick access',
   await expect(page.locator('#ownerAttentionSummary')).toContainText('requieren revisión');
   await expect(page.locator('#ownerDashboardAttention')).toBeVisible();
 
-  const quick = page.locator('#ownerQuickActions');
-  await expect(quick).toBeVisible();
-  await expect(quick.getByRole('link')).toHaveCount(4);
-  await expect(quick.getByRole('link', { name: 'Agenda' })).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
-  await expect(quick.getByRole('link', { name: 'Pendientes' })).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
-  await expect(quick.getByRole('link', { name: 'Conversaciones' })).toHaveAttribute('href', '/conversations.html');
-  await expect(quick.getByRole('link', { name: 'Inventario' })).toHaveAttribute('href', '/inventory.html');
+  await expect(page.locator('#ownerQuickActions')).toHaveCount(0);
+  await expect(page.locator('#ownerPlanRow')).toHaveCount(0);
+  await expect(page.locator('#ownerValueTitle')).toHaveText('Esta semana');
 
   await expect(page.locator('#ownerDashboardState')).toHaveAttribute('role', 'status');
   await expect(page.locator('#ownerDashboardMessage')).toHaveAttribute('aria-live', 'polite');

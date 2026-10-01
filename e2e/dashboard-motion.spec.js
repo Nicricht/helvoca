@@ -68,3 +68,42 @@ test('dashboard entry can reset stale scroll position without affecting refresh 
   await page.evaluate(() => window.loadDashboard({ resetScroll: true }));
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
 });
+
+
+test('ready Inicio is a focused live business pulse with reusable visual assets', async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+  await mockDashboardBoot(page);
+  await page.goto('/');
+
+  await expect(page.locator('#dashboardView')).toBeVisible();
+  await expect(page.locator('.dashboard-hero-pulse')).toBeVisible();
+  await expect(page.locator('.home-pulse-robot')).toHaveAttribute('src', '/assets/home/recepvoz-robot.png');
+  await expect(page.locator('.home-pulse-wave')).toHaveAttribute('src', '/assets/home/recepvoz-wave.png');
+
+  await expect(page.locator('#operationalOverview')).toHaveClass(/owner-pulse-dashboard/);
+  await expect(page.locator('#operationalOverview .home-pulse-kpi:visible')).toHaveCount(3);
+  await expect(page.locator('#ownerDashboardTitle')).toHaveText('RecepVoz está trabajando');
+  await expect(page.locator('#ownerValueTitle')).toHaveText('Esta semana');
+  await expect(page.locator('#ownerQuickActions')).toHaveCount(0);
+  await expect(page.locator('#ownerPlanRow')).toHaveCount(0);
+
+  for (const asset of [
+    '/assets/home/recepvoz-robot.png',
+    '/assets/home/recepvoz-wave.png',
+    '/assets/home/recepvoz-nebula.png',
+    '/assets/home/recepvoz-bubble.png',
+    '/assets/home/recepvoz-particles.png',
+    '/assets/home/recepvoz-glow.png',
+    '/assets/home/recepvoz-flare.png'
+  ]) {
+    const response = await page.request.get(asset);
+    expect(response.status(), asset).toBe(200);
+  }
+
+  const cssResponse = await page.request.get('/dashboard-motion.css');
+  expect(cssResponse.status()).toBe(200);
+  const css = await cssResponse.text();
+  expect(css).toContain('.home-pulse-robot');
+  expect(css).toContain('.home-pulse-wave');
+  expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+});
