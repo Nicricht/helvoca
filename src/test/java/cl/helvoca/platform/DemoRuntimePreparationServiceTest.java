@@ -49,6 +49,8 @@ class DemoRuntimePreparationServiceTest {
         Business business = new Business();
         ReflectionTestUtils.setField(business, "id", runtimeId);
         business.setName("Old Demo");
+        business.setMode(cl.helvoca.business.BusinessMode.DEMO);
+        business.setStatus(cl.helvoca.business.BusinessStatus.ACTIVE);
         when(businesses.findById(runtimeId)).thenReturn(Optional.of(business));
 
         AiAgent existingAgent = new AiAgent();
@@ -171,6 +173,8 @@ class DemoRuntimePreparationServiceTest {
 
         Business business = new Business();
         ReflectionTestUtils.setField(business, "id", runtimeId);
+        business.setMode(cl.helvoca.business.BusinessMode.DEMO);
+        business.setStatus(cl.helvoca.business.BusinessStatus.ACTIVE);
         when(businesses.findById(runtimeId)).thenReturn(Optional.of(business));
         when(businessProfiles.findById(runtimeId)).thenReturn(Optional.of(profileEntity(runtimeId)));
         when(agents.findByBusinessId(runtimeId)).thenReturn(Optional.empty());
