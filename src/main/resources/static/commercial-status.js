@@ -374,21 +374,25 @@
         '</div>'
     ].join('');
     heading.insertAdjacentElement('afterend', overview);
-    heading.classList.add('dashboard-heading-pulse');
-    if (!heading.querySelector('.dashboard-hero-pulse')) {
-        const heroVisual = document.createElement('div');
-        heroVisual.className = 'dashboard-hero-pulse';
-        heroVisual.setAttribute('aria-hidden', 'true');
-        heroVisual.innerHTML = [
-            '<img class="home-pulse-nebula" src="/assets/home/recepvoz-nebula.png" alt="">',
-            '<img class="home-pulse-wave" src="/assets/home/recepvoz-wave.png" alt="">',
-            '<img class="home-pulse-particles" src="/assets/home/recepvoz-particles.png" alt="">',
-            '<img class="home-pulse-glow" src="/assets/home/recepvoz-glow.png" alt="">',
-            '<img class="home-pulse-robot" src="/assets/home/recepvoz-robot.png" alt="">',
-            '<img class="home-pulse-bubble" src="/assets/home/recepvoz-bubble.png" alt="">',
-            '<img class="home-pulse-flare" src="/assets/home/recepvoz-flare.png" alt="">'
-        ].join('');
-        heading.appendChild(heroVisual);
+    const isHomeDashboardSurface =
+        window.location.pathname === '/' || window.location.pathname.endsWith('/index.html');
+    if (isHomeDashboardSurface) {
+        heading.classList.add('dashboard-heading-pulse');
+        if (!heading.querySelector('.dashboard-hero-pulse')) {
+            const heroVisual = document.createElement('div');
+            heroVisual.className = 'dashboard-hero-pulse';
+            heroVisual.setAttribute('aria-hidden', 'true');
+            heroVisual.innerHTML = [
+                '<img class="home-pulse-nebula" src="/assets/home/recepvoz-nebula.png" alt="">',
+                '<img class="home-pulse-wave" src="/assets/home/recepvoz-wave.png" alt="">',
+                '<img class="home-pulse-particles" src="/assets/home/recepvoz-particles.png" alt="">',
+                '<img class="home-pulse-glow" src="/assets/home/recepvoz-glow.png" alt="">',
+                '<img class="home-pulse-robot" src="/assets/home/recepvoz-robot.png" alt="">',
+                '<img class="home-pulse-bubble" src="/assets/home/recepvoz-bubble.png" alt="">',
+                '<img class="home-pulse-flare" src="/assets/home/recepvoz-flare.png" alt="">'
+            ].join('');
+            heading.appendChild(heroVisual);
+        }
     }
 
     const stateBadge = overview.querySelector('#ownerDashboardState');
