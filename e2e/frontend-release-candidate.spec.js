@@ -270,8 +270,13 @@ test('release candidate owner traverses the complete safe business journey in on
   await expect(page.getByRole('heading', { level: 1 })).toContainText('está atendiendo');
 
   const homeNav = page.locator('#primaryNav');
+  await expect(page.locator('#homeBusinessWorkspace')).toHaveClass(/owner-collapsed/);
   await homeNav.getByRole('link', { name: 'Agenda', exact: true }).click();
   await expect(page.locator('[data-home-tab="bookings"]')).toHaveClass(/active/);
+  await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
+  await expect(page.locator('#homeBusinessWorkspace')).not.toHaveClass(/owner-collapsed/);
+  await expect(page.locator('[data-home-panel="bookings"]')).toBeVisible();
+  await expect(page.locator('[data-home-panel="bookings"]')).toContainText('Reservas');
   await homeNav.getByRole('link', { name: 'Clientes', exact: true }).click();
   await expect(page.locator('[data-home-tab="customers"]')).toHaveClass(/active/);
 
