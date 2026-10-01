@@ -84,6 +84,58 @@ class PlatformBusinessProvisioningServiceTest {
     }
 
     @Test
+    void createsPilotTenantWithOwnerInvitationAndNoTransferPhone() {
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        TeamInvitationService invitations = mock(TeamInvitationService.class);
+        AuditService audit = mock(AuditService.class);
+        PlatformBusinessProvisioningService service =
+                new PlatformBusinessProvisioningService(businesses, subscriptions, invitations, audit);
+
+        UUID businessId = UUID.randomUUID();
+        UUID invitationId = UUID.randomUUID();
+        when(businesses.saveAndFlush(any(Business.class))).thenAnswer(invocation -> {
+            Business business = invocation.getArgument(0);
+            ReflectionTestUtils.setField(business, "id", businessId);
+            assertEquals(BusinessMode.PILOT, business.getMode());
+            assertNull(business.getHumanTransferPhone());
+            return business;
+        });
+        when(invitations.createForPlatform(eq(businessId), any(InviteUserRequest.class)))
+                .thenReturn(new TeamInvitationResponse(
+                        invitationId,
+                        businessId,
+                        "Sushi Akira",
+                        "Ana",
+                        "ana@example.cl",
+                        "BUSINESS_OWNER",
+                        Instant.now().plusSeconds(3600),
+                        "PENDING",
+                        "/invite.html?businessId=" + businessId + "&token=one-time"));
+
+        PlatformBusinessProvisioningResponse result = service.provisionPilot(
+                new PlatformBusinessProvisioningRequest(
+                        " Sushi Akira ",
+                        "America/Santiago",
+                        "ES",
+                        null,
+                        " Ana ",
+                        "ANA@EXAMPLE.CL"));
+
+        assertEquals(businessId, result.businessId());
+        assertEquals("Sushi Akira", result.businessName());
+        assertEquals("ana@example.cl", result.adminEmail());
+        verify(subscriptions).startBasicTrial(businessId);
+        verify(audit).platformHumanSuccess(
+                eq(businessId),
+                eq("BUSINESS_PILOT_PROVISION"),
+                eq("BUSINESS"),
+                eq(businessId),
+                isNull(),
+                anyMap());
+    }
+
+    @Test
     void invalidTimezoneFailsBeforeCreatingTenant() {
         BusinessRepository businesses = mock(BusinessRepository.class);
         BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
