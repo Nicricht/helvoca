@@ -2080,6 +2080,7 @@ test('orders requests customers remain operable on mobile', async ({ page }) => 
 
 test('agenda gives the owner a decision-ready today week and day view', async ({ page }) => {
   test.setTimeout(45000);
+  await page.clock.setFixedTime(new Date('2026-10-01T21:00:00Z'));
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'agenda-professional-token'));
   await mockReadyHome(page);
 
