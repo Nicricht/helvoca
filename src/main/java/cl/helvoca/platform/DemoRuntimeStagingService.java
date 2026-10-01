@@ -75,38 +75,51 @@ public class DemoRuntimeStagingService {
      */
     @Transactional
     public void stage(DemoProfile profile, UUID runtimeBusinessId) {
-        if (profile == null) throw new IllegalArgumentException("Demo profile is required");
-        if (runtimeBusinessId == null) throw new IllegalArgumentException("Demo runtime is required");
+        requireInput(profile, runtimeBusinessId);
         if (properties != null) {
             UUID configured = properties.runtimeBusinessUuid();
             if (configured == null || !configured.equals(runtimeBusinessId)) {
                 throw new IllegalStateException("Only the server-owned DEMO runtime can be staged");
             }
         }
+        stageApproved(profile, runtimeBusinessId, BusinessMode.DEMO);
+    }
 
+    @Transactional
+    public void stagePilot(DemoProfile profile, UUID pilotBusinessId) {
+        requireInput(profile, pilotBusinessId);
+        stageApproved(profile, pilotBusinessId, BusinessMode.PILOT);
+    }
+
+    private void stageApproved(DemoProfile profile, UUID businessId, BusinessMode expectedMode) {
         try (TenantDatabaseContext.Scope ignored = databaseContext.useSystem()) {
-            Business runtime = businesses.findById(runtimeBusinessId)
-                    .orElseThrow(() -> new IllegalStateException("Configured DEMO runtime does not exist"));
-            requireDemoRuntime(runtime);
+            Business target = businesses.findById(businessId)
+                    .orElseThrow(() -> new IllegalStateException("Approved configuration target does not exist"));
+            requireTarget(target, expectedMode);
 
-            runtime.setName(profile.getBusinessName().trim());
-            runtime.setTimezone(profile.getTimezone().trim());
-            runtime.setLanguage(profile.getLanguage().trim().toLowerCase(Locale.ROOT));
-            businesses.save(runtime);
+            target.setName(profile.getBusinessName().trim());
+            target.setTimezone(profile.getTimezone().trim());
+            target.setLanguage(profile.getLanguage().trim().toLowerCase(Locale.ROOT));
+            businesses.save(target);
 
-            stageCatalog(profile, runtimeBusinessId);
-            stageHours(profile, runtimeBusinessId);
-            stageKnowledge(profile, runtimeBusinessId);
-            stageAgentAndCapabilities(profile, runtimeBusinessId);
+            stageCatalog(profile, businessId);
+            stageHours(profile, businessId);
+            stageKnowledge(profile, businessId);
+            stageAgentAndCapabilities(profile, businessId);
         }
     }
 
-    private static void requireDemoRuntime(Business runtime) {
-        if (runtime.getMode() != BusinessMode.DEMO) {
-            throw new IllegalStateException("Configured runtime is not in DEMO mode");
+    private static void requireInput(DemoProfile profile, UUID businessId) {
+        if (profile == null) throw new IllegalArgumentException("Demo profile is required");
+        if (businessId == null) throw new IllegalArgumentException("Target business is required");
+    }
+
+    private static void requireTarget(Business target, BusinessMode expectedMode) {
+        if (target.getMode() != expectedMode) {
+            throw new IllegalStateException("Approved configuration target is not in " + expectedMode.name() + " mode");
         }
-        if (runtime.getStatus() != BusinessStatus.ACTIVE) {
-            throw new IllegalStateException("Configured DEMO runtime is not active");
+        if (target.getStatus() != BusinessStatus.ACTIVE) {
+            throw new IllegalStateException("Approved configuration target is not active");
         }
     }
 
@@ -278,7 +291,7 @@ public class DemoRuntimeStagingService {
                 case "CATALOG" -> addBusinessCapability(
                         BusinessOperationCapability.CATALOG, toolCapabilities, businessCapabilities);
                 case "PAYMENT" -> throw new IllegalArgumentException(
-                        "Live payment capability cannot be staged into a DEMO runtime");
+                        "Live payment capability cannot be copied by DEMO/PILOT staging");
                 default -> throw new IllegalArgumentException("Unsupported demo capability: " + capability);
             }
         }
