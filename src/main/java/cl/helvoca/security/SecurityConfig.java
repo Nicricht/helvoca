@@ -36,6 +36,7 @@ public class SecurityConfig {
             "/sales.html", "/sales.css",
             "/privacy.html", "/terms.html",
             "/pricing.html", "/pricing.js", "/pricing.css",
+            "/app/**",
             "/account.html", "/account.js", "/account.css",
             "/settings.html", "/settings-page.js",
             "/inventory.html", "/inventory.js", "/inventory.css",
