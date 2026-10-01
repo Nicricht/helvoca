@@ -16,6 +16,7 @@ ALTER TABLE team_invitation
 ALTER TABLE team_invitation
     ADD CONSTRAINT ck_team_invitation_role CHECK (
         role_code IN (
+            'BUSINESS_OWNER',
             'BUSINESS_ADMIN',
             'MANAGER',
             'RECEPTION',
