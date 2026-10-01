@@ -1,6 +1,7 @@
 package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.ai.gemini.VoiceBakeOffCatalog;
+import cl.helvoca.voice.VoiceCallRouter;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,8 +53,11 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     private final String forbiddenTo;
     private final int maxSeconds;
     private final String direction;
+    private final boolean providerOverrideValid;
+    private final String providerOverride;
     private final boolean voiceOverrideValid;
     private final String voiceOverride;
+    private final boolean providerVoiceCombinationValid;
     private final TwilioCallControl callControl;
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(8))
@@ -70,6 +74,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
             @Value("${TWILIO_CERTIFICATION_FORBIDDEN_TO:}") String forbiddenTo,
             @Value("${TWILIO_CERTIFICATION_MAX_SECONDS:75}") int maxSeconds,
             @Value("${TWILIO_CERTIFICATION_DIRECTION:outbound-test}") String direction,
+            @Value("${TWILIO_CERTIFICATION_PROVIDER_OVERRIDE:}") String providerOverride,
             @Value("${TWILIO_CERTIFICATION_VOICE_OVERRIDE:}") String voiceOverride,
             TwilioCallControl callControl) {
         this.enabled = enabled;
@@ -82,8 +87,12 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         this.forbiddenTo = forbiddenTo;
         this.maxSeconds = Math.max(20, Math.min(maxSeconds, 180));
         this.direction = normalizeDirection(direction);
+        this.providerOverrideValid = validProviderOverride(providerOverride, this.direction);
+        this.providerOverride = VoiceCallRouter.normalizeCertificationProviderOverride(providerOverride);
         this.voiceOverrideValid = validVoiceOverride(voiceOverride, this.direction);
         this.voiceOverride = VoiceBakeOffCatalog.normalize(voiceOverride);
+        this.providerVoiceCombinationValid =
+                validProviderVoiceCombination(providerOverride, voiceOverride, this.direction);
         this.callControl = callControl;
     }
 
@@ -91,8 +100,11 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         if (!enabled || !FIRED.compareAndSet(false, true)) return;
         if (!validConfiguration()) {
-            log.error("TWILIO_CERTIFICATION_CALL blocked: invalid/missing Twilio certification configuration direction={}",
-                    direction);
+            log.error(
+                    "TWILIO_CERTIFICATION_CALL blocked: invalid/missing Twilio certification configuration direction={} provider_override={} voice_override={}",
+                    direction,
+                    providerOverride == null ? "none" : providerOverride,
+                    voiceOverride == null ? "none" : voiceOverride);
             return;
         }
         if (!isAllowedTarget(to, allowedTo)) {
@@ -109,13 +121,24 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
             t.setDaemon(true);
             return t;
         });
-        log.info("TWILIO_CERTIFICATION_CALL armed; direction={} starting in {} seconds after deployment cutover",
-                direction, START_DELAY_SECONDS);
+        log.info(
+                "TWILIO_CERTIFICATION_CALL armed; direction={} provider_override={} voice_override={} starting in {} seconds after deployment cutover",
+                direction,
+                providerOverride == null ? "none" : providerOverride,
+                voiceOverride == null ? "none" : voiceOverride,
+                START_DELAY_SECONDS);
         kickoff.schedule(() -> {
             try {
                 String callSid = createCall();
-                log.info("TWILIO_CERTIFICATION_CALL CREATED call={} direction={} from={} to={} max_seconds={}",
-                        callSid, direction, mask(from), mask(to), maxSeconds);
+                log.info(
+                        "TWILIO_CERTIFICATION_CALL CREATED call={} direction={} provider_override={} voice_override={} from={} to={} max_seconds={}",
+                        callSid,
+                        direction,
+                        providerOverride == null ? "none" : providerOverride,
+                        voiceOverride == null ? "none" : voiceOverride,
+                        mask(from),
+                        mask(to),
+                        maxSeconds);
                 scheduleSafetyHangup(callSid);
             } catch (Exception e) {
                 log.error("TWILIO_CERTIFICATION_CALL FAILED direction={} reason={}", direction, rootMessage(e));
@@ -185,7 +208,9 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 && to != null && E164.matcher(to.trim()).matches()
                 && publicBaseUrl != null && publicBaseUrl.trim().startsWith("https://")
                 && isAllowedTarget(to, allowedTo)
+                && providerOverrideValid
                 && voiceOverrideValid
+                && providerVoiceCombinationValid
                 && (OUTBOUND_TEST.equals(direction) || INBOUND_CERTIFICATION.equals(direction));
     }
 
@@ -195,10 +220,28 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         return INBOUND_CERTIFICATION.equals(normalized) ? INBOUND_CERTIFICATION : OUTBOUND_TEST;
     }
 
+    static boolean validProviderOverride(String value, String direction) {
+        if (value == null || value.isBlank()) return true;
+        return OUTBOUND_TEST.equals(normalizeDirection(direction))
+                && VoiceCallRouter.validCertificationProviderOverride(value);
+    }
+
     static boolean validVoiceOverride(String value, String direction) {
         if (value == null || value.isBlank()) return true;
         return OUTBOUND_TEST.equals(normalizeDirection(direction))
                 && VoiceBakeOffCatalog.allowed(value);
+    }
+
+    static boolean validProviderVoiceCombination(String provider,
+                                                 String voice,
+                                                 String direction) {
+        if (!validProviderOverride(provider, direction)
+                || !validVoiceOverride(voice, direction)) {
+            return false;
+        }
+        String normalizedProvider = VoiceCallRouter.normalizeCertificationProviderOverride(provider);
+        boolean hasVoiceOverride = voice != null && !voice.isBlank();
+        return !("openai-live".equals(normalizedProvider) && hasVoiceOverride);
     }
 
     static boolean shouldScheduleSafetyHangup(String direction) {

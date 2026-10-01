@@ -80,6 +80,7 @@ class OpenAiLiveIncomingContractTest {
         when(lifecycle.markStreamStarted(callId, callSid, "live:" + sessionId, "openai-live"))
                 .thenReturn(context);
         when(tools.buildInstructions(context)).thenReturn("backend instructions");
+        when(tools.agentVoice(context, null)).thenReturn("seductive_female");
         when(tools.execute(context, "get_business_information", "{}"))
                 .thenReturn("{\"success\":true,\"data\":{\"name\":\"Restaurante Demo\"},\"error\":null}");
 
@@ -105,7 +106,7 @@ class OpenAiLiveIncomingContractTest {
         JSONObject session = body.getJSONObject("session");
         assertEquals("live", session.getString("type"));
         assertEquals("gpt-live-1", session.getString("model"));
-        assertEquals("marin", session.getJSONObject("audio").getJSONObject("output").getString("voice"));
+        assertEquals("coral", session.getJSONObject("audio").getJSONObject("output").getString("voice"));
         JSONObject responses = session.getJSONObject("delegation").getJSONObject("responses");
         assertEquals("gpt-5.6-luna", responses.getString("model"));
         assertEquals("auto", responses.getString("tool_choice"));
