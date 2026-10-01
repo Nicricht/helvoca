@@ -10,9 +10,13 @@ import java.util.UUID;
 @PreAuthorize("hasRole('PLATFORM_ADMIN')")
 public class PlatformDemoSessionController {
     private final PlatformDemoSessionService service;
+    private final PlatformDemoTimelineService timeline;
 
-    public PlatformDemoSessionController(PlatformDemoSessionService service) {
+    public PlatformDemoSessionController(
+            PlatformDemoSessionService service,
+            PlatformDemoTimelineService timeline) {
         this.service = service;
+        this.timeline = timeline;
     }
 
     @PostMapping("/demos/{profileId}/prepare")
@@ -28,5 +32,10 @@ public class PlatformDemoSessionController {
     @GetMapping("/demo-sessions/{sessionId}")
     public PlatformDemoSessionResponse get(@PathVariable UUID sessionId) {
         return service.get(sessionId);
+    }
+
+    @GetMapping("/demo-sessions/{sessionId}/timeline")
+    public PlatformDemoTimelineResponse timeline(@PathVariable UUID sessionId) {
+        return timeline.timeline(sessionId);
     }
 }
