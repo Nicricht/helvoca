@@ -39,8 +39,10 @@ class CallCommercialPropertiesTest {
                 properties.resolveTelephonyCostPerMinuteUsd("other"));
 
         properties.setUsdToClpRate(new BigDecimal("-1"));
+        properties.setTwilioNumberMonthlyCostUsd(new BigDecimal("-7"));
         properties.setAiProviderCostPerMinuteUsd(Map.of("gemini", new BigDecimal("-2")));
         assertEquals(BigDecimal.ZERO, properties.getUsdToClpRate());
+        assertEquals(BigDecimal.ZERO, properties.getTwilioNumberMonthlyCostUsd());
         assertEquals(BigDecimal.ZERO, properties.resolveAiCostPerMinuteUsd("gemini", null));
     }
 
