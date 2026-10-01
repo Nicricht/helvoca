@@ -100,10 +100,6 @@ public class UsageCommercialStatusService {
         return nonNegative(seconds).divide(SIXTY, 0, RoundingMode.CEILING).longValueExact();
     }
 
-    private static long wholeMinutesFloorLong(BigDecimal seconds) {
-        return nonNegative(seconds).divide(SIXTY, 0, RoundingMode.FLOOR).longValueExact();
-    }
-
     private static BigDecimal nonNegative(BigDecimal value) {
         return value == null || value.signum() < 0 ? BigDecimal.ZERO : value;
     }
