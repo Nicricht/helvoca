@@ -20,6 +20,11 @@ public class PlatformDemoSessionController {
         return service.prepare(profileId);
     }
 
+    @GetMapping("/demo-sessions/current")
+    public PlatformDemoSessionResponse current() {
+        return service.current();
+    }
+
     @GetMapping("/demo-sessions/{sessionId}")
     public PlatformDemoSessionResponse get(@PathVariable UUID sessionId) {
         return service.get(sessionId);
