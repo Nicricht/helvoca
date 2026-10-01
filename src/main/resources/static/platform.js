@@ -64,6 +64,50 @@
     }[char]));
   }
 
+  function renderDemoReadiness(data = {}) {
+    const state = document.querySelector('#platformDemoReadinessState');
+    const root = document.querySelector('#platformDemoReadiness');
+    if (!state || !root) return;
+
+    const labels = {
+      runtime: 'Runtime demo',
+      voiceNumber: 'Número de voz',
+      voiceAi: 'IA de voz',
+      businessData: 'Datos del negocio',
+      operations: 'Operaciones',
+      whatsapp: 'WhatsApp',
+      payment: 'Pago',
+      externalEffects: 'Efectos externos'
+    };
+    const order = Object.keys(labels);
+    root.innerHTML = order.map(key => {
+      const item = data?.[key] || { state: 'NOT_CONFIGURED', detail: '' };
+      const status = String(item.state || 'NOT_CONFIGURED').toUpperCase();
+      return `
+        <article class="platform-demo-readiness-item">
+          <span>${escapeHtml(labels[key])}</span>
+          <strong class="platform-demo-readiness-state ${escapeHtml(status.toLowerCase())}">${escapeHtml(status)}</strong>
+          <small>${escapeHtml(item.detail || '')}</small>
+        </article>`;
+    }).join('');
+    state.classList.add('hidden');
+    root.classList.remove('hidden');
+  }
+
+  async function loadDemoReadiness() {
+    const state = document.querySelector('#platformDemoReadinessState');
+    const root = document.querySelector('#platformDemoReadiness');
+    if (!state || !root) return;
+    state.textContent = 'Revisando readiness del runtime demo…';
+    state.classList.remove('hidden');
+    root.classList.add('hidden');
+    try {
+      renderDemoReadiness(await api('/api/v1/platform/demos/readiness'));
+    } catch (error) {
+      state.textContent = error.message || 'No fue posible comprobar el runtime demo.';
+    }
+  }
+
   function renderDemoProfiles(items = []) {
     const profiles = Array.isArray(items) ? items : [];
     if (!demoProfiles || !demoState) return;
@@ -299,6 +343,6 @@
   document.querySelector('#platformEconomicsRefresh')?.addEventListener('click', loadEconomics);
 
   (async () => {
-    if (await guard()) await Promise.all([loadDemos(), loadEconomics()]);
+    if (await guard()) await Promise.all([loadDemoReadiness(), loadDemos(), loadEconomics()]);
   })();
 })();
