@@ -161,6 +161,8 @@ class PlatformDemoSessionServiceTest {
         UUID runtimeId = UUID.randomUUID();
         UUID profileId = UUID.randomUUID();
         Fixture f = fixture(runtimeId, profileId);
+        when(f.businesses.findById(runtimeId))
+                .thenReturn(Optional.of(business(runtimeId, BusinessMode.DEMO, BusinessStatus.ACTIVE)));
         when(f.profiles.findById(profileId)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class,
