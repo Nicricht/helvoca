@@ -89,7 +89,7 @@ public class DemoRuntimeStagingService {
     }
 
     private void stageCatalog(DemoProfile profile, UUID businessId) {
-        List<CatalogItem> current = catalog.findAllByBusinessIdOrderByNameAsc(businessId);
+        List<CatalogItem> current = new ArrayList<>(catalog.findAllByBusinessIdOrderByNameAsc(businessId));
         current.forEach(item -> item.setActive(false));
 
         Map<String, CatalogItem> byKey = new HashMap<>();
@@ -159,7 +159,7 @@ public class DemoRuntimeStagingService {
     }
 
     private void stageKnowledge(DemoProfile profile, UUID businessId) {
-        List<KnowledgeItem> current = knowledge.findAllByBusinessIdOrderByTitleAsc(businessId);
+        List<KnowledgeItem> current = new ArrayList<>(knowledge.findAllByBusinessIdOrderByTitleAsc(businessId));
         current.forEach(item -> item.setActive(false));
         Map<String, KnowledgeItem> byTitle = new HashMap<>();
         for (KnowledgeItem item : current) byTitle.put(item.getTitle().trim().toLowerCase(Locale.ROOT), item);
