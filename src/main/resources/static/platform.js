@@ -17,6 +17,9 @@
   const demoMessage = document.querySelector('#platformDemoMessage');
   const demoSessionState = document.querySelector('#platformDemoSessionState');
   const demoSession = document.querySelector('#platformDemoSession');
+  const demoTimelineState = document.querySelector('#platformDemoTimelineState');
+  const demoTimeline = document.querySelector('#platformDemoTimeline');
+  let demoPollBusy = false;
 
   function showMessage(text, kind = '') {
     message.textContent = text || '';
@@ -157,9 +160,70 @@
       (failed ? '<div class="platform-result-row"><span>Bloqueo</span><strong>' + escapeHtml(data.failureReason || 'Preparación incompleta') + '</strong></div>' : '');
     demoSessionState.textContent = failed
       ? 'La preparación falló de forma cerrada. Revisa el readiness antes de reintentar.'
-      : 'Sesión preparada con evidencia server-owned. Los efectos externos siguen desarmados.';
+      : state === 'ACTIVE'
+        ? 'Llamada DEMO activa. El timeline se actualiza con evidencia persistida del backend.'
+        : state === 'FINISHED'
+          ? 'Demostración finalizada. El resultado conserva solo evidencia persistida de esta sesión.'
+          : 'Sesión lista para recibir la llamada entrante al número DEMO.';
     demoSessionState.classList.remove('hidden');
     demoSession.classList.remove('hidden');
+  }
+
+  function timelineClock(value) {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return new Intl.DateTimeFormat('es-CL', {
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }).format(date);
+  }
+
+  function renderDemoTimeline(data = {}) {
+    if (!demoTimelineState || !demoTimeline) return;
+    const items = Array.isArray(data.items) ? data.items : [];
+    const live = String(data.state || '').toUpperCase() === 'ACTIVE';
+
+    if (!items.length) {
+      demoTimeline.innerHTML = '';
+      demoTimeline.classList.add('hidden');
+      demoTimelineState.textContent = 'Esperando evidencia real de la llamada DEMO…';
+      demoTimelineState.classList.remove('hidden');
+      return;
+    }
+
+    demoTimeline.innerHTML = items.map((item, index) => {
+      const status = String(item.status || '').toUpperCase();
+      const activeClass = live && index === items.length - 1 ? ' platform-demo-timeline-live' : '';
+      return `
+        <article class="platform-demo-timeline-item${activeClass}" data-status="${escapeHtml(status)}">
+          <span class="platform-demo-timeline-dot" aria-hidden="true"></span>
+          <div class="platform-demo-timeline-copy">
+            <strong>${escapeHtml(item.title || item.kind || 'Evento')}</strong>
+            <p>${escapeHtml(item.detail || '')}</p>
+          </div>
+          <div class="platform-demo-timeline-meta">
+            <span>${escapeHtml(status || item.kind || '')}</span>
+            <time datetime="${escapeHtml(item.at || '')}">${escapeHtml(timelineClock(item.at))}</time>
+          </div>
+        </article>`;
+    }).join('');
+
+    demoTimelineState.textContent = live
+      ? 'Evidencia en vivo de la sesión actual.'
+      : `${Number(data.callCount || 0)} llamada(s) correlacionada(s) con esta demo.`;
+    demoTimelineState.classList.remove('hidden');
+    demoTimeline.classList.remove('hidden');
+  }
+
+  async function loadDemoTimeline(sessionId) {
+    if (!sessionId || !demoTimelineState || !demoTimeline) return;
+    try {
+      renderDemoTimeline(await api(
+        '/api/v1/platform/demo-sessions/' + encodeURIComponent(sessionId) + '/timeline'));
+    } catch (error) {
+      demoTimelineState.textContent = error.message || 'No fue posible cargar el timeline de la demo.';
+      demoTimelineState.classList.remove('hidden');
+    }
   }
 
   async function prepareDemo(profileId, button) {
@@ -172,6 +236,7 @@
     try {
       const prepared = await api('/api/v1/platform/demos/' + encodeURIComponent(profileId) + '/prepare', { method: 'POST' });
       renderDemoSession(prepared);
+      if (prepared?.id) await loadDemoTimeline(prepared.id);
       if (prepared && prepared.readiness) renderDemoReadiness(prepared.readiness);
       else await loadDemoReadiness();
     } catch (error) {
@@ -185,13 +250,33 @@
   }
 
   async function loadCurrentDemoSession() {
-    if (!demoSessionState || !demoSession) return;
+    if (!demoSessionState || !demoSession) return null;
     try {
       const current = await api('/api/v1/platform/demo-sessions/current');
-      if (current) renderDemoSession(current);
+      if (current) {
+        renderDemoSession(current);
+        if (current.readiness) renderDemoReadiness(current.readiness);
+        if (current.id) await loadDemoTimeline(current.id);
+      }
+      return current;
     } catch (error) {
       demoSessionState.textContent = error.message || 'No fue posible comprobar la sesión demo actual.';
+      return null;
     }
+  }
+
+  async function refreshDemoLiveSurface() {
+    if (demoPollBusy || document.hidden) return;
+    demoPollBusy = true;
+    try {
+      await loadCurrentDemoSession();
+    } finally {
+      demoPollBusy = false;
+    }
+  }
+
+  function startDemoLivePolling() {
+    window.setInterval(refreshDemoLiveSurface, 2500);
   }
 
   async function loadDemos() {
@@ -404,6 +489,9 @@
   document.querySelector('#platformEconomicsRefresh')?.addEventListener('click', loadEconomics);
 
   (async () => {
-    if (await guard()) await Promise.all([loadDemoReadiness(), loadCurrentDemoSession(), loadDemos(), loadEconomics()]);
+    if (await guard()) {
+      await Promise.all([loadDemoReadiness(), loadCurrentDemoSession(), loadDemos(), loadEconomics()]);
+      startDemoLivePolling();
+    }
   })();
 })();
