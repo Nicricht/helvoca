@@ -160,7 +160,7 @@ class CallLoadIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
             for (int i = 0; i < concurrency; i++) {
                 int index = i;
                 futures.add(executor.submit(() -> attempt(
-                        tenant.phone(), scenario + "-" + index, ready, fire)));
+                        tenant.businessId(), tenant.phone(), scenario + "-" + index, ready, fire)));
             }
 
             assertTrue(ready.await(15, TimeUnit.SECONDS),
@@ -195,7 +195,8 @@ class CallLoadIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
         }
     }
 
-    private Attempt attempt(String destination,
+    private Attempt attempt(UUID businessId,
+                            String destination,
                             String suffix,
                             CountDownLatch ready,
                             CountDownLatch fire) throws Exception {
@@ -203,11 +204,11 @@ class CallLoadIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
         fire.await(15, TimeUnit.SECONDS);
         long started = System.nanoTime();
         try {
-            lifecycle.startInboundCall(
+            databaseContext.callAsTenant(businessId, () -> lifecycle.startInboundCall(
                     "twilio",
                     "CA-load-" + suffix + "-" + UUID.randomUUID(),
                     "+56910000000",
-                    destination);
+                    destination));
             return new Attempt(Outcome.ACCEPTED, elapsedMillis(started));
         } catch (CallCapacityExceededException expected) {
             return new Attempt(Outcome.REJECTED, elapsedMillis(started));
