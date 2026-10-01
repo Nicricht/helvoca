@@ -27,10 +27,11 @@ test('platform admin sees the Demo Center without any countdown and can create a
     payment: { state: 'SANDBOX_ONLY', detail: 'Merchant payment LIVE remains disabled.' },
     externalEffects: { state: 'DISARMED', detail: 'Outbound external effects are not armed.' }
   })));
-  await page.route('**/api/v1/platform/demo-sessions/current', route => route.fulfill({
-    status: 204,
-    body: ''
-  }));
+  let currentSession = null;
+  await page.route('**/api/v1/platform/demo-sessions/current', route => {
+    if (!currentSession) return route.fulfill({ status: 204, body: '' });
+    return route.fulfill(json(currentSession));
+  });
   await page.route('**/api/v1/platform/economics', route => route.fulfill(json({
     estimatedCommercialValueClp: 0,
     estimatedPlatformCostUsd: 0,
@@ -95,7 +96,7 @@ test('platform admin sees the Demo Center without any countdown and can create a
   let preparedProfileId = null;
   await page.route('**/api/v1/platform/demos/*/prepare', async route => {
     preparedProfileId = route.request().url().split('/').at(-2);
-    return route.fulfill(json({
+    const prepared = {
       id: 'dddddddd-1111-2222-3333-444444444444',
       correlationId: 'eeeeeeee-1111-2222-3333-444444444444',
       demoProfileId: preparedProfileId,
@@ -120,8 +121,51 @@ test('platform admin sees the Demo Center without any countdown and can create a
       },
       createdAt: '2026-10-01T06:00:00Z',
       updatedAt: '2026-10-01T06:00:00Z'
-    }));
+    };
+    currentSession = {
+      ...prepared,
+      state: 'ACTIVE',
+      startedAt: '2026-10-01T06:01:00Z',
+      updatedAt: '2026-10-01T06:01:00Z'
+    };
+    return route.fulfill(json(prepared));
   });
+
+  await page.route('**/api/v1/platform/demo-sessions/*/timeline', route => route.fulfill(json({
+    sessionId: 'dddddddd-1111-2222-3333-444444444444',
+    state: currentSession?.state || 'READY',
+    callCount: currentSession ? 1 : 0,
+    refreshedAt: '2026-10-01T06:01:12Z',
+    items: currentSession ? [
+      {
+        kind: 'CALL_STARTED',
+        at: '2026-10-01T06:01:00Z',
+        title: 'Llamada recibida',
+        detail: 'Entrante desde ••••1111 hacia el número DEMO.',
+        status: 'IN_PROGRESS',
+        callId: 'cccccccc-1111-2222-3333-444444444444',
+        entityId: 'cccccccc-1111-2222-3333-444444444444'
+      },
+      {
+        kind: 'TRANSCRIPT',
+        at: '2026-10-01T06:01:05Z',
+        title: 'Cliente',
+        detail: 'Quiero dos sakes.',
+        status: 'USER',
+        callId: 'cccccccc-1111-2222-3333-444444444444',
+        entityId: 'aaaaaaaa-1111-2222-3333-444444444444'
+      },
+      {
+        kind: 'ACTION',
+        at: '2026-10-01T06:01:08Z',
+        title: 'ORDER_CREATED',
+        detail: 'ORDER',
+        status: 'SUCCESS',
+        callId: 'cccccccc-1111-2222-3333-444444444444',
+        entityId: 'bbbbbbbb-1111-2222-3333-444444444444'
+      }
+    ] : []
+  })));
 
   await page.route('**/api/v1/platform/demos', async route => {
     if (route.request().method() === 'POST') {
