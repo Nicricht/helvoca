@@ -110,7 +110,7 @@ test('account keeps the core subscription useful when detailed usage is forbidde
 
   await expect(page.locator('#planName')).toHaveText('Profesional');
   await expect(page.locator('#accountRole')).toHaveText('Operador');
-  await expect(page.locator('#usageState')).toContainText('solo para administradores');
+  await expect(page.locator('#usageState')).toContainText('propietarios y administradores');
   await expect(page.locator('#accountError')).toBeHidden();
 });
 
@@ -158,4 +158,16 @@ test('account warns about overage and shows the estimated CLP charge without int
   await expect(page.locator('#overageEstimate')).toContainText('$545');
   await expect(page.locator('body')).not.toContainText('margen');
   await expect(page.locator('body')).not.toContainText('Costo plataforma');
+});
+
+
+test('business owner can inspect usage without seeing RecepVoz internal cost fields', async ({ page }) => {
+  await mockAccount(page, { roles: ['BUSINESS_OWNER'] });
+  await page.goto('/account.html');
+
+  await expect(page.locator('#accountRole')).toHaveText('Propietario');
+  await expect(page.getByText('Llamadas de voz')).toBeVisible();
+  await expect(page.locator('#voiceUsageSignalTitle')).toHaveText('Consumo bajo control');
+  await expect(page.locator('body')).not.toContainText('estimatedCostUsd');
+  await expect(page.locator('body')).not.toContainText('actualCostUsd');
 });
