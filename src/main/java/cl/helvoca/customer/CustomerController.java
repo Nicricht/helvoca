@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/customers")
-@PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+@PreAuthorize("hasAuthority('PERM_CUSTOMERS_READ')")
 public class CustomerController {
     private final CustomerService service;
     private final CustomerProfileService profileService;
@@ -32,7 +32,7 @@ public class CustomerController {
     public List<CustomerResponse> list() { return service.list(); }
 
     @GetMapping("/export")
-    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    @PreAuthorize("hasAuthority('PERM_CUSTOMERS_EXPORT')")
     public ResponseEntity<byte[]> export(@RequestParam(defaultValue = "csv") String format) {
         CustomerExportFile file = exportService.export(format);
         return ResponseEntity.ok()
@@ -53,11 +53,13 @@ public class CustomerController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('PERM_CUSTOMERS_MANAGE')")
     public CustomerResponse create(@Valid @RequestBody CustomerRequest request) {
         return service.create(request);
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_CUSTOMERS_MANAGE')")
     public CustomerResponse update(@PathVariable UUID id, @Valid @RequestBody CustomerRequest request) {
         return service.update(id, request);
     }
