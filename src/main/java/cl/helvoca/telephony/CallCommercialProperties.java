@@ -15,6 +15,7 @@ public class CallCommercialProperties {
     private BigDecimal telephonyCostPerMinuteUsd = BigDecimal.ZERO;
     private BigDecimal aiCostPerMinuteUsd = BigDecimal.ZERO;
     private BigDecimal usdToClpRate = BigDecimal.ZERO;
+    private BigDecimal twilioNumberMonthlyCostUsd = BigDecimal.ZERO;
     private Map<String, BigDecimal> telephonyProviderCostPerMinuteUsd = new LinkedHashMap<>();
     private Map<String, BigDecimal> aiProviderCostPerMinuteUsd = new LinkedHashMap<>();
     private Map<String, BigDecimal> aiModelCostPerMinuteUsd = new LinkedHashMap<>();
@@ -49,6 +50,14 @@ public class CallCommercialProperties {
 
     public void setUsdToClpRate(BigDecimal usdToClpRate) {
         this.usdToClpRate = nonNegative(usdToClpRate);
+    }
+
+    public BigDecimal getTwilioNumberMonthlyCostUsd() {
+        return twilioNumberMonthlyCostUsd;
+    }
+
+    public void setTwilioNumberMonthlyCostUsd(BigDecimal value) {
+        this.twilioNumberMonthlyCostUsd = nonNegative(value);
     }
 
     public Map<String, BigDecimal> getTelephonyProviderCostPerMinuteUsd() {
