@@ -18,6 +18,9 @@
   const demoSessionState = document.querySelector('#platformDemoSessionState');
   const demoSession = document.querySelector('#platformDemoSession');
   let currentDemoSession = null;
+  let demoPollTimer = null;
+  let demoPollBusy = false;
+  const DEMO_POLL_INTERVAL_MS = 2500;
 
   function showMessage(text, kind = '') {
     message.textContent = text || '';
@@ -153,12 +156,19 @@
     const converted = Boolean(data.convertedPilotBusinessId);
     const canStart = state === 'READY';
     const canFinish = state === 'ACTIVE';
+    const lifecycleHint = state === 'READY'
+      ? 'Esperando llamada'
+      : state === 'ACTIVE'
+        ? 'Llamada en curso'
+        : state === 'FINISHED'
+          ? 'Demo finalizada'
+          : state;
     const canAbort = state === 'READY' || state === 'ACTIVE';
     const canConvert = !converted && (state === 'READY' || state === 'FINISHED');
 
     demoSession.innerHTML =
       '<div class="platform-result-row"><span>Modo</span><strong><span class="platform-mode-pill demo">DEMO</span></strong></div>' +
-      '<div class="platform-result-row"><span>Sesión</span><strong>' + escapeHtml(state) + '</strong></div>' +
+      '<div class="platform-result-row"><span>Sesión</span><strong>' + escapeHtml(state) + ' · ' + escapeHtml(lifecycleHint) + '</strong></div>' +
       '<div class="platform-result-row"><span>Perfil activo</span><strong>' + escapeHtml(data.demoProfileId || '—') + '</strong></div>' +
       '<div class="platform-result-row"><span>Runtime</span><strong>' + escapeHtml(data.runtimeBusinessId || '—') + '</strong></div>' +
       '<div class="platform-result-row"><span>Correlación</span><strong>' + escapeHtml(data.correlationId || '—') + '</strong></div>' +
@@ -166,12 +176,15 @@
       '<div class="platform-result-row"><span>Pagos</span><strong>' + escapeHtml(data.paymentState || 'SANDBOX_ONLY') + '</strong></div>' +
       (failed ? '<div class="platform-result-row"><span>Bloqueo</span><strong>' + escapeHtml(data.failureReason || 'Preparación incompleta') + '</strong></div>' : '') +
       (converted ? '<div class="platform-result-row"><span>Conversión</span><strong><span class="platform-mode-pill pilot">PILOT</span> ' + escapeHtml(data.convertedPilotBusinessId) + '</strong></div>' : '') +
-      '<div class="platform-actions">' +
-        (canStart ? '<button class="button small primary" type="button" data-demo-action="start">Iniciar demo</button>' : '') +
-        (canFinish ? '<button class="button small secondary" type="button" data-demo-action="finish">Finalizar demo</button>' : '') +
-        (canAbort ? '<button class="button small ghost" type="button" data-demo-action="abort">Abortar</button>' : '') +
-        '<button class="button small ghost" type="button" data-demo-action="timeline">Actualizar evidencia</button>' +
-      '</div>' +
+      '<details class="platform-demo-manual">' +
+        '<summary>Controles manuales de respaldo</summary>' +
+        '<div class="platform-actions">' +
+          (canStart ? '<button class="button small ghost" type="button" data-demo-action="start">Iniciar manualmente</button>' : '') +
+          (canFinish ? '<button class="button small ghost" type="button" data-demo-action="finish">Finalizar manualmente</button>' : '') +
+          (canAbort ? '<button class="button small ghost" type="button" data-demo-action="abort">Abortar</button>' : '') +
+          '<button class="button small ghost" type="button" data-demo-action="timeline">Actualizar evidencia</button>' +
+        '</div>' +
+      '</details>' +
       '<div id="platformDemoTimeline" class="platform-demo-timeline"></div>' +
       '<div id="platformDemoProof" class="platform-demo-proof hidden"></div>' +
       (canConvert ? '<form id="platformDemoConvertForm" class="platform-demo-convert platform-form">' +
@@ -185,7 +198,13 @@
       ? 'La preparación falló de forma cerrada. Revisa el readiness antes de reintentar.'
       : converted
         ? 'La configuración aprobada ya se convirtió a un tenant PILOT nuevo. DEMO y PILOT siguen aislados.'
-        : 'Sesión con evidencia server-owned. Los efectos externos siguen desarmados y los pagos en sandbox.';
+        : state === 'READY'
+          ? 'Esperando llamada al número DEMO. La sesión se activará automáticamente cuando llegue una llamada inbound segura.'
+          : state === 'ACTIVE'
+            ? 'Llamada detectada. La sesión está activa y la evidencia persistida se actualiza automáticamente.'
+            : state === 'FINISHED'
+              ? 'La llamada terminó y la sesión se cerró automáticamente. Revisa el Proof of Value.'
+              : 'Sesión con evidencia server-owned. Los efectos externos siguen desarmados y los pagos en sandbox.';
     demoSessionState.classList.remove('hidden');
     demoSession.classList.remove('hidden');
   }
@@ -266,18 +285,45 @@
     }
   }
 
-  async function loadCurrentDemoSession() {
+  async function loadCurrentDemoSession({ quiet = false } = {}) {
     if (!demoSessionState || !demoSession) return;
     try {
       const current = await api('/api/v1/platform/demo-sessions/current');
       if (current) {
+        const previousState = currentDemoSession?.state;
         renderDemoSession(current);
         await loadDemoTimeline();
+        if (!quiet && previousState && previousState !== current.state) {
+          showDemoSessionMessage('Estado actualizado automáticamente: ' + current.state, 'success');
+        }
       }
     } catch (error) {
-      demoSessionState.textContent = error.message || 'No fue posible comprobar la sesión demo actual.';
+      if (!quiet) {
+        demoSessionState.textContent = error.message || 'No fue posible comprobar la sesión demo actual.';
+      }
     }
   }
+
+  async function pollLiveDemo() {
+    if (document.hidden || demoPollBusy || !currentDemoSession?.id) return;
+    const state = String(currentDemoSession.state || '').toUpperCase();
+    if (!['READY', 'ACTIVE'].includes(state)) return;
+    demoPollBusy = true;
+    try {
+      await loadCurrentDemoSession({ quiet: true });
+    } finally {
+      demoPollBusy = false;
+    }
+  }
+
+  function startDemoPolling() {
+    if (demoPollTimer) return;
+    demoPollTimer = window.setInterval(pollLiveDemo, DEMO_POLL_INTERVAL_MS);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) pollLiveDemo();
+  });
 
   async function loadDemos() {
     if (!demoState || !demoProfiles) return;
@@ -537,6 +583,9 @@
   document.querySelector('#platformEconomicsRefresh')?.addEventListener('click', loadEconomics);
 
   (async () => {
-    if (await guard()) await Promise.all([loadDemoReadiness(), loadCurrentDemoSession(), loadDemos(), loadEconomics()]);
+    if (await guard()) {
+      await Promise.all([loadDemoReadiness(), loadCurrentDemoSession(), loadDemos(), loadEconomics()]);
+      startDemoPolling();
+    }
   })();
 })();
