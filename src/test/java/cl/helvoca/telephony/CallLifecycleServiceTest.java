@@ -10,6 +10,7 @@ import cl.helvoca.phone.PhoneNumberRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -150,6 +151,53 @@ class CallLifecycleServiceTest {
 
         lifecycle.markAiModel(callId, oversized);
         verify(calls, times(1)).saveAndFlush(call);
+    }
+
+    @Test
+    void inboundAndStatusLifecyclePublishIdempotentObserverHooks() {
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        CallLifecycleObserver observer = mock(CallLifecycleObserver.class);
+        CallLifecycleService lifecycle = lifecycle(phones, customers, calls, new CallCommercialProperties());
+        lifecycle.setSubscriptions(subscriptions);
+        lifecycle.setLifecycleObservers(List.of(observer));
+
+        UUID businessId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        PhoneNumber phone = mock(PhoneNumber.class);
+        when(phone.getBusinessId()).thenReturn(businessId);
+        when(phone.getId()).thenReturn(UUID.randomUUID());
+        when(phones.findByPhoneNumberAndActiveTrue("+14355550004")).thenReturn(Optional.of(phone));
+        when(calls.findByProviderCallId("CA-observer"))
+                .thenReturn(Optional.empty(), Optional.empty());
+        when(calls.countByBusinessIdAndStatusIn(eq(businessId), anyCollection())).thenReturn(0L);
+        when(subscriptions.view(businessId)).thenReturn(activeSubscription(businessId, 2));
+        when(calls.saveAndFlush(any(CallSession.class))).thenAnswer(invocation -> {
+            CallSession saved = invocation.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", callId);
+            return saved;
+        });
+
+        UUID started = lifecycle.startInboundCall(
+                "twilio", "CA-observer", "+56911111113", "+14355550004");
+
+        assertEquals(callId, started);
+        verify(observer).onInboundCallStarted(argThat(call -> callId.equals(call.getId())));
+
+        CallSession persisted = new CallSession();
+        ReflectionTestUtils.setField(persisted, "id", callId);
+        persisted.setBusinessId(businessId);
+        persisted.setProviderCallId("CA-observer");
+        persisted.setStatus(CallStatus.IN_PROGRESS);
+        persisted.setStartedAt(Instant.now().minusSeconds(5));
+        when(calls.findByProviderCallId("CA-observer")).thenReturn(Optional.of(persisted));
+
+        lifecycle.updateStatus("CA-observer", "completed", 5);
+
+        verify(observer).onCallUpdated(persisted);
+        assertEquals(CallStatus.COMPLETED, persisted.getStatus());
     }
 
     @Test
