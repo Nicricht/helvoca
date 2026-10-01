@@ -1,5 +1,7 @@
 package cl.helvoca.omnichannel;
 
+import cl.helvoca.testsupport.ExplicitSystemDatabaseScopeSupport;
+
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallDirection;
@@ -41,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Testcontainers
 @SpringBootTest
 @Transactional
-class OmnichannelCoreIntegrationTest {
+class OmnichannelCoreIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
 
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
