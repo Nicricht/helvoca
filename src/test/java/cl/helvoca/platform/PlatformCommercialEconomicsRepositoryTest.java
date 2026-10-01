@@ -54,6 +54,41 @@ class PlatformCommercialEconomicsRepositoryTest {
     }
 
     @Test
+    void mapsNullableAndNonBigDecimalJdbcValues() throws Exception {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        ResultSet rs = mock(ResultSet.class);
+        UUID businessId = UUID.randomUUID();
+
+        when(rs.getObject("business_id", UUID.class)).thenReturn(businessId);
+        when(rs.getString("business_name")).thenReturn("Flexible");
+        when(rs.getString("plan_code")).thenReturn("ENTERPRISE");
+        when(rs.getString("plan_name")).thenReturn("Enterprise");
+        when(rs.getString("status")).thenReturn("ACTIVE");
+        when(rs.getObject("monthly_price_clp")).thenReturn(null);
+        when(rs.getBoolean("custom_pricing")).thenReturn(true);
+        when(rs.getObject("included_seconds")).thenReturn(60000L);
+        when(rs.getObject("used_seconds")).thenReturn("120");
+        when(rs.getObject("overage_unit_size")).thenReturn(null);
+        when(rs.getObject("overage_price_clp")).thenReturn("149");
+        when(rs.getInt("active_voice_number_count")).thenReturn(0);
+        when(rs.getObject("estimated_cost_usd")).thenReturn(null);
+
+        when(jdbc.query(anyString(), any(RowMapper.class))).thenAnswer(invocation -> {
+            RowMapper mapper = invocation.getArgument(1);
+            return List.of(mapper.mapRow(rs, 0));
+        });
+
+        var row = new PlatformCommercialEconomicsRepository(jdbc).currentBusinesses().getFirst();
+
+        assertNull(row.monthlyPriceClp());
+        assertEquals(new BigDecimal("60000"), row.includedSeconds());
+        assertEquals(new BigDecimal("120"), row.usedSeconds());
+        assertNull(row.overageUnitSize());
+        assertEquals(149, row.overagePriceClp());
+        assertEquals(BigDecimal.ZERO, row.estimatedCostUsd());
+    }
+
+    @Test
     void mapsProviderModelCostBreakdown() throws Exception {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         ResultSet rs = mock(ResultSet.class);
