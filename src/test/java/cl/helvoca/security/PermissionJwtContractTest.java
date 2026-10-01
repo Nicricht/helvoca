@@ -74,7 +74,7 @@ class PermissionJwtContractTest {
                 java.util.Map.of("alg", "HS256"),
                 java.util.Map.of(
                         "sub", "user-legacy",
-                        "roles", List.of("KITCHEN")));
+                        "roles", List.of("KITCHEN", "FUTURE_ROLE")));
 
         var authentication = new SecurityConfig().jwtAuthenticationConverter().convert(jwt);
         assertNotNull(authentication);
