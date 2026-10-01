@@ -557,6 +557,30 @@ class PostgresRowLevelSecurityIntegrationTest {
         assertEquals(1L, visibleB);
     }
 
+    @Test
+    void liveDemoFoundationKeepsLifecycleValidAndProfilesPlatformOnly() {
+        assertEquals(
+                "CUSTOMER",
+                ownerJdbc.queryForObject(
+                        "SELECT mode FROM business WHERE id = ?",
+                        String.class,
+                        businessA));
+
+        assertThrows(DataAccessException.class, () ->
+                ownerJdbc.update("UPDATE business SET mode = 'INVALID' WHERE id = ?", businessA));
+
+        for (String privilege : List.of("SELECT", "INSERT", "UPDATE", "DELETE")) {
+            assertFalse(ownerJdbc.queryForObject(
+                    "SELECT has_table_privilege('helvoca_runtime', 'public.demo_profile', ?)",
+                    Boolean.class,
+                    privilege));
+            assertTrue(ownerJdbc.queryForObject(
+                    "SELECT has_table_privilege('helvoca_system', 'public.demo_profile', ?)",
+                    Boolean.class,
+                    privilege));
+        }
+    }
+
     private void assertOwnerSessionScrubbed(Connection connection) throws Exception {
         try (Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery(
