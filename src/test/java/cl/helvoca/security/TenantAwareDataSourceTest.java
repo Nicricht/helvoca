@@ -16,14 +16,31 @@ import static org.mockito.Mockito.*;
 class TenantAwareDataSourceTest {
 
     @Test
-    void deniedContextRejectsConnectionBeforeBorrowingFromPool() throws Exception {
+    void deniedContextUsesTenantRoleWithoutTenantIdentity() throws Exception {
         HikariDataSource pool = mock(HikariDataSource.class);
+        Connection physical = mock(Connection.class);
+        Statement statement = mock(Statement.class);
+        PreparedStatement checkoutScrub = mock(PreparedStatement.class);
+        PreparedStatement installTenant = mock(PreparedStatement.class);
+        PreparedStatement closeScrub = mock(PreparedStatement.class);
+
+        when(pool.getConnection()).thenReturn(physical);
+        when(physical.isClosed()).thenReturn(false);
+        when(physical.getAutoCommit()).thenReturn(true);
+        when(physical.createStatement()).thenReturn(statement);
+        when(physical.prepareStatement(anyString()))
+                .thenReturn(checkoutScrub, installTenant, closeScrub);
+
         TenantDatabaseContext context = new TenantDatabaseContext();
         TenantAwareDataSource dataSource = new TenantAwareDataSource(pool, context);
 
-        assertThrows(SQLException.class, dataSource::getConnection);
+        Connection wrapped = dataSource.getConnection();
 
-        verify(pool, never()).getConnection();
+        verify(statement).execute("SET ROLE " + TenantAwareDataSource.TENANT_ROLE);
+        verify(statement, never()).execute("SET ROLE " + TenantAwareDataSource.SYSTEM_ROLE);
+        verify(installTenant).setString(1, "");
+
+        wrapped.close();
     }
 
     @Test
