@@ -6,6 +6,7 @@ import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessMode;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.business.BusinessStatus;
+import cl.helvoca.operations.ChannelRuntimeReadinessService;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import org.springframework.stereotype.Service;
@@ -25,15 +26,18 @@ public class PlatformDemoReadinessService {
     private final BusinessRepository businesses;
     private final PhoneNumberRepository phones;
     private final AiAgentRepository agents;
+    private final ChannelRuntimeReadinessService channels;
 
     public PlatformDemoReadinessService(DemoRuntimeProperties properties,
                                         BusinessRepository businesses,
                                         PhoneNumberRepository phones,
-                                        AiAgentRepository agents) {
+                                        AiAgentRepository agents,
+                                        ChannelRuntimeReadinessService channels) {
         this.properties = properties;
         this.businesses = businesses;
         this.phones = phones;
         this.agents = agents;
+        this.channels = channels;
     }
 
     @Transactional(readOnly = true)
@@ -65,6 +69,7 @@ public class PlatformDemoReadinessService {
                     unavailable, unavailable, unavailable);
         }
 
+        ChannelRuntimeReadinessService.ChannelRuntimeReadiness channel = channels.snapshot();
         List<PhoneNumber> configuredPhones = phones.findAllByBusinessIdOrderByCreatedAtDesc(runtimeId);
         PhoneNumber voice = configuredPhones.stream()
                 .filter(PhoneNumber::isActive)
@@ -85,19 +90,50 @@ public class PlatformDemoReadinessService {
 
         PlatformDemoReadinessResponse.ReadinessItem runtimeReady =
                 item("READY", runtime.getName());
-        PlatformDemoReadinessResponse.ReadinessItem voiceNumber = voice == null
-                ? item("NOT_CONFIGURED", "No active demo voice number is registered.")
-                : item("READY", voice.getPhoneNumber());
-        PlatformDemoReadinessResponse.ReadinessItem voiceAi = agent == null
-                ? item("NOT_CONFIGURED", "No active demo AI agent is configured.")
-                : item("READY", agent.getName());
+
+        PlatformDemoReadinessResponse.ReadinessItem voiceNumber;
+        if (voice == null) {
+            voiceNumber = item("NOT_CONFIGURED", "No active demo voice number is registered.");
+        } else if (!channel.twilio().webhookReady()) {
+            voiceNumber = item(
+                    "UNAVAILABLE",
+                    "Demo number is registered, but telephony ingress is not ready: " + channel.twilio().code());
+        } else {
+            voiceNumber = item("READY", voice.getPhoneNumber());
+        }
+
+        PlatformDemoReadinessResponse.ReadinessItem voiceAi;
+        if (agent == null) {
+            voiceAi = item("NOT_CONFIGURED", "No active demo AI agent is configured.");
+        } else if (!channel.voice().ready()) {
+            voiceAi = item(
+                    "UNAVAILABLE",
+                    "AI agent exists, but voice runtime is not ready: " + channel.voice().code());
+        } else {
+            String selected = channel.voice().selectedProvider();
+            voiceAi = item(
+                    "READY",
+                    selected == null || selected.isBlank()
+                            ? agent.getName()
+                            : agent.getName() + " · " + selected);
+        }
+
         PlatformDemoReadinessResponse.ReadinessItem businessData =
                 item("NOT_CONFIGURED", "No approved demo profile has been prepared into the runtime yet.");
         PlatformDemoReadinessResponse.ReadinessItem operations =
                 item("READY", "DEMO operations are isolated from PILOT/CUSTOMER tenants.");
-        PlatformDemoReadinessResponse.ReadinessItem whatsappState = whatsapp == null
-                ? item("NOT_CONFIGURED", "No certified demo WhatsApp channel is configured.")
-                : item("READY", "Certified demo WhatsApp channel is available.");
+
+        PlatformDemoReadinessResponse.ReadinessItem whatsappState;
+        if (whatsapp == null) {
+            whatsappState = item("NOT_CONFIGURED", "No certified demo WhatsApp channel is configured.");
+        } else if (!channel.whatsApp().ready()) {
+            whatsappState = item(
+                    "UNAVAILABLE",
+                    "Demo WhatsApp identity is certified, but runtime delivery is not ready: "
+                            + channel.whatsApp().code());
+        } else {
+            whatsappState = item("READY", "Certified demo WhatsApp channel is available.");
+        }
 
         return response(true, runtimeId, runtimeReady, voiceNumber, voiceAi,
                 businessData, operations, whatsappState);
