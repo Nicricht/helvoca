@@ -2151,6 +2151,50 @@ test('agenda gives the owner a decision-ready today week and day view', async ({
   expect(overflow).toBeLessThanOrEqual(1);
 });
 
+
+test('agenda keeps the table central and animates the selected reservation flow', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'agenda-motion-token'));
+  await mockReadyHome(page);
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
+
+  const table = page.locator('#homeBookingsList .home-business-table');
+  await expect(table).toBeVisible();
+  await expect(table.locator('thead')).toContainText('Acciones');
+
+  const firstRow = table.locator('tbody tr[data-home-booking-id]').first();
+  await expect(firstRow.locator('.home-agenda-avatar')).toBeVisible();
+  await expect(firstRow.locator('.home-agenda-source-badge')).toBeVisible();
+  await expect(firstRow.locator('.home-agenda-view')).toBeVisible();
+
+  const rowAnimation = await firstRow.evaluate(node => getComputedStyle(node).animationName);
+  expect(rowAnimation).toContain('agendaRowIn');
+
+  await firstRow.click();
+  await expect(firstRow).toHaveClass(/is-selected/);
+  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  await expect(page.locator('.home-agenda-detail-tabs')).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Resumen' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Conversación' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Cliente' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Actividad' })).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Conversación' }).click();
+  await expect(page.getByRole('tab', { name: 'Conversación' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[data-booking-detail-panel="conversation"]')).toBeVisible();
+
+  await page.locator('#homeBookingDetailClose').click();
+  await expect(firstRow).not.toHaveClass(/is-selected/);
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  const reducedRow = page.locator('#homeBookingsList .home-business-table tbody tr[data-home-booking-id]').first();
+  await expect(reducedRow).toBeVisible();
+  const reducedAnimation = await reducedRow.evaluate(node => getComputedStyle(node).animationDuration);
+  expect(reducedAnimation).toBe('0s');
+});
+
 test('booking cancellation from drawer works', async ({ page }) => {
   test.setTimeout(45000);
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
