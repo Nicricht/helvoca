@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { test, expect } = require('@playwright/test');
 
 test('three-minute sales demo is public, safe and ends with one next step', async ({ page }) => {
@@ -44,4 +46,24 @@ test('three-minute sales demo stays usable on mobile', async ({ page }) => {
 
   await expect(page.getByRole('button', { name: /Empezar demo/i })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
+
+test('three-minute sales demo emits exact-head visual evidence', async ({ page }) => {
+  const head = String(process.env.VISUAL_EVIDENCE_SHA || 'local').slice(0, 12);
+  const dir = path.join('test-results', 'visual-evidence', head);
+  fs.mkdirSync(dir, { recursive: true });
+
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 }
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/demo.html?rubro=sushi');
+    await page.screenshot({
+      path: path.join(dir, `demo-3min-${viewport.width}x${viewport.height}.png`),
+      fullPage: false,
+      animations: 'disabled'
+    });
+  }
 });
