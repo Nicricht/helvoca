@@ -25,6 +25,7 @@ public class PlatformCommercialEconomicsRepository {
                        cp.display_name AS plan_name,
                        bs.status,
                        cp.monthly_price_clp,
+                       cp.custom_pricing,
                        voice.limit_value AS included_seconds,
                        COALESCE((
                            SELECT SUM(u.quantity)
@@ -57,6 +58,7 @@ public class PlatformCommercialEconomicsRepository {
                 rs.getString("plan_name"),
                 rs.getString("status"),
                 nullableInteger(rs.getObject("monthly_price_clp")),
+                rs.getBoolean("custom_pricing"),
                 decimal(rs.getObject("included_seconds")),
                 decimal(rs.getObject("used_seconds")),
                 nullableDecimal(rs.getObject("overage_unit_size")),
@@ -118,6 +120,7 @@ public class PlatformCommercialEconomicsRepository {
             String planName,
             String status,
             Integer monthlyPriceClp,
+            boolean customPricing,
             BigDecimal includedSeconds,
             BigDecimal usedSeconds,
             BigDecimal overageUnitSize,
