@@ -17,8 +17,8 @@ import java.util.UUID;
  * Installs an explicit database scope for every HTTP request.
  *
  * Authenticated business users are tenant-scoped from the signed JWT. Platform
- * administration and explicitly approved public infrastructure/database paths
- * use SYSTEM scope. Every other request receives DENIED scope.
+ * administration and authenticated provider ingress use SYSTEM scope. Every
+ * other request receives DENIED scope, so protected tenant tables fail closed.
  */
 @Component
 public class TenantDatabaseContextFilter extends OncePerRequestFilter {
@@ -67,8 +67,6 @@ public class TenantDatabaseContextFilter extends OncePerRequestFilter {
         return path.equals("/api/v1/auth/login")
                 || path.equals("/api/v1/auth/register")
                 || path.startsWith("/api/v1/auth/invitations/")
-                || path.equals("/api/v1/public/pricing")
-                || path.equals("/actuator/health")
                 || path.startsWith("/webhooks/")
                 || path.startsWith("/ws/");
     }
