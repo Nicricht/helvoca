@@ -33,6 +33,7 @@ class PlatformDemoTimelineTest {
         BusinessOperationEventRepository operationEvents = mock(BusinessOperationEventRepository.class);
         CallSummaryRepository summaries = mock(CallSummaryRepository.class);
         CallActionRepository actions = mock(CallActionRepository.class);
+        CallTranscriptRepository transcripts = mock(CallTranscriptRepository.class);
 
         DemoSession session = DemoSession.preparing(UUID.randomUUID(), runtimeId, "rev");
         ReflectionTestUtils.setField(session, "id", sessionId);
@@ -80,9 +81,19 @@ class PlatformDemoTimelineTest {
         when(conversations.findAllByBusinessIdAndDemoSessionIdOrderByOpenedAtAsc(runtimeId, sessionId))
                 .thenReturn(List.of());
 
-        PlatformDemoTimelineResponse result = new PlatformDemoTimelineService(
-                properties, sessions, calls, conversations, operations, operationEvents, summaries, actions)
-                .timeline(sessionId);
+        CallTranscript turn = new CallTranscript();
+        ReflectionTestUtils.setField(turn, "id", UUID.randomUUID());
+        ReflectionTestUtils.setField(turn, "createdAt", Instant.parse("2026-10-01T06:30:30Z"));
+        turn.setCallId(callId);
+        turn.setSpeaker("USER");
+        turn.setContent("Quiero dos sakes");
+        turn.setSequenceNumber(1);
+        when(transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId)).thenReturn(List.of(turn));
+
+        PlatformDemoTimelineService timeline = new PlatformDemoTimelineService(
+                properties, sessions, calls, conversations, operations, operationEvents, summaries, actions);
+        timeline.setTranscripts(transcripts);
+        PlatformDemoTimelineResponse result = timeline.timeline(sessionId);
 
         assertEquals(sessionId, result.sessionId());
         assertEquals(runtimeId, result.runtimeBusinessId());
@@ -92,6 +103,10 @@ class PlatformDemoTimelineTest {
         assertEquals(1, result.proofOfValue().operations());
         assertTrue(result.proofOfValue().facts().stream()
                 .anyMatch(value -> value.contains("ORDER_CREATED")));
+        assertTrue(result.events().stream().anyMatch(event ->
+                "TRANSCRIPT".equals(event.type())
+                        && "USER".equals(event.status())
+                        && "Quiero dos sakes".equals(event.detail())));
     }
 
     @Test

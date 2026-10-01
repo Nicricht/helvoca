@@ -26,6 +26,8 @@ public interface CallSessionRepository extends JpaRepository<CallSession, UUID> 
     Page<CallSession> findAllByBusinessIdAndCertificationFalseAndTelephonyProviderNot(
             UUID businessId, String excludedProvider, Pageable pageable);
     long countByBusinessIdAndStatusIn(UUID businessId, Collection<CallStatus> statuses);
+    long countByBusinessIdAndDemoSessionIdAndStatusIn(
+            UUID businessId, UUID demoSessionId, Collection<CallStatus> statuses);
     long countByBusinessIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
             UUID businessId, Instant start, Instant end);
     long countByBusinessIdAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
