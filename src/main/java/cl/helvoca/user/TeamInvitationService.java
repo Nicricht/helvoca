@@ -28,7 +28,17 @@ import java.util.UUID;
 @Service
 public class TeamInvitationService {
     private static final EnumSet<RoleCode> INVITABLE_ROLES =
-            EnumSet.of(RoleCode.BUSINESS_ADMIN, RoleCode.OPERATOR);
+            EnumSet.of(
+                    RoleCode.BUSINESS_ADMIN,
+                    RoleCode.MANAGER,
+                    RoleCode.RECEPTION,
+                    RoleCode.STAFF,
+                    RoleCode.KITCHEN,
+                    RoleCode.DISPATCH,
+                    RoleCode.PROFESSIONAL,
+                    RoleCode.WAREHOUSE,
+                    RoleCode.SALES,
+                    RoleCode.OPERATOR);
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final long EXPIRY_HOURS = 72;
 
@@ -84,7 +94,7 @@ public class TeamInvitationService {
                                                      boolean platformAudit) {
         String email = normalizeEmail(request.email());
         if (!INVITABLE_ROLES.contains(request.role())) {
-            throw new IllegalArgumentException("Only BUSINESS_ADMIN or OPERATOR may be invited");
+            throw new IllegalArgumentException("Role cannot be invited into a business team");
         }
         if (users.existsByEmailIgnoreCase(email)) {
             throw new ConflictException("An account with that email already exists");
