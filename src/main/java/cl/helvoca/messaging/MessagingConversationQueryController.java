@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/messaging/conversations")
-@PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+@PreAuthorize("hasAuthority('PERM_CONVERSATIONS_READ')")
 public class MessagingConversationQueryController {
     private final MessagingConversationQueryService service;
 
