@@ -27,10 +27,60 @@ test('platform admin sees the Demo Center without any countdown and can create a
     payment: { state: 'SANDBOX_ONLY', detail: 'Merchant payment LIVE remains disabled.' },
     externalEffects: { state: 'DISARMED', detail: 'Outbound external effects are not armed.' }
   })));
-  await page.route('**/api/v1/platform/demo-sessions/current', route => route.fulfill({
-    status: 204,
-    body: ''
-  }));
+  let liveSession = null;
+  await page.route('**/api/v1/platform/demo-sessions/current', route => {
+    if (!liveSession) return route.fulfill({ status: 204, body: '' });
+    return route.fulfill(json(liveSession));
+  });
+  await page.route('**/api/v1/platform/demo-sessions/*/timeline', route => route.fulfill(json({
+    sessionId: liveSession?.id || null,
+    runtimeBusinessId: '99999999-8888-7777-6666-555555555555',
+    sessionStatus: liveSession?.state || 'READY',
+    events: liveSession ? [{
+      at: '2026-10-01T06:30:00Z',
+      type: 'SESSION',
+      entityId: liveSession.id,
+      status: liveSession.state,
+      detail: 'Persisted demo session'
+    }] : [],
+    proofOfValue: {
+      state: liveSession?.state === 'FINISHED' ? 'RECORDED_VALUE' : 'REVIEW_REQUIRED',
+      calls: liveSession?.state === 'FINISHED' ? 1 : 0,
+      conversations: 0,
+      operations: liveSession?.state === 'FINISHED' ? 1 : 0,
+      facts: liveSession?.state === 'FINISHED' ? ['ORDER: CONFIRMED'] : [],
+      followUps: liveSession?.state === 'FINISHED' ? [] : ['No persisted outcome evidence yet.']
+    }
+  })));
+  await page.route('**/api/v1/platform/demo-sessions/*/start', route => {
+    liveSession = { ...liveSession, state: 'ACTIVE', startedAt: '2026-10-01T06:31:00Z' };
+    return route.fulfill(json(liveSession));
+  });
+  await page.route('**/api/v1/platform/demo-sessions/*/finish', route => {
+    liveSession = { ...liveSession, state: 'FINISHED', finishedAt: '2026-10-01T06:33:00Z' };
+    return route.fulfill(json(liveSession));
+  });
+  await page.route('**/api/v1/platform/demo-sessions/*/abort', route => {
+    liveSession = { ...liveSession, state: 'ABORTED', finishedAt: '2026-10-01T06:33:00Z' };
+    return route.fulfill(json(liveSession));
+  });
+  await page.route('**/api/v1/platform/demo-sessions/*/convert-to-pilot', async route => {
+    expect(route.request().postDataJSON()).toEqual({
+      adminName: 'Ana Pérez',
+      adminEmail: 'ana@negocio.cl'
+    });
+    liveSession = { ...liveSession, convertedPilotBusinessId: 'aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb' };
+    return route.fulfill(json({
+      sessionId: liveSession.id,
+      pilotBusinessId: liveSession.convertedPilotBusinessId,
+      pilotBusinessName: 'Sushi Demo',
+      mode: 'PILOT',
+      invitationStatus: 'PENDING',
+      invitePath: '/invite.html?businessId=pilot&token=one-time',
+      onboardingPath: '/',
+      idempotentReplay: false
+    }));
+  });
   await page.route('**/api/v1/platform/economics', route => route.fulfill(json({
     estimatedCommercialValueClp: 0,
     estimatedPlatformCostUsd: 0,
@@ -59,7 +109,7 @@ test('platform admin sees the Demo Center without any countdown and can create a
   let preparedProfileId = null;
   await page.route('**/api/v1/platform/demos/*/prepare', async route => {
     preparedProfileId = route.request().url().split('/').at(-2);
-    return route.fulfill(json({
+    liveSession = {
       id: 'dddddddd-1111-2222-3333-444444444444',
       correlationId: 'eeeeeeee-1111-2222-3333-444444444444',
       demoProfileId: preparedProfileId,
@@ -83,8 +133,13 @@ test('platform admin sees the Demo Center without any countdown and can create a
         externalEffects: { state: 'DISARMED', detail: 'Outbound external effects are not armed.' }
       },
       createdAt: '2026-10-01T06:00:00Z',
+      operator: 'platform@recepvoz.cl',
+      externalEffectsState: 'DISARMED',
+      paymentState: 'SANDBOX_ONLY',
+      convertedPilotBusinessId: null,
       updatedAt: '2026-10-01T06:00:00Z'
-    }));
+    };
+    return route.fulfill(json(liveSession));
   });
 
   await page.route('**/api/v1/platform/demos', async route => {
@@ -122,6 +177,21 @@ test('platform admin sees the Demo Center without any countdown and can create a
   await expect(page.locator('#platformDemoSession')).toContainText('READY');
   await expect(page.locator('#platformDemoSession')).toContainText('99999999-8888-7777-6666-555555555555');
   await expect(page.locator('#platformDemoReadiness')).toContainText('Approved profile staged with session evidence.');
+  await expect(page.locator('#platformDemoSession')).toContainText('DISARMED');
+  await expect(page.locator('#platformDemoSession')).toContainText('SANDBOX_ONLY');
+
+  await page.getByRole('button', { name: 'Iniciar demo' }).click();
+  await expect(page.locator('#platformDemoSession')).toContainText('ACTIVE');
+  await page.getByRole('button', { name: 'Finalizar demo' }).click();
+  await expect(page.locator('#platformDemoSession')).toContainText('FINISHED');
+  await expect(page.locator('#platformDemoProof')).toContainText('RECORDED_VALUE');
+  await expect(page.locator('#platformDemoProof')).toContainText('ORDER: CONFIRMED');
+
+  await page.locator('input[name="pilotAdminName"]').fill('Ana Pérez');
+  await page.locator('input[name="pilotAdminEmail"]').fill('ana@negocio.cl');
+  await page.getByRole('button', { name: 'Crear PILOT e invitación' }).click();
+  await expect(page.locator('#platformDemoSessionMessage')).toContainText('PILOT creado');
+  await expect(page.locator('#platformDemoSession')).toContainText('aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb');
   await expect(page.locator('body')).not.toContainText('3:00');
   await expect(page.locator('body')).not.toContainText('3 minutos');
 
