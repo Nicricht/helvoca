@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/bookings")
-@PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+@PreAuthorize("hasAuthority('PERM_BOOKINGS_READ')")
 public class BookingController {
     private final BookingService service;
     private final BookingContextService contextService;
@@ -54,11 +54,13 @@ public class BookingController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('PERM_BOOKINGS_MANAGE')")
     public BookingResponse create(@Valid @RequestBody CreateBookingRequest request) {
         return service.create(request);
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_BOOKINGS_MANAGE')")
     public BookingResponse reschedule(
             @PathVariable UUID id,
             @Valid @RequestBody RescheduleBookingRequest request) {
@@ -66,11 +68,13 @@ public class BookingController {
     }
 
     @PostMapping("/{id}/complete")
+    @PreAuthorize("hasAuthority('PERM_BOOKINGS_MANAGE')")
     public BookingResponse complete(@PathVariable UUID id) {
         return lifecycleService.complete(id);
     }
 
     @PostMapping("/{id}/no-show")
+    @PreAuthorize("hasAuthority('PERM_BOOKINGS_MANAGE')")
     public BookingResponse noShow(@PathVariable UUID id) {
         return lifecycleService.noShow(id);
     }
@@ -82,6 +86,7 @@ public class BookingController {
 
     @PostMapping("/{id}/payments/manual")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('PERM_BOOKINGS_MANAGE')")
     public BookingPaymentService.ManualPaymentResponse recordManualPayment(
             @PathVariable UUID id,
             @RequestHeader(name = "Idempotency-Key") String idempotencyKey,
@@ -91,5 +96,6 @@ public class BookingController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('PERM_BOOKINGS_MANAGE')")
     public void cancel(@PathVariable UUID id) { service.cancel(id); }
 }
