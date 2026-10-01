@@ -23,7 +23,7 @@ class PlatformCommercialEconomicsServiceTest {
                 new PlatformCommercialEconomicsRepository.BusinessEconomicsSource(
                         businessId, "Barbería Norte", "BASIC", "Emprende", "ACTIVE",
                         24_990, false, new BigDecimal("6000"), new BigDecimal("6300"),
-                        new BigDecimal("60"), 149, new BigDecimal("5.000000"))
+                        new BigDecimal("60"), 149, 0, new BigDecimal("5.000000"))
         ));
         when(repository.providerBreakdown()).thenReturn(List.of(
                 new PlatformCommercialEconomicsRepository.ProviderCostSource(
@@ -56,6 +56,29 @@ class PlatformCommercialEconomicsServiceTest {
     }
 
     @Test
+    void includesConfiguredMonthlyPhoneCost() {
+        PlatformCommercialEconomicsRepository repository = mock(PlatformCommercialEconomicsRepository.class);
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setUsdToClpRate(new BigDecimal("900"));
+        properties.setTwilioNumberMonthlyCostUsd(new BigDecimal("7"));
+
+        when(repository.currentBusinesses()).thenReturn(List.of(
+                new PlatformCommercialEconomicsRepository.BusinessEconomicsSource(
+                        UUID.randomUUID(), "Negocio", "BASIC", "Emprende", "ACTIVE",
+                        24_990, false, new BigDecimal("6000"), BigDecimal.ZERO,
+                        new BigDecimal("60"), 149, 1, new BigDecimal("3.000000"))
+        ));
+        when(repository.providerBreakdown()).thenReturn(List.of());
+
+        var report = new PlatformCommercialEconomicsService(repository, properties).portfolio();
+
+        assertEquals(new BigDecimal("10.000000"), report.estimatedPlatformCostUsd());
+        assertEquals(new BigDecimal("9000"), report.estimatedPlatformCostClp());
+        assertEquals(1, report.businesses().getFirst().activeVoiceNumberCount());
+        assertEquals(new BigDecimal("7"), report.businesses().getFirst().estimatedFixedPhoneCostUsd());
+    }
+
+    @Test
     void customPricingReferenceIsNotCountedAsCommercialValue() {
         PlatformCommercialEconomicsRepository repository = mock(PlatformCommercialEconomicsRepository.class);
         CallCommercialProperties properties = new CallCommercialProperties();
@@ -65,7 +88,7 @@ class PlatformCommercialEconomicsServiceTest {
                 new PlatformCommercialEconomicsRepository.BusinessEconomicsSource(
                         UUID.randomUUID(), "Enterprise", "ENTERPRISE", "Enterprise", "ACTIVE",
                         119_990, true, new BigDecimal("60000"), BigDecimal.ZERO,
-                        null, null, new BigDecimal("1.000000"))
+                        null, null, 0, new BigDecimal("1.000000"))
         ));
         when(repository.providerBreakdown()).thenReturn(List.of());
 
@@ -87,7 +110,7 @@ class PlatformCommercialEconomicsServiceTest {
                 new PlatformCommercialEconomicsRepository.BusinessEconomicsSource(
                         UUID.randomUUID(), "Negocio", "PRO", "Negocio", "ACTIVE",
                         39_990, false, new BigDecimal("15000"), BigDecimal.ZERO,
-                        new BigDecimal("60"), 129, new BigDecimal("2.500000"))
+                        new BigDecimal("60"), 129, 0, new BigDecimal("2.500000"))
         ));
         when(repository.providerBreakdown()).thenReturn(List.of());
 
