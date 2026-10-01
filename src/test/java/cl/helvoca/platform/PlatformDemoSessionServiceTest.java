@@ -95,6 +95,86 @@ class PlatformDemoSessionServiceTest {
     }
 
     @Test
+    void existingPreparingSessionIsIdempotentAndDoesNotStageTwice() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID profileId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        DemoProfileRepository profiles = mock(DemoProfileRepository.class);
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        DemoRuntimeStagingService staging = mock(DemoRuntimeStagingService.class);
+        PlatformDemoReadinessService readiness = mock(PlatformDemoReadinessService.class);
+        AuditService audit = mock(AuditService.class);
+
+        Business runtime = runtime(runtimeId, BusinessMode.DEMO, BusinessStatus.ACTIVE);
+        DemoProfile profile = profile(profileId, Instant.parse("2026-10-01T05:00:00Z"));
+        DemoSession existing = DemoSession.preparing(profileId, runtimeId, profile.getUpdatedAt().toString());
+        ReflectionTestUtils.setField(existing, "id", UUID.randomUUID());
+
+        when(businesses.findById(runtimeId)).thenReturn(Optional.of(runtime));
+        when(profiles.findById(profileId)).thenReturn(Optional.of(profile));
+        when(sessions.findPreparedForRuntime(runtimeId)).thenReturn(Optional.of(existing));
+        when(readiness.readiness()).thenReturn(readiness(runtimeId, "READY", "READY", "NOT_CONFIGURED"));
+
+        PlatformDemoSessionResponse result = new PlatformDemoSessionService(
+                properties, businesses, profiles, sessions, staging, readiness, audit).prepare(profileId);
+
+        assertEquals(existing.getId(), result.id());
+        assertEquals(DemoSessionState.PREPARING, result.state());
+        verifyNoInteractions(staging);
+        verify(sessions, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void incompleteRequiredReadinessFailsClosedAfterControlledStaging() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID profileId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        DemoProfileRepository profiles = mock(DemoProfileRepository.class);
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        DemoRuntimeStagingService staging = mock(DemoRuntimeStagingService.class);
+        PlatformDemoReadinessService readiness = mock(PlatformDemoReadinessService.class);
+        AuditService audit = mock(AuditService.class);
+
+        when(businesses.findById(runtimeId))
+                .thenReturn(Optional.of(runtime(runtimeId, BusinessMode.DEMO, BusinessStatus.ACTIVE)));
+        when(profiles.findById(profileId))
+                .thenReturn(Optional.of(profile(profileId, Instant.parse("2026-10-01T05:00:00Z"))));
+        when(sessions.findPreparedForRuntime(runtimeId)).thenReturn(Optional.empty());
+        when(sessions.saveAndFlush(any(DemoSession.class))).thenAnswer(invocation -> {
+            DemoSession session = invocation.getArgument(0);
+            if (session.getId() == null) ReflectionTestUtils.setField(session, "id", UUID.randomUUID());
+            return session;
+        });
+        PlatformDemoReadinessResponse unavailable = new PlatformDemoReadinessResponse(
+                true, runtimeId,
+                item("READY", "runtime"),
+                item("READY", "number"),
+                item("UNAVAILABLE", "voice"),
+                item("READY", "data"),
+                item("READY", "ops"),
+                item("NOT_CONFIGURED", "wa"),
+                item("SANDBOX_ONLY", "payment"),
+                item("DISARMED", "effects"));
+        when(readiness.readiness()).thenReturn(unavailable);
+
+        PlatformDemoSessionResponse result = new PlatformDemoSessionService(
+                properties, businesses, profiles, sessions, staging, readiness, audit).prepare(profileId);
+
+        assertEquals(DemoSessionState.FAILED, result.state());
+        assertTrue(result.failureReason().contains("voiceAi"));
+        verify(staging).stage(any(DemoProfile.class), eq(runtimeId));
+        verify(audit).platformHumanSuccess(
+                eq(runtimeId), eq("DEMO_SESSION_FAILED"), eq("DEMO_SESSION"),
+                any(UUID.class), any(), any());
+    }
+
+    @Test
     void customerOrSuspendedRuntimeFailsClosedBeforeStaging() {
         UUID runtimeId = UUID.randomUUID();
         UUID profileId = UUID.randomUUID();
