@@ -699,6 +699,81 @@ class PostgresRowLevelSecurityIntegrationTest {
                 businessA));
     }
 
+    @Test
+    void demoCallCorrelationForeignKeyCannotCrossRuntimeTenantBoundary() {
+        UUID profileId = UUID.randomUUID();
+        UUID sessionA = UUID.randomUUID();
+        UUID sessionB = UUID.randomUUID();
+        UUID phoneA = UUID.randomUUID();
+        UUID phoneB = UUID.randomUUID();
+        UUID callA = UUID.randomUUID();
+
+        ownerJdbc.update("""
+                INSERT INTO demo_profile(id, display_name, business_name, greeting)
+                VALUES (?, 'Voice correlation', 'Voice correlation', 'Hola')
+                """, profileId);
+        ownerJdbc.update("""
+                INSERT INTO demo_session(
+                    id, correlation_id, demo_profile_id, runtime_business_id, state, configuration_revision,
+                    started_at, finished_at
+                ) VALUES (?, ?, ?, ?, 'FINISHED', 'voice-a', NOW() - INTERVAL '2 minutes', NOW() - INTERVAL '1 minute')
+                """, sessionA, UUID.randomUUID(), profileId, businessA);
+        ownerJdbc.update("""
+                INSERT INTO demo_session(
+                    id, correlation_id, demo_profile_id, runtime_business_id, state, configuration_revision,
+                    started_at, finished_at
+                ) VALUES (?, ?, ?, ?, 'FINISHED', 'voice-b', NOW() - INTERVAL '2 minutes', NOW() - INTERVAL '1 minute')
+                """, sessionB, UUID.randomUUID(), profileId, businessB);
+
+        ownerJdbc.update("""
+                INSERT INTO phone_number(id, business_id, phone_number)
+                VALUES (?, ?, ?)
+                """, phoneA, businessA, "+1500" + Math.abs(phoneA.hashCode()));
+        ownerJdbc.update("""
+                INSERT INTO phone_number(id, business_id, phone_number)
+                VALUES (?, ?, ?)
+                """, phoneB, businessB, "+1600" + Math.abs(phoneB.hashCode()));
+
+        ownerJdbc.update("""
+                INSERT INTO call_session(
+                    id, business_id, phone_number_id, provider_call_id, destination_number,
+                    direction, status, started_at, demo_session_id
+                ) VALUES (?, ?, ?, ?, ?, 'INBOUND', 'COMPLETED', NOW(), ?)
+                """, callA, businessA, phoneA, "CA-demo-" + callA, "+1500", sessionA);
+
+        assertEquals(sessionA, ownerJdbc.queryForObject(
+                "SELECT demo_session_id FROM call_session WHERE id = ?",
+                UUID.class,
+                callA));
+
+        assertThrows(DataAccessException.class, () -> ownerJdbc.update("""
+                INSERT INTO call_session(
+                    id, business_id, phone_number_id, provider_call_id, destination_number,
+                    direction, status, started_at, demo_session_id
+                ) VALUES (?, ?, ?, ?, ?, 'INBOUND', 'COMPLETED', NOW(), ?)
+                """, UUID.randomUUID(), businessA, phoneA,
+                "CA-cross-" + UUID.randomUUID(), "+1500", sessionB));
+
+        assertThrows(DataAccessException.class, () -> ownerJdbc.update("""
+                UPDATE call_session
+                   SET demo_session_id = ?
+                 WHERE id = ?
+                """, sessionB, callA));
+
+        assertEquals(1L, databaseContext.callAsTenant(
+                businessA,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM call_session WHERE demo_session_id = ?",
+                        Long.class,
+                        sessionA)));
+        assertEquals(0L, databaseContext.callAsTenant(
+                businessB,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM call_session WHERE demo_session_id = ?",
+                        Long.class,
+                        sessionA)));
+    }
+
     private void assertOwnerSessionScrubbed(Connection connection) throws Exception {
         try (Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery(
