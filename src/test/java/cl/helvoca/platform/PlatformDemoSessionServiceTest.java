@@ -5,7 +5,10 @@ import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessMode;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.business.BusinessStatus;
+import cl.helvoca.common.ConflictException;
+import cl.helvoca.common.NotFoundException;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -172,6 +175,173 @@ class PlatformDemoSessionServiceTest {
         verify(audit).platformHumanSuccess(
                 eq(runtimeId), eq("DEMO_SESSION_FAILED"), eq("DEMO_SESSION"),
                 any(UUID.class), any(), any());
+    }
+
+    @Test
+    void stalePreparingSessionResumesControlledStagingInsteadOfRemainingWedged() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID profileId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        DemoProfileRepository profiles = mock(DemoProfileRepository.class);
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        DemoRuntimeStagingService staging = mock(DemoRuntimeStagingService.class);
+        PlatformDemoReadinessService readiness = mock(PlatformDemoReadinessService.class);
+        AuditService audit = mock(AuditService.class);
+
+        DemoProfile profile = profile(profileId, Instant.parse("2026-10-01T05:00:00Z"));
+        DemoSession stale = DemoSession.preparing(profileId, runtimeId, profile.getUpdatedAt().toString());
+        ReflectionTestUtils.setField(stale, "id", UUID.randomUUID());
+        ReflectionTestUtils.setField(stale, "updatedAt", Instant.now().minusSeconds(600));
+
+        when(businesses.findById(runtimeId))
+                .thenReturn(Optional.of(runtime(runtimeId, BusinessMode.DEMO, BusinessStatus.ACTIVE)));
+        when(profiles.findById(profileId)).thenReturn(Optional.of(profile));
+        when(sessions.findPreparedForRuntime(runtimeId)).thenReturn(Optional.of(stale));
+        when(sessions.saveAndFlush(any(DemoSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(readiness.readiness()).thenReturn(readiness(runtimeId, "READY", "READY", "READY"));
+
+        PlatformDemoSessionResponse result = new PlatformDemoSessionService(
+                properties, businesses, profiles, sessions, staging, readiness, audit).prepare(profileId);
+
+        assertEquals(DemoSessionState.READY, result.state());
+        verify(staging).stage(profile, runtimeId);
+        verify(audit).platformHumanSuccess(
+                eq(runtimeId), eq("DEMO_SESSION_PREPARE_RESUME"), eq("DEMO_SESSION"),
+                eq(stale.getId()), any(), any());
+        verify(audit).platformHumanSuccess(
+                eq(runtimeId), eq("DEMO_SESSION_READY"), eq("DEMO_SESSION"),
+                eq(stale.getId()), any(), any());
+    }
+
+    @Test
+    void concurrentPrepareReturnsWinningSameRevisionSessionWithoutStagingTwice() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID profileId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        DemoProfileRepository profiles = mock(DemoProfileRepository.class);
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        DemoRuntimeStagingService staging = mock(DemoRuntimeStagingService.class);
+        PlatformDemoReadinessService readiness = mock(PlatformDemoReadinessService.class);
+        AuditService audit = mock(AuditService.class);
+
+        DemoProfile profile = profile(profileId, Instant.parse("2026-10-01T05:00:00Z"));
+        DemoSession winner = DemoSession.preparing(profileId, runtimeId, profile.getUpdatedAt().toString());
+        winner.markReady();
+        ReflectionTestUtils.setField(winner, "id", UUID.randomUUID());
+
+        when(businesses.findById(runtimeId))
+                .thenReturn(Optional.of(runtime(runtimeId, BusinessMode.DEMO, BusinessStatus.ACTIVE)));
+        when(profiles.findById(profileId)).thenReturn(Optional.of(profile));
+        when(sessions.findPreparedForRuntime(runtimeId))
+                .thenReturn(Optional.empty(), Optional.of(winner));
+        when(sessions.saveAndFlush(any(DemoSession.class)))
+                .thenThrow(new DataIntegrityViolationException("unique live runtime"));
+        when(readiness.readiness()).thenReturn(readiness(runtimeId, "READY", "READY", "READY"));
+
+        PlatformDemoSessionResponse result = new PlatformDemoSessionService(
+                properties, businesses, profiles, sessions, staging, readiness, audit).prepare(profileId);
+
+        assertEquals(winner.getId(), result.id());
+        assertEquals(DemoSessionState.READY, result.state());
+        verifyNoInteractions(staging);
+    }
+
+    @Test
+    void concurrentPrepareWithDifferentProfileFailsAsConflict() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID profileId = UUID.randomUUID();
+        UUID otherProfileId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        DemoProfileRepository profiles = mock(DemoProfileRepository.class);
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        DemoRuntimeStagingService staging = mock(DemoRuntimeStagingService.class);
+        PlatformDemoReadinessService readiness = mock(PlatformDemoReadinessService.class);
+        AuditService audit = mock(AuditService.class);
+
+        DemoProfile profile = profile(profileId, Instant.parse("2026-10-01T05:00:00Z"));
+        DemoSession winner = DemoSession.preparing(otherProfileId, runtimeId, "other-revision");
+        ReflectionTestUtils.setField(winner, "id", UUID.randomUUID());
+
+        when(businesses.findById(runtimeId))
+                .thenReturn(Optional.of(runtime(runtimeId, BusinessMode.DEMO, BusinessStatus.ACTIVE)));
+        when(profiles.findById(profileId)).thenReturn(Optional.of(profile));
+        when(sessions.findPreparedForRuntime(runtimeId))
+                .thenReturn(Optional.empty(), Optional.of(winner));
+        when(sessions.saveAndFlush(any(DemoSession.class)))
+                .thenThrow(new DataIntegrityViolationException("unique live runtime"));
+
+        PlatformDemoSessionService service = new PlatformDemoSessionService(
+                properties, businesses, profiles, sessions, staging, readiness, audit);
+
+        assertThrows(ConflictException.class, () -> service.prepare(profileId));
+        verifyNoInteractions(staging);
+    }
+
+    @Test
+    void preparedDifferentRevisionIsRejectedBeforeAnyRuntimeMutation() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID profileId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        DemoProfileRepository profiles = mock(DemoProfileRepository.class);
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        DemoRuntimeStagingService staging = mock(DemoRuntimeStagingService.class);
+        PlatformDemoReadinessService readiness = mock(PlatformDemoReadinessService.class);
+        AuditService audit = mock(AuditService.class);
+
+        DemoProfile profile = profile(profileId, Instant.parse("2026-10-01T05:00:00Z"));
+        DemoSession existing = DemoSession.preparing(profileId, runtimeId, "older-revision");
+        ReflectionTestUtils.setField(existing, "id", UUID.randomUUID());
+
+        when(businesses.findById(runtimeId))
+                .thenReturn(Optional.of(runtime(runtimeId, BusinessMode.DEMO, BusinessStatus.ACTIVE)));
+        when(profiles.findById(profileId)).thenReturn(Optional.of(profile));
+        when(sessions.findPreparedForRuntime(runtimeId)).thenReturn(Optional.of(existing));
+
+        PlatformDemoSessionService service = new PlatformDemoSessionService(
+                properties, businesses, profiles, sessions, staging, readiness, audit);
+
+        assertThrows(ConflictException.class, () -> service.prepare(profileId));
+        verifyNoInteractions(staging, readiness, audit);
+    }
+
+    @Test
+    void currentAndGetNeverExposeSessionsFromAnotherConfiguredRuntime() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID foreignRuntime = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        DemoProfileRepository profiles = mock(DemoProfileRepository.class);
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        DemoRuntimeStagingService staging = mock(DemoRuntimeStagingService.class);
+        PlatformDemoReadinessService readiness = mock(PlatformDemoReadinessService.class);
+        AuditService audit = mock(AuditService.class);
+
+        DemoSession foreign = DemoSession.preparing(UUID.randomUUID(), foreignRuntime, "rev");
+        ReflectionTestUtils.setField(foreign, "id", sessionId);
+        when(sessions.findPreparedForRuntime(runtimeId)).thenReturn(Optional.empty());
+        when(sessions.findById(sessionId)).thenReturn(Optional.of(foreign));
+
+        PlatformDemoSessionService service = new PlatformDemoSessionService(
+                properties, businesses, profiles, sessions, staging, readiness, audit);
+
+        assertNull(service.current());
+        assertThrows(NotFoundException.class, () -> service.get(sessionId));
+        verifyNoInteractions(readiness);
     }
 
     @Test
