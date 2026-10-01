@@ -42,7 +42,7 @@ public final class TenantAwareDataSource implements DataSource {
     }
 
     private Connection prepare(Connection connection) throws SQLException {
-        TenantDatabaseContext.Access access = context.currentOrInternalSystem();
+        TenantDatabaseContext.Access access = context.currentOrDenied();
         try {
             scrubOutsideTransaction(connection);
             String role = access.mode() == TenantDatabaseContext.Mode.SYSTEM ? SYSTEM_ROLE : TENANT_ROLE;

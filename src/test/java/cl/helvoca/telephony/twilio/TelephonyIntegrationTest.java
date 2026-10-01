@@ -1,5 +1,7 @@
 package cl.helvoca.telephony.twilio;
 
+import cl.helvoca.testsupport.ExplicitSystemDatabaseScopeSupport;
+
 import cl.helvoca.billing.BusinessSubscription;
 import cl.helvoca.billing.BusinessSubscriptionRepository;
 import cl.helvoca.billing.SubscriptionStatus;
@@ -27,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @Testcontainers
 @SpringBootTest
-class TelephonyIntegrationTest {
+class TelephonyIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 

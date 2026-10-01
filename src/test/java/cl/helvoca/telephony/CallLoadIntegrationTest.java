@@ -1,5 +1,7 @@
 package cl.helvoca.telephony;
 
+import cl.helvoca.testsupport.ExplicitSystemDatabaseScopeSupport;
+
 import cl.helvoca.billing.BusinessSubscription;
 import cl.helvoca.billing.BusinessSubscriptionRepository;
 import cl.helvoca.billing.SubscriptionStatus;
@@ -41,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers
 @SpringBootTest
-class CallLoadIntegrationTest {
+class CallLoadIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
 
     private static final List<CallStatus> ACTIVE_STATUSES =
             List.of(CallStatus.QUEUED, CallStatus.RINGING, CallStatus.IN_PROGRESS);
@@ -158,7 +160,7 @@ class CallLoadIntegrationTest {
             for (int i = 0; i < concurrency; i++) {
                 int index = i;
                 futures.add(executor.submit(() -> attempt(
-                        tenant.phone(), scenario + "-" + index, ready, fire)));
+                        tenant.businessId(), tenant.phone(), scenario + "-" + index, ready, fire)));
             }
 
             assertTrue(ready.await(15, TimeUnit.SECONDS),
@@ -193,7 +195,8 @@ class CallLoadIntegrationTest {
         }
     }
 
-    private Attempt attempt(String destination,
+    private Attempt attempt(UUID businessId,
+                            String destination,
                             String suffix,
                             CountDownLatch ready,
                             CountDownLatch fire) throws Exception {
@@ -201,11 +204,11 @@ class CallLoadIntegrationTest {
         fire.await(15, TimeUnit.SECONDS);
         long started = System.nanoTime();
         try {
-            lifecycle.startInboundCall(
+            databaseContext.callAsTenant(businessId, () -> lifecycle.startInboundCall(
                     "twilio",
                     "CA-load-" + suffix + "-" + UUID.randomUUID(),
                     "+56910000000",
-                    destination);
+                    destination));
             return new Attempt(Outcome.ACCEPTED, elapsedMillis(started));
         } catch (CallCapacityExceededException expected) {
             return new Attempt(Outcome.REJECTED, elapsedMillis(started));

@@ -1,5 +1,7 @@
 package cl.helvoca.telephony;
 
+import cl.helvoca.testsupport.ExplicitSystemDatabaseScopeSupport;
+
 import cl.helvoca.billing.BusinessSubscription;
 import cl.helvoca.billing.BusinessSubscriptionRepository;
 import cl.helvoca.billing.SubscriptionStatus;
@@ -34,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers
 @SpringBootTest
-class CallCapacityIntegrationTest {
+class CallCapacityIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
 
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
@@ -65,9 +67,9 @@ class CallCapacityIntegrationTest {
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
             Future<Boolean> first = executor.submit(() -> attempt(
-                    "CA-capacity-a1", tenantA.phone(), ready, fire));
+                    tenantA.businessId(), "CA-capacity-a1", tenantA.phone(), ready, fire));
             Future<Boolean> second = executor.submit(() -> attempt(
-                    "CA-capacity-a2", tenantA.phone(), ready, fire));
+                    tenantA.businessId(), "CA-capacity-a2", tenantA.phone(), ready, fire));
 
             assertTrue(ready.await(5, TimeUnit.SECONDS));
             fire.countDown();
@@ -78,8 +80,10 @@ class CallCapacityIntegrationTest {
             assertEquals(1L, calls.countByBusinessIdAndStatusIn(
                     tenantA.businessId(), List.of(CallStatus.RINGING, CallStatus.IN_PROGRESS, CallStatus.QUEUED)));
 
-            UUID tenantBCall = lifecycle.startInboundCall(
-                    "twilio", "CA-capacity-b1", "+56910000002", tenantB.phone());
+            UUID tenantBCall = databaseContext.callAsTenant(
+                    tenantB.businessId(),
+                    () -> lifecycle.startInboundCall(
+                            "twilio", "CA-capacity-b1", "+56910000002", tenantB.phone()));
             assertNotNull(tenantBCall);
             assertEquals(1L, calls.countByBusinessIdAndStatusIn(
                     tenantB.businessId(), List.of(CallStatus.RINGING, CallStatus.IN_PROGRESS, CallStatus.QUEUED)));
@@ -88,14 +92,17 @@ class CallCapacityIntegrationTest {
         }
     }
 
-    private boolean attempt(String callSid,
+    private boolean attempt(UUID businessId,
+                            String callSid,
                             String destination,
                             CountDownLatch ready,
                             CountDownLatch fire) throws Exception {
         ready.countDown();
         fire.await(5, TimeUnit.SECONDS);
         try {
-            lifecycle.startInboundCall("twilio", callSid, "+56910000001", destination);
+            databaseContext.callAsTenant(
+                    businessId,
+                    () -> lifecycle.startInboundCall("twilio", callSid, "+56910000001", destination));
             return true;
         } catch (CallCapacityExceededException expected) {
             return false;

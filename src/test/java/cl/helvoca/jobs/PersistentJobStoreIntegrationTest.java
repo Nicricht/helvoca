@@ -2,6 +2,8 @@ package cl.helvoca.jobs;
 
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
+import cl.helvoca.security.TenantDatabaseContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,10 +47,19 @@ class PersistentJobStoreIntegrationTest {
     @Autowired PersistentJobStore store;
     @Autowired BusinessRepository businesses;
     @Autowired JdbcTemplate jdbc;
+    @Autowired TenantDatabaseContext databaseContext;
+
+    TenantDatabaseContext.Scope systemScope;
 
     @BeforeEach
     void clearDurableJobs() {
+        systemScope = databaseContext.useSystem();
         jdbc.update("DELETE FROM persistent_job");
+    }
+
+    @AfterEach
+    void closeSystemScope() {
+        if (systemScope != null) systemScope.close();
     }
 
     @Test
@@ -183,7 +194,8 @@ class PersistentJobStoreIntegrationTest {
     private PersistentJob claim(String worker, CountDownLatch ready, CountDownLatch fire) throws Exception {
         ready.countDown();
         fire.await(5, TimeUnit.SECONDS);
-        return store.claimNext(worker, Duration.ofSeconds(30)).orElse(null);
+        return databaseContext.callAsSystem(
+                () -> store.claimNext(worker, Duration.ofSeconds(30)).orElse(null));
     }
 
     private PersistentJob enqueue(UUID businessId, String key, int maxAttempts) {

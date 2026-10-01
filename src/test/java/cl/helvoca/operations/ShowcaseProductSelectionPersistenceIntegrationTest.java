@@ -1,5 +1,7 @@
 package cl.helvoca.operations;
 
+import cl.helvoca.testsupport.ExplicitSystemDatabaseScopeSupport;
+
 import cl.helvoca.agent.AiAgent;
 import cl.helvoca.agent.AiAgentRepository;
 import cl.helvoca.agent.AiCapability;
@@ -32,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @Testcontainers
 @SpringBootTest
 @Transactional
-class ShowcaseProductSelectionPersistenceIntegrationTest {
+class ShowcaseProductSelectionPersistenceIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
 
     @Container
     static final PostgreSQLContainer<?> postgres =

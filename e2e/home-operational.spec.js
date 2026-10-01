@@ -2080,8 +2080,8 @@ test('orders requests customers remain operable on mobile', async ({ page }) => 
 
 test('agenda gives the owner a decision-ready today week and day view', async ({ page }) => {
   test.setTimeout(45000);
+  await page.clock.setFixedTime(new Date('2026-10-01T21:00:00Z'));
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'agenda-professional-token'));
-  await page.clock.setFixedTime(new Date('2026-10-01T22:50:00Z'));
   await mockReadyHome(page);
 
   await page.unroute('**/api/v1/bookings');
@@ -2150,6 +2150,51 @@ test('agenda gives the owner a decision-ready today week and day view', async ({
   await page.setViewportSize({ width: 390, height: 844 });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
+});
+
+
+test('agenda keeps the table central and animates the selected reservation flow', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'agenda-motion-token'));
+  await mockReadyHome(page);
+  await page.goto('/?tab=bookings#homeBusinessWorkspace');
+
+  const table = page.locator('#homeBookingsList .home-business-table');
+  await expect(table).toBeVisible();
+  await expect(table.locator('thead')).toContainText('Acciones');
+
+  const firstRow = table.locator('tbody tr[data-home-booking-id]').first();
+  await expect(firstRow.locator('.home-agenda-avatar')).toBeVisible();
+  await expect(firstRow.locator('.home-agenda-source-badge')).toBeVisible();
+  await expect(firstRow.locator('.home-agenda-view')).toBeVisible();
+
+  const rowAnimation = await firstRow.evaluate(node => getComputedStyle(node).animationName);
+  expect(rowAnimation).toContain('agendaRowIn');
+
+  await firstRow.click();
+  await expect(firstRow).toHaveClass(/is-selected/);
+  await expect(page.locator('#homeBookingDetailDrawer')).toBeVisible();
+  const detailTabs = page.locator('.home-agenda-detail-tabs');
+  await expect(detailTabs).toBeVisible();
+  await expect(detailTabs.getByRole('tab', { name: 'Resumen', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(detailTabs.getByRole('tab', { name: 'Conversación', exact: true })).toBeVisible();
+  await expect(detailTabs.getByRole('tab', { name: 'Cliente', exact: true })).toBeVisible();
+  await expect(detailTabs.getByRole('tab', { name: 'Actividad', exact: true })).toBeVisible();
+
+  await detailTabs.getByRole('tab', { name: 'Conversación', exact: true }).click();
+  await expect(detailTabs.getByRole('tab', { name: 'Conversación', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[data-booking-detail-panel="conversation"]')).toBeVisible();
+
+  await page.locator('#homeBookingDetailClose').click();
+  await expect(firstRow).not.toHaveClass(/is-selected/);
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  const reducedRow = page.locator('#homeBookingsList .home-business-table tbody tr[data-home-booking-id]').first();
+  await expect(reducedRow).toBeVisible();
+  const reducedAnimation = await reducedRow.evaluate(node => getComputedStyle(node).animationDuration);
+  expect(reducedAnimation).toBe('0s');
 });
 
 test('booking cancellation from drawer works', async ({ page }) => {

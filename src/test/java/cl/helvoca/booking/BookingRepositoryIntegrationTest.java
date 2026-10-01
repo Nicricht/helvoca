@@ -9,6 +9,9 @@ import cl.helvoca.operations.BusinessOperationRepository;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
+import cl.helvoca.security.TenantDatabaseContext;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -46,6 +49,19 @@ class BookingRepositoryIntegrationTest {
     @Autowired ServiceItemRepository services;
     @Autowired BookingRepository bookings;
     @Autowired BusinessOperationRepository operations;
+    @Autowired TenantDatabaseContext databaseContext;
+
+    TenantDatabaseContext.Scope systemScope;
+
+    @BeforeEach
+    void enterExplicitSystemFixtureScope() {
+        systemScope = databaseContext.useSystem();
+    }
+
+    @AfterEach
+    void leaveExplicitSystemFixtureScope() {
+        if (systemScope != null) systemScope.close();
+    }
 
     @Test
     void flywayOverlapAndUniversalBookingProjectionWorkAgainstPostgres() {

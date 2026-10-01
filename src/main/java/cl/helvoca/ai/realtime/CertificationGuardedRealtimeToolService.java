@@ -33,8 +33,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.util.List;
@@ -119,9 +118,12 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     }
 
     @Override
-    @Transactional(readOnly = true)
     public String buildInstructions(RealtimeCallContext context) {
-        String instructions = RecepVozConversationPolicyService.appendTo(super.buildInstructions(context));
+        return tenantRead(context, () -> buildGuardedInstructionsInTenant(context));
+    }
+
+    private String buildGuardedInstructionsInTenant(RealtimeCallContext context) {
+        String instructions = RecepVozConversationPolicyService.appendTo(super.buildInstructionsInTenant(context));
         if (isLatencyCertification(context)) {
             return instructions
                     + "\nMODO CERTIFICACIÓN DE LATENCIA READ-ONLY: responde de forma directa y breve. "
@@ -139,9 +141,12 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     }
 
     @Override
-    @Transactional(readOnly = true)
     public JSONArray toolDefinitions(RealtimeCallContext context) {
-        JSONArray definitions = super.toolDefinitions(context);
+        return tenantRead(context, () -> guardedToolDefinitionsInTenant(context));
+    }
+
+    private JSONArray guardedToolDefinitionsInTenant(RealtimeCallContext context) {
+        JSONArray definitions = super.toolDefinitionsInTenant(context);
         if (isLatencyCertification(context)) {
             JSONArray readOnly = new JSONArray();
             for (int i = 0; i < definitions.length(); i++) {
@@ -171,8 +176,14 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     }
 
     @Override
-    @Transactional(isolation = Isolation.READ_COMMITTED)
     public String prepareDeferredEndCall(RealtimeCallContext context) {
+        return tenantWrite(
+                context,
+                TransactionDefinition.ISOLATION_READ_COMMITTED,
+                () -> prepareDeferredEndCallInTenant(context));
+    }
+
+    private String prepareDeferredEndCallInTenant(RealtimeCallContext context) {
         long startedNanos = System.nanoTime();
         JSONObject result;
         CallSession call = calls.findByIdAndBusinessId(context.callId(), context.businessId()).orElse(null);
@@ -201,8 +212,14 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
     }
 
     @Override
-    @Transactional(isolation = Isolation.READ_COMMITTED)
     public String execute(RealtimeCallContext context, String toolName, String rawArguments) {
+        return tenantWrite(
+                context,
+                TransactionDefinition.ISOLATION_READ_COMMITTED,
+                () -> executeGuardedInTenant(context, toolName, rawArguments));
+    }
+
+    private String executeGuardedInTenant(RealtimeCallContext context, String toolName, String rawArguments) {
         long startedNanos = System.nanoTime();
         if ("end_call".equals(toolName)) {
             JSONObject result = endCall(context);
@@ -311,7 +328,7 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
         }
 
         lockBookingMutation(context, toolName, rawArguments);
-        String result = super.execute(context, toolName, rawArguments);
+        String result = super.executeInTenant(context, toolName, rawArguments);
         JSONObject args = parseArguments(rawArguments);
         JSONObject decorated = decorateBookingState(context, toolName, args, new JSONObject(result));
         if (!BOOKING_MUTATIONS.contains(toolName)) return decorated.toString();

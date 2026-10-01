@@ -20,6 +20,7 @@ import cl.helvoca.request.BusinessRequest;
 import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.request.RequestPriority;
 import cl.helvoca.schedule.BusinessScheduleService;
+import cl.helvoca.security.TenantTransactionExecutor;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.json.JSONArray;
@@ -28,8 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.TransactionDefinition;
 
 import java.time.*;
 import java.time.temporal.ChronoUnit;
@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 @Service
 public class RealtimeToolService {
@@ -60,6 +61,9 @@ public class RealtimeToolService {
 
     @Autowired(required = false)
     private CustomerIdentityService customerIdentities;
+
+    @Autowired
+    private TenantTransactionExecutor tenantTransactions;
 
     public RealtimeToolService(BusinessRepository businesses,
                                CustomerRepository customers,
@@ -91,8 +95,14 @@ public class RealtimeToolService {
                 "El proveedor telefónico actual no admite cierre diferido de reproducción.").toString();
     }
 
-    @Transactional(isolation = Isolation.SERIALIZABLE)
     public String execute(RealtimeCallContext context, String toolName, String rawArguments) {
+        return tenantWrite(
+                context,
+                TransactionDefinition.ISOLATION_SERIALIZABLE,
+                () -> executeInTenant(context, toolName, rawArguments));
+    }
+
+    protected String executeInTenant(RealtimeCallContext context, String toolName, String rawArguments) {
         long startedNanos = System.nanoTime();
         JSONObject result;
         try {
@@ -138,8 +148,11 @@ public class RealtimeToolService {
         return result.toString();
     }
 
-    @Transactional(readOnly = true)
     public JSONArray toolDefinitions(RealtimeCallContext context) {
+        return tenantRead(context, () -> toolDefinitionsInTenant(context));
+    }
+
+    protected JSONArray toolDefinitionsInTenant(RealtimeCallContext context) {
         if (aiAgents == null) return RealtimeToolDefinitions.all();
         Set<String> allowed = aiAgents.allowedToolNames(context.businessId());
         JSONArray filtered = new JSONArray();
@@ -151,34 +164,39 @@ public class RealtimeToolService {
         return filtered;
     }
 
-    @Transactional(readOnly = true)
     public boolean agentActive(RealtimeCallContext context) {
-        return aiAgents == null || aiAgents.runtime(context.businessId()).isActive();
+        return tenantRead(context, () -> aiAgents == null || aiAgents.runtime(context.businessId()).isActive());
     }
 
-    @Transactional(readOnly = true)
     public String agentVoice(RealtimeCallContext context, String fallback) {
-        if (aiAgents == null) return fallback;
-        String voice = aiAgents.runtime(context.businessId()).getVoice();
-        return voice == null || voice.isBlank() ? fallback : voice.trim();
+        return tenantRead(context, () -> {
+            if (aiAgents == null) return fallback;
+            String voice = aiAgents.runtime(context.businessId()).getVoice();
+            return voice == null || voice.isBlank() ? fallback : voice.trim();
+        });
     }
 
-    @Transactional(readOnly = true)
     public String agentGreeting(RealtimeCallContext context, String fallback) {
-        if (aiAgents == null) return fallback;
-        String greeting = aiAgents.runtime(context.businessId()).getGreeting();
-        return greeting == null || greeting.isBlank() ? fallback : greeting.trim();
+        return tenantRead(context, () -> {
+            if (aiAgents == null) return fallback;
+            String greeting = aiAgents.runtime(context.businessId()).getGreeting();
+            return greeting == null || greeting.isBlank() ? fallback : greeting.trim();
+        });
     }
 
-    @Transactional(readOnly = true)
     public String agentName(RealtimeCallContext context, String fallback) {
-        if (aiAgents == null) return fallback;
-        String name = aiAgents.runtime(context.businessId()).getName();
-        return name == null || name.isBlank() ? fallback : name.trim();
+        return tenantRead(context, () -> {
+            if (aiAgents == null) return fallback;
+            String name = aiAgents.runtime(context.businessId()).getName();
+            return name == null || name.isBlank() ? fallback : name.trim();
+        });
     }
 
-    @Transactional(readOnly = true)
     public String buildInstructions(RealtimeCallContext context) {
+        return tenantRead(context, () -> buildInstructionsInTenant(context));
+    }
+
+    protected String buildInstructionsInTenant(RealtimeCallContext context) {
         Business business = requireBusiness(context.businessId());
         ZoneId zone = ZoneId.of(business.getTimezone());
         ZonedDateTime localNow = ZonedDateTime.now(zone);
@@ -664,6 +682,23 @@ public class RealtimeToolService {
             throw new IllegalArgumentException("El stream no corresponde a la llamada.");
         }
         return call;
+    }
+
+    protected <T> T tenantRead(RealtimeCallContext context, Supplier<T> work) {
+        if (tenantTransactions == null) return work.get();
+        return tenantTransactions.read(requireContextBusinessId(context), work);
+    }
+
+    protected <T> T tenantWrite(RealtimeCallContext context, int isolationLevel, Supplier<T> work) {
+        if (tenantTransactions == null) return work.get();
+        return tenantTransactions.write(requireContextBusinessId(context), isolationLevel, work);
+    }
+
+    private static UUID requireContextBusinessId(RealtimeCallContext context) {
+        if (context == null || context.businessId() == null) {
+            throw new IllegalArgumentException("Realtime call context requires businessId");
+        }
+        return context.businessId();
     }
 
     private Business requireBusiness(UUID businessId) {
