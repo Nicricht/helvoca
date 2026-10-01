@@ -381,6 +381,12 @@
   to { transform: translate3d(3%, -8px, 0) rotate(-4deg) scaleX(1.04); }
 }
 
+@media (max-width: 840px) {
+  .lowerGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 760px) {
   .planTop,
   .planFooter {
@@ -389,10 +395,6 @@
   }
 
   .metrics {
-    grid-template-columns: 1fr;
-  }
-
-  .lowerGrid {
     grid-template-columns: 1fr;
   }
 
