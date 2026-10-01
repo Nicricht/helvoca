@@ -16,6 +16,17 @@ import static org.mockito.Mockito.*;
 class TenantAwareDataSourceTest {
 
     @Test
+    void deniedContextRejectsConnectionBeforeBorrowingFromPool() throws Exception {
+        HikariDataSource pool = mock(HikariDataSource.class);
+        TenantDatabaseContext context = new TenantDatabaseContext();
+        TenantAwareDataSource dataSource = new TenantAwareDataSource(pool, context);
+
+        assertThrows(SQLException.class, dataSource::getConnection);
+
+        verify(pool, never()).getConnection();
+    }
+
+    @Test
     void scrubFailureEvictsConnectionInsteadOfReturningContaminatedSessionToPool() throws Exception {
         HikariDataSource pool = mock(HikariDataSource.class);
         Connection physical = mock(Connection.class);
