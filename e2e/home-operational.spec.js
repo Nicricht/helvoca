@@ -555,8 +555,8 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#ownerQuestionsAttentionChip')).toBeVisible();
   await expect(page.locator('#ownerOrdersAttentionToday')).toHaveText('1');
   await expect(page.locator('#ownerOrdersAttentionChip')).toBeVisible();
-  await expect(page.locator('#ownerHandoffsChip')).toBeVisible();
-  await expect(page.locator('#ownerFailuresChip')).toBeVisible();
+  await expect(page.locator('#ownerHandoffsChip')).toBeHidden();
+  await expect(page.locator('#ownerFailuresChip')).toBeHidden();
   await expect(page.locator('#homeQuestionsToday')).toHaveText('2');
   await expect(page.locator('#homeFailuresToday')).toHaveText('0');
   await expect(page.locator('#homeMinutesToday')).toHaveText('8:00');
