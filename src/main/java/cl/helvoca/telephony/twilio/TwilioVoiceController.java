@@ -38,6 +38,9 @@ public class TwilioVoiceController {
     @Autowired(required = false)
     private PhoneNumberRepository pilotPhoneNumbers;
 
+    @Value("${TWILIO_CERTIFICATION_PROVIDER_OVERRIDE:}")
+    private String certificationProviderOverride;
+
     @Value("${TWILIO_CERTIFICATION_VOICE_OVERRIDE:}")
     private String certificationVoiceOverride;
 
@@ -61,7 +64,7 @@ public class TwilioVoiceController {
     public ResponseEntity<String> incoming(@RequestParam("CallSid") String callSid,
                                            @RequestParam("From") String from,
                                            @RequestParam("To") String to) {
-        return route(to, from, callSid, "inbound", null);
+        return route(to, from, callSid, "inbound", null, null);
     }
 
     @PostMapping(value = "/outbound-test", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
@@ -69,8 +72,16 @@ public class TwilioVoiceController {
     public ResponseEntity<String> outboundTest(@RequestParam("CallSid") String callSid,
                                                @RequestParam("From") String from,
                                                @RequestParam("To") String to) {
+        if (!VoiceCallRouter.validCertificationProviderOverride(certificationProviderOverride)) {
+            log.warn("Blocked Twilio outbound-test call={} because certification provider override is invalid",
+                    callSid);
+            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+        }
+
+        String providerOverride =
+                VoiceCallRouter.normalizeCertificationProviderOverride(certificationProviderOverride);
         String voiceOverride = VoiceBakeOffCatalog.normalize(certificationVoiceOverride);
-        return route(from, to, callSid, "outbound-test", voiceOverride);
+        return route(from, to, callSid, "outbound-test", providerOverride, voiceOverride);
     }
 
     @PostMapping(value = "/inbound-certification", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
@@ -82,7 +93,7 @@ public class TwilioVoiceController {
             log.warn("Blocked disabled Twilio certification ingress call={}", callSid);
             return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
-        return route(from, to, callSid, "inbound-certification", null);
+        return route(from, to, callSid, "inbound-certification", null, null);
     }
 
     @PostMapping(value = "/inbound-certification/{token}",
@@ -99,7 +110,7 @@ public class TwilioVoiceController {
             return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
         log.info("Authorized one-shot Twilio certification ingress call={}", callSid);
-        return route(from, to, callSid, "inbound-certification", null);
+        return route(from, to, callSid, "inbound-certification", null, null);
     }
 
     @PostMapping(value = "/stream-status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -139,6 +150,7 @@ public class TwilioVoiceController {
                                          String callerPhone,
                                          String callSid,
                                          String direction,
+                                         String providerOverride,
                                          String voiceOverride) {
         if (pilotExternalEffects != null && pilotPhoneNumbers != null) {
             UUID businessId = pilotPhoneNumbers.findByPhoneNumberAndActiveTrue(businessPhone)
@@ -176,9 +188,11 @@ public class TwilioVoiceController {
             }
         }
 
-        var routeDecision = voiceOverride == null
-                ? voiceRouter.route(businessPhone, callerPhone, callSid)
-                : voiceRouter.route(businessPhone, callerPhone, callSid, voiceOverride);
+        var routeDecision = providerOverride != null
+                ? voiceRouter.route(businessPhone, callerPhone, callSid, providerOverride, voiceOverride)
+                : voiceOverride == null
+                        ? voiceRouter.route(businessPhone, callerPhone, callSid)
+                        : voiceRouter.route(businessPhone, callerPhone, callSid, voiceOverride);
         return routeDecision
                 .map(decision -> {
                     log.info("Routing Twilio {} call={} provider={} mode={}",
