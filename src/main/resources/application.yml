@@ -46,6 +46,8 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  demo:
+    runtime-business-id: ${HELVOCA_DEMO_RUNTIME_BUSINESS_ID:}
   jwt:
     issuer: ${JWT_ISSUER:helvoca-api}
     secret: ${JWT_SECRET:Y2FsbGFpLWRldi1vbmx5LXNlY3JldC1rZXktMzItYnl0ZXMhISE=}
