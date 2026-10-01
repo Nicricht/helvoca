@@ -113,6 +113,8 @@
 
     const target = homeWorkspace.querySelector(`[data-home-tab="${name}"]`);
     if (!target) return;
+
+    homeWorkspace.classList.remove("owner-collapsed");
     target.click();
     setPrimaryActive(name);
     homeWorkspace.scrollIntoView({ behavior: "smooth", block: "start" });
