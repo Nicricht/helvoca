@@ -21,6 +21,9 @@ public class CallSession {
     @Column(name = "phone_number_id")
     private UUID phoneNumberId;
 
+    @Column(name = "demo_session_id")
+    private UUID demoSessionId;
+
     @Column(name = "telephony_provider", nullable = false, length = 30)
     private String telephonyProvider;
 
@@ -109,6 +112,8 @@ public class CallSession {
     public void setCustomerId(UUID customerId) { this.customerId = customerId; }
     public UUID getPhoneNumberId() { return phoneNumberId; }
     public void setPhoneNumberId(UUID phoneNumberId) { this.phoneNumberId = phoneNumberId; }
+    public UUID getDemoSessionId() { return demoSessionId; }
+    public void setDemoSessionId(UUID demoSessionId) { this.demoSessionId = demoSessionId; }
     public String getTelephonyProvider() { return telephonyProvider; }
     public void setTelephonyProvider(String telephonyProvider) { this.telephonyProvider = telephonyProvider; }
     public String getAiProvider() { return aiProvider; }
