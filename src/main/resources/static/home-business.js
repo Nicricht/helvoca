@@ -894,17 +894,17 @@
 
     return `
       <div class="home-agenda-detail-tabs" role="tablist" aria-label="Detalle de reserva">
-        ${tabs.map(([value, label]) => `<button type="button" role="tab" data-booking-detail-tab="${value}" aria-selected="${bookingDetailActiveTab === value ? "true" : "false"}" aria-controls="homeBookingPanel-${value}">${label}</button>`).join("")}
+        ${tabs.map(([value, label]) => `<button id="homeBookingTab-${value}" type="button" role="tab" data-booking-detail-tab="${value}" aria-selected="${bookingDetailActiveTab === value ? "true" : "false"}" aria-controls="homeBookingPanel-${value}">${label}</button>`).join("")}
       </div>
       <div class="home-agenda-detail-panels">
-        <section id="homeBookingPanel-summary" class="home-agenda-detail-panel" role="tabpanel" data-booking-detail-panel="summary" ${bookingDetailActiveTab === "summary" ? "" : "hidden"}>
+        <section id="homeBookingPanel-summary" class="home-agenda-detail-panel" role="tabpanel" aria-labelledby="homeBookingTab-summary" data-booking-detail-panel="summary" ${bookingDetailActiveTab === "summary" ? "" : "hidden"}>
           ${bookingFacts(booking, customer, service, context)}
           ${renderBookingOutcome(context)}
           ${renderBookingActions(booking)}
         </section>
-        <section id="homeBookingPanel-conversation" class="home-agenda-detail-panel" role="tabpanel" data-booking-detail-panel="conversation" ${bookingDetailActiveTab === "conversation" ? "" : "hidden"}>${contextMarkup}</section>
-        <section id="homeBookingPanel-customer" class="home-agenda-detail-panel" role="tabpanel" data-booking-detail-panel="customer" ${bookingDetailActiveTab === "customer" ? "" : "hidden"}>${renderBookingCustomer(customer)}</section>
-        <section id="homeBookingPanel-activity" class="home-agenda-detail-panel" role="tabpanel" data-booking-detail-panel="activity" ${bookingDetailActiveTab === "activity" ? "" : "hidden"}>${activityMarkup}</section>
+        <section id="homeBookingPanel-conversation" class="home-agenda-detail-panel" role="tabpanel" aria-labelledby="homeBookingTab-conversation" data-booking-detail-panel="conversation" ${bookingDetailActiveTab === "conversation" ? "" : "hidden"}>${contextMarkup}</section>
+        <section id="homeBookingPanel-customer" class="home-agenda-detail-panel" role="tabpanel" aria-labelledby="homeBookingTab-customer" data-booking-detail-panel="customer" ${bookingDetailActiveTab === "customer" ? "" : "hidden"}>${renderBookingCustomer(customer)}</section>
+        <section id="homeBookingPanel-activity" class="home-agenda-detail-panel" role="tabpanel" aria-labelledby="homeBookingTab-activity" data-booking-detail-panel="activity" ${bookingDetailActiveTab === "activity" ? "" : "hidden"}>${activityMarkup}</section>
       </div>`;
   }
 
@@ -998,7 +998,7 @@
   function bindBookingOpeners() {
     document.querySelectorAll("[data-home-booking-id]").forEach(node => {
       const open = event => {
-        if (event?.target?.closest?.("button,a,input,select,textarea")) return;
+        if (event?.target !== node && event?.target?.closest?.("button,a,input,select,textarea")) return;
         openBookingDetail(node.dataset.homeBookingId, node);
       };
       node.addEventListener("click", open);
@@ -1253,7 +1253,7 @@
         </select></label>
         <label><span>Servicio</span><select id="homeBookingService"><option value="all">Todos</option>${serviceOptions}</select></label>
         <label><span>Estado</span><select id="homeBookingStatus">
-          <option value="all">Todos</option><option value="CONFIRMED">Confirmadas</option><option value="CANCELLED">Canceladas</option>
+          <option value="all">Todos</option><option value="CONFIRMED">Confirmadas</option><option value="PENDING">Pendientes</option><option value="CANCELLED">Canceladas</option>
         </select></label>
         <label><span>Origen</span><select id="homeBookingSource"><option value="all">Todos</option>${sourceOptions}</select></label>
         <button id="homeBookingClearFilters" class="home-filter-clear" type="button">Limpiar</button>
