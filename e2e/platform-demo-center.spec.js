@@ -39,41 +39,6 @@ test('platform admin sees the Demo Center without any countdown and can create a
     providers: []
   })));
 
-  await page.route('**/api/v1/platform/demo-sessions/*/timeline', route => route.fulfill(json({
-    sessionId: 'dddddddd-1111-2222-3333-444444444444',
-    state: 'ACTIVE',
-    callCount: 1,
-    refreshedAt: '2026-10-01T06:01:00Z',
-    items: [
-      {
-        kind: 'CALL_STARTED',
-        at: '2026-10-01T06:00:10Z',
-        title: 'Llamada recibida',
-        detail: 'Entrante desde ••••1111 hacia el número DEMO.',
-        status: 'IN_PROGRESS',
-        callId: 'cccccccc-1111-2222-3333-444444444444',
-        entityId: 'cccccccc-1111-2222-3333-444444444444'
-      },
-      {
-        kind: 'TRANSCRIPT',
-        at: '2026-10-01T06:00:15Z',
-        title: 'Cliente',
-        detail: 'Quiero dos sakes',
-        status: 'USER',
-        callId: 'cccccccc-1111-2222-3333-444444444444',
-        entityId: 'bbbbbbbb-1111-2222-3333-444444444444'
-      },
-      {
-        kind: 'OPERATION',
-        at: '2026-10-01T06:00:25Z',
-        title: 'ORDER',
-        detail: 'Total registrado: 9980 CLP.',
-        status: 'CONFIRMED',
-        callId: 'cccccccc-1111-2222-3333-444444444444',
-        entityId: 'aaaaaaaa-1111-2222-3333-444444444444'
-      }
-    ]
-  })));
 
   let submitted = null;
   const profiles = [{
@@ -206,7 +171,7 @@ test('platform admin sees the Demo Center without any countdown and can create a
   await expect(page.locator('#platformDemoTimeline')).toContainText('Cliente');
   await expect(page.locator('#platformDemoTimeline')).toContainText('Quiero dos sakes');
   await expect(page.locator('#platformDemoTimeline')).toContainText('ORDER');
-  await expect(page.locator('#platformDemoTimeline')).toContainText('CONFIRMED');
+  await expect(page.locator('#platformDemoTimeline')).toContainText('SUCCESS');
   await expect(page.locator('#platformDemoTimelineMeta')).toContainText('1 llamada');
   await expect(page.locator('body')).not.toContainText('3:00');
   await expect(page.locator('body')).not.toContainText('3 minutos');
