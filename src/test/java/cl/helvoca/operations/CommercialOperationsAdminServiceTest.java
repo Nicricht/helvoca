@@ -438,6 +438,48 @@ class CommercialOperationsAdminServiceTest {
     }
 
     @Test
+    void preparationPermissionCanAdvanceConfirmedOrderToPreparing() {
+        UUID businessId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        BusinessOrderRepository orders = mock(BusinessOrderRepository.class);
+        BusinessOrderLineRepository lines = mock(BusinessOrderLineRepository.class);
+        BusinessOperationRepository operations = mock(BusinessOperationRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+
+        BusinessOrder order = order(
+                orderId,
+                businessId,
+                BusinessOrder.Status.CONFIRMED,
+                BusinessOrder.FulfillmentType.PICKUP);
+        order.setOperationId(operationId);
+
+        BusinessOperation operation = new BusinessOperation();
+        operation.setId(operationId);
+        operation.setBusinessId(businessId);
+        operation.setType(BusinessOperation.Type.ORDER);
+        operation.setStatus(BusinessOperation.Status.CONFIRMED);
+        operation.setRevision(1);
+        operation.setMetadata(Map.of("intent", "ORDER"));
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(orders.findByIdAndBusinessId(orderId, businessId)).thenReturn(Optional.of(order));
+        when(orders.saveAndFlush(any(BusinessOrder.class))).thenAnswer(i -> i.getArgument(0));
+        when(lines.findAllByOrderIdOrderByCreatedAtAsc(orderId)).thenReturn(List.of());
+        when(operations.findByIdAndBusinessId(operationId, businessId)).thenReturn(Optional.of(operation));
+        when(operations.saveAndFlush(any(BusinessOperation.class))).thenAnswer(i -> i.getArgument(0));
+
+        CommercialOperationsAdminService service = service(
+                orders, lines, tenant, mock(BusinessDeliveryRepository.class), operations);
+
+        var view = service.updateOrderPreparationStatus(orderId, BusinessOrder.Status.PREPARING);
+
+        assertEquals(BusinessOrder.Status.PREPARING, view.status());
+        assertEquals("PREPARING", operation.getMetadata().get("projectionStatus"));
+        verify(orders).saveAndFlush(order);
+    }
+
+    @Test
     void preparationPermissionCannotCancelOrCompleteOrders() {
         TenantProvider tenant = mock(TenantProvider.class);
         CommercialOperationsAdminService service = service(
