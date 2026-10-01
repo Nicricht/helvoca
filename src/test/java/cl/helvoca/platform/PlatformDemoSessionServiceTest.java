@@ -333,7 +333,7 @@ class PlatformDemoSessionServiceTest {
 
         DemoSession foreign = DemoSession.preparing(UUID.randomUUID(), foreignRuntime, "rev");
         ReflectionTestUtils.setField(foreign, "id", sessionId);
-        when(sessions.findPreparedForRuntime(runtimeId)).thenReturn(Optional.empty());
+        when(sessions.findFirstByRuntimeBusinessIdOrderByCreatedAtDesc(runtimeId)).thenReturn(Optional.empty());
         when(sessions.findById(sessionId)).thenReturn(Optional.of(foreign));
 
         PlatformDemoSessionService service = new PlatformDemoSessionService(
@@ -342,6 +342,36 @@ class PlatformDemoSessionServiceTest {
         assertNull(service.current());
         assertThrows(NotFoundException.class, () -> service.get(sessionId));
         verifyNoInteractions(readiness);
+    }
+
+    @Test
+    void currentKeepsLatestFinishedSessionVisibleForPresenterEvidence() {
+        UUID runtimeId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        DemoProfileRepository profiles = mock(DemoProfileRepository.class);
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        DemoRuntimeStagingService staging = mock(DemoRuntimeStagingService.class);
+        PlatformDemoReadinessService readiness = mock(PlatformDemoReadinessService.class);
+        AuditService audit = mock(AuditService.class);
+
+        DemoSession finished = DemoSession.preparing(UUID.randomUUID(), runtimeId, "rev");
+        ReflectionTestUtils.setField(finished, "id", UUID.randomUUID());
+        finished.markReady();
+        finished.markActive();
+        finished.markFinished();
+
+        when(sessions.findFirstByRuntimeBusinessIdOrderByCreatedAtDesc(runtimeId))
+                .thenReturn(Optional.of(finished));
+        when(readiness.readiness()).thenReturn(readiness(runtimeId, "READY", "READY", "READY"));
+
+        PlatformDemoSessionResponse result = new PlatformDemoSessionService(
+                properties, businesses, profiles, sessions, staging, readiness, audit).current();
+
+        assertEquals(finished.getId(), result.id());
+        assertEquals(DemoSessionState.FINISHED, result.state());
     }
 
     @Test
