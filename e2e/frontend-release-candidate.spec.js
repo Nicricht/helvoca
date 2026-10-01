@@ -270,6 +270,7 @@ test('release candidate owner traverses the complete safe business journey in on
   await expect(page.getByRole('heading', { level: 1 })).toContainText('está atendiendo');
 
   const homeNav = page.locator('#primaryNav');
+  await expect(homeNav.getByRole('link', { name: 'Conversaciones', exact: true })).toHaveCount(0);
   await expect(page.locator('#homeBusinessWorkspace')).toHaveClass(/owner-collapsed/);
   await homeNav.getByRole('link', { name: 'Agenda', exact: true }).click();
   await expect(page.locator('[data-home-tab="bookings"]')).toHaveClass(/active/);
@@ -423,7 +424,6 @@ test('release candidate captures exact-head visual evidence for every canonical 
 
         expect(railState.links.map(link => link.text), `${surface.name} rail labels`).toEqual([
           'Inicio',
-          'Conversaciones',
           'Agenda',
           'Clientes',
           'Inventario',

@@ -29,7 +29,6 @@ function navEntries(html) {
 test('customer navigation stays coherent and never exposes internal operations', async () => {
   const expected = [
     { href: '/', text: 'Inicio' },
-    { href: '/conversations.html', text: 'Conversaciones' },
     { href: '/#bookings', text: 'Agenda' },
     { href: '/#customers', text: 'Clientes' },
     { href: '/inventory.html', text: 'Inventario' },
@@ -68,7 +67,7 @@ test('receptionist area keeps history and safe simulation as local actions', asy
 
   expect(conversations).toContain('>Conversaciones</h1>');
   expect(conversations).toContain('href="/simulator.html">Probar recepcionista</a>');
-  expect(simulator).toContain('href="/conversations.html">Ver historial</a>');
+  expect(simulator).toContain('href="/#bookings">Ver agenda</a>');
   expect(simulator).toMatch(/No crea datos comerciales reales ni realiza llamadas telefónicas/i);
   expect(simulator).toMatch(/Tampoco envía WhatsApp real/i);
 });
@@ -133,7 +132,7 @@ test('primary customer navigation remains keyboard reachable at required widths'
 
     const nav = page.getByRole('navigation', { name: 'Navegación principal' });
     const links = nav.getByRole('link');
-    await expect(links).toHaveCount(7);
+    await expect(links).toHaveCount(6);
 
     await links.nth(0).focus();
     await expect(links.nth(0)).toBeFocused();

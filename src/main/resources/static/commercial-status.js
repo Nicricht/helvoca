@@ -365,7 +365,7 @@
         '      <div class="owner-quick-grid">',
         '        <a href="/?tab=bookings#homeBusinessWorkspace">Agenda</a>',
         '        <a href="/?tab=requests#homeBusinessWorkspace">Pendientes</a>',
-        '        <a href="/conversations.html">Conversaciones</a>',
+        '        <a href="/?tab=customers#homeBusinessWorkspace">Clientes</a>',
         '        <a href="/inventory.html">Inventario</a>',
         '      </div>',
         '    </nav>',

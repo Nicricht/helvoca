@@ -2358,7 +2358,7 @@ test('dashboard prioritizes calls, attention, recent activity and quick access',
   await expect(quick.getByRole('link')).toHaveCount(4);
   await expect(quick.getByRole('link', { name: 'Agenda' })).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
   await expect(quick.getByRole('link', { name: 'Pendientes' })).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
-  await expect(quick.getByRole('link', { name: 'Conversaciones' })).toHaveAttribute('href', '/conversations.html');
+  await expect(quick.getByRole('link', { name: 'Clientes' })).toHaveAttribute('href', '/?tab=customers#homeBusinessWorkspace');
   await expect(quick.getByRole('link', { name: 'Inventario' })).toHaveAttribute('href', '/inventory.html');
 
   await expect(page.locator('#ownerDashboardState')).toHaveAttribute('role', 'status');
