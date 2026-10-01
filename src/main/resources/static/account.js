@@ -216,8 +216,8 @@
     $("#accountApp").classList.remove("hidden");
     $("#accountLoading").classList.add("hidden");
 
-    if (!roles.includes("BUSINESS_ADMIN")) {
-      $("#usageState").textContent = "El detalle de uso está disponible solo para administradores del negocio.";
+    if (!roles.includes("BUSINESS_ADMIN") && !roles.includes("BUSINESS_OWNER")) {
+      $("#usageState").textContent = "El detalle de uso está disponible solo para propietarios y administradores del negocio.";
       return;
     }
 
@@ -232,7 +232,7 @@
     } else {
       const error = usageResult.reason;
       $("#usageState").textContent = error?.status === 403
-        ? "El detalle de uso está disponible solo para administradores del negocio."
+        ? "El detalle de uso está disponible solo para propietarios y administradores del negocio."
         : "No pudimos cargar el detalle de uso. El resumen de tu plan sigue disponible.";
     }
 
