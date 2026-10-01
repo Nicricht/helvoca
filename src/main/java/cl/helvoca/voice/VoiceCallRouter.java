@@ -18,6 +18,8 @@ import java.util.Set;
 public class VoiceCallRouter {
     private static final Logger log = LoggerFactory.getLogger(VoiceCallRouter.class);
     private static final String OPENAI_LIVE = "openai-live";
+    private static final Set<String> CERTIFICATION_PROVIDERS =
+            Set.of(GeminiLiveVoiceProvider.ID, OPENAI_LIVE);
 
     private final VoiceProviderProperties properties;
     private final VoiceAiProviderRegistry mediaProviders;
@@ -40,15 +42,47 @@ public class VoiceCallRouter {
     public Optional<RouteDecision> route(String businessPhone,
                                          String callerPhone,
                                          String twilioCallSid) {
-        return route(businessPhone, callerPhone, twilioCallSid, null);
+        return route(businessPhone, callerPhone, twilioCallSid, null, null);
     }
 
     public Optional<RouteDecision> route(String businessPhone,
                                          String callerPhone,
                                          String twilioCallSid,
                                          String voiceOverride) {
+        return route(businessPhone, callerPhone, twilioCallSid, null, voiceOverride);
+    }
+
+    public Optional<RouteDecision> route(String businessPhone,
+                                         String callerPhone,
+                                         String twilioCallSid,
+                                         String providerOverride,
+                                         String voiceOverride) {
+        if (!validCertificationProviderOverride(providerOverride)) {
+            log.error("Blocked unsupported certification voice provider call={} provider_override={}",
+                    twilioCallSid, providerOverride);
+            return Optional.empty();
+        }
+
+        String pinnedProvider = normalizeCertificationProviderOverride(providerOverride);
         boolean bakeOff = voiceOverride != null && !voiceOverride.isBlank();
-        for (String configuredId : providerOrder()) {
+        if (OPENAI_LIVE.equals(pinnedProvider) && bakeOff) {
+            log.error("Blocked incompatible certification overrides call={} provider_override={} voice_override={}",
+                    twilioCallSid, pinnedProvider, voiceOverride);
+            return Optional.empty();
+        }
+
+        List<String> configuredOrder = providerOrder();
+        List<String> routeOrder = configuredOrder;
+        if (pinnedProvider != null) {
+            if (!configuredOrder.contains(pinnedProvider)) {
+                log.error("Blocked certification provider not present in configured order call={} provider_override={} providers={}",
+                        twilioCallSid, pinnedProvider, configuredOrder);
+                return Optional.empty();
+            }
+            routeOrder = List.of(pinnedProvider);
+        }
+
+        for (String configuredId : routeOrder) {
             String id = canonical(configuredId);
             try {
                 if (OPENAI_LIVE.equals(id)) {
@@ -56,7 +90,8 @@ public class VoiceCallRouter {
                     boolean configured = openAiLive.isReady();
                     if (!health.allow(id, configured)) continue;
                     String twiml = openAiLive.twiml(businessPhone, callerPhone, twilioCallSid);
-                    log.info("Voice router selected provider={} mode=SIP call={}", id, twilioCallSid);
+                    log.info("Voice router selected provider={} mode=SIP call={} provider_override={}",
+                            id, twilioCallSid, pinnedProvider == null ? "none" : pinnedProvider);
                     return Optional.of(new RouteDecision(id, RouteMode.SIP, twiml));
                 }
 
@@ -69,15 +104,23 @@ public class VoiceCallRouter {
                                 businessPhone, callerPhone, twilioCallSid, provider.id(), voiceOverride)
                         : mediaTwiml.twiml(
                                 businessPhone, callerPhone, twilioCallSid, provider.id());
-                log.info("Voice router selected provider={} mode=MEDIA_STREAM call={} voice_override={}",
-                        provider.id(), twilioCallSid, bakeOff ? voiceOverride : "none");
+                log.info(
+                        "Voice router selected provider={} mode=MEDIA_STREAM call={} provider_override={} voice_override={}",
+                        provider.id(),
+                        twilioCallSid,
+                        pinnedProvider == null ? "none" : pinnedProvider,
+                        bakeOff ? voiceOverride : "none");
                 return Optional.of(new RouteDecision(provider.id(), RouteMode.MEDIA_STREAM, twiml));
             } catch (RuntimeException e) {
-                log.warn("Voice route candidate unavailable provider={} call={} reason={}", id, twilioCallSid, e.getMessage());
+                log.warn("Voice route candidate unavailable provider={} call={} reason={}",
+                        id, twilioCallSid, e.getMessage());
             }
         }
-        log.error("No healthy voice provider available call={} providers={} voice_override={}",
-                twilioCallSid, providerOrder(), bakeOff ? voiceOverride : "none");
+        log.error("No healthy voice provider available call={} providers={} provider_override={} voice_override={}",
+                twilioCallSid,
+                routeOrder,
+                pinnedProvider == null ? "none" : pinnedProvider,
+                bakeOff ? voiceOverride : "none");
         return Optional.empty();
     }
 
@@ -105,6 +148,17 @@ public class VoiceCallRouter {
         String selected = providers.stream().filter(ProviderStatus::available)
                 .map(ProviderStatus::providerId).findFirst().orElse(null);
         return new VoiceReadiness(ready, selected, providers);
+    }
+
+    public static boolean validCertificationProviderOverride(String value) {
+        if (value == null || value.isBlank()) return true;
+        return CERTIFICATION_PROVIDERS.contains(canonical(value));
+    }
+
+    public static String normalizeCertificationProviderOverride(String value) {
+        if (value == null || value.isBlank()) return null;
+        String normalized = canonical(value);
+        return CERTIFICATION_PROVIDERS.contains(normalized) ? normalized : null;
     }
 
     private List<String> providerOrder() {
