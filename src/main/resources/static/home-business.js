@@ -33,6 +33,8 @@
   };
   let loading = false;
   let incidentDraft = null;
+  let selectedBookingId = null;
+  let bookingDetailActiveTab = "summary";
 
   const workspaceTabValues = ["bookings", "orders", "sales", "requests", "customers", "audit"];
   const workspaceHashTabs = {
@@ -78,7 +80,40 @@
   };
   const source = value => ({VOICE:"Voz",AI_CALL:"Llamada",WHATSAPP:"WhatsApp",AI_WHATSAPP:"WhatsApp",MANUAL:"Manual",API:"API",ADMIN:"Manual"})[value] || value || "Sin origen";
   const sourceGroup = value => ({VOICE:"CALL",AI_CALL:"CALL",WHATSAPP:"WHATSAPP",AI_WHATSAPP:"WHATSAPP",MANUAL:"MANUAL",ADMIN:"MANUAL",API:"API"})[value] || value || "";
-  const status = value => ({CONFIRMED:"Confirmada",CANCELLED:"Cancelada",PREPARING:"Preparando",READY:"Listo",DISPATCHED:"Despachado",COMPLETED:"Completado",OPEN:"Abierta",IN_PROGRESS:"En curso"})[value] || value || "";
+  const status = value => ({CONFIRMED:"Confirmada",CANCELLED:"Cancelada",PENDING:"Pendiente",PREPARING:"Preparando",READY:"Listo",DISPATCHED:"Despachado",COMPLETED:"Completado",OPEN:"Abierta",IN_PROGRESS:"En curso"})[value] || value || "";
+  function agendaCustomerInitials(customer = {}) {
+    const label = String(customer.name || customer.phone || "Cliente").trim();
+    const parts = label.split(/\s+/).filter(Boolean);
+    const raw = parts.length > 1
+      ? parts.slice(0, 2).map(part => part[0] || "").join("")
+      : label.replace(/[^\p{L}\p{N}]/gu, "").slice(0, 2);
+    return (raw || "CL").toLocaleUpperCase("es");
+  }
+
+  function agendaStatusClass(value) {
+    return ({
+      CONFIRMED: "is-confirmed",
+      CANCELLED: "is-cancelled",
+      PENDING: "is-pending",
+      IN_PROGRESS: "is-progress"
+    })[value] || "is-neutral";
+  }
+
+  function agendaSourceClass(value) {
+    return ({
+      CALL: "is-call",
+      WHATSAPP: "is-whatsapp",
+      MANUAL: "is-manual",
+      API: "is-api"
+    })[sourceGroup(value)] || "is-other";
+  }
+
+  function syncAgendaSelection() {
+    document.querySelectorAll("[data-home-booking-id]").forEach(node => {
+      node.classList.toggle("is-selected", selectedBookingId !== null && String(node.dataset.homeBookingId) === String(selectedBookingId));
+    });
+  }
+
   const orderStatus = value => ({CONFIRMED:"Confirmado",CANCELLED:"Cancelado",PREPARING:"Preparando",READY:"Listo",DISPATCHED:"Despachado",COMPLETED:"Completado"})[value] || status(value);
   const orderStatusClass = value => ({
     CONFIRMED:"is-confirmed",
@@ -317,6 +352,8 @@
     backdrop.classList.add("hidden");
     backdrop.setAttribute("aria-hidden", "true");
     document.body.classList.remove("home-detail-open");
+    selectedBookingId = null;
+    syncAgendaSelection();
     restoreDrawerOpener();
   }
 
@@ -798,6 +835,92 @@
         : `No se encontró una conversación enlazada a ${entityKind === "pedido" ? "este pedido" : "esta reserva"}.`;
     return `<section class="home-detail-section"><h3>Origen</h3><p class="home-detail-muted">${originText}</p></section>`;
   }
+
+  function renderBookingCustomer(customer) {
+    const name = customer.name || customer.phone || "Cliente";
+    const rows = [
+      ["Nombre", name],
+      ["Teléfono", customer.phone || "Sin teléfono"],
+      ["Email", customer.email || "Sin email"]
+    ];
+    if (customer.notes) rows.push(["Notas", customer.notes]);
+    return `
+      <section class="home-detail-section home-agenda-customer-panel">
+        <div class="home-agenda-customer-hero">
+          <span class="home-agenda-avatar large" aria-hidden="true">${esc(agendaCustomerInitials(customer))}</span>
+          <div><span class="home-agenda-label">Cliente</span><strong>${esc(name)}</strong><small>Datos registrados en RecepVoz</small></div>
+        </div>
+        <div class="home-agenda-customer-facts">
+          ${rows.map(([label, value]) => `<div><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join("")}
+        </div>
+      </section>`;
+  }
+
+  function renderBookingOutcome(context) {
+    if (context?.channel === "VOICE" && context.call?.summary) {
+      return `
+        <section class="home-detail-section home-agenda-ai-summary">
+          <div class="home-agenda-ai-summary-head"><span aria-hidden="true">✦</span><h3>Resumen de RecepVoz</h3></div>
+          <p>${esc(context.call.summary)}</p>
+        </section>`;
+    }
+    if (context?.channel === "WHATSAPP") {
+      return `
+        <section class="home-detail-section home-agenda-ai-summary">
+          <div class="home-agenda-ai-summary-head"><span aria-hidden="true">✦</span><h3>Origen conversacional</h3></div>
+          <p>Esta reserva está vinculada a una conversación de WhatsApp. Revisa la pestaña Conversación para ver los mensajes registrados.</p>
+        </section>`;
+    }
+    return "";
+  }
+
+  function renderBookingDetailTabs(booking, customer, service, contextState, context, activityState, activity) {
+    const contextMarkup = contextState === "loading"
+      ? '<div class="home-detail-loading">Cargando conversación…</div>'
+      : contextState === "error"
+        ? '<section class="home-detail-section"><h3>Conversación</h3><p class="home-detail-muted">No pude cargar la conversación asociada en este momento.</p></section>'
+        : renderContext(context, "reserva", customer.name || customer.phone || "Cliente");
+    const activityMarkup = activityState === "loading"
+      ? '<div class="home-detail-loading">Cargando actividad…</div>'
+      : renderBookingActivity(activity || [], activityState === "error");
+
+    const tabs = [
+      ["summary", "Resumen"],
+      ["conversation", "Conversación"],
+      ["customer", "Cliente"],
+      ["activity", "Actividad"]
+    ];
+
+    return `
+      <div class="home-agenda-detail-tabs" role="tablist" aria-label="Detalle de reserva">
+        ${tabs.map(([value, label]) => `<button type="button" role="tab" data-booking-detail-tab="${value}" aria-selected="${bookingDetailActiveTab === value ? "true" : "false"}" aria-controls="homeBookingPanel-${value}">${label}</button>`).join("")}
+      </div>
+      <div class="home-agenda-detail-panels">
+        <section id="homeBookingPanel-summary" class="home-agenda-detail-panel" role="tabpanel" data-booking-detail-panel="summary" ${bookingDetailActiveTab === "summary" ? "" : "hidden"}>
+          ${bookingFacts(booking, customer, service, context)}
+          ${renderBookingOutcome(context)}
+          ${renderBookingActions(booking)}
+        </section>
+        <section id="homeBookingPanel-conversation" class="home-agenda-detail-panel" role="tabpanel" data-booking-detail-panel="conversation" ${bookingDetailActiveTab === "conversation" ? "" : "hidden"}>${contextMarkup}</section>
+        <section id="homeBookingPanel-customer" class="home-agenda-detail-panel" role="tabpanel" data-booking-detail-panel="customer" ${bookingDetailActiveTab === "customer" ? "" : "hidden"}>${renderBookingCustomer(customer)}</section>
+        <section id="homeBookingPanel-activity" class="home-agenda-detail-panel" role="tabpanel" data-booking-detail-panel="activity" ${bookingDetailActiveTab === "activity" ? "" : "hidden"}>${activityMarkup}</section>
+      </div>`;
+  }
+
+  function bindBookingDetailTabs() {
+    document.querySelectorAll("[data-booking-detail-tab]").forEach(button => {
+      button.addEventListener("click", () => {
+        bookingDetailActiveTab = button.dataset.bookingDetailTab || "summary";
+        document.querySelectorAll("[data-booking-detail-tab]").forEach(tab => {
+          tab.setAttribute("aria-selected", tab.dataset.bookingDetailTab === bookingDetailActiveTab ? "true" : "false");
+        });
+        document.querySelectorAll("[data-booking-detail-panel]").forEach(panel => {
+          panel.hidden = panel.dataset.bookingDetailPanel !== bookingDetailActiveTab;
+        });
+      });
+    });
+  }
+
   async function openBookingDetail(id, opener = null) {
     const booking = state.bookings.find(item => String(item.id) === String(id));
     if (!booking) return;
@@ -805,46 +928,73 @@
     const services = new Map(state.services.map(x => [String(x.id), x]));
     const customer = customers.get(String(booking.customerId)) || {};
     const service = services.get(String(booking.serviceId)) || {};
+    selectedBookingId = String(id);
+    bookingDetailActiveTab = "summary";
+    syncAgendaSelection();
     ensureBookingDrawer();
     document.querySelector("#homeBookingDetailDrawer .eyebrow").textContent = "RESERVA";
     document.querySelector("#homeBookingDetailTitle").textContent = customer.name || customer.phone || "Cliente";
     document.querySelector("#homeBookingDetailMeta").textContent = `Reservada para ${fmtCompact(booking.startAt)} · ${status(booking.status)}`;
     const body = document.querySelector("#homeBookingDetailBody");
-    body.innerHTML = bookingFacts(booking, customer, service) + renderBookingActions(booking) +
-      '<div class="home-detail-loading">Cargando conversación…</div>' + bookingActivityLoading();
-    bindBookingActions(booking);
+    let contextState = "loading";
+    let activityState = "loading";
+    let context = null;
+    let activity = [];
+
+    const renderDrawer = () => {
+      if (String(selectedBookingId) !== String(id)) return;
+      body.innerHTML = renderBookingDetailTabs(booking, customer, service, contextState, context, activityState, activity);
+      bindBookingActions(booking);
+      bindBookingDetailTabs();
+    };
+
+    renderDrawer();
     showBookingDrawer(opener);
 
-    try {
-      const context = await api(`/api/v1/bookings/${encodeURIComponent(id)}/context`);
-      body.innerHTML = bookingFacts(booking, customer, service, context) + renderBookingActions(booking) +
-        renderContext(context, "reserva", customer.name || customer.phone || "Cliente") + bookingActivityLoading();
-      bindBookingActions(booking);
-    } catch (error) {
-      body.innerHTML = bookingFacts(booking, customer, service) + renderBookingActions(booking) +
-        '<section class="home-detail-section"><h3>Conversación</h3><p class="home-detail-muted">No pude cargar la conversación asociada en este momento.</p></section>' +
-        bookingActivityLoading();
-      bindBookingActions(booking);
-    }
-
-    try {
-      const activity = await api(`/api/v1/bookings/${encodeURIComponent(id)}/activity`);
-      const slot = document.querySelector("#homeBookingActivitySlot");
-      if (slot) slot.outerHTML = renderBookingActivity(activity);
-    } catch (error) {
-      const slot = document.querySelector("#homeBookingActivitySlot");
-      if (slot) slot.outerHTML = renderBookingActivity([], true);
-    }
+    await Promise.allSettled([
+      api(`/api/v1/bookings/${encodeURIComponent(id)}/context`)
+        .then(value => {
+          context = value;
+          contextState = "ready";
+          renderDrawer();
+        })
+        .catch(() => {
+          contextState = "error";
+          renderDrawer();
+        }),
+      api(`/api/v1/bookings/${encodeURIComponent(id)}/activity`)
+        .then(value => {
+          activity = Array.isArray(value) ? value : [];
+          activityState = "ready";
+          renderDrawer();
+        })
+        .catch(() => {
+          activityState = "error";
+          renderDrawer();
+        })
+    ]);
   }
 
   function bindBookingOpeners() {
     document.querySelectorAll("[data-home-booking-id]").forEach(node => {
-      const open = () => openBookingDetail(node.dataset.homeBookingId, node);
+      const open = event => {
+        if (event?.target?.closest?.("button,a,input,select,textarea")) return;
+        openBookingDetail(node.dataset.homeBookingId, node);
+      };
       node.addEventListener("click", open);
       node.addEventListener("keydown", event => {
-        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); }
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openBookingDetail(node.dataset.homeBookingId, node); }
       });
     });
+    document.querySelectorAll("[data-home-booking-action]").forEach(button => {
+      button.addEventListener("click", event => {
+        event.stopPropagation();
+        const id = button.dataset.homeBookingAction;
+        const opener = button.closest("[data-home-booking-id]") || button;
+        openBookingDetail(id, opener);
+      });
+    });
+    syncAgendaSelection();
   }
 
   function ready() {
@@ -1104,15 +1254,26 @@
       return;
     }
 
-    host.innerHTML = overview + controls + `<div class="home-business-table-shell"><table class="home-business-table"><thead><tr><th>Fecha / hora</th><th>Cliente</th><th>Servicio</th><th>Contacto</th><th>Origen</th><th>Estado</th></tr></thead><tbody>${items.map(item => {
+    host.innerHTML = overview + controls + `<div class="home-business-table-shell home-agenda-table-shell"><table class="home-business-table home-agenda-table"><thead><tr><th>Fecha / hora</th><th>Cliente</th><th>Servicio</th><th>Contacto</th><th>Origen</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>${items.map((item, index) => {
       const customer = customers.get(String(item.customerId)) || {};
       const service = services.get(String(item.serviceId)) || {};
-      return `<tr tabindex="0" data-home-booking-id="${esc(item.id)}"><td><strong>${esc(fmt(item.startAt))}</strong></td><td><strong>${esc(customer.name || customer.phone || "Cliente")}</strong></td><td>${esc(service.name || "Servicio")}</td><td>${esc(customer.phone || "Sin teléfono")}</td><td>${esc(source(item.source))}</td><td><span class="home-pill ${item.status === "CANCELLED" ? "bad" : ""}">${esc(status(item.status))}</span></td></tr>`;
+      const aiManaged = ["AI_CALL", "AI_WHATSAPP", "VOICE", "WHATSAPP"].includes(item.source);
+      const customerLabel = customer.name || customer.phone || "Cliente";
+      return `<tr class="home-agenda-row ${selectedBookingId !== null && String(selectedBookingId) === String(item.id) ? "is-selected" : ""}" style="--agenda-row-index:${index}" tabindex="0" data-home-booking-id="${esc(item.id)}">
+        <td><strong>${esc(fmt(item.startAt))}</strong></td>
+        <td><div class="home-agenda-customer"><span class="home-agenda-avatar" aria-hidden="true">${esc(agendaCustomerInitials(customer))}</span><span><strong>${esc(customerLabel)}</strong>${customer.email ? `<small>${esc(customer.email)}</small>` : ""}</span></div></td>
+        <td><strong>${esc(service.name || "Servicio")}</strong></td>
+        <td>${esc(customer.phone || "Sin teléfono")}</td>
+        <td><div class="home-agenda-source"><span class="home-agenda-source-badge ${agendaSourceClass(item.source)}">${esc(source(item.source))}</span>${aiManaged ? '<small class="home-agenda-ai-tag">RecepVoz</small>' : ""}</div></td>
+        <td><span class="home-pill home-agenda-status ${agendaStatusClass(item.status)}">${esc(status(item.status))}</span></td>
+        <td><button class="home-agenda-view" type="button" data-home-booking-action="${esc(item.id)}" aria-label="Ver reserva de ${esc(customerLabel)}">Ver</button></td>
+      </tr>`;
     }).join("")}</tbody></table></div>
-    <div class="home-business-mobile-list">${items.map(item => {
+    <div class="home-business-mobile-list">${items.map((item, index) => {
       const customer = customers.get(String(item.customerId)) || {};
       const service = services.get(String(item.serviceId)) || {};
-      return `<article class="home-business-mobile-card" tabindex="0" data-home-booking-id="${esc(item.id)}"><strong>${esc(customer.name || customer.phone || "Cliente")}</strong><span>${esc(fmt(item.startAt))} · ${esc(service.name || "Servicio")}</span><span class="home-pill ${item.status === "CANCELLED" ? "bad" : ""}">${esc(status(item.status))}</span></article>`;
+      const customerLabel = customer.name || customer.phone || "Cliente";
+      return `<article class="home-business-mobile-card home-agenda-mobile-card ${selectedBookingId !== null && String(selectedBookingId) === String(item.id) ? "is-selected" : ""}" style="--agenda-row-index:${index}" tabindex="0" data-home-booking-id="${esc(item.id)}"><div class="home-agenda-customer"><span class="home-agenda-avatar" aria-hidden="true">${esc(agendaCustomerInitials(customer))}</span><span><strong>${esc(customerLabel)}</strong><small>${esc(service.name || "Servicio")}</small></span></div><span>${esc(fmt(item.startAt))}</span><span class="home-pill home-agenda-status ${agendaStatusClass(item.status)}">${esc(status(item.status))}</span></article>`;
     }).join("")}</div>`;
     bindBookingFilters();
     bindBookingOpeners();
