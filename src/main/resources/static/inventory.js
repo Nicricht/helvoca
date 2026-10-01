@@ -157,23 +157,37 @@
     }
 
     function renderSummary() {
-        const tracked = state.products.filter(item => item.configured && item.trackingEnabled);
-        const onHand = tracked.reduce((sum, item) => sum + Number(item.onHand || 0), 0);
+        const configured = state.products.filter(item => item.configured);
+        const tracked = configured.filter(item => item.trackingEnabled);
+        const available = tracked.reduce((sum, item) => sum + Number(item.available || 0), 0);
         const reserved = tracked.reduce((sum, item) => sum + Number(item.reserved || 0), 0);
         const low = tracked.filter(item => item.lowStock).length;
+        const unconfigured = state.products.filter(item => !item.configured);
 
         $("#inventoryProductsCount").textContent = state.products.length;
-        $("#inventoryConfiguredCount").textContent = `${tracked.length} con seguimiento`;
-        $("#inventoryOnHandTotal").textContent = onHand;
-        $("#inventoryReservedTotal").textContent = reserved;
+        $("#inventoryConfiguredCount").textContent =
+            `${configured.length} con stock configurado`;
+        $("#inventoryAvailableTotal").textContent = tracked.length ? String(available) : "—";
+        $("#inventoryReservedTotal").textContent = tracked.length ? String(reserved) : "—";
         $("#inventoryLowStockCount").textContent = low;
         $("#inventoryLowStockKpi").classList.toggle("alert", low > 0);
+
+        const setupNotice = $("#inventorySetupNotice");
+        setupNotice?.classList.toggle("hidden", unconfigured.length === 0);
+        if (unconfigured.length > 0) {
+            const noun = unconfigured.length === 1 ? "producto" : "productos";
+            $("#inventorySetupNoticeTitle").textContent =
+                `${unconfigured.length} ${noun} sin stock configurado`;
+            $("#inventorySetupNoticeText").textContent =
+                "Configúralo para que la IA sepa exactamente cuánto puede ofrecer.";
+        }
     }
 
     function renderAlerts() {
         const list = $("#inventoryAlertsList");
         const emptyAlerts = $("#inventoryAlertsEmpty");
         const alerts = Array.isArray(state.alerts) ? state.alerts : [];
+        $("#inventoryAlertsPanel")?.classList.toggle("is-empty", alerts.length === 0);
         const pending = alerts.filter(alert => !alert.acknowledged).length;
         $("#inventoryAlertsCount").textContent =
             `${pending} pendiente${pending === 1 ? "" : "s"}`;
@@ -278,6 +292,9 @@
         const notifications = Array.isArray(state.restockNotifications)
             ? state.restockNotifications
             : [];
+        $("#inventoryRestockPanel")?.classList.toggle(
+            "is-empty",
+            subscriptions.length === 0 && notifications.length === 0);
         $("#inventoryRestockCount").textContent =
             `${subscriptions.length} esperando`;
         $("#inventoryRestockCount").className =
@@ -356,13 +373,13 @@
         const query = search.value.trim().toLowerCase();
         if (query && !`${item.name} ${item.sku} ${item.description}`.toLowerCase().includes(query)) return false;
         switch (filter.value) {
-            case "TRACKED": return item.configured && item.trackingEnabled;
+            case "TRACKED": return item.configured;
             case "LOW": return item.configured && item.trackingEnabled
                 && (item.lowStock || productHasAlert(item, "LOW_STOCK"));
             case "OUT": return item.configured && item.trackingEnabled
                 && (Number(item.available) === 0 || productHasAlert(item, "OUT_OF_STOCK"));
             case "RESTOCKED": return productHasAlert(item, "RESTOCKED");
-            case "UNCONFIGURED": return !item.configured || !item.trackingEnabled;
+            case "UNCONFIGURED": return !item.configured;
             default: return true;
         }
     }
@@ -399,8 +416,11 @@
     }
 
     function stateBadge(item) {
-        if (!item.configured || !item.trackingEnabled) {
-            return '<span class="inventory-state off">Sin seguimiento</span>';
+        if (!item.configured) {
+            return '<span class="inventory-state off">Sin configurar</span>';
+        }
+        if (!item.trackingEnabled) {
+            return '<span class="inventory-state off">Control desactivado</span>';
         }
         if (Number(item.available) === 0) return '<span class="inventory-state out">Agotado</span>';
         if (item.lowStock) return '<span class="inventory-state low">Stock bajo</span>';
@@ -418,15 +438,18 @@
             ? `<button class="button ghost inventory-history-btn" type="button" data-id="${item.id}">Historial</button>`
             : "";
         if (!state.canManage) return variants + history;
-        const editProduct = `<button class="button ghost inventory-product-edit-btn" type="button" data-id="${item.id}" aria-label="Editar producto ${escapeHtml(item.name)}">Producto</button>`;
+
+        const editProduct = `<button class="button ghost inventory-product-edit-btn" type="button" data-id="${item.id}" aria-label="Editar producto ${escapeHtml(item.name)}">Editar</button>`;
         const configureLabel = item.configured ? "Editar stock" : "Configurar stock";
-        const configure = `<button class="button ghost inventory-config-btn" type="button" data-id="${item.id}" aria-label="${configureLabel} de ${escapeHtml(item.name)}">${configureLabel}</button>`;
+        const configure = `<button class="button ${item.configured ? "ghost" : "primary"} inventory-config-btn" type="button" data-id="${item.id}" aria-label="${configureLabel} de ${escapeHtml(item.name)}">${configureLabel}</button>`;
         const needsRestock = item.configured && item.trackingEnabled
             && Number(item.available) <= Number(item.reorderThreshold || 0);
         const adjust = item.configured && item.trackingEnabled
             ? `<button class="button ${needsRestock ? "primary" : "secondary"} inventory-adjust-btn" type="button" data-id="${item.id}">${needsRestock ? "Reponer" : "Ajustar"}</button>`
             : "";
-        return editProduct + variants + configure + adjust + history;
+
+        if (!item.configured) return configure + variants + editProduct;
+        return adjust + history + variants + configure + editProduct;
     }
 
     function renderRows() {
@@ -436,12 +459,15 @@
                 <td class="inventory-product" data-label="Producto">
                     <strong>${escapeHtml(item.name)}</strong>
                     <small>${escapeHtml(item.description || "Producto del catálogo")}</small>
+                    <small class="inventory-product-meta">
+                        <span class="inventory-sku ${item.sku ? "" : "missing"}">${escapeHtml(item.sku || "Sin SKU")}</span>
+                        <span aria-hidden="true">·</span>
+                        <span class="inventory-price">${formatMoney(item.price, item.currency)}</span>
+                    </small>
                 </td>
-                <td data-label="SKU"><span class="inventory-sku ${item.sku ? "" : "missing"}">${escapeHtml(item.sku || "Sin SKU")}</span></td>
-                <td data-label="Precio"><span class="inventory-price">${formatMoney(item.price, item.currency)}</span></td>
-                <td data-label="Físico">${numberCell(item.onHand)}</td>
-                <td data-label="Reservado">${numberCell(item.reserved, "reserved")}</td>
                 <td data-label="Disponible">${numberCell(item.available, "available")}</td>
+                <td data-label="Reservado">${numberCell(item.reserved, "reserved")}</td>
+                <td data-label="Físico">${numberCell(item.onHand)}</td>
                 <td data-label="Mínimo">${numberCell(item.reorderThreshold)}</td>
                 <td data-label="Estado">${stateBadge(item)}</td>
                 <td data-label="Acciones"><div class="inventory-row-actions">${actionButtons(item)}</div></td>
@@ -964,6 +990,12 @@
     search.addEventListener("input", renderRows);
     filter.addEventListener("change", renderRows);
     sort?.addEventListener("change", renderRows);
+    $("#inventoryShowUnconfiguredBtn")?.addEventListener("click", () => {
+        filter.value = "UNCONFIGURED";
+        renderRows();
+        $("#inventoryWorkspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        search.focus();
+    });
     $("#inventoryAddProductBtn").addEventListener("click", () => openProductForm());
     $("#inventoryRefreshBtn").addEventListener("click", async event => {
         event.currentTarget.disabled = true;
