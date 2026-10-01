@@ -129,6 +129,107 @@ class DemoVoiceCallLifecycleObserverTest {
         verify(audit).success(runtimeId, "DEMO_SESSION_FINISHED", "DEMO_SESSION", sessionId);
     }
 
+    @Test
+    void lifecycleIgnoresIneligibleAndTerminalReplayBranchesWithoutSideEffects() {
+        UUID runtimeId = UUID.randomUUID();
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        AuditService audit = mock(AuditService.class);
+
+        DemoRuntimeProperties missingRuntime = new DemoRuntimeProperties();
+        DemoVoiceCallLifecycleObserver withoutRuntime =
+                new DemoVoiceCallLifecycleObserver(missingRuntime, sessions, calls, audit);
+        withoutRuntime.onInboundCallStarted(null);
+        withoutRuntime.onCallUpdated(null);
+
+        DemoVoiceCallLifecycleObserver observer =
+                new DemoVoiceCallLifecycleObserver(properties(runtimeId), sessions, calls, audit);
+
+        CallSession outbound = inboundCall(UUID.randomUUID(), runtimeId, CallStatus.RINGING);
+        outbound.setDirection(CallDirection.OUTBOUND);
+        observer.onInboundCallStarted(outbound);
+
+        CallSession foreign = inboundCall(UUID.randomUUID(), UUID.randomUUID(), CallStatus.RINGING);
+        foreign.setDemoSessionId(UUID.randomUUID());
+        observer.onCallUpdated(foreign);
+
+        UUID correlatedId = UUID.randomUUID();
+        CallSession missingSession = inboundCall(UUID.randomUUID(), runtimeId, CallStatus.IN_PROGRESS);
+        missingSession.setDemoSessionId(correlatedId);
+        when(sessions.findByIdForUpdate(correlatedId)).thenReturn(Optional.empty());
+        observer.onCallUpdated(missingSession);
+
+        UUID foreignSessionId = UUID.randomUUID();
+        DemoSession foreignSession = readySession(foreignSessionId, UUID.randomUUID());
+        CallSession crossRuntimeSession = inboundCall(UUID.randomUUID(), runtimeId, CallStatus.IN_PROGRESS);
+        crossRuntimeSession.setDemoSessionId(foreignSessionId);
+        when(sessions.findByIdForUpdate(foreignSessionId)).thenReturn(Optional.of(foreignSession));
+        observer.onCallUpdated(crossRuntimeSession);
+
+        verify(calls, never()).saveAndFlush(any());
+        verify(sessions, never()).saveAndFlush(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void nonTerminalUpdateActivatesReadySessionAndTerminalReplayDoesNotRefinish() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        AuditService audit = mock(AuditService.class);
+        DemoVoiceCallLifecycleObserver observer =
+                new DemoVoiceCallLifecycleObserver(properties(runtimeId), sessions, calls, audit);
+
+        DemoSession ready = readySession(sessionId, runtimeId);
+        CallSession live = inboundCall(UUID.randomUUID(), runtimeId, CallStatus.IN_PROGRESS);
+        live.setDemoSessionId(sessionId);
+        when(sessions.findByIdForUpdate(sessionId)).thenReturn(Optional.of(ready));
+        when(sessions.saveAndFlush(ready)).thenReturn(ready);
+
+        observer.onCallUpdated(live);
+
+        assertEquals(DemoSessionState.ACTIVE, ready.getState());
+        verify(audit).success(runtimeId, "DEMO_SESSION_ACTIVE", "DEMO_SESSION", sessionId);
+
+        DemoSession finished = readySession(sessionId, runtimeId);
+        finished.markActive();
+        finished.markFinished();
+        when(sessions.findByIdForUpdate(sessionId)).thenReturn(Optional.of(finished));
+        CallSession terminal = inboundCall(UUID.randomUUID(), runtimeId, CallStatus.FAILED);
+        terminal.setDemoSessionId(sessionId);
+
+        observer.onCallUpdated(terminal);
+
+        assertEquals(DemoSessionState.FINISHED, finished.getState());
+        verify(calls, never()).countByDemoSessionIdAndStatusIn(eq(sessionId), anyCollection());
+    }
+
+    @Test
+    void correlatedReadyReplayActivatesButActiveReplayIsNoop() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        AuditService audit = mock(AuditService.class);
+        DemoVoiceCallLifecycleObserver observer =
+                new DemoVoiceCallLifecycleObserver(properties(runtimeId), sessions, calls, audit);
+
+        DemoSession ready = readySession(sessionId, runtimeId);
+        CallSession replay = inboundCall(UUID.randomUUID(), runtimeId, CallStatus.RINGING);
+        replay.setDemoSessionId(sessionId);
+        when(sessions.findByIdForUpdate(sessionId)).thenReturn(Optional.of(ready));
+        when(sessions.saveAndFlush(ready)).thenReturn(ready);
+
+        observer.onInboundCallStarted(replay);
+        assertEquals(DemoSessionState.ACTIVE, ready.getState());
+
+        observer.onInboundCallStarted(replay);
+        verify(sessions, times(1)).saveAndFlush(ready);
+        verify(audit, times(1)).success(runtimeId, "DEMO_SESSION_ACTIVE", "DEMO_SESSION", sessionId);
+        verify(calls, never()).saveAndFlush(any());
+    }
+
     private static DemoRuntimeProperties properties(UUID runtimeId) {
         DemoRuntimeProperties properties = new DemoRuntimeProperties();
         properties.setRuntimeBusinessId(runtimeId.toString());
