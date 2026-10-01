@@ -32,6 +32,12 @@ public class PlatformDemoProfileService {
         return profiles.findAllByOrderByUpdatedAtDesc().stream().map(this::response).toList();
     }
 
+    @Transactional(readOnly = true)
+    public PlatformDemoProfileResponse get(UUID id) {
+        return response(profiles.findById(id)
+                .orElseThrow(() -> new NotFoundException("Demo profile not found")));
+    }
+
     @Transactional
     public PlatformDemoProfileResponse create(PlatformDemoProfileRequest request) {
         validate(request);
