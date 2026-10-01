@@ -134,6 +134,7 @@ Commercial behavior has three separate sources of truth:
 1. `business_subscription` records the tenant's contracted subscription/payment state;
 2. V41 `usage_meter_event` is the append-only source of measured usage;
 3. V42 `commercial_plan` and `commercial_plan_entitlement` define catalog metadata, quotas, overage policy and hard capacity.
+4. V82 adds provider/model cost snapshots, an emergency voice safety entitlement and platform-only estimated unit economics. It does not replace V41/V42 or turn estimates into payment truth.
 
 Plan price, public code, display name, recommendation flags and entitlements are database data, not Java enum constants. Subscription plan codes are persisted as strings so future catalog changes do not require adding enum values.
 

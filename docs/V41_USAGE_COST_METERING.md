@@ -30,7 +30,7 @@ Database triggers are used for these authoritative sources so a future adapter o
 
 `UsageMeterService.record(...)` is the generic domain entry point for future capabilities. It derives `business_id` from the authenticated tenant instead of accepting a caller-supplied tenant id and uses the database idempotency boundary.
 
-`GET /api/v1/usage/summary?from=<instant>&to=<instant>` is restricted to `BUSINESS_ADMIN` and returns totals grouped by meter key and unit, including estimated and actual costs when available.
+`GET /api/v1/usage/summary?from=<instant>&to=<instant>` is available to `BUSINESS_OWNER` and `BUSINESS_ADMIN` and returns customer-safe totals grouped by meter key and unit. Since V82, provider cost fields remain internal and are deliberately redacted from the tenant API.
 
 ## Relationship to V42
 

@@ -118,6 +118,43 @@
       : "";
   }
 
+  function formatClp(value) {
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency", currency: "CLP", maximumFractionDigits: 0
+    }).format(Math.max(0, Number(value || 0)));
+  }
+
+  function renderUsageStatus(status = {}) {
+    const level = String(status.alertLevel || "NORMAL").toUpperCase();
+    const signal = $("#voiceUsageSignal");
+    const title = $("#voiceUsageSignalTitle");
+    const text = $("#voiceUsageSignalText");
+    const messages = {
+      NORMAL: ["Consumo bajo control", "Aún tienes holgura dentro de tus minutos incluidos."],
+      NOTICE: ["Ya usaste al menos el 70%", "Conviene revisar tu consumo antes de acercarte al límite incluido."],
+      WARNING: ["Te acercas al límite", "Ya usaste al menos el 90% de tus minutos incluidos."],
+      LIMIT: ["Minutos incluidos utilizados", "Las llamadas adicionales pasan a exceso según tu plan."],
+      OVERAGE: ["Estás usando minutos adicionales", "El exceso se calcula según el precio por minuto de tu plan."]
+    };
+    const copy = messages[level] || messages.NORMAL;
+    signal.className = `usage-signal ${level.toLowerCase()}`;
+    title.textContent = copy[0];
+    text.textContent = copy[1];
+
+    const estimate = Math.max(0, Number(status.estimatedOverageChargeClp || 0));
+    $("#overageEstimate").textContent = estimate > 0
+      ? `${formatClp(estimate)} aprox.`
+      : "Sin exceso";
+
+    const safety = Math.max(0, Number(status.safetyLimitMinutes || 0));
+    $("#voiceSafetyLimit").textContent = safety > 0 ? `${safety} min` : "No disponible";
+    if (status.safetyExceeded) {
+      signal.className = "usage-signal safety";
+      title.textContent = "Consumo detenido por seguridad";
+      text.textContent = "Se alcanzó el techo extraordinario de protección. Contacta soporte para revisar el consumo.";
+    }
+  }
+
   function renderUsage(items = []) {
     const state = $("#usageState");
     const list = $("#usageList");
@@ -179,19 +216,28 @@
     $("#accountApp").classList.remove("hidden");
     $("#accountLoading").classList.add("hidden");
 
-    if (!roles.includes("BUSINESS_ADMIN")) {
-      $("#usageState").textContent = "El detalle de uso está disponible solo para administradores del negocio.";
+    if (!roles.includes("BUSINESS_ADMIN") && !roles.includes("BUSINESS_OWNER")) {
+      $("#usageState").textContent = "El detalle de uso está disponible solo para propietarios y administradores del negocio.";
       return;
     }
 
     const window = usageWindow(sub);
-    try {
-      const usage = await api(`/api/v1/usage/summary?from=${encodeURIComponent(window.from)}&to=${encodeURIComponent(window.to)}`);
-      renderUsage(usage);
-    } catch (error) {
-      $("#usageState").textContent = error.status === 403
-        ? "El detalle de uso está disponible solo para administradores del negocio."
+    const [usageResult, statusResult] = await Promise.allSettled([
+      api(`/api/v1/usage/summary?from=${encodeURIComponent(window.from)}&to=${encodeURIComponent(window.to)}`),
+      api("/api/v1/usage/status")
+    ]);
+
+    if (usageResult.status === "fulfilled") {
+      renderUsage(usageResult.value);
+    } else {
+      const error = usageResult.reason;
+      $("#usageState").textContent = error?.status === 403
+        ? "El detalle de uso está disponible solo para propietarios y administradores del negocio."
         : "No pudimos cargar el detalle de uso. El resumen de tu plan sigue disponible.";
+    }
+
+    if (statusResult.status === "fulfilled") {
+      renderUsageStatus(statusResult.value);
     }
   }
 

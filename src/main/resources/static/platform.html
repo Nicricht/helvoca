@@ -31,7 +31,26 @@
     .platform-message.error { color:#f28d8d; }
     .platform-message.success { color:#37cd91; }
     .platform-empty { color:var(--muted); font-size:11px; line-height:1.6; }
-    @media(max-width:760px){ .platform-grid{grid-template-columns:1fr;} .platform-form{grid-template-columns:1fr;} .platform-form label.wide,.platform-actions{grid-column:auto;} .platform-top{align-items:flex-start;} }
+    .platform-economics { margin-top:16px; }
+    .platform-economics-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:14px; }
+    .platform-economics-head p { margin:4px 0 0; color:var(--muted); font-size:11px; line-height:1.5; }
+    .platform-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
+    .platform-kpi { padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); }
+    .platform-kpi span { display:block; color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.04em; }
+    .platform-kpi strong { display:block; margin-top:5px; font-size:17px; }
+    .platform-economics-grid { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(260px,.55fr); gap:12px; }
+    .platform-economics-block { min-width:0; }
+    .platform-economics-block h3 { margin:0 0 8px; font-size:13px; }
+    .platform-economics-list { display:grid; gap:7px; }
+    .platform-economics-row { display:grid; grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(84px,.55fr)); gap:8px; align-items:center; padding:10px 11px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); font-size:10px; }
+    .platform-economics-row strong,.platform-economics-row span { min-width:0; overflow-wrap:anywhere; }
+    .platform-economics-row span { color:var(--muted); }
+    .platform-provider-row { display:grid; gap:4px; padding:10px 11px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); font-size:10px; }
+    .platform-provider-row small { color:var(--muted); }
+    .platform-alert { display:inline-flex; margin-left:5px; padding:2px 5px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:8px; font-weight:800; }
+    .platform-economics-note { margin-top:10px; color:var(--muted); font-size:10px; line-height:1.5; }
+    @media(max-width:900px){.platform-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}.platform-economics-grid{grid-template-columns:1fr;}}
+    @media(max-width:760px){ .platform-grid{grid-template-columns:1fr;} .platform-form{grid-template-columns:1fr;} .platform-form label.wide,.platform-actions{grid-column:auto;} .platform-top{align-items:flex-start;} .platform-economics-row{grid-template-columns:1fr;} .platform-kpis{grid-template-columns:1fr 1fr;} }
   </style>
   <link rel="stylesheet" href="/frontend-foundation.css?v=20260930-2">
 </head>
@@ -103,7 +122,38 @@
         </div>
       </article>
     </section>
+
+    <section class="card platform-card platform-economics" aria-labelledby="platformEconomicsTitle">
+      <div class="platform-economics-head">
+        <div>
+          <div class="eyebrow">ECONOMÍA INTERNA</div>
+          <h2 id="platformEconomicsTitle">Radar económico</h2>
+          <p>Estimaciones operativas para controlar costo y margen. No equivalen a pagos cobrados ni a facturas de proveedores.</p>
+        </div>
+        <button id="platformEconomicsRefresh" class="button small ghost" type="button">Actualizar</button>
+      </div>
+      <div id="platformEconomicsState" class="platform-empty" role="status" aria-live="polite">Cargando economía del período…</div>
+      <div id="platformEconomicsContent" class="hidden">
+        <div class="platform-kpis">
+          <div class="platform-kpi"><span>Valor comercial estimado</span><strong id="platformCommercialValue">—</strong></div>
+          <div class="platform-kpi"><span>Costo plataforma estimado</span><strong id="platformPlatformCost">—</strong></div>
+          <div class="platform-kpi"><span>Margen bruto estimado</span><strong id="platformGrossMargin">—</strong></div>
+          <div class="platform-kpi"><span>Margen estimado</span><strong id="platformGrossMarginPercent">—</strong></div>
+        </div>
+        <div class="platform-economics-grid">
+          <div class="platform-economics-block">
+            <h3>Negocios</h3>
+            <div id="platformEconomicsBusinesses" class="platform-economics-list"></div>
+          </div>
+          <div class="platform-economics-block">
+            <h3>Voz por proveedor/modelo</h3>
+            <div id="platformEconomicsProviders" class="platform-economics-list"></div>
+          </div>
+        </div>
+        <p id="platformEconomicsNote" class="platform-economics-note"></p>
+      </div>
+    </section>
   </main>
-  <script src="/platform.js?v=20260926-1" defer></script>
+  <script src="/platform.js?v=20261001-1" defer></script>
 </body>
 </html>

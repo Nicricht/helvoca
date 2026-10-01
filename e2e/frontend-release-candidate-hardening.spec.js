@@ -264,7 +264,7 @@ test('operator can inspect the active plan but cannot access admin usage or trig
 
   await expect(page.locator('#planName')).toHaveText('Profesional');
   await expect(page.locator('#accountRole')).toHaveText('Operador');
-  await expect(page.locator('#usageState')).toContainText('solo para administradores');
+  await expect(page.locator('#usageState')).toContainText('propietarios y administradores');
   await expect(page.locator('#accountError')).toBeHidden();
   await expect(page.getByRole('button', { name: /pagar|cobrar|suscrib/i })).toHaveCount(0);
   expect(mutations).toEqual([]);

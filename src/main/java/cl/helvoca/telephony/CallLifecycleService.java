@@ -247,11 +247,11 @@ public class CallLifecycleService {
         if (seconds == null || seconds < 0) return;
         BigDecimal minutes = BigDecimal.valueOf(seconds)
                 .divide(BigDecimal.valueOf(60), 6, RoundingMode.HALF_UP);
-        BigDecimal telephony = commercial.getTelephonyCostPerMinuteUsd()
+        BigDecimal telephony = commercial.resolveTelephonyCostPerMinuteUsd(call.getTelephonyProvider())
                 .multiply(minutes).setScale(6, RoundingMode.HALF_UP);
         BigDecimal ai = call.getAiProvider() == null || call.getAiProvider().isBlank()
                 ? BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP)
-                : commercial.getAiCostPerMinuteUsd()
+                : commercial.resolveAiCostPerMinuteUsd(call.getAiProvider(), call.getAiModel())
                 .multiply(minutes).setScale(6, RoundingMode.HALF_UP);
         call.setEstimatedTelephonyCostUsd(telephony);
         call.setEstimatedAiCostUsd(ai);
