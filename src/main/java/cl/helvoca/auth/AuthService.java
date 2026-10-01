@@ -1,6 +1,7 @@
 package cl.helvoca.auth;
 
 import cl.helvoca.security.JwtProperties;
+import cl.helvoca.security.RolePermissionCatalog;
 import cl.helvoca.user.AppUserRepository;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -38,7 +39,12 @@ public class AuthService {
 
         Instant now = Instant.now();
         Instant expiresAt = now.plusSeconds(properties.accessTokenMinutes() * 60);
-        var roles = user.getRoles().stream().map(r -> r.getCode().name()).sorted().toList();
+        var roleCodes = user.getRoles().stream().map(r -> r.getCode()).collect(java.util.stream.Collectors.toSet());
+        var roles = roleCodes.stream().map(Enum::name).sorted().toList();
+        var permissions = RolePermissionCatalog.permissionsFor(roleCodes).stream()
+                .map(Enum::name)
+                .sorted()
+                .toList();
 
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
                 .issuer(properties.issuer())
@@ -47,7 +53,8 @@ public class AuthService {
                 .subject(user.getId().toString())
                 .claim("name", user.getName())
                 .claim("email", user.getEmail())
-                .claim("roles", roles);
+                .claim("roles", roles)
+                .claim("permissions", permissions);
 
         if (user.getBusiness() != null) {
             claims.claim("business_id", user.getBusiness().getId().toString());
