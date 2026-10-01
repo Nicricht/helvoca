@@ -54,16 +54,35 @@ test('three-minute sales demo emits exact-head visual evidence', async ({ page }
   const dir = path.join('test-results', 'visual-evidence', head);
   fs.mkdirSync(dir, { recursive: true });
 
-  for (const viewport of [
-    { width: 1440, height: 900 },
-    { width: 390, height: 844 }
-  ]) {
-    await page.setViewportSize(viewport);
-    await page.goto('/demo.html?rubro=sushi');
-    await page.screenshot({
-      path: path.join(dir, `demo-3min-${viewport.width}x${viewport.height}.png`),
-      fullPage: false,
-      animations: 'disabled'
-    });
-  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/demo.html?rubro=sushi');
+  await page.screenshot({
+    path: path.join(dir, 'demo-3min-1440x900.png'),
+    fullPage: false,
+    animations: 'disabled'
+  });
+
+  await page.getByRole('button', { name: /Empezar demo/i }).click();
+  await page.screenshot({
+    path: path.join(dir, 'demo-3min-stage-1440x900.png'),
+    fullPage: false,
+    animations: 'disabled'
+  });
+
+  await page.getByRole('button', { name: /Siguiente/i }).click();
+  await page.getByRole('button', { name: /Siguiente/i }).click();
+  await page.getByRole('button', { name: /Ver resultado/i }).click();
+  await page.screenshot({
+    path: path.join(dir, 'demo-3min-close-1440x900.png'),
+    fullPage: false,
+    animations: 'disabled'
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/demo.html?rubro=sushi');
+  await page.screenshot({
+    path: path.join(dir, 'demo-3min-390x844.png'),
+    fullPage: false,
+    animations: 'disabled'
+  });
 });
