@@ -10,6 +10,7 @@ import cl.helvoca.common.NotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -17,6 +18,7 @@ import java.util.UUID;
 
 @Service
 public class PlatformDemoSessionService {
+    private static final Duration PREPARING_STALE_AFTER = Duration.ofMinutes(5);
     private final DemoRuntimeProperties properties;
     private final BusinessRepository businesses;
     private final DemoProfileRepository profiles;
@@ -60,10 +62,10 @@ public class PlatformDemoSessionService {
         if (session != null && !matches(session, profileId, revision)) {
             throw new ConflictException("Another live demo session is already prepared or active");
         }
-        if (session != null
-                && (session.getState() == DemoSessionState.PREPARING
-                    || session.getState() == DemoSessionState.READY
-                    || session.getState() == DemoSessionState.ACTIVE)) {
+        if (session != null && session.getState() != DemoSessionState.PREPARING) {
+            return response(session, readiness.readiness());
+        }
+        if (session != null && !isStalePreparing(session)) {
             return response(session, readiness.readiness());
         }
 
@@ -84,6 +86,14 @@ public class PlatformDemoSessionService {
                     "DEMO_SESSION",
                     session.getId(),
                     Map.of(),
+                    auditState(session));
+        } else {
+            audit.platformHumanSuccess(
+                    runtimeId,
+                    "DEMO_SESSION_PREPARE_RESUME",
+                    "DEMO_SESSION",
+                    session.getId(),
+                    Map.of("reason", "stale_preparing"),
                     auditState(session));
         }
 
@@ -160,6 +170,13 @@ public class PlatformDemoSessionService {
         if (runtime.getStatus() != BusinessStatus.ACTIVE) {
             throw new IllegalStateException("Configured DEMO runtime is not active");
         }
+    }
+
+    private static boolean isStalePreparing(DemoSession session) {
+        Instant updatedAt = session.getUpdatedAt();
+        return session.getState() == DemoSessionState.PREPARING
+                && updatedAt != null
+                && updatedAt.isBefore(Instant.now().minus(PREPARING_STALE_AFTER));
     }
 
     private static boolean matches(DemoSession session, UUID profileId, String revision) {
