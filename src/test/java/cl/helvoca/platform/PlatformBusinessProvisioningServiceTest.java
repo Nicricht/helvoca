@@ -3,6 +3,7 @@ package cl.helvoca.platform;
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.business.Business;
+import cl.helvoca.business.BusinessMode;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.user.InviteUserRequest;
 import cl.helvoca.user.RoleCode;
@@ -34,6 +35,7 @@ class PlatformBusinessProvisioningServiceTest {
         when(businesses.saveAndFlush(any(Business.class))).thenAnswer(invocation -> {
             Business business = invocation.getArgument(0);
             ReflectionTestUtils.setField(business, "id", businessId);
+            assertEquals(BusinessMode.CUSTOMER, business.getMode());
             return business;
         });
         when(invitations.createForPlatform(eq(businessId), any(InviteUserRequest.class)))
