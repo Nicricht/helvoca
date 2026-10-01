@@ -1,5 +1,7 @@
 package cl.helvoca.telephony;
 
+import cl.helvoca.testsupport.ExplicitSystemDatabaseScopeSupport;
+
 import cl.helvoca.billing.BusinessSubscription;
 import cl.helvoca.billing.BusinessSubscriptionRepository;
 import cl.helvoca.billing.SubscriptionStatus;
@@ -41,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers
 @SpringBootTest
-class CallLoadIntegrationTest {
+class CallLoadIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
 
     private static final List<CallStatus> ACTIVE_STATUSES =
             List.of(CallStatus.QUEUED, CallStatus.RINGING, CallStatus.IN_PROGRESS);
