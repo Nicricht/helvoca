@@ -33,8 +33,24 @@ public class DemoSession {
     private String configurationRevision;
 
     @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "configuration_snapshot_json", nullable = false, columnDefinition = "jsonb")
+    private Map<String, Object> configurationSnapshot = new LinkedHashMap<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "readiness_snapshot_json", nullable = false, columnDefinition = "jsonb")
     private Map<String, Object> readinessSnapshot = new LinkedHashMap<>();
+
+    @Column(name = "operator", nullable = false, length = 180)
+    private String operator = "platform";
+
+    @Column(name = "external_effects_state", nullable = false, length = 30)
+    private String externalEffectsState = "DISARMED";
+
+    @Column(name = "payment_state", nullable = false, length = 30)
+    private String paymentState = "SANDBOX_ONLY";
+
+    @Column(name = "converted_pilot_business_id")
+    private UUID convertedPilotBusinessId;
 
     @Column(name = "failure_reason", columnDefinition = "text")
     private String failureReason;
@@ -55,11 +71,21 @@ public class DemoSession {
     private Instant updatedAt;
 
     public static DemoSession preparing(UUID profileId, UUID runtimeBusinessId, String revision) {
+        return preparing(profileId, runtimeBusinessId, revision, "platform", Map.of());
+    }
+
+    public static DemoSession preparing(UUID profileId,
+                                        UUID runtimeBusinessId,
+                                        String revision,
+                                        String operator,
+                                        Map<String, Object> configurationSnapshot) {
         DemoSession value = new DemoSession();
         value.correlationId = UUID.randomUUID();
         value.demoProfileId = profileId;
         value.runtimeBusinessId = runtimeBusinessId;
         value.configurationRevision = revision;
+        value.operator = operator == null || operator.isBlank() ? "platform" : operator.trim().toLowerCase();
+        value.setConfigurationSnapshot(configurationSnapshot);
         value.state = DemoSessionState.PREPARING;
         return value;
     }
@@ -68,34 +94,30 @@ public class DemoSession {
     void prePersist() {
         Instant now = Instant.now();
         if (correlationId == null) correlationId = UUID.randomUUID();
+        if (operator == null || operator.isBlank()) operator = "platform";
+        if (externalEffectsState == null || externalEffectsState.isBlank()) externalEffectsState = "DISARMED";
+        if (paymentState == null || paymentState.isBlank()) paymentState = "SANDBOX_ONLY";
         if (createdAt == null) createdAt = now;
         updatedAt = now;
     }
 
     @PreUpdate
-    void preUpdate() {
-        updatedAt = Instant.now();
-    }
+    void preUpdate() { updatedAt = Instant.now(); }
 
-    public void markStaged() {
-        stagedAt = Instant.now();
-    }
-
-    public void markReady() {
-        state = DemoSessionState.READY;
-        failureReason = null;
-    }
-
+    public void markStaged() { stagedAt = Instant.now(); }
+    public void markReady() { state = DemoSessionState.READY; failureReason = null; }
     public void markActive() {
         state = DemoSessionState.ACTIVE;
         if (startedAt == null) startedAt = Instant.now();
     }
-
     public void markFinished() {
         state = DemoSessionState.FINISHED;
         finishedAt = Instant.now();
     }
-
+    public void markAborted() {
+        state = DemoSessionState.ABORTED;
+        finishedAt = Instant.now();
+    }
     public void markFailed(String reason) {
         state = DemoSessionState.FAILED;
         failureReason = reason == null || reason.isBlank() ? "Demo preparation failed" : reason;
@@ -107,9 +129,20 @@ public class DemoSession {
     public UUID getRuntimeBusinessId() { return runtimeBusinessId; }
     public DemoSessionState getState() { return state; }
     public String getConfigurationRevision() { return configurationRevision; }
+    public Map<String, Object> getConfigurationSnapshot() { return configurationSnapshot; }
+    public void setConfigurationSnapshot(Map<String, Object> value) {
+        configurationSnapshot = new LinkedHashMap<>(value == null ? Map.of() : value);
+    }
     public Map<String, Object> getReadinessSnapshot() { return readinessSnapshot; }
-    public void setReadinessSnapshot(Map<String, Object> readinessSnapshot) {
-        this.readinessSnapshot = new LinkedHashMap<>(readinessSnapshot == null ? Map.of() : readinessSnapshot);
+    public void setReadinessSnapshot(Map<String, Object> value) {
+        readinessSnapshot = new LinkedHashMap<>(value == null ? Map.of() : value);
+    }
+    public String getOperator() { return operator; }
+    public String getExternalEffectsState() { return externalEffectsState; }
+    public String getPaymentState() { return paymentState; }
+    public UUID getConvertedPilotBusinessId() { return convertedPilotBusinessId; }
+    public void setConvertedPilotBusinessId(UUID convertedPilotBusinessId) {
+        this.convertedPilotBusinessId = convertedPilotBusinessId;
     }
     public String getFailureReason() { return failureReason; }
     public Instant getStagedAt() { return stagedAt; }

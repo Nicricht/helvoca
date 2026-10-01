@@ -12,6 +12,8 @@ public interface MessagingConversationRepository extends JpaRepository<Messaging
             UUID businessId, String channel, String sender, String recipient, Instant after);
 
     List<MessagingConversation> findAllByBusinessIdAndChannelOrderByLastMessageAtDesc(UUID businessId, String channel);
+    List<MessagingConversation> findAllByBusinessIdAndDemoSessionIdOrderByOpenedAtAsc(
+            UUID businessId, UUID demoSessionId);
     List<MessagingConversation> findTop20ByBusinessIdAndCustomerIdOrderByLastMessageAtDesc(
             UUID businessId, UUID customerId);
 

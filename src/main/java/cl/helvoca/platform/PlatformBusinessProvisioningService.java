@@ -3,6 +3,7 @@ package cl.helvoca.platform;
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.business.Business;
+import cl.helvoca.business.BusinessMode;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.user.InviteUserRequest;
 import cl.helvoca.user.RoleCode;
@@ -34,6 +35,17 @@ public class PlatformBusinessProvisioningService {
 
     @Transactional
     public PlatformBusinessProvisioningResponse provision(PlatformBusinessProvisioningRequest request) {
+        return provision(request, BusinessMode.CUSTOMER);
+    }
+
+    @Transactional
+    public PlatformBusinessProvisioningResponse provisionPilot(PlatformBusinessProvisioningRequest request) {
+        return provision(request, BusinessMode.PILOT);
+    }
+
+    private PlatformBusinessProvisioningResponse provision(
+            PlatformBusinessProvisioningRequest request,
+            BusinessMode mode) {
         validateTimezone(request.timezone());
 
         String businessName = request.businessName().trim();
@@ -48,6 +60,7 @@ public class PlatformBusinessProvisioningService {
         business.setTimezone(timezone);
         business.setLanguage(language);
         business.setHumanTransferPhone(humanTransferPhone);
+        business.setMode(mode);
         business = businesses.saveAndFlush(business);
 
         subscriptions.startBasicTrial(business.getId());
@@ -58,7 +71,7 @@ public class PlatformBusinessProvisioningService {
 
         audit.platformHumanSuccess(
                 business.getId(),
-                "BUSINESS_PROVISION",
+                mode == BusinessMode.PILOT ? "BUSINESS_PILOT_PROVISION" : "BUSINESS_PROVISION",
                 "BUSINESS",
                 business.getId(),
                 null,

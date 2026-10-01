@@ -11,6 +11,7 @@ import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.omnichannel.CustomerIdentityService;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.platform.DemoSessionCorrelationService;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -39,6 +40,7 @@ public class CallLifecycleService {
     private final MeterRegistry metrics;
     private BusinessSubscriptionService subscriptions;
     private CustomerIdentityService customerIdentities;
+    private DemoSessionCorrelationService demoSessions;
 
     public CallLifecycleService(PhoneNumberRepository phoneNumbers,
                                 CustomerRepository customers,
@@ -62,6 +64,11 @@ public class CallLifecycleService {
     @Autowired(required = false)
     void setCustomerIdentities(CustomerIdentityService customerIdentities) {
         this.customerIdentities = customerIdentities;
+    }
+
+    @Autowired(required = false)
+    void setDemoSessions(DemoSessionCorrelationService demoSessions) {
+        this.demoSessions = demoSessions;
     }
 
     @Transactional
@@ -122,6 +129,10 @@ public class CallLifecycleService {
         if (customerIdentities != null) {
             customerIdentities.resolveVerifiedPhone(businessId, from)
                     .ifPresent(call::setCustomerId);
+        }
+        if (demoSessions != null) {
+            demoSessions.activeSessionIdForBusiness(businessId)
+                    .ifPresent(call::setDemoSessionId);
         }
         CallSession saved = calls.saveAndFlush(call);
         metrics.counter("helvoca.calls.started", "provider", normalizedProvider).increment();

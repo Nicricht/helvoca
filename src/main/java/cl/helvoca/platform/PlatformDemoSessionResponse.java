@@ -1,6 +1,7 @@
 package cl.helvoca.platform;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 public record PlatformDemoSessionResponse(
@@ -16,5 +17,11 @@ public record PlatformDemoSessionResponse(
         String failureReason,
         PlatformDemoReadinessResponse readiness,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        String operator,
+        Map<String, Object> configurationSnapshot,
+        Map<String, Object> readinessSnapshot,
+        String externalEffectsState,
+        String paymentState,
+        UUID convertedPilotBusinessId
 ) {}

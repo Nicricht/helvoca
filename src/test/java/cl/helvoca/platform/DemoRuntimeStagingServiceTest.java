@@ -92,6 +92,58 @@ class DemoRuntimeStagingServiceTest {
     }
 
     @Test
+    void copiesApprovedConfigurationToFreshPilotWithoutProviderCredentials() {
+        UUID businessId = UUID.randomUUID();
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CatalogItemRepository catalog = mock(CatalogItemRepository.class);
+        BusinessHourRepository hours = mock(BusinessHourRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        AiAgentRepository agents = mock(AiAgentRepository.class);
+        BusinessOperationCapabilityRepository grants = mock(BusinessOperationCapabilityRepository.class);
+
+        Business pilot = new Business();
+        ReflectionTestUtils.setField(pilot, "id", businessId);
+        pilot.setMode(BusinessMode.PILOT);
+        pilot.setStatus(BusinessStatus.ACTIVE);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(pilot));
+        when(catalog.findAllByBusinessIdOrderByNameAsc(businessId)).thenReturn(List.of());
+        when(knowledge.findAllByBusinessIdOrderByTitleAsc(businessId)).thenReturn(List.of());
+        when(agents.findByBusinessId(businessId)).thenReturn(Optional.empty());
+
+        DemoRuntimeStagingService service = new DemoRuntimeStagingService(
+                businesses, catalog, hours, knowledge, agents, grants, new TenantDatabaseContext());
+
+        service.stagePilot(profile(), businessId);
+
+        assertEquals("Sushi Akira", pilot.getName());
+        verify(businesses).save(pilot);
+        verify(hours).deleteAllByBusinessId(businessId);
+        verify(grants).deleteAllByBusinessId(businessId);
+    }
+
+    @Test
+    void pilotCopyRejectsCustomerTarget() {
+        UUID businessId = UUID.randomUUID();
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        Business customer = new Business();
+        ReflectionTestUtils.setField(customer, "id", businessId);
+        customer.setMode(BusinessMode.CUSTOMER);
+        customer.setStatus(BusinessStatus.ACTIVE);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(customer));
+
+        DemoRuntimeStagingService service = new DemoRuntimeStagingService(
+                businesses,
+                mock(CatalogItemRepository.class),
+                mock(BusinessHourRepository.class),
+                mock(KnowledgeItemRepository.class),
+                mock(AiAgentRepository.class),
+                mock(BusinessOperationCapabilityRepository.class),
+                new TenantDatabaseContext());
+
+        assertThrows(IllegalStateException.class, () -> service.stagePilot(profile(), businessId));
+    }
+
+    @Test
     void refusesPaymentCapabilityAndNonDemoRuntime() {
         UUID businessId = UUID.randomUUID();
         BusinessRepository businesses = mock(BusinessRepository.class);

@@ -25,6 +25,8 @@ public class BusinessOperation {
     private UUID businessId;
     @Column(name = "customer_id")
     private UUID customerId;
+    @Column(name = "demo_session_id")
+    private UUID demoSessionId;
     @Column(name = "source_reference_id")
     private UUID sourceReferenceId;
     @Enumerated(EnumType.STRING)
@@ -84,6 +86,8 @@ public class BusinessOperation {
     public void setBusinessId(UUID businessId) { this.businessId = businessId; }
     public UUID getCustomerId() { return customerId; }
     public void setCustomerId(UUID customerId) { this.customerId = customerId; }
+    public UUID getDemoSessionId() { return demoSessionId; }
+    public void setDemoSessionId(UUID demoSessionId) { this.demoSessionId = demoSessionId; }
     public UUID getSourceReferenceId() { return sourceReferenceId; }
     public void setSourceReferenceId(UUID sourceReferenceId) { this.sourceReferenceId = sourceReferenceId; }
     public Type getType() { return type; }

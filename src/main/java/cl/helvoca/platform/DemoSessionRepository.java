@@ -1,6 +1,10 @@
 package cl.helvoca.platform;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +14,16 @@ public interface DemoSessionRepository extends JpaRepository<DemoSession, UUID> 
     Optional<DemoSession> findFirstByRuntimeBusinessIdAndStateInOrderByCreatedAtDesc(
             UUID runtimeBusinessId,
             List<DemoSessionState> states);
+
+    Optional<DemoSession> findByIdAndRuntimeBusinessId(UUID id, UUID runtimeBusinessId);
+
+    Optional<DemoSession> findFirstByRuntimeBusinessIdOrderByCreatedAtDesc(UUID runtimeBusinessId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from DemoSession d where d.id = :id and d.runtimeBusinessId = :runtimeBusinessId")
+    Optional<DemoSession> findForUpdateByIdAndRuntimeBusinessId(
+            @Param("id") UUID id,
+            @Param("runtimeBusinessId") UUID runtimeBusinessId);
 
     default Optional<DemoSession> findPreparedForRuntime(UUID runtimeBusinessId) {
         return findFirstByRuntimeBusinessIdAndStateInOrderByCreatedAtDesc(

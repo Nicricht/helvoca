@@ -10,6 +10,7 @@ import cl.helvoca.messaging.outbound.MetaWhatsAppMessagingProvider;
 import cl.helvoca.messaging.outbound.WhatsAppAssistantReplyDeliveryService;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.platform.DemoSessionCorrelationService;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +58,9 @@ public class WhatsAppReceptionistService {
 
     @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired(required = false)
+    private DemoSessionCorrelationService demoSessions;
 
     public record ResolvedSystemReply(UUID messageId, String recipient, String replyProviderId) {}
 
@@ -159,10 +163,8 @@ public class WhatsAppReceptionistService {
 
         Instant now = Instant.now();
         Instant after = now.minus(Duration.ofHours(properties.getSessionHours()));
-        MessagingConversation conversation = conversations
-                .findFirstByBusinessIdAndChannelAndSenderAndRecipientAndLastMessageAtAfterOrderByLastMessageAtDesc(
-                        businessId, CHANNEL, from, to, after)
-                .orElseGet(() -> newConversation(phone, from, to, now));
+        MessagingConversation conversation =
+                sessionScopedConversation(phone, from, to, now, after);
 
         attachVerifiedCustomer(conversation, businessId, from);
         conversation.setLastMessageAt(now);
@@ -216,10 +218,8 @@ public class WhatsAppReceptionistService {
 
         Instant now = Instant.now();
         Instant after = now.minus(Duration.ofHours(properties.getSessionHours()));
-        MessagingConversation conversation = conversations
-                .findFirstByBusinessIdAndChannelAndSenderAndRecipientAndLastMessageAtAfterOrderByLastMessageAtDesc(
-                        phone.getBusinessId(), CHANNEL, from, to, after)
-                .orElseGet(() -> newConversation(phone, from, to, now));
+        MessagingConversation conversation =
+                sessionScopedConversation(phone, from, to, now, after);
 
         attachVerifiedCustomer(conversation, phone.getBusinessId(), from);
         conversation.setLastMessageAt(now);
@@ -380,6 +380,35 @@ public class WhatsAppReceptionistService {
         return bookingContext && positiveConfirmation && !explicitNegation;
     }
 
+    private MessagingConversation sessionScopedConversation(
+            PhoneNumber phone,
+            String from,
+            String to,
+            Instant now,
+            Instant after) {
+        MessagingConversation existing = conversations
+                .findFirstByBusinessIdAndChannelAndSenderAndRecipientAndLastMessageAtAfterOrderByLastMessageAtDesc(
+                        phone.getBusinessId(), CHANNEL, from, to, after)
+                .orElse(null);
+
+        if (demoSessions == null) {
+            return existing != null ? existing : newConversation(phone, from, to, now);
+        }
+
+        UUID activeDemoSessionId = demoSessions.activeSessionIdForBusiness(phone.getBusinessId())
+                .orElse(null);
+        if (activeDemoSessionId == null) {
+            return existing != null ? existing : newConversation(phone, from, to, now);
+        }
+
+        if (existing != null && activeDemoSessionId.equals(existing.getDemoSessionId())) {
+            return existing;
+        }
+
+        // Never attach pre-demo messaging history to a new demo execution.
+        return newConversation(phone, from, to, now);
+    }
+
     private MessagingConversation newConversation(PhoneNumber phone, String from, String to, Instant now) {
         MessagingConversation conversation = new MessagingConversation();
         conversation.setBusinessId(phone.getBusinessId());
@@ -388,6 +417,10 @@ public class WhatsAppReceptionistService {
         conversation.setRecipient(to);
         conversation.setOpenedAt(now);
         conversation.setLastMessageAt(now);
+        if (demoSessions != null) {
+            demoSessions.activeSessionIdForBusiness(phone.getBusinessId())
+                    .ifPresent(conversation::setDemoSessionId);
+        }
         attachVerifiedCustomer(conversation, phone.getBusinessId(), from);
         return conversation;
     }
