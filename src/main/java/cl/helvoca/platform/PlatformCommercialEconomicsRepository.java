@@ -38,6 +38,13 @@ public class PlatformCommercialEconomicsRepository {
                        voice.overage_unit_size,
                        voice.overage_price_clp,
                        COALESCE((
+                           SELECT COUNT(*)
+                             FROM phone_number pn
+                            WHERE pn.business_id = bs.business_id
+                              AND pn.active = TRUE
+                              AND UPPER(pn.provider) = 'TWILIO'
+                       ), 0) AS active_voice_number_count,
+                       COALESCE((
                            SELECT SUM(COALESCE(u.actual_cost_usd, u.estimated_cost_usd, 0))
                              FROM usage_meter_event u
                             WHERE u.business_id = bs.business_id
@@ -63,6 +70,7 @@ public class PlatformCommercialEconomicsRepository {
                 decimal(rs.getObject("used_seconds")),
                 nullableDecimal(rs.getObject("overage_unit_size")),
                 nullableInteger(rs.getObject("overage_price_clp")),
+                rs.getInt("active_voice_number_count"),
                 decimal(rs.getObject("estimated_cost_usd"))));
     }
 
@@ -125,6 +133,7 @@ public class PlatformCommercialEconomicsRepository {
             BigDecimal usedSeconds,
             BigDecimal overageUnitSize,
             Integer overagePriceClp,
+            int activeVoiceNumberCount,
             BigDecimal estimatedCostUsd) {
     }
 
