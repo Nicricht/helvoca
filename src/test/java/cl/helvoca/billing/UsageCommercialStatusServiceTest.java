@@ -46,6 +46,43 @@ class UsageCommercialStatusServiceTest {
     }
 
     @Test
+    void coversZeroQuotaAndSanitizesMissingValues() {
+        assertEquals("NORMAL", UsageCommercialStatusService.alertLevel(null, null));
+        assertEquals("OVERAGE", UsageCommercialStatusService.alertLevel(BigDecimal.ONE, BigDecimal.ZERO));
+        assertEquals("NORMAL", UsageCommercialStatusService.alertLevel(
+                BigDecimal.TEN, new BigDecimal("100")));
+
+        assertEquals(new BigDecimal("0.0"),
+                UsageCommercialStatusService.usagePercent(null, null));
+        assertEquals(new BigDecimal("100.0"),
+                UsageCommercialStatusService.usagePercent(BigDecimal.ONE, BigDecimal.ZERO));
+        assertEquals(new BigDecimal("0.0"),
+                UsageCommercialStatusService.usagePercent(new BigDecimal("-1"), new BigDecimal("100")));
+    }
+
+    @Test
+    void missingSafetyEntitlementFailsClosed() {
+        UUID businessId = UUID.randomUUID();
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        Instant now = Instant.now();
+        when(subscriptions.view(businessId)).thenReturn(new BusinessSubscriptionService.SubscriptionView(
+                businessId, "BASIC", "EMPRENDE", "Emprende", "ACTIVE",
+                true, 1, 100, 0, 0,
+                now.minusSeconds(60), now.plusSeconds(60), null, true,
+                List.of(new CommercialEntitlementService.EntitlementUsage(
+                        "VOICE_SECONDS", "USAGE", "VOICE_SECONDS",
+                        new BigDecimal("6000"), "SECONDS", false,
+                        BigDecimal.ZERO, new BigDecimal("6000"), BigDecimal.ZERO,
+                        false, new BigDecimal("60"), 149)),
+                false));
+
+        assertThrows(IllegalStateException.class,
+                () -> new UsageCommercialStatusService(subscriptions, tenantProvider).currentForTenant());
+    }
+
+    @Test
     void calculatesCeiledPricedOverageWithoutCallingItCollectedRevenue() {
         UUID businessId = UUID.randomUUID();
         BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
