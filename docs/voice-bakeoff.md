@@ -87,3 +87,46 @@ The September 27, 2026 human listening final selected **Sulafat** as the primary
 - Legacy `Leda` and `Despina` selections migrate to the current youthful female profile.
 - Leda and Laomedeia remain comparison/fallback candidates in the bake-off catalogue.
 - The masculine profile and unrelated tenant voice profiles are unchanged.
+
+
+## Cross-provider A/B
+
+The provider comparison is separate from the six-voice Gemini bake-off above. It compares the actual production voice stacks while leaving normal inbound routing unchanged.
+
+Use the existing one-shot outbound certification path and leave `TWILIO_CERTIFICATION_VOICE_OVERRIDE` blank. Pin one provider at a time:
+
+```text
+# Run A
+TWILIO_CERTIFICATION_PROVIDER_OVERRIDE=gemini
+TWILIO_CERTIFICATION_VOICE_OVERRIDE=
+
+# Run B
+TWILIO_CERTIFICATION_PROVIDER_OVERRIDE=openai-live
+TWILIO_CERTIFICATION_VOICE_OVERRIDE=
+```
+
+Only `gemini` and `openai-live` are accepted. Unknown values fail closed. A provider pin is accepted only for `outbound-test`, never for inbound certification. When a provider is pinned, that certification call cannot fall back to the other provider.
+
+A Gemini-specific voice candidate such as `Sulafat` cannot be combined with the OpenAI pin. For a provider comparison, use the tenant's normal voice profile. RecepVoz resolves that profile to the provider-specific voice automatically.
+
+The call target allowlist, forbidden-target check, explicit startup opt-in, one-shot run gate and automatic safety hangup remain mandatory.
+
+### Comparison scorecard
+
+Run both providers with the same business, greeting, user scenario and tenant voice profile. Evaluate:
+
+- time from the end of the caller turn to first audible response;
+- naturalness and conversational flow;
+- interruption / barge-in behavior;
+- Spanish and Chilean conversational feel;
+- pronunciation of names, times, prices and addresses;
+- tool-use correctness and confirmation discipline;
+- audio artifacts, clipping or robotic cadence;
+- recovery after hesitation, correction or interruption;
+- overall receptionist experience.
+
+Do not change the production provider order based on a single pleasant sample. Repeat representative scenarios and retain the measured evidence.
+
+### Verified production snapshot
+
+On September 30, 2026, production logs show Gemini sessions using `gemini-3.8-live`. The normal provider order is `gemini,openai-live`. The OpenAI Live SIP integration has no production model override configured, so it uses the repository default `gpt-live-1`. This snapshot is operational evidence for the initial A/B and should be re-verified before future comparisons.
