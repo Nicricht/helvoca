@@ -1,8 +1,13 @@
 {
-  "name": "helvoca-console-e2e",
+  "name": "helvoca-console",
   "private": true,
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
-    "test:e2e": "playwright test"
+    "frontend:build": "npm --workspace frontend run build",
+    "frontend:typecheck": "npm --workspace frontend run typecheck",
+    "test:e2e": "npm run frontend:build && playwright test"
   },
   "devDependencies": {
     "@playwright/test": "1.55.0"
