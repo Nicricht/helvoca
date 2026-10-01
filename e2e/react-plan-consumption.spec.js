@@ -163,12 +163,21 @@ test.describe('React Plan y consumo pilot', () => {
     await expect(page).toHaveURL('http://127.0.0.1:4173/');
   });
 
-  test('has no page-level horizontal overflow on mobile', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+  test('stays contained at desktop, tablet and mobile widths', async ({ page }) => {
     await bootAuthenticated(page);
-    await page.goto('/app/plan');
 
-    await expect(page.getByTestId('plan-name')).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 768, height: 1024 },
+      { width: 390, height: 844 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/app/plan');
+
+      await expect(page.getByTestId('plan-name')).toBeVisible();
+      expect(await page.evaluate(() =>
+        document.documentElement.scrollWidth <= document.documentElement.clientWidth
+      )).toBe(true);
+    }
   });
 });
