@@ -961,7 +961,7 @@
     }).length;
     const confirmedCount = allItems.filter(item => item.status === "CONFIRMED").length;
     const nextBooking = allItems
-      .filter(item => item.status !== "CANCELLED" && new Date(item.startAt || 0) >= now)
+      .filter(item => item.status === "CONFIRMED" && new Date(item.startAt || 0) >= now)
       .sort((a, b) => new Date(a.startAt || 0) - new Date(b.startAt || 0))[0] || null;
 
     const nextCustomer = nextBooking
