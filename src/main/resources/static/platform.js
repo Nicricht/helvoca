@@ -184,6 +184,16 @@
     }
   }
 
+  async function loadCurrentDemoSession() {
+    if (!demoSessionState || !demoSession) return;
+    try {
+      const current = await api('/api/v1/platform/demo-sessions/current');
+      if (current) renderDemoSession(current);
+    } catch (error) {
+      demoSessionState.textContent = error.message || 'No fue posible comprobar la sesión demo actual.';
+    }
+  }
+
   async function loadDemos() {
     if (!demoState || !demoProfiles) return;
     demoState.textContent = 'Cargando perfiles de demo…';
@@ -394,6 +404,6 @@
   document.querySelector('#platformEconomicsRefresh')?.addEventListener('click', loadEconomics);
 
   (async () => {
-    if (await guard()) await Promise.all([loadDemoReadiness(), loadDemos(), loadEconomics()]);
+    if (await guard()) await Promise.all([loadDemoReadiness(), loadCurrentDemoSession(), loadDemos(), loadEconomics()]);
   })();
 })();
