@@ -13,6 +13,22 @@
     message.className = text ? kind : 'hidden';
   }
 
+  function roleLabel(role) {
+    return {
+      BUSINESS_OWNER:'Propietario',
+      BUSINESS_ADMIN:'Administrador',
+      MANAGER:'Encargado',
+      RECEPTION:'Recepción / Caja',
+      STAFF:'Personal',
+      KITCHEN:'Preparación / Cocina',
+      DISPATCH:'Despacho',
+      PROFESSIONAL:'Profesional',
+      WAREHOUSE:'Bodega / Inventario',
+      SALES:'Ventas',
+      OPERATOR:'Operador'
+    }[role] || role || 'Sin rol';
+  }
+
   async function request(path, options = {}) {
     const headers = new Headers(options.headers || {});
     if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
@@ -43,7 +59,7 @@
       const name = document.createElement('strong');
       name.textContent = data.name || data.email || 'Invitación';
       const detail = document.createElement('span');
-      detail.textContent = `${data.email || ''} · ${data.role === 'BUSINESS_ADMIN' ? 'Administrador' : 'Operador'}`;
+      detail.textContent = `${data.email || ''} · ${roleLabel(data.role)}`;
       meta.append(name, detail);
       meta.classList.remove('hidden');
 
