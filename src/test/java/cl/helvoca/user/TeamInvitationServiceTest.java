@@ -190,6 +190,39 @@ class TeamInvitationServiceTest {
     }
 
     @Test
+    void principalOwnerAcceptanceAddsLegacyAdminCompatibilityRole() {
+        String rawToken = "principal-owner-token";
+        TeamInvitation invitation = invitation(rawToken, RoleCode.BUSINESS_OWNER, Instant.now().plusSeconds(3600));
+        invitation.setName("Dueño Principal");
+        invitation.setEmail("owner@negocio.cl");
+        Role owner = mock(Role.class);
+        Role admin = mock(Role.class);
+
+        when(invitations.findByBusinessIdAndTokenHash(
+                businessId, TeamInvitationService.hash(rawToken))).thenReturn(Optional.of(invitation));
+        when(users.existsByEmailIgnoreCase("owner@negocio.cl")).thenReturn(false);
+        when(roles.findByCode(RoleCode.BUSINESS_OWNER)).thenReturn(Optional.of(owner));
+        when(roles.findByCode(RoleCode.BUSINESS_ADMIN)).thenReturn(Optional.of(admin));
+        when(passwordEncoder.encode("UnaClaveMuySegura123")).thenReturn("bcrypt-hash");
+        when(users.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+        when(invitations.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+        when(authService.login(new LoginRequest("owner@negocio.cl", "UnaClaveMuySegura123")))
+                .thenReturn(new LoginResponse(
+                        "jwt-owner", "Bearer", 3600,
+                        new LoginResponse.UserInfo(UUID.randomUUID(), businessId, "Dueño Principal",
+                                "owner@negocio.cl", List.of("BUSINESS_ADMIN", "BUSINESS_OWNER"))));
+
+        LoginResponse result = service.accept(
+                businessId, rawToken, new AcceptInvitationRequest("UnaClaveMuySegura123"));
+
+        assertEquals("jwt-owner", result.accessToken());
+        ArgumentCaptor<AppUser> user = ArgumentCaptor.forClass(AppUser.class);
+        verify(users).saveAndFlush(user.capture());
+        assertTrue(user.getValue().getRoles().contains(owner));
+        assertTrue(user.getValue().getRoles().contains(admin));
+    }
+
+    @Test
     void expiredInvitationCannotBeAccepted() {
         String rawToken = "expired-token";
         TeamInvitation invitation = invitation(rawToken, RoleCode.OPERATOR, Instant.now().minusSeconds(1));
