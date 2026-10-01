@@ -1,5 +1,6 @@
 package cl.helvoca.telephony.twilio;
 
+import cl.helvoca.security.TenantDatabaseContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,14 +14,17 @@ public class TwilioCertificationCommandWorker {
     private final boolean enabled;
     private final TwilioCertificationCommandStore commands;
     private final TwilioCertificationCommandCallLauncher launcher;
+    private final TenantDatabaseContext databaseContext;
 
     public TwilioCertificationCommandWorker(
             @Value("${TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED:false}") boolean enabled,
             TwilioCertificationCommandStore commands,
-            TwilioCertificationCommandCallLauncher launcher) {
+            TwilioCertificationCommandCallLauncher launcher,
+            TenantDatabaseContext databaseContext) {
         this.enabled = enabled;
         this.commands = commands;
         this.launcher = launcher;
+        this.databaseContext = databaseContext;
     }
 
     @Scheduled(
@@ -29,14 +33,16 @@ public class TwilioCertificationCommandWorker {
     public void poll() {
         if (!enabled) return;
 
-        commands.claimNext().ifPresent(command -> {
+        databaseContext.callAsSystem(commands::claimNext).ifPresent(command -> {
             try {
                 String callSid = launcher.launch(command.callbackToken());
-                commands.recordProviderCall(command.runId(), command.callbackToken(), callSid);
+                databaseContext.runAsSystem(
+                        () -> commands.recordProviderCall(command.runId(), command.callbackToken(), callSid));
                 log.info("TWILIO_CERTIFICATION_COMMAND CREATED run={} call={} target=fixed-allowlist",
                         command.runId(), callSid);
             } catch (Exception e) {
-                commands.markFailed(command.runId(), rootMessage(e));
+                databaseContext.runAsSystem(
+                        () -> commands.markFailed(command.runId(), rootMessage(e)));
                 log.error("TWILIO_CERTIFICATION_COMMAND FAILED run={} reason={}",
                         command.runId(), rootMessage(e));
             }

@@ -1,5 +1,6 @@
 package cl.helvoca.telephony.twilio;
 
+import cl.helvoca.security.TenantDatabaseContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,12 +14,15 @@ public class TwilioCertificationCommandBootstrapRunner implements ApplicationRun
 
     private final String runId;
     private final TwilioCertificationCommandStore commands;
+    private final TenantDatabaseContext databaseContext;
 
     public TwilioCertificationCommandBootstrapRunner(
             @Value("${TWILIO_CERTIFICATION_COMMAND_BOOTSTRAP_RUN_ID:}") String runId,
-            TwilioCertificationCommandStore commands) {
+            TwilioCertificationCommandStore commands,
+            TenantDatabaseContext databaseContext) {
         this.runId = runId;
         this.commands = commands;
+        this.databaseContext = databaseContext;
     }
 
     @Override
@@ -29,7 +33,8 @@ public class TwilioCertificationCommandBootstrapRunner implements ApplicationRun
             log.error("TWILIO_CERTIFICATION_COMMAND bootstrap blocked: invalid run id");
             return;
         }
-        boolean inserted = commands.enqueue(normalized, "startup-bootstrap");
+        boolean inserted = databaseContext.callAsSystem(
+                () -> commands.enqueue(normalized, "startup-bootstrap"));
         log.info("TWILIO_CERTIFICATION_COMMAND bootstrap run={} inserted={}", normalized, inserted);
     }
 }
