@@ -74,6 +74,10 @@ The account screen shows the applicable warning and the estimated CLP overage ba
 
 RecepVoz internal provider cost and gross margin are never exposed on the customer account screen.
 
+### Customer API redaction
+
+`GET /api/v1/usage/summary` returns only meter key, unit, quantity and event count to BUSINESS_OWNER / BUSINESS_ADMIN. Internal `estimated_cost_usd` and `actual_cost_usd` remain available only inside backend/platform economics and are not serialized to tenant clients.
+
 ## Emergency safety ceiling
 
 Ordinary voice allowance remains a soft commercial entitlement with priced overage.
