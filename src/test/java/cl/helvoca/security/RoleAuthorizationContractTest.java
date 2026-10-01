@@ -19,18 +19,18 @@ class RoleAuthorizationContractTest {
     }
 
     @Test
-    void customerExportIsAdminOnlyWhileCustomerWorkspaceRemainsOperationalForOperator() throws Exception {
+    void customerWorkspaceUsesReadAndExportPermissions() throws Exception {
         PreAuthorize controllerRule = CustomerController.class.getAnnotation(PreAuthorize.class);
-        assertEquals("hasAnyRole('BUSINESS_ADMIN','OPERATOR')", controllerRule.value());
+        assertEquals("hasAuthority('PERM_CUSTOMERS_READ')", controllerRule.value());
 
         Method export = CustomerController.class.getMethod("export", String.class);
         PreAuthorize exportRule = export.getAnnotation(PreAuthorize.class);
-        assertEquals("hasRole('BUSINESS_ADMIN')", exportRule.value());
+        assertEquals("hasAuthority('PERM_CUSTOMERS_EXPORT')", exportRule.value());
     }
 
     @Test
-    void bookingWorkspaceRemainsAvailableToOperator() {
+    void bookingWorkspaceUsesBookingReadPermission() {
         PreAuthorize rule = BookingController.class.getAnnotation(PreAuthorize.class);
-        assertEquals("hasAnyRole('BUSINESS_ADMIN','OPERATOR')", rule.value());
+        assertEquals("hasAuthority('PERM_BOOKINGS_READ')", rule.value());
     }
 }
