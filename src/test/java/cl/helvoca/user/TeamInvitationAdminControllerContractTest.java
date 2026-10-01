@@ -10,13 +10,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class TeamInvitationAdminControllerContractTest {
     @Test
-    void invitationManagementIsBusinessAdminOnly() {
+    void invitationManagementRequiresTeamManagePermission() {
         RequestMapping mapping = TeamInvitationAdminController.class.getAnnotation(RequestMapping.class);
         assertNotNull(mapping);
         assertTrue(Arrays.asList(mapping.value()).contains("/api/v1/admin/invitations"));
 
         PreAuthorize auth = TeamInvitationAdminController.class.getAnnotation(PreAuthorize.class);
         assertNotNull(auth);
-        assertEquals("hasRole('BUSINESS_ADMIN')", auth.value());
+        assertEquals("hasAuthority('PERM_TEAM_MANAGE')", auth.value());
     }
 }
