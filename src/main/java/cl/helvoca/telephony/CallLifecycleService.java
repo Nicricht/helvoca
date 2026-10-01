@@ -39,6 +39,7 @@ public class CallLifecycleService {
     private final MeterRegistry metrics;
     private BusinessSubscriptionService subscriptions;
     private CustomerIdentityService customerIdentities;
+    private List<CallLifecycleObserver> lifecycleObservers = List.of();
 
     public CallLifecycleService(PhoneNumberRepository phoneNumbers,
                                 CustomerRepository customers,
@@ -64,13 +65,21 @@ public class CallLifecycleService {
         this.customerIdentities = customerIdentities;
     }
 
+    @Autowired(required = false)
+    void setLifecycleObservers(List<CallLifecycleObserver> lifecycleObservers) {
+        this.lifecycleObservers = lifecycleObservers == null ? List.of() : List.copyOf(lifecycleObservers);
+    }
+
     @Transactional
     public UUID startInboundCall(String telephonyProvider,
                                  String providerCallId,
                                  String from,
                                  String to) {
         CallSession existing = calls.findByProviderCallId(providerCallId).orElse(null);
-        if (existing != null) return existing.getId();
+        if (existing != null) {
+            notifyInboundStarted(existing);
+            return existing.getId();
+        }
 
         PhoneNumber phone = phoneNumbers.findByPhoneNumberAndActiveTrue(to)
                 .orElseThrow(() -> new NotFoundException("Destination phone number is not registered"));
@@ -78,7 +87,10 @@ public class CallLifecycleService {
         UUID businessId = phone.getBusinessId();
         lockBusinessCapacity(businessId);
         existing = calls.findByProviderCallId(providerCallId).orElse(null);
-        if (existing != null) return existing.getId();
+        if (existing != null) {
+            notifyInboundStarted(existing);
+            return existing.getId();
+        }
 
         if (subscriptions == null) {
             metrics.counter("helvoca.calls.rejected", "reason", "subscription").increment();
@@ -124,6 +136,7 @@ public class CallLifecycleService {
                     .ifPresent(call::setCustomerId);
         }
         CallSession saved = calls.saveAndFlush(call);
+        notifyInboundStarted(saved);
         metrics.counter("helvoca.calls.started", "provider", normalizedProvider).increment();
         return saved.getId();
     }
@@ -162,6 +175,7 @@ public class CallLifecycleService {
             if (call.getAnsweredAt() == null) call.setAnsweredAt(Instant.now());
         }
         calls.saveAndFlush(call);
+        notifyCallUpdated(call);
         return context(call);
     }
 
@@ -240,6 +254,19 @@ public class CallLifecycleService {
             }
         }
         calls.saveAndFlush(call);
+        notifyCallUpdated(call);
+    }
+
+    private void notifyInboundStarted(CallSession call) {
+        for (CallLifecycleObserver observer : lifecycleObservers) {
+            observer.onInboundCallStarted(call);
+        }
+    }
+
+    private void notifyCallUpdated(CallSession call) {
+        for (CallLifecycleObserver observer : lifecycleObservers) {
+            observer.onCallUpdated(call);
+        }
     }
 
     private void updateEstimatedCost(CallSession call) {
