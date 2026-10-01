@@ -142,6 +142,101 @@ class DemoSessionCorrelationTest {
     }
 
     @Test
+    void inboundVoiceReturnsExistingActiveSessionWithoutRecheckingReadiness() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        DemoInboundSafetyReadiness readiness = mock(DemoInboundSafetyReadiness.class);
+        AuditService audit = mock(AuditService.class);
+
+        DemoSession active = DemoSession.preparing(UUID.randomUUID(), runtimeId, "rev");
+        ReflectionTestUtils.setField(active, "id", sessionId);
+        active.markReady();
+        active.markActive();
+        when(sessions.findPreparedForRuntime(runtimeId)).thenReturn(Optional.of(active));
+
+        DemoSessionCorrelationService service = new DemoSessionCorrelationService(
+                properties, sessions, mock(CallSessionRepository.class),
+                mock(MessagingConversationRepository.class));
+        service.setInboundSafety(readiness);
+        service.setAudit(audit);
+
+        assertEquals(Optional.of(sessionId), service.activeOrActivateForInboundVoice(runtimeId));
+        verifyNoInteractions(readiness, audit);
+        verify(sessions, never()).findForUpdateByIdAndRuntimeBusinessId(any(), any());
+    }
+
+    @Test
+    void inboundVoiceFailsClosedWhenPreparedSessionDisappearsBeforeLock() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        DemoInboundSafetyReadiness readiness = mock(DemoInboundSafetyReadiness.class);
+        AuditService audit = mock(AuditService.class);
+
+        DemoSession ready = DemoSession.preparing(UUID.randomUUID(), runtimeId, "rev");
+        ReflectionTestUtils.setField(ready, "id", sessionId);
+        ready.markReady();
+        when(sessions.findPreparedForRuntime(runtimeId)).thenReturn(Optional.of(ready));
+        when(readiness.safeSnapshot(runtimeId)).thenReturn(Optional.of(safeSnapshot(runtimeId)));
+        when(sessions.findForUpdateByIdAndRuntimeBusinessId(sessionId, runtimeId))
+                .thenReturn(Optional.empty());
+
+        DemoSessionCorrelationService service = new DemoSessionCorrelationService(
+                properties, sessions, mock(CallSessionRepository.class),
+                mock(MessagingConversationRepository.class));
+        service.setInboundSafety(readiness);
+        service.setAudit(audit);
+
+        assertTrue(service.activeOrActivateForInboundVoice(runtimeId).isEmpty());
+        verify(sessions, never()).saveAndFlush(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void inboundVoiceUsesSessionThatAnotherRequestActivatedWhileWaitingForLock() {
+        UUID runtimeId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        DemoRuntimeProperties properties = new DemoRuntimeProperties();
+        properties.setRuntimeBusinessId(runtimeId.toString());
+
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+        DemoInboundSafetyReadiness readiness = mock(DemoInboundSafetyReadiness.class);
+        AuditService audit = mock(AuditService.class);
+
+        DemoSession ready = DemoSession.preparing(UUID.randomUUID(), runtimeId, "rev");
+        ReflectionTestUtils.setField(ready, "id", sessionId);
+        ready.markReady();
+
+        DemoSession active = DemoSession.preparing(UUID.randomUUID(), runtimeId, "rev");
+        ReflectionTestUtils.setField(active, "id", sessionId);
+        active.markReady();
+        active.markActive();
+
+        when(sessions.findPreparedForRuntime(runtimeId)).thenReturn(Optional.of(ready));
+        when(readiness.safeSnapshot(runtimeId)).thenReturn(Optional.of(safeSnapshot(runtimeId)));
+        when(sessions.findForUpdateByIdAndRuntimeBusinessId(sessionId, runtimeId))
+                .thenReturn(Optional.of(active));
+
+        DemoSessionCorrelationService service = new DemoSessionCorrelationService(
+                properties, sessions, mock(CallSessionRepository.class),
+                mock(MessagingConversationRepository.class));
+        service.setInboundSafety(readiness);
+        service.setAudit(audit);
+
+        assertEquals(Optional.of(sessionId), service.activeOrActivateForInboundVoice(runtimeId));
+        verify(readiness, times(1)).safeSnapshot(runtimeId);
+        verify(sessions, never()).saveAndFlush(any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
     void terminalCorrelatedCallFinishesSessionOnlyAfterLastLiveCallEnds() {
         UUID runtimeId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
