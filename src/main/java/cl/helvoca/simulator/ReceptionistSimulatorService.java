@@ -18,11 +18,13 @@ import cl.helvoca.call.CallTranscriptService;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.messaging.GeminiMessagingAiFallback;
 import cl.helvoca.messaging.MessagingAiClient;
+import cl.helvoca.platform.DemoSessionCorrelationService;
 import cl.helvoca.security.TenantProvider;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,6 +64,7 @@ public class ReceptionistSimulatorService {
     private final SimulatorStateService state;
     private final OpenAiRealtimeProperties openAi;
     private final GeminiMessagingAiFallback geminiFallback;
+    private DemoSessionCorrelationService demoSessions;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
 
     public ReceptionistSimulatorService(TenantProvider tenantProvider,
@@ -90,6 +93,11 @@ public class ReceptionistSimulatorService {
         this.geminiFallback = geminiFallback;
     }
 
+    @Autowired(required = false)
+    void setDemoSessions(DemoSessionCorrelationService demoSessions) {
+        this.demoSessions = demoSessions;
+    }
+
     @Transactional
     public SessionResponse start() {
         UUID businessId = tenantProvider.requireBusinessId();
@@ -114,6 +122,10 @@ public class ReceptionistSimulatorService {
         call.setAnsweredAt(now);
         call.setStreamSid("simulator:" + token);
         call.setStreamStartedAt(now);
+        if (demoSessions != null) {
+            demoSessions.activeSessionIdForBusiness(businessId)
+                    .ifPresent(call::setDemoSessionId);
+        }
         call = calls.saveAndFlush(call);
 
         state.start(call.getId());
