@@ -14,7 +14,10 @@ import cl.helvoca.schedule.BusinessHour;
 import cl.helvoca.schedule.BusinessHourRepository;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
+import cl.helvoca.security.TenantDatabaseContext;
 import org.json.JSONObject;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -64,6 +67,19 @@ class BookingConcurrencyIntegrationTest {
     @Autowired CallSessionRepository calls;
     @Autowired BookingRepository bookings;
     @Autowired RealtimeToolService tools;
+    @Autowired TenantDatabaseContext databaseContext;
+
+    TenantDatabaseContext.Scope systemScope;
+
+    @BeforeEach
+    void enterExplicitSystemFixtureScope() {
+        systemScope = databaseContext.useSystem();
+    }
+
+    @AfterEach
+    void leaveExplicitSystemFixtureScope() {
+        if (systemScope != null) systemScope.close();
+    }
 
     @Test
     void simultaneousConfirmationsCannotDoubleBookSameServiceAndTime() throws Exception {
