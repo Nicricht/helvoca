@@ -18,27 +18,36 @@ public class CommercialOperationsAdminController {
     }
 
     @GetMapping("/orders")
-    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    @PreAuthorize("hasAuthority('PERM_ORDERS_READ')")
     public ResponseEntity<List<CommercialOperationsAdminService.OrderView>> orders() {
         return ResponseEntity.ok(service.orders());
     }
 
     @PatchMapping("/orders/{id}/status")
-    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    @PreAuthorize("hasAuthority('PERM_ORDERS_MANAGE')")
     public ResponseEntity<CommercialOperationsAdminService.OrderView> updateOrderStatus(
             @PathVariable UUID id,
             @RequestBody OrderStatusRequest request) {
         return ResponseEntity.ok(service.updateOrderStatus(id, request == null ? null : request.status()));
     }
 
+    @PatchMapping("/orders/{id}/preparation-status")
+    @PreAuthorize("hasAuthority('PERM_ORDERS_PREPARE')")
+    public ResponseEntity<CommercialOperationsAdminService.OrderView> updateOrderPreparationStatus(
+            @PathVariable UUID id,
+            @RequestBody OrderStatusRequest request) {
+        return ResponseEntity.ok(service.updateOrderPreparationStatus(
+                id, request == null ? null : request.status()));
+    }
+
     @GetMapping("/deliveries")
-    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    @PreAuthorize("hasAuthority('PERM_DELIVERIES_READ')")
     public ResponseEntity<List<CommercialOperationsAdminService.DeliveryView>> deliveries() {
         return ResponseEntity.ok(service.deliveries());
     }
 
     @PatchMapping("/deliveries/{id}/status")
-    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    @PreAuthorize("hasAuthority('PERM_DELIVERIES_MANAGE')")
     public ResponseEntity<CommercialOperationsAdminService.DeliveryView> updateDeliveryStatus(
             @PathVariable UUID id,
             @RequestBody DeliveryStatusRequest request) {
@@ -46,13 +55,13 @@ public class CommercialOperationsAdminController {
     }
 
     @GetMapping("/quotes")
-    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    @PreAuthorize("hasAuthority('PERM_DELIVERIES_READ')")
     public ResponseEntity<List<CommercialOperationsAdminService.QuoteView>> quotes() {
         return ResponseEntity.ok(service.quotes());
     }
 
     @PatchMapping("/quotes/{id}/status")
-    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    @PreAuthorize("hasAuthority('PERM_DELIVERIES_MANAGE')")
     public ResponseEntity<CommercialOperationsAdminService.QuoteView> updateQuoteStatus(
             @PathVariable UUID id,
             @RequestBody QuoteStatusRequest request) {
@@ -60,13 +69,13 @@ public class CommercialOperationsAdminController {
     }
 
     @GetMapping("/leads")
-    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    @PreAuthorize("hasAuthority('PERM_DELIVERIES_READ')")
     public ResponseEntity<List<CommercialOperationsAdminService.LeadView>> leads() {
         return ResponseEntity.ok(service.leads());
     }
 
     @PatchMapping("/leads/{id}/status")
-    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    @PreAuthorize("hasAuthority('PERM_DELIVERIES_MANAGE')")
     public ResponseEntity<CommercialOperationsAdminService.LeadView> updateLeadStatus(
             @PathVariable UUID id,
             @RequestBody LeadStatusRequest request) {
