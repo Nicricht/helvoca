@@ -63,6 +63,8 @@ class PostgresRowLevelSecurityIntegrationTest {
         ownerJdbc.update("DELETE FROM inventory_restock_notification");
         ownerJdbc.update("DELETE FROM inventory_restock_subscription");
         ownerJdbc.update("DELETE FROM customer");
+        ownerJdbc.update("DELETE FROM demo_session");
+        ownerJdbc.update("DELETE FROM demo_profile");
         ownerJdbc.update("DELETE FROM business");
 
         businessA = UUID.randomUUID();
