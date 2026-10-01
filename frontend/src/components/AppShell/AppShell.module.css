@@ -1,4 +1,6 @@
 .layout {
+  min-width: 0;
+  max-width: 100%;
   min-height: 100dvh;
   display: grid;
   grid-template-columns: var(--rv-frame-sidebar-width) minmax(0, 1fr);
@@ -6,6 +8,7 @@
 }
 
 .sidebar {
+  min-width: 0;
   position: sticky;
   top: 0;
   height: 100dvh;
@@ -40,6 +43,8 @@
 }
 
 .nav {
+  min-width: 0;
+  max-width: 100%;
   display: grid;
   gap: 5px;
 }
