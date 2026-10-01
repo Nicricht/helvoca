@@ -65,6 +65,8 @@
     .platform-demo-readiness-state.sandbox_only,.platform-demo-readiness-state.disarmed,.platform-demo-readiness-state.not_configured { color:#e8c96a; }
     .platform-demo-readiness-state.unavailable,.platform-demo-readiness-state.failed { color:#f28d8d; }
     .platform-demo-readiness-item small { display:block; margin-top:5px; color:var(--muted); font-size:9px; line-height:1.4; overflow-wrap:anywhere; }
+    .platform-demo-timeline-head { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-top:12px; }
+    .platform-demo-timeline-meta-summary { flex:0 0 auto; color:var(--muted); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
     .platform-demo-timeline { display:grid; gap:8px; margin:12px 0 16px; }
     .platform-demo-timeline-item { position:relative; display:grid; grid-template-columns:12px minmax(0,1fr) auto; gap:9px; align-items:start; padding:11px 12px; border:1px solid var(--border); border-radius:11px; background:var(--surface-2); overflow:hidden; }
     .platform-demo-timeline-dot { width:8px; height:8px; margin-top:4px; border-radius:999px; background:currentColor; color:var(--muted); box-shadow:0 0 0 4px rgba(255,255,255,.025); }
@@ -157,8 +159,11 @@
       </div>
       <div id="platformDemoSession" class="platform-result hidden" aria-label="Sesión live demo actual"></div>
 
-      <div id="platformDemoTimelineState" class="platform-empty" role="status" aria-live="polite">
-        El timeline aparecerá cuando la sesión reciba evidencia real de la llamada.
+      <div class="platform-demo-timeline-head">
+        <div id="platformDemoTimelineState" class="platform-empty" role="status" aria-live="polite">
+          El timeline aparecerá cuando la sesión reciba evidencia real de la llamada.
+        </div>
+        <div id="platformDemoTimelineMeta" class="platform-demo-timeline-meta-summary hidden" aria-live="polite"></div>
       </div>
       <div id="platformDemoTimeline" class="platform-demo-timeline hidden" aria-label="Timeline en vivo de la demo"></div>
 
