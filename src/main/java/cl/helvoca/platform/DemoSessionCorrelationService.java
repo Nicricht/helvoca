@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,7 +21,7 @@ public class DemoSessionCorrelationService {
     private final DemoSessionRepository sessions;
     private final CallSessionRepository calls;
     private final MessagingConversationRepository conversations;
-    private PlatformDemoReadinessService readiness;
+    private DemoInboundSafetyReadiness inboundSafety;
     private AuditService audit;
 
     public DemoSessionCorrelationService(DemoRuntimeProperties properties,
@@ -34,8 +35,8 @@ public class DemoSessionCorrelationService {
     }
 
     @Autowired
-    void setReadiness(PlatformDemoReadinessService readiness) {
-        this.readiness = readiness;
+    void setInboundSafety(DemoInboundSafetyReadiness inboundSafety) {
+        this.inboundSafety = inboundSafety;
     }
 
     @Autowired
@@ -66,12 +67,11 @@ public class DemoSessionCorrelationService {
         if (candidate.getState() == DemoSessionState.ACTIVE) {
             return Optional.of(candidate.getId());
         }
-        if (candidate.getState() != DemoSessionState.READY || readiness == null || audit == null) {
+        if (candidate.getState() != DemoSessionState.READY || inboundSafety == null || audit == null) {
             return Optional.empty();
         }
 
-        PlatformDemoReadinessResponse current = readiness.readiness();
-        if (!safeForInboundVoice(runtimeId, current)) return Optional.empty();
+        if (inboundSafety.safeSnapshot(runtimeId).isEmpty()) return Optional.empty();
 
         DemoSession locked = sessions.findForUpdateByIdAndRuntimeBusinessId(candidate.getId(), runtimeId)
                 .orElse(null);
@@ -79,7 +79,10 @@ public class DemoSessionCorrelationService {
         if (locked.getState() == DemoSessionState.ACTIVE) return Optional.of(locked.getId());
         if (locked.getState() != DemoSessionState.READY) return Optional.empty();
 
-        locked.setReadinessSnapshot(readinessSnapshot(current));
+        Optional<Map<String, Object>> lockedSnapshot = inboundSafety.safeSnapshot(runtimeId);
+        if (lockedSnapshot.isEmpty()) return Optional.empty();
+
+        locked.setReadinessSnapshot(lockedSnapshot.get());
         locked.markActive();
         sessions.saveAndFlush(locked);
         audit.success(runtimeId, "DEMO_SESSION_AUTO_ACTIVE", "DEMO_SESSION", locked.getId());
@@ -110,40 +113,6 @@ public class DemoSessionCorrelationService {
         if (audit != null) {
             audit.success(runtimeId, "DEMO_SESSION_AUTO_FINISHED", "DEMO_SESSION", session.getId());
         }
-    }
-
-    private static boolean safeForInboundVoice(
-            UUID runtimeId,
-            PlatformDemoReadinessResponse value) {
-        return value != null
-                && value.runtimeConfigured()
-                && runtimeId.equals(value.runtimeBusinessId())
-                && ready(value.runtime())
-                && ready(value.voiceNumber())
-                && ready(value.voiceAi())
-                && ready(value.businessData())
-                && ready(value.operations())
-                && value.payment() != null
-                && "SANDBOX_ONLY".equals(value.payment().state())
-                && value.externalEffects() != null
-                && "DISARMED".equals(value.externalEffects().state());
-    }
-
-    private static boolean ready(PlatformDemoReadinessResponse.ReadinessItem item) {
-        return item != null && "READY".equals(item.state());
-    }
-
-    private static java.util.Map<String, Object> readinessSnapshot(PlatformDemoReadinessResponse value) {
-        java.util.LinkedHashMap<String, Object> snapshot = new java.util.LinkedHashMap<>();
-        snapshot.put("runtimeBusinessId", value.runtimeBusinessId());
-        snapshot.put("runtime", value.runtime().state());
-        snapshot.put("voiceNumber", value.voiceNumber().state());
-        snapshot.put("voiceAi", value.voiceAi().state());
-        snapshot.put("businessData", value.businessData().state());
-        snapshot.put("operations", value.operations().state());
-        snapshot.put("payment", value.payment().state());
-        snapshot.put("externalEffects", value.externalEffects().state());
-        return snapshot;
     }
 
     @Transactional(readOnly = true)
