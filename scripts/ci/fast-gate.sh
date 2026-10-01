@@ -29,6 +29,7 @@ POM_CHANGED=false
 RUN_CHAOS=false
 RUN_PILOT=false
 RUN_SOFTWARE_FACTORY=false
+FRONTEND_CHANGED=false
 
 add_tests_from_dir() {
   local dir="$1"
@@ -51,6 +52,9 @@ for file in "${CHANGED[@]}"; do
   case "$file" in
     pom.xml)
       POM_CHANGED=true
+      ;;
+    package.json|Dockerfile|frontend/*|frontend/**/*)
+      FRONTEND_CHANGED=true
       ;;
     src/main/java/*.java|src/main/java/**/*.java)
       JAVA_CHANGED=true
@@ -111,6 +115,15 @@ for file in "${CHANGED[@]}"; do
       ;;
   esac
 done
+
+if [[ "$FRONTEND_CHANGED" == true ]]; then
+  echo "React frontend surface changed. Installing workspace dependencies..."
+  npm install --no-audit --no-fund
+  echo "Type checking React frontend..."
+  npm run frontend:typecheck
+  echo "Building React frontend..."
+  npm run frontend:build
+fi
 
 if [[ "$JAVA_CHANGED" == true || "$POM_CHANGED" == true ]]; then
   echo "Compiling Java test sources..."
