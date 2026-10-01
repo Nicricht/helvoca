@@ -18,6 +18,9 @@ public class MessagingConversation {
     @Column(name = "customer_id")
     private UUID customerId;
 
+    @Column(name = "demo_session_id")
+    private UUID demoSessionId;
+
     @Column(nullable = false, length = 30)
     private String channel;
 
@@ -56,6 +59,8 @@ public class MessagingConversation {
     public void setBusinessId(UUID businessId) { this.businessId = businessId; }
     public UUID getCustomerId() { return customerId; }
     public void setCustomerId(UUID customerId) { this.customerId = customerId; }
+    public UUID getDemoSessionId() { return demoSessionId; }
+    public void setDemoSessionId(UUID demoSessionId) { this.demoSessionId = demoSessionId; }
     public String getChannel() { return channel; }
     public void setChannel(String channel) { this.channel = channel; }
     public String getSender() { return sender; }
