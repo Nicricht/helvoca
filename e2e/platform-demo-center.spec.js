@@ -15,6 +15,18 @@ test('platform admin sees the Demo Center without any countdown and can create a
     roles: ['PLATFORM_ADMIN'],
     businessId: ''
   })));
+  await page.route('**/api/v1/platform/demos/readiness', route => route.fulfill(json({
+    runtimeConfigured: true,
+    runtimeBusinessId: '99999999-8888-7777-6666-555555555555',
+    runtime: { state: 'READY', detail: 'Live Demo Runtime' },
+    voiceNumber: { state: 'READY', detail: '+56911112222' },
+    voiceAi: { state: 'READY', detail: 'Demo AI' },
+    businessData: { state: 'NOT_CONFIGURED', detail: 'No approved demo profile has been prepared into the runtime yet.' },
+    operations: { state: 'READY', detail: 'DEMO operations are isolated from PILOT/CUSTOMER tenants.' },
+    whatsapp: { state: 'NOT_CONFIGURED', detail: 'No certified demo WhatsApp channel is configured.' },
+    payment: { state: 'SANDBOX_ONLY', detail: 'Merchant payment LIVE remains disabled.' },
+    externalEffects: { state: 'DISARMED', detail: 'Outbound external effects are not armed.' }
+  })));
   await page.route('**/api/v1/platform/economics', route => route.fulfill(json({
     estimatedCommercialValueClp: 0,
     estimatedPlatformCostUsd: 0,
@@ -62,6 +74,10 @@ test('platform admin sees the Demo Center without any countdown and can create a
   await page.goto('/platform.html');
 
   await expect(page.getByRole('heading', { name: 'Centro de Demos' })).toBeVisible();
+  await expect(page.locator('#platformDemoReadiness')).toContainText('Runtime demo');
+  await expect(page.locator('#platformDemoReadiness')).toContainText('READY');
+  await expect(page.locator('#platformDemoReadiness')).toContainText('SANDBOX_ONLY');
+  await expect(page.locator('#platformDemoReadiness')).toContainText('DISARMED');
   await expect(page.locator('body')).not.toContainText('3:00');
   await expect(page.locator('body')).not.toContainText('3 minutos');
   await expect(page.locator('#platformDemoProfiles')).toContainText('Sushi Demo');
