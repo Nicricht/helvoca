@@ -136,7 +136,7 @@ export function PlanConsumptionPage() {
   const projectionData = projection(subscription);
 
   const planName = subscription.planName || subscription.publicPlanCode || subscription.plan || "Plan";
-  const status = statusLabels[String(subscription.status ?? "").toUpperCase()] || "Activo";
+  const status = statusLabels[String(subscription.status ?? "").toUpperCase()] || "Sin estado";
   const billingText = subscription.billingProviderConnected
     ? "Facturación conectada."
     : "Pagos automáticos aún no habilitados.";
