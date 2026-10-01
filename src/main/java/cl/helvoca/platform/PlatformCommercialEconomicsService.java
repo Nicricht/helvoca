@@ -71,8 +71,11 @@ public class PlatformCommercialEconomicsService {
         BigDecimal used = nonNegative(source.usedSeconds());
         BigDecimal overage = used.subtract(included).max(BigDecimal.ZERO);
 
-        boolean commercialValueUnknown = source.monthlyPriceClp() == null && revenueEligible(source.status());
-        long baseValue = source.monthlyPriceClp() == null || !revenueEligible(source.status())
+        boolean commercialValueUnknown = revenueEligible(source.status())
+                && (source.monthlyPriceClp() == null || source.customPricing());
+        long baseValue = source.monthlyPriceClp() == null
+                || source.customPricing()
+                || !revenueEligible(source.status())
                 ? 0L : source.monthlyPriceClp().longValue();
         long overageValue = overageValue(overage, source.overageUnitSize(), source.overagePriceClp());
         long commercialValue = Math.addExact(baseValue, overageValue);
