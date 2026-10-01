@@ -659,6 +659,46 @@ class PostgresRowLevelSecurityIntegrationTest {
         }
     }
 
+    @Test
+    void demoSessionsEnforceOnePreparedOrActiveSessionPerRuntimeAtDatabaseBoundary() {
+        UUID profileId = UUID.randomUUID();
+
+        ownerJdbc.update("""
+                INSERT INTO demo_profile(id, display_name, business_name, greeting)
+                VALUES (?, 'Unique demo', 'Unique demo', 'Hola')
+                """, profileId);
+        ownerJdbc.update("""
+                INSERT INTO demo_session(
+                    correlation_id, demo_profile_id, runtime_business_id, state, configuration_revision
+                ) VALUES (?, ?, ?, 'PREPARING', 'rev-1')
+                """, UUID.randomUUID(), profileId, businessA);
+
+        assertThrows(DataAccessException.class, () -> ownerJdbc.update("""
+                INSERT INTO demo_session(
+                    correlation_id, demo_profile_id, runtime_business_id, state, configuration_revision
+                ) VALUES (?, ?, ?, 'READY', 'rev-2')
+                """, UUID.randomUUID(), profileId, businessA));
+
+        ownerJdbc.update(
+                "UPDATE demo_session SET state = 'FINISHED', finished_at = NOW() WHERE runtime_business_id = ?",
+                businessA);
+
+        ownerJdbc.update("""
+                INSERT INTO demo_session(
+                    correlation_id, demo_profile_id, runtime_business_id, state, configuration_revision
+                ) VALUES (?, ?, ?, 'ACTIVE', 'rev-3')
+                """, UUID.randomUUID(), profileId, businessA);
+
+        assertEquals(2L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM demo_session WHERE runtime_business_id = ?",
+                Long.class,
+                businessA));
+        assertEquals(1L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM demo_session WHERE runtime_business_id = ? AND state IN ('PREPARING', 'READY', 'ACTIVE')",
+                Long.class,
+                businessA));
+    }
+
     private void assertOwnerSessionScrubbed(Connection connection) throws Exception {
         try (Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery(
