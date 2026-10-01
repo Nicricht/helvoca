@@ -127,6 +127,7 @@ test.describe('React Plan y consumo pilot', () => {
 
     await page.goto('/app/plan');
     await expect(page.getByRole('status')).toContainText('Cargando');
+    await expect.poll(() => typeof releaseSubscription).toBe('function');
 
     releaseSubscription();
   });
