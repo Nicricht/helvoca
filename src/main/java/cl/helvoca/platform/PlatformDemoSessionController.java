@@ -29,4 +29,19 @@ public class PlatformDemoSessionController {
     public PlatformDemoSessionResponse get(@PathVariable UUID sessionId) {
         return service.get(sessionId);
     }
+
+    @PostMapping("/demo-sessions/{sessionId}/start")
+    public PlatformDemoSessionResponse start(@PathVariable UUID sessionId) {
+        return service.start(sessionId);
+    }
+
+    @PostMapping("/demo-sessions/{sessionId}/finish")
+    public PlatformDemoSessionResponse finish(@PathVariable UUID sessionId) {
+        return service.finish(sessionId);
+    }
+
+    @PostMapping("/demo-sessions/{sessionId}/abort")
+    public PlatformDemoSessionResponse abort(@PathVariable UUID sessionId) {
+        return service.abort(sessionId);
+    }
 }
