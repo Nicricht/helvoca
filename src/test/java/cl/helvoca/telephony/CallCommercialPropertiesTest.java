@@ -47,6 +47,27 @@ class CallCommercialPropertiesTest {
     }
 
     @Test
+    void coversBlankAndNullRateKeysAndLegacyNulls() {
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setMaxConcurrentPerBusiness(-10);
+        properties.setAiCostPerMinuteUsd(null);
+        properties.setTelephonyCostPerMinuteUsd(null);
+
+        java.util.Map<String, BigDecimal> rates = new java.util.LinkedHashMap<>();
+        rates.put(null, BigDecimal.ONE);
+        rates.put("   ", BigDecimal.ONE);
+        rates.put("Gemini", new BigDecimal("0.020"));
+        properties.setAiProviderCostPerMinuteUsd(rates);
+
+        assertEquals(0, properties.getMaxConcurrentPerBusiness());
+        assertEquals(BigDecimal.ZERO, properties.getAiCostPerMinuteUsd());
+        assertEquals(BigDecimal.ZERO, properties.getTelephonyCostPerMinuteUsd());
+        assertEquals(new BigDecimal("0.020"), properties.resolveAiCostPerMinuteUsd("gemini", " "));
+        assertEquals(BigDecimal.ZERO, properties.resolveAiCostPerMinuteUsd(null, null));
+        assertEquals(BigDecimal.ZERO, properties.resolveTelephonyCostPerMinuteUsd(""));
+    }
+
+    @Test
     void nullRateMapsRemainSafeAndEmpty() {
         CallCommercialProperties properties = new CallCommercialProperties();
         properties.setAiProviderCostPerMinuteUsd(null);
