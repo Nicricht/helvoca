@@ -27,6 +27,10 @@ test('platform admin sees the Demo Center without any countdown and can create a
     payment: { state: 'SANDBOX_ONLY', detail: 'Merchant payment LIVE remains disabled.' },
     externalEffects: { state: 'DISARMED', detail: 'Outbound external effects are not armed.' }
   })));
+  await page.route('**/api/v1/platform/demo-sessions/current', route => route.fulfill({
+    status: 204,
+    body: ''
+  }));
   await page.route('**/api/v1/platform/economics', route => route.fulfill(json({
     estimatedCommercialValueClp: 0,
     estimatedPlatformCostUsd: 0,
