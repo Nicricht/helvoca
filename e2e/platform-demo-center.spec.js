@@ -52,6 +52,37 @@ test('platform admin sees the Demo Center without any countdown and can create a
     createdAt: '2026-10-01T04:00:00Z',
     updatedAt: '2026-10-01T04:00:00Z'
   }];
+  let preparedProfileId = null;
+  await page.route('**/api/v1/platform/demos/*/prepare', async route => {
+    preparedProfileId = route.request().url().split('/').at(-2);
+    return route.fulfill(json({
+      id: 'dddddddd-1111-2222-3333-444444444444',
+      correlationId: 'eeeeeeee-1111-2222-3333-444444444444',
+      demoProfileId: preparedProfileId,
+      runtimeBusinessId: '99999999-8888-7777-6666-555555555555',
+      state: 'READY',
+      configurationRevision: '2026-10-01T04:00:00Z',
+      stagedAt: '2026-10-01T06:00:00Z',
+      startedAt: null,
+      finishedAt: null,
+      failureReason: null,
+      readiness: {
+        runtimeConfigured: true,
+        runtimeBusinessId: '99999999-8888-7777-6666-555555555555',
+        runtime: { state: 'READY', detail: 'Live Demo Runtime' },
+        voiceNumber: { state: 'READY', detail: '+56911112222' },
+        voiceAi: { state: 'READY', detail: 'Demo AI · gemini' },
+        businessData: { state: 'READY', detail: 'Approved profile staged with session evidence.' },
+        operations: { state: 'READY', detail: 'DEMO operations are isolated.' },
+        whatsapp: { state: 'NOT_CONFIGURED', detail: 'Not armed.' },
+        payment: { state: 'SANDBOX_ONLY', detail: 'Merchant payment LIVE remains disabled.' },
+        externalEffects: { state: 'DISARMED', detail: 'Outbound external effects are not armed.' }
+      },
+      createdAt: '2026-10-01T06:00:00Z',
+      updatedAt: '2026-10-01T06:00:00Z'
+    }));
+  });
+
   await page.route('**/api/v1/platform/demos', async route => {
     if (route.request().method() === 'POST') {
       submitted = route.request().postDataJSON();
@@ -81,6 +112,14 @@ test('platform admin sees the Demo Center without any countdown and can create a
   await expect(page.locator('body')).not.toContainText('3:00');
   await expect(page.locator('body')).not.toContainText('3 minutos');
   await expect(page.locator('#platformDemoProfiles')).toContainText('Sushi Demo');
+
+  await page.getByRole('button', { name: 'Preparar demo' }).first().click();
+  await expect.poll(() => preparedProfileId).toBe('11111111-2222-3333-4444-555555555555');
+  await expect(page.locator('#platformDemoSession')).toContainText('READY');
+  await expect(page.locator('#platformDemoSession')).toContainText('99999999-8888-7777-6666-555555555555');
+  await expect(page.locator('#platformDemoReadiness')).toContainText('Approved profile staged with session evidence.');
+  await expect(page.locator('body')).not.toContainText('3:00');
+  await expect(page.locator('body')).not.toContainText('3 minutos');
 
   await page.getByRole('button', { name: /Crear nueva demo/i }).click();
   await page.locator('input[name="demoDisplayName"]').fill('Sushi Akira');
