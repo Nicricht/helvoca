@@ -63,10 +63,16 @@
           <div id="voiceUsageProgress" class="account-progress" role="progressbar" aria-label="Uso de minutos de voz" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <span id="voiceUsageBar"></span>
           </div>
+          <div id="voiceUsageSignal" class="usage-signal normal" role="status" aria-live="polite">
+            <strong id="voiceUsageSignalTitle">Consumo bajo control</strong>
+            <span id="voiceUsageSignalText">Te avisaremos antes de que se terminen tus minutos incluidos.</span>
+          </div>
           <dl class="account-facts">
             <div><dt>Período</dt><dd id="billingPeriod">Sin información</dd></div>
             <div><dt>Llamadas simultáneas</dt><dd id="concurrentCalls">0</dd></div>
             <div><dt>Exceso</dt><dd id="overageMinutes">0 min</dd></div>
+            <div><dt>Exceso estimado</dt><dd id="overageEstimate">Sin exceso</dd></div>
+            <div><dt>Protección excepcional</dt><dd id="voiceSafetyLimit">No disponible</dd></div>
           </dl>
           <div id="billingConnection" class="account-connection">Estado de facturación no disponible</div>
         </article>
