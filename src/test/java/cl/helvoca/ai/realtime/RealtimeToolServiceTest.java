@@ -1,5 +1,7 @@
 package cl.helvoca.ai.realtime;
 
+import cl.helvoca.agent.AiAgent;
+import cl.helvoca.agent.AiAgentService;
 import cl.helvoca.booking.Booking;
 import cl.helvoca.booking.BookingRepository;
 import cl.helvoca.booking.BookingStatus;
@@ -16,11 +18,13 @@ import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.request.RequestPriority;
 import cl.helvoca.request.RequestStatus;
 import cl.helvoca.schedule.BusinessScheduleService;
+import cl.helvoca.security.TenantTransactionExecutor;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.TransactionDefinition;
 
 import java.lang.reflect.Field;
 import java.time.Instant;
@@ -31,6 +35,7 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -468,6 +473,66 @@ class RealtimeToolServiceTest {
         verify(bookings).saveAndFlush(booking);
     }
 
+    @Test
+    void agentPresentationUsesConfiguredValuesAndFallsBackForMissingOnes() throws Exception {
+        UUID businessId = UUID.randomUUID();
+        RealtimeToolService tools = service();
+        AiAgentService aiAgents = mock(AiAgentService.class);
+        AiAgent agent = mock(AiAgent.class);
+        setField(tools, "aiAgents", aiAgents);
+
+        when(aiAgents.runtime(businessId)).thenReturn(agent);
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-agent");
+
+        when(agent.isActive()).thenReturn(false);
+        assertFalse(tools.agentActive(context));
+
+        when(agent.getVoice()).thenReturn(null, " ", "  marin  ");
+        assertEquals("fallback-voice", tools.agentVoice(context, "fallback-voice"));
+        assertEquals("fallback-voice", tools.agentVoice(context, "fallback-voice"));
+        assertEquals("marin", tools.agentVoice(context, "fallback-voice"));
+
+        when(agent.getGreeting()).thenReturn(null, " ", "  Hola desde configuración  ");
+        assertEquals("fallback-greeting", tools.agentGreeting(context, "fallback-greeting"));
+        assertEquals("fallback-greeting", tools.agentGreeting(context, "fallback-greeting"));
+        assertEquals("Hola desde configuración", tools.agentGreeting(context, "fallback-greeting"));
+
+        when(agent.getName()).thenReturn(null, " ", "  Aurora  ");
+        assertEquals("fallback-name", tools.agentName(context, "fallback-name"));
+        assertEquals("fallback-name", tools.agentName(context, "fallback-name"));
+        assertEquals("Aurora", tools.agentName(context, "fallback-name"));
+    }
+
+    @Test
+    void tenantTransactionBoundaryUsesContextBusinessAndRejectsMissingTenant() throws Exception {
+        UUID businessId = UUID.randomUUID();
+        RealtimeToolService tools = service();
+        TenantTransactionExecutor tenantTransactions = mock(TenantTransactionExecutor.class);
+        setField(tools, "tenantTransactions", tenantTransactions);
+
+        when(tenantTransactions.read(eq(businessId), any()))
+                .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(1)).get());
+        when(tenantTransactions.write(eq(businessId), eq(TransactionDefinition.ISOLATION_SERIALIZABLE), any()))
+                .thenAnswer(invocation -> ((Supplier<?>) invocation.getArgument(2)).get());
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-tenant");
+
+        assertEquals("read-ok", tools.tenantRead(context, () -> "read-ok"));
+        assertEquals(
+                "write-ok",
+                tools.tenantWrite(context, TransactionDefinition.ISOLATION_SERIALIZABLE, () -> "write-ok"));
+
+        verify(tenantTransactions).read(eq(businessId), any());
+        verify(tenantTransactions).write(eq(businessId), eq(TransactionDefinition.ISOLATION_SERIALIZABLE), any());
+
+        assertThrows(IllegalArgumentException.class, () -> tools.tenantRead(null, () -> "never"));
+        RealtimeCallContext missingBusiness = new RealtimeCallContext(
+                UUID.randomUUID(), null, null, "+56911111111", "+56222222222", "MZ-missing");
+        assertThrows(IllegalArgumentException.class, () -> tools.tenantRead(missingBusiness, () -> "never"));
+    }
+
     private static RealtimeToolService service() {
         return new RealtimeToolService(
                 mock(BusinessRepository.class), mock(CustomerRepository.class), mock(ServiceItemRepository.class),
@@ -533,6 +598,16 @@ class RealtimeToolServiceTest {
         booking.setEndAt(endAt);
         booking.setStatus(BookingStatus.CONFIRMED);
         return booking;
+    }
+
+    private static void setField(Object target, String fieldName, Object value) {
+        try {
+            Field field = target.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 
     private static void setId(Object target, UUID id) {
