@@ -51,6 +51,14 @@ public class CommercialOperationsAdminService {
     }
 
     @Transactional
+    public OrderView updateOrderPreparationStatus(UUID orderId, BusinessOrder.Status status) {
+        if (status != BusinessOrder.Status.PREPARING && status != BusinessOrder.Status.READY) {
+            throw new IllegalArgumentException("Preparation role may only set PREPARING or READY");
+        }
+        return updateOrderStatus(orderId, status);
+    }
+
+    @Transactional
     public OrderView updateOrderStatus(UUID orderId, BusinessOrder.Status status) {
         if (status == null) throw new IllegalArgumentException("Order status is required");
         UUID businessId = tenantProvider.requireBusinessId();
