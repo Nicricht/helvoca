@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/usage")
-@PreAuthorize("hasRole('BUSINESS_ADMIN')")
+@PreAuthorize("hasAnyRole('BUSINESS_OWNER','BUSINESS_ADMIN')")
 public class UsageCommercialStatusController {
     private final UsageCommercialStatusService service;
 
