@@ -17,6 +17,7 @@
   const demoMessage = document.querySelector('#platformDemoMessage');
   const demoSessionState = document.querySelector('#platformDemoSessionState');
   const demoSession = document.querySelector('#platformDemoSession');
+  let currentDemoSession = null;
 
   function showMessage(text, kind = '') {
     message.textContent = text || '';
@@ -146,20 +147,100 @@
 
   function renderDemoSession(data = {}) {
     if (!demoSessionState || !demoSession) return;
+    currentDemoSession = data || null;
     const state = String(data.state || 'PREPARING').toUpperCase();
     const failed = state === 'FAILED';
+    const converted = Boolean(data.convertedPilotBusinessId);
+    const canStart = state === 'READY';
+    const canFinish = state === 'ACTIVE';
+    const canAbort = state === 'READY' || state === 'ACTIVE';
+    const canConvert = !converted && (state === 'READY' || state === 'FINISHED');
+
     demoSession.innerHTML =
+      '<div class="platform-result-row"><span>Modo</span><strong><span class="platform-mode-pill demo">DEMO</span></strong></div>' +
       '<div class="platform-result-row"><span>Sesión</span><strong>' + escapeHtml(state) + '</strong></div>' +
       '<div class="platform-result-row"><span>Perfil activo</span><strong>' + escapeHtml(data.demoProfileId || '—') + '</strong></div>' +
       '<div class="platform-result-row"><span>Runtime</span><strong>' + escapeHtml(data.runtimeBusinessId || '—') + '</strong></div>' +
       '<div class="platform-result-row"><span>Correlación</span><strong>' + escapeHtml(data.correlationId || '—') + '</strong></div>' +
-      '<div class="platform-result-row"><span>Revisión</span><strong>' + escapeHtml(data.configurationRevision || '—') + '</strong></div>' +
-      (failed ? '<div class="platform-result-row"><span>Bloqueo</span><strong>' + escapeHtml(data.failureReason || 'Preparación incompleta') + '</strong></div>' : '');
+      '<div class="platform-result-row"><span>Efectos externos</span><strong>' + escapeHtml(data.externalEffectsState || 'DISARMED') + '</strong></div>' +
+      '<div class="platform-result-row"><span>Pagos</span><strong>' + escapeHtml(data.paymentState || 'SANDBOX_ONLY') + '</strong></div>' +
+      (failed ? '<div class="platform-result-row"><span>Bloqueo</span><strong>' + escapeHtml(data.failureReason || 'Preparación incompleta') + '</strong></div>' : '') +
+      (converted ? '<div class="platform-result-row"><span>Conversión</span><strong><span class="platform-mode-pill pilot">PILOT</span> ' + escapeHtml(data.convertedPilotBusinessId) + '</strong></div>' : '') +
+      '<div class="platform-actions">' +
+        (canStart ? '<button class="button small primary" type="button" data-demo-action="start">Iniciar demo</button>' : '') +
+        (canFinish ? '<button class="button small secondary" type="button" data-demo-action="finish">Finalizar demo</button>' : '') +
+        (canAbort ? '<button class="button small ghost" type="button" data-demo-action="abort">Abortar</button>' : '') +
+        '<button class="button small ghost" type="button" data-demo-action="timeline">Actualizar evidencia</button>' +
+      '</div>' +
+      '<div id="platformDemoTimeline" class="platform-demo-timeline"></div>' +
+      '<div id="platformDemoProof" class="platform-demo-proof hidden"></div>' +
+      (canConvert ? '<form id="platformDemoConvertForm" class="platform-demo-convert platform-form">' +
+        '<label>Nombre del dueño<input name="pilotAdminName" maxlength="150" required placeholder="Ana Pérez"></label>' +
+        '<label>Email del dueño<input name="pilotAdminEmail" type="email" maxlength="180" required placeholder="ana@negocio.cl"></label>' +
+        '<div class="platform-actions"><button class="button primary" type="submit">Crear PILOT e invitación</button></div>' +
+      '</form>' : '') +
+      '<div id="platformDemoSessionMessage" class="platform-message hidden"></div>';
+
     demoSessionState.textContent = failed
       ? 'La preparación falló de forma cerrada. Revisa el readiness antes de reintentar.'
-      : 'Sesión preparada con evidencia server-owned. Los efectos externos siguen desarmados.';
+      : converted
+        ? 'La configuración aprobada ya se convirtió a un tenant PILOT nuevo. DEMO y PILOT siguen aislados.'
+        : 'Sesión con evidencia server-owned. Los efectos externos siguen desarmados y los pagos en sandbox.';
     demoSessionState.classList.remove('hidden');
     demoSession.classList.remove('hidden');
+  }
+
+  function showDemoSessionMessage(text, kind = '') {
+    const root = document.querySelector('#platformDemoSessionMessage');
+    if (!root) return;
+    root.textContent = text || '';
+    root.className = text ? `platform-message ${kind}` : 'platform-message hidden';
+  }
+
+  function renderDemoTimeline(data = {}) {
+    const root = document.querySelector('#platformDemoTimeline');
+    const proof = document.querySelector('#platformDemoProof');
+    if (!root || !proof) return;
+    const events = Array.isArray(data.events) ? data.events : [];
+    root.innerHTML = events.length
+      ? events.map(item => `
+          <article class="platform-demo-event">
+            <strong>${escapeHtml(item.type || 'EVENTO')} · ${escapeHtml(item.status || 'REGISTRADO')}</strong>
+            <p>${escapeHtml(item.detail || 'Evidencia persistida')}</p>
+          </article>`).join('')
+      : '<div class="platform-empty">Todavía no hay evidencia persistida para esta sesión.</div>';
+
+    const value = data.proofOfValue || {};
+    const facts = Array.isArray(value.facts) ? value.facts : [];
+    const followUps = Array.isArray(value.followUps) ? value.followUps : [];
+    proof.innerHTML =
+      '<strong>Proof of Value · ' + escapeHtml(value.state || 'REVIEW_REQUIRED') + '</strong>' +
+      '<p>' + Number(value.calls || 0) + ' llamada(s) · ' +
+        Number(value.conversations || 0) + ' conversación(es) · ' +
+        Number(value.operations || 0) + ' operación(es)</p>' +
+      (facts.length ? '<p><b>Hechos:</b> ' + facts.map(escapeHtml).join(' · ') + '</p>' : '') +
+      (followUps.length ? '<p><b>Revisión:</b> ' + followUps.map(escapeHtml).join(' · ') + '</p>' : '');
+    proof.classList.remove('hidden');
+  }
+
+  async function loadDemoTimeline() {
+    if (!currentDemoSession?.id) return;
+    try {
+      renderDemoTimeline(await api(
+        '/api/v1/platform/demo-sessions/' + encodeURIComponent(currentDemoSession.id) + '/timeline'));
+    } catch (error) {
+      showDemoSessionMessage(error.message || 'No fue posible cargar la evidencia de la demo.', 'error');
+    }
+  }
+
+  async function transitionDemo(action) {
+    if (!currentDemoSession?.id) return;
+    const next = await api(
+      '/api/v1/platform/demo-sessions/' + encodeURIComponent(currentDemoSession.id) + '/' + action,
+      { method: 'POST' });
+    renderDemoSession(next);
+    if (next?.readiness) renderDemoReadiness(next.readiness);
+    await loadDemoTimeline();
   }
 
   async function prepareDemo(profileId, button) {
@@ -174,6 +255,7 @@
       renderDemoSession(prepared);
       if (prepared && prepared.readiness) renderDemoReadiness(prepared.readiness);
       else await loadDemoReadiness();
+      await loadDemoTimeline();
     } catch (error) {
       if (demoSessionState) {
         demoSessionState.textContent = error.message || 'No fue posible preparar la demo.';
@@ -188,7 +270,10 @@
     if (!demoSessionState || !demoSession) return;
     try {
       const current = await api('/api/v1/platform/demo-sessions/current');
-      if (current) renderDemoSession(current);
+      if (current) {
+        renderDemoSession(current);
+        await loadDemoTimeline();
+      }
     } catch (error) {
       demoSessionState.textContent = error.message || 'No fue posible comprobar la sesión demo actual.';
     }
@@ -350,6 +435,54 @@
     const button = event.target.closest('[data-demo-prepare]');
     if (!button) return;
     prepareDemo(button.dataset.demoPrepare, button);
+  });
+
+  demoSession?.addEventListener('click', async event => {
+    const button = event.target.closest('[data-demo-action]');
+    if (!button) return;
+    const action = button.dataset.demoAction;
+    button.disabled = true;
+    try {
+      if (action === 'timeline') await loadDemoTimeline();
+      else await transitionDemo(action);
+    } catch (error) {
+      showDemoSessionMessage(error.message || 'No fue posible cambiar el estado de la demo.', 'error');
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  demoSession?.addEventListener('submit', async event => {
+    const convertForm = event.target.closest('#platformDemoConvertForm');
+    if (!convertForm) return;
+    event.preventDefault();
+    if (!currentDemoSession?.id) return;
+    const button = convertForm.querySelector('button[type="submit"]');
+    if (button) button.disabled = true;
+    try {
+      const fields = new FormData(convertForm);
+      const converted = await api(
+        '/api/v1/platform/demo-sessions/' + encodeURIComponent(currentDemoSession.id) + '/convert-to-pilot',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            adminName: String(fields.get('pilotAdminName') || '').trim(),
+            adminEmail: String(fields.get('pilotAdminEmail') || '').trim()
+          })
+        });
+      currentDemoSession.convertedPilotBusinessId = converted.pilotBusinessId;
+      renderDemoSession(currentDemoSession);
+      showDemoSessionMessage(
+        'PILOT creado: ' + escapeHtml(converted.pilotBusinessName || 'Negocio') +
+        ' · ' + escapeHtml(converted.pilotBusinessId) +
+        (converted.invitePath ? ' · Invitación de un solo uso generada.' : ''),
+        'success');
+      await loadDemoTimeline();
+    } catch (error) {
+      showDemoSessionMessage(error.message || 'No fue posible convertir la demo a PILOT.', 'error');
+    } finally {
+      if (button) button.disabled = false;
+    }
   });
 
   document.querySelector('#platformDemoCreateOpen')?.addEventListener('click', openDemoForm);
