@@ -31,20 +31,31 @@ No avanzar estados por intención. Avanzar solo por hechos reales y registrarlos
 
 CTA único: conseguir permiso para una demo. No vender por chat, no mandar una pared de texto y no afirmar que el prospecto pierde clientes si todavía no lo confirmó.
 
-## 3. Demo segura de 5–10 minutos
+## 3. Primera demostración: 3 minutos
 
-Demo por defecto: **web/simulador**, sin proveedores reales.
+La primera reunión **no** intenta mostrar todo RecepVoz. Abrir directamente `/demo.html`.
 
-1. Mostrar `/sales.html`.
-2. Abrir un tenant demo ya configurado.
-3. Hacer una consulta de servicio/producto, precio u horario.
-4. Consultar disponibilidad cuando corresponda.
-5. Ejecutar la acción principal del rubro: reserva, pedido, cotización, lead o solicitud.
-6. Corregir/reprogramar y demostrar que el sistema actualiza en vez de duplicar.
-7. Hacer una pregunta desconocida y mostrar que no inventa una respuesta.
-8. Mostrar el resultado persistido / actividad.
-9. Mostrar `/pricing.html`.
-10. Cerrar: “¿Quieres que lo configuremos con tus datos y definamos un piloto?”
+Objetivo único: conseguir permiso para una segunda demo con los datos del negocio.
+
+1. Elegir el rubro en pantalla.
+2. Presionar **Empezar demo**.
+3. Mostrar tres escenas: consulta normal, cambio/corrección y pregunta que no debe inventarse.
+4. Leer únicamente la línea **TÚ DICES** de cada escena; no explicar arquitectura ni recorrer otras pantallas.
+5. Al llegar al resultado, hacer la única pregunta de cierre: **“¿Quieres que lo probemos con los datos de tu negocio?”**
+
+La demo express es completamente simulada y no llama APIs de negocio. No crea datos, no llama, no envía WhatsApp y no cobra.
+
+### Solo después de que el prospecto acepte más tiempo
+
+Pasar a la demo completa con `/simulator.html` y un tenant demo configurado:
+
+1. consulta de servicio/producto, precio u horario;
+2. disponibilidad cuando corresponda;
+3. acción principal del rubro: reserva, pedido, cotización, lead o solicitud;
+4. corrección/reprogramación;
+5. caso desconocido;
+6. resultado persistido / actividad;
+7. pricing y definición de piloto.
 
 **Voz o WhatsApp real solo se muestran si ese tenant/canal está previamente configurado y certificado. Merchant payments LIVE no se demuestran ni se venden: el producto mantiene ese modo intencionalmente deshabilitado y solo dispone del flujo sandbox.**
 
