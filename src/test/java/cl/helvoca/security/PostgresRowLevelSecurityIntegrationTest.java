@@ -63,6 +63,8 @@ class PostgresRowLevelSecurityIntegrationTest {
         ownerJdbc.update("DELETE FROM inventory_restock_notification");
         ownerJdbc.update("DELETE FROM inventory_restock_subscription");
         ownerJdbc.update("DELETE FROM customer");
+        ownerJdbc.update("DELETE FROM demo_session");
+        ownerJdbc.update("DELETE FROM demo_profile");
         ownerJdbc.update("DELETE FROM business");
 
         businessA = UUID.randomUUID();
@@ -579,6 +581,122 @@ class PostgresRowLevelSecurityIntegrationTest {
                     Boolean.class,
                     privilege));
         }
+    }
+
+    @Test
+    void demoSessionsAreForceRlsIsolatedAndRuntimeReadOnly() {
+        UUID profileId = UUID.randomUUID();
+        UUID sessionA = UUID.randomUUID();
+        UUID sessionB = UUID.randomUUID();
+
+        ownerJdbc.update("""
+                INSERT INTO demo_profile(id, display_name, business_name, greeting)
+                VALUES (?, 'RLS demo', 'RLS demo', 'Hola')
+                """, profileId);
+        ownerJdbc.update("""
+                INSERT INTO demo_session(
+                    id, correlation_id, demo_profile_id, runtime_business_id, state, configuration_revision
+                ) VALUES (?, ?, ?, ?, 'FINISHED', 'rev-a')
+                """, sessionA, UUID.randomUUID(), profileId, businessA);
+        ownerJdbc.update("""
+                INSERT INTO demo_session(
+                    id, correlation_id, demo_profile_id, runtime_business_id, state, configuration_revision
+                ) VALUES (?, ?, ?, ?, 'FINISHED', 'rev-b')
+                """, sessionB, UUID.randomUUID(), profileId, businessB);
+
+        long visibleA = databaseContext.callAsTenant(
+                businessA,
+                () -> runtimeJdbc.queryForObject("SELECT COUNT(*) FROM demo_session", Long.class));
+        long visibleB = databaseContext.callAsTenant(
+                businessB,
+                () -> runtimeJdbc.queryForObject("SELECT COUNT(*) FROM demo_session", Long.class));
+        assertEquals(1L, visibleA);
+        assertEquals(1L, visibleB);
+
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(
+                businessA,
+                () -> runtimeJdbc.update("""
+                        INSERT INTO demo_session(
+                            correlation_id, demo_profile_id, runtime_business_id, state, configuration_revision
+                        ) VALUES (?, ?, ?, 'FINISHED', 'tenant-write')
+                        """, UUID.randomUUID(), profileId, businessA)));
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(
+                businessA,
+                () -> runtimeJdbc.update(
+                        "UPDATE demo_session SET failure_reason = 'mutated' WHERE id = ?",
+                        sessionA)));
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(
+                businessA,
+                () -> runtimeJdbc.update("DELETE FROM demo_session WHERE id = ?", sessionA)));
+
+        assertTrue(ownerJdbc.queryForObject("""
+                SELECT c.relrowsecurity
+                  FROM pg_class c
+                  JOIN pg_namespace n ON n.oid = c.relnamespace
+                 WHERE n.nspname = 'public' AND c.relname = 'demo_session'
+                """, Boolean.class));
+        assertTrue(ownerJdbc.queryForObject("""
+                SELECT c.relforcerowsecurity
+                  FROM pg_class c
+                  JOIN pg_namespace n ON n.oid = c.relnamespace
+                 WHERE n.nspname = 'public' AND c.relname = 'demo_session'
+                """, Boolean.class));
+
+        assertTrue(ownerJdbc.queryForObject(
+                "SELECT has_table_privilege('helvoca_runtime', 'public.demo_session', 'SELECT')",
+                Boolean.class));
+        for (String privilege : List.of("INSERT", "UPDATE", "DELETE")) {
+            assertFalse(ownerJdbc.queryForObject(
+                    "SELECT has_table_privilege('helvoca_runtime', 'public.demo_session', ?)",
+                    Boolean.class,
+                    privilege));
+        }
+        for (String privilege : List.of("SELECT", "INSERT", "UPDATE", "DELETE")) {
+            assertTrue(ownerJdbc.queryForObject(
+                    "SELECT has_table_privilege('helvoca_system', 'public.demo_session', ?)",
+                    Boolean.class,
+                    privilege));
+        }
+    }
+
+    @Test
+    void demoSessionsEnforceOnePreparedOrActiveSessionPerRuntimeAtDatabaseBoundary() {
+        UUID profileId = UUID.randomUUID();
+
+        ownerJdbc.update("""
+                INSERT INTO demo_profile(id, display_name, business_name, greeting)
+                VALUES (?, 'Unique demo', 'Unique demo', 'Hola')
+                """, profileId);
+        ownerJdbc.update("""
+                INSERT INTO demo_session(
+                    correlation_id, demo_profile_id, runtime_business_id, state, configuration_revision
+                ) VALUES (?, ?, ?, 'PREPARING', 'rev-1')
+                """, UUID.randomUUID(), profileId, businessA);
+
+        assertThrows(DataAccessException.class, () -> ownerJdbc.update("""
+                INSERT INTO demo_session(
+                    correlation_id, demo_profile_id, runtime_business_id, state, configuration_revision
+                ) VALUES (?, ?, ?, 'READY', 'rev-2')
+                """, UUID.randomUUID(), profileId, businessA));
+
+        ownerJdbc.update(
+                "UPDATE demo_session SET state = 'FINISHED', finished_at = NOW() WHERE runtime_business_id = ?",
+                businessA);
+
+        ownerJdbc.update("""
+                INSERT INTO demo_session(
+                    correlation_id, demo_profile_id, runtime_business_id, state, configuration_revision
+                ) VALUES (?, ?, ?, 'ACTIVE', 'rev-3')
+                """, UUID.randomUUID(), profileId, businessA);
+
+        assertEquals(2L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM demo_session WHERE runtime_business_id = ?",
+                Long.class,
+                businessA));
+        assertEquals(1L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM demo_session WHERE runtime_business_id = ? AND state IN ('PREPARING', 'READY', 'ACTIVE')",
+                Long.class,
+                businessA));
     }
 
     private void assertOwnerSessionScrubbed(Connection connection) throws Exception {

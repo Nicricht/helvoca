@@ -9,6 +9,7 @@ import cl.helvoca.business.BusinessStatus;
 import cl.helvoca.operations.ChannelRuntimeReadinessService;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,17 +28,29 @@ public class PlatformDemoReadinessService {
     private final PhoneNumberRepository phones;
     private final AiAgentRepository agents;
     private final ChannelRuntimeReadinessService channels;
+    private final DemoSessionRepository sessions;
 
     public PlatformDemoReadinessService(DemoRuntimeProperties properties,
                                         BusinessRepository businesses,
                                         PhoneNumberRepository phones,
                                         AiAgentRepository agents,
                                         ChannelRuntimeReadinessService channels) {
+        this(properties, businesses, phones, agents, channels, null);
+    }
+
+    @Autowired
+    public PlatformDemoReadinessService(DemoRuntimeProperties properties,
+                                        BusinessRepository businesses,
+                                        PhoneNumberRepository phones,
+                                        AiAgentRepository agents,
+                                        ChannelRuntimeReadinessService channels,
+                                        DemoSessionRepository sessions) {
         this.properties = properties;
         this.businesses = businesses;
         this.phones = phones;
         this.agents = agents;
         this.channels = channels;
+        this.sessions = sessions;
     }
 
     @Transactional(readOnly = true)
@@ -120,6 +133,16 @@ public class PlatformDemoReadinessService {
 
         PlatformDemoReadinessResponse.ReadinessItem businessData =
                 item("NOT_CONFIGURED", "No approved demo profile has been prepared into the runtime yet.");
+        if (sessions != null) {
+            DemoSession prepared = sessions.findPreparedForRuntime(runtimeId).orElse(null);
+            if (prepared != null && prepared.getStagedAt() != null) {
+                businessData = item(
+                        "READY",
+                        "Profile " + prepared.getDemoProfileId()
+                                + " staged as revision " + prepared.getConfigurationRevision()
+                                + " for session " + prepared.getCorrelationId() + ".");
+            }
+        }
         PlatformDemoReadinessResponse.ReadinessItem operations =
                 item("READY", "DEMO operations are isolated from PILOT/CUSTOMER tenants.");
 

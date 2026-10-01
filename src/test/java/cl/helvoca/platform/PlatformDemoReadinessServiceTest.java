@@ -148,6 +148,38 @@ class PlatformDemoReadinessServiceTest {
         verifyNoInteractions(phones, agents, channels);
     }
 
+    @Test
+    void stagedPreparedSessionMakesBusinessDataReadinessFactual() {
+        UUID businessId = UUID.randomUUID();
+        UUID profileId = UUID.randomUUID();
+        DemoRuntimeProperties properties = properties(businessId);
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        AiAgentRepository agents = mock(AiAgentRepository.class);
+        ChannelRuntimeReadinessService channels = mock(ChannelRuntimeReadinessService.class);
+        DemoSessionRepository sessions = mock(DemoSessionRepository.class);
+
+        when(businesses.findById(businessId))
+                .thenReturn(Optional.of(business(businessId, BusinessMode.DEMO, BusinessStatus.ACTIVE)));
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of(phone(businessId)));
+        when(agents.findByBusinessId(businessId)).thenReturn(Optional.of(activeAgent(businessId)));
+        when(channels.snapshot()).thenReturn(channelReadiness(true, true, false));
+
+        DemoSession session = DemoSession.preparing(
+                profileId, businessId, Instant.parse("2026-10-01T05:00:00Z").toString());
+        session.markStaged();
+        when(sessions.findPreparedForRuntime(businessId)).thenReturn(Optional.of(session));
+
+        PlatformDemoReadinessResponse result =
+                new PlatformDemoReadinessService(
+                        properties, businesses, phones, agents, channels, sessions).readiness();
+
+        assertEquals("READY", result.businessData().state());
+        assertTrue(result.businessData().detail().contains(profileId.toString()));
+        assertTrue(result.businessData().detail().contains(session.getConfigurationRevision()));
+        assertEquals("UNAVAILABLE", result.whatsapp().state());
+    }
+
     private static ChannelRuntimeReadinessService.ChannelRuntimeReadiness channelReadiness(
             boolean telephonyReady,
             boolean voiceReady,

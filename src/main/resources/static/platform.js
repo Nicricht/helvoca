@@ -15,6 +15,8 @@
   const demoForm = document.querySelector('#platformDemoForm');
   const demoSave = document.querySelector('#platformDemoSave');
   const demoMessage = document.querySelector('#platformDemoMessage');
+  const demoSessionState = document.querySelector('#platformDemoSessionState');
+  const demoSession = document.querySelector('#platformDemoSession');
 
   function showMessage(text, kind = '') {
     message.textContent = text || '';
@@ -131,12 +133,65 @@
                   : '<span>Sin capacidades activadas</span>'}
               </div>
               ${notes ? `<p><strong>Nota:</strong> ${escapeHtml(notes)}</p>` : ''}
+              <div class="platform-actions">
+                <button class="button small primary" type="button" data-demo-prepare="${escapeHtml(profile.id || '')}">Preparar demo</button>
+              </div>
             </article>`;
         }).join('')
       : '<div class="platform-empty">Todavía no hay perfiles. Crea uno para preparar una demo con datos aprobados.</div>';
 
     demoState.classList.add('hidden');
     demoProfiles.classList.remove('hidden');
+  }
+
+  function renderDemoSession(data = {}) {
+    if (!demoSessionState || !demoSession) return;
+    const state = String(data.state || 'PREPARING').toUpperCase();
+    const failed = state === 'FAILED';
+    demoSession.innerHTML =
+      '<div class="platform-result-row"><span>Sesión</span><strong>' + escapeHtml(state) + '</strong></div>' +
+      '<div class="platform-result-row"><span>Perfil activo</span><strong>' + escapeHtml(data.demoProfileId || '—') + '</strong></div>' +
+      '<div class="platform-result-row"><span>Runtime</span><strong>' + escapeHtml(data.runtimeBusinessId || '—') + '</strong></div>' +
+      '<div class="platform-result-row"><span>Correlación</span><strong>' + escapeHtml(data.correlationId || '—') + '</strong></div>' +
+      '<div class="platform-result-row"><span>Revisión</span><strong>' + escapeHtml(data.configurationRevision || '—') + '</strong></div>' +
+      (failed ? '<div class="platform-result-row"><span>Bloqueo</span><strong>' + escapeHtml(data.failureReason || 'Preparación incompleta') + '</strong></div>' : '');
+    demoSessionState.textContent = failed
+      ? 'La preparación falló de forma cerrada. Revisa el readiness antes de reintentar.'
+      : 'Sesión preparada con evidencia server-owned. Los efectos externos siguen desarmados.';
+    demoSessionState.classList.remove('hidden');
+    demoSession.classList.remove('hidden');
+  }
+
+  async function prepareDemo(profileId, button) {
+    if (!profileId) return;
+    if (button) button.disabled = true;
+    if (demoSessionState) {
+      demoSessionState.textContent = 'Preparando configuración aprobada en el runtime DEMO…';
+      demoSessionState.classList.remove('hidden');
+    }
+    try {
+      const prepared = await api('/api/v1/platform/demos/' + encodeURIComponent(profileId) + '/prepare', { method: 'POST' });
+      renderDemoSession(prepared);
+      if (prepared && prepared.readiness) renderDemoReadiness(prepared.readiness);
+      else await loadDemoReadiness();
+    } catch (error) {
+      if (demoSessionState) {
+        demoSessionState.textContent = error.message || 'No fue posible preparar la demo.';
+        demoSessionState.classList.remove('hidden');
+      }
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function loadCurrentDemoSession() {
+    if (!demoSessionState || !demoSession) return;
+    try {
+      const current = await api('/api/v1/platform/demo-sessions/current');
+      if (current) renderDemoSession(current);
+    } catch (error) {
+      demoSessionState.textContent = error.message || 'No fue posible comprobar la sesión demo actual.';
+    }
   }
 
   async function loadDemos() {
@@ -291,6 +346,12 @@
     }
   });
 
+  demoProfiles?.addEventListener('click', event => {
+    const button = event.target.closest('[data-demo-prepare]');
+    if (!button) return;
+    prepareDemo(button.dataset.demoPrepare, button);
+  });
+
   document.querySelector('#platformDemoCreateOpen')?.addEventListener('click', openDemoForm);
   document.querySelector('#platformDemoCancel')?.addEventListener('click', closeDemoForm);
 
@@ -343,6 +404,6 @@
   document.querySelector('#platformEconomicsRefresh')?.addEventListener('click', loadEconomics);
 
   (async () => {
-    if (await guard()) await Promise.all([loadDemoReadiness(), loadDemos(), loadEconomics()]);
+    if (await guard()) await Promise.all([loadDemoReadiness(), loadCurrentDemoSession(), loadDemos(), loadEconomics()]);
   })();
 })();
