@@ -22,7 +22,7 @@ import static org.mockito.Mockito.*;
 
 class RegistrationServiceTest {
     @Test
-    void registerCreatesTenantAdminAndReturnsJwtLogin() {
+    void registerCreatesTenantOwnerWithLegacyAdminCompatibilityAndReturnsJwtLogin() {
         BusinessRepository businesses = mock(BusinessRepository.class);
         AppUserRepository users = mock(AppUserRepository.class);
         RoleRepository roles = mock(RoleRepository.class);
@@ -30,16 +30,20 @@ class RegistrationServiceTest {
         AuthService auth = mock(AuthService.class);
         RegistrationService service = new RegistrationService(businesses, users, roles, encoder, auth);
 
+        Role ownerRole = new Role();
+        ownerRole.setCode(RoleCode.BUSINESS_OWNER);
+        ownerRole.setName("Business owner");
         Role adminRole = new Role();
         adminRole.setCode(RoleCode.BUSINESS_ADMIN);
         adminRole.setName("Business admin");
+        when(roles.findByCode(RoleCode.BUSINESS_OWNER)).thenReturn(Optional.of(ownerRole));
         when(roles.findByCode(RoleCode.BUSINESS_ADMIN)).thenReturn(Optional.of(adminRole));
         when(businesses.saveAndFlush(any(Business.class))).thenAnswer(i -> i.getArgument(0));
         when(users.saveAndFlush(any(AppUser.class))).thenAnswer(i -> i.getArgument(0));
         when(encoder.encode("very-secure-password")).thenReturn("HASH");
         LoginResponse expected = new LoginResponse("jwt", "Bearer", 3600,
                 new LoginResponse.UserInfo(UUID.randomUUID(), UUID.randomUUID(), "Ana", "ana@example.com",
-                        List.of("BUSINESS_ADMIN")));
+                        List.of("BUSINESS_ADMIN", "BUSINESS_OWNER")));
         when(auth.login(new LoginRequest("ana@example.com", "very-secure-password"))).thenReturn(expected);
 
         LoginResponse result = service.register(new RegisterBusinessRequest(
@@ -57,6 +61,7 @@ class RegistrationServiceTest {
         AppUser user = userCaptor.getValue();
         assertEquals("ana@example.com", user.getEmail());
         assertEquals("HASH", user.getPasswordHash());
+        assertTrue(user.getRoles().contains(ownerRole));
         assertTrue(user.getRoles().contains(adminRole));
         assertSame(businessCaptor.getValue(), user.getBusiness());
     }
