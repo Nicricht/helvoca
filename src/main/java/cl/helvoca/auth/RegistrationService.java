@@ -60,15 +60,15 @@ public class RegistrationService {
             subscriptions.startBasicTrial(business.getId());
         }
 
-        var businessAdmin = roles.findByCode(RoleCode.BUSINESS_ADMIN)
-                .orElseThrow(() -> new IllegalStateException("BUSINESS_ADMIN role is not configured"));
+        var businessOwner = roles.findByCode(RoleCode.BUSINESS_OWNER)
+                .orElseThrow(() -> new IllegalStateException("BUSINESS_OWNER role is not configured"));
 
         AppUser user = new AppUser();
         user.setBusiness(business);
         user.setName(request.adminName().trim());
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
-        user.getRoles().add(businessAdmin);
+        user.getRoles().add(businessOwner);
         users.saveAndFlush(user);
 
         return authService.login(new LoginRequest(email, request.password()));
