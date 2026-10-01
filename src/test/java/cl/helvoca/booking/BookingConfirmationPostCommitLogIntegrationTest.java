@@ -7,6 +7,7 @@ import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
+import cl.helvoca.security.TenantDatabaseContext;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +17,8 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.transaction.AfterTransaction;
+import org.springframework.test.context.transaction.BeforeTransaction;
 import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -53,6 +56,22 @@ class BookingConfirmationPostCommitLogIntegrationTest {
     @Autowired CustomerRepository customers;
     @Autowired ServiceItemRepository services;
     @Autowired BookingConfirmationWorkflowService workflow;
+    @Autowired TenantDatabaseContext databaseContext;
+
+    TenantDatabaseContext.Scope systemScope;
+
+    @BeforeTransaction
+    void enterExplicitSystemFixtureScope() {
+        systemScope = databaseContext.useSystem();
+    }
+
+    @AfterTransaction
+    void leaveExplicitSystemFixtureScope() {
+        if (systemScope != null) {
+            systemScope.close();
+            systemScope = null;
+        }
+    }
 
     @Test
     void emitsStructuredBookingConfirmedEvidenceOnlyAfterCommit(CapturedOutput output) {
