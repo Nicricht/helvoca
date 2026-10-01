@@ -13,9 +13,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import cl.helvoca.user.RoleCode;
 
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -70,11 +73,25 @@ public class SecurityConfig {
 
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {
-            Collection<GrantedAuthority> combined = new ArrayList<>();
+            Set<GrantedAuthority> combined = new LinkedHashSet<>();
             Collection<GrantedAuthority> roleAuthorities = roles.convert(jwt);
             Collection<GrantedAuthority> permissionAuthorities = permissions.convert(jwt);
             if (roleAuthorities != null) combined.addAll(roleAuthorities);
             if (permissionAuthorities != null) combined.addAll(permissionAuthorities);
+
+            var roleClaims = jwt.getClaimAsStringList("roles");
+            if (roleClaims != null) {
+                java.util.Set<RoleCode> roleCodes = new java.util.HashSet<>();
+                for (String value : roleClaims) {
+                    try {
+                        roleCodes.add(RoleCode.valueOf(value));
+                    } catch (IllegalArgumentException ignored) {
+                        // Unknown future roles do not gain implicit permissions.
+                    }
+                }
+                RolePermissionCatalog.permissionsFor(roleCodes).forEach(permission ->
+                        combined.add(new SimpleGrantedAuthority("PERM_" + permission.name())));
+            }
             return combined;
         });
         return converter;
