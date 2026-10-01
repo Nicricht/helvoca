@@ -48,7 +48,7 @@
                 <div>
                     <div class="eyebrow">Operación</div>
                     <h1>Inventario</h1>
-                    <p>Lo que la IA puede prometer depende de estos números. El stock disponible se calcula como físico menos reservado.</p>
+                    <p>Controla qué puede ofrecer la IA. Disponible = stock físico − reservado.</p>
                 </div>
                 <div class="inventory-heading-actions">
                     <a id="inventoryImportBtn" class="button secondary hidden" href="/business-import.html">Importar archivos</a>
@@ -63,61 +63,36 @@
                 <article class="inventory-kpi">
                     <span>Productos</span>
                     <strong id="inventoryProductsCount">0</strong>
-                    <small id="inventoryConfiguredCount">0 con seguimiento</small>
+                    <small id="inventoryConfiguredCount">0 con stock configurado</small>
                 </article>
                 <article class="inventory-kpi">
-                    <span>Stock físico</span>
-                    <strong id="inventoryOnHandTotal">0</strong>
-                    <small>Unidades registradas</small>
+                    <span>Disponible</span>
+                    <strong id="inventoryAvailableTotal">—</strong>
+                    <small>Unidades que la IA puede ofrecer</small>
                 </article>
                 <article class="inventory-kpi">
                     <span>Reservado</span>
-                    <strong id="inventoryReservedTotal">0</strong>
-                    <small>Pedidos y operaciones activas</small>
+                    <strong id="inventoryReservedTotal">—</strong>
+                    <small>Unidades comprometidas ahora</small>
                 </article>
                 <article id="inventoryLowStockKpi" class="inventory-kpi">
-                    <span>Stock bajo</span>
+                    <span>Productos con stock bajo</span>
                     <strong id="inventoryLowStockCount">0</strong>
-                    <small>Productos que requieren atención</small>
+                    <small>Requieren atención</small>
                 </article>
             </section>
 
-            <section class="card inventory-alerts-panel" aria-label="Alertas automáticas de inventario">
-                <div class="inventory-alerts-head">
-                    <div>
-                        <div class="eyebrow">Automatización</div>
-                        <h2>Alertas de inventario</h2>
-                        <p>Se generan solo cuando cambia el estado: stock bajo, agotado o repuesto.</p>
-                    </div>
-                    <span id="inventoryAlertsCount" class="badge muted">0 pendientes</span>
+            <section id="inventorySetupNotice" class="inventory-setup-notice hidden" aria-live="polite">
+                <div>
+                    <strong id="inventorySetupNoticeTitle">Configura el stock de tus productos</strong>
+                    <span id="inventorySetupNoticeText">La IA solo puede prometer disponibilidad cuando el stock está configurado.</span>
                 </div>
-                <div id="inventoryAlertsList" class="inventory-alerts-list"></div>
-                <div id="inventoryAlertsEmpty" class="inventory-alerts-empty hidden">
-                    <strong>Todo bajo control.</strong>
-                    <span>No hay alertas abiertas de inventario.</span>
-                </div>
+                <button id="inventoryShowUnconfiguredBtn" class="button secondary" type="button">Ver sin configurar</button>
             </section>
 
-            <section class="card inventory-restock-panel" aria-label="Clientes esperando reposición">
-                <div class="inventory-restock-head">
-                    <div>
-                        <div class="eyebrow">Oportunidades</div>
-                        <h2>Esperando reposición</h2>
-                        <p>Clientes que pidieron aviso cuando vuelva el stock. Los avisos quedan preparados, pero este módulo no los envía por WhatsApp automáticamente.</p>
-                    </div>
-                    <div class="inventory-restock-metrics">
-                        <span id="inventoryRestockCount" class="badge muted">0 esperando</span>
-                        <span id="inventoryPendingNotificationCount" class="badge muted">0 avisos listos</span>
-                    </div>
-                </div>
-                <div id="inventoryRestockList" class="inventory-restock-list"></div>
-                <div id="inventoryRestockEmpty" class="inventory-alerts-empty hidden">
-                    <strong>Sin clientes esperando stock.</strong>
-                    <span>Cuando alguien acepte recibir un aviso de reposición aparecerá aquí.</span>
-                </div>
-            </section>
 
-            <section class="card inventory-workspace">
+
+            <section id="inventoryWorkspace" class="card inventory-workspace">
                 <div class="inventory-toolbar">
                     <div class="inventory-search">
                         <label for="inventorySearch">Buscar</label>
@@ -127,7 +102,7 @@
                         Estado
                         <select id="inventoryFilter">
                             <option value="ALL">Todos</option>
-                            <option value="TRACKED">Con seguimiento</option>
+                            <option value="TRACKED">Stock configurado</option>
                             <option value="LOW">Stock bajo</option>
                             <option value="OUT">Agotados</option>
                             <option value="RESTOCKED">Repuestos</option>
@@ -150,11 +125,9 @@
                         <thead>
                         <tr>
                             <th>Producto</th>
-                            <th>SKU</th>
-                            <th>Precio</th>
-                            <th>Físico</th>
-                            <th>Reservado</th>
                             <th>Disponible</th>
+                            <th>Reservado</th>
+                            <th>Físico</th>
                             <th>Mínimo</th>
                             <th>Estado</th>
                             <th class="inventory-actions-head">Acciones</th>
@@ -167,6 +140,41 @@
                 <div id="inventoryEmpty" class="inventory-empty hidden">
                     <strong>No hay productos para mostrar.</strong>
                     <span>Ajusta el filtro o agrega productos al catálogo del negocio.</span>
+                </div>
+            </section>
+
+            <section id="inventoryAlertsPanel" class="card inventory-alerts-panel" aria-label="Alertas automáticas de inventario">
+                <div class="inventory-alerts-head">
+                    <div>
+                        <div class="eyebrow">Automatización</div>
+                        <h2>Alertas de inventario</h2>
+                        <p>Se generan solo cuando cambia el estado: stock bajo, agotado o repuesto.</p>
+                    </div>
+                    <span id="inventoryAlertsCount" class="badge muted">0 pendientes</span>
+                </div>
+                <div id="inventoryAlertsList" class="inventory-alerts-list"></div>
+                <div id="inventoryAlertsEmpty" class="inventory-alerts-empty hidden">
+                    <strong>Todo bajo control.</strong>
+                    <span>No hay alertas abiertas de inventario.</span>
+                </div>
+            </section>
+
+            <section id="inventoryRestockPanel" class="card inventory-restock-panel" aria-label="Clientes esperando reposición">
+                <div class="inventory-restock-head">
+                    <div>
+                        <div class="eyebrow">Oportunidades</div>
+                        <h2>Esperando reposición</h2>
+                        <p>Clientes que pidieron aviso cuando vuelva el stock. Los avisos quedan preparados, pero este módulo no los envía por WhatsApp automáticamente.</p>
+                    </div>
+                    <div class="inventory-restock-metrics">
+                        <span id="inventoryRestockCount" class="badge muted">0 esperando</span>
+                        <span id="inventoryPendingNotificationCount" class="badge muted">0 avisos listos</span>
+                    </div>
+                </div>
+                <div id="inventoryRestockList" class="inventory-restock-list"></div>
+                <div id="inventoryRestockEmpty" class="inventory-alerts-empty hidden">
+                    <strong>Sin clientes esperando stock.</strong>
+                    <span>Cuando alguien acepte recibir un aviso de reposición aparecerá aquí.</span>
                 </div>
             </section>
         </section>

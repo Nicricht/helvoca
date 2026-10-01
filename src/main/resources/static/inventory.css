@@ -384,3 +384,80 @@
 .inventory-alerts-empty span,
 .inventory-restock-main small,
 .inventory-restock-status{font-size:12px}
+
+
+/* Inventory clarity pass: local composition only. FRAME CHANGE: NO. */
+.inventory-setup-notice {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:18px;
+    margin:0 0 14px;
+    padding:13px 15px;
+    border:1px solid rgba(255,191,105,.24);
+    border-radius:14px;
+    background:rgba(255,191,105,.055);
+}
+.inventory-setup-notice strong,
+.inventory-setup-notice span { display:block; }
+.inventory-setup-notice strong { font-size:12px; }
+.inventory-setup-notice span {
+    margin-top:3px;
+    color:var(--muted);
+    font-size:10px;
+    line-height:1.45;
+}
+.inventory-workspace { margin-bottom:14px; }
+.inventory-table { min-width:780px; }
+.inventory-product { min-width:240px; }
+.inventory-product-meta {
+    display:flex !important;
+    align-items:center;
+    gap:6px;
+    margin-top:5px !important;
+    max-width:none !important;
+    overflow:visible !important;
+    white-space:normal !important;
+}
+.inventory-product-meta .inventory-price { color:var(--muted); font-size:10px; }
+.inventory-product-meta .inventory-sku { font-size:10px; }
+
+.inventory-alerts-panel.is-empty,
+.inventory-restock-panel.is-empty {
+    padding:11px 15px;
+}
+.inventory-alerts-panel.is-empty .inventory-alerts-head,
+.inventory-restock-panel.is-empty .inventory-restock-head,
+.inventory-alerts-panel.is-empty .inventory-alerts-list,
+.inventory-restock-panel.is-empty .inventory-restock-list {
+    display:none;
+}
+.inventory-alerts-panel.is-empty .inventory-alerts-empty,
+.inventory-restock-panel.is-empty .inventory-alerts-empty {
+    display:flex !important;
+    align-items:center;
+    gap:7px;
+    padding:0;
+}
+.inventory-alerts-panel.is-empty .inventory-alerts-empty strong,
+.inventory-alerts-panel.is-empty .inventory-alerts-empty span,
+.inventory-restock-panel.is-empty .inventory-alerts-empty strong,
+.inventory-restock-panel.is-empty .inventory-alerts-empty span {
+    display:inline;
+    margin:0;
+}
+.inventory-alerts-panel.is-empty .inventory-alerts-empty strong::before {
+    content:"✓ ";
+    color:var(--success);
+}
+
+@media(max-width:760px){
+    .inventory-setup-notice {
+        align-items:flex-start;
+        flex-direction:column;
+    }
+    .inventory-setup-notice .button { width:100%; }
+    .inventory-mobile-cards .inventory-table { min-width:0; }
+    .inventory-product { min-width:0; }
+    .inventory-product-meta { flex-wrap:wrap; }
+}
