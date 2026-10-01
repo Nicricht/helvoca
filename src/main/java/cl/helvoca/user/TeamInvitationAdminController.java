@@ -10,7 +10,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/admin/invitations")
-@PreAuthorize("hasRole('BUSINESS_ADMIN')")
+@PreAuthorize("hasAuthority('PERM_TEAM_MANAGE')")
 public class TeamInvitationAdminController {
     private final TeamInvitationService service;
 
