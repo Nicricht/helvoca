@@ -2086,8 +2086,13 @@ test('agenda gives the owner a decision-ready today week and day view', async ({
   await page.unroute('**/api/v1/bookings');
   await page.route('**/api/v1/bookings', route => route.fulfill(json([
     {
+      id: 'agenda-pending', customerId: 'cust2', serviceId: 'svc2',
+      startAt: '2026-10-01T22:30:00Z', endAt: '2026-10-01T22:45:00Z',
+      status: 'PENDING', source: 'AI_WHATSAPP'
+    },
+    {
       id: 'agenda-1', customerId: 'cust1', serviceId: 'svc1',
-      startAt: '2026-10-01T22:00:00Z', endAt: '2026-10-01T22:30:00Z',
+      startAt: '2026-10-01T23:00:00Z', endAt: '2026-10-01T23:30:00Z',
       status: 'CONFIRMED', source: 'AI_CALL'
     },
     {
@@ -2111,8 +2116,8 @@ test('agenda gives the owner a decision-ready today week and day view', async ({
 
   const overview = page.locator('#homeAgendaOverview');
   await expect(overview).toBeVisible();
-  await expect(page.locator('#homeAgendaTodayCount')).toHaveText('2');
-  await expect(page.locator('#homeAgendaWeekCount')).toHaveText('3');
+  await expect(page.locator('#homeAgendaTodayCount')).toHaveText('3');
+  await expect(page.locator('#homeAgendaWeekCount')).toHaveText('4');
   await expect(page.locator('#homeAgendaConfirmedCount')).toHaveText('3');
   await expect(page.locator('#homeAgendaNext')).toContainText('Ana Reserva');
   await expect(page.locator('#homeAgendaNext')).toContainText('Peluquería');
@@ -2122,24 +2127,24 @@ test('agenda gives the owner a decision-ready today week and day view', async ({
 
   await page.locator('[data-agenda-period="today"]').click();
   await expect(page.locator('#homeBookingDate')).toHaveValue('today');
-  await expect(page.locator('.home-filter-result')).toContainText('2 de 4');
+  await expect(page.locator('.home-filter-result')).toContainText('3 de 5');
   await expect(page.locator('#homeBookingsList')).toContainText('Ana Reserva');
   await expect(page.locator('#homeBookingsList')).toContainText('Bruno Masaje');
 
   await page.locator('[data-agenda-period="week"]').click();
   await expect(page.locator('#homeBookingDate')).toHaveValue('week');
-  await expect(page.locator('.home-filter-result')).toContainText('3 de 4');
+  await expect(page.locator('.home-filter-result')).toContainText('4 de 5');
 
   await page.locator('[data-agenda-day="2026-10-02"]').click();
   await expect(page.locator('[data-agenda-day="2026-10-02"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.home-filter-result')).toContainText('1 de 4');
+  await expect(page.locator('.home-filter-result')).toContainText('1 de 5');
   const focusedRows = page.locator('#homeBookingsList .home-business-table tbody');
   await expect(focusedRows).toContainText('Bruno Masaje');
   await expect(focusedRows).not.toContainText('Ana Reserva');
 
   await page.locator('[data-agenda-period="all"]').click();
   await expect(page.locator('[data-agenda-period="all"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.home-filter-result')).toContainText('4 de 4');
+  await expect(page.locator('.home-filter-result')).toContainText('5 de 5');
 
   await page.setViewportSize({ width: 390, height: 844 });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
