@@ -352,6 +352,7 @@
     backdrop.classList.add("hidden");
     backdrop.setAttribute("aria-hidden", "true");
     document.body.classList.remove("home-detail-open");
+    document.querySelector("#homeBookingDetailDrawer")?.classList.remove("home-agenda-drawer");
     selectedBookingId = null;
     syncAgendaSelection();
     restoreDrawerOpener();
@@ -908,15 +909,33 @@
   }
 
   function bindBookingDetailTabs() {
-    document.querySelectorAll("[data-booking-detail-tab]").forEach(button => {
-      button.addEventListener("click", () => {
-        bookingDetailActiveTab = button.dataset.bookingDetailTab || "summary";
-        document.querySelectorAll("[data-booking-detail-tab]").forEach(tab => {
-          tab.setAttribute("aria-selected", tab.dataset.bookingDetailTab === bookingDetailActiveTab ? "true" : "false");
-        });
-        document.querySelectorAll("[data-booking-detail-panel]").forEach(panel => {
-          panel.hidden = panel.dataset.bookingDetailPanel !== bookingDetailActiveTab;
-        });
+    const tabs = [...document.querySelectorAll("[data-booking-detail-tab]")];
+    const activate = button => {
+      if (!button) return;
+      bookingDetailActiveTab = button.dataset.bookingDetailTab || "summary";
+      tabs.forEach(tab => {
+        const active = tab.dataset.bookingDetailTab === bookingDetailActiveTab;
+        tab.setAttribute("aria-selected", active ? "true" : "false");
+        tab.tabIndex = active ? 0 : -1;
+      });
+      document.querySelectorAll("[data-booking-detail-panel]").forEach(panel => {
+        panel.hidden = panel.dataset.bookingDetailPanel !== bookingDetailActiveTab;
+      });
+    };
+
+    tabs.forEach((button, index) => {
+      button.tabIndex = button.getAttribute("aria-selected") === "true" ? 0 : -1;
+      button.addEventListener("click", () => activate(button));
+      button.addEventListener("keydown", event => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        let nextIndex = index;
+        if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+        if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+        if (event.key === "Home") nextIndex = 0;
+        if (event.key === "End") nextIndex = tabs.length - 1;
+        activate(tabs[nextIndex]);
+        tabs[nextIndex].focus();
       });
     });
   }
@@ -932,6 +951,7 @@
     bookingDetailActiveTab = "summary";
     syncAgendaSelection();
     ensureBookingDrawer();
+    document.querySelector("#homeBookingDetailDrawer")?.classList.add("home-agenda-drawer");
     document.querySelector("#homeBookingDetailDrawer .eyebrow").textContent = "RESERVA";
     document.querySelector("#homeBookingDetailTitle").textContent = customer.name || customer.phone || "Cliente";
     document.querySelector("#homeBookingDetailMeta").textContent = `Reservada para ${fmtCompact(booking.startAt)} · ${status(booking.status)}`;
