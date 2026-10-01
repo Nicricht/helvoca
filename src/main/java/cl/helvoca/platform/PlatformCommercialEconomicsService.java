@@ -80,7 +80,9 @@ public class PlatformCommercialEconomicsService {
         long overageValue = overageValue(overage, source.overageUnitSize(), source.overagePriceClp());
         long commercialValue = Math.addExact(baseValue, overageValue);
 
-        BigDecimal costUsd = nonNegative(source.estimatedCostUsd());
+        BigDecimal fixedPhoneCostUsd = commercial.getTwilioNumberMonthlyCostUsd()
+                .multiply(BigDecimal.valueOf(Math.max(0, source.activeVoiceNumberCount())));
+        BigDecimal costUsd = nonNegative(source.estimatedCostUsd()).add(fixedPhoneCostUsd);
         BigDecimal costClp = toClp(costUsd);
         BigDecimal marginClp = costClp == null || commercialValueUnknown
                 ? null : BigDecimal.valueOf(commercialValue).subtract(costClp);
@@ -97,6 +99,8 @@ public class PlatformCommercialEconomicsService {
                 baseValue,
                 overageValue,
                 commercialValueUnknown ? null : commercialValue,
+                source.activeVoiceNumberCount(),
+                fixedPhoneCostUsd,
                 costUsd,
                 costClp,
                 marginClp,
@@ -184,6 +188,8 @@ public class PlatformCommercialEconomicsService {
             long basePlanValueClp,
             long estimatedOverageValueClp,
             Long estimatedCommercialValueClp,
+            int activeVoiceNumberCount,
+            BigDecimal estimatedFixedPhoneCostUsd,
             BigDecimal estimatedPlatformCostUsd,
             BigDecimal estimatedPlatformCostClp,
             BigDecimal estimatedGrossMarginClp,
