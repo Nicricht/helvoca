@@ -13,6 +13,7 @@ import cl.helvoca.operations.OperationConfirmation;
 import cl.helvoca.operations.OperationConfirmationRepository;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
+import cl.helvoca.security.TenantDatabaseContext;
 import jakarta.persistence.EntityManager;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.transaction.AfterTransaction;
+import org.springframework.test.context.transaction.BeforeTransaction;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -59,6 +62,22 @@ class BookingConfirmationWorkflowIntegrationTest {
     @Autowired BookingConfirmationWorkflowService workflow;
     @Autowired ConversationStateService conversationState;
     @Autowired EntityManager entityManager;
+    @Autowired TenantDatabaseContext databaseContext;
+
+    TenantDatabaseContext.Scope systemScope;
+
+    @BeforeTransaction
+    void enterExplicitSystemFixtureScope() {
+        systemScope = databaseContext.useSystem();
+    }
+
+    @AfterTransaction
+    void leaveExplicitSystemFixtureScope() {
+        if (systemScope != null) {
+            systemScope.close();
+            systemScope = null;
+        }
+    }
 
     @Test
     void proposalDoesNotCreateBookingAndSameCustomerCanConfirmOnAnotherChannel() {
