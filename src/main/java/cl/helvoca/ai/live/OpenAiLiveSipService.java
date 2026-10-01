@@ -4,6 +4,7 @@ import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.ai.realtime.RealtimeToolDefinitions;
 import cl.helvoca.ai.realtime.RealtimeToolService;
+import cl.helvoca.agent.AgentVoiceProfile;
 import cl.helvoca.telephony.CallLifecycleService;
 import cl.helvoca.voice.VoiceProviderHealthRegistry;
 import org.json.JSONArray;
@@ -225,7 +226,8 @@ public class OpenAiLiveSipService {
         String greeting = firstNonBlank(tools.agentGreeting(context, null), defaultGreeting);
         JSONArray tenantTools = tools.toolDefinitions(context);
         if (tenantTools == null) tenantTools = RealtimeToolDefinitions.all();
-        String voice = firstNonBlank(tools.agentVoice(context, null), live.getVoice());
+        String tenantVoice = tools.agentVoice(context, null);
+        String voice = AgentVoiceProfile.resolveOpenAi(tenantVoice, live.getVoice());
 
         String frontendInstructions = """
                 Eres %s, la recepcionista por voz de %s. Habla de forma natural, cálida y breve.
