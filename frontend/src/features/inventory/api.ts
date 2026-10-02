@@ -59,6 +59,19 @@ export interface AdjustInventoryStockInput {
   note: string | null;
 }
 
+export interface InventoryMovement {
+  id: string;
+  type: "CONFIGURE" | "ADJUSTMENT" | "RESERVATION" | "RELEASE" | "CONSUMPTION";
+  quantityDelta: number;
+  reservedDelta: number;
+  onHandAfter: number;
+  reservedAfter: number;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  note?: string | null;
+  createdAt: string;
+}
+
 export interface InventoryAlert {
   id: string;
   catalogItemId?: string;
@@ -145,4 +158,11 @@ export function createCatalogProduct(input: CreateCatalogProductInput) {
     method: "POST",
     body: JSON.stringify(input)
   });
+}
+
+
+export function getInventoryHistory(catalogItemId: string) {
+  return apiRequest<InventoryMovement[]>(
+    `/api/v1/inventory/${encodeURIComponent(catalogItemId)}/movements`
+  );
 }
