@@ -304,6 +304,16 @@ export function InventoryPage() {
   const canReadAutomation = canReadVariants;
   const canManageAutomation = roles.includes("BUSINESS_ADMIN");
 
+  async function refreshWorkspace() {
+    if (refreshPending) return;
+    setRefreshPending(true);
+    try {
+      await model.refetchPrimary();
+    } finally {
+      setRefreshPending(false);
+    }
+  }
+
   async function acknowledgeAlert(alertId: string) {
     if (!canManageAutomation || !beginMutation()) return;
     setMutationError("");
@@ -429,10 +439,10 @@ export function InventoryPage() {
       name,
       optionValuesJson,
       sku,
-      trackingEnabled: current?.trackingEnabled ?? true,
+      trackingEnabled: data.get("variantTrackingEnabled") === "on",
       onHand,
       reorderThreshold,
-      active: current?.active ?? true,
+      active: data.get("variantActive") === "on",
       note: note || null
     };
   }
@@ -552,18 +562,24 @@ export function InventoryPage() {
     if (!beginMutation()) return;
     setMutationError("");
     try {
-      await createCatalogProduct({
-        kind: "PRODUCT",
+      const input = {
+        kind: "PRODUCT" as const,
         name,
         description: description || null,
         price,
         currency,
-        durationMinutes: null,
-        metadataJson: null,
-        active: true
-      });
+        durationMinutes: productEditing?.durationMinutes ?? null,
+        metadataJson: productEditing?.metadataJson ?? null,
+        active: productEditing?.active !== false
+      };
+      if (productEditing) {
+        await updateCatalogProduct(productEditing.id, input);
+      } else {
+        await createCatalogProduct(input);
+      }
       await model.refetchPrimary();
       setProductCreateOpen(false);
+      setProductEditing(null);
     } catch (error) {
       setMutationError(mutationMessage(error));
     } finally {
@@ -592,7 +608,7 @@ export function InventoryPage() {
       const note = String(data.get("note") ?? "").trim();
       await configureInventoryStock(configureTarget.id, {
         sku: sku || null,
-        trackingEnabled: true,
+        trackingEnabled: data.get("trackingEnabled") === "on",
         onHand,
         reorderThreshold,
         note: note || null
