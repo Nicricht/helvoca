@@ -1378,7 +1378,7 @@ jobs:
               });
             });
 
-            await agenda.click();
+            await agenda.evaluate(el => el.click());
             await page.waitForURL('https://recepvoz.cl/app/agenda', { timeout: 10000 });
 
             console.log('clicked Agenda URL:', page.url());
