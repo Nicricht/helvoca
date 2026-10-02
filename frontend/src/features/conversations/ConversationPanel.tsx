@@ -160,7 +160,9 @@ export function ConversationPanel({
   );
 
   useEffect(() => {
-    if ((hasContext && !contextualReference) || (!hasContext && !workspace.items.length)) {
+    if (hasContext) return;
+
+    if (!workspace.items.length) {
       setSelectedKey(null);
       return;
     }
@@ -177,7 +179,7 @@ export function ConversationPanel({
     } else if (!currentStillExists) {
       setSelectedKey(keyOf(workspace.items[0]));
     }
-  }, [preferredConversation, selectedKey, workspace.items]);
+  }, [hasContext, preferredConversation, selectedKey, workspace.items]);
 
   const selected = contextualReference ?? (
     workspace.items.find(item => keyOf(item) === selectedKey) ?? null
