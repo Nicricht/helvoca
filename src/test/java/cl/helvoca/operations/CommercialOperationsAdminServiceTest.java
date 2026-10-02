@@ -498,6 +498,72 @@ class CommercialOperationsAdminServiceTest {
         verifyNoInteractions(tenant);
     }
 
+
+    @Test
+    void ordersUsesBoundedRepositoryQueryAndBatchLoadsLines() {
+        UUID businessId = UUID.randomUUID();
+        UUID firstOrderId = UUID.randomUUID();
+        UUID secondOrderId = UUID.randomUUID();
+        BusinessOrderRepository orders = mock(BusinessOrderRepository.class);
+        BusinessOrderLineRepository lines = mock(BusinessOrderLineRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+
+        BusinessOrder first = order(
+                firstOrderId,
+                businessId,
+                BusinessOrder.Status.CONFIRMED,
+                BusinessOrder.FulfillmentType.PICKUP);
+        BusinessOrder second = order(
+                secondOrderId,
+                businessId,
+                BusinessOrder.Status.PREPARING,
+                BusinessOrder.FulfillmentType.DELIVERY);
+
+        BusinessOrderLine firstLine = line(firstOrderId, "Martillo");
+        BusinessOrderLine secondLine = line(secondOrderId, "Taladro");
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(orders.findTop100ByBusinessIdOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(first, second));
+        when(lines.findAllByOrderIdInOrderByCreatedAtAsc(anyCollection()))
+                .thenReturn(List.of(firstLine, secondLine));
+
+        CommercialOperationsAdminService service = service(
+                orders,
+                lines,
+                tenant,
+                mock(BusinessDeliveryRepository.class),
+                mock(BusinessOperationRepository.class));
+
+        var result = service.orders();
+
+        assertEquals(2, result.size());
+        assertEquals(List.of("Martillo"), result.get(0).lines().stream()
+                .map(CommercialOperationsAdminService.OrderLineView::name)
+                .toList());
+        assertEquals(List.of("Taladro"), result.get(1).lines().stream()
+                .map(CommercialOperationsAdminService.OrderLineView::name)
+                .toList());
+
+        verify(orders).findTop100ByBusinessIdOrderByCreatedAtDesc(businessId);
+        verify(orders, never()).findAllByBusinessIdOrderByCreatedAtDesc(any());
+        verify(lines).findAllByOrderIdInOrderByCreatedAtAsc(anyCollection());
+        verify(lines, never()).findAllByOrderIdOrderByCreatedAtAsc(any());
+    }
+
+    private static BusinessOrderLine line(UUID orderId, String name) {
+        BusinessOrderLine line = new BusinessOrderLine();
+        line.setId(UUID.randomUUID());
+        line.setOrderId(orderId);
+        line.setBusinessId(UUID.randomUUID());
+        line.setCatalogItemId(UUID.randomUUID());
+        line.setItemName(name);
+        line.setQuantity(1);
+        line.setUnitPrice(java.math.BigDecimal.valueOf(1000));
+        line.setLineTotal(java.math.BigDecimal.valueOf(1000));
+        return line;
+    }
+
     private static CommercialOperationsAdminService service(BusinessOrderRepository orders,
                                                             BusinessOrderLineRepository lines,
                                                             TenantProvider tenant,
