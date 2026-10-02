@@ -32,6 +32,22 @@ export interface InventoryStock {
   lowStock?: boolean;
 }
 
+
+export interface ConfigureInventoryStockInput {
+  sku: string | null;
+  trackingEnabled: boolean;
+  onHand: number;
+  reorderThreshold: number;
+  note: string | null;
+}
+
+export interface AdjustInventoryStockInput {
+  delta: number;
+  referenceType: "MANUAL";
+  referenceId: string | null;
+  note: string | null;
+}
+
 export interface InventoryAlert {
   id: string;
   catalogItemId?: string;
@@ -83,4 +99,31 @@ export function getRestockSubscriptions() {
 
 export function getRestockNotifications() {
   return apiRequest<RestockNotification[]>("/api/v1/inventory/restock-subscriptions/notifications");
+}
+
+
+export function configureInventoryStock(
+  catalogItemId: string,
+  input: ConfigureInventoryStockInput
+) {
+  return apiRequest<InventoryStock>(
+    `/api/v1/inventory/${encodeURIComponent(catalogItemId)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input)
+    }
+  );
+}
+
+export function adjustInventoryStock(
+  catalogItemId: string,
+  input: AdjustInventoryStockInput
+) {
+  return apiRequest<InventoryStock>(
+    `/api/v1/inventory/${encodeURIComponent(catalogItemId)}/adjustments`,
+    {
+      method: "POST",
+      body: JSON.stringify(input)
+    }
+  );
 }
