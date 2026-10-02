@@ -251,9 +251,11 @@ export function InventoryPage() {
       if (query && !`${row.name} ${row.description} ${row.sku}`.toLocaleLowerCase("es").includes(query)) {
         return false;
       }
+      if (status === "TRACKED") return row.configured;
       if (status === "LOW") return row.lowStock;
       if (status === "OUT") return row.outOfStock;
-      if (status === "UNCONFIGURED") return !row.configured || !row.trackingEnabled;
+      if (status === "RESTOCKED") return row.restocked;
+      if (status === "UNCONFIGURED") return !row.configured;
       return true;
     });
 
@@ -265,6 +267,13 @@ export function InventoryPage() {
         const av = a.available ?? Number.POSITIVE_INFINITY;
         const bv = b.available ?? Number.POSITIVE_INFINITY;
         return av - bv || a.name.localeCompare(b.name, "es");
+      });
+    }
+    if (sort === "AVAILABLE_DESC") {
+      return [...next].sort((a, b) => {
+        const av = a.available ?? Number.NEGATIVE_INFINITY;
+        const bv = b.available ?? Number.NEGATIVE_INFINITY;
+        return bv - av || a.name.localeCompare(b.name, "es");
       });
     }
 
@@ -308,11 +317,26 @@ export function InventoryPage() {
     }
   }
 
-  function restockFromAlert(catalogItemId?: string) {
+  async function restockFromAlert(catalogItemId?: string, variantId?: string | null) {
     if (!canManageAutomation || !catalogItemId) return;
     const row = rows.find(candidate => candidate.id === String(catalogItemId));
-    if (!row || !row.configured || !row.trackingEnabled) return;
+    if (!row) return;
     setMutationError("");
+
+    if (variantId) {
+      const loaded = await openVariants(row);
+      const variant = loaded?.find(candidate => candidate.id === String(variantId));
+      if (!variant || !variant.active || !variant.trackingEnabled) {
+        setMutationError("La variante ya no está disponible para reposición.");
+        return;
+      }
+      setVariantEditorMode(null);
+      setVariantEditing(null);
+      setVariantAdjusting(variant);
+      return;
+    }
+
+    if (!row.configured || !row.trackingEnabled) return;
     setAdjustTarget(row);
   }
 
@@ -349,6 +373,7 @@ export function InventoryPage() {
   async function refreshVariants(catalogItemId: string) {
     const data = await getInventoryVariants(catalogItemId);
     setVariants(data);
+    return data;
   }
 
   async function openVariants(row: ProductRow) {
@@ -362,7 +387,7 @@ export function InventoryPage() {
     setMutationError("");
     setVariantsPending(true);
     try {
-      await refreshVariants(row.id);
+      return await refreshVariants(row.id);
     } catch (error) {
       setVariantsError(error instanceof Error && error.message
         ? error.message
@@ -370,6 +395,7 @@ export function InventoryPage() {
     } finally {
       setVariantsPending(false);
     }
+    return undefined;
   }
 
   function variantInputFromForm(
