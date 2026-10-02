@@ -1541,13 +1541,18 @@ export function InventoryPage() {
               <div className={styles.dialogHeader}>
                 <div>
                   <span className={styles.dialogEyebrow}>Catálogo</span>
-                  <h2 id="createProductTitle">Nuevo producto</h2>
+                  <h2 id="createProductTitle">
+                    {productEditing ? `Editar producto · ${productEditing.name || "Producto"}` : "Nuevo producto"}
+                  </h2>
                 </div>
                 <button
                   className="button ghost"
                   type="button"
                   disabled={mutationPending}
-                  onClick={() => setProductCreateOpen(false)}
+                  onClick={() => {
+                    setProductCreateOpen(false);
+                    setProductEditing(null);
+                  }}
                 >
                   Cancelar
                 </button>
@@ -1556,23 +1561,35 @@ export function InventoryPage() {
               <form className={styles.dialogForm} onSubmit={handleCreateProduct}>
                 <label className={styles.field}>
                   <span>Nombre</span>
-                  <input name="name" autoFocus required />
+                  <input name="name" defaultValue={productEditing?.name ?? ""} autoFocus required />
                 </label>
 
                 <label className={styles.field}>
                   <span>Descripción</span>
-                  <input name="description" />
+                  <input name="description" defaultValue={productEditing?.description ?? ""} />
                 </label>
 
                 <div className={styles.formGrid}>
                   <label className={styles.field}>
                     <span>Precio</span>
-                    <input name="price" type="number" min="0" step="0.01" required />
+                    <input
+                      name="price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      defaultValue={productEditing?.price ?? ""}
+                      required
+                    />
                   </label>
 
                   <label className={styles.field}>
                     <span>Moneda</span>
-                    <input name="currency" defaultValue="CLP" maxLength={3} required />
+                    <input
+                      name="currency"
+                      defaultValue={productEditing?.currency ?? "CLP"}
+                      maxLength={3}
+                      required
+                    />
                   </label>
                 </div>
 
@@ -1584,7 +1601,11 @@ export function InventoryPage() {
 
                 <div className={styles.dialogActions}>
                   <button className="button primary" type="submit" disabled={mutationPending}>
-                    {mutationPending ? "Creando…" : "Crear producto"}
+                    {mutationPending
+                      ? "Guardando…"
+                      : productEditing
+                        ? "Guardar producto"
+                        : "Crear producto"}
                   </button>
                 </div>
               </form>
@@ -1603,7 +1624,9 @@ export function InventoryPage() {
               <div className={styles.dialogHeader}>
                 <div>
                   <span className={styles.dialogEyebrow}>Inventario autoritativo</span>
-                  <h2 id="configureStockTitle">Configurar stock · {configureTarget.name}</h2>
+                  <h2 id="configureStockTitle">
+                    {configureTarget.configured ? "Editar stock" : "Configurar stock"} · {configureTarget.name}
+                  </h2>
                 </div>
                 <button
                   className="button ghost"
@@ -1646,6 +1669,15 @@ export function InventoryPage() {
                     />
                   </label>
                 </div>
+
+                <label className={styles.checkField}>
+                  <input
+                    name="trackingEnabled"
+                    type="checkbox"
+                    defaultChecked={configureTarget.configured ? configureTarget.trackingEnabled : true}
+                  />
+                  <span>Seguimiento activo</span>
+                </label>
 
                 <label className={styles.field}>
                   <span>Nota</span>
