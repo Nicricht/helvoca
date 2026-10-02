@@ -9,8 +9,11 @@ function directReactRoutes() {
     closeBundle() {
       const appDir = fileURLToPath(new URL("../src/main/resources/static/app/", import.meta.url));
       const inventoryDir = fileURLToPath(new URL("../src/main/resources/static/app/inventory/", import.meta.url));
+      const ordersDir = fileURLToPath(new URL("../src/main/resources/static/app/orders/", import.meta.url));
       mkdirSync(inventoryDir, { recursive: true });
+      mkdirSync(ordersDir, { recursive: true });
       copyFileSync(`${appDir}index.html`, `${inventoryDir}index.html`);
+      copyFileSync(`${appDir}index.html`, `${ordersDir}index.html`);
     }
   };
 }
