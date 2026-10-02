@@ -823,6 +823,187 @@ export function InventoryPage() {
           )}
         </section>
 
+        {canReadAutomation && (
+          <section
+            className={styles.automationWorkspace}
+            aria-labelledby="inventoryAutomationTitle"
+          >
+            <div className={styles.workspaceHeader}>
+              <div>
+                <h2 id="inventoryAutomationTitle">Alertas y reposición</h2>
+                <p>
+                  Revisa quiebres de stock, personas esperando reposición y avisos que ya están listos para enviar.
+                </p>
+              </div>
+              <div className={styles.automationSummary}>
+                <span>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length} alertas pendientes</span>
+                <span>{(model.restockSubscriptions.data ?? []).length} esperando reposición</span>
+                <span>
+                  {(model.restockNotifications.data ?? []).length} {(model.restockNotifications.data ?? []).length === 1 ? "aviso listo" : "avisos listos"}
+                </span>
+              </div>
+            </div>
+
+            {mutationError && !configureTarget && !adjustTarget && !productCreateOpen
+              && !variantsTarget && !variantEditorMode && !variantAdjusting && (
+                <p className={styles.automationError} role="alert">{mutationError}</p>
+              )}
+
+            <div className={styles.automationGrid}>
+              <section className={styles.automationPanel} aria-labelledby="inventoryAlertsTitle">
+                <div className={styles.panelHeader}>
+                  <div>
+                    <span className={styles.dialogEyebrow}>Stock</span>
+                    <h3 id="inventoryAlertsTitle">Alertas</h3>
+                  </div>
+                  <strong>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length}</strong>
+                </div>
+
+                <div className={styles.automationList}>
+                  {(model.alerts.data ?? []).length === 0 ? (
+                    <p className={styles.automationEmpty}>No hay alertas abiertas.</p>
+                  ) : (
+                    (model.alerts.data ?? []).map(alert => (
+                      <article
+                        key={alert.id}
+                        className={styles.automationCard}
+                        data-testid={`inventory-alert-${alert.id}`}
+                      >
+                        <div className={styles.automationCardHeader}>
+                          <div>
+                            <strong>{alertLabel(alert.type)}</strong>
+                            <span>{alert.subjectName || "Producto"}</span>
+                          </div>
+                          <span className={alert.acknowledged ? styles.statusMuted : styles.statusWarning}>
+                            {alert.acknowledged ? "Atendida" : "Pendiente"}
+                          </span>
+                        </div>
+
+                        <div className={styles.automationMeta}>
+                          {alert.sku && <span>SKU: {alert.sku}</span>}
+                          <span>Disponible: {alert.available ?? "—"}</span>
+                          <span>Umbral: {alert.reorderThreshold ?? "—"}</span>
+                        </div>
+
+                        {canManageAutomation && (
+                          <div className={styles.variantActions}>
+                            {!alert.acknowledged && (
+                              <button
+                                className="button ghost"
+                                type="button"
+                                disabled={mutationPending}
+                                onClick={() => void acknowledgeAlert(alert.id)}
+                              >
+                                Marcar atendida
+                              </button>
+                            )}
+                            {!alert.variantId && rows.some(row =>
+                              row.id === String(alert.catalogItemId)
+                              && row.configured
+                              && row.trackingEnabled
+                            ) && (
+                              <button
+                                className="button secondary"
+                                type="button"
+                                disabled={mutationPending}
+                                onClick={() => restockFromAlert(alert.catalogItemId)}
+                              >
+                                Reponer stock
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              <section className={styles.automationPanel} aria-labelledby="restockWaitingTitle">
+                <div className={styles.panelHeader}>
+                  <div>
+                    <span className={styles.dialogEyebrow}>Clientes</span>
+                    <h3 id="restockWaitingTitle">Esperando reposición</h3>
+                  </div>
+                  <strong>{(model.restockSubscriptions.data ?? []).length}</strong>
+                </div>
+
+                <div className={styles.automationList}>
+                  {(model.restockSubscriptions.data ?? []).length === 0 ? (
+                    <p className={styles.automationEmpty}>Nadie está esperando reposición.</p>
+                  ) : (
+                    (model.restockSubscriptions.data ?? []).map(subscription => (
+                      <article
+                        key={subscription.id}
+                        className={styles.automationCard}
+                        data-testid={`restock-subscription-${subscription.id}`}
+                      >
+                        <div className={styles.automationCardHeader}>
+                          <div>
+                            <strong>{subscription.contact || "Contacto"}</strong>
+                            <span>{channelLabel(subscription.preferredChannel)}</span>
+                          </div>
+                          <span className={styles.statusWarning}>Esperando</span>
+                        </div>
+
+                        {canManageAutomation && (
+                          <div className={styles.variantActions}>
+                            <button
+                              className="button ghost"
+                              type="button"
+                              disabled={mutationPending}
+                              onClick={() => void cancelWaiting(subscription.id)}
+                            >
+                              Cancelar espera
+                            </button>
+                          </div>
+                        )}
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              <section className={styles.automationPanel} aria-labelledby="restockNotificationsTitle">
+                <div className={styles.panelHeader}>
+                  <div>
+                    <span className={styles.dialogEyebrow}>Avisos</span>
+                    <h3 id="restockNotificationsTitle">Listos para enviar</h3>
+                  </div>
+                  <strong>{(model.restockNotifications.data ?? []).length}</strong>
+                </div>
+
+                <div className={styles.automationList}>
+                  {(model.restockNotifications.data ?? []).length === 0 ? (
+                    <p className={styles.automationEmpty}>No hay avisos pendientes.</p>
+                  ) : (
+                    (model.restockNotifications.data ?? []).map(notification => (
+                      <article
+                        key={notification.id}
+                        className={styles.automationCard}
+                        data-testid={`restock-notification-${notification.id}`}
+                      >
+                        <div className={styles.automationCardHeader}>
+                          <div>
+                            <strong>{notification.subjectName || "Producto repuesto"}</strong>
+                            <span>{notification.contact || "Contacto"} · {channelLabel(notification.preferredChannel)}</span>
+                          </div>
+                          <span className={styles.statusOk}>Pendiente de envío</span>
+                        </div>
+
+                        <div className={styles.automationMeta}>
+                          {notification.sku && <span>SKU: {notification.sku}</span>}
+                          <span>Disponible: {notification.available ?? "—"}</span>
+                        </div>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+            </div>
+          </section>
+        )}
+
         {variantsTarget && (
           <div className={styles.dialogBackdrop}>
             <section
