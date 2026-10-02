@@ -2,7 +2,13 @@ import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, Boxes, PackageCheck, PackageOpen, Search } from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { useInventoryWorkspace } from "../../features/inventory/useInventoryWorkspace";
-import {\n  adjustInventoryStock,\n  configureInventoryStock,\n  type CatalogItem,\n  type InventoryAlert,\n  type InventoryStock\n} from "../../features/inventory/api";
+import {
+  adjustInventoryStock,
+  configureInventoryStock,
+  type CatalogItem,
+  type InventoryAlert,
+  type InventoryStock
+} from "../../features/inventory/api";
 import styles from "./InventoryPage.module.css";
 
 type StatusFilter = "ALL" | "LOW" | "OUT" | "UNCONFIGURED";
