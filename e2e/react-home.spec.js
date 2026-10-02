@@ -389,11 +389,18 @@ test.describe('React Home migration', () => {
 
   test('401 clears the browser session and returns to the public entry', async ({ page }) => {
     await bootHome(page, { expired: true });
+    await page.route('http://127.0.0.1:4173/', route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<!doctype html><html><body><main data-auth-entry>Acceso</main></body></html>'
+      })
+    );
 
     await page.goto('/app');
 
-    await expect(page).toHaveURL(/\/$/);
-    await page.waitForLoadState('domcontentloaded');
+    await expect(page).toHaveURL('http://127.0.0.1:4173/');
+    await expect(page.locator('[data-auth-entry]')).toBeVisible();
     expect(await page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBeNull();
   });
 
