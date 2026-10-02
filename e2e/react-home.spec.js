@@ -173,7 +173,11 @@ async function bootHome(page, options = {}) {
   let onboardingRequests = 0;
 
   await page.addInitScript(
-    token => sessionStorage.setItem('helvoca_access_token', token),
+    token => {
+      if (window.location.pathname.startsWith('/app')) {
+        sessionStorage.setItem('helvoca_access_token', token);
+      }
+    },
     options.token || 'react-home-e2e'
   );
 
