@@ -1,5 +1,6 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, Boxes, PackageCheck, PackageOpen, Search } from "lucide-react";
+import { ApiError } from "../../api/client";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { useInventoryWorkspace } from "../../features/inventory/useInventoryWorkspace";
 import {
@@ -96,6 +97,20 @@ function stockValue(value: number | null) {
 }
 
 function mutationMessage(error: unknown) {
+  if (error instanceof ApiError) {
+    if (error.status === 409 && /sku/i.test(error.message)) {
+      return "Ese SKU ya está en uso. Elige otro SKU.";
+    }
+    if (error.status === 409) {
+      return "El cambio entra en conflicto con el estado actual. Actualiza los datos e intenta nuevamente.";
+    }
+    if (error.status === 400) {
+      return "Revisa los datos ingresados e intenta nuevamente.";
+    }
+    if (error.status >= 500) {
+      return "El servidor no pudo guardar el cambio. Intenta nuevamente.";
+    }
+  }
   return error instanceof Error && error.message
     ? error.message
     : "No pudimos guardar el cambio.";
@@ -198,7 +213,20 @@ export function InventoryPage() {
   const [variantHistoryPending, setVariantHistoryPending] = useState(false);
   const [variantHistoryError, setVariantHistoryError] = useState("");
   const [mutationPending, setMutationPending] = useState(false);
+  const mutationLock = useRef(false);
   const [mutationError, setMutationError] = useState("");
+
+  function beginMutation() {
+    if (mutationLock.current) return false;
+    mutationLock.current = true;
+    setMutationPending(true);
+    return true;
+  }
+
+  function endMutation() {
+    mutationLock.current = false;
+    setMutationPending(false);
+  }
 
   const rows = useMemo(
     () => buildRows(
