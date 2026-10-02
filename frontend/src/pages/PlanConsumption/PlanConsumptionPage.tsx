@@ -1,8 +1,15 @@
+import { useMutation } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
 import { BarChart3, Crown, MessageSquareText, PhoneCall, ReceiptText, Timer } from "lucide-react";
+import { useState } from "react";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { usePlanConsumption, usageMetrics } from "../../features/billing/usePlanConsumption";
-import type { Subscription } from "../../features/billing/api";
+import {
+  createBillingCheckout,
+  type BillingCheckoutResponse,
+  type PublicPlan,
+  type Subscription
+} from "../../features/billing/api";
 import styles from "./PlanConsumptionPage.module.css";
 
 const statusLabels: Record<string, string> = {
@@ -30,6 +37,15 @@ function formatDate(value?: string) {
     year: "numeric",
     timeZone: "UTC"
   }).format(date);
+}
+
+function formatClp(value?: number | null) {
+  if (value == null) return "Precio personalizado";
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0
+  }).format(value);
 }
 
 function projection(subscription: Subscription) {
@@ -75,6 +91,21 @@ export function PlanConsumptionPage() {
   const reduceMotion = useReducedMotion();
   const model = usePlanConsumption();
   const subscription = model.subscription.data;
+  const [manageOpen, setManageOpen] = useState(false);
+  const [checkoutResult, setCheckoutResult] = useState<BillingCheckoutResponse | null>(null);
+  const [checkoutMessage, setCheckoutMessage] = useState("");
+
+  const checkout = useMutation({
+    mutationFn: createBillingCheckout,
+    onSuccess: result => {
+      setCheckoutResult(result);
+      setCheckoutMessage(`Checkout creado para ${result.planName}. El plan se activará solo cuando el proveedor confirme el pago.`);
+      window.open(result.checkoutUrl, "_blank", "noopener,noreferrer");
+    },
+    onError: error => {
+      setCheckoutMessage(error instanceof Error ? error.message : "No pudimos crear el checkout.");
+    }
+  });
 
   const loading = model.subscription.isPending || model.me.isPending;
   const failed = model.subscription.isError;
@@ -143,6 +174,24 @@ export function PlanConsumptionPage() {
     ? "Facturación conectada."
     : "Pagos automáticos aún no habilitados.";
 
+  const billing = model.billingStatus.data;
+  const plans = model.publicPlans.data ?? [];
+  const pendingPlanName = checkoutResult?.planName || billing?.pendingPlanName || null;
+
+  function choosePlan(plan: PublicPlan) {
+    if (!model.canManageBilling || !billing?.checkoutConfigured || checkout.isPending) return;
+    if (plan.customPricing || plan.monthlyPriceClp == null) return;
+    if (plan.code === billing.currentPlanCode) return;
+
+    const accepted = window.confirm(
+      `¿Continuar con ${plan.name} por ${formatClp(plan.monthlyPriceClp)} al mes? El plan no se activará hasta verificar el pago.`
+    );
+    if (!accepted) return;
+
+    setCheckoutMessage("");
+    checkout.mutate(plan.code);
+  }
+
   return (
     <AppShell>
       <main className={`rv-page-frame ${styles.page}`}>
@@ -172,6 +221,16 @@ export function PlanConsumptionPage() {
               </div>
             </div>
             <div className={styles.headerActions}>
+              {model.canManageBilling && billing?.checkoutConfigured && (
+                <button
+                  className="button secondary"
+                  type="button"
+                  aria-expanded={manageOpen}
+                  onClick={() => setManageOpen(value => !value)}
+                >
+                  {manageOpen ? "Ocultar planes" : "Gestionar plan"}
+                </button>
+              )}
               <a className="button primary" href="/pricing.html">Ver planes</a>
             </div>
           </div>
@@ -213,6 +272,63 @@ export function PlanConsumptionPage() {
             <span className={styles.renewal}>Renueva {formatDate(subscription.currentPeriodEnd)}</span>
           </div>
         </motion.section>
+
+        {model.canManageBilling && manageOpen && (
+          <section className={styles.managementCard} aria-labelledby="planManagementTitle">
+            <div className={styles.managementHeader}>
+              <div>
+                <span className={styles.cardEyebrow}>Facturación</span>
+                <h2 id="planManagementTitle">Gestionar plan</h2>
+                <p>El cambio solo queda activo después de que el proveedor confirma el pago.</p>
+              </div>
+              {pendingPlanName && <span className={styles.pendingPill}>Plan pendiente: {pendingPlanName}</span>}
+            </div>
+
+            {model.billingStatus.isError && (
+              <div className={styles.checkoutError} role="alert">
+                No pudimos cargar el estado de facturación.
+              </div>
+            )}
+
+            <div className={styles.planOptions}>
+              {plans.map(plan => {
+                const current = plan.code === billing?.currentPlanCode;
+                const custom = Boolean(plan.customPricing || plan.monthlyPriceClp == null);
+                return (
+                  <article className={styles.planOption} key={plan.code}>
+                    <div>
+                      <strong>{plan.name}</strong>
+                      <span>
+                        {formatClp(plan.monthlyPriceClp)}
+                        {plan.includedMinutes != null ? ` · ${plan.includedMinutes} min incluidos` : ""}
+                      </span>
+                    </div>
+                    {current ? (
+                      <span className={styles.currentPlanPill}>Plan actual</span>
+                    ) : custom ? (
+                      <a className="button ghost" href="/sales.html">Cotización personalizada</a>
+                    ) : (
+                      <button
+                        className="button secondary"
+                        type="button"
+                        disabled={!billing?.checkoutConfigured || checkout.isPending}
+                        onClick={() => choosePlan(plan)}
+                      >
+                        {checkout.isPending ? "Preparando…" : `Elegir ${plan.name}`}
+                      </button>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+
+            {checkoutMessage && (
+              <div className={checkout.isError ? styles.checkoutError : styles.checkoutMessage} role="status">
+                {checkoutMessage}
+              </div>
+            )}
+          </section>
+        )}
 
         <section className={styles.section} aria-labelledby="usageTitle">
           <h2 id="usageTitle" className={styles.sectionHeading}>Uso del período</h2>
