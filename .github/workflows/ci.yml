@@ -1288,3 +1288,107 @@ jobs:
 
       - name: Certify first fictional customer week
         run: bash scripts/ci/first-fictional-customer-week.sh
+
+
+  agenda-production-navigation-smoke:
+    if: github.event_name == 'pull_request' && github.head_ref == 'chore/verify-agenda-navigation-production-25d089'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Verify production bytes and canonical Agenda destination
+        run: |
+          set -euo pipefail
+
+          root="$(mktemp)"
+          agenda="$(mktemp)"
+          nav_js="$(mktemp)"
+          status_js="$(mktemp)"
+
+          root_code="$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 25 -sS -L -o "$root" -w "%{http_code}" https://recepvoz.cl/)"
+          agenda_code="$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 25 -sS -L -o "$agenda" -w "%{http_code}" https://recepvoz.cl/app/agenda)"
+          nav_code="$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 25 -sS -L -o "$nav_js" -w "%{http_code}" 'https://recepvoz.cl/first-user-ux-v2.js?v=20261002-agenda-1')"
+          status_code="$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 25 -sS -L -o "$status_js" -w "%{http_code}" 'https://recepvoz.cl/commercial-status.js?v=20261002-agenda-1')"
+
+          echo "root -> HTTP $root_code"
+          echo "/app/agenda -> HTTP $agenda_code"
+          echo "first-user-ux-v2.js -> HTTP $nav_code"
+          echo "commercial-status.js -> HTTP $status_code"
+
+          test "$root_code" = "200"
+          test "$agenda_code" = "200"
+          test "$nav_code" = "200"
+          test "$status_code" = "200"
+
+          grep -Fq 'href="/app/agenda">Agenda</a>' "$root"
+          grep -Fq '/first-user-ux-v2.js?v=20261002-agenda-1' "$root"
+          grep -Fq '/commercial-status.js?v=20261002-agenda-1' "$root"
+          grep -Fq 'if (link.dataset.homeNav === "bookings") return;' "$nav_js"
+          grep -Fq '/app/agenda' "$status_js"
+          ! grep -Fq '/?tab=bookings#homeBusinessWorkspace' "$status_js"
+          grep -Eq '<div[^>]+id="root"|/app/assets/|type="module"' "$agenda"
+
+      - name: Install Chromium smoke dependency
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Verify the production Home click is not intercepted into legacy Agenda
+        run: |
+          node <<'NODE'
+          const { chromium } = require('@playwright/test');
+
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage();
+
+            await page.goto('https://recepvoz.cl/', { waitUntil: 'networkidle', timeout: 60000 });
+
+            const agenda = page.locator('#primaryNav [data-home-nav="bookings"]');
+            if (await agenda.count() !== 1) {
+              throw new Error('Agenda nav link not found on production Home');
+            }
+
+            const href = await agenda.getAttribute('href');
+            console.log('production Agenda href:', href);
+            if (href !== '/app/agenda') {
+              throw new Error('Production Agenda href is not /app/agenda');
+            }
+
+            await agenda.evaluate(el => {
+              el.removeAttribute('aria-disabled');
+              el.classList.remove('is-disabled');
+            });
+
+            let targetRequested = false;
+            await page.route('https://recepvoz.cl/app/agenda', async route => {
+              targetRequested = true;
+              await route.fulfill({
+                status: 200,
+                contentType: 'text/html',
+                body: '<!doctype html><title>Agenda smoke</title><h1>Agenda smoke</h1>'
+              });
+            });
+
+            await agenda.click();
+            await page.waitForURL('https://recepvoz.cl/app/agenda', { timeout: 10000 });
+
+            console.log('clicked Agenda URL:', page.url());
+            if (!targetRequested) {
+              throw new Error('Agenda click never requested /app/agenda');
+            }
+
+            await browser.close();
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
