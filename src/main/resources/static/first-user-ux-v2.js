@@ -84,7 +84,7 @@
     if (nextAction && nextIndex >= 0) {
       const nextStep = states[nextIndex];
       nextAction.textContent = nextStep.actionLabel;
-      nextAction.href = `/settings.html?section=${nextStep.section}`;
+      nextAction.href = `/app/settings?section=${nextStep.section}`;
     }
 
     onboarding.classList.toggle("hidden", ready);
@@ -107,7 +107,7 @@
 
   function activateHomeTab(name) {
     if (!homeWorkspace || homeWorkspace.classList.contains("hidden")) {
-      if (!dashboard.classList.contains("hidden")) window.location.assign("/settings.html");
+      if (!dashboard.classList.contains("hidden")) window.location.assign("/app/settings");
       return;
     }
 
