@@ -366,7 +366,7 @@
         '        <a href="/?tab=bookings#homeBusinessWorkspace">Agenda</a>',
         '        <a href="/?tab=requests#homeBusinessWorkspace">Pendientes</a>',
         '        <a href="/conversations.html">Conversaciones</a>',
-        '        <a href="/inventory.html">Inventario</a>',
+        '        <a href="/app/inventory">Inventario</a>',
         '      </div>',
         '    </nav>',
         '    <div id="ownerSevenDayRow" class="owner-seven-day hidden"><strong>Últimos 7 días</strong><span id="ownerSevenDaySummary">–</span></div>',

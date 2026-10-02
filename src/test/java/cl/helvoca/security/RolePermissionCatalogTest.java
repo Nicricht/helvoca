@@ -73,6 +73,7 @@ class RolePermissionCatalogTest {
                 PermissionCode.ORDERS_READ,
                 PermissionCode.INVENTORY_READ,
                 PermissionCode.ANALYTICS_READ)));
+        assertFalse(permissions.contains(PermissionCode.INVENTORY_MANAGE));
         assertFalse(permissions.contains(PermissionCode.TEAM_MANAGE));
         assertFalse(permissions.contains(PermissionCode.BILLING_MANAGE));
     }

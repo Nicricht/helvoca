@@ -449,12 +449,12 @@ test('primary and public navigation fit desktop tablet and mobile viewports', as
 
       await page.goto('/');
       await expect(page.locator('#primaryNav')).toBeVisible();
-      await expect(page.locator('.nav-inventory')).toHaveAttribute('href', '/inventory.html');
+      await expect(page.locator('.nav-inventory')).toHaveAttribute('href', '/app/inventory');
       await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
       await expectNoPageOverflow();
 
       await page.goto('/settings.html');
-      await expect(page.locator('.nav-inventory')).toHaveAttribute('href', '/inventory.html');
+      await expect(page.locator('.nav-inventory')).toHaveAttribute('href', '/app/inventory');
       await expect(page.locator('.nav-config')).toHaveClass(/active/);
       await page.getByRole('button', { name: '🏪 Negocio', exact: true }).click();
       await expect(page.locator('#configBusinessPanel')).toBeVisible();

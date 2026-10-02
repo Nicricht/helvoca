@@ -98,7 +98,7 @@ public final class RolePermissionCatalog {
                     DELIVERIES_READ,
                     QUOTES_READ,
                     LEADS_READ,
-                    INVENTORY_READ, INVENTORY_MANAGE,
+                    INVENTORY_READ,
                     CATALOG_READ,
                     ANALYTICS_READ,
                     OPERATIONS_READ,

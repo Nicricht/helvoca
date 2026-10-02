@@ -32,7 +32,7 @@ test('customer navigation stays coherent and never exposes internal operations',
     { href: '/conversations.html', text: 'Conversaciones' },
     { href: '/#bookings', text: 'Agenda' },
     { href: '/#customers', text: 'Clientes' },
-    { href: '/inventory.html', text: 'Inventario' },
+    { href: '/app/inventory', text: 'Inventario' },
     { href: '/settings.html', text: 'Configuración' },
     { href: '/account.html', text: 'Facturación' }
   ];
