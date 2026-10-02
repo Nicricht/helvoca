@@ -1,8 +1,8 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, Boxes, PackageCheck, PackageOpen, Search } from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { useInventoryWorkspace } from "../../features/inventory/useInventoryWorkspace";
-import type { CatalogItem, InventoryAlert, InventoryStock } from "../../features/inventory/api";
+import {\n  adjustInventoryStock,\n  configureInventoryStock,\n  type CatalogItem,\n  type InventoryAlert,\n  type InventoryStock\n} from "../../features/inventory/api";
 import styles from "./InventoryPage.module.css";
 
 type StatusFilter = "ALL" | "LOW" | "OUT" | "UNCONFIGURED";
@@ -76,6 +76,12 @@ function stockValue(value: number | null) {
   return value === null ? "—" : String(value);
 }
 
+function mutationMessage(error: unknown) {
+  return error instanceof Error && error.message
+    ? error.message
+    : "No pudimos guardar el cambio.";
+}
+
 function SummaryCard({
   label,
   value,
@@ -119,6 +125,10 @@ export function InventoryPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [sort, setSort] = useState<SortMode>("ATTENTION");
+  const [configureTarget, setConfigureTarget] = useState<ProductRow | null>(null);
+  const [adjustTarget, setAdjustTarget] = useState<ProductRow | null>(null);
+  const [mutationPending, setMutationPending] = useState(false);
+  const [mutationError, setMutationError] = useState("");
 
   const rows = useMemo(
     () => buildRows(
@@ -173,6 +183,71 @@ export function InventoryPage() {
     || model.restockNotifications.isError;
   const businessName = model.business.data?.name?.trim();
   const roleLabel = model.canManage ? "Gestión habilitada" : "Solo lectura";
+
+  async function handleConfigure(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!configureTarget || !model.canManage || mutationPending) return;
+
+    const data = new FormData(event.currentTarget);
+    const onHand = Number(data.get("onHand"));
+    const reorderThreshold = Number(data.get("reorderThreshold"));
+
+    if (!Number.isInteger(onHand) || onHand < 0
+        || !Number.isInteger(reorderThreshold) || reorderThreshold < 0) {
+      setMutationError("El stock físico y el umbral deben ser números enteros iguales o mayores que cero.");
+      return;
+    }
+
+    setMutationPending(true);
+    setMutationError("");
+    try {
+      const sku = String(data.get("sku") ?? "").trim();
+      const note = String(data.get("note") ?? "").trim();
+      await configureInventoryStock(configureTarget.id, {
+        sku: sku || null,
+        trackingEnabled: true,
+        onHand,
+        reorderThreshold,
+        note: note || null
+      });
+      await model.refetchPrimary();
+      setConfigureTarget(null);
+    } catch (error) {
+      setMutationError(mutationMessage(error));
+    } finally {
+      setMutationPending(false);
+    }
+  }
+
+  async function handleAdjustment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!adjustTarget || !model.canManage || mutationPending) return;
+
+    const data = new FormData(event.currentTarget);
+    const delta = Number(data.get("delta"));
+    if (!Number.isInteger(delta) || delta === 0) {
+      setMutationError("El ajuste debe ser un número entero distinto de cero.");
+      return;
+    }
+
+    setMutationPending(true);
+    setMutationError("");
+    try {
+      const note = String(data.get("note") ?? "").trim();
+      await adjustInventoryStock(adjustTarget.id, {
+        delta,
+        referenceType: "MANUAL",
+        referenceId: null,
+        note: note || null
+      });
+      await model.refetchPrimary();
+      setAdjustTarget(null);
+    } catch (error) {
+      setMutationError(mutationMessage(error));
+    } finally {
+      setMutationPending(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -331,6 +406,7 @@ export function InventoryPage() {
                   <th scope="col">Disponible</th>
                   <th scope="col">Reservado</th>
                   <th scope="col">Físico</th>
+                  {model.canManage && <th scope="col">Acciones</th>}
                 </tr>
               </thead>
               <tbody>
@@ -348,6 +424,33 @@ export function InventoryPage() {
                     </td>
                     <td>{stockValue(row.reserved)}</td>
                     <td>{stockValue(row.onHand)}</td>
+                    {model.canManage && (
+                      <td className={styles.actionCell}>
+                        {!row.configured || !row.trackingEnabled ? (
+                          <button
+                            className="button secondary"
+                            type="button"
+                            onClick={() => {
+                              setMutationError("");
+                              setConfigureTarget(row);
+                            }}
+                          >
+                            Configurar stock
+                          </button>
+                        ) : (
+                          <button
+                            className="button secondary"
+                            type="button"
+                            onClick={() => {
+                              setMutationError("");
+                              setAdjustTarget(row);
+                            }}
+                          >
+                            Ajustar stock
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -361,6 +464,129 @@ export function InventoryPage() {
             </div>
           )}
         </section>
+
+        {configureTarget && (
+          <div className={styles.dialogBackdrop}>
+            <section
+              className={styles.dialog}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="configureStockTitle"
+            >
+              <div className={styles.dialogHeader}>
+                <div>
+                  <span className={styles.dialogEyebrow}>Inventario autoritativo</span>
+                  <h2 id="configureStockTitle">Configurar stock · {configureTarget.name}</h2>
+                </div>
+                <button
+                  className="button ghost"
+                  type="button"
+                  disabled={mutationPending}
+                  onClick={() => setConfigureTarget(null)}
+                >
+                  Cancelar
+                </button>
+              </div>
+
+              <form className={styles.dialogForm} onSubmit={handleConfigure}>
+                <label className={styles.field}>
+                  <span>SKU</span>
+                  <input name="sku" defaultValue={configureTarget.sku} autoFocus />
+                </label>
+
+                <div className={styles.formGrid}>
+                  <label className={styles.field}>
+                    <span>Stock físico inicial</span>
+                    <input
+                      name="onHand"
+                      type="number"
+                      min="0"
+                      step="1"
+                      defaultValue={configureTarget.onHand ?? 0}
+                      required
+                    />
+                  </label>
+
+                  <label className={styles.field}>
+                    <span>Umbral de reposición</span>
+                    <input
+                      name="reorderThreshold"
+                      type="number"
+                      min="0"
+                      step="1"
+                      defaultValue={configureTarget.reorderThreshold ?? 0}
+                      required
+                    />
+                  </label>
+                </div>
+
+                <label className={styles.field}>
+                  <span>Nota</span>
+                  <input name="note" placeholder="Ej. carga inicial" />
+                </label>
+
+                {mutationError && <p className={styles.dialogError} role="alert">{mutationError}</p>}
+
+                <div className={styles.dialogActions}>
+                  <button className="button primary" type="submit" disabled={mutationPending}>
+                    {mutationPending ? "Guardando…" : "Guardar configuración"}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        )}
+
+        {adjustTarget && (
+          <div className={styles.dialogBackdrop}>
+            <section
+              className={styles.dialog}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="adjustStockTitle"
+            >
+              <div className={styles.dialogHeader}>
+                <div>
+                  <span className={styles.dialogEyebrow}>Movimiento manual</span>
+                  <h2 id="adjustStockTitle">Ajustar stock · {adjustTarget.name}</h2>
+                </div>
+                <button
+                  className="button ghost"
+                  type="button"
+                  disabled={mutationPending}
+                  onClick={() => setAdjustTarget(null)}
+                >
+                  Cancelar
+                </button>
+              </div>
+
+              <form className={styles.dialogForm} onSubmit={handleAdjustment}>
+                <p className={styles.dialogHint}>
+                  Disponible ahora: <strong>{stockValue(adjustTarget.available)}</strong>.
+                  Usa un valor positivo para reponer y negativo para corregir una baja.
+                </p>
+
+                <label className={styles.field}>
+                  <span>Ajuste</span>
+                  <input name="delta" type="number" step="1" required autoFocus />
+                </label>
+
+                <label className={styles.field}>
+                  <span>Nota</span>
+                  <input name="note" placeholder="Ej. reposición" />
+                </label>
+
+                {mutationError && <p className={styles.dialogError} role="alert">{mutationError}</p>}
+
+                <div className={styles.dialogActions}>
+                  <button className="button primary" type="submit" disabled={mutationPending}>
+                    {mutationPending ? "Aplicando…" : "Aplicar ajuste"}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        )}
       </main>
     </AppShell>
   );
