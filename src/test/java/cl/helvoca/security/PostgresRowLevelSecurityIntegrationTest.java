@@ -606,6 +606,28 @@ class PostgresRowLevelSecurityIntegrationTest {
     }
 
     @Test
+    void conversationStateRejectsCrossTenantActiveOperationEvenForOwner() {
+        UUID customerB = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessB);
+        UUID operationB = insertProjectionOperation(businessB, customerB, "LEAD");
+        UUID stateId = UUID.randomUUID();
+
+        try {
+            ownerJdbc.update("""
+                    INSERT INTO conversation_operation_state(
+                        id, business_id, source_reference_id, channel, active_operation_id
+                    ) VALUES (?, ?, ?, 'MANUAL', ?)
+                    """, stateId, businessA, UUID.randomUUID(), operationB);
+            ownerJdbc.update("DELETE FROM conversation_operation_state WHERE id = ?", stateId);
+            fail("Cross-tenant conversation_operation_state active operation was accepted");
+        } catch (DataAccessException expected) {
+            // PostgreSQL tenant-integrity constraint rejected the write.
+        }
+    }
+
+    @Test
     void operationForeignKeysRejectCrossTenantCustomerAndDeliveryZoneEvenForOwner() {
         UUID customerA = ownerJdbc.queryForObject(
                 "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
