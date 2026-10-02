@@ -2,7 +2,6 @@ import {
   Bot,
   Building2,
   CalendarClock,
-  ChevronRight,
   Globe2,
   Link2,
   MessagesSquare,
@@ -24,6 +23,8 @@ import type {
   VoiceOption
 } from "../../features/settings/api";
 import type { SectionKey, SettingsDraft } from "../../features/settings/viewModel";
+import { ScheduleExceptionsPanel } from "./ScheduleExceptionsPanel";
+import { TeamSettingsPanel } from "./TeamSettingsPanel";
 import styles from "./SettingsPage.module.css";
 
 const dayNames = [
@@ -57,6 +58,9 @@ interface SettingsPanelViewProps {
   activeSection: SectionKey;
   draft: SettingsDraft;
   canManage: boolean;
+  canManageTeam: boolean;
+  canReadScheduleExceptions: boolean;
+  canManageScheduleExceptions: boolean;
   voices: VoiceOption[];
   phones: PhoneNumber[];
   updateRoot: (
@@ -81,6 +85,9 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
     activeSection,
     draft,
     canManage,
+    canManageTeam,
+    canReadScheduleExceptions,
+    canManageScheduleExceptions,
     voices,
     phones,
     updateRoot,
@@ -466,6 +473,11 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             </div>
           ))}
         </div>
+
+        <ScheduleExceptionsPanel
+          canRead={canReadScheduleExceptions}
+          canManage={canManageScheduleExceptions}
+        />
       </section>
     );
   }
@@ -628,10 +640,7 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
           </div>
         </div>
       </div>
-      <a className="button secondary" href="/settings.html?section=team">
-        Abrir gestión de equipo actual
-        <ChevronRight size={15} aria-hidden="true" />
-      </a>
+<TeamSettingsPanel canManage={canManageTeam} />
     </section>
   );
 }
