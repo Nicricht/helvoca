@@ -135,7 +135,7 @@ export function ScheduleExceptionsPanel({
     <section className={styles.subPanel} aria-label="Días especiales">
       <div className={styles.subPanelHeading}>
         <div>
-          <strong>Días especiales</strong>
+          <h3>Días especiales</h3>
           <span>Cierra una fecha concreta o reemplaza el horario normal solo para ese día.</span>
         </div>
         <CalendarClock size={18} aria-hidden="true" />
