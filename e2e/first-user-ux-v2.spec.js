@@ -34,6 +34,8 @@ async function mockBaseTenant(page, status) {
       ? [{ id: 'svc1', name: 'Corte Premium', durationMinutes: 30, price: 18990, active: true }]
       : []
   )));
+  await page.route('**/api/v1/bookings', route => route.fulfill(json([])));
+  await page.route('**/api/v1/customers', route => route.fulfill(json([])));
   await page.route('**/api/v1/business/hours', route => route.fulfill(json(
     status.scheduleConfigured
       ? [{ dayOfWeek: 1, openTime: '09:00:00', closeTime: '18:00:00' }]
@@ -145,10 +147,15 @@ test('ready owner lands on a simple daily home with direct reservations and cust
   await expect(nav.locator('a:visible')).toContainText(['Inicio', 'Conversaciones', 'Agenda', 'Clientes', 'Inventario', 'Configuración', 'Facturación']);
   await expect(nav.getByRole('link', { name: 'Inventario', exact: true })).toHaveAttribute('href', '/app/inventory');
 
-  await nav.getByRole('link', { name: 'Agenda', exact: true }).click();
-  await expect(page.locator('[data-home-tab="bookings"]')).toHaveClass(/active/);
+  const agendaLink = nav.getByRole('link', { name: 'Agenda', exact: true });
+  await expect(agendaLink).toHaveAttribute('href', '/app/agenda');
+  await agendaLink.click();
+  await expect(page).toHaveURL(/\/app\/agenda\/?$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Agenda' })).toBeVisible();
 
-  await nav.getByRole('link', { name: 'Clientes', exact: true }).click();
+  await page.goto('/');
+  const restoredNav = page.locator('#primaryNav');
+  await restoredNav.getByRole('link', { name: 'Clientes', exact: true }).click();
   await expect(page.locator('[data-home-tab="customers"]')).toHaveClass(/active/);
 });
 
