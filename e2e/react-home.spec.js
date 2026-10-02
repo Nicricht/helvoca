@@ -25,7 +25,7 @@ const INCOMPLETE_ONBOARDING = {
   humanTransferConfigured: false,
   phoneConfigured: false,
   readyForCalls: false,
-  nextStep: 'SERVICES'
+  nextStep: 'ADD_SERVICE'
 };
 
 const READY_OPERATIONS = {
@@ -316,6 +316,27 @@ test.describe('React Home migration', () => {
 
     await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Resumen de ventas' })).toHaveCount(0);
+  });
+
+  test('phone onboarding parity points the owner to the receptionist setup', async ({ page }) => {
+    await bootHome(page, {
+      onboarding: {
+        ...READY_ONBOARDING,
+        phoneConfigured: false,
+        readyForCalls: false,
+        nextStep: 'CONNECT_PHONE_NUMBER'
+      }
+    });
+
+    await page.goto('/app');
+
+    const onboarding = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(onboarding).toContainText('Recepcionista');
+    await expect(onboarding.getByRole('link', { name: /continuar/i })).toHaveAttribute(
+      'href',
+      /\/settings\.html\?section=receptionist/
+    );
+    await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toHaveCount(0);
   });
 
   test('shows an explicit loading state while the daily summary is pending', async ({ page }) => {

@@ -33,10 +33,26 @@ const coreOnboardingSteps = [
   { key: "businessProfileConfigured", label: "Información del negocio" },
   { key: "servicesConfigured", label: "Servicios" },
   { key: "scheduleConfigured", label: "Horarios" },
-  { key: "knowledgeConfigured", label: "Conocimiento de la IA" }
+  { key: "phoneConfigured", label: "Recepcionista" }
 ] as const;
 
 const nextStepCopy: Record<string, { text: string; href: string }> = {
+  CONFIGURE_BUSINESS: {
+    text: "Completa la información de tu negocio.",
+    href: "/settings.html?section=business"
+  },
+  ADD_SERVICE: {
+    text: "Configura tus servicios para que la IA pueda orientar y reservar.",
+    href: "/settings.html?section=services"
+  },
+  CONFIGURE_HOURS: {
+    text: "Define tus horarios de atención.",
+    href: "/settings.html?section=hours"
+  },
+  CONNECT_PHONE_NUMBER: {
+    text: "Conecta el canal telefónico de tu recepcionista.",
+    href: "/settings.html?section=receptionist"
+  },
   BUSINESS_PROFILE: {
     text: "Completa la información de tu negocio.",
     href: "/settings.html?section=business"
@@ -49,13 +65,9 @@ const nextStepCopy: Record<string, { text: string; href: string }> = {
     text: "Define tus horarios de atención.",
     href: "/settings.html?section=hours"
   },
-  KNOWLEDGE: {
-    text: "Agrega el conocimiento que necesita tu recepcionista.",
-    href: "/settings.html?section=knowledge"
-  },
   PHONE: {
     text: "Conecta el canal telefónico de tu recepcionista.",
-    href: "/settings.html?section=phone"
+    href: "/settings.html?section=receptionist"
   }
 };
 
