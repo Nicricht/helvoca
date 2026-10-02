@@ -425,3 +425,65 @@ test('Meta embedded signup completes inside React and clears the registration PI
   await expect(page.getByText('temporary-e2e-code')).toHaveCount(0);
   await expect(page.getByText('123456')).toHaveCount(0);
 });
+
+
+test('managed payment sandbox lives in React Integrations and mutates only after confirmation', async ({ page }) => {
+  await bootReactSettings(page);
+
+  let enabled = false;
+  let enableCalls = 0;
+  let disableCalls = 0;
+
+  await page.route('**/api/v1/payment-provider/managed-sandbox', route => route.fulfill(json({
+    available: true,
+    configured: enabled,
+    enabled,
+    blockedByCustomConfiguration: false,
+    provider: 'mercadopago',
+    mode: 'SANDBOX',
+    webhookPath: '/webhooks/v1/payments/mercadopago/demo'
+  })));
+
+  await page.route('**/api/v1/payment-provider/managed-sandbox/enable', async route => {
+    enableCalls += 1;
+    enabled = true;
+    await route.fulfill(json({
+      available: true,
+      configured: true,
+      enabled: true,
+      blockedByCustomConfiguration: false,
+      provider: 'mercadopago',
+      mode: 'SANDBOX',
+      webhookPath: '/webhooks/v1/payments/mercadopago/demo'
+    }));
+  });
+
+  await page.route('**/api/v1/payment-provider/managed-sandbox/disable', async route => {
+    disableCalls += 1;
+    enabled = false;
+    await route.fulfill(json({
+      available: true,
+      configured: true,
+      enabled: false,
+      blockedByCustomConfiguration: false,
+      provider: 'mercadopago',
+      mode: 'SANDBOX',
+      webhookPath: '/webhooks/v1/payments/mercadopago/demo'
+    }));
+  });
+
+  await page.goto('/app/settings?section=integrations');
+
+  await expect(page.getByRole('heading', { name: 'Pagos de prueba' })).toBeVisible();
+  expect(enableCalls).toBe(0);
+  expect(disableCalls).toBe(0);
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Activar pagos de prueba' }).click();
+  await expect.poll(() => enableCalls).toBe(1);
+  await expect(page.getByText('Mercado Pago Sandbox activo')).toBeVisible();
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Desactivar pagos de prueba' }).click();
+  await expect.poll(() => disableCalls).toBe(1);
+});
