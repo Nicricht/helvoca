@@ -348,7 +348,9 @@ export function SettingsPage() {
       return;
     }
 
+    const submitButton = event.currentTarget.querySelector<HTMLButtonElement>('button[type="submit"]');
     submitLock.current = true;
+    if (submitButton) submitButton.disabled = true;
     setSavePhase("saving");
 
     try {
@@ -412,6 +414,7 @@ export function SettingsPage() {
       setSavePhase("dirty");
     } finally {
       submitLock.current = false;
+      if (submitButton) submitButton.disabled = false;
     }
   }
 
