@@ -66,7 +66,7 @@ export function ScheduleExceptionsPanel({
       );
       setMessage("Día especial guardado.");
       resetFields();
-      await queryClient.invalidateQueries({ queryKey: ["settings", "schedule-exceptions"] });
+      void queryClient.invalidateQueries({ queryKey: ["settings", "schedule-exceptions"], refetchType: "none" });
     },
     onError: error => setMessage(errorMessage(error, "No pudimos guardar el día especial."))
   });
@@ -79,7 +79,7 @@ export function ScheduleExceptionsPanel({
         current => (current ?? []).filter(item => item.exceptionDate !== deletedDate)
       );
       setMessage("Día especial eliminado.");
-      await queryClient.invalidateQueries({ queryKey: ["settings", "schedule-exceptions"] });
+      void queryClient.invalidateQueries({ queryKey: ["settings", "schedule-exceptions"], refetchType: "none" });
     },
     onError: error => setMessage(errorMessage(error, "No pudimos eliminar el día especial."))
   });
