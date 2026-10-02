@@ -1,5 +1,8 @@
 export { ConversationPanel } from "./ConversationPanel";
-export type { ConversationPanelProps } from "./ConversationPanel";
+export type {
+  ConversationPanelProps,
+  EmbeddedConversationContext
+} from "./ConversationPanel";
 export {
   useConversationDetail,
   useCustomerConversations
