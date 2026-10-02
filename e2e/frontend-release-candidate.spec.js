@@ -304,13 +304,13 @@ test('release candidate owner traverses the complete safe business journey in on
   await expect(page.getByText('Hola, soy Sofía. ¿En qué te ayudo?')).toBeVisible();
   await expect(page.locator('#resolution')).toHaveText('Reserva creada');
 
-  await page.goto('/settings.html?section=business');
-  await expect(page.locator('.dashboard-heading h1')).toHaveText('Mi negocio');
-  await expect(page.locator('.ux-config-nav [data-settings-section]')).toContainText([
-    'Negocio', 'Servicios', 'Horarios', 'Recepcionista'
+  await page.goto('/app/settings?section=business');
+  await expect(page.getByRole('heading', { level: 1, name: 'Configuración' })).toBeVisible();
+  await expect(page.getByRole('tablist', { name: 'Secciones de configuración' })).toContainText([
+    'Negocio', 'Recepcionista IA', 'Servicios', 'Horarios', 'Conocimiento', 'Canales', 'Integraciones', 'Equipo'
   ]);
-  await page.locator('.ux-config-nav [data-settings-section="receptionist"]').click();
-  await expect(page.locator('#configAgentPanel')).toBeVisible();
+  await page.getByRole('tab', { name: 'Recepcionista IA' }).click();
+  await expect(page.getByRole('heading', { name: 'Recepcionista IA' })).toBeVisible();
 
   await page.goto('/account.html');
   await expect(page.getByRole('heading', { level: 1, name: 'Plan y facturación' })).toBeVisible();
@@ -327,7 +327,7 @@ test('release candidate principal surfaces remain usable on a 390px customer vie
   await mockReleaseCandidate(page);
   await page.setViewportSize({ width: 390, height: 844 });
 
-  for (const path of ['/', '/inventory.html', '/conversations.html', '/simulator.html', '/settings.html', '/account.html']) {
+  for (const path of ['/', '/inventory.html', '/conversations.html', '/simulator.html', '/app/settings', '/account.html']) {
     await page.goto(path);
     await page.waitForTimeout(80);
     const layout = await page.evaluate(() => ({
@@ -360,7 +360,7 @@ test('release candidate captures exact-head visual evidence for every canonical 
     { name: 'home', route: '/' },
     { name: 'conversations', route: '/conversations.html' },
     { name: 'inventory', route: '/inventory.html' },
-    { name: 'settings', route: '/settings.html' },
+    { name: 'settings', route: '/app/settings' },
     { name: 'billing', route: '/account.html' },
     { name: 'simulator', route: '/simulator.html' }
   ];
@@ -380,7 +380,7 @@ test('release candidate captures exact-head visual evidence for every canonical 
       } else if (surface.name === 'inventory') {
         await expect(page.locator('[data-inventory-product-id="product-rc"]')).toContainText('Taladro percutor');
       } else if (surface.name === 'settings') {
-        await expect(page.locator('.dashboard-heading h1')).toHaveText('Mi negocio');
+        await expect(page.getByRole('heading', { level: 1, name: 'Configuración' })).toBeVisible();
       } else if (surface.name === 'billing') {
         await expect(page.locator('#planName')).toHaveText('Profesional');
       } else if (surface.name === 'simulator') {
@@ -392,7 +392,7 @@ test('release candidate captures exact-head visual evidence for every canonical 
           home: '#primaryNav',
           conversations: '.rv-nav',
           inventory: '.inventory-nav',
-          settings: '#primaryNav',
+          settings: 'aside[aria-label="Navegación de RecepVoz"]',
           billing: '.account-nav',
           simulator: '.topbar nav'
         }[surface.name];
