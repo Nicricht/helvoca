@@ -204,6 +204,17 @@ test.describe('React Agenda migration', () => {
     await expect(row).toContainText('Confirmada');
   });
 
+  test('renders WhatsApp booking source and authoritative status in React Agenda', async ({ page }) => {
+    await bootAgenda(page);
+    await page.goto('/app/agenda');
+
+    const row = page.getByTestId('agenda-row-b2');
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('Bruno Masaje');
+    await expect(row).toContainText('WhatsApp');
+    await expect(row).toContainText('Cancelada');
+  });
+
   test('filters reservations by search, service and status without leaving Agenda', async ({ page }) => {
     await bootAgenda(page);
     await page.goto('/app/agenda');
