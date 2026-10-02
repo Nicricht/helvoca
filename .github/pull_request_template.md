@@ -24,6 +24,31 @@
 - [ ] Affected invariants are identified.
 - [ ] Tenant/security/financial/inventory boundaries were reviewed when applicable.
 
+
+## QA classification
+
+<!-- The implementing agent selects these. The user must not need to request test types manually. Check every applicable test level and justify every important N/A. -->
+
+Required test levels:
+- [ ] Unit
+- [ ] Integration / PostgreSQL
+- [ ] Security / Tenant
+- [ ] Concurrency / Idempotency
+- [ ] Contract / Provider failure
+- [ ] Component / UI
+- [ ] E2E
+- [ ] Golden Journey
+- [ ] Production verification
+
+Why these levels are sufficient:
+<!-- Map each important failure property to the lowest test level that proves it. -->
+
+Important N/A decisions:
+<!-- Explain why a normally expected level does not apply. Do not leave risk-relevant omissions implicit. -->
+
+Coverage target/evidence:
+<!-- State measured line/branch/method evidence when applicable. HIGH-risk new or materially modified business logic targets 100% meaningful line/branch/method coverage. -->
+
 ## Frontend frame contract
 
 <!-- Required for frontend/UI changes. Use N/A only when no frontend surface is touched. See docs/frontend/FRAME_CONTRACT.md. -->

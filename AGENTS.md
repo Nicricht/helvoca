@@ -20,6 +20,28 @@ Classify each implementation as LOW, MEDIUM, or HIGH risk before coding.
 
 Use verification proportional to the real risk. Before implementation, review the affected path across UI, API, business logic, data, security, integrations, operations, and continuity for long-running work, plus the project invariants in `docs/engineering/invariants.md`.
 
+
+## QA ownership and test selection
+
+The implementing agent owns QA for every change. The user is not responsible for selecting or reminding the agent which tests to create or run. Before coding, read `docs/engineering/QA_POLICY.md`, classify the change, identify the properties that can fail, and select the lowest test level that can prove each property correctly.
+
+Do not mechanically run every test category for every edit. Unit tests prove isolated logic; integration/PostgreSQL tests prove persistence, SQL, Flyway, repository and transactional behavior; security/tenant tests prove authorization and isolation boundaries; concurrency/idempotency tests prove race and replay safety; contract/failure tests prove provider boundaries; component tests prove local UI behavior; browser E2E proves user journeys; Golden Journey proves release-critical commercial flows; production verification proves the exact deployed artifact.
+
+Mandatory rules:
+- A reproducible bug requires a regression test that is observed RED for the intended reason before the fix when technically feasible.
+- New or materially changed business logic requires focused unit tests unless the behavior can only be observed correctly at a higher boundary.
+- SQL, JPA, Flyway, constraints, RLS and repository semantics require real PostgreSQL/Testcontainers integration evidence when changed.
+- Tenant-owned relationships require an adversarial tenant A -> tenant B attempt when the affected path could permit cross-tenant references or access.
+- Payments, inventory, booking capacity, retries, webhooks and other replay/race-sensitive behavior require idempotency and/or concurrency verification when applicable.
+- External providers require contract/failure-path evidence for relevant timeout, retry, duplicate, partial-success and provider-error behavior without triggering unauthorized real-world side effects.
+- Stateful React behavior requires component/unit coverage when local behavior is meaningful; user-visible journeys require browser E2E when a browser-level failure is plausible.
+- Release-critical commercial behavior requires the applicable Golden Journey or release contract.
+- Production-bound changes require exact-main-SHA production verification appropriate to the change, including migration/startup/health/smoke/log checks when relevant.
+- Do not add assertion-free or behavior-free tests merely to increase a coverage number.
+- Any implementation or engineering-contract edit after certification invalidates stale evidence and requires fresh verification.
+
+Coverage is a guardrail, not proof of correctness. The current automated differential floor remains at least 80% changed executable line coverage and 70% changed branch coverage. For HIGH-risk new or materially modified business logic, the engineering target is 100% meaningful line, branch and method coverage, with any infeasible or meaningless exception documented in the PR. Do not claim 100% coverage unless the measured report actually proves it.
+
 ## Required workflow
 
 1. Never develop directly on `main`. Refresh `main`, then create a dedicated branch.

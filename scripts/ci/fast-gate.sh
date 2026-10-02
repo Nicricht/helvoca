@@ -160,4 +160,7 @@ fi
 echo "Checking protected frontend frame contract..."
 node scripts/ci/check-frontend-frame-contract.js
 
+echo "Checking mandatory QA governance contract..."
+python3 scripts/ci/check-qa-governance.py
+
 echo "Fast Gate passed."
