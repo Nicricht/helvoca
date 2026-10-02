@@ -19,6 +19,8 @@ public class BusinessOrderLine {
     private UUID orderId;
     @Column(name = "catalog_item_id", nullable = false)
     private UUID catalogItemId;
+    @Column(name = "business_id", nullable = false)
+    private UUID businessId;
     @Column(name = "variant_id")
     private UUID variantId;
     @Column(name = "item_name", nullable = false, length = 180)
@@ -46,6 +48,8 @@ public class BusinessOrderLine {
     public void setOrderId(UUID orderId) { this.orderId = orderId; }
     public UUID getCatalogItemId() { return catalogItemId; }
     public void setCatalogItemId(UUID catalogItemId) { this.catalogItemId = catalogItemId; }
+    public UUID getBusinessId() { return businessId; }
+    public void setBusinessId(UUID businessId) { this.businessId = businessId; }
     public UUID getVariantId() { return variantId; }
     public void setVariantId(UUID variantId) { this.variantId = variantId; }
     public String getItemName() { return itemName; }
