@@ -396,6 +396,53 @@ class PostgresRowLevelSecurityIntegrationTest {
     }
 
     @Test
+    void bookingForeignKeysRejectCrossTenantCustomerAndServiceEvenForOwner() {
+        UUID customerA = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessA);
+        UUID customerB = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessB);
+        UUID serviceA = UUID.randomUUID();
+        UUID serviceB = UUID.randomUUID();
+
+        ownerJdbc.update("""
+                INSERT INTO service(id, business_id, name, duration_minutes, price)
+                VALUES (?, ?, 'Booking integrity A', 30, 10000)
+                """, serviceA, businessA);
+        ownerJdbc.update("""
+                INSERT INTO service(id, business_id, name, duration_minutes, price)
+                VALUES (?, ?, 'Booking integrity B', 30, 10000)
+                """, serviceB, businessB);
+
+        assertThrows(DataAccessException.class, () -> ownerJdbc.update("""
+                INSERT INTO booking(
+                    id, business_id, customer_id, service_id,
+                    start_at, end_at, status, source
+                ) VALUES (
+                    ?, ?, ?, ?,
+                    NOW() + INTERVAL '1 day',
+                    NOW() + INTERVAL '1 day 30 minutes',
+                    'CONFIRMED', 'ADMIN'
+                )
+                """, UUID.randomUUID(), businessA, customerB, serviceA));
+
+        assertThrows(DataAccessException.class, () -> ownerJdbc.update("""
+                INSERT INTO booking(
+                    id, business_id, customer_id, service_id,
+                    start_at, end_at, status, source
+                ) VALUES (
+                    ?, ?, ?, ?,
+                    NOW() + INTERVAL '2 days',
+                    NOW() + INTERVAL '2 days 30 minutes',
+                    'CONFIRMED', 'ADMIN'
+                )
+                """, UUID.randomUUID(), businessA, customerA, serviceB));
+    }
+
+    @Test
     void inventoryRestockSubscriptionsAndNotificationsAreTenantIsolated() {
         UUID customerA = ownerJdbc.queryForObject(
                 "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
