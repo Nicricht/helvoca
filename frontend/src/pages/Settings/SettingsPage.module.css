@@ -872,7 +872,9 @@
   gap: 4px;
 }
 
-.subPanelHeading strong {
+.subPanelHeading strong,
+.subPanelHeading h3 {
+  margin: 0;
   color: var(--rv-text-primary);
   font-size: 13px;
 }
