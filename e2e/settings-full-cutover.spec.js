@@ -185,3 +185,243 @@ test('special business hours are managed inside React Settings', async ({ page }
 
   await expect(page.getByText('Horario de fin de año')).toBeVisible();
 });
+
+
+test('channel provisioning and WhatsApp activation remain explicit in React Settings', async ({ page }) => {
+  await bootReactSettings(page);
+
+  let provisionCalls = 0;
+  let activationCalls = 0;
+
+  await page.route('**/api/v1/phone-numbers/provisioning/status', route => route.fulfill(json({
+    enabled: true,
+    configured: true,
+    purchaseAvailable: true,
+    provider: 'TWILIO',
+    message: 'Disponible'
+  })));
+
+  await page.route('**/api/v1/phone-numbers/provisioning/available?*', route => route.fulfill(json([
+    {
+      phoneNumber: '+56220001111',
+      friendlyName: '+56220001111',
+      locality: 'Santiago',
+      region: 'RM',
+      isoCountry: 'CL',
+      addressRequirements: 'none',
+      voiceCapable: true
+    }
+  ])));
+
+  await page.route('**/api/v1/phone-numbers/provisioning', async route => {
+    provisionCalls += 1;
+    await route.fulfill(json({
+      id: 'phone-1',
+      provider: 'TWILIO',
+      phoneNumber: '+56220001111',
+      active: true,
+      whatsappEnabled: false
+    }));
+  });
+
+  await page.route('**/api/v1/channels/whatsapp/meta/config', route => route.fulfill(json({
+    status: 'CONFIGURED_DISABLED',
+    configured: true,
+    enabled: false,
+    provider: 'META',
+    phoneRecordId: 'phone-1',
+    phoneNumber: '+56220001111',
+    credentialReferenceConfigured: true
+  })));
+
+  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/bootstrap', route => route.fulfill(json({
+    enabled: true,
+    available: false
+  })));
+
+  await page.route('**/api/v1/channels/whatsapp/meta/certification/readiness', route => route.fulfill(json({
+    state: 'READY_FOR_PILOT_CERTIFICATION',
+    ready: true,
+    alreadyCertified: false,
+    blockers: []
+  })));
+
+  await page.route('**/api/v1/channels/whatsapp/meta/deployment/readiness', route => route.fulfill(json({
+    state: 'READY_FOR_TENANT_STAGING',
+    readyForTenantStaging: true,
+    blockers: []
+  })));
+
+  await page.route('**/api/v1/channels/whatsapp/meta/config/activate', async route => {
+    activationCalls += 1;
+    await route.fulfill(json({
+      status: 'CONFIGURED_ENABLED',
+      configured: true,
+      enabled: true,
+      provider: 'META',
+      phoneRecordId: 'phone-1',
+      phoneNumber: '+56220001111',
+      credentialReferenceConfigured: true
+    }));
+  });
+
+  await page.goto('/app/settings?section=channels');
+
+  expect(provisionCalls).toBe(0);
+  expect(activationCalls).toBe(0);
+
+  await page.getByRole('button', { name: 'Buscar números' }).click();
+  await expect(page.getByText('+56220001111')).toBeVisible();
+  expect(provisionCalls).toBe(0);
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Aprovisionar' }).click();
+  await expect.poll(() => provisionCalls).toBe(1);
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Activar WhatsApp' }).click();
+  await expect.poll(() => activationCalls).toBe(1);
+});
+
+test('Meta embedded signup completes inside React and clears the registration PIN', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.FB = {
+      init: () => {},
+      login: callback => callback({ authResponse: { code: 'temporary-e2e-code' } })
+    };
+  });
+  await bootReactSettings(page);
+
+  let authorizationPayload = null;
+  let finalizationPayload = null;
+  let configured = false;
+
+  await page.route('**/api/v1/phone-numbers/provisioning/status', route => route.fulfill(json({
+    enabled: true,
+    configured: true,
+    purchaseAvailable: false,
+    provider: 'TWILIO',
+    message: 'No disponible'
+  })));
+
+  await page.route('**/api/v1/channels/whatsapp/meta/config', route => route.fulfill(json(
+    configured
+      ? {
+          status: 'CONFIGURED_DISABLED',
+          configured: true,
+          enabled: false,
+          provider: 'META',
+          phoneRecordId: 'phone-meta',
+          phoneNumber: '+56911111111',
+          credentialReferenceConfigured: true
+        }
+      : {
+          status: 'NOT_CONFIGURED',
+          configured: false,
+          enabled: false
+        }
+  )));
+
+  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/bootstrap', route => route.fulfill(json({
+    enabled: true,
+    available: true,
+    appId: '123456789',
+    configId: '987654321',
+    graphApiVersion: 'v26.0'
+  })));
+
+  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/authorization-code', async route => {
+    authorizationPayload = route.request().postDataJSON();
+    await route.fulfill(json({
+      state: 'AUTHORIZATION_CODE_EXCHANGED_AND_VALIDATED',
+      accepted: true,
+      retained: false,
+      exchangePending: false,
+      wabas: [{
+        id: '1906385232743451',
+        name: 'Negocio E2E WhatsApp',
+        currency: 'CLP',
+        timezoneId: 'America/Santiago',
+        systemUserAssigned: true
+      }],
+      wabaAfterCursor: null
+    }));
+  });
+
+  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/waba/phone-numbers', route => route.fulfill(json({
+    state: 'PHONE_NUMBERS_DISCOVERED',
+    appSubscribed: true,
+    phoneNumbers: [{
+      id: '112233445566',
+      displayPhoneNumber: '+56 9 1111 1111',
+      verifiedName: 'Negocio E2E',
+      qualityRating: 'GREEN',
+      codeVerificationStatus: 'VERIFIED'
+    }],
+    afterCursor: null
+  })));
+
+  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/waba/phone-number/validate', route => route.fulfill(json({
+    state: 'PHONE_NUMBER_VALIDATED',
+    phoneNumberId: '112233445566',
+    displayPhoneNumber: '+56 9 1111 1111',
+    verifiedName: 'Negocio E2E',
+    qualityRating: 'GREEN',
+    codeVerificationStatus: 'VERIFIED'
+  })));
+
+  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/waba/phone-number/finalize', async route => {
+    finalizationPayload = route.request().postDataJSON();
+    configured = true;
+    await route.fulfill(json({
+      state: 'PHONE_NUMBER_REGISTERED_AND_STAGED',
+      phoneRecordId: 'phone-meta',
+      provider: 'META',
+      phoneNumberId: '112233445566',
+      wabaId: '1906385232743451',
+      credentialRef: 'meta-credential-ref',
+      enabled: false
+    }));
+  });
+
+  await page.route('**/api/v1/channels/whatsapp/meta/certification/readiness', route => route.fulfill(json({
+    state: 'BLOCKED',
+    ready: false,
+    alreadyCertified: false,
+    blockers: [{ code: 'CERT_REQUIRED', message: 'Certification required' }]
+  })));
+
+  await page.route('**/api/v1/channels/whatsapp/meta/deployment/readiness', route => route.fulfill(json({
+    state: 'BLOCKED',
+    readyForTenantStaging: false,
+    blockers: [{ code: 'STAGING_REQUIRED', message: 'Staging required' }]
+  })));
+
+  await page.goto('/app/settings?section=channels');
+
+  await page.getByRole('button', { name: 'Conectar WhatsApp' }).click();
+  await page.getByRole('button', { name: 'Continuar con Meta' }).click();
+
+  await expect.poll(() => authorizationPayload).toEqual({ code: 'temporary-e2e-code' });
+  await expect(page.getByText('Negocio E2E WhatsApp')).toBeVisible();
+
+  await page.getByRole('button', { name: /Negocio E2E WhatsApp/ }).click();
+  await page.getByRole('button', { name: 'Continuar con esta cuenta' }).click();
+
+  await expect(page.getByText('+56 9 1111 1111')).toBeVisible();
+  await page.getByRole('button', { name: /\+56 9 1111 1111/ }).click();
+  await page.getByRole('button', { name: 'Validar número' }).click();
+
+  const pinInput = page.getByLabel('PIN de registro de Meta');
+  await pinInput.fill('123456');
+  await page.getByRole('button', { name: 'Finalizar conexión' }).click();
+
+  await expect.poll(() => finalizationPayload).toEqual({
+    wabaId: '1906385232743451',
+    phoneNumberId: '112233445566',
+    pin: '123456'
+  });
+  await expect(pinInput).toHaveValue('');
+  await expect(page.getByText('temporary-e2e-code')).toHaveCount(0);
+  await expect(page.getByText('123456')).toHaveCount(0);
+});
