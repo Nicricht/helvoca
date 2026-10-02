@@ -186,7 +186,6 @@ jobs:
           node --check src/main/resources/static/voice-selector.js
           node --check src/main/resources/static/ux-simplification.js
           node --check src/main/resources/static/pricing.js
-          node --check src/main/resources/static/home-business.js
           node --check src/main/resources/static/settings-page.js
           node --check src/main/resources/static/simulator.js
 
@@ -296,7 +295,6 @@ jobs:
           node --check src/main/resources/static/voice-selector.js
           node --check src/main/resources/static/ux-simplification.js
           node --check src/main/resources/static/pricing.js
-          node --check src/main/resources/static/home-business.js
           node --check src/main/resources/static/settings-page.js
           node --check src/main/resources/static/simulator.js
 
@@ -428,7 +426,6 @@ jobs:
 
       - name: Validate reservations JavaScript
         run: |
-          node --check src/main/resources/static/home-business.js
           node --check e2e/home-operational.spec.js
 
       - name: Install reservations test dependencies
@@ -482,7 +479,6 @@ jobs:
           node-version: "22"
 
       - name: Validate workspace JavaScript
-        run: node --check src/main/resources/static/home-business.js
 
       - name: Install workspace test dependencies
         run: |
@@ -535,7 +531,6 @@ jobs:
           node-version: "22"
 
       - name: Validate orders JavaScript
-        run: node --check src/main/resources/static/home-business.js
 
       - name: Install orders test dependencies
         run: |
@@ -1003,7 +998,6 @@ jobs:
       - name: Check changed operational JavaScript syntax
         run: |
           node --check src/main/resources/static/app.js
-          node --check src/main/resources/static/home-business.js
           node --check src/main/resources/static/settings-page.js
           node --check src/main/resources/static/ux-simplification.js
 
@@ -1051,7 +1045,6 @@ jobs:
 
       - name: Validate operational redesign JavaScript
         run: |
-          node --check src/main/resources/static/home-business.js
           node --check src/main/resources/static/settings-page.js
 
       - name: Install operational redesign test dependencies
@@ -1208,7 +1201,6 @@ jobs:
 
       - name: Validate interaction JavaScript
         run: |
-          node --check src/main/resources/static/home-business.js
           node --check src/main/resources/static/simulator.js
           node --check e2e/interaction-audit.spec.js
 
