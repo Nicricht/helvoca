@@ -382,6 +382,138 @@
   font-size: 13px;
 }
 
+.actionCell {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.actionCell :global(.button) {
+  min-height: 34px;
+  padding-inline: 11px;
+  font-size: 12px;
+}
+
+.dialogBackdrop {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(3, 10, 17, .74);
+  backdrop-filter: blur(8px);
+}
+
+.dialog {
+  width: min(560px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+  border: 1px solid var(--rv-border-default);
+  border-radius: var(--rv-radius-xl);
+  background: var(--rv-bg-canvas);
+  box-shadow: var(--rv-shadow-lg);
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--rv-border-subtle);
+}
+
+.dialogHeader h2 {
+  margin: 4px 0 0;
+  color: var(--rv-text-primary);
+  font-size: 20px;
+  line-height: 1.25;
+  letter-spacing: -.02em;
+}
+
+.dialogEyebrow {
+  color: var(--rv-accent);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.dialogForm {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.field span {
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.field input {
+  min-width: 0;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--rv-border-default);
+  border-radius: 10px;
+  outline: 0;
+  color: var(--rv-text-primary);
+  background: var(--rv-surface-1);
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.field input:focus {
+  border-color: var(--rv-accent-border);
+  box-shadow: 0 0 0 3px var(--rv-accent-soft);
+}
+
+.dialogHint {
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 10px;
+  color: var(--rv-text-secondary);
+  background: rgba(255, 255, 255, .02);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.dialogHint strong {
+  color: var(--rv-text-primary);
+}
+
+.dialogError {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(242, 141, 141, .28);
+  border-radius: 10px;
+  color: var(--rv-danger);
+  background: rgba(242, 141, 141, .07);
+  font-size: 12px;
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 2px;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
