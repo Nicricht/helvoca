@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class ReactFrontendController {
 
-    @GetMapping({"/app", "/app/", "/app/plan"})
+    @GetMapping({"/app", "/app/", "/app/plan", "/app/inventory", "/app/inventory/"})
     public String application() {
         return "forward:/app/index.html";
     }
