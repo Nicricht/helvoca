@@ -16,6 +16,8 @@ import {
   getPhoneProvisioningStatus,
   provisionPhoneNumber,
   searchAvailablePhoneNumbers,
+  setPhoneActive,
+  setPhoneWhatsAppEnabled,
   validateMetaPhoneNumber,
   type AvailablePhoneNumber,
   type MetaPhoneCandidate,
@@ -189,6 +191,27 @@ export function ChannelsSettingsPanel({
       await refreshChannels();
     },
     onError: error => setPhoneMessage(errorMessage(error, "No pudimos conectar ese número."))
+  });
+
+  const togglePhoneActive = useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) => setPhoneActive(id, active),
+    onSuccess: async result => {
+      setPhoneMessage((result.phoneNumber || "El número") + (result.active ? " quedó activo." : " quedó inactivo."));
+      await refreshChannels();
+    },
+    onError: error => setPhoneMessage(errorMessage(error, "No pudimos cambiar el estado del número."))
+  });
+
+  const togglePhoneWhatsApp = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => setPhoneWhatsAppEnabled(id, enabled),
+    onSuccess: async result => {
+      setPhoneMessage(
+        (result.phoneNumber || "El número")
+          + (result.whatsappEnabled ? " tiene WhatsApp habilitado." : " tiene WhatsApp deshabilitado.")
+      );
+      await refreshChannels();
+    },
+    onError: error => setPhoneMessage(errorMessage(error, "No pudimos cambiar el estado de WhatsApp."))
   });
 
   const detach = useMutation({
@@ -413,14 +436,35 @@ export function ChannelsSettingsPanel({
                   {phone.whatsappEnabled ? "WhatsApp" : "Voz"}
                 </span>
                 {canManage && phone.id && (
-                  <button
-                    className={styles.iconDangerStatic}
-                    type="button"
-                    aria-label={"Desvincular " + (phone.phoneNumber || "número")}
-                    onClick={() => doDetach(phone)}
-                  >
-                    <Trash2 size={16} aria-hidden="true" />
-                  </button>
+                  <>
+                    <button
+                      className="button ghost"
+                      type="button"
+                      disabled={togglePhoneActive.isPending}
+                      onClick={() => togglePhoneActive.mutate({ id: phone.id as string, active: !phone.active })}
+                    >
+                      {phone.active ? "Desactivar" : "Activar"}
+                    </button>
+                    <button
+                      className="button ghost"
+                      type="button"
+                      disabled={togglePhoneWhatsApp.isPending || (!phone.active && !phone.whatsappEnabled)}
+                      onClick={() => togglePhoneWhatsApp.mutate({
+                        id: phone.id as string,
+                        enabled: !phone.whatsappEnabled
+                      })}
+                    >
+                      {phone.whatsappEnabled ? "Desactivar WhatsApp" : "Activar WhatsApp"}
+                    </button>
+                    <button
+                      className={styles.iconDangerStatic}
+                      type="button"
+                      aria-label={"Desvincular " + (phone.phoneNumber || "número")}
+                      onClick={() => doDetach(phone)}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>
+                  </>
                 )}
               </div>
             </article>
