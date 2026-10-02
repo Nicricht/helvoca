@@ -755,6 +755,27 @@ export function InventoryPage() {
           </p>
         )}
 
+        {rows.some(row => !row.configured) && (
+          <section
+            className={styles.setupNotice}
+            aria-label="Productos sin stock configurado"
+          >
+            <div>
+              <strong>
+                {rows.filter(row => !row.configured).length} {rows.filter(row => !row.configured).length === 1 ? "producto" : "productos"} sin stock configurado
+              </strong>
+              <span>La IA solo puede prometer disponibilidad cuando el stock está configurado.</span>
+            </div>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => setStatus("UNCONFIGURED")}
+            >
+              Ver sin configurar
+            </button>
+          </section>
+        )}
+
         <section className={styles.workspace} aria-labelledby="inventoryWorkspaceTitle">
           <div className={styles.workspaceHeader}>
             <div>
@@ -763,17 +784,31 @@ export function InventoryPage() {
             </div>
             <div className={styles.workspaceActions}>
               {model.canManageCatalog && (
-                <button
-                  className="button primary"
-                  type="button"
-                  onClick={() => {
-                    setMutationError("");
-                    setProductCreateOpen(true);
-                  }}
-                >
-                  Nuevo producto
-                </button>
+                <>
+                  <a className="button secondary" href="/business-import.html">
+                    Importar archivos
+                  </a>
+                  <button
+                    className="button primary"
+                    type="button"
+                    onClick={() => {
+                      setMutationError("");
+                      setProductEditing(null);
+                      setProductCreateOpen(true);
+                    }}
+                  >
+                    Nuevo producto
+                  </button>
+                </>
               )}
+              <button
+                className="button ghost"
+                type="button"
+                disabled={refreshPending}
+                onClick={() => void refreshWorkspace()}
+              >
+                {refreshPending ? "Actualizando…" : "Actualizar"}
+              </button>
               <div className={styles.queueSummary} aria-label="Resumen de reposición">
                 <span>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length} alertas</span>
                 <span>{(model.restockSubscriptions.data ?? []).length} esperando reposición</span>
@@ -798,8 +833,10 @@ export function InventoryPage() {
               <span>Estado</span>
               <select aria-label="Estado" value={status} onChange={event => setStatus(event.target.value as StatusFilter)}>
                 <option value="ALL">Todos</option>
+                <option value="TRACKED">Stock configurado</option>
                 <option value="LOW">Stock bajo</option>
                 <option value="OUT">Agotado</option>
+                <option value="RESTOCKED">Repuestos</option>
                 <option value="UNCONFIGURED">Sin configurar</option>
               </select>
             </label>
@@ -807,9 +844,10 @@ export function InventoryPage() {
             <label className={styles.selectField}>
               <span>Orden</span>
               <select aria-label="Orden" value={sort} onChange={event => setSort(event.target.value as SortMode)}>
-                <option value="ATTENTION">Prioridad</option>
+                <option value="ATTENTION">Atención primero</option>
                 <option value="NAME_ASC">Nombre A–Z</option>
-                <option value="AVAILABLE_ASC">Menor disponible</option>
+                <option value="AVAILABLE_ASC">Disponible: menor a mayor</option>
+                <option value="AVAILABLE_DESC">Disponible: mayor a menor</option>
               </select>
             </label>
           </div>
@@ -823,6 +861,7 @@ export function InventoryPage() {
                   <th scope="col">Disponible</th>
                   <th scope="col">Reservado</th>
                   <th scope="col">Físico</th>
+                  <th scope="col">Mínimo</th>
                   <th scope="col">Acciones</th>
                 </tr>
               </thead>
@@ -841,6 +880,7 @@ export function InventoryPage() {
                     </td>
                     <td>{stockValue(row.reserved)}</td>
                     <td>{stockValue(row.onHand)}</td>
+                    <td>{stockValue(row.reorderThreshold)}</td>
                     <td className={styles.actionCell}>
                       {canReadVariants && (
                         <button
@@ -860,18 +900,19 @@ export function InventoryPage() {
                           Ver historial
                         </button>
                       )}
-                      {model.canManageStock && (!row.configured || !row.trackingEnabled ? (
+                      {model.canManageStock && (
                         <button
-                          className="button secondary"
+                          className="button ghost"
                           type="button"
                           onClick={() => {
                             setMutationError("");
                             setConfigureTarget(row);
                           }}
                         >
-                          Configurar stock
+                          {row.configured ? "Editar stock" : "Configurar stock"}
                         </button>
-                      ) : (
+                      )}
+                      {model.canManageStock && row.configured && row.trackingEnabled && (
                         <button
                           className="button secondary"
                           type="button"
@@ -882,7 +923,23 @@ export function InventoryPage() {
                         >
                           Ajustar stock
                         </button>
-                      ))}
+                      )}
+                      {model.canManageCatalog && (
+                        <button
+                          className="button ghost"
+                          type="button"
+                          aria-label={`Editar producto ${row.name}`}
+                          onClick={() => {
+                            const item = (model.catalog.data ?? []).find(candidate => String(candidate.id) === row.id);
+                            if (!item) return;
+                            setMutationError("");
+                            setProductEditing(item);
+                            setProductCreateOpen(true);
+                          }}
+                        >
+                          Editar
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -972,20 +1029,18 @@ export function InventoryPage() {
                                 Marcar atendida
                               </button>
                             )}
-                            {!alert.variantId && rows.some(row =>
-                              row.id === String(alert.catalogItemId)
-                              && row.configured
-                              && row.trackingEnabled
-                            ) && (
-                              <button
-                                className="button secondary"
-                                type="button"
-                                disabled={mutationPending}
-                                onClick={() => restockFromAlert(alert.catalogItemId)}
-                              >
-                                Reponer stock
-                              </button>
-                            )}
+                            {(alert.type === "LOW_STOCK" || alert.type === "OUT_OF_STOCK")
+                              && rows.some(row => row.id === String(alert.catalogItemId))
+                              && (
+                                <button
+                                  className="button secondary"
+                                  type="button"
+                                  disabled={mutationPending}
+                                  onClick={() => void restockFromAlert(alert.catalogItemId, alert.variantId)}
+                                >
+                                  Reponer stock
+                                </button>
+                              )}
                           </div>
                         )}
                       </article>
