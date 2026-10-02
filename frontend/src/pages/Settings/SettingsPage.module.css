@@ -426,6 +426,13 @@
   background: var(--rv-surface-2);
 }
 
+.cardTitle {
+  display: block;
+  margin: 0 40px 11px 0;
+  color: var(--rv-text-primary);
+  font-size: 13px;
+}
+
 .editCardGrid {
   min-width: 0;
   padding-right: 36px;
