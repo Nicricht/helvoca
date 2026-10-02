@@ -692,9 +692,9 @@ export function OrdersPage() {
                 role="dialog"
                 aria-modal="true"
                 aria-label={`Pedido ${selected.id} · ${selected.contactName || "Cliente"}`}
-                initial={reduceMotion ? false : { x: 36, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: 24, opacity: 0 }}
+                initial={reduceMotion ? false : { opacity: 0, clipPath: "inset(0 0 0 8%)" }}
+                animate={{ opacity: 1, clipPath: "inset(0 0 0 0%)" }}
+                exit={{ opacity: 0, clipPath: "inset(0 0 0 6%)" }}
                 transition={{ duration: reduceMotion ? 0 : .24, ease: "easeOut" }}
               >
                 <header className={styles.drawerHeader}>
