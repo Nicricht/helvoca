@@ -100,6 +100,7 @@ async function bootOrders(page, options = {}) {
     const url = new URL(route.request().url());
     expect(url.searchParams.has('businessId')).toBe(false);
     listCalls += 1;
+    if (options.ordersGate) await options.ordersGate;
     if (options.ordersError) {
       return route.fulfill(json({ message: 'orders unavailable' }, 503));
     }
@@ -243,6 +244,26 @@ test.describe('React Orders / Operations migration', () => {
     await page.getByLabel('Origen').selectOption('MANUAL');
     await expect(page.getByTestId('orders-row-order-2')).toBeVisible();
     await expect(page.getByTestId('orders-row-order-1')).toHaveCount(0);
+
+    await page.getByLabel('Origen').selectOption('ALL');
+    await page.getByLabel('Orden').selectOption('OLDEST');
+    const rows = page.locator('[data-testid^="orders-row-"]');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toHaveAttribute('data-testid', 'orders-row-order-2');
+    await expect(rows.nth(1)).toHaveAttribute('data-testid', 'orders-row-order-1');
+  });
+
+  test('keeps a visible loading state while the authoritative orders request is pending', async ({ page }) => {
+    let releaseOrders;
+    const ordersGate = new Promise(resolve => { releaseOrders = resolve; });
+    await bootOrders(page, { ordersGate });
+
+    await page.goto('/app/orders');
+    await expect(page.getByRole('status')).toContainText('Cargando pedidos');
+
+    releaseOrders();
+    await expect(page.getByRole('heading', { level: 1, name: 'Pedidos' })).toBeVisible();
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
   });
 
   test('opens detail with customer lines totals fulfillment history and contextual conversation', async ({ page }) => {
