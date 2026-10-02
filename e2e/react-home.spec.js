@@ -393,7 +393,8 @@ test.describe('React Home migration', () => {
     await page.goto('/app');
 
     await expect(page).toHaveURL(/\/$/);
-    await expect.poll(() => page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBeNull();
+    await page.waitForLoadState('domcontentloaded');
+    expect(await page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBeNull();
   });
 
   test('operator gets the operational cockpit without calling the owner-only onboarding endpoint', async ({ page }) => {
