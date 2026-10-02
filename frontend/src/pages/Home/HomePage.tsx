@@ -39,35 +39,35 @@ const coreOnboardingSteps = [
 const nextStepCopy: Record<string, { text: string; href: string }> = {
   CONFIGURE_BUSINESS: {
     text: "Completa la información de tu negocio.",
-    href: "/settings.html?section=business"
+    href: "/app/settings?section=business"
   },
   ADD_SERVICE: {
     text: "Configura tus servicios para que la IA pueda orientar y reservar.",
-    href: "/settings.html?section=services"
+    href: "/app/settings?section=services"
   },
   CONFIGURE_HOURS: {
     text: "Define tus horarios de atención.",
-    href: "/settings.html?section=hours"
+    href: "/app/settings?section=hours"
   },
   CONNECT_PHONE_NUMBER: {
     text: "Conecta el canal telefónico de tu recepcionista.",
-    href: "/settings.html?section=receptionist"
+    href: "/app/settings?section=receptionist"
   },
   BUSINESS_PROFILE: {
     text: "Completa la información de tu negocio.",
-    href: "/settings.html?section=business"
+    href: "/app/settings?section=business"
   },
   SERVICES: {
     text: "Configura tus servicios para que la IA pueda orientar y reservar.",
-    href: "/settings.html?section=services"
+    href: "/app/settings?section=services"
   },
   SCHEDULE: {
     text: "Define tus horarios de atención.",
-    href: "/settings.html?section=hours"
+    href: "/app/settings?section=hours"
   },
   PHONE: {
     text: "Conecta el canal telefónico de tu recepcionista.",
-    href: "/settings.html?section=receptionist"
+    href: "/app/settings?section=receptionist"
   }
 };
 
@@ -275,7 +275,7 @@ function QuickActions() {
     { label: "Agenda", href: "/app/agenda", icon: CalendarDays },
     { label: "Conversaciones", href: "/app/agenda", icon: MessageSquare },
     { label: "Inventario", href: "/app/inventory", icon: PackageSearch },
-    { label: "Configuración", href: "/settings.html", icon: Settings },
+    { label: "Configuración", href: "/app/settings", icon: Settings },
     { label: "Plan y consumo", href: "/app/plan", icon: WalletCards }
   ];
 

@@ -16,7 +16,7 @@ const navigation = [
   { href: "/app/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/#customers", label: "Clientes", icon: Users },
   { href: "/app/inventory", label: "Inventario", icon: PackageSearch },
-  { href: "/settings.html", label: "Configuración", icon: Settings }
+  { href: "/app/settings", label: "Configuración", icon: Settings }
 ];
 
 export function AppShell({ children }: PropsWithChildren) {
@@ -31,6 +31,7 @@ export function AppShell({ children }: PropsWithChildren) {
     if (label === "Inicio") return location.pathname === "/";
     if (label === "Agenda") return location.pathname.startsWith("/agenda");
     if (label === "Inventario") return location.pathname.startsWith("/inventory");
+    if (label === "Configuración") return location.pathname.startsWith("/settings");
     return false;
   }
 

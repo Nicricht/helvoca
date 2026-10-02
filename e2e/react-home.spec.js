@@ -281,6 +281,7 @@ test.describe('React Home migration', () => {
     await expect(quick.locator('a[href="/#bookings"]')).toHaveCount(0);
     await expect(quick.locator('a[href="/conversations.html"]')).toHaveCount(0);
     await expect(quick.getByRole('link', { name: 'Inventario' })).toHaveAttribute('href', '/app/inventory');
+    await expect(quick.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/app/settings');
     await expect(quick.getByRole('link', { name: 'Plan y consumo' })).toHaveAttribute('href', '/app/plan');
 
     const sales = page.getByRole('region', { name: 'Resumen de ventas' });
@@ -313,7 +314,7 @@ test.describe('React Home migration', () => {
     await expect(onboarding).toContainText(/servicios/i);
     await expect(onboarding.getByRole('link', { name: /continuar/i })).toHaveAttribute(
       'href',
-      /\/settings\.html\?section=services/
+      /\/app\/settings\?section=services/
     );
 
     await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toHaveCount(0);
@@ -336,7 +337,7 @@ test.describe('React Home migration', () => {
     await expect(onboarding).toContainText('Recepcionista');
     await expect(onboarding.getByRole('link', { name: /continuar/i })).toHaveAttribute(
       'href',
-      /\/settings\.html\?section=receptionist/
+      /\/app\/settings\?section=receptionist/
     );
     await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toHaveCount(0);
   });
