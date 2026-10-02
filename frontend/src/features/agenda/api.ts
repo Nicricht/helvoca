@@ -28,6 +28,13 @@ export interface Customer {
   notes?: string | null;
 }
 
+export interface CreateCustomerInput {
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+}
+
 export interface ServiceItem {
   id: string;
   name: string;
@@ -89,6 +96,13 @@ export function getBookings() {
 
 export function getCustomers() {
   return apiRequest<Customer[]>("/api/v1/customers");
+}
+
+export function createCustomer(input: CreateCustomerInput) {
+  return apiRequest<Customer>("/api/v1/customers", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
 }
 
 export function getServices() {

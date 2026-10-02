@@ -186,7 +186,6 @@ jobs:
           node --check src/main/resources/static/voice-selector.js
           node --check src/main/resources/static/ux-simplification.js
           node --check src/main/resources/static/pricing.js
-          node --check src/main/resources/static/home-business.js
           node --check src/main/resources/static/settings-page.js
           node --check src/main/resources/static/simulator.js
 
@@ -296,7 +295,6 @@ jobs:
           node --check src/main/resources/static/voice-selector.js
           node --check src/main/resources/static/ux-simplification.js
           node --check src/main/resources/static/pricing.js
-          node --check src/main/resources/static/home-business.js
           node --check src/main/resources/static/settings-page.js
           node --check src/main/resources/static/simulator.js
 
@@ -428,8 +426,8 @@ jobs:
 
       - name: Validate reservations JavaScript
         run: |
-          node --check src/main/resources/static/home-business.js
-          node --check e2e/home-operational.spec.js
+          node --check e2e/react-agenda.spec.js
+          node --check e2e/react-legacy-capability-cutover.spec.js
 
       - name: Install reservations test dependencies
         run: |
@@ -437,7 +435,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run reservations frontend E2E
-        run: npx playwright test e2e/home-operational.spec.js --grep "ready customer sees live operational home instead of setup cards|reservation filters drawer and conversation links work|booking cancellation from drawer works|booking reschedule checks availability and updates the drawer|manual booking creation checks availability and adds the reservation|customers workspace sorts and renders contact data|manual customer creation adds customer and updates booking selector|newly created customer can receive a manual booking|newly created booking can be rescheduled from the agenda|newly created booking can be cancelled from the agenda|cancelled new booking appears in the customer history|customer exports download csv and xlsx|newly created customer is included in csv and xlsx exports|operator cannot see audit or export controls but keeps reservations and customers|audit workspace shows actor role resource and before after changes|new customer booking lifecycle appears in audit workspace|audit filters query by actor action resource and date range|audit exports preserve active filters in csv and xlsx"
+        run: npx playwright test e2e/react-agenda.spec.js e2e/react-legacy-capability-cutover.spec.js
 
       - name: Report reservations QA status
         if: always()
@@ -481,16 +479,13 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Validate workspace JavaScript
-        run: node --check src/main/resources/static/home-business.js
-
       - name: Install workspace test dependencies
         run: |
           npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
 
       - name: Run orders requests customers E2E
-        run: npx playwright test e2e/home-operational.spec.js --grep "orders list drawer and conversation work|orders status transition works|requests workspace renders active requests|requests workspace renders its empty state|customers workspace sorts and renders contact data|orders requests customers remain operable on mobile"
+        run: npx playwright test e2e/react-orders.spec.js e2e/react-legacy-capability-cutover.spec.js
 
       - name: Report workspace QA status
         if: always()
@@ -534,16 +529,13 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Validate orders JavaScript
-        run: node --check src/main/resources/static/home-business.js
-
       - name: Install orders test dependencies
         run: |
           npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
 
       - name: Run orders E2E
-        run: npx playwright test e2e/home-operational.spec.js --grep "orders list drawer and conversation work|orders status transition works"
+        run: npx playwright test e2e/react-orders.spec.js
 
       - name: Report orders QA status
         if: always()
@@ -595,7 +587,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run conversations E2E
-        run: npx playwright test e2e/home-operational.spec.js --grep "conversation|reservation filters drawer and conversation links work"
+        run: npx playwright test e2e/react-agenda.spec.js e2e/react-orders.spec.js --grep "conversation"
 
       - name: Report conversations QA status
         if: always()
@@ -1003,7 +995,6 @@ jobs:
       - name: Check changed operational JavaScript syntax
         run: |
           node --check src/main/resources/static/app.js
-          node --check src/main/resources/static/home-business.js
           node --check src/main/resources/static/settings-page.js
           node --check src/main/resources/static/ux-simplification.js
 
@@ -1051,7 +1042,6 @@ jobs:
 
       - name: Validate operational redesign JavaScript
         run: |
-          node --check src/main/resources/static/home-business.js
           node --check src/main/resources/static/settings-page.js
 
       - name: Install operational redesign test dependencies
@@ -1060,7 +1050,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run targeted operational redesign E2E
-        run: npx playwright test e2e/home-operational.spec.js e2e/settings.spec.js
+        run: npx playwright test e2e/react-home.spec.js e2e/react-agenda.spec.js e2e/react-orders.spec.js e2e/react-legacy-capability-cutover.spec.js e2e/settings.spec.js
 
       - name: Report operational redesign QA status
         if: always()
@@ -1163,7 +1153,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run navigation and responsive E2E
-        run: npx playwright test e2e/frontend-ux.spec.js e2e/home-operational.spec.js e2e/simulator.spec.js
+        run: npx playwright test e2e/frontend-ux.spec.js e2e/react-home.spec.js e2e/react-agenda.spec.js e2e/react-orders.spec.js e2e/simulator.spec.js
 
       - name: Report navigation QA status
         if: always()
@@ -1208,7 +1198,6 @@ jobs:
 
       - name: Validate interaction JavaScript
         run: |
-          node --check src/main/resources/static/home-business.js
           node --check src/main/resources/static/simulator.js
           node --check e2e/interaction-audit.spec.js
 

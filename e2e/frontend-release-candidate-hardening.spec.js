@@ -31,7 +31,7 @@ async function commonIdentity(page, roles = ['BUSINESS_ADMIN']) {
   })));
 }
 
-test('new ferretería owner is guided to the first incomplete setup step without entering operations', async ({ page }) => {
+test('new ferretería owner is guided by React Home to the first incomplete setup step', async ({ page }) => {
   const mutations = trackMutations(page);
   await commonIdentity(page);
 
@@ -43,76 +43,18 @@ test('new ferretería owner is guided to the first incomplete setup step without
     humanTransferConfigured: false,
     phoneConfigured: false,
     readyForCalls: false,
-    nextStep: 'SERVICES'
+    nextStep: 'ADD_SERVICE'
   })));
-  await page.route('**/api/v1/onboarding/guide', route => route.fulfill(json({
-    readyForPilot: false,
-    completed: 1,
-    total: 7,
-    progressPercent: 14,
-    nextStep: {
-      code: 'BUSINESS_SETUP',
-      label: 'Datos, oferta y horarios',
-      complete: false,
-      detail: 'Pendiente',
-      actionLabel: 'Preparar negocio',
-      actionHref: '/settings.html'
-    },
-    steps: []
-  })));
-  await page.route('**/api/v1/onboarding/activation', route => route.fulfill(json({
-    ready: false,
-    completed: 1,
-    total: 10,
-    progressPercent: 10,
-    blockers: ['SERVICES', 'SCHEDULE', 'RECEPTIONIST'],
-    steps: []
-  })));
-  await page.route('**/api/v1/services', route => route.fulfill(json([])));
-  await page.route('**/api/v1/business/hours', route => route.fulfill(json([])));
-  await page.route('**/api/v1/knowledge**', route => route.fulfill(json([])));
-  await page.route('**/api/v1/ai-agent', route => route.fulfill(json({
-    configured: false,
-    name: 'RecepVoz',
-    language: 'es',
-    active: false,
-    capabilities: []
-  })));
-  await page.route('**/api/v1/phone-numbers', route => route.fulfill(json([])));
-  await page.route('**/api/v1/phone-numbers/provisioning/status', route => route.fulfill(json({
-    enabled: false,
-    configured: false,
-    purchaseAvailable: false,
-    provider: 'TWILIO',
-    message: 'No disponible en RC'
-  })));
-  await page.route('**/api/v1/subscription', route => route.fulfill(json({
-    plan: 'BASIC',
-    status: 'ACTIVE',
-    serviceAllowed: true,
-    maxConcurrentCalls: 1,
-    includedMinutes: 100,
-    usedMinutes: 0,
-    overageMinutes: 0,
-    billingProviderConnected: false,
-    legacyFallback: false
-  })));
-  await page.route('**/api/v1/public/pricing', route => route.fulfill(json([])));
-  await page.route('**/api/v1/admin/users', route => route.fulfill(json([])));
-  await page.route('**/api/v1/admin/invitations', route => route.fulfill(json([])));
-  await page.route('**/api/v1/operations/pilot-metrics**', route => route.fulfill(json({
-    conversationsHandled: 0,
-    bookingsCreated: 0,
-    requiresAttention: 0
-  })));
-  await page.goto('/');
 
-  await expect(page.locator('#firstUserOnboarding')).toBeVisible();
-  await expect(page.locator('#firstUserOnboarding h1')).toHaveText('Vamos a preparar tu recepcionista');
-  await expect(page.locator('#firstUserProgressText')).toHaveText('1 de 4 pasos completados');
-  await expect(page.locator('#firstUserNextAction')).toHaveText('Continuar con Servicios');
-  await expect(page.locator('#firstUserNextAction')).toHaveAttribute('href', '/settings.html?section=services');
-  await expect(page.locator('#homeBusinessWorkspace')).toBeHidden();
+  await page.goto('/app');
+
+  const onboarding = page.getByRole('region', { name: 'Configura tu negocio' });
+  await expect(onboarding).toBeVisible();
+  await expect(onboarding.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '25');
+  await expect(onboarding).toContainText(/servicios/i);
+  await expect(onboarding.getByRole('link', { name: /continuar/i }))
+    .toHaveAttribute('href', '/app/settings?section=services');
+  await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toHaveCount(0);
   expect(mutations).toEqual([]);
 });
 

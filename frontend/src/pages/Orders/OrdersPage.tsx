@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { AppShell } from "../../components/AppShell/AppShell";
+import { OperationsSupportPanel } from "../../features/operations/OperationsSupportPanel";
 import {
   getCallContext,
   getConversation,
@@ -673,6 +674,11 @@ export function OrdersPage() {
             </>
           )}
         </section>
+
+        <OperationsSupportPanel
+          user={model.me.data}
+          showCustomerTools={view === "CUSTOMERS"}
+        />
 
         <AnimatePresence>
           {selected && (

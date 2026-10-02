@@ -204,6 +204,17 @@ test.describe('React Agenda migration', () => {
     await expect(row).toContainText('Confirmada');
   });
 
+  test('renders WhatsApp booking source and authoritative status in React Agenda', async ({ page }) => {
+    await bootAgenda(page);
+    await page.goto('/app/agenda');
+
+    const row = page.getByTestId('agenda-row-b2');
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('Bruno Masaje');
+    await expect(row).toContainText('WhatsApp');
+    await expect(row).toContainText('Cancelada');
+  });
+
   test('filters reservations by search, service and status without leaving Agenda', async ({ page }) => {
     await bootAgenda(page);
     await page.goto('/app/agenda');
@@ -298,8 +309,8 @@ test.describe('React Agenda migration', () => {
 
     await page.getByRole('button', { name: 'Nueva cita' }).click();
     const dialog = page.getByRole('dialog', { name: 'Nueva cita' });
-    await dialog.getByLabel('Cliente').selectOption('cust1');
-    await dialog.getByLabel('Servicio').selectOption('svc1');
+    await dialog.locator('select[aria-label="Cliente"]').selectOption('cust1');
+    await dialog.locator('select[aria-label="Servicio"]').selectOption('svc1');
     await dialog.getByLabel('Fecha').fill('2026-10-07');
     await dialog.getByLabel('Hora').fill('10:00');
 

@@ -233,32 +233,3 @@ test('inventory is an actionable product and stock workspace on desktop and mobi
   await expect(page.locator('.inventory-table-wrap')).toHaveClass(/inventory-mobile-cards/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
 });
-
-test('orders can be searched, filtered and understood by state and next action', async ({ page }) => {
-  await page.goto('/?tab=orders');
-
-  await expect(page.locator('[data-home-panel="orders"]')).toBeVisible();
-  await expect(page.locator('#homeOrderSearch')).toBeVisible();
-  await expect(page.locator('#homeOrderStatus')).toBeVisible();
-  await expect(page.locator('#homeOrderSort')).toBeVisible();
-  await expect(page.locator('#homeOrderResult')).toContainText('2');
-
-  const ready = page.locator('[data-home-order-id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]').first();
-  await expect(ready).toContainText('Camila Soto');
-  await expect(ready).toContainText('Listo');
-  await expect(ready).toContainText('Despachar');
-  await expect(ready.locator('.home-order-status')).toHaveClass(/is-ready/);
-
-  await page.locator('#homeOrderSearch').fill('Diego');
-  await expect(page.locator('#homeOrderResult')).toContainText('1');
-  await expect(page.locator('[data-home-order-id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"]').first()).toBeVisible();
-  await expect(page.locator('[data-home-order-id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]').first()).toHaveCount(0);
-
-  await page.locator('#homeOrderSearch').fill('');
-  await page.locator('#homeOrderStatus').selectOption('READY');
-  await expect(page.locator('#homeOrderResult')).toContainText('1');
-  await expect(page.locator('[data-home-order-id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]').first()).toBeVisible();
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
-});
