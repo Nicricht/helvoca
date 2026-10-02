@@ -126,6 +126,13 @@
   line-height: 1.5;
 }
 
+.workspaceActions {
+  flex: 0 0 auto;
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
 .queueSummary {
   flex: 0 0 auto;
   display: flex;
@@ -527,6 +534,11 @@
 @media (max-width: 760px) {
   .workspaceHeader {
     flex-direction: column;
+  }
+
+  .workspaceActions {
+    width: 100%;
+    justify-items: start;
   }
 
   .queueSummary {
