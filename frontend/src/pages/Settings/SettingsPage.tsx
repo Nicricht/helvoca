@@ -546,6 +546,8 @@ export function SettingsPage() {
               canManageTeam={model.canManageTeam}
               canReadScheduleExceptions={model.canReadScheduleExceptions}
               canManageScheduleExceptions={model.canManageScheduleExceptions}
+              canReadChannels={model.canReadChannels}
+              canManageChannels={model.canManageChannels}
               voices={model.voices.data ?? []}
               phones={model.phones.data ?? []}
               updateRoot={updateRoot}
