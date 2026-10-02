@@ -1,6 +1,5 @@
 import type { PropsWithChildren } from "react";
 import {
-  Bot,
   CalendarDays,
   LayoutDashboard,
   PackageSearch,
@@ -16,7 +15,6 @@ const navigation = [
   { href: "/#bookings", label: "Reservas", icon: CalendarDays },
   { href: "/#customers", label: "Clientes", icon: Users },
   { href: "/app/inventory", label: "Inventario", icon: PackageSearch },
-  { href: "/conversations.html", label: "Recepcionista IA", icon: Bot },
   { href: "/settings.html", label: "Configuración", icon: Settings }
 ];
 
