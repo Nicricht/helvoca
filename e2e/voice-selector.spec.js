@@ -46,7 +46,7 @@ test('React Settings selects the AI voice from the backend catalog and never exp
 
   await page.goto('/app/settings?section=receptionist');
 
-  const selector = page.getByLabel('Voz');
+  const selector = page.locator('#settings-panel-receptionist').getByLabel('Voz');
   await expect(selector).toBeVisible();
   await expect(selector).toHaveValue('marin');
   await expect(selector.locator('option')).toHaveText(['Natural', 'Profesional', 'Amigable']);
