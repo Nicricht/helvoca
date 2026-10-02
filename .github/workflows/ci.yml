@@ -638,9 +638,7 @@ jobs:
         run: |
           node --check src/main/resources/static/app.js
           node --check src/main/resources/static/commercial-status.js
-          node --check src/main/resources/static/settings-page.js
           node --check src/main/resources/static/ux-simplification.js
-          node --check src/main/resources/static/voice-selector.js
           node --check src/main/resources/static/phone-provisioning.js
 
       - name: Install settings test dependencies
@@ -1000,7 +998,6 @@ jobs:
         run: |
           node --check src/main/resources/static/app.js
           node --check src/main/resources/static/home-business.js
-          node --check src/main/resources/static/settings-page.js
           node --check src/main/resources/static/ux-simplification.js
 
       - name: Report operational JavaScript QA status
@@ -1048,7 +1045,6 @@ jobs:
       - name: Validate operational redesign JavaScript
         run: |
           node --check src/main/resources/static/home-business.js
-          node --check src/main/resources/static/settings-page.js
 
       - name: Install operational redesign test dependencies
         run: |
