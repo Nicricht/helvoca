@@ -1,7 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { useLocation } from "react-router-dom";
 import {
-  Bot,
   CalendarDays,
   LayoutDashboard,
   PackageSearch,
@@ -14,10 +13,9 @@ import styles from "./AppShell.module.css";
 
 const navigation = [
   { href: "/app", label: "Inicio", icon: LayoutDashboard },
-  { href: "/#bookings", label: "Reservas", icon: CalendarDays },
+  { href: "/app/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/#customers", label: "Clientes", icon: Users },
   { href: "/app/inventory", label: "Inventario", icon: PackageSearch },
-  { href: "/conversations.html", label: "Recepcionista IA", icon: Bot },
   { href: "/settings.html", label: "Configuración", icon: Settings }
 ];
 
@@ -31,6 +29,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
   function isCurrentNavigation(label: string): boolean {
     if (label === "Inicio") return location.pathname === "/";
+    if (label === "Agenda") return location.pathname.startsWith("/agenda");
     if (label === "Inventario") return location.pathname.startsWith("/inventory");
     return false;
   }

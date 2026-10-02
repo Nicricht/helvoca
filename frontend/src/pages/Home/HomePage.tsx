@@ -272,9 +272,8 @@ function RecentActivity({ dashboard }: { dashboard: OperationsDashboard }) {
 
 function QuickActions() {
   const actions = [
-    { label: "Agenda", href: "/#bookings", icon: CalendarDays },
-    { label: "Clientes", href: "/#customers", icon: Users },
-    { label: "Conversaciones", href: "/conversations.html", icon: MessageSquare },
+    { label: "Agenda", href: "/app/agenda", icon: CalendarDays },
+    { label: "Conversaciones", href: "/app/agenda", icon: MessageSquare },
     { label: "Inventario", href: "/app/inventory", icon: PackageSearch },
     { label: "Configuración", href: "/settings.html", icon: Settings },
     { label: "Plan y consumo", href: "/app/plan", icon: WalletCards }

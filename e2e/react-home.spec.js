@@ -275,9 +275,9 @@ test.describe('React Home migration', () => {
 
     const quick = page.getByRole('navigation', { name: 'Accesos rápidos' });
     await expect(quick).toBeVisible();
-    await expect(quick.getByRole('link', { name: 'Agenda' })).toBeVisible();
-    await expect(quick.getByRole('link', { name: 'Clientes' })).toBeVisible();
-    await expect(quick.getByRole('link', { name: 'Conversaciones' })).toBeVisible();
+    await expect(quick.getByRole('link', { name: 'Agenda' })).toHaveAttribute('href', '/app/agenda');
+    await expect(quick.getByRole('link', { name: 'Conversaciones' })).toHaveAttribute('href', '/app/agenda');
+    await expect(quick.getByRole('link', { name: 'Clientes' })).toHaveCount(0);
     await expect(quick.getByRole('link', { name: 'Inventario' })).toHaveAttribute('href', '/app/inventory');
     await expect(quick.getByRole('link', { name: 'Plan y consumo' })).toHaveAttribute('href', '/app/plan');
 
