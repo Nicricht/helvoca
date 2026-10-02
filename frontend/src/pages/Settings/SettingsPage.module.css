@@ -1068,3 +1068,152 @@
     flex: 1;
   }
 }
+
+
+.channelWorkspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.channelActionGrid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.channelActionCard {
+  min-width: 0;
+  display: grid;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 12px;
+  background: var(--rv-surface-1);
+}
+
+.channelActionCard strong,
+.channelStatusCard strong,
+.activationBox strong {
+  color: var(--rv-text-primary);
+  font-size: 12px;
+}
+
+.channelActionCard span,
+.channelStatusCard span,
+.activationBox span,
+.choiceCard span,
+.choiceCardActive span {
+  color: var(--rv-text-secondary);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.channelActionCard input,
+.phoneSearchFields input,
+.pinBox input {
+  min-width: 0;
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--rv-border-default);
+  border-radius: 10px;
+  color: var(--rv-text-primary);
+  background: var(--rv-bg-canvas);
+  font: inherit;
+  font-size: 12px;
+}
+
+.phoneSearchFields {
+  display: grid;
+  grid-template-columns: minmax(80px, .35fr) minmax(120px, .65fr);
+  gap: 8px;
+}
+
+.channelStatusCard,
+.activationBox {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 12px;
+  background: var(--rv-surface-1);
+}
+
+.channelStatusCard > div,
+.activationBox > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.metaFlow {
+  margin-top: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.choiceGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.choiceCard,
+.choiceCardActive {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 11px;
+  border-radius: 10px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.choiceCard {
+  border: 1px solid var(--rv-border-subtle);
+  color: var(--rv-text-primary);
+  background: var(--rv-bg-canvas);
+}
+
+.choiceCardActive {
+  border: 1px solid var(--rv-accent-border);
+  color: var(--rv-accent);
+  background: var(--rv-accent-soft);
+  box-shadow: var(--rv-focus-ring);
+}
+
+.choiceCard strong,
+.choiceCardActive strong {
+  font-size: 12px;
+}
+
+.pinBox {
+  max-width: 420px;
+  display: grid;
+  gap: 9px;
+}
+
+.activationBox {
+  margin-top: 12px;
+  border-color: var(--rv-ai-accent-border);
+  background: var(--rv-ai-accent-soft);
+}
+
+@media (max-width: 760px) {
+  .channelActionGrid,
+  .phoneSearchFields {
+    grid-template-columns: 1fr;
+  }
+
+  .channelStatusCard,
+  .activationBox {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
