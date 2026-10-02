@@ -342,7 +342,7 @@ test('assisted onboarding hands the same business to an invited administrator th
 
   const inviteField = page.getByLabel('Enlace de invitación');
   await expect(inviteField).toHaveValue(/invite\.html\?businessId=.*token=e2e-invite-token/);
-  await expect(page.getByText('Dueña Negocio')).toBeVisible();
+  await expect(page.locator('section[aria-label="Invitaciones del equipo"]').getByText('Dueña Negocio')).toBeVisible();
 
   const inviteUrl = await inviteField.inputValue();
   await page.goto(inviteUrl);
@@ -357,8 +357,9 @@ test('assisted onboarding hands the same business to an invited administrator th
   await expect(page).toHaveURL(/\/$/);
 
   await page.goto('/app/settings?section=team');
-  await expect(page.getByText('Dueña Negocio')).toBeVisible();
-  await expect(page.getByText('duena@negocio.cl')).toBeVisible();
+  const members = page.locator('section[aria-label="Miembros del equipo"]');
+  await expect(members.getByText('Dueña Negocio')).toBeVisible();
+  await expect(members.getByText('duena@negocio.cl')).toBeVisible();
 });
 
 test('primary and public navigation fit desktop tablet and mobile viewports', async ({ page }) => {
