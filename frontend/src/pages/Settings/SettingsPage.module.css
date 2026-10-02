@@ -1217,3 +1217,52 @@
     flex-direction: column;
   }
 }
+
+
+.integrationGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.integrationStatusCard {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 12px;
+  background: var(--rv-surface-1);
+}
+
+.integrationStatusCard > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.integrationStatusCard strong {
+  color: var(--rv-text-primary);
+  font-size: 12px;
+}
+
+.integrationStatusCard span {
+  color: var(--rv-text-secondary);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.integrationActions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 680px) {
+  .integrationStatusCard {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
