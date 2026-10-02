@@ -1,12 +1,10 @@
 import type { PropsWithChildren } from "react";
 import {
-  Bot,
   CalendarDays,
   LayoutDashboard,
   PackageSearch,
   Settings,
   ShoppingBag,
-  Users,
   WalletCards
 } from "lucide-react";
 import { clearAccessToken } from "../../api/client";
@@ -14,16 +12,14 @@ import styles from "./AppShell.module.css";
 
 const navigation = [
   { href: "/", label: "Inicio", icon: LayoutDashboard },
-  { href: "/#bookings", label: "Reservas", icon: CalendarDays },
-  { href: "/#customers", label: "Clientes", icon: Users },
+  { href: "/#bookings", label: "Agenda", icon: CalendarDays },
   { href: "/app/orders", label: "Operaciones", icon: ShoppingBag },
   { href: "/app/inventory", label: "Inventario", icon: PackageSearch },
-  { href: "/conversations.html", label: "Recepcionista IA", icon: Bot },
   { href: "/settings.html", label: "Configuración", icon: Settings }
 ];
 
 export function AppShell({ children }: PropsWithChildren) {
-  const currentPath = window.location.pathname;
+  const currentPath = window.location.pathname.replace(/\/$/, "") || "/";
 
   function logout() {
     clearAccessToken();
