@@ -15,7 +15,7 @@ async function bootReactSettings(page) {
   await page.route('**/api/v1/**', route => {
     const path = new URL(route.request().url()).pathname;
     if (route.request().method() !== 'GET') {
-      return route.fulfill(json({ message: 'mutation blocked by cutover RED' }, 501));
+      return route.fallback();
     }
     if (path === '/api/v1/auth/me') {
       return route.fulfill(json({
