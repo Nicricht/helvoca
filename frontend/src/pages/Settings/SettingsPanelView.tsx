@@ -23,6 +23,7 @@ import type {
   VoiceOption
 } from "../../features/settings/api";
 import type { SectionKey, SettingsDraft } from "../../features/settings/viewModel";
+import { ChannelsSettingsPanel } from "./ChannelsSettingsPanel";
 import { ScheduleExceptionsPanel } from "./ScheduleExceptionsPanel";
 import { TeamSettingsPanel } from "./TeamSettingsPanel";
 import styles from "./SettingsPage.module.css";
@@ -61,6 +62,8 @@ interface SettingsPanelViewProps {
   canManageTeam: boolean;
   canReadScheduleExceptions: boolean;
   canManageScheduleExceptions: boolean;
+  canReadChannels: boolean;
+  canManageChannels: boolean;
   voices: VoiceOption[];
   phones: PhoneNumber[];
   updateRoot: (
@@ -88,6 +91,8 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
     canManageTeam,
     canReadScheduleExceptions,
     canManageScheduleExceptions,
+    canReadChannels,
+    canManageChannels,
     voices,
     phones,
     updateRoot,
@@ -562,33 +567,16 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             <span className={styles.sectionIcon}><Phone size={19} aria-hidden="true" /></span>
             <div>
               <h2>Canales</h2>
-              <p>Estado observable de tus números. Las acciones de proveedor se mantienen separadas y explícitas.</p>
+              <p>Telefonía y WhatsApp Business con acciones explícitas y sin efectos automáticos al abrir la pantalla.</p>
             </div>
           </div>
         </div>
 
-        <div className={styles.channelList}>
-          {phones.length === 0 && (
-            <div className={styles.emptyCard}>
-              <Phone size={20} aria-hidden="true" />
-              <div>
-                <strong>No hay números conectados.</strong>
-                <span>Esta pantalla no aprovisiona ni activa proveedores automáticamente.</span>
-              </div>
-            </div>
-          )}
-          {phones.map(phone => (
-            <article className={styles.channelCard} key={phone.id || phone.phoneNumber}>
-              <div>
-                <strong>{phone.phoneNumber || "Número"}</strong>
-                <span>{phone.provider || "Proveedor"} · {phone.active ? "Activo" : "Inactivo"}</span>
-              </div>
-              <span className={phone.active ? styles.goodPill : styles.mutedPill}>
-                {phone.whatsappEnabled ? "WhatsApp habilitado" : "Voz"}
-              </span>
-            </article>
-          ))}
-        </div>
+        <ChannelsSettingsPanel
+          phones={phones}
+          canRead={canReadChannels}
+          canManage={canManageChannels}
+        />
       </section>
     );
   }
