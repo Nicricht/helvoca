@@ -155,7 +155,7 @@ public class OrderWorkflowService {
             operation.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
             operation.setMetadata(stateMetadata(operation.getMetadata(), true));
             operation = operations.saveAndFlush(operation);
-            replaceItems(operation.getId(), recalculated.lines());
+            replaceItems(businessId, operation.getId(), recalculated.lines());
             return errorWithData("ORDER_TOTAL_CHANGED",
                     "El precio o despacho cambió. Presenta el nuevo total y solicita una nueva confirmación.",
                     quoteData(operation, recalculated));
