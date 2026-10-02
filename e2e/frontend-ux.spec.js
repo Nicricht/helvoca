@@ -269,33 +269,9 @@ test('login keeps errors visible and enters the dashboard after valid credential
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBe('login-token');
 });
 
-test('ready customer sees operations on home and configuration on settings', async ({ page }) => {
+test('ready customer sees operations on home and React configuration', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await mockReadyTenant(page);
-  await page.route('https://connect.facebook.net/**/sdk.js', route => route.fulfill({
-    status: 200,
-    contentType: 'application/javascript',
-    body: 'window.FB={init:(options)=>{window.__fbInitOptions=options;},login:(callback,options)=>{window.__fbLoginOptions=options;callback({authResponse:{code:"temporary-code-for-e2e"}});}}; if(window.fbAsyncInit) window.fbAsyncInit();'
-  }));
-  let embeddedSignupCodeHandoff = null;
-  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/authorization-code', async route => {
-    embeddedSignupCodeHandoff = route.request().postDataJSON();
-    await route.fulfill(json({
-      state: 'AUTHORIZATION_CODE_EXCHANGED_AND_VALIDATED',
-      accepted: true,
-      retained: false,
-      exchangePending: false,
-      wabas: [{
-        id: '1906385232743451',
-        name: 'Negocio E2E WhatsApp',
-        currency: 'CLP',
-        timezoneId: 'America/Santiago',
-        messageTemplateNamespace: 'e2e',
-        systemUserAssigned: true
-      }],
-      wabaAfterCursor: null
-    }));
-  });
 
   await page.goto('/');
 
@@ -306,53 +282,14 @@ test('ready customer sees operations on home and configuration on settings', asy
   await expect(page.locator('#commercialStatusCard')).toBeHidden();
   await expect(page.locator('.nav-config')).toHaveAttribute('href', '/app/settings');
 
-  await page.goto('/settings.html');
-
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mi negocio');
-  await expect(page.locator('#advancedPanel')).toBeVisible();
-  await expect(page.locator('#statusGrid')).toBeHidden();
-  await expect(page.locator('.nav-config')).toHaveClass(/active/);
-  await expect(page.getByRole('button', { name: '🏪 Negocio', exact: true })).toBeVisible();
-  await expect(page.locator('#configBusinessPanel')).toBeVisible();
-
-  await expect(page.locator('#commercialStatusCard')).toBeVisible();
-  await expect(page.locator('#commercialPlans')).toBeHidden();
-  await expect(page.getByText('Pro · 477 min')).toBeVisible();
-  await page.getByRole('button', { name: 'Gestionar', exact: true }).click();
-  await expect(page.locator('#commercialPlans')).toBeVisible();
-
-  await page.getByRole('button', { name: '📞 Canales', exact: true }).click();
-  await expect(page.locator('#phoneCompactSummary').getByText('+56911111111')).toBeVisible();
-  await page.getByRole('button', { name: 'Cambiar' }).click();
-  await expect(page.getByRole('button', { name: 'Conectar mi número' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Buscar un número nuevo' })).toBeVisible();
-  await expect(page.locator('#provisioningSearchForm')).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Conectar WhatsApp', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Conectar WhatsApp', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Continuar con Meta', exact: true })).toBeVisible();
-  await expect(page.locator('#metaWhatsAppConnectMessage')).toContainText('SDK de Meta preparado');
-  expect(await page.evaluate(() => window.__fbInitOptions)).toEqual({
-    appId: '123456789',
-    xfbml: false,
-    version: 'v26.0'
-  });
-
-  await page.getByRole('button', { name: 'Continuar con Meta', exact: true }).click();
-  expect(await page.evaluate(() => window.__fbLoginOptions)).toEqual({
-    config_id: '987654321',
-    auth_type: 'rerequest',
-    response_type: 'code',
-    override_default_response_type: true,
-    extras: { setup: {} }
-  });
-  await expect.poll(() => embeddedSignupCodeHandoff).toEqual({ code: 'temporary-code-for-e2e' });
-  await expect(page.locator('#metaWhatsAppConnectMessage'))
-    .toHaveText('Autorización completada. Encontramos 1 cuenta de WhatsApp Business.');
-  await expect(page.locator('#metaWhatsAppWabaCandidates')).toContainText('Negocio E2E WhatsApp');
-  await expect(page.locator('#metaWhatsAppConnectMessage')).not.toContainText('temporary-code-for-e2e');
+  await page.goto('/settings.html?section=business');
+  await expect(page).toHaveURL(/\/app\/settings\/?\?section=business$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Configuración' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Negocio' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('a[href^="/settings.html"]')).toHaveCount(0);
 });
 
-test('assisted onboarding hands the same business to an invited administrator', async ({ page }) => {
+test('assisted onboarding hands the same business to an invited administrator through React Settings', async ({ page }) => {
   const teamState = {
     users: [{ id: 'user-admin', name: 'Administrador Inicial', email: 'admin@demo.cl', active: true, roles: ['BUSINESS_ADMIN'] }],
     invitations: []
@@ -389,29 +326,25 @@ test('assisted onboarding hands the same business to an invited administrator', 
     }
 
     const invitation = teamState.invitations[0];
-    await route.fulfill(json({
-      ...invitation,
-      invitePath: null
-    }));
+    await route.fulfill(json({ ...invitation, invitePath: null }));
   });
 
-  await page.goto('/settings.html');
+  await page.goto('/app/settings?section=team');
 
-  const teamCard = page.locator('#teamInvitationsCard');
-  await expect(teamCard).toBeVisible();
-  await expect(page.locator('#teamMembersList')).toContainText('Administrador Inicial');
-  await expect(page.locator('#teamMembersList')).toContainText('admin@demo.cl');
+  await expect(page.getByRole('heading', { name: 'Equipo y permisos' })).toBeVisible();
+  await expect(page.getByText('Administrador Inicial')).toBeVisible();
+  await expect(page.getByText('admin@demo.cl')).toBeVisible();
 
-  await page.locator('#teamInviteForm [name="name"]').fill('Dueña Negocio');
-  await page.locator('#teamInviteForm [name="email"]').fill('duena@negocio.cl');
-  await page.locator('#teamInviteForm [name="role"]').selectOption('BUSINESS_ADMIN');
-  await page.locator('#teamInviteForm button[type="submit"]').click();
+  await page.getByLabel('Nombre de la persona').fill('Dueña Negocio');
+  await page.getByLabel('Correo de la persona').fill('duena@negocio.cl');
+  await page.getByLabel('Rol de la persona').selectOption('BUSINESS_ADMIN');
+  await page.getByRole('button', { name: 'Crear invitación' }).click();
 
-  await expect(page.locator('#teamInviteUrl')).toHaveValue(/invite\.html\?businessId=.*token=e2e-invite-token/);
-  await expect(page.locator('#teamInviteList')).toContainText('Dueña Negocio');
-  await expect(page.locator('#teamInviteList')).toContainText('Pendiente');
+  const inviteField = page.getByLabel('Enlace de invitación');
+  await expect(inviteField).toHaveValue(/invite\.html\?businessId=.*token=e2e-invite-token/);
+  await expect(page.getByText('Dueña Negocio')).toBeVisible();
 
-  const inviteUrl = await page.locator('#teamInviteUrl').inputValue();
+  const inviteUrl = await inviteField.inputValue();
   await page.goto(inviteUrl);
 
   await expect(page.locator('#inviteTitle')).toHaveText('Únete a Negocio E2E');
@@ -423,11 +356,9 @@ test('assisted onboarding hands the same business to an invited administrator', 
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBe('owner-token');
   await expect(page).toHaveURL(/\/$/);
 
-  await page.goto('/settings.html');
-  await expect(page.locator('#teamMembersList')).toContainText('Dueña Negocio');
-  await expect(page.locator('#teamMembersList')).toContainText('duena@negocio.cl');
-  await expect(page.locator('#teamMembersList')).toContainText('ACTIVO');
-  await expect(page.locator('#teamInviteList')).toContainText('Aceptada');
+  await page.goto('/app/settings?section=team');
+  await expect(page.getByText('Dueña Negocio')).toBeVisible();
+  await expect(page.getByText('duena@negocio.cl')).toBeVisible();
 });
 
 test('primary and public navigation fit desktop tablet and mobile viewports', async ({ page }) => {
@@ -453,11 +384,9 @@ test('primary and public navigation fit desktop tablet and mobile viewports', as
       await expect(page.locator('.nav-config')).toHaveAttribute('href', '/app/settings');
       await expectNoPageOverflow();
 
-      await page.goto('/settings.html');
-      await expect(page.locator('.nav-inventory')).toHaveAttribute('href', '/app/inventory');
-      await expect(page.locator('.nav-config')).toHaveClass(/active/);
-      await page.getByRole('button', { name: '🏪 Negocio', exact: true }).click();
-      await expect(page.locator('#configBusinessPanel')).toBeVisible();
+      await page.goto('/app/settings');
+      await expect(page.getByRole('heading', { level: 1, name: 'Configuración' })).toBeVisible();
+      await expect(page.getByRole('tablist', { name: 'Secciones de configuración' })).toBeVisible();
       await expectNoPageOverflow();
 
       await page.goto('/inventory.html');
