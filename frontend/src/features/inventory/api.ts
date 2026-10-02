@@ -3,6 +3,7 @@ import { apiRequest } from "../../api/client";
 export interface CurrentUser {
   email?: string;
   roles?: string[];
+  permissions?: string[];
 }
 
 export interface BusinessSummary {
