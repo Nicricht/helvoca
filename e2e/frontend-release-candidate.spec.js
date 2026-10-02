@@ -210,7 +210,7 @@ async function mockCanonicalApp(page) {
 const canonical = [
   { name: 'home', route: '/app', heading: 'Inicio' },
   { name: 'agenda', route: '/app/agenda', heading: 'Agenda' },
-  { name: 'operations', route: '/app/orders', heading: 'Operaciones' },
+  { name: 'operations', route: '/app/orders', heading: 'Pedidos' },
   { name: 'inventory', route: '/app/inventory', heading: 'Inventario' },
   { name: 'settings', route: '/app/settings', heading: 'Configuración' },
   { name: 'plan', route: '/app/plan', heading: 'Plan y consumo' }
@@ -225,7 +225,7 @@ test('release candidate owner traverses every canonical React workspace', async 
   const nav = page.getByRole('navigation', { name: 'Navegación principal' });
   const destinations = [
     ['Agenda', '/app/agenda', 'Agenda'],
-    ['Operaciones', '/app/orders', 'Operaciones'],
+    ['Operaciones', '/app/orders', 'Pedidos'],
     ['Inventario', '/app/inventory', 'Inventario'],
     ['Configuración', '/app/settings', 'Configuración'],
     ['Plan y consumo', '/app/plan', 'Plan y consumo']
