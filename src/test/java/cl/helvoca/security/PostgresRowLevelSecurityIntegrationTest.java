@@ -1184,6 +1184,143 @@ class PostgresRowLevelSecurityIntegrationTest {
         }
     }
 
+
+    @Test
+    void schemaGuardRejectsTenantForeignKeysWithoutBusinessIdentity() {
+        List<String> unsafeTenantForeignKeys = ownerJdbc.queryForList("""
+                WITH tenant_tables AS (
+                    SELECT cls.oid,
+                           ns.nspname,
+                           cls.relname,
+                           business_col.attnum AS business_attnum
+                      FROM pg_class cls
+                      JOIN pg_namespace ns ON ns.oid = cls.relnamespace
+                      JOIN pg_attribute business_col
+                        ON business_col.attrelid = cls.oid
+                       AND business_col.attname = 'business_id'
+                       AND business_col.attnotnull
+                       AND NOT business_col.attisdropped
+                     WHERE ns.nspname = 'public'
+                       AND cls.relkind = 'r'
+                )
+                SELECT child.relname || '.' || fk.conname || ' -> ' || parent.relname
+                  FROM pg_constraint fk
+                  JOIN tenant_tables child ON child.oid = fk.conrelid
+                  JOIN tenant_tables parent ON parent.oid = fk.confrelid
+                 WHERE fk.contype = 'f'
+                   AND NOT EXISTS (
+                       SELECT 1
+                         FROM pg_constraint guard
+                        WHERE guard.contype = 'f'
+                          AND guard.conrelid = fk.conrelid
+                          AND guard.confrelid = fk.confrelid
+                          AND fk.conkey <@ guard.conkey
+                          AND fk.confkey <@ guard.confkey
+                          AND child.business_attnum = ANY(guard.conkey)
+                          AND parent.business_attnum = ANY(guard.confkey)
+                   )
+                 ORDER BY child.relname, fk.conname
+                """, String.class);
+
+        assertTrue(unsafeTenantForeignKeys.isEmpty(),
+                "Tenant-owned foreign keys must include business identity: " + unsafeTenantForeignKeys);
+    }
+
+    @Test
+    void humanHandoffRequiresTenantAwareOperationReference() {
+        Boolean protectedOperationReference = ownerJdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                      FROM pg_constraint fk
+                      JOIN pg_class child ON child.oid = fk.conrelid
+                      JOIN pg_class parent ON parent.oid = fk.confrelid
+                      JOIN pg_attribute operation_col
+                        ON operation_col.attrelid = child.oid
+                       AND operation_col.attname = 'operation_id'
+                      JOIN pg_attribute child_business_col
+                        ON child_business_col.attrelid = child.oid
+                       AND child_business_col.attname = 'business_id'
+                      JOIN pg_attribute parent_id_col
+                        ON parent_id_col.attrelid = parent.oid
+                       AND parent_id_col.attname = 'id'
+                      JOIN pg_attribute parent_business_col
+                        ON parent_business_col.attrelid = parent.oid
+                       AND parent_business_col.attname = 'business_id'
+                     WHERE fk.contype = 'f'
+                       AND child.relname = 'human_handoff'
+                       AND parent.relname = 'business_operation'
+                       AND operation_col.attnum = ANY(fk.conkey)
+                       AND child_business_col.attnum = ANY(fk.conkey)
+                       AND parent_id_col.attnum = ANY(fk.confkey)
+                       AND parent_business_col.attnum = ANY(fk.confkey)
+                )
+                """, Boolean.class);
+
+        assertTrue(Boolean.TRUE.equals(protectedOperationReference),
+                "human_handoff.operation_id must be tenant-aware at the PostgreSQL boundary");
+    }
+
+    @Test
+    void lineItemsRejectCrossTenantCatalogReferencesEvenForOwner() {
+        UUID itemA = UUID.randomUUID();
+        UUID itemB = UUID.randomUUID();
+        UUID operationA = UUID.randomUUID();
+        UUID orderA = UUID.randomUUID();
+
+        ownerJdbc.update(
+                "INSERT INTO catalog_item(id, business_id, kind, name, price) VALUES (?, ?, 'PRODUCT', ?, 1000)",
+                itemA, businessA, "Line integrity A " + itemA);
+        ownerJdbc.update(
+                "INSERT INTO catalog_item(id, business_id, kind, name, price) VALUES (?, ?, 'PRODUCT', ?, 1000)",
+                itemB, businessB, "Line integrity B " + itemB);
+        ownerJdbc.update("""
+                INSERT INTO business_operation(
+                    id, business_id, type, status, source, revision, currency
+                ) VALUES (?, ?, 'ORDER', 'CONFIRMED', 'MANUAL', 1, 'CLP')
+                """, operationA, businessA);
+        ownerJdbc.update("""
+                INSERT INTO business_order(
+                    id, business_id, operation_id, fulfillment_type, status,
+                    subtotal, delivery_fee, total, currency, source
+                ) VALUES (?, ?, ?, 'PICKUP', 'CONFIRMED', 1000, 0, 1000, 'CLP', 'MANUAL')
+                """, orderA, businessA, operationA);
+
+        org.junit.jupiter.api.Assertions.assertAll(
+                "line item tenant references",
+                () -> assertOperationItemInsertRejectedOrCleaned(operationA, itemB),
+                () -> assertOrderLineInsertRejectedOrCleaned(orderA, itemB));
+    }
+
+    private void assertOperationItemInsertRejectedOrCleaned(UUID operationId, UUID catalogItemId) {
+        UUID itemId = UUID.randomUUID();
+        try {
+            ownerJdbc.update("""
+                    INSERT INTO business_operation_item(
+                        id, operation_id, catalog_item_id, item_name, quantity, unit_price, line_total
+                    ) VALUES (?, ?, ?, 'Cross tenant item', 1, 1000, 1000)
+                    """, itemId, operationId, catalogItemId);
+            ownerJdbc.update("DELETE FROM business_operation_item WHERE id = ?", itemId);
+            fail("Cross-tenant business_operation_item catalog reference was accepted");
+        } catch (DataAccessException expected) {
+            // PostgreSQL tenant-integrity constraint rejected the write.
+        }
+    }
+
+    private void assertOrderLineInsertRejectedOrCleaned(UUID orderId, UUID catalogItemId) {
+        UUID lineId = UUID.randomUUID();
+        try {
+            ownerJdbc.update("""
+                    INSERT INTO business_order_line(
+                        id, order_id, catalog_item_id, item_name, quantity, unit_price, line_total
+                    ) VALUES (?, ?, ?, 'Cross tenant line', 1, 1000, 1000)
+                    """, lineId, orderId, catalogItemId);
+            ownerJdbc.update("DELETE FROM business_order_line WHERE id = ?", lineId);
+            fail("Cross-tenant business_order_line catalog reference was accepted");
+        } catch (DataAccessException expected) {
+            // PostgreSQL tenant-integrity constraint rejected the write.
+        }
+    }
+
     @Test
     void schemaGuardRejectsUnprotectedTenantTablesAndDirectTenantChildren() {
         List<String> directTenantTablesWithoutRls = ownerJdbc.queryForList("""
