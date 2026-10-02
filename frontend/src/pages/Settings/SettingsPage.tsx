@@ -6,26 +6,16 @@ import {
   ChevronRight,
   CircleAlert,
   CloudUpload,
-  Globe2,
   Link2,
   MessagesSquare,
   Phone,
-  Plus,
   Save,
   ShieldCheck,
   Sparkles,
-  Trash2,
   UsersRound,
   Wrench
 } from "lucide-react";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode
-} from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "../../api/client";
 import { AppShell } from "../../components/AppShell/AppShell";
 import {
@@ -39,31 +29,13 @@ import {
   type ServiceItem
 } from "../../features/settings/api";
 import { useSettingsWorkspace } from "../../features/settings/useSettingsWorkspace";
+import type {
+  SavePhase,
+  SectionKey,
+  SettingsDraft
+} from "../../features/settings/viewModel";
+import { SettingsPanelView } from "./SettingsPanelView";
 import styles from "./SettingsPage.module.css";
-
-type SectionKey =
-  | "business"
-  | "receptionist"
-  | "services"
-  | "hours"
-  | "knowledge"
-  | "channels"
-  | "integrations"
-  | "team";
-
-type SavePhase = "clean" | "dirty" | "saving" | "saved";
-
-interface DraftState {
-  businessName: string;
-  timezone: string;
-  language: string;
-  humanTransferPhone: string;
-  profile: BusinessProfileInput;
-  services: ServiceItem[];
-  hours: BusinessHour[];
-  knowledge: KnowledgeItem[];
-  agent: AiAgentInput;
-}
 
 const sections: Array<{
   key: SectionKey;
@@ -78,16 +50,6 @@ const sections: Array<{
   { key: "channels", label: "Canales", icon: Phone },
   { key: "integrations", label: "Integraciones", icon: Link2 },
   { key: "team", label: "Equipo", icon: UsersRound }
-];
-
-const dayNames = [
-  "Domingo",
-  "Lunes",
-  "Martes",
-  "Miércoles",
-  "Jueves",
-  "Viernes",
-  "Sábado"
 ];
 
 function sectionFromLocation(): SectionKey {
@@ -151,27 +113,10 @@ function saveErrorMessage(error: unknown) {
     : "No pudimos guardar la configuración. Intenta nuevamente.";
 }
 
-function Field({
-  label,
-  children,
-  wide = false
-}: {
-  label: string;
-  children: ReactNode;
-  wide?: boolean;
-}) {
-  return (
-    <label className={wide ? `${styles.field} ${styles.fieldWide}` : styles.field}>
-      <span>{label}</span>
-      {children}
-    </label>
-  );
-}
-
 export function SettingsPage() {
   const model = useSettingsWorkspace();
   const [activeSection, setActiveSection] = useState<SectionKey>(sectionFromLocation);
-  const [draft, setDraft] = useState<DraftState | null>(null);
+  const [draft, setDraft] = useState<SettingsDraft | null>(null);
   const [savePhase, setSavePhase] = useState<SavePhase>("clean");
   const [saveError, setSaveError] = useState("");
   const hydrated = useRef(false);
@@ -225,6 +170,7 @@ export function SettingsPage() {
         capabilities: [...(agent?.capabilities ?? [])]
       }
     });
+
     hydrated.current = true;
     setSavePhase("clean");
   }, [
@@ -256,9 +202,9 @@ export function SettingsPage() {
     window.history.replaceState(null, "", url);
   }
 
-  function updateRoot<K extends keyof Pick<DraftState, "businessName" | "timezone" | "language" | "humanTransferPhone">>(
-    key: K,
-    value: DraftState[K]
+  function updateRoot(
+    key: "businessName" | "timezone" | "language" | "humanTransferPhone",
+    value: string
   ) {
     setDraft(current => current ? { ...current, [key]: value } : current);
     markDirty();
@@ -281,9 +227,11 @@ export function SettingsPage() {
   function updateService(index: number, patch: Partial<ServiceItem>) {
     setDraft(current => {
       if (!current) return current;
-      const services = current.services.map((service, currentIndex) =>
-        currentIndex === index ? { ...service, ...patch } : service);
-      return { ...current, services };
+      return {
+        ...current,
+        services: current.services.map((service, currentIndex) =>
+          currentIndex === index ? { ...service, ...patch } : service)
+      };
     });
     markDirty();
   }
@@ -311,9 +259,11 @@ export function SettingsPage() {
   function updateHour(index: number, patch: Partial<BusinessHour>) {
     setDraft(current => {
       if (!current) return current;
-      const hours = current.hours.map((hour, currentIndex) =>
-        currentIndex === index ? { ...hour, ...patch } : hour);
-      return { ...current, hours };
+      return {
+        ...current,
+        hours: current.hours.map((hour, currentIndex) =>
+          currentIndex === index ? { ...hour, ...patch } : hour)
+      };
     });
     markDirty();
   }
@@ -338,9 +288,11 @@ export function SettingsPage() {
   function updateKnowledge(index: number, patch: Partial<KnowledgeItem>) {
     setDraft(current => {
       if (!current) return current;
-      const knowledge = current.knowledge.map((item, currentIndex) =>
-        currentIndex === index ? { ...item, ...patch } : item);
-      return { ...current, knowledge };
+      return {
+        ...current,
+        knowledge: current.knowledge.map((item, currentIndex) =>
+          currentIndex === index ? { ...item, ...patch } : item)
+      };
     });
     markDirty();
   }
@@ -584,527 +536,25 @@ export function SettingsPage() {
           </div>
 
           <div className={styles.panelWrap}>
-            {activeSection === "business" && (
-              <section
-                id="settings-panel-business"
-                className={styles.panel}
-                role="tabpanel"
-                aria-label="Negocio"
-              >
-                <div className={styles.sectionHeading}>
-                  <div>
-                    <span className={styles.sectionIcon}><Building2 size={19} aria-hidden="true" /></span>
-                    <div>
-                      <h2>Información del negocio</h2>
-                      <p>Datos públicos y operativos que usa la recepcionista para responder correctamente.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.formGrid}>
-                  <Field label="Nombre del negocio" wide>
-                    <input
-                      value={draft.businessName}
-                      readOnly={!model.canManage}
-                      onChange={event => updateRoot("businessName", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Descripción pública" wide>
-                    <textarea
-                      value={String(draft.profile.publicDescription ?? "")}
-                      readOnly={!model.canManage}
-                      onChange={event => updateProfile("publicDescription", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Sitio web">
-                    <input
-                      type="url"
-                      value={String(draft.profile.websiteUrl ?? "")}
-                      readOnly={!model.canManage}
-                      onChange={event => updateProfile("websiteUrl", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Teléfono principal">
-                    <input
-                      value={String(draft.profile.publicPhone ?? "")}
-                      readOnly={!model.canManage}
-                      onChange={event => updateProfile("publicPhone", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Correo público">
-                    <input
-                      type="email"
-                      value={String(draft.profile.publicEmail ?? "")}
-                      readOnly={!model.canManage}
-                      onChange={event => updateProfile("publicEmail", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Teléfono de transferencia">
-                    <input
-                      value={draft.humanTransferPhone}
-                      readOnly={!model.canManage}
-                      onChange={event => updateRoot("humanTransferPhone", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Dirección" wide>
-                    <input
-                      value={String(draft.profile.addressLine ?? "")}
-                      readOnly={!model.canManage}
-                      onChange={event => updateProfile("addressLine", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Comuna">
-                    <input
-                      value={String(draft.profile.commune ?? "")}
-                      readOnly={!model.canManage}
-                      onChange={event => updateProfile("commune", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Ciudad">
-                    <input
-                      value={String(draft.profile.city ?? "")}
-                      readOnly={!model.canManage}
-                      onChange={event => updateProfile("city", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Región">
-                    <input
-                      value={String(draft.profile.region ?? "")}
-                      readOnly={!model.canManage}
-                      onChange={event => updateProfile("region", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="País">
-                    <input
-                      maxLength={2}
-                      value={String(draft.profile.countryCode ?? "")}
-                      readOnly={!model.canManage}
-                      onChange={event => updateProfile("countryCode", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Zona horaria">
-                    <input
-                      value={draft.timezone}
-                      readOnly={!model.canManage}
-                      onChange={event => updateRoot("timezone", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Idioma">
-                    <input
-                      value={draft.language}
-                      readOnly={!model.canManage}
-                      onChange={event => updateRoot("language", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Moneda">
-                    <input
-                      maxLength={3}
-                      value={String(draft.profile.defaultCurrency ?? "CLP")}
-                      readOnly={!model.canManage}
-                      onChange={event => updateProfile("defaultCurrency", event.target.value)}
-                    />
-                  </Field>
-                </div>
-              </section>
-            )}
-
-            {activeSection === "receptionist" && (
-              <section
-                id="settings-panel-receptionist"
-                className={`${styles.panel} ${styles.aiPanel}`}
-                role="tabpanel"
-                aria-label="Recepcionista IA"
-              >
-                <div className={styles.sectionHeading}>
-                  <div>
-                    <span className={`${styles.sectionIcon} ${styles.aiIcon}`}><Bot size={19} aria-hidden="true" /></span>
-                    <div>
-                      <h2>Recepcionista IA</h2>
-                      <p>Define cómo habla y se presenta. Las reglas comerciales siguen siendo autoridad del backend.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.formGrid}>
-                  <Field label="Nombre de la recepcionista">
-                    <input
-                      value={draft.agent.name}
-                      readOnly={!model.canManage}
-                      onChange={event => updateAgent("name", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Idioma">
-                    <input
-                      value={draft.agent.language}
-                      readOnly={!model.canManage}
-                      onChange={event => updateAgent("language", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Voz" wide>
-                    <select
-                      value={draft.agent.voice}
-                      disabled={!model.canManage}
-                      onChange={event => updateAgent("voice", event.target.value)}
-                    >
-                      {!model.voices.data?.some(option =>
-                        (option.selection || option.code) === draft.agent.voice
-                      ) && draft.agent.voice && (
-                        <option value={draft.agent.voice}>{draft.agent.voice}</option>
-                      )}
-                      {(model.voices.data ?? []).map(option => {
-                        const value = String(option.selection || option.code || "");
-                        return <option key={value} value={value}>{option.name || value}</option>;
-                      })}
-                    </select>
-                  </Field>
-
-                  <Field label="Saludo inicial" wide>
-                    <textarea
-                      value={draft.agent.greeting}
-                      readOnly={!model.canManage}
-                      onChange={event => updateAgent("greeting", event.target.value)}
-                    />
-                  </Field>
-
-                  <Field label="Instrucciones conversacionales" wide>
-                    <textarea
-                      className={styles.tallTextarea}
-                      value={draft.agent.instructions}
-                      readOnly={!model.canManage}
-                      onChange={event => updateAgent("instructions", event.target.value)}
-                    />
-                  </Field>
-                </div>
-
-                <div className={styles.authorityNote}>
-                  <ShieldCheck size={18} aria-hidden="true" />
-                  <div>
-                    <strong>La IA no decide precios, stock, disponibilidad ni pagos.</strong>
-                    <span>Esos datos se consultan desde servicios autoritativos del backend.</span>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {activeSection === "services" && (
-              <section
-                id="settings-panel-services"
-                className={styles.panel}
-                role="tabpanel"
-                aria-label="Servicios"
-              >
-                <div className={styles.sectionHeading}>
-                  <div>
-                    <span className={styles.sectionIcon}><Wrench size={19} aria-hidden="true" /></span>
-                    <div>
-                      <h2>Servicios</h2>
-                      <p>Lo que tus clientes pueden consultar y reservar.</p>
-                    </div>
-                  </div>
-                  {model.canManage && (
-                    <button className="button secondary" type="button" onClick={addService}>
-                      <Plus size={15} aria-hidden="true" />
-                      Añadir servicio
-                    </button>
-                  )}
-                </div>
-
-                <div className={styles.cardList}>
-                  {draft.services.map((service, index) => (
-                    <article className={styles.editCard} key={service.id || `new-service-${index}`}>
-                      <strong className={styles.cardTitle}>{service.name || "Servicio nuevo"}</strong>
-                      <div className={styles.editCardGrid}>
-                        <Field label="Nombre">
-                          <input
-                            value={service.name}
-                            readOnly={!model.canManage}
-                            onChange={event => updateService(index, { name: event.target.value })}
-                          />
-                        </Field>
-                        <Field label="Duración (min)">
-                          <input
-                            type="number"
-                            min="1"
-                            value={service.durationMinutes}
-                            readOnly={!model.canManage}
-                            onChange={event => updateService(index, {
-                              durationMinutes: Number(event.target.value)
-                            })}
-                          />
-                        </Field>
-                        <Field label="Precio">
-                          <input
-                            type="number"
-                            min="0"
-                            value={service.price ?? ""}
-                            readOnly={!model.canManage}
-                            onChange={event => updateService(index, {
-                              price: event.target.value === "" ? null : Number(event.target.value)
-                            })}
-                          />
-                        </Field>
-                        <Field label="Descripción" wide>
-                          <input
-                            value={String(service.description ?? "")}
-                            readOnly={!model.canManage}
-                            onChange={event => updateService(index, { description: event.target.value })}
-                          />
-                        </Field>
-                      </div>
-                      {model.canManage && (
-                        <button
-                          className={styles.iconDanger}
-                          type="button"
-                          aria-label={`Eliminar servicio ${service.name || index + 1}`}
-                          onClick={() => removeService(index)}
-                        >
-                          <Trash2 size={16} aria-hidden="true" />
-                        </button>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeSection === "hours" && (
-              <section
-                id="settings-panel-hours"
-                className={styles.panel}
-                role="tabpanel"
-                aria-label="Horarios"
-              >
-                <div className={styles.sectionHeading}>
-                  <div>
-                    <span className={styles.sectionIcon}><CalendarClock size={19} aria-hidden="true" /></span>
-                    <div>
-                      <h2>Horarios de atención</h2>
-                      <p>Franjas semanales utilizadas por disponibilidad y reservas.</p>
-                    </div>
-                  </div>
-                  {model.canManage && (
-                    <button className="button secondary" type="button" onClick={addHour}>
-                      <Plus size={15} aria-hidden="true" />
-                      Añadir horario
-                    </button>
-                  )}
-                </div>
-
-                <div className={styles.hoursList}>
-                  {draft.hours.map((hour, index) => (
-                    <div className={styles.hourRow} key={`${hour.dayOfWeek}-${index}`}>
-                      <select
-                        aria-label={`Día ${index + 1}`}
-                        value={hour.dayOfWeek}
-                        disabled={!model.canManage}
-                        onChange={event => updateHour(index, { dayOfWeek: Number(event.target.value) })}
-                      >
-                        {dayNames.map((name, day) => <option value={day} key={name}>{name}</option>)}
-                      </select>
-                      <input
-                        aria-label={`Apertura ${index + 1}`}
-                        type="time"
-                        value={String(hour.openTime).slice(0, 5)}
-                        readOnly={!model.canManage}
-                        onChange={event => updateHour(index, { openTime: event.target.value })}
-                      />
-                      <span aria-hidden="true">→</span>
-                      <input
-                        aria-label={`Cierre ${index + 1}`}
-                        type="time"
-                        value={String(hour.closeTime).slice(0, 5)}
-                        readOnly={!model.canManage}
-                        onChange={event => updateHour(index, { closeTime: event.target.value })}
-                      />
-                      {model.canManage && (
-                        <button
-                          className={styles.iconDanger}
-                          type="button"
-                          aria-label={`Eliminar horario ${index + 1}`}
-                          onClick={() => removeHour(index)}
-                        >
-                          <Trash2 size={16} aria-hidden="true" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeSection === "knowledge" && (
-              <section
-                id="settings-panel-knowledge"
-                className={styles.panel}
-                role="tabpanel"
-                aria-label="Conocimiento"
-              >
-                <div className={styles.sectionHeading}>
-                  <div>
-                    <span className={styles.sectionIcon}><MessagesSquare size={19} aria-hidden="true" /></span>
-                    <div>
-                      <h2>Conocimiento y respuestas</h2>
-                      <p>Preguntas frecuentes e información descriptiva que la IA puede consultar.</p>
-                    </div>
-                  </div>
-                  {model.canManage && (
-                    <button className="button secondary" type="button" onClick={addKnowledge}>
-                      <Plus size={15} aria-hidden="true" />
-                      Añadir respuesta
-                    </button>
-                  )}
-                </div>
-
-                <div className={styles.cardList}>
-                  {draft.knowledge.map((item, index) => (
-                    <article className={styles.editCard} key={item.id || `new-knowledge-${index}`}>
-                      <div className={styles.editCardGrid}>
-                        <Field label="Título">
-                          <input
-                            value={item.title}
-                            readOnly={!model.canManage}
-                            onChange={event => updateKnowledge(index, { title: event.target.value })}
-                          />
-                        </Field>
-                        <Field label="Categoría">
-                          <input
-                            value={String(item.category ?? "")}
-                            readOnly={!model.canManage}
-                            onChange={event => updateKnowledge(index, { category: event.target.value })}
-                          />
-                        </Field>
-                        <Field label="Respuesta" wide>
-                          <textarea
-                            value={item.content}
-                            readOnly={!model.canManage}
-                            onChange={event => updateKnowledge(index, { content: event.target.value })}
-                          />
-                        </Field>
-                      </div>
-                      {model.canManage && (
-                        <button
-                          className={styles.iconDanger}
-                          type="button"
-                          aria-label={`Eliminar respuesta ${item.title || index + 1}`}
-                          onClick={() => removeKnowledge(index)}
-                        >
-                          <Trash2 size={16} aria-hidden="true" />
-                        </button>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeSection === "channels" && (
-              <section
-                id="settings-panel-channels"
-                className={styles.panel}
-                role="tabpanel"
-                aria-label="Canales"
-              >
-                <div className={styles.sectionHeading}>
-                  <div>
-                    <span className={styles.sectionIcon}><Phone size={19} aria-hidden="true" /></span>
-                    <div>
-                      <h2>Canales</h2>
-                      <p>Estado observable de tus números. Las acciones de proveedor se mantienen separadas y explícitas.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className={styles.channelList}>
-                  {(model.phones.data ?? []).length === 0 && (
-                    <div className={styles.emptyCard}>
-                      <Phone size={20} aria-hidden="true" />
-                      <div>
-                        <strong>No hay números conectados.</strong>
-                        <span>Esta pantalla no aprovisiona ni activa proveedores automáticamente.</span>
-                      </div>
-                    </div>
-                  )}
-                  {(model.phones.data ?? []).map(phone => (
-                    <article className={styles.channelCard} key={phone.id || phone.phoneNumber}>
-                      <div>
-                        <strong>{phone.phoneNumber || "Número"}</strong>
-                        <span>{phone.provider || "Proveedor"} · {phone.active ? "Activo" : "Inactivo"}</span>
-                      </div>
-                      <span className={phone.active ? styles.goodPill : styles.mutedPill}>
-                        {phone.whatsappEnabled ? "WhatsApp habilitado" : "Voz"}
-                      </span>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {activeSection === "integrations" && (
-              <section
-                id="settings-panel-integrations"
-                className={styles.panel}
-                role="tabpanel"
-                aria-label="Integraciones"
-              >
-                <div className={styles.sectionHeading}>
-                  <div>
-                    <span className={styles.sectionIcon}><Globe2 size={19} aria-hidden="true" /></span>
-                    <div>
-                      <h2>Integraciones</h2>
-                      <p>Los proveedores externos se administran con endpoints explícitos y nunca muestran credenciales completas.</p>
-                    </div>
-                  </div>
-                </div>
-                <div className={styles.authorityNote}>
-                  <ShieldCheck size={18} aria-hidden="true" />
-                  <div>
-                    <strong>Zona segura de integraciones</strong>
-                    <span>
-                      Activación de WhatsApp, pagos y otros proveedores se migrará como bloque independiente
-                      con confirmación, permisos y E2E mockeado.
-                    </span>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {activeSection === "team" && (
-              <section
-                id="settings-panel-team"
-                className={styles.panel}
-                role="tabpanel"
-                aria-label="Equipo"
-              >
-                <div className={styles.sectionHeading}>
-                  <div>
-                    <span className={styles.sectionIcon}><UsersRound size={19} aria-hidden="true" /></span>
-                    <div>
-                      <h2>Equipo y permisos</h2>
-                      <p>La gestión de invitaciones conserva por ahora el flujo legacy hasta certificar su bloque React.</p>
-                    </div>
-                  </div>
-                </div>
-                <a className="button secondary" href="/settings.html?section=team">
-                  Abrir gestión de equipo actual
-                  <ChevronRight size={15} aria-hidden="true" />
-                </a>
-              </section>
-            )}
+            <SettingsPanelView
+              activeSection={activeSection}
+              draft={draft}
+              canManage={model.canManage}
+              voices={model.voices.data ?? []}
+              phones={model.phones.data ?? []}
+              updateRoot={updateRoot}
+              updateProfile={updateProfile}
+              updateAgent={updateAgent}
+              updateService={updateService}
+              addService={addService}
+              removeService={removeService}
+              updateHour={updateHour}
+              addHour={addHour}
+              removeHour={removeHour}
+              updateKnowledge={updateKnowledge}
+              addKnowledge={addKnowledge}
+              removeKnowledge={removeKnowledge}
+            />
           </div>
 
           {model.canManage && (
