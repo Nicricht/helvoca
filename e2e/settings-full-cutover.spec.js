@@ -539,19 +539,21 @@ test('business profile and AI capabilities remain editable after the legacy cuto
 
   await page.goto('/app/settings?section=business');
 
-  await expect(page.getByLabel('Rubro')).toHaveValue('hardware_store');
-  await expect(page.getByLabel('Productos')).toHaveValue('true');
-  await expect(page.getByLabel('Servicios')).toHaveValue('false');
+  const businessPanel = page.locator('#settings-panel-business');
+  await expect(businessPanel.getByLabel('Rubro')).toHaveValue('hardware_store');
+  await expect(businessPanel.getByLabel('Productos')).toHaveValue('true');
+  await expect(businessPanel.getByLabel('Servicios')).toHaveValue('false');
   await expect(page.getByText('Prioriza catálogo, stock, cotizaciones, pedidos y despacho.')).toBeVisible();
 
-  await page.getByLabel('Servicios').selectOption('true');
+  await businessPanel.getByLabel('Servicios').selectOption('true');
   await page.getByRole('tab', { name: 'Recepcionista IA' }).click();
 
-  const active = page.getByLabel(/Agente IA activo para este negocio/);
+  const receptionistPanel = page.locator('#settings-panel-receptionist');
+  const active = receptionistPanel.getByLabel(/Agente IA activo para este negocio/);
   await expect(active).toBeChecked();
-  await expect(page.getByLabel('Información')).toBeChecked();
-  await expect(page.getByLabel('Servicios', { exact: true })).toBeChecked();
-  await page.getByLabel('Crear reserva').check();
+  await expect(receptionistPanel.getByLabel('Información')).toBeChecked();
+  await expect(receptionistPanel.getByLabel('Servicios', { exact: true })).toBeChecked();
+  await receptionistPanel.getByLabel('Crear reserva').check();
 
   await page.getByRole('button', { name: 'Guardar cambios' }).click();
 
