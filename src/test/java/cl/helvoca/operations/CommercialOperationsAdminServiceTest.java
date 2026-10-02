@@ -500,6 +500,61 @@ class CommercialOperationsAdminServiceTest {
 
 
     @Test
+    void deliveryQuoteAndLeadListsUseBoundedRepositoryQueries() {
+        UUID businessId = UUID.randomUUID();
+        TenantProvider tenant = mock(TenantProvider.class);
+        BusinessDeliveryRepository deliveries = mock(BusinessDeliveryRepository.class);
+        BusinessQuoteRepository quotes = mock(BusinessQuoteRepository.class);
+        BusinessLeadRepository leads = mock(BusinessLeadRepository.class);
+
+        BusinessDelivery delivery = new BusinessDelivery();
+        delivery.setId(UUID.randomUUID());
+        delivery.setBusinessId(businessId);
+        delivery.setStatus(BusinessDelivery.Status.CONFIRMED);
+        delivery.setSource(BusinessOrder.Source.API);
+
+        BusinessQuote quote = new BusinessQuote();
+        quote.setId(UUID.randomUUID());
+        quote.setBusinessId(businessId);
+        quote.setTitle("Cotización");
+        quote.setStatus(BusinessQuote.Status.REQUESTED);
+        quote.setSource(BusinessOrder.Source.API);
+
+        BusinessLead lead = new BusinessLead();
+        lead.setId(UUID.randomUUID());
+        lead.setBusinessId(businessId);
+        lead.setName("Cliente");
+        lead.setInterest("Taladro");
+        lead.setStatus(BusinessLead.Status.NEW);
+        lead.setSource(BusinessOrder.Source.API);
+
+        when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(deliveries.findTop100ByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of(delivery));
+        when(quotes.findTop100ByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of(quote));
+        when(leads.findTop100ByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of(lead));
+
+        CommercialOperationsAdminService service = new CommercialOperationsAdminService(
+                mock(BusinessOrderRepository.class),
+                mock(BusinessOrderLineRepository.class),
+                quotes,
+                leads,
+                deliveries,
+                mock(BusinessOperationRepository.class),
+                tenant);
+
+        assertEquals(1, service.deliveries().size());
+        assertEquals(1, service.quotes().size());
+        assertEquals(1, service.leads().size());
+
+        verify(deliveries).findTop100ByBusinessIdOrderByCreatedAtDesc(businessId);
+        verify(quotes).findTop100ByBusinessIdOrderByCreatedAtDesc(businessId);
+        verify(leads).findTop100ByBusinessIdOrderByCreatedAtDesc(businessId);
+        verify(deliveries, never()).findAllByBusinessIdOrderByCreatedAtDesc(any());
+        verify(quotes, never()).findAllByBusinessIdOrderByCreatedAtDesc(any());
+        verify(leads, never()).findAllByBusinessIdOrderByCreatedAtDesc(any());
+    }
+
+    @Test
     void ordersUsesBoundedRepositoryQueryAndBatchLoadsLines() {
         UUID businessId = UUID.randomUUID();
         UUID firstOrderId = UUID.randomUUID();
