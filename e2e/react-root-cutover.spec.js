@@ -29,6 +29,24 @@ test.describe('legacy Home retirement cutover', () => {
     await expect(page).toHaveURL(/\/app\/?$/);
   });
 
+  test('successful business registration enters React Home instead of the legacy dashboard', async ({ page }) => {
+    await mockCurrentUser(page);
+    await page.route('**/api/v1/auth/register', route =>
+      route.fulfill(json({ accessToken: 'register-cutover-e2e' }))
+    );
+
+    await page.goto('/');
+    await page.locator('#registerForm [name="businessName"]').fill('Negocio Nuevo');
+    await page.locator('#registerForm [name="email"]').fill('owner@nuevo.cl');
+    await page.locator('#registerForm [name="password"]').fill('clave-segura-123');
+    await page.locator('#registerForm button[type="submit"]').click();
+
+    await expect(page).toHaveURL(/\/app\/?$/);
+    await expect.poll(() =>
+      page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))
+    ).toBe('register-cutover-e2e');
+  });
+
   test('successful business login enters React Home instead of the legacy dashboard', async ({ page }) => {
     await mockCurrentUser(page);
     await page.route('**/api/v1/auth/login', route =>
