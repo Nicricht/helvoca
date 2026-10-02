@@ -13,10 +13,21 @@ async function bootAdminInventory(page) {
   );
 
   const productId = '22222222-2222-2222-2222-222222222222';
+  const createdProductId = '33333333-3333-3333-3333-333333333333';
   let inventory = [];
+  let catalog = [{
+    id: productId,
+    kind: 'PRODUCT',
+    name: 'Cera mate',
+    description: 'Cera profesional',
+    price: 5990,
+    currency: 'CLP',
+    active: true
+  }];
   const requests = {
     configure: [],
-    adjust: []
+    adjust: [],
+    createProduct: []
   };
 
   await page.route('**/api/v1/auth/me', route => route.fulfill(json({
@@ -29,15 +40,25 @@ async function bootAdminInventory(page) {
     name: 'Tienda Demo'
   })));
 
-  await page.route('**/api/v1/catalog', route => route.fulfill(json([{
-    id: productId,
-    kind: 'PRODUCT',
-    name: 'Cera mate',
-    description: 'Cera profesional',
-    price: 5990,
-    currency: 'CLP',
-    active: true
-  }])));
+  await page.route('**/api/v1/catalog', async route => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill(json(catalog));
+    }
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON();
+      requests.createProduct.push(body);
+      const created = {
+        id: createdProductId,
+        ...body
+      };
+      catalog = [...catalog, created];
+      return route.fulfill({
+        ...json(created),
+        status: 201
+      });
+    }
+    return route.continue();
+  });
 
   await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([])));
   await page.route('**/api/v1/inventory/restock-subscriptions', route => route.fulfill(json([])));
@@ -86,10 +107,43 @@ async function bootAdminInventory(page) {
     return route.continue();
   });
 
-  return { productId, requests };
+  return { productId, createdProductId, requests };
 }
 
 test.describe('React Inventory mutations', () => {
+  test('admin creates a product in the catalog and sees it ready for stock configuration', async ({ page }) => {
+    const { createdProductId, requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await expect(dialog).toBeVisible();
+
+    await dialog.getByLabel('Nombre').fill('Pomada premium');
+    await dialog.getByLabel('Descripción').fill('Fijación fuerte');
+    await dialog.getByLabel('Precio').fill('7490');
+    await dialog.getByLabel('Moneda').fill('CLP');
+    await dialog.getByRole('button', { name: 'Crear producto' }).click();
+
+    await expect.poll(() => requests.createProduct.length).toBe(1);
+    expect(requests.createProduct[0]).toEqual({
+      kind: 'PRODUCT',
+      name: 'Pomada premium',
+      description: 'Fijación fuerte',
+      price: 7490,
+      currency: 'CLP',
+      durationMinutes: null,
+      metadataJson: null,
+      active: true
+    });
+
+    const row = page.getByTestId(`inventory-row-${createdProductId}`);
+    await expect(row).toContainText('Pomada premium');
+    await expect(row).toContainText('Sin configurar');
+    await expect(row.getByRole('button', { name: 'Configurar stock' })).toBeVisible();
+    await expect(page.getByTestId('inventory-products')).toContainText('2');
+  });
+
   test('admin configures an existing product and then adjusts authoritative base stock', async ({ page }) => {
     const { productId, requests } = await bootAdminInventory(page);
     await page.goto('/app/inventory');
