@@ -72,6 +72,48 @@ export interface InventoryMovement {
   createdAt: string;
 }
 
+export interface InventoryVariant {
+  id: string;
+  catalogItemId: string;
+  name: string;
+  optionValuesJson: string;
+  sku: string;
+  trackingEnabled: boolean;
+  onHand: number;
+  reserved: number;
+  available: number;
+  reorderThreshold: number;
+  lowStock: boolean;
+  active: boolean;
+}
+
+export interface InventoryVariantInput {
+  name: string;
+  optionValuesJson: string;
+  sku: string;
+  trackingEnabled: boolean;
+  onHand: number;
+  reorderThreshold: number;
+  active: boolean;
+  note: string | null;
+}
+
+export interface InventoryVariantAdjustmentInput {
+  delta: number;
+  note: string | null;
+}
+
+export interface InventoryVariantMovement {
+  id: string;
+  type: "CONFIGURE" | "ADJUSTMENT" | "RESERVATION" | "RELEASE" | "CONSUMPTION";
+  quantityDelta: number;
+  reservedDelta: number;
+  onHandAfter: number;
+  reservedAfter: number;
+  note?: string | null;
+  createdAt: string;
+}
+
 export interface InventoryAlert {
   id: string;
   catalogItemId?: string;
@@ -164,5 +206,57 @@ export function createCatalogProduct(input: CreateCatalogProductInput) {
 export function getInventoryHistory(catalogItemId: string) {
   return apiRequest<InventoryMovement[]>(
     `/api/v1/inventory/${encodeURIComponent(catalogItemId)}/movements`
+  );
+}
+
+
+export function getInventoryVariants(catalogItemId: string) {
+  return apiRequest<InventoryVariant[]>(
+    `/api/v1/inventory/${encodeURIComponent(catalogItemId)}/variants`
+  );
+}
+
+export function createInventoryVariant(
+  catalogItemId: string,
+  input: InventoryVariantInput
+) {
+  return apiRequest<InventoryVariant>(
+    `/api/v1/inventory/${encodeURIComponent(catalogItemId)}/variants`,
+    { method: "POST", body: JSON.stringify(input) }
+  );
+}
+
+export function updateInventoryVariant(
+  catalogItemId: string,
+  variantId: string,
+  input: InventoryVariantInput
+) {
+  return apiRequest<InventoryVariant>(
+    `/api/v1/inventory/${encodeURIComponent(catalogItemId)}/variants/${encodeURIComponent(variantId)}`,
+    { method: "PUT", body: JSON.stringify(input) }
+  );
+}
+
+export function adjustInventoryVariant(
+  catalogItemId: string,
+  variantId: string,
+  input: InventoryVariantAdjustmentInput
+) {
+  return apiRequest<InventoryVariant>(
+    `/api/v1/inventory/${encodeURIComponent(catalogItemId)}/variants/${encodeURIComponent(variantId)}/adjustments`,
+    { method: "POST", body: JSON.stringify(input) }
+  );
+}
+
+export function deactivateInventoryVariant(catalogItemId: string, variantId: string) {
+  return apiRequest<InventoryVariant>(
+    `/api/v1/inventory/${encodeURIComponent(catalogItemId)}/variants/${encodeURIComponent(variantId)}/deactivate`,
+    { method: "POST" }
+  );
+}
+
+export function getInventoryVariantHistory(catalogItemId: string, variantId: string) {
+  return apiRequest<InventoryVariantMovement[]>(
+    `/api/v1/inventory/${encodeURIComponent(catalogItemId)}/variants/${encodeURIComponent(variantId)}/movements`
   );
 }
