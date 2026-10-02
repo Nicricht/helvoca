@@ -362,7 +362,7 @@ function SalesSummary({
             )}
             <span className={styles.salesMeta}>
               {data.paidOrders} pedidos pagados
-              {data.revenueChangePercent !== null
+              {data.revenueChangePercent != null
                 ? ` · ${data.revenueChangePercent >= 0 ? "+" : ""}${data.revenueChangePercent.toLocaleString("es-CL")}%`
                 : ""}
             </span>

@@ -309,6 +309,19 @@ test.describe('React Home migration', () => {
     expect(requests.some(request => request.url.includes('/operations/readiness'))).toBe(false);
   });
 
+  test('sales summary survives nullable analytics fields omitted by backend JSON serialization', async ({ page }) => {
+    const analytics = { ...READY_ANALYTICS };
+    delete analytics.revenueChangePercent;
+
+    await bootHome(page, { analytics });
+
+    await page.goto('/app');
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Resumen de ventas' })).toBeVisible();
+    await expect(page.locator('#root')).not.toBeEmpty();
+  });
+
   test('incomplete owner sees onboarding guidance instead of duplicated operational workspaces', async ({ page }) => {
     await bootHome(page, { onboarding: INCOMPLETE_ONBOARDING });
 

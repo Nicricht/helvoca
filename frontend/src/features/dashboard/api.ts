@@ -79,7 +79,7 @@ export type SalesAnalytics = {
   paidOrders: number;
   unitsSold: number;
   averageTicket: number | null;
-  revenueChangePercent: number | null;
+  revenueChangePercent?: number | null;
   currencyTotals: CurrencyTotal[];
   salesOverTime: DailySalesPoint[];
   recepVozOrders: number;
