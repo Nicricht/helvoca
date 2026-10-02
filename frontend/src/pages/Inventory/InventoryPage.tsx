@@ -6,8 +6,10 @@ import {
   adjustInventoryStock,
   configureInventoryStock,
   createCatalogProduct,
+  getInventoryHistory,
   type CatalogItem,
   type InventoryAlert,
+  type InventoryMovement,
   type InventoryStock
 } from "../../features/inventory/api";
 import styles from "./InventoryPage.module.css";
@@ -89,6 +91,27 @@ function mutationMessage(error: unknown) {
     : "No pudimos guardar el cambio.";
 }
 
+function movementLabel(type: InventoryMovement["type"]) {
+  if (type === "CONFIGURE") return "Configuración";
+  if (type === "ADJUSTMENT") return "Ajuste manual";
+  if (type === "RESERVATION") return "Reserva";
+  if (type === "RELEASE") return "Liberación";
+  return "Consumo";
+}
+
+function signedDelta(value: number) {
+  return value > 0 ? `+${value}` : String(value);
+}
+
+function movementDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("es-CL", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
+}
+
 function SummaryCard({
   label,
   value,
@@ -135,6 +158,10 @@ export function InventoryPage() {
   const [productCreateOpen, setProductCreateOpen] = useState(false);
   const [configureTarget, setConfigureTarget] = useState<ProductRow | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<ProductRow | null>(null);
+  const [historyTarget, setHistoryTarget] = useState<ProductRow | null>(null);
+  const [historyMovements, setHistoryMovements] = useState<InventoryMovement[]>([]);
+  const [historyPending, setHistoryPending] = useState(false);
+  const [historyError, setHistoryError] = useState("");
   const [mutationPending, setMutationPending] = useState(false);
   const [mutationError, setMutationError] = useState("");
 
@@ -191,6 +218,23 @@ export function InventoryPage() {
     || model.restockNotifications.isError;
   const businessName = model.business.data?.name?.trim();
   const roleLabel = model.canManage ? "Gestión habilitada" : "Solo lectura";
+
+  async function openHistory(row: ProductRow) {
+    setHistoryTarget(row);
+    setHistoryMovements([]);
+    setHistoryError("");
+    setHistoryPending(true);
+    try {
+      const movements = await getInventoryHistory(row.id);
+      setHistoryMovements(movements);
+    } catch (error) {
+      setHistoryError(error instanceof Error && error.message
+        ? error.message
+        : "No pudimos cargar el historial.");
+    } finally {
+      setHistoryPending(false);
+    }
+  }
 
   async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -473,7 +517,7 @@ export function InventoryPage() {
                   <th scope="col">Disponible</th>
                   <th scope="col">Reservado</th>
                   <th scope="col">Físico</th>
-                  {model.canManage && <th scope="col">Acciones</th>}
+                  <th scope="col">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -491,33 +535,40 @@ export function InventoryPage() {
                     </td>
                     <td>{stockValue(row.reserved)}</td>
                     <td>{stockValue(row.onHand)}</td>
-                    {model.canManage && (
-                      <td className={styles.actionCell}>
-                        {!row.configured || !row.trackingEnabled ? (
-                          <button
-                            className="button secondary"
-                            type="button"
-                            onClick={() => {
-                              setMutationError("");
-                              setConfigureTarget(row);
-                            }}
-                          >
-                            Configurar stock
-                          </button>
-                        ) : (
-                          <button
-                            className="button secondary"
-                            type="button"
-                            onClick={() => {
-                              setMutationError("");
-                              setAdjustTarget(row);
-                            }}
-                          >
-                            Ajustar stock
-                          </button>
-                        )}
-                      </td>
-                    )}
+                    <td className={styles.actionCell}>
+                      {row.configured && (
+                        <button
+                          className="button ghost"
+                          type="button"
+                          onClick={() => void openHistory(row)}
+                        >
+                          Ver historial
+                        </button>
+                      )}
+                      {model.canManage && (!row.configured || !row.trackingEnabled ? (
+                        <button
+                          className="button secondary"
+                          type="button"
+                          onClick={() => {
+                            setMutationError("");
+                            setConfigureTarget(row);
+                          }}
+                        >
+                          Configurar stock
+                        </button>
+                      ) : (
+                        <button
+                          className="button secondary"
+                          type="button"
+                          onClick={() => {
+                            setMutationError("");
+                            setAdjustTarget(row);
+                          }}
+                        >
+                          Ajustar stock
+                        </button>
+                      ))}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -531,6 +582,79 @@ export function InventoryPage() {
             </div>
           )}
         </section>
+
+        {historyTarget && (
+          <div className={styles.dialogBackdrop}>
+            <section
+              className={styles.dialog}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="historyTitle"
+            >
+              <div className={styles.dialogHeader}>
+                <div>
+                  <span className={styles.dialogEyebrow}>Trazabilidad</span>
+                  <h2 id="historyTitle">Historial · {historyTarget.name}</h2>
+                </div>
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => setHistoryTarget(null)}
+                >
+                  Cerrar
+                </button>
+              </div>
+
+              <div className={styles.historyBody}>
+                {historyPending && (
+                  <p className={styles.dialogHint} role="status">Cargando movimientos…</p>
+                )}
+
+                {!historyPending && historyError && (
+                  <p className={styles.dialogError} role="alert">{historyError}</p>
+                )}
+
+                {!historyPending && !historyError && historyMovements.length === 0 && (
+                  <p className={styles.dialogHint}>Este producto todavía no tiene movimientos registrados.</p>
+                )}
+
+                {!historyPending && !historyError && historyMovements.length > 0 && (
+                  <div className={styles.movementList}>
+                    {historyMovements.map(movement => (
+                      <article
+                        key={movement.id}
+                        className={styles.movementCard}
+                        data-testid={`inventory-movement-${movement.id}`}
+                      >
+                        <div className={styles.movementHeader}>
+                          <strong>{movementLabel(movement.type)}</strong>
+                          <time
+                            data-testid="movement-created-at"
+                            dateTime={movement.createdAt}
+                          >
+                            {movementDate(movement.createdAt)}
+                          </time>
+                        </div>
+
+                        <div className={styles.movementDeltas}>
+                          <span>Físico {signedDelta(movement.quantityDelta)}</span>
+                          <span>Reservado {signedDelta(movement.reservedDelta)}</span>
+                        </div>
+
+                        <div className={styles.movementAfter}>
+                          <span>Físico después: {movement.onHandAfter}</span>
+                          <span>Reservado después: {movement.reservedAfter}</span>
+                        </div>
+
+                        {movement.note && <p className={styles.movementNote}>{movement.note}</p>}
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
 
         {productCreateOpen && (
           <div className={styles.dialogBackdrop}>
