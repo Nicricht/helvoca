@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, Boxes, PackageCheck, PackageOpen, Search } from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { useInventoryWorkspace } from "../../features/inventory/useInventoryWorkspace";
@@ -87,7 +87,7 @@ function SummaryCard({
   value: string;
   detail: string;
   testId: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
 }) {
   return (
     <article className={styles.summaryCard} data-testid={testId}>
@@ -291,7 +291,7 @@ export function InventoryPage() {
 
           <div className={styles.toolbar}>
             <label className={styles.searchField}>
-              <span className="sr-only">Buscar productos</span>
+              <span className={styles.visuallyHidden}>Buscar productos</span>
               <Search size={17} aria-hidden="true" />
               <input
                 type="search"
