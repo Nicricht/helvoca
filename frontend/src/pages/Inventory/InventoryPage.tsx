@@ -283,7 +283,7 @@ export function InventoryPage() {
               <h2 id="inventoryWorkspaceTitle">Productos y stock</h2>
               <p>El stock disponible siempre viene del backend. La búsqueda y los filtros solo cambian esta vista.</p>
             </div>
-            <div className={styles.queueSummary} aria-label="Estado de reposición">
+            <div className={styles.queueSummary} aria-label="Resumen de reposición">
               <span>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length} alertas</span>
               <span>{(model.restockSubscriptions.data ?? []).length} esperando reposición</span>
             </div>
