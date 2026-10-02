@@ -37,4 +37,4 @@ Run #3245 (`6671d1d93c7cff104b898473b1b3abbfabc31f54`) contains the complete Ord
 
 The commits after that run add the direct React route, static build copy, Spring forwarding, permission-gated optional delivery reads, simplified navigation and migration documentation.
 
-The next PR run must certify the exact current head before this PR may advance beyond Draft.
+The next PR run must certify the exact current head before this PR may advance beyond Draft.\n\nCheckpoint refreshed after the earlier queued PR runs completed so the next synchronize event validates the fully wired route.
