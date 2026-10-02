@@ -14,6 +14,37 @@ test('internal operations surface hosts readiness control and pilot metrics away
     roles: ['BUSINESS_ADMIN']
   })));
 
+
+  let activation = {
+    ready: false,
+    completed: 2,
+    total: 3,
+    progressPercent: 67,
+    steps: [
+      { code: 'CORE_SETUP', label: 'Negocio configurado', complete: true, automatic: true, required: true },
+      { code: 'TECHNICAL_READINESS', label: 'Canales y operación listos', complete: true, automatic: true, required: true },
+      { code: 'PRICES_CONFIRMED', label: 'Precios confirmados', complete: false, automatic: false, required: true }
+    ]
+  };
+
+  await page.route('**/api/v1/onboarding/activation', async route => {
+    if (route.request().method() === 'PUT') {
+      const payload = route.request().postDataJSON();
+      activation = {
+        ...activation,
+        ready: Boolean(payload.pricesConfirmed),
+        completed: payload.pricesConfirmed ? 3 : 2,
+        progressPercent: payload.pricesConfirmed ? 100 : 67,
+        steps: activation.steps.map(step =>
+          step.code === 'PRICES_CONFIRMED'
+            ? { ...step, complete: Boolean(payload.pricesConfirmed) }
+            : step
+        )
+      };
+    }
+    await route.fulfill(json(activation));
+  });
+
   await page.route('**/api/v1/operations/pilot-readiness', route => route.fulfill(json({
     ready: true,
     passed: 3,
@@ -103,6 +134,8 @@ test('internal operations surface hosts readiness control and pilot metrics away
   await expect(page.getByRole('heading', { level: 1, name: 'Operación y certificación' })).toBeVisible();
   await expect(page.locator('#operationalOverview')).toHaveCount(0);
   await expect(page.locator('#pilotReadinessCard')).toBeVisible();
+  await expect(page.locator('#pilotActivationCard')).toBeVisible();
+  await expect(page.locator('#pilotActivationScore')).toHaveText('2/3');
   await expect(page.locator('#pilotReadinessScore')).toHaveText('3/3');
   await expect(page.locator('#pilotControlCard')).toBeVisible();
   await expect(page.locator('#pilotControlBadge')).toHaveText('GO');
@@ -112,6 +145,11 @@ test('internal operations surface hosts readiness control and pilot metrics away
   await expect(page.locator('#pilotPreflightTraffic')).toContainText('bloqueado globalmente');
   await expect(page.locator('#pilotMetricConversations')).toHaveText('7');
   await expect(page.locator('#pilotMetricRevenue')).toContainText('$18.990');
+
+  await page.locator('#pilotActivationList input[data-field="pricesConfirmed"]').check();
+  await page.locator('#pilotActivationSave').click();
+  await expect(page.locator('#pilotActivationScore')).toHaveText('3/3');
+  await expect(page.locator('#pilotActivationMessage')).toContainText('Checklist completo');
 
   await page.locator('#pilotStart').click();
   await expect(page.locator('#pilotControlBadge')).toHaveText('RUNNING');
