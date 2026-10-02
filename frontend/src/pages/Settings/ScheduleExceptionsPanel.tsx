@@ -55,7 +55,15 @@ export function ScheduleExceptionsPanel({
         reason: string | null;
       };
     }) => saveScheduleException(exceptionDate, input),
-    onSuccess: async () => {
+    onSuccess: async saved => {
+      queryClient.setQueryData<ScheduleException[]>(
+        ["settings", "schedule-exceptions"],
+        current => {
+          const values = current ?? [];
+          const withoutDate = values.filter(item => item.exceptionDate !== saved.exceptionDate);
+          return [...withoutDate, saved].sort((a, b) => a.exceptionDate.localeCompare(b.exceptionDate));
+        }
+      );
       setMessage("Día especial guardado.");
       resetFields();
       await queryClient.invalidateQueries({ queryKey: ["settings", "schedule-exceptions"] });
@@ -65,7 +73,11 @@ export function ScheduleExceptionsPanel({
 
   const deleteMutation = useMutation({
     mutationFn: deleteScheduleException,
-    onSuccess: async () => {
+    onSuccess: async (_result, deletedDate) => {
+      queryClient.setQueryData<ScheduleException[]>(
+        ["settings", "schedule-exceptions"],
+        current => (current ?? []).filter(item => item.exceptionDate !== deletedDate)
+      );
       setMessage("Día especial eliminado.");
       await queryClient.invalidateQueries({ queryKey: ["settings", "schedule-exceptions"] });
     },
