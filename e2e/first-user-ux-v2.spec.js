@@ -25,7 +25,7 @@ async function mockBaseTenant(page, status) {
       complete: false,
       detail: 'Pendiente',
       actionLabel: 'Preparar negocio',
-      actionHref: '/settings.html'
+      actionHref: '/app/settings'
     },
     steps: []
   })));
@@ -118,7 +118,7 @@ test('new owner gets a four-step guided setup instead of the operational workspa
     'Recepcionista'
   ]);
   await expect(page.locator('#firstUserNextAction')).toHaveText('Continuar con Servicios');
-  await expect(page.locator('#firstUserNextAction')).toHaveAttribute('href', '/settings.html?section=services');
+  await expect(page.locator('#firstUserNextAction')).toHaveAttribute('href', '/app/settings?section=services');
   await expect(page.locator('#homeBusinessWorkspace')).toBeHidden();
   await expect(page.locator('#primaryNav a:visible')).toContainText(['Inicio', 'Agenda', 'Clientes', 'Configuración', 'Facturación']);
   await expect(page.locator('#primaryNav .nav-inventory')).toBeHidden();
@@ -207,7 +207,7 @@ test('onboarding exposes one dominant next action that follows persisted progres
   const nextAction = page.locator('#firstUserNextAction');
   await expect(nextAction).toBeVisible();
   await expect(nextAction).toHaveText('Continuar con Horarios');
-  await expect(nextAction).toHaveAttribute('href', '/settings.html?section=hours');
+  await expect(nextAction).toHaveAttribute('href', '/app/settings?section=hours');
 });
 
 test('onboarding remains usable without horizontal overflow on mobile', async ({ page }) => {
