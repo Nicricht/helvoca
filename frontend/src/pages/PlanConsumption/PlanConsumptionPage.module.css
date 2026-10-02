@@ -1,0 +1,438 @@
+.page {
+  position: relative;
+  isolation: isolate;
+}
+
+.ambient {
+  position: absolute;
+  z-index: -1;
+  top: -72px;
+  right: 0;
+  width: min(620px, 58vw);
+  height: 240px;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: .48;
+  filter: blur(.2px);
+}
+
+.wave,
+.wave::before,
+.wave::after {
+  position: absolute;
+  inset: auto -8% 42px 2%;
+  height: 1px;
+  content: "";
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent 0%, rgba(22, 217, 245, .12) 16%, rgba(22, 217, 245, .72) 48%, rgba(139, 92, 246, .42) 72%, transparent 100%);
+  box-shadow: 0 0 34px rgba(22, 217, 245, .16);
+  transform: rotate(-7deg);
+  animation: drift 8s ease-in-out infinite alternate;
+}
+
+.wave::before {
+  inset: -42px -4% auto 6%;
+  opacity: .55;
+  transform: rotate(2deg);
+  animation-duration: 11s;
+}
+
+.wave::after {
+  inset: 46px 8% auto -2%;
+  opacity: .34;
+  transform: rotate(-3deg);
+  animation-duration: 13s;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--rv-space-3);
+}
+
+.planCard,
+.metric,
+.projectionCard,
+.billingCard,
+.loadingCard,
+.errorCard {
+  border: 1px solid var(--rv-border-subtle);
+  background: linear-gradient(155deg, rgba(16, 36, 52, .92), rgba(11, 27, 41, .96));
+  box-shadow: var(--rv-shadow-sm);
+}
+
+.planCard {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(22px, 3vw, 34px);
+  border-radius: var(--rv-radius-xl);
+}
+
+.planCard::after {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  right: -96px;
+  top: -112px;
+  content: "";
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(22, 217, 245, .13), transparent 68%);
+  pointer-events: none;
+}
+
+.planTop {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rv-space-6);
+}
+
+.planIdentity {
+  min-width: 0;
+}
+
+.planKicker {
+  display: flex;
+  align-items: center;
+  gap: var(--rv-space-2);
+  margin-bottom: var(--rv-space-2);
+  color: var(--rv-text-tertiary);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.planNameRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rv-space-3);
+}
+
+.planName {
+  margin: 0;
+  color: var(--rv-text-primary);
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1;
+  letter-spacing: -.035em;
+}
+
+.activePill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(61, 220, 151, .28);
+  border-radius: var(--rv-radius-pill);
+  color: var(--rv-success);
+  background: rgba(61, 220, 151, .08);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.usageHero {
+  position: relative;
+  z-index: 1;
+  margin-top: clamp(30px, 5vw, 52px);
+}
+
+.usageLabel {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--rv-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.usageNumber {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--rv-text-primary);
+}
+
+.usageNumber strong {
+  font-size: clamp(38px, 6vw, 64px);
+  line-height: .96;
+  letter-spacing: -.06em;
+}
+
+.usageNumber span {
+  color: var(--rv-text-secondary);
+  font-size: clamp(17px, 2vw, 22px);
+  font-weight: 750;
+}
+
+.progressMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 22px;
+  color: var(--rv-text-secondary);
+  font-size: 13px;
+}
+
+.progressTrack {
+  position: relative;
+  height: 9px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: var(--rv-radius-pill);
+  background: rgba(255, 255, 255, .06);
+}
+
+.progressBar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--rv-accent), #66efff);
+  box-shadow: 0 0 18px rgba(22, 217, 245, .34);
+}
+
+.planFooter {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rv-space-5);
+  margin-top: var(--rv-space-6);
+  padding-top: var(--rv-space-5);
+  border-top: 1px solid var(--rv-border-subtle);
+}
+
+.remaining {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.remaining strong {
+  color: var(--rv-text-primary);
+  font-size: 18px;
+}
+
+.remaining span,
+.renewal {
+  color: var(--rv-text-tertiary);
+  font-size: 13px;
+}
+
+.section {
+  margin-top: clamp(28px, 4vw, 42px);
+}
+
+.sectionHeading {
+  margin: 0 0 var(--rv-space-4);
+  color: var(--rv-text-primary);
+  font-size: 18px;
+  letter-spacing: -.02em;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--rv-space-4);
+}
+
+.metric {
+  min-width: 0;
+  padding: 20px;
+  border-radius: var(--rv-radius-lg);
+}
+
+.metricIcon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  margin-bottom: 18px;
+  border: 1px solid var(--rv-accent-border);
+  border-radius: 11px;
+  color: var(--rv-accent);
+  background: var(--rv-accent-soft);
+}
+
+.metricValue {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--rv-text-primary);
+  font-size: clamp(28px, 4vw, 38px);
+  line-height: 1;
+  letter-spacing: -.04em;
+}
+
+.metricLabel {
+  display: block;
+  margin-top: 7px;
+  color: var(--rv-text-secondary);
+  font-size: 13px;
+}
+
+.restricted {
+  margin: 12px 0 0;
+  color: var(--rv-text-tertiary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lowerGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, .8fr);
+  gap: var(--rv-space-4);
+  margin-top: var(--rv-space-4);
+}
+
+.projectionCard,
+.billingCard {
+  min-width: 0;
+  padding: 22px;
+  border-radius: var(--rv-radius-lg);
+}
+
+.cardEyebrow {
+  display: block;
+  margin-bottom: 9px;
+  color: var(--rv-text-tertiary);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.projectionText,
+.billingText {
+  margin: 0;
+  color: var(--rv-text-primary);
+  font-size: clamp(16px, 2vw, 19px);
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.billingCard {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.billingIcon {
+  flex: 0 0 auto;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--rv-border-default);
+  border-radius: 12px;
+  color: var(--rv-text-secondary);
+  background: rgba(255, 255, 255, .025);
+}
+
+.loadingCard,
+.errorCard {
+  padding: 24px;
+  border-radius: var(--rv-radius-lg);
+}
+
+.loadingCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--rv-text-secondary);
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, .12);
+  border-top-color: var(--rv-accent);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+.errorCard {
+  color: var(--rv-text-secondary);
+}
+
+.errorCard strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--rv-text-primary);
+  font-size: 18px;
+}
+
+.errorBilling {
+  margin-top: var(--rv-space-4);
+  padding-top: var(--rv-space-4);
+  border-top: 1px solid var(--rv-border-subtle);
+  color: var(--rv-text-tertiary);
+  font-size: 13px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes drift {
+  from { transform: translate3d(-2%, 0, 0) rotate(-7deg) scaleX(.96); }
+  to { transform: translate3d(3%, -8px, 0) rotate(-4deg) scaleX(1.04); }
+}
+
+@media (max-width: 840px) {
+  .lowerGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .planTop,
+  .planFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .ambient {
+    width: 92vw;
+    opacity: .3;
+  }
+}
+
+@media (max-width: 620px) {
+  .headerActions {
+    width: 100%;
+  }
+
+  .headerActions a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .planCard,
+  .projectionCard,
+  .billingCard,
+  .metric {
+    border-radius: var(--rv-radius-md);
+  }
+
+  .progressMeta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wave,
+  .wave::before,
+  .wave::after,
+  .spinner {
+    animation: none;
+  }
+}
