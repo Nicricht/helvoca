@@ -82,8 +82,14 @@ function whatsappTurns(detail: WhatsAppDetail): UnifiedTurn[] {
 }
 
 function latestCustomerQuestion(turns: UnifiedTurn[]) {
-  return [...turns].reverse().find(turn => turn.customer && turn.content.trim())?.content
-    ?? "No hay una pregunta del cliente guardada.";
+  const customerTurns = turns.filter(
+    turn => turn.customer && turn.content.trim()
+  );
+  return (
+    [...customerTurns].reverse().find(turn => turn.content.includes("?"))?.content ??
+    customerTurns.at(-1)?.content ??
+    "No hay una pregunta del cliente guardada."
+  );
 }
 
 function recepVozActivity(
@@ -99,7 +105,11 @@ function recepVozActivity(
   }
 
   if (turns.some(turn => turn.recepvoz)) {
-    return ["Respondió al cliente por WhatsApp"];
+    return [
+      kind === "call"
+        ? "Respondió durante la llamada"
+        : "Respondió al cliente por WhatsApp"
+    ];
   }
 
   return ["No hay una acción de RecepVoz registrada."];
