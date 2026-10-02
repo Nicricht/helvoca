@@ -58,8 +58,10 @@ test.describe('legacy Home retirement cutover', () => {
 
     await expect(page).toHaveURL(/\/$/);
     await expect(page.locator('#authView')).toBeVisible();
-    await expect(page.locator('#loginForm')).toBeVisible();
+    await expect(page.locator('#registerTab')).toBeVisible();
+    await expect(page.locator('#loginTab')).toBeVisible();
     await expect(page.locator('#registerForm')).toBeVisible();
+    await expect(page.locator('#loginForm')).toBeHidden();
   });
 
   test('public root no longer loads retired Home workspace assets', async ({ page }) => {
