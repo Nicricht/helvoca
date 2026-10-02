@@ -8,5 +8,6 @@ import java.util.UUID;
 
 public interface BusinessQuoteRepository extends JpaRepository<BusinessQuote, UUID> {
     Optional<BusinessQuote> findByIdAndBusinessId(UUID id, UUID businessId);
+    List<BusinessQuote> findTop100ByBusinessIdOrderByCreatedAtDesc(UUID businessId);
     List<BusinessQuote> findAllByBusinessIdOrderByCreatedAtDesc(UUID businessId);
 }
