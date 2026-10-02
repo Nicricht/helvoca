@@ -3,12 +3,14 @@ import { AlertTriangle, Boxes, PackageCheck, PackageOpen, Search } from "lucide-
 import { AppShell } from "../../components/AppShell/AppShell";
 import { useInventoryWorkspace } from "../../features/inventory/useInventoryWorkspace";
 import {
+  acknowledgeInventoryAlert,
   adjustInventoryStock,
   adjustInventoryVariant,
   configureInventoryStock,
   createCatalogProduct,
   createInventoryVariant,
   deactivateInventoryVariant,
+  cancelRestockSubscription,
   getInventoryHistory,
   getInventoryVariantHistory,
   getInventoryVariants,
@@ -118,6 +120,20 @@ function movementDate(value: string) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
+}
+
+function alertLabel(type?: string) {
+  if (type === "OUT_OF_STOCK") return "Agotado";
+  if (type === "LOW_STOCK") return "Stock bajo";
+  if (type === "RESTOCKED") return "Repuesto";
+  return "Alerta de inventario";
+}
+
+function channelLabel(channel?: string) {
+  if (channel === "WHATSAPP") return "WhatsApp";
+  if (channel === "EMAIL") return "Email";
+  if (channel === "SMS") return "SMS";
+  return channel || "Canal";
 }
 
 function SummaryCard({
@@ -240,6 +256,44 @@ export function InventoryPage() {
   const roles = model.me.data?.roles ?? [];
   const canReadVariants = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
   const canManageVariants = roles.includes("BUSINESS_ADMIN");
+  const canReadAutomation = canReadVariants;
+  const canManageAutomation = roles.includes("BUSINESS_ADMIN");
+
+  async function acknowledgeAlert(alertId: string) {
+    if (!canManageAutomation || mutationPending) return;
+    setMutationPending(true);
+    setMutationError("");
+    try {
+      await acknowledgeInventoryAlert(alertId);
+      await model.refetchPrimary();
+    } catch (error) {
+      setMutationError(mutationMessage(error));
+    } finally {
+      setMutationPending(false);
+    }
+  }
+
+  function restockFromAlert(catalogItemId?: string) {
+    if (!canManageAutomation || !catalogItemId) return;
+    const row = rows.find(candidate => candidate.id === String(catalogItemId));
+    if (!row || !row.configured || !row.trackingEnabled) return;
+    setMutationError("");
+    setAdjustTarget(row);
+  }
+
+  async function cancelWaiting(subscriptionId: string) {
+    if (!canManageAutomation || mutationPending) return;
+    setMutationPending(true);
+    setMutationError("");
+    try {
+      await cancelRestockSubscription(subscriptionId);
+      await model.refetchPrimary();
+    } catch (error) {
+      setMutationError(mutationMessage(error));
+    } finally {
+      setMutationPending(false);
+    }
+  }
 
   async function openHistory(row: ProductRow) {
     setHistoryTarget(row);
