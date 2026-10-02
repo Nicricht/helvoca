@@ -635,8 +635,8 @@ registerForm.addEventListener("submit", async event => {
         };
         const result = await api("/api/v1/auth/register", { method: "POST", body: JSON.stringify(payload) }, false);
         setToken(result.accessToken);
-        await loadDashboard({ resetScroll: true });
-        showMessage(aiMessage, "Cuenta creada. Sigue la ruta de activación: RecepVoz te mostrará un solo siguiente paso a la vez.", "success");
+        window.location.replace("/app");
+        return;
     } catch (error) {
         showMessage(authMessage, error.message || "No fue posible crear la empresa.");
     } finally {
@@ -656,7 +656,8 @@ loginForm.addEventListener("submit", async event => {
         }, false);
         setToken(result.accessToken);
         if (redirectPlatformAdmin(result?.user?.roles)) return;
-        await loadDashboard({ resetScroll: true });
+        window.location.replace("/app");
+        return;
     } catch (error) {
         showMessage(authMessage, error.message || "Credenciales inválidas.");
     } finally {
