@@ -271,7 +271,7 @@ test('channel provisioning and WhatsApp activation remain explicit in React Sett
   expect(activationCalls).toBe(0);
 
   await page.getByRole('button', { name: 'Buscar números' }).click();
-  await expect(page.getByText('+56220001111')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Aprovisionar' })).toBeVisible();
   expect(provisionCalls).toBe(0);
 
   page.once('dialog', dialog => dialog.accept());
