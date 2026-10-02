@@ -324,7 +324,7 @@
         '      <article id="homeCallsMetric" class="home-metric" aria-label="Llamadas recibidas"><strong id="ownerCallsTodayPrimary">–</strong><span>Llamadas</span><small id="homeConversationBreakdown">–</small></article>',
         '      <a id="homeBookingsMetric" class="home-metric" href="/app/agenda" aria-label="Ver reservas"><strong id="homeBookingsToday">–</strong><span>Reservas</span><small>Generadas hoy</small></a>',
         '      <a id="homeRequestsMetric" class="home-metric" href="/?tab=requests#homeBusinessWorkspace" aria-label="Ver solicitudes pendientes"><strong id="homeRequestsToday">–</strong><span>Pendientes</span><small>Solicitudes por resolver</small></a>',
-        '      <a id="ownerOrdersMetric" class="home-metric hidden" href="/app/orders" aria-label="Ver pedidos y ventas"><strong id="ownerOrdersToday">–</strong><span>Pedidos</span><small id="ownerOrdersHint">Generados hoy</small></a>',
+        '      <a id="ownerOrdersMetric" class="home-metric hidden" href="/app/orders" aria-label="Ver pedidos"><strong id="ownerOrdersToday">–</strong><span>Pedidos</span><small id="ownerOrdersHint">Generados hoy</small></a>',
         '    </div>',
         '    <section id="ownerValuePanel" class="owner-value-panel" aria-labelledby="ownerValueTitle" data-state="loading">',
         '      <div class="owner-value-head">',
