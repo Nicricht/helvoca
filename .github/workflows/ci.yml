@@ -1285,3 +1285,47 @@ jobs:
 
       - name: Certify first fictional customer week
         run: bash scripts/ci/first-fictional-customer-week.sh
+
+
+  agenda-production-smoke:
+    if: github.event_name == 'pull_request' && github.head_ref == 'chore/verify-agenda-production-smoke-51ce746'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Verify Agenda and health in production
+        run: |
+          set -euo pipefail
+
+          verify_health() {
+            local base_url="$1"
+            local label="$2"
+            local body
+            local code
+            body="$(mktemp)"
+            code="$(curl --retry 4 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 25 -sS -L -o "$body" -w "%{http_code}" "$base_url/actuator/health")"
+            echo "$label /actuator/health -> HTTP $code"
+            cat "$body"
+            echo
+            test "$code" = "200"
+            grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"' "$body"
+          }
+
+          verify_agenda() {
+            local base_url="$1"
+            local label="$2"
+            local body
+            local code
+            body="$(mktemp)"
+            code="$(curl --retry 4 --retry-delay 2 --retry-all-errors --connect-timeout 10 --max-time 25 -sS -L -o "$body" -w "%{http_code}" "$base_url/app/agenda")"
+            echo "$label /app/agenda -> HTTP $code"
+            head -c 500 "$body" || true
+            echo
+            test "$code" = "200"
+            grep -Eq '<div[^>]+id="root"|/app/assets/|type="module"' "$body"
+          }
+
+          verify_health "https://recepvoz.cl" "recepvoz.cl"
+          verify_agenda "https://recepvoz.cl" "recepvoz.cl"
+          verify_health "https://helvoca-api-production.up.railway.app" "Railway"
+          verify_agenda "https://helvoca-api-production.up.railway.app" "Railway"
