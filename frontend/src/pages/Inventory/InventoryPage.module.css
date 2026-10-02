@@ -91,6 +91,35 @@
   line-height: 1.4;
 }
 
+.setupNotice {
+  margin-top: 18px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--rv-accent-border);
+  border-radius: 14px;
+  background: var(--rv-accent-soft);
+}
+
+.setupNotice > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.setupNotice strong {
+  color: var(--rv-text-primary);
+  font-size: 13px;
+}
+
+.setupNotice span {
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .workspace,
 .automationWorkspace {
   min-width: 0;
@@ -600,6 +629,27 @@
   gap: 7px;
 }
 
+.checkField {
+  min-width: 0;
+  min-height: 42px;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--rv-border-default);
+  border-radius: 10px;
+  color: var(--rv-text-secondary);
+  background: var(--rv-surface-1);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.checkField input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
 .field span {
   color: var(--rv-text-secondary);
   font-size: 12px;
@@ -868,6 +918,7 @@
     padding-inline: 14px;
   }
 
+  .setupNotice,
   .dialogHeader,
   .dialogHeaderActions,
   .variantCardMain,
