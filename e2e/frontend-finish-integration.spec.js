@@ -44,6 +44,16 @@ test('customer navigation stays coherent and never exposes internal operations',
   }
 });
 
+test('home Agenda shortcuts use the canonical React route', async () => {
+  const home = read('index.html');
+  const status = read('commercial-status.js');
+
+  expect(home).toContain('href="/app/agenda">Agenda</a>');
+  expect(home).not.toContain('href="/#bookings">Agenda</a>');
+  expect(status).toContain('href="/app/agenda"');
+  expect(status).not.toContain('/?tab=bookings#homeBusinessWorkspace');
+});
+
 test('canonical foundation remains dark, solid and readable', async () => {
   const css = read('frontend-foundation.css');
 
