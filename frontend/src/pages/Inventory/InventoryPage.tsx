@@ -5,6 +5,7 @@ import { useInventoryWorkspace } from "../../features/inventory/useInventoryWork
 import {
   adjustInventoryStock,
   configureInventoryStock,
+  createCatalogProduct,
   type CatalogItem,
   type InventoryAlert,
   type InventoryStock
@@ -131,6 +132,7 @@ export function InventoryPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [sort, setSort] = useState<SortMode>("ATTENTION");
+  const [productCreateOpen, setProductCreateOpen] = useState(false);
   const [configureTarget, setConfigureTarget] = useState<ProductRow | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<ProductRow | null>(null);
   const [mutationPending, setMutationPending] = useState(false);
@@ -189,6 +191,51 @@ export function InventoryPage() {
     || model.restockNotifications.isError;
   const businessName = model.business.data?.name?.trim();
   const roleLabel = model.canManage ? "Gestión habilitada" : "Solo lectura";
+
+  async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!model.canManage || mutationPending) return;
+
+    const data = new FormData(event.currentTarget);
+    const name = String(data.get("name") ?? "").trim();
+    const description = String(data.get("description") ?? "").trim();
+    const price = Number(data.get("price"));
+    const currency = String(data.get("currency") ?? "").trim().toUpperCase();
+
+    if (!name) {
+      setMutationError("Escribe un nombre para el producto.");
+      return;
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      setMutationError("El precio debe ser un número igual o mayor que cero.");
+      return;
+    }
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      setMutationError("La moneda debe tener tres letras, por ejemplo CLP.");
+      return;
+    }
+
+    setMutationPending(true);
+    setMutationError("");
+    try {
+      await createCatalogProduct({
+        kind: "PRODUCT",
+        name,
+        description: description || null,
+        price,
+        currency,
+        durationMinutes: null,
+        metadataJson: null,
+        active: true
+      });
+      await model.refetchPrimary();
+      setProductCreateOpen(false);
+    } catch (error) {
+      setMutationError(mutationMessage(error));
+    } finally {
+      setMutationPending(false);
+    }
+  }
 
   async function handleConfigure(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -364,9 +411,23 @@ export function InventoryPage() {
               <h2 id="inventoryWorkspaceTitle">Productos y stock</h2>
               <p>El stock disponible siempre viene del backend. La búsqueda y los filtros solo cambian esta vista.</p>
             </div>
-            <div className={styles.queueSummary} aria-label="Resumen de reposición">
-              <span>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length} alertas</span>
-              <span>{(model.restockSubscriptions.data ?? []).length} esperando reposición</span>
+            <div className={styles.workspaceActions}>
+              {model.canManage && (
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={() => {
+                    setMutationError("");
+                    setProductCreateOpen(true);
+                  }}
+                >
+                  Nuevo producto
+                </button>
+              )}
+              <div className={styles.queueSummary} aria-label="Resumen de reposición">
+                <span>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length} alertas</span>
+                <span>{(model.restockSubscriptions.data ?? []).length} esperando reposición</span>
+              </div>
             </div>
           </div>
 
@@ -470,6 +531,68 @@ export function InventoryPage() {
             </div>
           )}
         </section>
+
+        {productCreateOpen && (
+          <div className={styles.dialogBackdrop}>
+            <section
+              className={styles.dialog}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="createProductTitle"
+            >
+              <div className={styles.dialogHeader}>
+                <div>
+                  <span className={styles.dialogEyebrow}>Catálogo</span>
+                  <h2 id="createProductTitle">Nuevo producto</h2>
+                </div>
+                <button
+                  className="button ghost"
+                  type="button"
+                  disabled={mutationPending}
+                  onClick={() => setProductCreateOpen(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+
+              <form className={styles.dialogForm} onSubmit={handleCreateProduct}>
+                <label className={styles.field}>
+                  <span>Nombre</span>
+                  <input name="name" autoFocus required />
+                </label>
+
+                <label className={styles.field}>
+                  <span>Descripción</span>
+                  <input name="description" />
+                </label>
+
+                <div className={styles.formGrid}>
+                  <label className={styles.field}>
+                    <span>Precio</span>
+                    <input name="price" type="number" min="0" step="0.01" required />
+                  </label>
+
+                  <label className={styles.field}>
+                    <span>Moneda</span>
+                    <input name="currency" defaultValue="CLP" maxLength={3} required />
+                  </label>
+                </div>
+
+                <p className={styles.dialogHint}>
+                  El producto se crea primero en catálogo. Luego puedes configurar su SKU y stock físico.
+                </p>
+
+                {mutationError && <p className={styles.dialogError} role="alert">{mutationError}</p>}
+
+                <div className={styles.dialogActions}>
+                  <button className="button primary" type="submit" disabled={mutationPending}>
+                    {mutationPending ? "Creando…" : "Crear producto"}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        )}
 
         {configureTarget && (
           <div className={styles.dialogBackdrop}>
