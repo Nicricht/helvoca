@@ -248,7 +248,7 @@ export function ConversationPanel({
     );
   }
 
-  if (!workspace.items.length) {
+  if ((hasContext && !contextualReference) || (!hasContext && !workspace.items.length)) {
     return (
       <section className={styles.state} aria-label="Conversación relacionada">
         <strong>Sin conversación relacionada</strong>
