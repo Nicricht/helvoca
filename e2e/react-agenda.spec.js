@@ -243,6 +243,38 @@ test.describe('React Agenda migration', () => {
     await expect(dialog).toContainText('Reserva creada');
   });
 
+
+  test('opens reservation conversation read-only without browser tenant identity', async ({ page }) => {
+    const tenantHints = [];
+    const mutations = [];
+
+    page.on('request', request => {
+      const url = new URL(request.url());
+      if (!url.pathname.startsWith('/api/v1/')) return;
+
+      const body = request.postData() || '';
+      if (url.searchParams.has('businessId') || /["']?businessId["']?\\s*[:=]/i.test(body)) {
+        tenantHints.push({ method: request.method(), url: request.url(), body });
+      }
+
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) {
+        mutations.push({ method: request.method(), url: request.url(), body });
+      }
+    });
+
+    await bootAgenda(page);
+    await page.goto('/app/agenda');
+
+    await page.getByTestId('agenda-row-b1').click();
+    const dialog = page.getByRole('dialog', { name: 'Reserva · Ana Reserva' });
+    await dialog.getByRole('tab', { name: 'Conversación' }).click();
+
+    await expect(dialog).toContainText('Quiero reservar una evaluación.');
+    await expect(dialog).toContainText('Reserva creada');
+    expect(tenantHints).toEqual([]);
+    expect(mutations).toEqual([]);
+  });
+
   test('keeps the table usable if contextual conversation fails', async ({ page }) => {
     await bootAgenda(page, { contextError: true });
     await page.goto('/app/agenda');
