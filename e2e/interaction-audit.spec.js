@@ -4,7 +4,7 @@ const path = require('path');
 
 const staticDir = path.resolve(__dirname, '../src/main/resources/static');
 const htmlFiles = fs.readdirSync(staticDir).filter(name => name.endsWith('.html')).sort();
-const applicationRoutes = new Set(['/app/inventory']);
+const applicationRoutes = new Set(['/app/inventory', '/app/agenda']);
 
 function attributes(source) {
   return Object.fromEntries(

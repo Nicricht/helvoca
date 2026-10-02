@@ -123,6 +123,11 @@
 
   primaryNav.querySelectorAll("[data-home-nav]").forEach(link => {
     link.addEventListener("click", event => {
+      if (link.getAttribute("aria-disabled") === "true") {
+        event.preventDefault();
+        return;
+      }
+      if (link.dataset.homeNav === "bookings") return;
       event.preventDefault();
       activateHomeTab(link.dataset.homeNav);
     });
