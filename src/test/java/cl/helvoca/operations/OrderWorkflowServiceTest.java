@@ -89,6 +89,7 @@ class OrderWorkflowServiceTest {
 
         BusinessOperationItem draftLine = persistedDraftLine.get();
         assertNotNull(draftLine);
+        assertEquals(businessId, draftLine.getBusinessId());
         assertEquals(2, draftLine.getQuantity());
         assertEquals(new BigDecimal("5000"), draftLine.getUnitPrice());
         assertEquals(new BigDecimal("10000"), draftLine.getLineTotal());
@@ -289,6 +290,7 @@ class OrderWorkflowServiceTest {
 
         BusinessOrderLine snapshot = persistedLine.get();
         assertNotNull(snapshot);
+        assertEquals(businessId, snapshot.getBusinessId());
         assertEquals(2, snapshot.getQuantity());
         assertEquals(new BigDecimal("4500"), snapshot.getUnitPrice());
         assertEquals(new BigDecimal("9000"), snapshot.getLineTotal());
