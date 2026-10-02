@@ -4,6 +4,7 @@ const path = require('path');
 
 const staticDir = path.resolve(__dirname, '../src/main/resources/static');
 const htmlFiles = fs.readdirSync(staticDir).filter(name => name.endsWith('.html')).sort();
+const applicationRoutes = new Set(['/app/inventory']);
 
 function attributes(source) {
   return Object.fromEntries(
@@ -37,6 +38,7 @@ test('static interaction markup has unique targets and complete controls', async
         continue;
       }
       const target = href.split(/[?#]/, 1)[0];
+      if (applicationRoutes.has(target)) continue;
       const targetFile = target === '/'
         ? 'index.html'
         : target.startsWith('/')
