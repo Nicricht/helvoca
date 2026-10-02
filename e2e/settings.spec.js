@@ -2,6 +2,19 @@ const { test, expect } = require('@playwright/test');
 const fs = require('node:fs');
 
 test.describe('settings legacy compatibility', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'settings-compat'));
+    await page.route('**/api/v1/auth/me', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        email: 'admin@demo.cl',
+        roles: ['BUSINESS_ADMIN'],
+        permissions: ['BUSINESS_READ', 'BUSINESS_MANAGE']
+      })
+    }));
+  });
+
   test('settings.html redirects to the canonical React Settings route', async ({ page }) => {
     await page.goto('/settings.html');
     await expect(page).toHaveURL(/\/app\/settings\/?$/);
