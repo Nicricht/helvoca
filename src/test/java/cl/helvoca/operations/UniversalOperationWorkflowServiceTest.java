@@ -113,6 +113,7 @@ class UniversalOperationWorkflowServiceTest {
         ArgumentCaptor<BusinessOperationItem> lineCaptor = ArgumentCaptor.forClass(BusinessOperationItem.class);
         verify(operationItems).save(lineCaptor.capture());
         assertEquals(operation.getId(), lineCaptor.getValue().getOperationId());
+        assertEquals(businessId, lineCaptor.getValue().getBusinessId());
         assertEquals(2, lineCaptor.getValue().getQuantity());
         assertEquals(new BigDecimal("2500"), lineCaptor.getValue().getUnitPrice());
         assertEquals("normal", lineCaptor.getValue().getModifiers().get("urgency"));

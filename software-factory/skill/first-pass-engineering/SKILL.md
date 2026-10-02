@@ -17,6 +17,21 @@ Evaluate only the perspectives relevant to the task: Product, Architecture, UX/U
 
 Continuity asks: if this interaction disappears now, can a fresh agent reconstruct exactly where the work stopped without asking the user to rebuild context?
 
+## QA ownership and test selection
+
+The implementing agent owns QA. The user is not responsible for selecting or reminding the agent which tests to create or run.
+
+For every implementation:
+1. Identify the properties that can fail.
+2. Select the lowest test level that can prove each property correctly.
+3. Add higher-level verification only when the failure crosses components, persistence, security boundaries, concurrency, external providers, or real user journeys.
+4. Treat coverage as evidence of exercised structure, not proof of correctness.
+5. Reject tests that merely execute code without asserting meaningful behavior.
+6. For reproducible bugs, create a regression test that fails for the intended reason before the fix when technically feasible.
+7. For high-risk behavior, include the applicable adversarial, authorization/isolation, idempotency, concurrency, retry/timeout, partial-success, recovery, and production verification.
+
+A unit test does not replace an integration test when correctness depends on a real database or boundary. An integration test does not replace browser E2E when the user-facing journey can fail independently. An E2E test does not replace focused unit coverage for complex business rules.
+
 ## Before coding
 
 1. Read the repository rules, architecture, nearby tests, and existing patterns.

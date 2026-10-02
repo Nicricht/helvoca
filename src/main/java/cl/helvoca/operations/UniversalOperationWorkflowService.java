@@ -73,7 +73,7 @@ public class UniversalOperationWorkflowService {
         operation.setTotal(calculation.amount());
         operation.setCurrency(calculation.currency());
         operation = operations.saveAndFlush(operation);
-        persistItems(operation.getId(), calculation.items());
+        persistItems(businessId, operation.getId(), calculation.items());
 
         BusinessQuote quote = new BusinessQuote();
         quote.setOperationId(operation.getId());
@@ -296,10 +296,11 @@ public class UniversalOperationWorkflowService {
         return new QuoteCalculation(subtotal, currency == null ? "CLP" : currency, snapshots);
     }
 
-    private void persistItems(UUID operationId, List<ItemSnapshot> snapshots) {
+    private void persistItems(UUID businessId, UUID operationId, List<ItemSnapshot> snapshots) {
         for (ItemSnapshot snapshot : snapshots) {
             BusinessOperationItem line = new BusinessOperationItem();
             line.setOperationId(operationId);
+            line.setBusinessId(businessId);
             line.setCatalogItemId(snapshot.item().getId());
             line.setItemName(snapshot.item().getName());
             line.setQuantity(snapshot.quantity());

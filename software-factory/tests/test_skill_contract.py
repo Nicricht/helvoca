@@ -17,6 +17,18 @@ class FirstPassSkillContractTest(unittest.TestCase):
         self.assertIsNotNone(match)
         self.assertTrue(match.group(1).strip().startswith("Use when"))
 
+    def test_contains_mandatory_qa_ownership_contract(self):
+        lowered = self.text.lower()
+        for phrase in (
+            "user is not responsible for selecting",
+            "test level",
+            "lowest test level",
+            "higher-level verification",
+            "regression test",
+            "production verification",
+        ):
+            self.assertIn(phrase, lowered)
+
     def test_contains_core_first_pass_controls(self):
         lowered = self.text.lower()
         for phrase in (
