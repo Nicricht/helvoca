@@ -23,7 +23,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
   type FormEvent,
   type ReactNode
 } from "react";
