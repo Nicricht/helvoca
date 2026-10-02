@@ -652,6 +652,9 @@ jobs:
           npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
 
+      - name: Build React frontend
+        run: npm run frontend:build
+
       - name: Run settings frontend E2E
         run: npx playwright test e2e/settings.spec.js e2e/react-settings-core.spec.js e2e/react-settings-hardening.spec.js e2e/voice-selector.spec.js e2e/phone-provisioning.spec.js e2e/commercial-status.spec.js e2e/frontend-ux.spec.js --grep "settings|voice|phone search|commercial dashboard|plan checkout|ready customer"
 
