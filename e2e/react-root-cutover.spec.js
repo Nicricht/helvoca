@@ -64,9 +64,10 @@ test.describe('legacy Home retirement cutover', () => {
     await expect(page.locator('#loginForm')).toBeHidden();
   });
 
-  test('public root no longer loads retired Home workspace assets', async ({ page }) => {
+  test('public root no longer exposes retired Home workspace markup or assets', async ({ page }) => {
     await page.goto('/');
 
+    await expect(page.locator('#homeBusinessWorkspace')).toHaveCount(0);
     await expect(page.locator('script[src*="home-business.js"]')).toHaveCount(0);
     await expect(page.locator('link[href*="home-business.css"]')).toHaveCount(0);
   });
