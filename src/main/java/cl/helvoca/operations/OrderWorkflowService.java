@@ -76,7 +76,7 @@ public class OrderWorkflowService {
         applyCalculation(operation, calculation);
         operation.setMetadata(stateMetadata(null, true));
         operation = operations.saveAndFlush(operation);
-        replaceItems(operation.getId(), calculation.lines());
+        replaceItems(businessId, operation.getId(), calculation.lines());
         return success(quoteData(operation, calculation));
     }
 
@@ -101,7 +101,7 @@ public class OrderWorkflowService {
         operation.setStatus(BusinessOperation.Status.AWAITING_CONFIRMATION);
         operation.setMetadata(stateMetadata(operation.getMetadata(), true));
         operation = operations.saveAndFlush(operation);
-        replaceItems(operation.getId(), calculation.lines());
+        replaceItems(businessId, operation.getId(), calculation.lines());
         return success(quoteData(operation, calculation));
     }
 
@@ -203,6 +203,7 @@ public class OrderWorkflowService {
         for (Line line : recalculated.lines()) {
             BusinessOrderLine entity = new BusinessOrderLine();
             entity.setOrderId(order.getId());
+            entity.setBusinessId(businessId);
             entity.setCatalogItemId(line.item().getId());
             entity.setVariantId(line.variant() == null ? null : line.variant().getId());
             entity.setItemName(line.item().getName());
@@ -352,12 +353,13 @@ public class OrderWorkflowService {
         operation.setCurrency(calculation.currency());
     }
 
-    private void replaceItems(UUID operationId, List<Line> lines) {
+    private void replaceItems(UUID businessId, UUID operationId, List<Line> lines) {
         operationItems.deleteAllByOperationId(operationId);
         List<BusinessOperationItem> replacements = new ArrayList<>();
         for (Line line : lines) {
             BusinessOperationItem item = new BusinessOperationItem();
             item.setOperationId(operationId);
+            item.setBusinessId(businessId);
             item.setCatalogItemId(line.item().getId());
             item.setVariantId(line.variant() == null ? null : line.variant().getId());
             item.setItemName(line.item().getName());
