@@ -464,26 +464,6 @@ export function SettingsPage() {
     }
   }
 
-  if (model.primaryLoading || !draft) {
-    return (
-      <AppShell>
-        <main className="rv-page-frame">
-          <header className="rv-page-header">
-            <div>
-              <p className="eyebrow">TU NEGOCIO</p>
-              <h1>Configuración</h1>
-              <p>Preparando la configuración segura de tu negocio…</p>
-            </div>
-          </header>
-          <div className={styles.loadingCard} role="status" aria-live="polite">
-            <span className={styles.spinner} aria-hidden="true" />
-            <span>Cargando configuración…</span>
-          </div>
-        </main>
-      </AppShell>
-    );
-  }
-
   if (model.primaryError) {
     return (
       <AppShell>
@@ -501,6 +481,26 @@ export function SettingsPage() {
               <p>Tu información no fue modificada. Recarga la página para volver a intentarlo.</p>
             </div>
           </section>
+        </main>
+      </AppShell>
+    );
+  }
+
+  if (model.primaryLoading || !draft) {
+    return (
+      <AppShell>
+        <main className="rv-page-frame">
+          <header className="rv-page-header">
+            <div>
+              <p className="eyebrow">TU NEGOCIO</p>
+              <h1>Configuración</h1>
+              <p>Preparando la configuración segura de tu negocio…</p>
+            </div>
+          </header>
+          <div className={styles.loadingCard} role="status" aria-live="polite">
+            <span className={styles.spinner} aria-hidden="true" />
+            <span>Cargando configuración…</span>
+          </div>
         </main>
       </AppShell>
     );
@@ -828,6 +828,7 @@ export function SettingsPage() {
                 <div className={styles.cardList}>
                   {draft.services.map((service, index) => (
                     <article className={styles.editCard} key={service.id || `new-service-${index}`}>
+                      <strong className={styles.cardTitle}>{service.name || "Servicio nuevo"}</strong>
                       <div className={styles.editCardGrid}>
                         <Field label="Nombre">
                           <input
