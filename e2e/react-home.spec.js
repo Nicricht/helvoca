@@ -174,7 +174,9 @@ async function bootHome(page, options = {}) {
 
   await page.addInitScript(
     token => {
-      if (window.location.pathname.startsWith('/app')) {
+      const seedKey = '__react_home_e2e_session_seeded';
+      if (sessionStorage.getItem(seedKey) !== '1') {
+        sessionStorage.setItem(seedKey, '1');
         sessionStorage.setItem('helvoca_access_token', token);
       }
     },
