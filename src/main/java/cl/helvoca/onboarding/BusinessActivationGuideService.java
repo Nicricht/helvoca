@@ -51,22 +51,22 @@ public class BusinessActivationGuideService {
                 voice
                         ? "El canal de voz está listo."
                         : "Conecta el número y completa la configuración de voz.",
-                "Configurar canales", "/settings.html#configuration"));
+                "Configurar canales", "/app/settings#configuration"));
         steps.add(step("WHATSAPP", "WhatsApp", whatsapp,
                 whatsapp
                         ? "WhatsApp puede recibir y enviar mensajes."
                         : "Conecta WhatsApp Business para continuar la conversación desde la llamada.",
-                "Conectar WhatsApp", "/settings.html#configuration"));
+                "Conectar WhatsApp", "/app/settings#configuration"));
         steps.add(step("COMMERCIAL", "Catálogo, venta y pagos", commercial,
                 commercial
                         ? "Catálogo y operación comercial están listos."
                         : "Completa catálogo, capacidades comerciales y Mercado Pago.",
-                "Preparar venta", "/settings.html#configuration"));
+                "Preparar venta", "/app/settings#configuration"));
         steps.add(step("ACTIVATION", "Validación del negocio", activationComplete,
                 activationComplete
                         ? "El checklist de activación está completo."
                         : "Revisa con el negocio precios, FAQ, políticas y pruebas antes de activar.",
-                "Completar checklist", "/settings.html#configuration"));
+                "Completar checklist", "/app/settings#configuration"));
         steps.add(step("PILOT", "Control del piloto", pilotConfigured,
                 pilotConfigured
                         ? "El piloto ya tiene responsable, objetivo y ciclo operativo."
