@@ -4,13 +4,21 @@ import { AppShell } from "../../components/AppShell/AppShell";
 import { useInventoryWorkspace } from "../../features/inventory/useInventoryWorkspace";
 import {
   adjustInventoryStock,
+  adjustInventoryVariant,
   configureInventoryStock,
   createCatalogProduct,
+  createInventoryVariant,
+  deactivateInventoryVariant,
   getInventoryHistory,
+  getInventoryVariantHistory,
+  getInventoryVariants,
+  updateInventoryVariant,
   type CatalogItem,
   type InventoryAlert,
   type InventoryMovement,
-  type InventoryStock
+  type InventoryStock,
+  type InventoryVariant,
+  type InventoryVariantMovement
 } from "../../features/inventory/api";
 import styles from "./InventoryPage.module.css";
 
@@ -162,6 +170,17 @@ export function InventoryPage() {
   const [historyMovements, setHistoryMovements] = useState<InventoryMovement[]>([]);
   const [historyPending, setHistoryPending] = useState(false);
   const [historyError, setHistoryError] = useState("");
+  const [variantsTarget, setVariantsTarget] = useState<ProductRow | null>(null);
+  const [variants, setVariants] = useState<InventoryVariant[]>([]);
+  const [variantsPending, setVariantsPending] = useState(false);
+  const [variantsError, setVariantsError] = useState("");
+  const [variantEditorMode, setVariantEditorMode] = useState<"CREATE" | "EDIT" | null>(null);
+  const [variantEditing, setVariantEditing] = useState<InventoryVariant | null>(null);
+  const [variantAdjusting, setVariantAdjusting] = useState<InventoryVariant | null>(null);
+  const [variantHistoryTarget, setVariantHistoryTarget] = useState<InventoryVariant | null>(null);
+  const [variantHistory, setVariantHistory] = useState<InventoryVariantMovement[]>([]);
+  const [variantHistoryPending, setVariantHistoryPending] = useState(false);
+  const [variantHistoryError, setVariantHistoryError] = useState("");
   const [mutationPending, setMutationPending] = useState(false);
   const [mutationError, setMutationError] = useState("");
 
@@ -218,6 +237,9 @@ export function InventoryPage() {
     || model.restockNotifications.isError;
   const businessName = model.business.data?.name?.trim();
   const roleLabel = model.canManage ? "Gestión habilitada" : "Solo lectura";
+  const roles = model.me.data?.roles ?? [];
+  const canReadVariants = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
+  const canManageVariants = roles.includes("BUSINESS_ADMIN");
 
   async function openHistory(row: ProductRow) {
     setHistoryTarget(row);
