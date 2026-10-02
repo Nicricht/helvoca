@@ -117,26 +117,23 @@ export function sortWhatsAppMessages(items: WhatsAppMessageItem[] = []) {
   );
 }
 
+function turnRole(item: CallTranscriptItem | WhatsAppMessageItem) {
+  const candidate = item as Partial<CallTranscriptItem & WhatsAppMessageItem>;
+  return String(
+    candidate.speaker ?? candidate.role ?? candidate.direction ?? ""
+  ).toUpperCase();
+}
+
 export function isCustomerTurn(
   item: CallTranscriptItem | WhatsAppMessageItem
 ) {
-  const value = String(
-    "speaker" in item
-      ? item.speaker
-      : item.role ?? item.direction
-  ).toUpperCase();
-  return ["USER", "CALLER", "INBOUND"].includes(value);
+  return ["USER", "CALLER", "INBOUND"].includes(turnRole(item));
 }
 
 export function isRecepVozTurn(
   item: CallTranscriptItem | WhatsAppMessageItem
 ) {
-  const value = String(
-    "speaker" in item
-      ? item.speaker
-      : item.role ?? item.direction
-  ).toUpperCase();
-  return ["ASSISTANT", "AI", "OUTBOUND"].includes(value);
+  return ["ASSISTANT", "AI", "OUTBOUND"].includes(turnRole(item));
 }
 
 export function summarizeActions(actions: CallActionItem[] = []) {

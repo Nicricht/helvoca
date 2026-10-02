@@ -7,7 +7,9 @@ import {
   getWhatsAppConversations,
   getWhatsAppDetail,
   unwrapCalls,
-  type ConversationKind
+  type CallDetail,
+  type ConversationKind,
+  type WhatsAppDetail
 } from "./api";
 
 export interface ConversationReference {
@@ -111,7 +113,7 @@ export function useCustomerConversations(customerId?: string | null) {
 export function useConversationDetail(
   reference: ConversationReference | null
 ) {
-  return useQuery({
+  return useQuery<CallDetail | WhatsAppDetail>({
     queryKey: [
       "conversations",
       "detail",
