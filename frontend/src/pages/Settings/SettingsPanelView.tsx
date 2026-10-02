@@ -24,6 +24,7 @@ import type {
 } from "../../features/settings/api";
 import type { SectionKey, SettingsDraft } from "../../features/settings/viewModel";
 import { ChannelsSettingsPanel } from "./ChannelsSettingsPanel";
+import { IntegrationsSettingsPanel } from "./IntegrationsSettingsPanel";
 import { ScheduleExceptionsPanel } from "./ScheduleExceptionsPanel";
 import { TeamSettingsPanel } from "./TeamSettingsPanel";
 import styles from "./SettingsPage.module.css";
@@ -64,6 +65,8 @@ interface SettingsPanelViewProps {
   canManageScheduleExceptions: boolean;
   canReadChannels: boolean;
   canManageChannels: boolean;
+  canReadIntegrations: boolean;
+  canManageIntegrations: boolean;
   voices: VoiceOption[];
   phones: PhoneNumber[];
   updateRoot: (
@@ -93,6 +96,8 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
     canManageScheduleExceptions,
     canReadChannels,
     canManageChannels,
+    canReadIntegrations,
+    canManageIntegrations,
     voices,
     phones,
     updateRoot,
@@ -594,20 +599,15 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             <span className={styles.sectionIcon}><Globe2 size={19} aria-hidden="true" /></span>
             <div>
               <h2>Integraciones</h2>
-              <p>Los proveedores externos se administran con endpoints explícitos y nunca muestran credenciales completas.</p>
+              <p>Conecta capacidades comerciales sin exponer credenciales ni mezclar herramientas internas.</p>
             </div>
           </div>
         </div>
-        <div className={styles.authorityNote}>
-          <ShieldCheck size={18} aria-hidden="true" />
-          <div>
-            <strong>Zona segura de integraciones</strong>
-            <span>
-              Activación de WhatsApp, pagos y otros proveedores se migra como bloque independiente
-              con confirmación, permisos y E2E mockeado.
-            </span>
-          </div>
-        </div>
+
+        <IntegrationsSettingsPanel
+          canRead={canReadIntegrations}
+          canManage={canManageIntegrations}
+        />
       </section>
     );
   }
