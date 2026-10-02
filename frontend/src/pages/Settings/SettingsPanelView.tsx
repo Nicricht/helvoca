@@ -3,7 +3,6 @@ import {
   Building2,
   CalendarClock,
   Globe2,
-  Link2,
   MessagesSquare,
   Phone,
   Plus,
