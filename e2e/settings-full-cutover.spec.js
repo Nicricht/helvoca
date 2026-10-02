@@ -487,3 +487,75 @@ test('managed payment sandbox lives in React Integrations and mutates only after
   await page.getByRole('button', { name: 'Desactivar pagos de prueba' }).click();
   await expect.poll(() => disableCalls).toBe(1);
 });
+
+
+test('business profile and AI capabilities remain editable after the legacy cutover', async ({ page }) => {
+  await bootReactSettings(page);
+
+  let profilePayload = null;
+  let agentPayload = null;
+
+  await page.route('**/api/v1/business/profile', async route => {
+    if (route.request().method() === 'PUT') {
+      profilePayload = route.request().postDataJSON();
+      return route.fulfill(json(profilePayload));
+    }
+    return route.fulfill(json({
+      presetKey: 'hardware_store',
+      publicDescription: 'Ferretería de barrio',
+      publicPhone: '+56220009999',
+      publicEmail: 'ventas@ferreteria.cl',
+      websiteUrl: 'https://ferreteria.cl',
+      addressLine: 'Av. Principal 123',
+      commune: 'Santiago',
+      city: 'Santiago',
+      region: 'RM',
+      countryCode: 'CL',
+      defaultCurrency: 'CLP',
+      sellsProducts: true,
+      sellsServices: false,
+      usesReservations: false
+    }));
+  });
+
+  await page.route('**/api/v1/onboarding/setup', route => route.fulfill(json({ readyForCalls: true })));
+
+  await page.route('**/api/v1/ai-agent', async route => {
+    if (route.request().method() === 'PUT') {
+      agentPayload = route.request().postDataJSON();
+      return route.fulfill(json({ configured: true, ...agentPayload }));
+    }
+    return route.fulfill(json({
+      configured: true,
+      name: 'Sofía',
+      language: 'es',
+      voice: 'marin',
+      greeting: 'Hola',
+      instructions: 'Responde brevemente',
+      active: true,
+      capabilities: ['GET_BUSINESS_INFORMATION', 'LIST_SERVICES']
+    }));
+  });
+
+  await page.goto('/app/settings?section=business');
+
+  await expect(page.getByLabel('Rubro')).toHaveValue('hardware_store');
+  await expect(page.getByLabel('Productos')).toHaveValue('true');
+  await expect(page.getByLabel('Servicios')).toHaveValue('false');
+  await expect(page.getByText('Prioriza catálogo, stock, cotizaciones, pedidos y despacho.')).toBeVisible();
+
+  await page.getByLabel('Servicios').selectOption('true');
+  await page.getByRole('tab', { name: 'Recepcionista IA' }).click();
+
+  const active = page.getByLabel(/Agente IA activo para este negocio/);
+  await expect(active).toBeChecked();
+  await expect(page.getByLabel('Información')).toBeChecked();
+  await expect(page.getByLabel('Servicios', { exact: true })).toBeChecked();
+  await page.getByLabel('Crear reserva').check();
+
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+
+  await expect.poll(() => profilePayload?.sellsServices).toBe(true);
+  await expect.poll(() => agentPayload?.capabilities).toContain('CREATE_BOOKING');
+  expect(agentPayload.active).toBe(true);
+});
