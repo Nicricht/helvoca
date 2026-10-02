@@ -40,7 +40,7 @@ async function base(page, { catalog, inventory, alerts = [], roles = ['BUSINESS_
   })));
 
   await page.route('**/api/v1/catalog/**', async route => {
-    if (route.request().method() !== 'PUT') return route.continue();
+    if (route.request().method() !== 'PUT') return route.fallback();
     const id = route.request().url().split('/').pop();
     const body = route.request().postDataJSON();
     state.catalogUpdates.push({ id, body });
@@ -72,11 +72,11 @@ async function base(page, { catalog, inventory, alerts = [], roles = ['BUSINESS_
       return route.fulfill(json(state.inventory.find(stock => stock.catalogItemId === productId)));
     }
     if (url.pathname.endsWith('/movements')) return route.fulfill(json([]));
-    return route.continue();
+    return route.fallback();
   });
 
   await page.route('**/api/v1/inventory', route => {
-    if (!route.request().url().endsWith('/api/v1/inventory')) return route.continue();
+    if (!route.request().url().endsWith('/api/v1/inventory')) return route.fallback();
     state.inventoryGets += 1;
     return route.fulfill(json(state.inventory));
   });
@@ -221,7 +221,7 @@ test.describe('React Inventory legacy parity', () => {
     };
 
     await page.route(`**/api/v1/inventory/${productId}/variants/${variantId}`, async route => {
-      if (route.request().method() !== 'PUT') return route.continue();
+      if (route.request().method() !== 'PUT') return route.fallback();
       const body = route.request().postDataJSON();
       state.variantUpdates.push(body);
       variant = { ...variant, ...body, available: body.onHand - variant.reserved };
