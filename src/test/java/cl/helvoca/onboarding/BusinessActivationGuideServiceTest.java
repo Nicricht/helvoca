@@ -115,7 +115,7 @@ class BusinessActivationGuideServiceTest {
         BusinessActivationGuideService.Guide result = service.current();
 
         assertEquals("WHATSAPP", result.nextStep().code());
-        assertEquals("/app/settings", result.nextStep().actionHref());
+        assertEquals("/app/settings?section=channels", result.nextStep().actionHref());
         assertEquals("Conectar WhatsApp", result.nextStep().actionLabel());
     }
 
