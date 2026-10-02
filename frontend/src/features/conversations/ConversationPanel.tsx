@@ -18,10 +18,18 @@ import {
 } from "./useCustomerConversations";
 import styles from "./ConversationPanel.module.css";
 
+export interface EmbeddedConversationContext {
+  channel?: string | null;
+  sourceReferenceId?: string | null;
+  call?: CallDetail | null;
+  whatsapp?: WhatsAppDetail | null;
+}
+
 export interface ConversationPanelProps {
   customerId?: string | null;
   customerLabel?: string | null;
   preferredConversation?: ConversationReference | null;
+  context?: EmbeddedConversationContext | null;
 }
 
 type UnifiedTurn = {
@@ -137,15 +145,22 @@ function detailSummary(
 export function ConversationPanel({
   customerId,
   customerLabel,
-  preferredConversation
+  preferredConversation,
+  context
 }: ConversationPanelProps) {
-  const workspace = useCustomerConversations(customerId);
+  const contextualReference: ConversationReference | null = context?.call
+    ? { kind: "call", id: context.call.call.id }
+    : context?.whatsapp
+      ? { kind: "whatsapp", id: context.whatsapp.conversation.id }
+      : null;
+  const hasContext = context !== undefined;
+  const workspace = useCustomerConversations(hasContext ? null : customerId);
   const [selectedKey, setSelectedKey] = useState<string | null>(
     preferredConversation ? keyOf(preferredConversation) : null
   );
 
   useEffect(() => {
-    if (!workspace.items.length) {
+    if ((hasContext && !contextualReference) || (!hasContext && !workspace.items.length)) {
       setSelectedKey(null);
       return;
     }
@@ -164,18 +179,20 @@ export function ConversationPanel({
     }
   }, [preferredConversation, selectedKey, workspace.items]);
 
-  const selected = workspace.items.find(
-    item => keyOf(item) === selectedKey
-  ) ?? null;
-
-  const detail = useConversationDetail(
-    selected ? { kind: selected.kind, id: selected.id } : null
+  const selected = contextualReference ?? (
+    workspace.items.find(item => keyOf(item) === selectedKey) ?? null
   );
 
-  const view = useMemo(() => {
-    if (!selected || !detail.data) return null;
+  const detail = useConversationDetail(
+    !hasContext && selected ? { kind: selected.kind, id: selected.id } : null
+  );
 
-    const raw = detail.data as CallDetail | WhatsAppDetail;
+  const resolvedDetail = context?.call ?? context?.whatsapp ?? detail.data;
+
+  const view = useMemo(() => {
+    if (!selected || !resolvedDetail) return null;
+
+    const raw = resolvedDetail as CallDetail | WhatsAppDetail;
     const turns =
       selected.kind === "call"
         ? callTurns(raw as CallDetail)
@@ -194,9 +211,9 @@ export function ConversationPanel({
       needsAttention,
       question: latestCustomerQuestion(turns)
     };
-  }, [detail.data, selected]);
+  }, [resolvedDetail, selected]);
 
-  if (!customerId) {
+  if (!hasContext && !customerId) {
     return (
       <section className={styles.state} aria-label="Conversación relacionada">
         <strong>Selecciona una reserva</strong>
@@ -205,7 +222,7 @@ export function ConversationPanel({
     );
   }
 
-  if (workspace.forbidden) {
+  if (!hasContext && workspace.forbidden) {
     return (
       <section className={styles.state} role="alert" aria-label="Conversación relacionada">
         <strong>Sin acceso a conversaciones</strong>
@@ -214,7 +231,7 @@ export function ConversationPanel({
     );
   }
 
-  if (workspace.error) {
+  if (!hasContext && workspace.error) {
     return (
       <section className={styles.state} role="alert" aria-label="Conversación relacionada">
         <strong>No pudimos cargar el historial</strong>
@@ -223,7 +240,7 @@ export function ConversationPanel({
     );
   }
 
-  if (workspace.loading) {
+  if (!hasContext && workspace.loading) {
     return (
       <section className={styles.state} role="status" aria-label="Conversación relacionada">
         <strong>Cargando conversación…</strong>
@@ -253,40 +270,42 @@ export function ConversationPanel({
         <span className={styles.readOnly}>Solo lectura</span>
       </header>
 
-      {workspace.partial.length > 0 && (
+      {!hasContext && workspace.partial.length > 0 && (
         <div className={styles.partial} role="status">
           {workspace.partial.join(" ")}
         </div>
       )}
 
-      <div className={styles.sessions} aria-label="Conversaciones del cliente">
-        {workspace.items.map(item => {
-          const active = selected ? keyOf(item) === keyOf(selected) : false;
-          return (
-            <button
-              key={keyOf(item)}
-              type="button"
-              className={active ? styles.sessionActive : styles.session}
-              aria-pressed={active}
-              onClick={() => setSelectedKey(keyOf(item))}
-            >
-              <span className={styles.channel}>
-                {item.kind === "call" ? "Llamada" : "WhatsApp"}
-              </span>
-              <strong>{sessionLabel(item)}</strong>
-              <small>{formatDate(item.occurredAt)}</small>
-            </button>
-          );
-        })}
-      </div>
+      {!hasContext && (
+        <div className={styles.sessions} aria-label="Conversaciones del cliente">
+          {workspace.items.map(item => {
+            const active = selected ? keyOf(item) === keyOf(selected) : false;
+            return (
+              <button
+                key={keyOf(item)}
+                type="button"
+                className={active ? styles.sessionActive : styles.session}
+                aria-pressed={active}
+                onClick={() => setSelectedKey(keyOf(item))}
+              >
+                <span className={styles.channel}>
+                  {item.kind === "call" ? "Llamada" : "WhatsApp"}
+                </span>
+                <strong>{sessionLabel(item)}</strong>
+                <small>{formatDate(item.occurredAt)}</small>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      {detail.isPending && (
+      {!hasContext && detail.isPending && (
         <div className={styles.detailState} role="status">
           Cargando detalle…
         </div>
       )}
 
-      {detail.isError && (
+      {!hasContext && detail.isError && (
         <div className={styles.detailState} role="alert">
           No pudimos abrir esta conversación.
         </div>
