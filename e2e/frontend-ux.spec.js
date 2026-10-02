@@ -159,7 +159,7 @@ test('auth tabs and simplified registration controls are usable', async ({ page 
   await expect(page.locator('#loginForm')).toBeHidden();
 });
 
-test('registration validates fields and enters the dashboard with the expected payload', async ({ page }) => {
+test('registration validates fields and enters React Home with the expected payload', async ({ page }) => {
   await mockReadyTenant(page, {
     activationGuide: {
       readyForPilot: false,
@@ -215,22 +215,11 @@ test('registration validates fields and enters the dashboard with the expected p
   expect(registerPayload.timezone).toBeTruthy();
   expect(registerPayload.language).toBeTruthy();
 
-  await expect(page.locator('#dashboardView')).toBeVisible();
-  await expect(page.locator('#authView')).toBeHidden();
-  await expect(page.locator('#sessionBadge')).toHaveText('Sesión activa');
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBe('register-token');
-  await expect(page.locator('#businessActivationGuide')).toBeVisible();
-  await expect(page.locator('#activationGuideScore')).toHaveText('1/7');
-  await expect(page.locator('#businessActivationGuide [data-code="ACCOUNT"]')).toHaveClass(/complete/);
-  await expect(page.locator('#businessActivationGuide [data-code="BUSINESS_SETUP"]')).toHaveClass(/next/);
-  await expect(page.locator('#activationGuideNext')).toContainText('Siguiente: Datos, oferta y horarios');
-  await expect(page.locator('#activationGuideNext a')).toHaveText('Preparar negocio');
-  await expect(page.locator('#activationGuideNext a')).toHaveAttribute('href', '/#aiForm');
-  await expect(page.locator('#businessActivationGuide')).not.toContainText('Railway');
-  await expect(page.locator('#businessActivationGuide')).not.toContainText('webhook');
+  await expect(page).toHaveURL(/\/app\/?$/);
 });
 
-test('login keeps errors visible and enters the dashboard after valid credentials', async ({ page }) => {
+test('login keeps errors visible and enters React Home after valid credentials', async ({ page }) => {
   await mockReadyTenant(page);
 
   let loginCalls = 0;
@@ -263,10 +252,8 @@ test('login keeps errors visible and enters the dashboard after valid credential
   await page.locator('#loginForm button[type="submit"]').click();
 
   await expect.poll(() => loginCalls).toBe(2);
-  await expect(page.locator('#dashboardView')).toBeVisible();
-  await expect(page.locator('#authView')).toBeHidden();
-  await expect(page.locator('#sessionBadge')).toHaveText('Sesión activa');
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBe('login-token');
+  await expect(page).toHaveURL(/\/app\/?$/);
 });
 
 test('ready customer sees operations on home and configuration on settings', async ({ page }) => {

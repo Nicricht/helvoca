@@ -28,7 +28,7 @@ function navEntries(html) {
 
 test('customer navigation stays coherent and never exposes internal operations', async () => {
   const expected = [
-    { href: '/', text: 'Inicio' },
+    { href: '/app', text: 'Inicio' },
     { href: '/conversations.html', text: 'Conversaciones' },
     { href: '/app/agenda', text: 'Agenda' },
     { href: '/app/orders', text: 'Operaciones' },
