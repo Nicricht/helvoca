@@ -110,8 +110,12 @@ for file in "${CHANGED[@]}"; do
       RUN_SOFTWARE_FACTORY=true
       ;;
     src/main/resources/static/*.js|src/main/resources/static/**/*.js|e2e/*.js|e2e/**/*.js)
-      echo "Syntax check: $file"
-      node --check "$file"
+      if [[ -f "$file" ]]; then
+        echo "Syntax check: $file"
+        node --check "$file"
+      else
+        echo "Skipping syntax check for deleted JavaScript: $file"
+      fi
       ;;
   esac
 done
