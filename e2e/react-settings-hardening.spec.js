@@ -147,7 +147,7 @@ test.describe('React settings hardening RED contract', () => {
 
     const nav = page.getByRole('tablist', { name: 'Secciones de configuración' });
     await nav.getByRole('tab', { name: 'Servicios' }).click();
-    await expect(page.getByText('Consulta')).toBeVisible();
+    await expect(page.getByText('Consulta', { exact: true })).toBeVisible();
   });
 
   test('renders safely at 1440 768 and 390 with scrollable internal tabs', async ({ page }) => {
