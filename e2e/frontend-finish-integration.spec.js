@@ -31,6 +31,7 @@ test('customer navigation stays coherent and never exposes internal operations',
     { href: '/', text: 'Inicio' },
     { href: '/conversations.html', text: 'Conversaciones' },
     { href: '/app/agenda', text: 'Agenda' },
+    { href: '/app/orders', text: 'Operaciones' },
     { href: '/#customers', text: 'Clientes' },
     { href: '/app/inventory', text: 'Inventario' },
     { href: '/settings.html', text: 'Configuración' },
@@ -143,7 +144,7 @@ test('primary customer navigation remains keyboard reachable at required widths'
 
     const nav = page.getByRole('navigation', { name: 'Navegación principal' });
     const links = nav.getByRole('link');
-    await expect(links).toHaveCount(7);
+    await expect(links).toHaveCount(8);
 
     await links.nth(0).focus();
     await expect(links.nth(0)).toBeFocused();

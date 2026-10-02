@@ -427,6 +427,7 @@ test('release candidate captures exact-head visual evidence for every canonical 
           'Inicio',
           'Conversaciones',
           'Agenda',
+          'Operaciones',
           'Clientes',
           'Inventario',
           'Configuración',

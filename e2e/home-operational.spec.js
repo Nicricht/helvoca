@@ -564,7 +564,7 @@ test('ready customer sees live operational home instead of setup cards', async (
   expect(await page.locator('#homeCallsMetric').evaluate(element => element.tagName)).toBe('ARTICLE');
   await expect(page.locator('#homeBookingsMetric')).toHaveAttribute('href', '/app/agenda');
   await expect(page.locator('#homeRequestsMetric')).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
-  await expect(page.locator('#ownerOrdersMetric')).toHaveAttribute('href', '/?tab=sales#homeBusinessWorkspace');
+  await expect(page.locator('#ownerOrdersMetric')).toHaveAttribute('href', '/app/orders');
   await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
   await page.locator('#ownerWorkspaceToggle').click();
   await expect(page.locator('#homeBusinessWorkspace')).not.toHaveClass(/owner-collapsed/);

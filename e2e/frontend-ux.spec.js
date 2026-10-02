@@ -463,6 +463,7 @@ test('primary and public navigation fit desktop tablet and mobile viewports', as
       await page.goto('/inventory.html');
       await expect(page.locator('.nav-inventory')).toHaveClass(/active/);
       await expect(page.locator('.nav-bookings')).toHaveAttribute('href', '/app/agenda');
+      await expect(page.locator('.nav-orders')).toHaveAttribute('href', '/app/orders');
       await expect(page.locator('.nav-customers')).toHaveAttribute('href', '/#customers');
       await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
       await expectNoPageOverflow();
