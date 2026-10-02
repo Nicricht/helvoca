@@ -201,7 +201,7 @@ test.describe('React settings core RED contract', () => {
   });
 
   test('tracks dirty/saving/saved, avoids duplicate submit and never sends businessId', async ({ page }) => {
-    const state = await bootSettingsCore(page, { setupDelayMs: 250 });
+    const state = await bootSettingsCore(page, { setupDelayMs: 1200 });
     await page.goto('/app/settings');
 
     const name = page.getByLabel('Nombre del negocio');
