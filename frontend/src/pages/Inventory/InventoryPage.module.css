@@ -391,6 +391,9 @@
 
 .actionCell {
   width: 1%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   white-space: nowrap;
 }
 
@@ -521,6 +524,63 @@
   padding-top: 2px;
 }
 
+.historyBody {
+  padding: 20px;
+}
+
+.movementList {
+  display: grid;
+  gap: 12px;
+}
+
+.movementCard {
+  display: grid;
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 12px;
+  background: var(--rv-surface-1);
+}
+
+.movementHeader,
+.movementDeltas,
+.movementAfter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.movementHeader strong {
+  color: var(--rv-text-primary);
+  font-size: 13px;
+}
+
+.movementHeader time {
+  color: var(--rv-text-tertiary);
+  font-size: 11px;
+}
+
+.movementDeltas span {
+  color: var(--rv-accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.movementAfter {
+  padding-top: 9px;
+  border-top: 1px solid var(--rv-border-subtle);
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+}
+
+.movementNote {
+  margin: 0;
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -575,6 +635,14 @@
   .table th,
   .table td {
     padding-inline: 14px;
+  }
+
+  .movementHeader,
+  .movementDeltas,
+  .movementAfter {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
   }
 }
 
