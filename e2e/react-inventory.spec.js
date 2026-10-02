@@ -7,7 +7,7 @@ const json = body => ({
 });
 
 async function bootInventory(page, options = {}) {
-  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', options.token || 'inventory-react-e2e'));
+  await page.addInitScript(token => sessionStorage.setItem('helvoca_access_token', token), options.token || 'inventory-react-e2e');
 
   await page.route('**/api/v1/auth/me', route => {
     if (options.expired) {
