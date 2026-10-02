@@ -39,3 +39,45 @@ On 2026-10-01 production logs showed a repeated database permission failure on `
 
 ## Next step
 Inspect runtime allocation/concurrency patterns, scheduled jobs, repository query shapes, schema indexes, and current production deployment/CI state. Implement only evidence-backed changes.
+
+
+## Audit findings
+
+### Evidence-backed defects
+1. `CommercialOperationsAdminService.orders()` fetched every tenant order, then truncated to 100 in Java.
+2. The same surface loaded order lines one order at a time, creating an N+1 pattern: up to 101 repository queries for one 100-order response.
+3. Deliveries, quotes and leads also fetched all tenant rows before truncating to 100 in Java.
+
+Existing PostgreSQL indexes already support the intended access paths:
+- `business_order(business_id, created_at DESC)`
+- `business_delivery(business_id, created_at DESC)`
+- `business_quote(business_id, created_at DESC)`
+- `business_lead(business_id, created_at DESC)`
+- `business_order_line(order_id, created_at)`
+
+No duplicate index migration is warranted.
+
+### Memory / pool investigation
+Critical in-memory structures were reviewed:
+- Twilio WebSocket state is removed on connection close.
+- Gemini pending audio is bounded and cleared.
+- call-summary in-flight IDs are removed in `finally`.
+- certification schedulers shut down.
+- simulator session state is removed by the simulator finish flow.
+
+Production Railway logs for the last day do not show Hikari `Failed to validate connection` / `Pool is empty` warnings. Therefore no JVM or Hikari tuning is being introduced without heap/direct-buffer evidence.
+
+## RED evidence
+GitHub Actions run #3371 on commit `29da21cee0c6b316b182e3bbddb632b169f33d42` failed exactly at:
+`CommercialOperationsAdminServiceTest.ordersUsesBoundedRepositoryQueryAndBatchLoadsLines`
+with expected 2 results but actual 0, because production code still called the legacy unbounded repository method.
+
+## Implemented hardening
+- PostgreSQL performs the 100-row bound for orders, deliveries, quotes and leads.
+- Order lines are fetched in one batch for the bounded order set.
+- Single-order mutation detail still uses the focused single-order line query.
+- Real PostgreSQL integration coverage verifies the 100-row tenant-scoped repository behavior.
+- Focused unit coverage verifies the batch line-loading contract and bounded list methods.
+
+## Final verification pending
+Fast Gate, Full Gate, exact-head sync with `main`, merge, exact-main CI and Railway verification remain pending for the final HEAD.
