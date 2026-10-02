@@ -458,6 +458,154 @@ class PostgresRowLevelSecurityIntegrationTest {
     }
 
     @Test
+    void quoteForeignKeysRejectCrossTenantOperationAndCustomerEvenForOwner() {
+        UUID customerA = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessA);
+        UUID customerB = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessB);
+        UUID operationA = insertProjectionOperation(businessA, customerA, "QUOTE");
+        UUID operationB = insertProjectionOperation(businessB, customerB, "QUOTE");
+
+        org.junit.jupiter.api.Assertions.assertAll(
+                "business_quote tenant references",
+                () -> assertQuoteInsertRejectedOrCleaned(
+                        businessA, customerA, operationB, "cross-operation"),
+                () -> assertQuoteInsertRejectedOrCleaned(
+                        businessA, customerB, operationA, "cross-customer"));
+    }
+
+    @Test
+    void leadForeignKeysRejectCrossTenantOperationAndCustomerEvenForOwner() {
+        UUID customerA = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessA);
+        UUID customerB = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessB);
+        UUID operationA = insertProjectionOperation(businessA, customerA, "LEAD");
+        UUID operationB = insertProjectionOperation(businessB, customerB, "LEAD");
+
+        org.junit.jupiter.api.Assertions.assertAll(
+                "business_lead tenant references",
+                () -> assertLeadInsertRejectedOrCleaned(
+                        businessA, customerA, operationB, "cross-operation"),
+                () -> assertLeadInsertRejectedOrCleaned(
+                        businessA, customerB, operationA, "cross-customer"));
+    }
+
+    @Test
+    void requestForeignKeysRejectCrossTenantOperationCustomerAndCallEvenForOwner() {
+        UUID customerA = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessA);
+        UUID customerB = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessB);
+        UUID operationA = insertProjectionOperation(businessA, customerA, "REQUEST");
+        UUID operationB = insertProjectionOperation(businessB, customerB, "REQUEST");
+        UUID callA = insertProjectionCall(businessA);
+        UUID callB = insertProjectionCall(businessB);
+
+        org.junit.jupiter.api.Assertions.assertAll(
+                "business_request tenant references",
+                () -> assertRequestInsertRejectedOrCleaned(
+                        businessA, customerA, operationB, callA, "cross-operation"),
+                () -> assertRequestInsertRejectedOrCleaned(
+                        businessA, customerB, operationA, callA, "cross-customer"),
+                () -> assertRequestInsertRejectedOrCleaned(
+                        businessA, customerA, operationA, callB, "cross-call"));
+    }
+
+    private UUID insertProjectionOperation(UUID businessId, UUID customerId, String type) {
+        UUID operationId = UUID.randomUUID();
+        ownerJdbc.update("""
+                INSERT INTO business_operation(
+                    id, business_id, customer_id, type, status, source, revision, currency
+                ) VALUES (?, ?, ?, ?, 'CONFIRMED', 'MANUAL', 1, 'CLP')
+                """, operationId, businessId, customerId, type);
+        return operationId;
+    }
+
+    private UUID insertProjectionCall(UUID businessId) {
+        UUID callId = UUID.randomUUID();
+        ownerJdbc.update("""
+                INSERT INTO call_session(
+                    id, business_id, provider_call_id, destination_number,
+                    direction, status, started_at
+                ) VALUES (?, ?, ?, '+56900000000', 'inbound', 'completed', NOW())
+                """, callId, businessId, "tenant-integrity-" + callId);
+        return callId;
+    }
+
+    private void assertQuoteInsertRejectedOrCleaned(
+            UUID businessId,
+            UUID customerId,
+            UUID operationId,
+            String suffix) {
+        UUID quoteId = UUID.randomUUID();
+        try {
+            ownerJdbc.update("""
+                    INSERT INTO business_quote(
+                        id, business_id, customer_id, title, status, source, operation_id
+                    ) VALUES (?, ?, ?, 'Tenant integrity quote', 'REQUESTED', 'MANUAL', ?)
+                    """, quoteId, businessId, customerId, operationId);
+            ownerJdbc.update("DELETE FROM business_quote WHERE id = ?", quoteId);
+            fail("Cross-tenant business_quote reference was accepted: " + suffix);
+        } catch (DataAccessException expected) {
+            // PostgreSQL tenant-integrity constraint rejected the write.
+        }
+    }
+
+    private void assertLeadInsertRejectedOrCleaned(
+            UUID businessId,
+            UUID customerId,
+            UUID operationId,
+            String suffix) {
+        UUID leadId = UUID.randomUUID();
+        try {
+            ownerJdbc.update("""
+                    INSERT INTO business_lead(
+                        id, business_id, customer_id, name, interest, status, source, operation_id
+                    ) VALUES (?, ?, ?, 'Tenant integrity lead', 'Tenant integrity', 'NEW', 'MANUAL', ?)
+                    """, leadId, businessId, customerId, operationId);
+            ownerJdbc.update("DELETE FROM business_lead WHERE id = ?", leadId);
+            fail("Cross-tenant business_lead reference was accepted: " + suffix);
+        } catch (DataAccessException expected) {
+            // PostgreSQL tenant-integrity constraint rejected the write.
+        }
+    }
+
+    private void assertRequestInsertRejectedOrCleaned(
+            UUID businessId,
+            UUID customerId,
+            UUID operationId,
+            UUID callId,
+            String suffix) {
+        UUID requestId = UUID.randomUUID();
+        try {
+            ownerJdbc.update("""
+                    INSERT INTO business_request(
+                        id, business_id, customer_id, call_id, request_type, title,
+                        priority, status, source, created_at, updated_at, operation_id
+                    ) VALUES (?, ?, ?, ?, 'GENERAL', 'Tenant integrity request',
+                              'NORMAL', 'OPEN', 'MANUAL', NOW(), NOW(), ?)
+                    """, requestId, businessId, customerId, callId, operationId);
+            ownerJdbc.update("DELETE FROM business_request WHERE id = ?", requestId);
+            fail("Cross-tenant business_request reference was accepted: " + suffix);
+        } catch (DataAccessException expected) {
+            // PostgreSQL tenant-integrity constraint rejected the write.
+        }
+    }
+
+    @Test
     void operationForeignKeysRejectCrossTenantCustomerAndDeliveryZoneEvenForOwner() {
         UUID customerA = ownerJdbc.queryForObject(
                 "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
