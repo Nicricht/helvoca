@@ -5,7 +5,7 @@ import {
   LayoutDashboard,
   PackageSearch,
   Settings,
-  Users,
+  ShoppingBag,
   WalletCards
 } from "lucide-react";
 import { clearAccessToken } from "../../api/client";
@@ -14,7 +14,7 @@ import styles from "./AppShell.module.css";
 const navigation = [
   { href: "/app", label: "Inicio", icon: LayoutDashboard },
   { href: "/app/agenda", label: "Agenda", icon: CalendarDays },
-  { href: "/#customers", label: "Clientes", icon: Users },
+  { href: "/app/orders", label: "Operaciones", icon: ShoppingBag },
   { href: "/app/inventory", label: "Inventario", icon: PackageSearch },
   { href: "/app/settings", label: "Configuración", icon: Settings }
 ];
@@ -30,6 +30,7 @@ export function AppShell({ children }: PropsWithChildren) {
   function isCurrentNavigation(label: string): boolean {
     if (label === "Inicio") return location.pathname === "/";
     if (label === "Agenda") return location.pathname.startsWith("/agenda");
+    if (label === "Operaciones") return location.pathname.startsWith("/orders");
     if (label === "Inventario") return location.pathname.startsWith("/inventory");
     if (label === "Configuración") return location.pathname.startsWith("/settings");
     return false;

@@ -14,6 +14,8 @@ public class ReactFrontendController {
             "/app/inventory/",
             "/app/agenda",
             "/app/agenda/",
+            "/app/orders",
+            "/app/orders/",
             "/app/settings",
             "/app/settings/"
     })
