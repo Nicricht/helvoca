@@ -138,7 +138,7 @@ test('Team is managed inside React Settings without legacy fallback', async ({ p
   await page.getByLabel('Rol de la persona').selectOption('MANAGER');
   await page.getByRole('button', { name: 'Crear invitación' }).click();
 
-  await expect(page.getByLabel('Enlace de invitación')).toContainText('new-token');
+  await expect(page.getByLabel('Enlace de invitación')).toHaveValue(/new-token/);
   await expect(page.locator('a[href^="/settings.html"]')).toHaveCount(0);
 });
 
