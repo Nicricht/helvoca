@@ -486,6 +486,7 @@ export function HomePage() {
 
   return (
     <AppShell>
+      <MotionConfig reducedMotion="user">
       <main className={`rv-page-frame ${styles.page}`}>
         <div className={styles.ambient} aria-hidden="true">
           <span className={styles.wave} />
@@ -546,6 +547,7 @@ export function HomePage() {
           </motion.div>
         ) : null}
       </main>
+      </MotionConfig>
     </AppShell>
   );
 }
