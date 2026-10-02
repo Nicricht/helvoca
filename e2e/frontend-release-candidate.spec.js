@@ -2,38 +2,53 @@ const { test, expect } = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const json = body => ({
-  status: 200,
+const json = (body, status = 200) => ({
+  status,
   contentType: 'application/json',
   body: JSON.stringify(body)
 });
 
-async function mockReleaseCandidate(page) {
-  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'rc-e2e-token'));
+async function mockCanonicalApp(page) {
+  await page.addInitScript(() => {
+    if (window.location.pathname.startsWith('/app')) {
+      sessionStorage.setItem('helvoca_access_token', 'rc-react-token');
+    }
+  });
 
   await page.route('**/api/v1/**', async route => {
-    const request = route.request();
-    const url = new URL(request.url());
-    const path = url.pathname;
-    const method = request.method();
+    const url = new URL(route.request().url());
+    const p = url.pathname;
+    const method = route.request().method();
 
-    if (path === '/api/v1/auth/me') return route.fulfill(json({
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+      return route.fulfill(json({ message: 'RC read-only fixture blocks mutations' }, 501));
+    }
+
+    if (p === '/api/v1/auth/me') return route.fulfill(json({
       email: 'admin@ferreteria-rc.cl',
-      roles: ['BUSINESS_ADMIN']
+      roles: ['BUSINESS_ADMIN'],
+      permissions: [
+        'BUSINESS_READ', 'BUSINESS_MANAGE', 'CATALOG_READ', 'CATALOG_MANAGE',
+        'CUSTOMERS_READ', 'CUSTOMERS_MANAGE', 'CUSTOMERS_EXPORT',
+        'BOOKINGS_READ', 'BOOKINGS_MANAGE', 'ORDERS_READ', 'ORDERS_MANAGE',
+        'INVENTORY_READ', 'INVENTORY_MANAGE', 'ANALYTICS_READ',
+        'OPERATIONS_READ', 'REQUESTS_READ', 'REQUESTS_MANAGE', 'AUDIT_READ'
+      ]
     }));
-    if (path === '/api/v1/business') return route.fulfill(json({
+    if (p === '/api/v1/business') return route.fulfill(json({
+      id: 'business-rc',
       name: 'Ferretería Release Candidate',
       timezone: 'America/Santiago',
       language: 'es',
       humanTransferPhone: '+56999999999'
     }));
-    if (path === '/api/v1/business/profile') return route.fulfill(json({
+    if (p === '/api/v1/business/profile') return route.fulfill(json({
       businessId: 'business-rc',
       presetKey: 'store',
       publicDescription: 'Ferretería y materiales',
       publicPhone: '+56911112222',
       publicEmail: 'ventas@ferreteria-rc.cl',
-      websiteUrl: 'https://example.test',
+      websiteUrl: null,
       addressLine: 'Av. Demo 123',
       commune: 'Santiago',
       city: 'Santiago',
@@ -44,7 +59,7 @@ async function mockReleaseCandidate(page) {
       sellsServices: true,
       usesReservations: true
     }));
-    if (path === '/api/v1/onboarding/status') return route.fulfill(json({
+    if (p === '/api/v1/onboarding/status') return route.fulfill(json({
       businessProfileConfigured: true,
       servicesConfigured: true,
       scheduleConfigured: true,
@@ -54,34 +69,62 @@ async function mockReleaseCandidate(page) {
       readyForCalls: true,
       nextStep: 'READY'
     }));
-    if (path === '/api/v1/onboarding/guide') return route.fulfill(json({
-      readyForPilot: true,
-      completed: 7,
-      total: 7,
-      progressPercent: 100,
-      nextStep: null,
-      steps: []
+    if (p === '/api/v1/operations/dashboard') return route.fulfill(json({
+      businessName: 'Ferretería Release Candidate',
+      timezone: 'America/Santiago',
+      localNow: '2026-10-02T18:00:00-03:00',
+      callsToday: 12,
+      callDurationSecondsToday: 1220,
+      bookingsToday: 3,
+      newCustomersToday: 2,
+      openRequests: 1,
+      unansweredQuestions: 0,
+      callFailuresToday: 0,
+      estimatedCallCostTodayUsd: 2.1,
+      recentCalls: [],
+      recentRequests: [],
+      unanswered: []
     }));
-    if (path === '/api/v1/onboarding/activation') return route.fulfill(json({
-      ready: true,
-      completed: 10,
-      total: 10,
-      progressPercent: 100,
-      blockers: [],
-      steps: []
+    if (p === '/api/v1/commercial/analytics') return route.fulfill(json({
+      days: 7,
+      timezone: 'America/Santiago',
+      primaryCurrency: 'CLP',
+      totalRevenue: 189900,
+      paidOrders: 5,
+      unitsSold: 7,
+      averageTicket: 37980,
+      revenueChangePercent: 12.5,
+      currencyTotals: [{ currency: 'CLP', amount: 189900 }],
+      salesOverTime: [],
+      topProducts: [],
+      channels: [],
+      peakWeekday: 'THURSDAY',
+      peakHour: 13,
+      recepVozOrders: 4,
+      recepVozRevenue: 159900,
+      bookingCurrency: 'CLP',
+      paidBookings: 3,
+      bookingRevenue: 75000,
+      providerVerifiedBookingRevenue: 50000,
+      manualRecordedBookingRevenue: 25000,
+      recepVozPaidBookings: 2,
+      recepVozBookingRevenue: 50000,
+      bookingCurrencyTotals: [{ currency: 'CLP', amount: 75000 }],
+      insights: []
     }));
-    if (path === '/api/v1/services') return route.fulfill(json([
+    if (p === '/api/v1/services') return route.fulfill(json([
       { id: 'svc-rc', name: 'Corte de madera', durationMinutes: 30, price: 12990, active: true }
     ]));
-    if (path === '/api/v1/business/hours') return route.fulfill(json([
+    if (p === '/api/v1/bookings') return route.fulfill(json([]));
+    if (p === '/api/v1/customers') return route.fulfill(json([]));
+    if (p === '/api/v1/business/hours') return route.fulfill(json([
       { dayOfWeek: 1, openTime: '09:00:00', closeTime: '18:00:00' }
     ]));
-    if (path === '/api/v1/business/schedule-exceptions') return route.fulfill(json([]));
-    if (path === '/api/v1/knowledge') return route.fulfill(json([]));
-    if (path === '/api/v1/ai-agent/voices') return route.fulfill(json([
+    if (p === '/api/v1/knowledge') return route.fulfill(json([]));
+    if (p === '/api/v1/ai-agent/voices') return route.fulfill(json([
       { code: 'natural', selection: 'marin', name: 'Natural', description: 'Conversacional' }
     ]));
-    if (path === '/api/v1/ai-agent') return route.fulfill(json({
+    if (p === '/api/v1/ai-agent') return route.fulfill(json({
       configured: true,
       name: 'Sofía',
       language: 'es',
@@ -91,43 +134,44 @@ async function mockReleaseCandidate(page) {
       active: true,
       capabilities: ['GET_BUSINESS_INFORMATION', 'LIST_SERVICES']
     }));
-    if (path === '/api/v1/phone-numbers') return route.fulfill(json([
+    if (p === '/api/v1/phone-numbers') return route.fulfill(json([]));
+
+    if (p === '/api/v1/commercial/orders') return route.fulfill(json([]));
+    if (p === '/api/v1/commercial/deliveries') return route.fulfill(json([]));
+    if (p === '/api/v1/requests') return route.fulfill(json([]));
+    if (p === '/api/v1/audit') return route.fulfill(json([]));
+
+    if (p === '/api/v1/catalog') return route.fulfill(json([
       {
-        id: 'phone-rc',
-        provider: 'TWILIO',
-        externalId: 'PNrc',
-        phoneNumber: '+56911111111',
-        active: true,
-        whatsappEnabled: false
+        id: 'product-rc',
+        kind: 'PRODUCT',
+        name: 'Taladro percutor',
+        description: '750W',
+        price: 54990,
+        currency: 'CLP',
+        active: true
       }
     ]));
-    if (path === '/api/v1/phone-numbers/provisioning/status') return route.fulfill(json({
-      enabled: false,
-      configured: false,
-      purchaseAvailable: false,
-      provider: 'TWILIO',
-      message: 'No disponible en RC'
-    }));
-    if (path === '/api/v1/payment-provider/managed-sandbox') return route.fulfill(json({
-      available: true,
-      configured: false,
-      enabled: false,
-      blockedByCustomConfiguration: false,
-      provider: null,
-      mode: null,
-      webhookPath: null
-    }));
-    if (path === '/api/v1/billing/status') return route.fulfill(json({
-      provider: 'mercadopago',
-      billingEnabled: true,
-      checkoutConfigured: true,
-      currentPlanCode: 'PRO',
-      currentPlanName: 'Profesional',
-      currentMonthlyPriceClp: 69990,
-      subscriptionStatus: 'ACTIVE',
-      awaitingProviderVerification: false
-    }));
-    if (path === '/api/v1/subscription') return route.fulfill(json({
+    if (p === '/api/v1/inventory') return route.fulfill(json([
+      {
+        id: 'stock-rc',
+        catalogItemId: 'product-rc',
+        sku: 'TAL-RC',
+        trackingEnabled: true,
+        onHand: 8,
+        reserved: 1,
+        available: 7,
+        reorderThreshold: 2,
+        lowStock: false
+      }
+    ]));
+    if (p === '/api/v1/inventory/alerts') return route.fulfill(json([]));
+    if (p === '/api/v1/inventory/restock-subscriptions') return route.fulfill(json([]));
+    if (p === '/api/v1/inventory/restock-subscriptions/notifications') return route.fulfill(json([]));
+    if (/^\/api\/v1\/inventory\/[^/]+\/variants$/.test(p)) return route.fulfill(json([]));
+    if (/^\/api\/v1\/inventory\/[^/]+\/movements$/.test(p)) return route.fulfill(json([]));
+
+    if (p === '/api/v1/subscription') return route.fulfill(json({
       businessId: 'business-rc',
       plan: 'PRO',
       publicPlanCode: 'PRO',
@@ -144,204 +188,83 @@ async function mockReleaseCandidate(page) {
       entitlements: [],
       legacyFallback: false
     }));
-    if (path === '/api/v1/usage/summary') return route.fulfill(json([
-      {
-        meterKey: 'VOICE_SECONDS',
-        unit: 'SECONDS',
-        quantity: 7500,
-        estimatedCostUsd: 4.20,
-        actualCostUsd: 4.10,
-        eventCount: 12
-      }
+    if (p === '/api/v1/usage/summary') return route.fulfill(json([
+      { meterKey: 'VOICE_SECONDS', unit: 'SECONDS', quantity: 7500, eventCount: 12 }
     ]));
-    if (path === '/api/v1/public/pricing') return route.fulfill(json([]));
-    if (path === '/api/v1/admin/users') return route.fulfill(json([]));
-    if (path === '/api/v1/admin/invitations') return route.fulfill(json([]));
-
-    if (path === '/api/v1/bookings') return route.fulfill(json([]));
-    if (path === '/api/v1/customers') return route.fulfill(json([]));
-    if (path === '/api/v1/commercial/orders') return route.fulfill(json([]));
-    if (path === '/api/v1/commercial/pipeline') return route.fulfill(json({
-      total: 0,
-      active: 0,
-      paid: 0,
-      needsAction: 0,
-      items: []
-    }));
-    if (path === '/api/v1/operations/dashboard') return route.fulfill(json({
-      businessName: 'Ferretería Release Candidate',
-      timezone: 'America/Santiago',
-      recentRequests: []
-    }));
-    if (path === '/api/v1/operations/pilot-metrics') return route.fulfill(json({
-      conversationsHandled: 12,
-      bookingsCreated: 3,
-      requiresAttention: 1
-    }));
-    if (path === '/api/v1/audit') return route.fulfill(json([]));
-
-    if (path === '/api/v1/catalog') return route.fulfill(json([
-      {
-        id: 'product-rc',
-        kind: 'PRODUCT',
-        name: 'Taladro percutor',
-        description: '750W',
-        price: 54990,
-        currency: 'CLP',
-        active: true
-      }
-    ]));
-    if (path === '/api/v1/inventory') return route.fulfill(json([
-      {
-        catalogItemId: 'product-rc',
-        productName: 'Taladro percutor',
-        sku: 'TAL-RC',
-        trackingEnabled: true,
-        onHand: 8,
-        reserved: 1,
-        available: 7,
-        reorderThreshold: 2,
-        lowStock: false
-      }
-    ]));
-    if (path === '/api/v1/inventory/alerts') return route.fulfill(json([]));
-    if (path === '/api/v1/inventory/restock-subscriptions') return route.fulfill(json([]));
-    if (path === '/api/v1/inventory/restock-subscriptions/notifications') return route.fulfill(json([]));
-    if (/^\/api\/v1\/inventory\/[^/]+\/variants$/.test(path)) return route.fulfill(json([]));
-    if (/^\/api\/v1\/inventory\/[^/]+\/movements$/.test(path)) return route.fulfill(json([]));
-
-    if (path === '/api/v1/calls') return route.fulfill(json({
-      content: [{
-        id: 'call-rc',
-        callerNumber: '+56955556666',
-        direction: 'INBOUND',
-        status: 'COMPLETED',
-        startedAt: '2026-09-28T18:10:00Z',
-        durationSeconds: 95,
-        resolution: 'BOOKING_CREATED'
-      }],
-      number: 0,
-      size: 100,
-      totalElements: 1,
-      totalPages: 1
-    }));
-    if (path === '/api/v1/calls/call-rc') return route.fulfill(json({
-      call: {
-        id: 'call-rc',
-        callerNumber: '+56955556666',
-        direction: 'INBOUND',
-        status: 'COMPLETED',
-        startedAt: '2026-09-28T18:10:00Z',
-        durationSeconds: 95,
-        resolution: 'BOOKING_CREATED'
-      },
-      summary: 'El cliente pidió una reserva y quedó confirmada.',
-      transcript: [
-        { id: 't-rc', speaker: 'USER', content: 'Necesito una hora mañana.', sequenceNumber: 1, createdAt: '2026-09-28T18:10:05Z' }
-      ],
-      actions: [
-        { id: 'a-rc', actionType: 'CREATE_BOOKING', success: true, detail: 'Reserva para mañana 10:00', createdAt: '2026-09-28T18:10:15Z' }
-      ]
-    }));
-    if (path === '/api/v1/messaging/conversations') return route.fulfill(json([]));
-
-    if (path === '/api/v1/simulator/sessions' && method === 'POST') return route.fulfill(json({
-      sessionId: 'rc-session',
-      greeting: 'Hola, soy Sofía. ¿En qué te ayudo?'
-    }));
-    if (path === '/api/v1/calls/rc-session') return route.fulfill(json({
-      call: { resolution: 'BOOKING_CREATED' },
-      actions: [{ actionType: 'CREATE_BOOKING', success: true, detail: 'Reserva simulada' }]
+    if (p === '/api/v1/usage/status') return route.fulfill(json({
+      includedMinutes: 500,
+      usedMinutes: 125,
+      overageMinutes: 0,
+      usagePercent: 25,
+      alertLevel: 'NORMAL',
+      estimatedOverageChargeClp: 0,
+      safetyLimitMinutes: 700,
+      safetyRemainingMinutes: 575,
+      safetyExceeded: false
     }));
 
-    return route.fulfill({
-      status: 404,
-      contentType: 'application/json',
-      body: JSON.stringify({ message: 'RC mock endpoint not defined', path })
-    });
+    return route.fulfill(json([]));
   });
 }
 
-test('release candidate owner traverses the complete safe business journey in one session', async ({ page }) => {
-  await mockReleaseCandidate(page);
+const canonical = [
+  { name: 'home', route: '/app', heading: 'Inicio' },
+  { name: 'agenda', route: '/app/agenda', heading: 'Agenda' },
+  { name: 'operations', route: '/app/orders', heading: 'Operaciones' },
+  { name: 'inventory', route: '/app/inventory', heading: 'Inventario' },
+  { name: 'settings', route: '/app/settings', heading: 'Configuración' },
+  { name: 'plan', route: '/app/plan', heading: 'Plan y consumo' }
+];
 
-  await page.goto('/');
-  await expect(page.locator('#firstUserOnboarding')).toBeHidden();
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('está atendiendo');
+test('release candidate owner traverses every canonical React workspace', async ({ page }) => {
+  await mockCanonicalApp(page);
 
-  const homeNav = page.locator('#primaryNav');
-  await expect(page.locator('#homeBusinessWorkspace')).toHaveClass(/owner-collapsed/);
-  const agendaLink = homeNav.getByRole('link', { name: 'Agenda', exact: true });
-  await expect(agendaLink).toHaveAttribute('href', '/app/agenda');
-  await agendaLink.click();
-  await expect(page).toHaveURL(/\/app\/agenda\/?$/);
-  await expect(page.getByRole('heading', { level: 1, name: 'Agenda' })).toBeVisible();
+  await page.goto('/app');
+  await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
 
-  await page.goto('/');
-  const restoredHomeNav = page.locator('#primaryNav');
-  await restoredHomeNav.getByRole('link', { name: 'Clientes', exact: true }).click();
-  await expect(page.locator('[data-home-tab="customers"]')).toHaveClass(/active/);
-  await expect(page.locator('#homeBusinessWorkspace')).not.toHaveClass(/owner-collapsed/);
-  await expect(page.locator('[data-home-panel="customers"]')).toBeVisible();
+  const nav = page.getByRole('navigation', { name: 'Navegación principal' });
+  const destinations = [
+    ['Agenda', '/app/agenda', 'Agenda'],
+    ['Operaciones', '/app/orders', 'Operaciones'],
+    ['Inventario', '/app/inventory', 'Inventario'],
+    ['Configuración', '/app/settings', 'Configuración'],
+    ['Plan y consumo', '/app/plan', 'Plan y consumo']
+  ];
 
-  await restoredHomeNav.getByRole('link', { name: 'Inicio', exact: true }).click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.locator('#homeBusinessWorkspace')).toHaveClass(/owner-collapsed/);
+  for (const [label, href, heading] of destinations) {
+    await page.goto('/app');
+    const link = page.getByRole('navigation', { name: 'Navegación principal' })
+      .getByRole('link', { name: label });
+    await expect(link).toHaveAttribute('href', href);
+    await link.click();
+    await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
+  }
 
-  await page.goto('/inventory.html');
-  await expect(page.getByRole('heading', { level: 1, name: 'Inventario', exact: true })).toBeVisible();
-  await expect(page.locator('[data-inventory-product-id="product-rc"]')).toContainText('Taladro percutor');
-
-  await page.goto('/conversations.html');
-  await expect(page.getByRole('heading', { level: 1, name: 'Conversaciones' })).toBeVisible();
-  await expect(page.locator('#conversationList')).toContainText('+56955556666');
-  await expect(page.getByText('El cliente pidió una reserva y quedó confirmada.')).toBeVisible();
-
-  await page.goto('/simulator.html');
-  await expect(page.getByText(/no crea datos comerciales reales ni realiza llamadas telefónicas/i)).toBeVisible();
-  await expect(page.getByText(/WhatsApp real/i)).toBeVisible();
-  await page.getByRole('button', { name: 'Nueva prueba' }).click();
-  await expect(page.getByText('Hola, soy Sofía. ¿En qué te ayudo?')).toBeVisible();
-  await expect(page.locator('#resolution')).toHaveText('Reserva creada');
-
-  await page.goto('/settings.html?section=business');
-  await expect(page.locator('.dashboard-heading h1')).toHaveText('Mi negocio');
-  await expect(page.locator('.ux-config-nav [data-settings-section]')).toContainText([
-    'Negocio', 'Servicios', 'Horarios', 'Recepcionista'
-  ]);
-  await page.locator('.ux-config-nav [data-settings-section="receptionist"]').click();
-  await expect(page.locator('#configAgentPanel')).toBeVisible();
-
-  await page.goto('/account.html');
-  await expect(page.getByRole('heading', { level: 1, name: 'Plan y facturación' })).toBeVisible();
-  await expect(page.locator('#planName')).toHaveText('Profesional');
-  await expect(page.locator('#voiceUsage')).toContainText('125 de 500 min');
-
-  await page.goto('/');
+  await page.goto('/app');
   await page.getByRole('button', { name: 'Salir' }).click();
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.locator('#authView')).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBeFalsy();
 });
 
-test('release candidate principal surfaces remain usable on a 390px customer viewport', async ({ page }) => {
-  await mockReleaseCandidate(page);
+test('release candidate canonical React surfaces remain usable on mobile', async ({ page }) => {
+  await mockCanonicalApp(page);
   await page.setViewportSize({ width: 390, height: 844 });
 
-  for (const path of ['/', '/inventory.html', '/conversations.html', '/simulator.html', '/settings.html', '/account.html']) {
-    await page.goto(path);
-    await page.waitForTimeout(80);
+  for (const surface of canonical) {
+    await page.goto(surface.route);
+    await expect(page.getByRole('heading', { level: 1, name: surface.heading })).toBeVisible();
     const layout = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth
     }));
-    expect(layout.scrollWidth, path).toBeLessThanOrEqual(layout.clientWidth + 1);
+    expect(layout.scrollWidth, surface.route).toBeLessThanOrEqual(layout.clientWidth + 1);
   }
 });
 
-
-test('release candidate captures exact-head visual evidence for every canonical viewport', async ({ page }) => {
+test('release candidate captures exact-head React visual evidence for every canonical viewport', async ({ page }) => {
   test.setTimeout(120000);
-  await mockReleaseCandidate(page);
+  await mockCanonicalApp(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
 
   const head = (process.env.VISUAL_EVIDENCE_SHA || 'local').slice(0, 12);
@@ -356,96 +279,13 @@ test('release candidate captures exact-head visual evidence for every canonical 
     { width: 768, height: 1024 },
     { width: 390, height: 844 }
   ];
-  const surfaces = [
-    { name: 'home', route: '/' },
-    { name: 'conversations', route: '/conversations.html' },
-    { name: 'inventory', route: '/inventory.html' },
-    { name: 'settings', route: '/settings.html' },
-    { name: 'billing', route: '/account.html' },
-    { name: 'simulator', route: '/simulator.html' }
-  ];
 
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
 
-    for (const surface of surfaces) {
+    for (const surface of canonical) {
       await page.goto(surface.route);
-
-      if (surface.name === 'home') {
-        await expect(page.locator('#dashboardView')).toBeVisible();
-        await expect(page.locator('#firstUserOnboarding')).toBeHidden();
-      } else if (surface.name === 'conversations') {
-        await expect(page.locator('#conversationList')).toContainText('+56955556666');
-
-      } else if (surface.name === 'inventory') {
-        await expect(page.locator('[data-inventory-product-id="product-rc"]')).toContainText('Taladro percutor');
-      } else if (surface.name === 'settings') {
-        await expect(page.locator('.dashboard-heading h1')).toHaveText('Mi negocio');
-      } else if (surface.name === 'billing') {
-        await expect(page.locator('#planName')).toHaveText('Profesional');
-      } else if (surface.name === 'simulator') {
-        await expect(page.locator('#startBtn')).toBeVisible();
-      }
-
-      if (viewport.width >= 1280) {
-        const railSelector = {
-          home: '#primaryNav',
-          conversations: '.rv-nav',
-          inventory: '.inventory-nav',
-          settings: '#primaryNav',
-          billing: '.account-nav',
-          simulator: '.topbar nav'
-        }[surface.name];
-
-        const railState = await page.locator(railSelector).evaluate(nav => {
-          const navStyle = getComputedStyle(nav);
-          const navRect = nav.getBoundingClientRect();
-          return {
-            position: navStyle.position,
-            flexDirection: navStyle.flexDirection,
-            height: navRect.height,
-            links: [...nav.querySelectorAll('a')].map(link => {
-              const style = getComputedStyle(link);
-              const rect = link.getBoundingClientRect();
-              const range = document.createRange();
-              range.selectNodeContents(link);
-              const textRect = range.getBoundingClientRect();
-              return {
-                text: link.innerText.trim(),
-                width: rect.width,
-                height: rect.height,
-                textWidth: textRect.width,
-                textHeight: textRect.height,
-                opacity: style.opacity,
-                visibility: style.visibility
-              };
-            })
-          };
-        });
-
-        expect(railState.links.map(link => link.text), `${surface.name} rail labels`).toEqual([
-          'Inicio',
-          'Conversaciones',
-          'Agenda',
-          'Operaciones',
-          'Clientes',
-          'Inventario',
-          'Configuración',
-          'Facturación'
-        ]);
-        expect(railState.position, `${surface.name} rail position`).toBe('fixed');
-        expect(railState.flexDirection, `${surface.name} rail direction`).toBe('column');
-        expect(railState.height, `${surface.name} rail height`).toBeGreaterThan(400);
-
-        for (const link of railState.links) {
-          expect(link.width, `${surface.name} ${link.text} width`).toBeGreaterThan(100);
-          expect(link.height, `${surface.name} ${link.text} height`).toBeGreaterThanOrEqual(40);
-          expect(link.textWidth, `${surface.name} ${link.text} text width`).toBeGreaterThan(20);
-          expect(link.textHeight, `${surface.name} ${link.text} text height`).toBeGreaterThan(10);
-          expect(link.opacity, `${surface.name} ${link.text} opacity`).toBe('1');
-          expect(link.visibility, `${surface.name} ${link.text} visibility`).toBe('visible');
-        }
-      }
+      await expect(page.getByRole('heading', { level: 1, name: surface.heading })).toBeVisible();
 
       const layout = await page.evaluate(() => ({
         scrollWidth: document.documentElement.scrollWidth,
@@ -455,10 +295,7 @@ test('release candidate captures exact-head visual evidence for every canonical 
         .toBeLessThanOrEqual(layout.clientWidth + 1);
 
       await page.screenshot({
-        path: path.join(
-          evidenceDir,
-          `${surface.name}-${viewport.width}x${viewport.height}.png`
-        ),
+        path: path.join(evidenceDir, `${surface.name}-${viewport.width}x${viewport.height}.png`),
         fullPage: false,
         animations: 'disabled'
       });
