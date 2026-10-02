@@ -1247,6 +1247,26 @@ export function InventoryPage() {
                           />
                         </label>
 
+                        <div className={styles.formGrid}>
+                          <label className={styles.checkField}>
+                            <input
+                              name="variantTrackingEnabled"
+                              type="checkbox"
+                              defaultChecked={variantEditing ? variantEditing.trackingEnabled : true}
+                            />
+                            <span>Seguimiento activo</span>
+                          </label>
+
+                          <label className={styles.checkField}>
+                            <input
+                              name="variantActive"
+                              type="checkbox"
+                              defaultChecked={variantEditing ? variantEditing.active : true}
+                            />
+                            <span>Variante activa</span>
+                          </label>
+                        </div>
+
                         <label className={styles.field}>
                           <span>Nota</span>
                           <input name="variantNote" />
@@ -1351,7 +1371,7 @@ export function InventoryPage() {
                                 Historial
                               </button>
 
-                              {canManageVariants && variant.active && (
+                              {canManageVariants && (
                                 <>
                                   <button
                                     className="button ghost"
@@ -1365,26 +1385,30 @@ export function InventoryPage() {
                                   >
                                     Editar
                                   </button>
-                                  <button
-                                    className="button secondary"
-                                    type="button"
-                                    onClick={() => {
-                                      setMutationError("");
-                                      setVariantEditorMode(null);
-                                      setVariantEditing(null);
-                                      setVariantAdjusting(variant);
-                                    }}
-                                  >
-                                    Ajustar
-                                  </button>
-                                  <button
-                                    className="button ghost"
-                                    type="button"
-                                    disabled={mutationPending}
-                                    onClick={() => void deactivateVariant(variant)}
-                                  >
-                                    Desactivar
-                                  </button>
+                                  {variant.active && variant.trackingEnabled && (
+                                    <button
+                                      className="button secondary"
+                                      type="button"
+                                      onClick={() => {
+                                        setMutationError("");
+                                        setVariantEditorMode(null);
+                                        setVariantEditing(null);
+                                        setVariantAdjusting(variant);
+                                      }}
+                                    >
+                                      Ajustar
+                                    </button>
+                                  )}
+                                  {variant.active && (
+                                    <button
+                                      className="button ghost"
+                                      type="button"
+                                      disabled={mutationPending}
+                                      onClick={() => void deactivateVariant(variant)}
+                                    >
+                                      Desactivar
+                                    </button>
+                                  )}
                                 </>
                               )}
                             </div>
