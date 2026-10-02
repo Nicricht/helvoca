@@ -458,6 +458,58 @@ class PostgresRowLevelSecurityIntegrationTest {
     }
 
     @Test
+    void operationForeignKeysRejectCrossTenantCustomerAndDeliveryZoneEvenForOwner() {
+        UUID customerA = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessA);
+        UUID customerB = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessB);
+        UUID zoneA = UUID.randomUUID();
+        UUID zoneB = UUID.randomUUID();
+
+        ownerJdbc.update("""
+                INSERT INTO delivery_zone(id, business_id, name, fee, active)
+                VALUES (?, ?, 'Operation integrity A', 1000, TRUE)
+                """, zoneA, businessA);
+        ownerJdbc.update("""
+                INSERT INTO delivery_zone(id, business_id, name, fee, active)
+                VALUES (?, ?, 'Operation integrity B', 1000, TRUE)
+                """, zoneB, businessB);
+
+        assertOperationInsertRejectedOrCleaned(
+                businessA, customerB, zoneA, "cross-customer");
+        assertOperationInsertRejectedOrCleaned(
+                businessA, customerA, zoneB, "cross-zone");
+    }
+
+    private void assertOperationInsertRejectedOrCleaned(
+            UUID businessId,
+            UUID customerId,
+            UUID deliveryZoneId,
+            String suffix) {
+        UUID operationId = UUID.randomUUID();
+        try {
+            ownerJdbc.update("""
+                    INSERT INTO business_operation(
+                        id, business_id, customer_id, type, status, source, revision,
+                        fulfillment_type, delivery_zone_id, delivery_address,
+                        subtotal, delivery_fee, total, currency
+                    ) VALUES (?, ?, ?, 'ORDER', 'CONFIRMED', 'MANUAL', 1,
+                              'DELIVERY', ?, 'Tenant integrity address',
+                              1000, 1000, 2000, 'CLP')
+                    """,
+                    operationId, businessId, customerId, deliveryZoneId);
+            ownerJdbc.update("DELETE FROM business_operation WHERE id = ?", operationId);
+            fail("Cross-tenant business_operation reference was accepted: " + suffix);
+        } catch (DataAccessException expected) {
+            // PostgreSQL tenant-integrity constraint rejected the write.
+        }
+    }
+
+    @Test
     void deliveryForeignKeysRejectCrossTenantCustomerOrderAndZoneEvenForOwner() {
         UUID customerA = ownerJdbc.queryForObject(
                 "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
