@@ -15,6 +15,7 @@ import {
   getInventoryHistory,
   getInventoryVariantHistory,
   getInventoryVariants,
+  updateCatalogProduct,
   updateInventoryVariant,
   type CatalogItem,
   type InventoryAlert,
@@ -25,8 +26,8 @@ import {
 } from "../../features/inventory/api";
 import styles from "./InventoryPage.module.css";
 
-type StatusFilter = "ALL" | "LOW" | "OUT" | "UNCONFIGURED";
-type SortMode = "ATTENTION" | "NAME_ASC" | "AVAILABLE_ASC";
+type StatusFilter = "ALL" | "TRACKED" | "LOW" | "OUT" | "RESTOCKED" | "UNCONFIGURED";
+type SortMode = "ATTENTION" | "NAME_ASC" | "AVAILABLE_ASC" | "AVAILABLE_DESC";
 
 interface ProductRow {
   id: string;
@@ -41,6 +42,7 @@ interface ProductRow {
   reorderThreshold: number | null;
   lowStock: boolean;
   outOfStock: boolean;
+  restocked: boolean;
 }
 
 function numberOrNull(value: unknown) {
@@ -87,7 +89,8 @@ function buildRows(catalog: CatalogItem[], inventory: InventoryStock[], alerts: 
         outOfStock: Boolean(
           trackingEnabled
           && (available === 0 || alertsForProduct?.has("OUT_OF_STOCK"))
-        )
+        ),
+        restocked: Boolean(alertsForProduct?.has("RESTOCKED"))
       };
     });
 }
@@ -177,8 +180,11 @@ function SummaryCard({
 }
 
 function ProductStatus({ row }: { row: ProductRow }) {
-  if (!row.configured || !row.trackingEnabled) {
+  if (!row.configured) {
     return <span className={styles.statusMuted}>Sin configurar</span>;
+  }
+  if (!row.trackingEnabled) {
+    return <span className={styles.statusMuted}>Control desactivado</span>;
   }
   if (row.outOfStock) {
     return <span className={styles.statusDanger}>Agotado</span>;
@@ -195,6 +201,8 @@ export function InventoryPage() {
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [sort, setSort] = useState<SortMode>("ATTENTION");
   const [productCreateOpen, setProductCreateOpen] = useState(false);
+  const [productEditing, setProductEditing] = useState<CatalogItem | null>(null);
+  const [refreshPending, setRefreshPending] = useState(false);
   const [configureTarget, setConfigureTarget] = useState<ProductRow | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<ProductRow | null>(null);
   const [historyTarget, setHistoryTarget] = useState<ProductRow | null>(null);
