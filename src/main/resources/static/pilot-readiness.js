@@ -48,7 +48,7 @@
     <div id="pilotReadinessList" class="pilot-readiness-list"></div>
     <div class="pilot-readiness-footer">
       <span id="pilotReadinessSummary">Comprobando canales y operación comercial…</span>
-      <a class="button small ghost" href="/settings.html">Corregir configuración</a>
+      <a class="button small ghost" href="/app/settings">Corregir configuración</a>
     </div>
   `;
 
