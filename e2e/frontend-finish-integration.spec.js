@@ -30,7 +30,7 @@ test('customer navigation stays coherent and never exposes internal operations',
   const expected = [
     { href: '/', text: 'Inicio' },
     { href: '/conversations.html', text: 'Conversaciones' },
-    { href: '/#bookings', text: 'Agenda' },
+    { href: '/app/agenda', text: 'Agenda' },
     { href: '/#customers', text: 'Clientes' },
     { href: '/app/inventory', text: 'Inventario' },
     { href: '/settings.html', text: 'Configuración' },
@@ -42,6 +42,16 @@ test('customer navigation stays coherent and never exposes internal operations',
     expect(navEntries(html), `${page} primary navigation`).toEqual(expected);
     expect(html, `${page} must not expose internal operations`).not.toContain('href="/operations.html"');
   }
+});
+
+test('home Agenda shortcuts use the canonical React route', async () => {
+  const home = read('index.html');
+  const status = read('commercial-status.js');
+
+  expect(home).toContain('href="/app/agenda">Agenda</a>');
+  expect(home).not.toContain('href="/#bookings">Agenda</a>');
+  expect(status).toContain('href="/app/agenda"');
+  expect(status).not.toContain('/?tab=bookings#homeBusinessWorkspace');
 });
 
 test('canonical foundation remains dark, solid and readable', async () => {

@@ -271,18 +271,20 @@ test('release candidate owner traverses the complete safe business journey in on
 
   const homeNav = page.locator('#primaryNav');
   await expect(page.locator('#homeBusinessWorkspace')).toHaveClass(/owner-collapsed/);
-  await homeNav.getByRole('link', { name: 'Agenda', exact: true }).click();
-  await expect(page.locator('[data-home-tab="bookings"]')).toHaveClass(/active/);
-  await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
-  await expect(page.locator('#homeBusinessWorkspace')).not.toHaveClass(/owner-collapsed/);
-  await expect(page.locator('[data-home-panel="bookings"]')).toBeVisible();
-  await expect(page.locator('[data-home-panel="bookings"]')).toContainText('Reservas');
-  await homeNav.getByRole('link', { name: 'Clientes', exact: true }).click();
+  const agendaLink = homeNav.getByRole('link', { name: 'Agenda', exact: true });
+  await expect(agendaLink).toHaveAttribute('href', '/app/agenda');
+  await agendaLink.click();
+  await expect(page).toHaveURL(/\/app\/agenda\/?$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Agenda' })).toBeVisible();
+
+  await page.goto('/');
+  const restoredHomeNav = page.locator('#primaryNav');
+  await restoredHomeNav.getByRole('link', { name: 'Clientes', exact: true }).click();
   await expect(page.locator('[data-home-tab="customers"]')).toHaveClass(/active/);
   await expect(page.locator('#homeBusinessWorkspace')).not.toHaveClass(/owner-collapsed/);
   await expect(page.locator('[data-home-panel="customers"]')).toBeVisible();
 
-  await homeNav.getByRole('link', { name: 'Inicio', exact: true }).click();
+  await restoredHomeNav.getByRole('link', { name: 'Inicio', exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.locator('#homeBusinessWorkspace')).toHaveClass(/owner-collapsed/);
 
