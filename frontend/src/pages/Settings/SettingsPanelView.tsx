@@ -38,6 +38,57 @@ const dayNames = [
   "Sábado"
 ];
 
+
+const businessPresetOptions = [
+  ["", "General"],
+  ["store", "Tienda / comercio"],
+  ["hardware_store", "Ferretería / materiales"],
+  ["services", "Servicios"],
+  ["restaurant", "Restaurant / alimentos"],
+  ["clinic", "Salud / clínica"],
+  ["salon", "Belleza / peluquería"],
+  ["workshop", "Taller / reparación"],
+  ["hospitality", "Hotel / hospedaje"],
+  ["professional", "Profesional / oficina"]
+] as const;
+
+const businessPresetSuggestions: Record<string, string> = {
+  store: "Prioriza productos.",
+  hardware_store: "Prioriza catálogo, stock, cotizaciones, pedidos y despacho. Confirma medidas, cantidades y disponibilidad antes de cerrar una venta.",
+  salon: "Prioriza servicios y reservas.",
+  restaurant: "Prioriza productos y pedidos.",
+  clinic: "Prioriza servicios y reservas."
+};
+
+const agentCapabilities = [
+  ["GET_BUSINESS_INFORMATION", "Información"],
+  ["LIST_SERVICES", "Servicios"],
+  ["SEARCH_KNOWLEDGE", "Conocimiento"],
+  ["FIND_CALLER", "Identificar cliente"],
+  ["REGISTER_CALLER", "Registrar cliente"],
+  ["LIST_AVAILABLE_SLOTS", "Ver horarios"],
+  ["CHECK_BOOKING_AVAILABILITY", "Comprobar horario"],
+  ["CREATE_BOOKING", "Crear reserva"],
+  ["LIST_CUSTOMER_BOOKINGS", "Ver reservas"],
+  ["RESCHEDULE_BOOKING", "Reprogramar"],
+  ["CANCEL_BOOKING", "Cancelar reserva"],
+  ["CREATE_REQUEST", "Crear solicitud"],
+  ["RECORD_UNANSWERED_QUESTION", "Guardar pregunta"],
+  ["TRANSFER_TO_HUMAN", "Transferir a persona"]
+] as const;
+
+function profileBooleanValue(value: boolean | null | undefined) {
+  if (value === true) return "true";
+  if (value === false) return "false";
+  return "";
+}
+
+function parseProfileBoolean(value: string): boolean | null {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+}
+
 function Field({
   label,
   children,
@@ -140,6 +191,66 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             />
           </Field>
 
+          <Field label="Rubro">
+            <select
+              value={String(draft.profile.presetKey ?? "")}
+              disabled={!canManage}
+              onChange={event => updateProfile("presetKey", event.target.value || null)}
+            >
+              {businessPresetOptions.map(([value, label]) => (
+                <option value={value} key={value || "general"}>{label}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Moneda">
+            <select
+              value={String(draft.profile.defaultCurrency ?? "CLP")}
+              disabled={!canManage}
+              onChange={event => updateProfile("defaultCurrency", event.target.value)}
+            >
+              {["CLP", "USD", "EUR", "MXN", "COP", "PEN", "ARS", "BRL"].map(currency => (
+                <option value={currency} key={currency}>{currency}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Productos">
+            <select
+              value={profileBooleanValue(draft.profile.sellsProducts)}
+              disabled={!canManage}
+              onChange={event => updateProfile("sellsProducts", parseProfileBoolean(event.target.value))}
+            >
+              <option value="">Sin definir</option>
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
+          </Field>
+
+          <Field label="Servicios">
+            <select
+              value={profileBooleanValue(draft.profile.sellsServices)}
+              disabled={!canManage}
+              onChange={event => updateProfile("sellsServices", parseProfileBoolean(event.target.value))}
+            >
+              <option value="">Sin definir</option>
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
+          </Field>
+
+          <Field label="Reservas">
+            <select
+              value={profileBooleanValue(draft.profile.usesReservations)}
+              disabled={!canManage}
+              onChange={event => updateProfile("usesReservations", parseProfileBoolean(event.target.value))}
+            >
+              <option value="">Sin definir</option>
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
+          </Field>
+
           <Field label="Descripción pública" wide>
             <textarea
               value={String(draft.profile.publicDescription ?? "")}
@@ -239,15 +350,14 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             />
           </Field>
 
-          <Field label="Moneda">
-            <input
-              maxLength={3}
-              value={String(draft.profile.defaultCurrency ?? "CLP")}
-              readOnly={!canManage}
-              onChange={event => updateProfile("defaultCurrency", event.target.value)}
-            />
-          </Field>
         </div>
+
+        {draft.profile.presetKey && businessPresetSuggestions[draft.profile.presetKey] && (
+          <div className={styles.businessHint} role="status">
+            <strong>Sugerencia para este rubro</strong>
+            <span>{businessPresetSuggestions[draft.profile.presetKey]}</span>
+          </div>
+        )}
       </section>
     );
   }
@@ -323,6 +433,47 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
               onChange={event => updateAgent("instructions", event.target.value)}
             />
           </Field>
+        </div>
+
+        <label className={styles.agentToggle}>
+          <input
+            type="checkbox"
+            checked={draft.agent.active}
+            disabled={!canManage}
+            onChange={event => updateAgent("active", event.target.checked)}
+          />
+          <span>
+            <strong>Agente IA activo para este negocio</strong>
+            <small>Desactívalo para impedir que atienda aunque la configuración permanezca guardada.</small>
+          </span>
+        </label>
+
+        <div className={styles.capabilityBlock}>
+          <div>
+            <strong>Capacidades permitidas</strong>
+            <span>El backend sigue aplicando estas restricciones aunque el modelo intente excederlas.</span>
+          </div>
+          <div className={styles.capabilityGrid}>
+            {agentCapabilities.map(([value, label]) => {
+              const checked = draft.agent.capabilities.includes(value);
+              return (
+                <label className={styles.capabilityOption} key={value}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={!canManage}
+                    onChange={event => {
+                      const next = event.target.checked
+                        ? [...new Set([...draft.agent.capabilities, value])]
+                        : draft.agent.capabilities.filter(item => item !== value);
+                      updateAgent("capabilities", next);
+                    }}
+                  />
+                  <span>{label}</span>
+                </label>
+              );
+            })}
+          </div>
         </div>
 
         <div className={styles.authorityNote}>
