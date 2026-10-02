@@ -13,9 +13,9 @@ async function mockBaseDashboard(page) {
     scheduleConfigured: true,
     knowledgeConfigured: false,
     humanTransferConfigured: false,
-    phoneConfigured: true,
-    readyForCalls: true,
-    nextStep: 'OPTIONAL_HUMAN_TRANSFER'
+    phoneConfigured: false,
+    readyForCalls: false,
+    nextStep: 'CONNECT_PHONE_NUMBER'
   })));
   await page.route('**/api/v1/services', route => route.fulfill(json([
     { id: 'svc1', name: 'Consulta', durationMinutes: 30, price: 25000, active: true }
@@ -100,7 +100,7 @@ test('commercial dashboard stays compact until the customer manages the plan', a
   });
   await page.route('**/api/v1/subscription', route => route.fulfill(json(activeSubscription())));
 
-  await page.goto('/settings.html');
+  await page.goto('/');
 
   const card = page.locator('#commercialStatusCard');
   await expect(card).toBeVisible();
@@ -166,7 +166,7 @@ test('plan checkout starts only after explicit confirmation and does not activat
     }));
   });
 
-  await page.goto('/settings.html');
+  await page.goto('/');
 
   const card = page.locator('#commercialStatusCard');
   await expect(card).toBeVisible();
