@@ -258,6 +258,161 @@ export function InventoryPage() {
     }
   }
 
+  async function refreshVariants(catalogItemId: string) {
+    const data = await getInventoryVariants(catalogItemId);
+    setVariants(data);
+  }
+
+  async function openVariants(row: ProductRow) {
+    if (!canReadVariants) return;
+    setVariantsTarget(row);
+    setVariants([]);
+    setVariantsError("");
+    setVariantEditorMode(null);
+    setVariantEditing(null);
+    setVariantAdjusting(null);
+    setMutationError("");
+    setVariantsPending(true);
+    try {
+      await refreshVariants(row.id);
+    } catch (error) {
+      setVariantsError(error instanceof Error && error.message
+        ? error.message
+        : "No pudimos cargar las variantes.");
+    } finally {
+      setVariantsPending(false);
+    }
+  }
+
+  function variantInputFromForm(
+    form: HTMLFormElement,
+    current: InventoryVariant | null
+  ) {
+    const data = new FormData(form);
+    const name = String(data.get("variantName") ?? "").trim();
+    const optionValuesJson = String(data.get("optionValuesJson") ?? "").trim() || "{}";
+    const sku = String(data.get("variantSku") ?? "").trim().toUpperCase();
+    const onHand = Number(data.get("variantOnHand"));
+    const reorderThreshold = Number(data.get("variantReorderThreshold"));
+    const note = String(data.get("variantNote") ?? "").trim();
+
+    if (!name) throw new Error("Escribe un nombre para la variante.");
+    if (!sku) throw new Error("Escribe un SKU para la variante.");
+    if (!Number.isInteger(onHand) || onHand < 0
+        || !Number.isInteger(reorderThreshold) || reorderThreshold < 0) {
+      throw new Error("El stock físico y el umbral deben ser enteros iguales o mayores que cero.");
+    }
+    try {
+      const parsed = JSON.parse(optionValuesJson);
+      if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+        throw new Error("not-object");
+      }
+    } catch {
+      throw new Error("Opciones JSON debe ser un objeto JSON válido.");
+    }
+
+    return {
+      name,
+      optionValuesJson,
+      sku,
+      trackingEnabled: current?.trackingEnabled ?? true,
+      onHand,
+      reorderThreshold,
+      active: current?.active ?? true,
+      note: note || null
+    };
+  }
+
+  async function handleVariantEditor(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!variantsTarget || !canManageVariants || !variantEditorMode || mutationPending) return;
+
+    setMutationError("");
+    let input;
+    try {
+      input = variantInputFromForm(event.currentTarget, variantEditing);
+    } catch (error) {
+      setMutationError(mutationMessage(error));
+      return;
+    }
+
+    setMutationPending(true);
+    try {
+      if (variantEditorMode === "CREATE") {
+        await createInventoryVariant(variantsTarget.id, input);
+      } else if (variantEditing) {
+        await updateInventoryVariant(variantsTarget.id, variantEditing.id, input);
+      }
+      await refreshVariants(variantsTarget.id);
+      setVariantEditorMode(null);
+      setVariantEditing(null);
+    } catch (error) {
+      setMutationError(mutationMessage(error));
+    } finally {
+      setMutationPending(false);
+    }
+  }
+
+  async function handleVariantAdjustment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!variantsTarget || !variantAdjusting || !canManageVariants || mutationPending) return;
+
+    const data = new FormData(event.currentTarget);
+    const delta = Number(data.get("variantDelta"));
+    const note = String(data.get("variantAdjustmentNote") ?? "").trim();
+    if (!Number.isInteger(delta) || delta === 0) {
+      setMutationError("El ajuste de variante debe ser un entero distinto de cero.");
+      return;
+    }
+
+    setMutationPending(true);
+    setMutationError("");
+    try {
+      await adjustInventoryVariant(variantsTarget.id, variantAdjusting.id, {
+        delta,
+        note: note || null
+      });
+      await refreshVariants(variantsTarget.id);
+      setVariantAdjusting(null);
+    } catch (error) {
+      setMutationError(mutationMessage(error));
+    } finally {
+      setMutationPending(false);
+    }
+  }
+
+  async function deactivateVariant(variant: InventoryVariant) {
+    if (!variantsTarget || !canManageVariants || mutationPending) return;
+    setMutationPending(true);
+    setMutationError("");
+    try {
+      await deactivateInventoryVariant(variantsTarget.id, variant.id);
+      await refreshVariants(variantsTarget.id);
+    } catch (error) {
+      setMutationError(mutationMessage(error));
+    } finally {
+      setMutationPending(false);
+    }
+  }
+
+  async function openVariantHistory(variant: InventoryVariant) {
+    if (!variantsTarget || !canReadVariants) return;
+    setVariantHistoryTarget(variant);
+    setVariantHistory([]);
+    setVariantHistoryError("");
+    setVariantHistoryPending(true);
+    try {
+      const movements = await getInventoryVariantHistory(variantsTarget.id, variant.id);
+      setVariantHistory(movements);
+    } catch (error) {
+      setVariantHistoryError(error instanceof Error && error.message
+        ? error.message
+        : "No pudimos cargar el historial de la variante.");
+    } finally {
+      setVariantHistoryPending(false);
+    }
+  }
+
   async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!model.canManage || mutationPending) return;
