@@ -87,6 +87,13 @@ export function useSettingsWorkspace() {
     ? permissions.includes("BUSINESS_MANAGE")
     : roles.some(role => LEGACY_MANAGE_ROLES.has(role));
 
+  const canManageTeam = hasPermissionClaims
+    ? permissions.includes("TEAM_MANAGE") || roles.some(role => LEGACY_MANAGE_ROLES.has(role))
+    : roles.some(role => LEGACY_MANAGE_ROLES.has(role));
+
+  const canReadScheduleExceptions = roles.includes("BUSINESS_ADMIN") || roles.includes("OPERATOR");
+  const canManageScheduleExceptions = roles.includes("BUSINESS_ADMIN");
+
   const primaryLoading = me.isPending || business.isPending;
   const primaryError = me.isError || business.isError;
 
@@ -113,6 +120,9 @@ export function useSettingsWorkspace() {
     voices,
     phones,
     canManage,
+    canManageTeam,
+    canReadScheduleExceptions,
+    canManageScheduleExceptions,
     primaryLoading,
     primaryError,
     partialErrors
