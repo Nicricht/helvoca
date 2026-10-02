@@ -713,6 +713,15 @@ export function InventoryPage() {
                     <td>{stockValue(row.reserved)}</td>
                     <td>{stockValue(row.onHand)}</td>
                     <td className={styles.actionCell}>
+                      {canReadVariants && (
+                        <button
+                          className="button ghost"
+                          type="button"
+                          onClick={() => void openVariants(row)}
+                        >
+                          Variantes
+                        </button>
+                      )}
                       {row.configured && (
                         <button
                           className="button ghost"
@@ -759,6 +768,329 @@ export function InventoryPage() {
             </div>
           )}
         </section>
+
+        {variantsTarget && (
+          <div className={styles.dialogBackdrop}>
+            <section
+              className={styles.dialog}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="variantsTitle"
+            >
+              <div className={styles.dialogHeader}>
+                <div>
+                  <span className={styles.dialogEyebrow}>Variantes</span>
+                  <h2 id="variantsTitle">Variantes · {variantsTarget.name}</h2>
+                </div>
+                <div className={styles.dialogHeaderActions}>
+                  {canManageVariants && (
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => {
+                        setMutationError("");
+                        setVariantEditing(null);
+                        setVariantEditorMode("CREATE");
+                        setVariantAdjusting(null);
+                      }}
+                    >
+                      Nueva variante
+                    </button>
+                  )}
+                  <button
+                    className="button ghost"
+                    type="button"
+                    disabled={mutationPending}
+                    onClick={() => {
+                      setVariantsTarget(null);
+                      setVariantEditorMode(null);
+                      setVariantEditing(null);
+                      setVariantAdjusting(null);
+                    }}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.variantBody}>
+                {variantsPending && (
+                  <p className={styles.dialogHint} role="status">Cargando variantes…</p>
+                )}
+
+                {!variantsPending && variantsError && (
+                  <p className={styles.dialogError} role="alert">{variantsError}</p>
+                )}
+
+                {!variantsPending && !variantsError && (
+                  <>
+                    {variantEditorMode && (
+                      <form className={styles.variantForm} onSubmit={handleVariantEditor}>
+                        <h3>{variantEditorMode === "CREATE" ? "Nueva variante" : "Editar variante"}</h3>
+
+                        <label className={styles.field}>
+                          <span>Nombre de variante</span>
+                          <input
+                            name="variantName"
+                            defaultValue={variantEditing?.name ?? ""}
+                            autoFocus
+                            required
+                          />
+                        </label>
+
+                        <label className={styles.field}>
+                          <span>Opciones JSON</span>
+                          <input
+                            name="optionValuesJson"
+                            defaultValue={variantEditing?.optionValuesJson ?? "{}"}
+                            required
+                          />
+                        </label>
+
+                        <div className={styles.formGrid}>
+                          <label className={styles.field}>
+                            <span>SKU de variante</span>
+                            <input
+                              name="variantSku"
+                              defaultValue={variantEditing?.sku ?? ""}
+                              required
+                            />
+                          </label>
+
+                          <label className={styles.field}>
+                            <span>Stock físico inicial</span>
+                            <input
+                              name="variantOnHand"
+                              type="number"
+                              min="0"
+                              step="1"
+                              defaultValue={variantEditing?.onHand ?? 0}
+                              required
+                            />
+                          </label>
+                        </div>
+
+                        <label className={styles.field}>
+                          <span>Umbral de reposición</span>
+                          <input
+                            name="variantReorderThreshold"
+                            type="number"
+                            min="0"
+                            step="1"
+                            defaultValue={variantEditing?.reorderThreshold ?? 0}
+                            required
+                          />
+                        </label>
+
+                        <label className={styles.field}>
+                          <span>Nota</span>
+                          <input name="variantNote" />
+                        </label>
+
+                        {mutationError && <p className={styles.dialogError} role="alert">{mutationError}</p>}
+
+                        <div className={styles.dialogActions}>
+                          <button
+                            className="button ghost"
+                            type="button"
+                            disabled={mutationPending}
+                            onClick={() => {
+                              setVariantEditorMode(null);
+                              setVariantEditing(null);
+                              setMutationError("");
+                            }}
+                          >
+                            Cancelar
+                          </button>
+                          <button className="button primary" type="submit" disabled={mutationPending}>
+                            {mutationPending
+                              ? "Guardando…"
+                              : variantEditorMode === "CREATE"
+                                ? "Crear variante"
+                                : "Guardar variante"}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {variantAdjusting && (
+                      <form className={styles.variantForm} onSubmit={handleVariantAdjustment}>
+                        <h3>Ajustar · {variantAdjusting.name}</h3>
+                        <p className={styles.dialogHint}>
+                          Disponible ahora: <strong>{variantAdjusting.available}</strong>
+                        </p>
+
+                        <label className={styles.field}>
+                          <span>Ajuste de variante</span>
+                          <input name="variantDelta" type="number" step="1" required autoFocus />
+                        </label>
+
+                        <label className={styles.field}>
+                          <span>Nota de ajuste</span>
+                          <input name="variantAdjustmentNote" />
+                        </label>
+
+                        {mutationError && <p className={styles.dialogError} role="alert">{mutationError}</p>}
+
+                        <div className={styles.dialogActions}>
+                          <button
+                            className="button ghost"
+                            type="button"
+                            disabled={mutationPending}
+                            onClick={() => {
+                              setVariantAdjusting(null);
+                              setMutationError("");
+                            }}
+                          >
+                            Cancelar
+                          </button>
+                          <button className="button primary" type="submit" disabled={mutationPending}>
+                            {mutationPending ? "Aplicando…" : "Aplicar ajuste de variante"}
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {variants.length === 0 ? (
+                      <p className={styles.dialogHint}>Este producto todavía no tiene variantes.</p>
+                    ) : (
+                      <div className={styles.variantList}>
+                        {variants.map(variant => (
+                          <article
+                            key={variant.id}
+                            className={styles.variantCard}
+                            data-testid={`inventory-variant-${variant.id}`}
+                          >
+                            <div className={styles.variantCardMain}>
+                              <div>
+                                <strong>{variant.name}</strong>
+                                <span>{variant.sku}</span>
+                              </div>
+                              <span className={variant.active ? styles.statusOk : styles.statusMuted}>
+                                {variant.active ? "Activa" : "Inactiva"}
+                              </span>
+                            </div>
+
+                            <div className={styles.variantMetrics}>
+                              <span>Disponible: <strong>{variant.available}</strong></span>
+                              <span>Físico: <strong>{variant.onHand}</strong></span>
+                              <span>Reservado: <strong>{variant.reserved}</strong></span>
+                            </div>
+
+                            <div className={styles.variantActions}>
+                              <button
+                                className="button ghost"
+                                type="button"
+                                onClick={() => void openVariantHistory(variant)}
+                              >
+                                Historial
+                              </button>
+
+                              {canManageVariants && variant.active && (
+                                <>
+                                  <button
+                                    className="button ghost"
+                                    type="button"
+                                    onClick={() => {
+                                      setMutationError("");
+                                      setVariantAdjusting(null);
+                                      setVariantEditing(variant);
+                                      setVariantEditorMode("EDIT");
+                                    }}
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    className="button secondary"
+                                    type="button"
+                                    onClick={() => {
+                                      setMutationError("");
+                                      setVariantEditorMode(null);
+                                      setVariantEditing(null);
+                                      setVariantAdjusting(variant);
+                                    }}
+                                  >
+                                    Ajustar
+                                  </button>
+                                  <button
+                                    className="button ghost"
+                                    type="button"
+                                    disabled={mutationPending}
+                                    onClick={() => void deactivateVariant(variant)}
+                                  >
+                                    Desactivar
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {variantHistoryTarget && (
+          <div className={styles.dialogBackdrop}>
+            <section
+              className={styles.dialog}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="variantHistoryTitle"
+            >
+              <div className={styles.dialogHeader}>
+                <div>
+                  <span className={styles.dialogEyebrow}>Trazabilidad de variante</span>
+                  <h2 id="variantHistoryTitle">Historial variante · {variantHistoryTarget.name}</h2>
+                </div>
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => setVariantHistoryTarget(null)}
+                >
+                  Cerrar historial
+                </button>
+              </div>
+
+              <div className={styles.historyBody}>
+                {variantHistoryPending && (
+                  <p className={styles.dialogHint} role="status">Cargando movimientos…</p>
+                )}
+                {!variantHistoryPending && variantHistoryError && (
+                  <p className={styles.dialogError} role="alert">{variantHistoryError}</p>
+                )}
+                {!variantHistoryPending && !variantHistoryError && variantHistory.length === 0 && (
+                  <p className={styles.dialogHint}>Esta variante todavía no tiene movimientos.</p>
+                )}
+                {!variantHistoryPending && !variantHistoryError && variantHistory.length > 0 && (
+                  <div className={styles.movementList}>
+                    {variantHistory.map(movement => (
+                      <article key={movement.id} className={styles.movementCard}>
+                        <div className={styles.movementHeader}>
+                          <strong>{movementLabel(movement.type)}</strong>
+                          <time dateTime={movement.createdAt}>{movementDate(movement.createdAt)}</time>
+                        </div>
+                        <div className={styles.movementDeltas}>
+                          <span>Físico {signedDelta(movement.quantityDelta)}</span>
+                          <span>Reservado {signedDelta(movement.reservedDelta)}</span>
+                        </div>
+                        <div className={styles.movementAfter}>
+                          <span>Físico después: {movement.onHandAfter}</span>
+                          <span>Reservado después: {movement.reservedAfter}</span>
+                        </div>
+                        {movement.note && <p className={styles.movementNote}>{movement.note}</p>}
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
 
         {historyTarget && (
           <div className={styles.dialogBackdrop}>
