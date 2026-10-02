@@ -9,7 +9,7 @@ import {
   getRestockSubscriptions
 } from "./api";
 
-const MANAGE_ROLES = new Set(["BUSINESS_ADMIN", "BUSINESS_OWNER"]);
+const LEGACY_MANAGE_ROLES = new Set(["BUSINESS_ADMIN", "BUSINESS_OWNER"]);
 
 const queryDefaults = {
   retry: false,
@@ -60,7 +60,16 @@ export function useInventoryWorkspace() {
   });
 
   const roles = me.data?.roles ?? [];
-  const canManage = roles.some(role => MANAGE_ROLES.has(role));
+  const permissions = me.data?.permissions;
+  const hasPermissionClaims = Array.isArray(permissions);
+  const legacyCanManage = roles.some(role => LEGACY_MANAGE_ROLES.has(role));
+  const canManageStock = hasPermissionClaims
+    ? permissions.includes("INVENTORY_MANAGE")
+    : legacyCanManage;
+  const canManageCatalog = hasPermissionClaims
+    ? permissions.includes("CATALOG_MANAGE")
+    : legacyCanManage;
+  const canManage = canManageStock || canManageCatalog;
 
   async function refetchPrimary() {
     await Promise.all([
@@ -83,6 +92,8 @@ export function useInventoryWorkspace() {
     restockSubscriptions,
     restockNotifications,
     canManage,
+    canManageStock,
+    canManageCatalog,
     refetchPrimary
   };
 }
