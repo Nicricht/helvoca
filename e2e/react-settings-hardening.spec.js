@@ -113,7 +113,7 @@ async function boot(page, options = {}) {
   return { requests };
 }
 
-test.describe('React Settings hardening RED contract', () => {
+test.describe('React settings hardening RED contract', () => {
   test('expired auth returns to the login surface', async ({ page }) => {
     await boot(page, { expired: true });
     await page.goto('/app/settings');
