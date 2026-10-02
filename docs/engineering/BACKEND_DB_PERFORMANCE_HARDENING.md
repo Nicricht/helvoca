@@ -81,3 +81,42 @@ with expected 2 results but actual 0, because production code still called the l
 
 ## Final verification pending
 Fast Gate, Full Gate, exact-head sync with `main`, merge, exact-main CI and Railway verification remain pending for the final HEAD.
+
+
+## Dashboard hardening
+
+### Second evidence-backed defect
+`OperationsDashboardService` loaded all tenant bookings, customers, requests and open unanswered questions into Java memory in order to calculate four counters and render at most ten request/question rows.
+
+### RED evidence
+GitHub Actions run #3384 on commit `65aed50fb3ab9b1a13d006b2312c34d0715b0e12` failed exactly at:
+`OperationsDashboardServiceTest.dashboardCountsAndRecentListsStayBoundedInRepositories`
+with expected bookingsToday=7 but actual=0, proving the service still ignored the new bounded/count repository operations.
+
+### GREEN implementation
+Dashboard now delegates to PostgreSQL:
+- today's non-cancelled booking count;
+- today's new-customer count;
+- open/in-progress request count;
+- open unanswered-question count;
+- most recent 10 requests;
+- most recent 10 open unanswered questions.
+
+It no longer materializes the full tenant tables for these dashboard values.
+
+### GREEN evidence
+Implementation commit `529ff88c7a6ded5c081fb419a51101f5cc83d91c`:
+- Fast Gate success;
+- Golden Journey success;
+- 356 targeted tests, 0 failures;
+- `OperationsDashboardServiceTest` green.
+
+PostgreSQL integration commit `7e472a4253fd81d0b8276a47da6512a6ceefdb06`:
+- Fast Gate success;
+- Golden Journey success;
+- 357 targeted tests, 0 failures;
+- `OperationsDashboardReadRepositoryIntegrationTest` green against PostgreSQL 16;
+- validates tenant-scoped counts and SQL Top-10 behavior.
+
+## Scope decision
+No JVM heap limit, Hikari pool setting, or new PostgreSQL index is changed in this PR. Production evidence did not justify those changes. The hardening is intentionally limited to observed unbounded read amplification and N+1 behavior.
