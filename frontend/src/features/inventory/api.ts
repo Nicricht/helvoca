@@ -18,6 +18,8 @@ export interface CatalogItem {
   description?: string;
   price?: number | null;
   currency?: string;
+  durationMinutes?: number | null;
+  metadataJson?: string | null;
   active?: boolean;
 }
 
@@ -27,9 +29,9 @@ export interface CreateCatalogProductInput {
   description: string | null;
   price: number;
   currency: string;
-  durationMinutes: null;
-  metadataJson: null;
-  active: true;
+  durationMinutes: number | null;
+  metadataJson: string | null;
+  active: boolean;
 }
 
 export interface InventoryStock {
@@ -216,6 +218,19 @@ export function createCatalogProduct(input: CreateCatalogProductInput) {
     method: "POST",
     body: JSON.stringify(input)
   });
+}
+
+export function updateCatalogProduct(
+  catalogItemId: string,
+  input: CreateCatalogProductInput
+) {
+  return apiRequest<CatalogItem>(
+    `/api/v1/catalog/${encodeURIComponent(catalogItemId)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(input)
+    }
+  );
 }
 
 
