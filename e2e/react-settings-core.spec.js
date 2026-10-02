@@ -171,7 +171,7 @@ async function bootSettingsCore(page, options = {}) {
   return state;
 }
 
-test.describe('React Settings core RED contract', () => {
+test.describe('React settings core RED contract', () => {
   test('reads existing configuration in one coherent surface with compact internal navigation', async ({ page }) => {
     await bootSettingsCore(page);
     await page.goto('/app/settings');
