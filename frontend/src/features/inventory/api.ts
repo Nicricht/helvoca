@@ -117,26 +117,41 @@ export interface InventoryVariantMovement {
 export interface InventoryAlert {
   id: string;
   catalogItemId?: string;
+  variantId?: string | null;
   type?: string;
   acknowledged?: boolean;
+  acknowledgedAt?: string | null;
   subjectName?: string;
+  sku?: string | null;
   available?: number;
   reorderThreshold?: number;
+  createdAt?: string;
 }
 
 export interface RestockSubscription {
   id: string;
+  customerId?: string | null;
   catalogItemId?: string;
+  variantId?: string | null;
   preferredChannel?: string;
   contact?: string;
+  status?: string;
+  createdAt?: string;
 }
 
 export interface RestockNotification {
   id: string;
+  subscriptionId?: string;
+  customerId?: string | null;
   catalogItemId?: string;
+  variantId?: string | null;
   preferredChannel?: string;
   contact?: string;
+  subjectName?: string;
+  sku?: string | null;
   available?: number;
+  status?: string;
+  createdAt?: string;
 }
 
 export function getCurrentUser() {
@@ -258,5 +273,20 @@ export function deactivateInventoryVariant(catalogItemId: string, variantId: str
 export function getInventoryVariantHistory(catalogItemId: string, variantId: string) {
   return apiRequest<InventoryVariantMovement[]>(
     `/api/v1/inventory/${encodeURIComponent(catalogItemId)}/variants/${encodeURIComponent(variantId)}/movements`
+  );
+}
+
+
+export function acknowledgeInventoryAlert(alertId: string) {
+  return apiRequest<InventoryAlert>(
+    `/api/v1/inventory/alerts/${encodeURIComponent(alertId)}/acknowledge`,
+    { method: "POST" }
+  );
+}
+
+export function cancelRestockSubscription(subscriptionId: string) {
+  return apiRequest<RestockSubscription>(
+    `/api/v1/inventory/restock-subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
+    { method: "POST" }
   );
 }
