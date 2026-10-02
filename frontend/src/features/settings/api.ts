@@ -249,6 +249,18 @@ export interface MetaDeploymentReadiness {
   blockers?: MetaReadinessBlocker[];
 }
 
+
+
+export interface ManagedPaymentSandboxStatus {
+  available: boolean;
+  configured: boolean;
+  enabled: boolean;
+  blockedByCustomConfiguration: boolean;
+  provider?: string | null;
+  mode?: string | null;
+  webhookPath?: string | null;
+}
+
 export interface SetupInput {
   businessName: string;
   timezone: string;
@@ -480,4 +492,21 @@ export function activateMetaWhatsApp() {
 
 export function deactivateMetaWhatsApp() {
   return apiRequest<MetaWhatsAppStatus>("/api/v1/channels/whatsapp/meta/config/deactivate", { method: "POST" });
+}
+
+
+export function getManagedPaymentSandbox() {
+  return apiRequest<ManagedPaymentSandboxStatus>("/api/v1/payment-provider/managed-sandbox");
+}
+
+export function enableManagedPaymentSandbox() {
+  return apiRequest<ManagedPaymentSandboxStatus>("/api/v1/payment-provider/managed-sandbox/enable", {
+    method: "POST"
+  });
+}
+
+export function disableManagedPaymentSandbox() {
+  return apiRequest<ManagedPaymentSandboxStatus>("/api/v1/payment-provider/managed-sandbox/disable", {
+    method: "POST"
+  });
 }
