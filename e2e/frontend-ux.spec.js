@@ -304,7 +304,7 @@ test('ready customer sees operations on home and configuration on settings', asy
   await expect(page.locator('#nextStepBanner')).toBeHidden();
   await expect(page.locator('#advancedPanel')).toBeHidden();
   await expect(page.locator('#commercialStatusCard')).toBeHidden();
-  await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
+  await expect(page.locator('.nav-config')).toHaveAttribute('href', '/app/settings');
 
   await page.goto('/settings.html');
 
@@ -450,7 +450,7 @@ test('primary and public navigation fit desktop tablet and mobile viewports', as
       await page.goto('/');
       await expect(page.locator('#primaryNav')).toBeVisible();
       await expect(page.locator('.nav-inventory')).toHaveAttribute('href', '/app/inventory');
-      await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
+      await expect(page.locator('.nav-config')).toHaveAttribute('href', '/app/settings');
       await expectNoPageOverflow();
 
       await page.goto('/settings.html');
@@ -464,7 +464,7 @@ test('primary and public navigation fit desktop tablet and mobile viewports', as
       await expect(page.locator('.nav-inventory')).toHaveClass(/active/);
       await expect(page.locator('.nav-bookings')).toHaveAttribute('href', '/app/agenda');
       await expect(page.locator('.nav-customers')).toHaveAttribute('href', '/#customers');
-      await expect(page.locator('.nav-config')).toHaveAttribute('href', '/settings.html');
+      await expect(page.locator('.nav-config')).toHaveAttribute('href', '/app/settings');
       await expectNoPageOverflow();
 
       await page.goto('/sales.html');
