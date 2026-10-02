@@ -205,7 +205,7 @@ test.describe('React settings core RED contract', () => {
     await page.goto('/app/settings');
 
     const name = page.getByLabel('Nombre del negocio');
-    const save = page.getByRole('button', { name: 'Guardar cambios' });
+    const save = page.locator('form button[type="submit"]');
 
     await name.fill('Barbería Norte Centro');
     await expect(page.getByRole('status')).toContainText('Cambios sin guardar');
