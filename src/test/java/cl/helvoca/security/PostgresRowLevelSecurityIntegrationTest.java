@@ -396,6 +396,73 @@ class PostgresRowLevelSecurityIntegrationTest {
     }
 
     @Test
+    void paymentForeignKeysRejectCrossTenantOperationsAndCustomerEvenForOwner() {
+        UUID customerA = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessA);
+        UUID customerB = ownerJdbc.queryForObject(
+                "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
+                UUID.class,
+                businessB);
+
+        UUID paymentOperationA = UUID.randomUUID();
+        UUID paymentOperationB = UUID.randomUUID();
+        UUID targetOperationA = UUID.randomUUID();
+        UUID targetOperationB = UUID.randomUUID();
+
+        ownerJdbc.update("""
+                INSERT INTO business_operation(
+                    id, business_id, customer_id, type, status, source, revision, currency
+                ) VALUES (?, ?, ?, 'PAYMENT', 'CONFIRMED', 'MANUAL', 1, 'CLP')
+                """, paymentOperationA, businessA, customerA);
+        ownerJdbc.update("""
+                INSERT INTO business_operation(
+                    id, business_id, customer_id, type, status, source, revision, currency
+                ) VALUES (?, ?, ?, 'PAYMENT', 'CONFIRMED', 'MANUAL', 1, 'CLP')
+                """, paymentOperationB, businessB, customerB);
+        ownerJdbc.update("""
+                INSERT INTO business_operation(
+                    id, business_id, customer_id, type, status, source, revision, currency
+                ) VALUES (?, ?, ?, 'ORDER', 'CONFIRMED', 'MANUAL', 1, 'CLP')
+                """, targetOperationA, businessA, customerA);
+        ownerJdbc.update("""
+                INSERT INTO business_operation(
+                    id, business_id, customer_id, type, status, source, revision, currency
+                ) VALUES (?, ?, ?, 'ORDER', 'CONFIRMED', 'MANUAL', 1, 'CLP')
+                """, targetOperationB, businessB, customerB);
+
+        assertPaymentInsertRejectedOrCleaned(
+                businessA, paymentOperationB, customerA, targetOperationA, "cross-operation");
+        assertPaymentInsertRejectedOrCleaned(
+                businessA, paymentOperationA, customerB, targetOperationA, "cross-customer");
+        assertPaymentInsertRejectedOrCleaned(
+                businessA, paymentOperationA, customerA, targetOperationB, "cross-target");
+    }
+
+    private void assertPaymentInsertRejectedOrCleaned(
+            UUID businessId,
+            UUID operationId,
+            UUID customerId,
+            UUID targetOperationId,
+            String suffix) {
+        UUID paymentId = UUID.randomUUID();
+        try {
+            ownerJdbc.update("""
+                    INSERT INTO business_payment(
+                        id, operation_id, business_id, customer_id, target_operation_id,
+                        provider, idempotency_key, amount, currency, status, source
+                    ) VALUES (?, ?, ?, ?, ?, 'TEST', ?, 1000, 'CLP', 'PENDING', 'MANUAL')
+                    """, paymentId, operationId, businessId, customerId, targetOperationId,
+                    "tenant-integrity-" + suffix + "-" + paymentId);
+            ownerJdbc.update("DELETE FROM business_payment WHERE id = ?", paymentId);
+            fail("Cross-tenant business_payment reference was accepted: " + suffix);
+        } catch (DataAccessException expected) {
+            // PostgreSQL tenant-integrity constraint rejected the write.
+        }
+    }
+
+    @Test
     void bookingForeignKeysRejectCrossTenantCustomerAndServiceEvenForOwner() {
         UUID customerA = ownerJdbc.queryForObject(
                 "SELECT id FROM customer WHERE business_id = ? LIMIT 1",
