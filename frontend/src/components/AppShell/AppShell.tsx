@@ -12,10 +12,10 @@ import styles from "./AppShell.module.css";
 
 const navigation = [
   { href: "/", label: "Inicio", icon: LayoutDashboard },
-  { href: "/#bookings", label: "Agenda", icon: CalendarDays },
+  { href: "/app/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/app/orders", label: "Operaciones", icon: ShoppingBag },
   { href: "/app/inventory", label: "Inventario", icon: PackageSearch },
-  { href: "/settings.html", label: "Configuración", icon: Settings }
+  { href: "/app/settings", label: "Configuración", icon: Settings }
 ];
 
 export function AppShell({ children }: PropsWithChildren) {

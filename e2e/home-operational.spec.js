@@ -562,7 +562,7 @@ test('ready customer sees live operational home instead of setup cards', async (
   await expect(page.locator('#ownerPlanName')).toHaveText('PRO');
   await expect(page.locator('#ownerPlanUsage')).toHaveText('23 / 500 min');
   expect(await page.locator('#homeCallsMetric').evaluate(element => element.tagName)).toBe('ARTICLE');
-  await expect(page.locator('#homeBookingsMetric')).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
+  await expect(page.locator('#homeBookingsMetric')).toHaveAttribute('href', '/app/agenda');
   await expect(page.locator('#homeRequestsMetric')).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
   await expect(page.locator('#ownerOrdersMetric')).toHaveAttribute('href', '/?tab=sales#homeBusinessWorkspace');
   await expect(page.locator('#homeBusinessWorkspace')).toBeVisible();
@@ -2476,7 +2476,7 @@ test('dashboard prioritizes calls, attention, recent activity and quick access',
   const quick = page.locator('#ownerQuickActions');
   await expect(quick).toBeVisible();
   await expect(quick.getByRole('link')).toHaveCount(4);
-  await expect(quick.getByRole('link', { name: 'Agenda' })).toHaveAttribute('href', '/?tab=bookings#homeBusinessWorkspace');
+  await expect(quick.getByRole('link', { name: 'Agenda' })).toHaveAttribute('href', '/app/agenda');
   await expect(quick.getByRole('link', { name: 'Pendientes' })).toHaveAttribute('href', '/?tab=requests#homeBusinessWorkspace');
   await expect(quick.getByRole('link', { name: 'Conversaciones' })).toHaveAttribute('href', '/conversations.html');
   await expect(quick.getByRole('link', { name: 'Inventario' })).toHaveAttribute('href', '/app/inventory');
