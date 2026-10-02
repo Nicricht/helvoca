@@ -99,5 +99,5 @@ test('React phone provisioning never provisions until explicit confirmation', as
   await page.getByRole('button', { name: 'Aprovisionar' }).click();
 
   await expect.poll(() => provisionCalls).toBe(1);
-  await expect(page.getByRole('status')).toContainText('quedó conectado');
+  await expect(page.locator('section[aria-label="Telefonía"] [role="status"]')).toContainText('quedó conectado');
 });
