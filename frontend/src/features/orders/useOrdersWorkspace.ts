@@ -39,18 +39,6 @@ export function useOrdersWorkspace() {
     ...queryDefaults
   });
 
-  const orders = useQuery({
-    queryKey: ["commercial", "orders"],
-    queryFn: getOrders,
-    ...queryDefaults
-  });
-
-  const deliveries = useQuery({
-    queryKey: ["commercial", "deliveries"],
-    queryFn: getDeliveries,
-    ...queryDefaults
-  });
-
   const roles = me.data?.roles ?? [];
   const permissions = me.data?.permissions;
   const hasPermissionClaims = Array.isArray(permissions);
@@ -70,6 +58,19 @@ export function useOrdersWorkspace() {
   const canReadDeliveries = hasPermissionClaims
     ? permissions.includes("DELIVERIES_READ")
     : roles.some(role => MANAGE_ROLES.has(role) || role === "DISPATCH");
+
+  const orders = useQuery({
+    queryKey: ["commercial", "orders"],
+    queryFn: getOrders,
+    ...queryDefaults
+  });
+
+  const deliveries = useQuery({
+    queryKey: ["commercial", "deliveries"],
+    queryFn: getDeliveries,
+    enabled: me.isSuccess && canReadDeliveries,
+    ...queryDefaults
+  });
 
   async function refetchOrders() {
     await orders.refetch();
