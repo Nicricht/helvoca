@@ -225,7 +225,7 @@ export function InventoryPage() {
 
   function endMutation() {
     mutationLock.current = false;
-    endMutation();
+    setMutationPending(false);
   }
 
   const rows = useMemo(
@@ -810,7 +810,7 @@ export function InventoryPage() {
                           Ver historial
                         </button>
                       )}
-                      {model.canManageCatalog && (!row.configured || !row.trackingEnabled ? (
+                      {model.canManageStock && (!row.configured || !row.trackingEnabled ? (
                         <button
                           className="button secondary"
                           type="button"
