@@ -309,8 +309,8 @@ test.describe('React Agenda migration', () => {
 
     await page.getByRole('button', { name: 'Nueva cita' }).click();
     const dialog = page.getByRole('dialog', { name: 'Nueva cita' });
-    await dialog.getByLabel('Cliente').selectOption('cust1');
-    await dialog.getByLabel('Servicio').selectOption('svc1');
+    await dialog.locator('select[aria-label="Cliente"]').selectOption('cust1');
+    await dialog.locator('select[aria-label="Servicio"]').selectOption('svc1');
     await dialog.getByLabel('Fecha').fill('2026-10-07');
     await dialog.getByLabel('Hora').fill('10:00');
 
