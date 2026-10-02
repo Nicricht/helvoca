@@ -416,11 +416,11 @@ export function AgendaPage() {
                 <table aria-label="Reservas">
                   <thead>
                     <tr>
-                      <th>Fecha y hora</th>
-                      <th>Cliente</th>
-                      <th>Servicio</th>
-                      <th>Origen</th>
-                      <th>Estado</th>
+                      <th scope="col" role="columnheader">Fecha y hora</th>
+                      <th scope="col" role="columnheader">Cliente</th>
+                      <th scope="col" role="columnheader">Servicio</th>
+                      <th scope="col" role="columnheader">Origen</th>
+                      <th scope="col" role="columnheader">Estado</th>
                     </tr>
                   </thead>
                   <tbody>

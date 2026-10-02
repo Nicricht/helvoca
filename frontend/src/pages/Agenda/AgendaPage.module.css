@@ -1,3 +1,8 @@
+.page,
+.page * {
+  box-sizing: border-box;
+}
+
 .page {
   --agenda-bg: #06111c;
   --agenda-panel: #0b1b29;
@@ -10,7 +15,9 @@
   --agenda-yellow: #ffb020;
   --agenda-red: #ff5263;
   width: 100%;
+  min-width: 0;
   max-width: 1600px;
+  overflow-x: clip;
   margin: 0 auto;
   padding: 28px;
   color: var(--agenda-text);
