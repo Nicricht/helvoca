@@ -56,7 +56,7 @@ test('new ferretería owner is guided to the first incomplete setup step without
       complete: false,
       detail: 'Pendiente',
       actionLabel: 'Preparar negocio',
-      actionHref: '/settings.html'
+      actionHref: '/app/settings'
     },
     steps: []
   })));
@@ -111,7 +111,7 @@ test('new ferretería owner is guided to the first incomplete setup step without
   await expect(page.locator('#firstUserOnboarding h1')).toHaveText('Vamos a preparar tu recepcionista');
   await expect(page.locator('#firstUserProgressText')).toHaveText('1 de 4 pasos completados');
   await expect(page.locator('#firstUserNextAction')).toHaveText('Continuar con Servicios');
-  await expect(page.locator('#firstUserNextAction')).toHaveAttribute('href', '/settings.html?section=services');
+  await expect(page.locator('#firstUserNextAction')).toHaveAttribute('href', '/app/settings?section=services');
   await expect(page.locator('#homeBusinessWorkspace')).toBeHidden();
   expect(mutations).toEqual([]);
 });
