@@ -1,6 +1,5 @@
 import type { PropsWithChildren } from "react";
 import {
-  Bot,
   CalendarDays,
   LayoutDashboard,
   PackageSearch,
@@ -13,10 +12,9 @@ import styles from "./AppShell.module.css";
 
 const navigation = [
   { href: "/", label: "Inicio", icon: LayoutDashboard },
-  { href: "/#bookings", label: "Reservas", icon: CalendarDays },
+  { href: "/app/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/#customers", label: "Clientes", icon: Users },
   { href: "/app/inventory", label: "Inventario", icon: PackageSearch },
-  { href: "/conversations.html", label: "Recepcionista IA", icon: Bot },
   { href: "/app/settings", label: "Configuración", icon: Settings }
 ];
 
@@ -38,7 +36,12 @@ export function AppShell({ children }: PropsWithChildren) {
 
         <nav className={styles.nav} aria-label="Navegación principal">
           {navigation.map(({ href, label, icon: Icon }) => (
-            <a key={label} href={href} data-current={currentPath === href ? "true" : undefined}>
+            <a
+              key={label}
+              href={href}
+              data-current={currentPath === href ? "true" : undefined}
+              aria-current={currentPath === href ? "page" : undefined}
+            >
               <Icon size={18} aria-hidden="true" />
               <span>{label}</span>
             </a>
