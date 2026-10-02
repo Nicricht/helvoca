@@ -59,9 +59,12 @@ test('dashboard entry can reset stale scroll position without affecting refresh 
   await page.evaluate(() => {
     const spacer = document.createElement('div');
     spacer.id = 'motion-scroll-spacer';
+    spacer.setAttribute('aria-hidden', 'true');
     spacer.style.height = '2600px';
-    document.querySelector('#dashboardView').appendChild(spacer);
-    window.scrollTo(0, document.body.scrollHeight);
+    document.body.appendChild(spacer);
+    document.documentElement.style.minHeight = '4000px';
+    document.body.style.minHeight = '4000px';
+    window.scrollTo(0, 1200);
   });
 
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(300);
