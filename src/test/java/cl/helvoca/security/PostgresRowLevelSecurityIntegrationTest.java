@@ -1198,6 +1198,7 @@ class PostgresRowLevelSecurityIntegrationTest {
                       JOIN pg_attribute business_col
                         ON business_col.attrelid = cls.oid
                        AND business_col.attname = 'business_id'
+                       AND business_col.attnotnull
                        AND NOT business_col.attisdropped
                      WHERE ns.nspname = 'public'
                        AND cls.relkind = 'r'
