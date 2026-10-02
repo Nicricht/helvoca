@@ -93,6 +93,8 @@ export function useSettingsWorkspace() {
 
   const canReadScheduleExceptions = roles.includes("BUSINESS_ADMIN") || roles.includes("OPERATOR");
   const canManageScheduleExceptions = roles.includes("BUSINESS_ADMIN");
+  const canReadChannels = roles.includes("BUSINESS_ADMIN") || roles.includes("OPERATOR");
+  const canManageChannels = roles.includes("BUSINESS_ADMIN");
 
   const primaryLoading = me.isPending || business.isPending;
   const primaryError = me.isError || business.isError;
@@ -123,6 +125,8 @@ export function useSettingsWorkspace() {
     canManageTeam,
     canReadScheduleExceptions,
     canManageScheduleExceptions,
+    canReadChannels,
+    canManageChannels,
     primaryLoading,
     primaryError,
     partialErrors
