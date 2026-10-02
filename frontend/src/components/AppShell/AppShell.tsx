@@ -17,10 +17,12 @@ const navigation = [
   { href: "/#customers", label: "Clientes", icon: Users },
   { href: "/app/inventory", label: "Inventario", icon: PackageSearch },
   { href: "/conversations.html", label: "Recepcionista IA", icon: Bot },
-  { href: "/settings.html", label: "Configuración", icon: Settings }
+  { href: "/app/settings", label: "Configuración", icon: Settings }
 ];
 
 export function AppShell({ children }: PropsWithChildren) {
+  const currentPath = window.location.pathname;
+
   function logout() {
     clearAccessToken();
     window.location.assign("/");
@@ -36,12 +38,17 @@ export function AppShell({ children }: PropsWithChildren) {
 
         <nav className={styles.nav} aria-label="Navegación principal">
           {navigation.map(({ href, label, icon: Icon }) => (
-            <a key={label} href={href}>
+            <a key={label} href={href} data-current={currentPath === href ? "true" : undefined}>
               <Icon size={18} aria-hidden="true" />
               <span>{label}</span>
             </a>
           ))}
-          <a className={styles.accountLink} href="/app/plan" data-current="true" aria-current="page">
+          <a
+            className={styles.accountLink}
+            href="/app/plan"
+            data-current={currentPath === "/app/plan" ? "true" : undefined}
+            aria-current={currentPath === "/app/plan" ? "page" : undefined}
+          >
             <WalletCards size={18} aria-hidden="true" />
             <span>Plan y consumo</span>
           </a>
