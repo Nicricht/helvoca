@@ -15,7 +15,7 @@ const navigation = [
   { href: "/", label: "Inicio", icon: LayoutDashboard },
   { href: "/#bookings", label: "Reservas", icon: CalendarDays },
   { href: "/#customers", label: "Clientes", icon: Users },
-  { href: "/inventory.html", label: "Inventario", icon: PackageSearch },
+  { href: "/app/inventory", label: "Inventario", icon: PackageSearch },
   { href: "/conversations.html", label: "Recepcionista IA", icon: Bot },
   { href: "/settings.html", label: "Configuración", icon: Settings }
 ];
