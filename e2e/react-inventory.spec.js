@@ -89,6 +89,33 @@ async function bootInventory(page, options = {}) {
     }
   ])));
 
+  await page.route('**/api/v1/inventory/prod-1/movements', route => route.fulfill(json([
+    {
+      id: 'move-2',
+      type: 'ADJUSTMENT',
+      quantityDelta: 3,
+      reservedDelta: 0,
+      onHandAfter: 8,
+      reservedAfter: 3,
+      referenceType: 'MANUAL',
+      referenceId: null,
+      note: 'Reposición bodega',
+      createdAt: '2026-10-02T12:30:00Z'
+    },
+    {
+      id: 'move-1',
+      type: 'RESERVATION',
+      quantityDelta: 0,
+      reservedDelta: 2,
+      onHandAfter: 5,
+      reservedAfter: 3,
+      referenceType: 'ORDER_OPERATION',
+      referenceId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      note: 'Reserva pedido',
+      createdAt: '2026-10-02T11:00:00Z'
+    }
+  ])));
+
   await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([
     {
       id: 'alert-1',
@@ -144,6 +171,32 @@ test.describe('React Inventory migration', () => {
     await expect(page.getByRole('alert')).toContainText('No pudimos cargar');
     await expect(page.getByTestId('inventory-available')).not.toContainText('6');
     await expect(page.getByRole('button', { name: /reintentar/i })).toBeVisible();
+  });
+
+  test('shows authoritative movement history to a read-only operator', async ({ page }) => {
+    await bootInventory(page, { roles: ['OPERATOR'] });
+    await page.goto('/app/inventory');
+
+    const row = page.getByTestId('inventory-row-prod-1');
+    await row.getByRole('button', { name: 'Ver historial' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Historial · Taladro percutor' });
+    await expect(dialog).toBeVisible();
+
+    const adjustment = dialog.getByTestId('inventory-movement-move-2');
+    await expect(adjustment).toContainText('Ajuste manual');
+    await expect(adjustment).toContainText('+3');
+    await expect(adjustment).toContainText('Físico después: 8');
+    await expect(adjustment).toContainText('Reservado después: 3');
+    await expect(adjustment).toContainText('Reposición bodega');
+    await expect(adjustment.getByTestId('movement-created-at')).toHaveAttribute('datetime', '2026-10-02T12:30:00Z');
+
+    const reservation = dialog.getByTestId('inventory-movement-move-1');
+    await expect(reservation).toContainText('Reserva');
+    await expect(reservation).toContainText('Reservado +2');
+    await expect(reservation).toContainText('Reserva pedido');
+
+    await expect(page.getByRole('button', { name: /ajustar stock/i })).toHaveCount(0);
   });
 
   test('does not expose manage actions to a restricted role', async ({ page }) => {
