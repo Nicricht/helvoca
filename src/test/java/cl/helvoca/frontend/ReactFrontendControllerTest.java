@@ -21,5 +21,13 @@ class ReactFrontendControllerTest {
         mvc.perform(get("/app/inventory"))
                 .andExpect(status().isOk())
                 .andExpect(forwardedUrl("/app/index.html"));
+
+        mvc.perform(get("/app/agenda"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/app/index.html"));
+
+        mvc.perform(get("/app/agenda/"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/app/index.html"));
     }
 }
