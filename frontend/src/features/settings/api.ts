@@ -438,6 +438,22 @@ export function connectExistingPhoneNumber(phoneNumber: string) {
   });
 }
 
+
+
+export function setPhoneActive(id: string, active: boolean) {
+  return apiRequest<PhoneNumber>(`/api/v1/phone-numbers/${encodeURIComponent(id)}/active`, {
+    method: "PATCH",
+    body: JSON.stringify({ active })
+  });
+}
+
+export function setPhoneWhatsAppEnabled(id: string, enabled: boolean) {
+  return apiRequest<PhoneNumber>(`/api/v1/phone-numbers/${encodeURIComponent(id)}/whatsapp`, {
+    method: "PATCH",
+    body: JSON.stringify({ enabled })
+  });
+}
+
 export function detachPhoneNumber(id: string) {
   return apiRequest<void>(`/api/v1/phone-numbers/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
