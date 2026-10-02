@@ -225,7 +225,7 @@ export function InventoryPage() {
 
   function endMutation() {
     mutationLock.current = false;
-    setMutationPending(false);
+    endMutation();
   }
 
   const rows = useMemo(
@@ -288,8 +288,7 @@ export function InventoryPage() {
   const canManageAutomation = roles.includes("BUSINESS_ADMIN");
 
   async function acknowledgeAlert(alertId: string) {
-    if (!canManageAutomation || mutationPending) return;
-    setMutationPending(true);
+    if (!canManageAutomation || !beginMutation()) return;
     setMutationError("");
     try {
       await acknowledgeInventoryAlert(alertId);
@@ -297,7 +296,7 @@ export function InventoryPage() {
     } catch (error) {
       setMutationError(mutationMessage(error));
     } finally {
-      setMutationPending(false);
+      endMutation();
     }
   }
 
@@ -310,8 +309,7 @@ export function InventoryPage() {
   }
 
   async function cancelWaiting(subscriptionId: string) {
-    if (!canManageAutomation || mutationPending) return;
-    setMutationPending(true);
+    if (!canManageAutomation || !beginMutation()) return;
     setMutationError("");
     try {
       await cancelRestockSubscription(subscriptionId);
@@ -319,7 +317,7 @@ export function InventoryPage() {
     } catch (error) {
       setMutationError(mutationMessage(error));
     } finally {
-      setMutationPending(false);
+      endMutation();
     }
   }
 
@@ -407,7 +405,7 @@ export function InventoryPage() {
 
   async function handleVariantEditor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!variantsTarget || !canManageVariants || !variantEditorMode || mutationPending) return;
+    if (!variantsTarget || !canManageVariants || !variantEditorMode || mutationLock.current) return;
 
     setMutationError("");
     let input;
@@ -418,7 +416,7 @@ export function InventoryPage() {
       return;
     }
 
-    setMutationPending(true);
+    if (!beginMutation()) return;
     try {
       if (variantEditorMode === "CREATE") {
         await createInventoryVariant(variantsTarget.id, input);
@@ -431,13 +429,13 @@ export function InventoryPage() {
     } catch (error) {
       setMutationError(mutationMessage(error));
     } finally {
-      setMutationPending(false);
+      endMutation();
     }
   }
 
   async function handleVariantAdjustment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!variantsTarget || !variantAdjusting || !canManageVariants || mutationPending) return;
+    if (!variantsTarget || !variantAdjusting || !canManageVariants || mutationLock.current) return;
 
     const data = new FormData(event.currentTarget);
     const delta = Number(data.get("variantDelta"));
@@ -447,7 +445,7 @@ export function InventoryPage() {
       return;
     }
 
-    setMutationPending(true);
+    if (!beginMutation()) return;
     setMutationError("");
     try {
       await adjustInventoryVariant(variantsTarget.id, variantAdjusting.id, {
@@ -459,13 +457,12 @@ export function InventoryPage() {
     } catch (error) {
       setMutationError(mutationMessage(error));
     } finally {
-      setMutationPending(false);
+      endMutation();
     }
   }
 
   async function deactivateVariant(variant: InventoryVariant) {
-    if (!variantsTarget || !canManageVariants || mutationPending) return;
-    setMutationPending(true);
+    if (!variantsTarget || !canManageVariants || !beginMutation()) return;
     setMutationError("");
     try {
       await deactivateInventoryVariant(variantsTarget.id, variant.id);
@@ -473,7 +470,7 @@ export function InventoryPage() {
     } catch (error) {
       setMutationError(mutationMessage(error));
     } finally {
-      setMutationPending(false);
+      endMutation();
     }
   }
 
@@ -497,7 +494,7 @@ export function InventoryPage() {
 
   async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!model.canManage || mutationPending) return;
+    if (!model.canManageCatalog || mutationLock.current) return;
 
     const data = new FormData(event.currentTarget);
     const name = String(data.get("name") ?? "").trim();
@@ -518,7 +515,7 @@ export function InventoryPage() {
       return;
     }
 
-    setMutationPending(true);
+    if (!beginMutation()) return;
     setMutationError("");
     try {
       await createCatalogProduct({
@@ -536,13 +533,13 @@ export function InventoryPage() {
     } catch (error) {
       setMutationError(mutationMessage(error));
     } finally {
-      setMutationPending(false);
+      endMutation();
     }
   }
 
   async function handleConfigure(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!configureTarget || !model.canManage || mutationPending) return;
+    if (!configureTarget || !model.canManageStock || mutationLock.current) return;
 
     const data = new FormData(event.currentTarget);
     const onHand = Number(data.get("onHand"));
@@ -554,7 +551,7 @@ export function InventoryPage() {
       return;
     }
 
-    setMutationPending(true);
+    if (!beginMutation()) return;
     setMutationError("");
     try {
       const sku = String(data.get("sku") ?? "").trim();
@@ -571,13 +568,13 @@ export function InventoryPage() {
     } catch (error) {
       setMutationError(mutationMessage(error));
     } finally {
-      setMutationPending(false);
+      endMutation();
     }
   }
 
   async function handleAdjustment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!adjustTarget || !model.canManage || mutationPending) return;
+    if (!adjustTarget || !model.canManageStock || mutationLock.current) return;
 
     const data = new FormData(event.currentTarget);
     const delta = Number(data.get("delta"));
@@ -586,7 +583,7 @@ export function InventoryPage() {
       return;
     }
 
-    setMutationPending(true);
+    if (!beginMutation()) return;
     setMutationError("");
     try {
       const note = String(data.get("note") ?? "").trim();
@@ -601,7 +598,7 @@ export function InventoryPage() {
     } catch (error) {
       setMutationError(mutationMessage(error));
     } finally {
-      setMutationPending(false);
+      endMutation();
     }
   }
 
@@ -715,7 +712,7 @@ export function InventoryPage() {
               <p>El stock disponible siempre viene del backend. La búsqueda y los filtros solo cambian esta vista.</p>
             </div>
             <div className={styles.workspaceActions}>
-              {model.canManage && (
+              {model.canManageCatalog && (
                 <button
                   className="button primary"
                   type="button"
@@ -813,7 +810,7 @@ export function InventoryPage() {
                           Ver historial
                         </button>
                       )}
-                      {model.canManage && (!row.configured || !row.trackingEnabled ? (
+                      {model.canManageCatalog && (!row.configured || !row.trackingEnabled ? (
                         <button
                           className="button secondary"
                           type="button"
