@@ -1288,3 +1288,102 @@ jobs:
 
       - name: Certify first fictional customer week
         run: bash scripts/ci/first-fictional-customer-week.sh
+
+
+  orders-production-navigation-smoke:
+    if: github.event_name == 'pull_request' && github.head_ref == 'chore/verify-orders-navigation-production-5b2f951'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Verify production bytes and canonical Operations destination
+        run: |
+          set -euo pipefail
+
+          root="$(mktemp)"
+          orders="$(mktemp)"
+          status_js="$(mktemp)"
+          health="$(mktemp)"
+
+          root_code="$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 25 -sS -L -o "$root" -w "%{http_code}" https://recepvoz.cl/)"
+          orders_code="$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 25 -sS -L -o "$orders" -w "%{http_code}" https://recepvoz.cl/app/orders)"
+          status_code="$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 25 -sS -L -o "$status_js" -w "%{http_code}" 'https://recepvoz.cl/commercial-status.js?v=20261002-orders-1')"
+          health_code="$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 25 -sS -L -o "$health" -w "%{http_code}" https://recepvoz.cl/actuator/health)"
+
+          echo "root -> HTTP $root_code"
+          echo "/app/orders -> HTTP $orders_code"
+          echo "commercial-status.js -> HTTP $status_code"
+          echo "/actuator/health -> HTTP $health_code"
+          cat "$health"
+          echo
+
+          test "$root_code" = "200"
+          test "$orders_code" = "200"
+          test "$status_code" = "200"
+          test "$health_code" = "200"
+
+          grep -Fq 'href="/app/orders">Operaciones</a>' "$root"
+          grep -Fq '/commercial-status.js?v=20261002-orders-1' "$root"
+          grep -Fq 'id="ownerOrdersMetric" class="home-metric hidden" href="/app/orders"' "$status_js"
+          grep -Eq '<div[^>]+id="root"|/app/assets/|type="module"' "$orders"
+          grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"' "$health"
+
+      - name: Install Chromium smoke dependency
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Verify production Operations navigation with Chromium
+        run: |
+          node <<'NODE'
+          const { chromium } = require('@playwright/test');
+
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage();
+
+            await page.goto('https://recepvoz.cl/', { waitUntil: 'networkidle', timeout: 60000 });
+
+            const operations = page.locator('#primaryNav .nav-orders');
+            if (await operations.count() !== 1) {
+              throw new Error('Operaciones nav link not found on production Home');
+            }
+
+            const href = await operations.getAttribute('href');
+            console.log('production Operations href:', href);
+            if (href !== '/app/orders') {
+              throw new Error('Production Operations href is not /app/orders');
+            }
+
+            let targetRequested = false;
+            await page.route('https://recepvoz.cl/app/orders', async route => {
+              targetRequested = true;
+              await route.fulfill({
+                status: 200,
+                contentType: 'text/html',
+                body: '<!doctype html><title>Operations smoke</title><h1>Operations smoke</h1>'
+              });
+            });
+
+            await operations.evaluate(el => el.click());
+            await page.waitForURL('https://recepvoz.cl/app/orders', { timeout: 10000 });
+
+            console.log('clicked Operations URL:', page.url());
+            if (!targetRequested) {
+              throw new Error('Operations click never requested /app/orders');
+            }
+
+            await browser.close();
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
