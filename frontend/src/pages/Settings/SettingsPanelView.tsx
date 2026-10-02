@@ -2,9 +2,7 @@ import {
   Bot,
   Building2,
   CalendarClock,
-  ChevronRight,
   Globe2,
-  Link2,
   MessagesSquare,
   Phone,
   Plus,
@@ -24,6 +22,10 @@ import type {
   VoiceOption
 } from "../../features/settings/api";
 import type { SectionKey, SettingsDraft } from "../../features/settings/viewModel";
+import { ChannelsSettingsPanel } from "./ChannelsSettingsPanel";
+import { IntegrationsSettingsPanel } from "./IntegrationsSettingsPanel";
+import { ScheduleExceptionsPanel } from "./ScheduleExceptionsPanel";
+import { TeamSettingsPanel } from "./TeamSettingsPanel";
 import styles from "./SettingsPage.module.css";
 
 const dayNames = [
@@ -35,6 +37,57 @@ const dayNames = [
   "Viernes",
   "Sábado"
 ];
+
+
+const businessPresetOptions = [
+  ["", "General"],
+  ["store", "Tienda / comercio"],
+  ["hardware_store", "Ferretería / materiales"],
+  ["services", "Servicios"],
+  ["restaurant", "Restaurant / alimentos"],
+  ["clinic", "Salud / clínica"],
+  ["salon", "Belleza / peluquería"],
+  ["workshop", "Taller / reparación"],
+  ["hospitality", "Hotel / hospedaje"],
+  ["professional", "Profesional / oficina"]
+] as const;
+
+const businessPresetSuggestions: Record<string, string> = {
+  store: "Prioriza productos.",
+  hardware_store: "Prioriza catálogo, stock, cotizaciones, pedidos y despacho. Confirma medidas, cantidades y disponibilidad antes de cerrar una venta.",
+  salon: "Prioriza servicios y reservas.",
+  restaurant: "Prioriza productos y pedidos.",
+  clinic: "Prioriza servicios y reservas."
+};
+
+const agentCapabilities = [
+  ["GET_BUSINESS_INFORMATION", "Información"],
+  ["LIST_SERVICES", "Servicios"],
+  ["SEARCH_KNOWLEDGE", "Conocimiento"],
+  ["FIND_CALLER", "Identificar cliente"],
+  ["REGISTER_CALLER", "Registrar cliente"],
+  ["LIST_AVAILABLE_SLOTS", "Ver horarios"],
+  ["CHECK_BOOKING_AVAILABILITY", "Comprobar horario"],
+  ["CREATE_BOOKING", "Crear reserva"],
+  ["LIST_CUSTOMER_BOOKINGS", "Ver reservas"],
+  ["RESCHEDULE_BOOKING", "Reprogramar"],
+  ["CANCEL_BOOKING", "Cancelar reserva"],
+  ["CREATE_REQUEST", "Crear solicitud"],
+  ["RECORD_UNANSWERED_QUESTION", "Guardar pregunta"],
+  ["TRANSFER_TO_HUMAN", "Transferir a persona"]
+] as const;
+
+function profileBooleanValue(value: boolean | null | undefined) {
+  if (value === true) return "true";
+  if (value === false) return "false";
+  return "";
+}
+
+function parseProfileBoolean(value: string): boolean | null {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+}
 
 function Field({
   label,
@@ -57,6 +110,13 @@ interface SettingsPanelViewProps {
   activeSection: SectionKey;
   draft: SettingsDraft;
   canManage: boolean;
+  canManageTeam: boolean;
+  canReadScheduleExceptions: boolean;
+  canManageScheduleExceptions: boolean;
+  canReadChannels: boolean;
+  canManageChannels: boolean;
+  canReadIntegrations: boolean;
+  canManageIntegrations: boolean;
   voices: VoiceOption[];
   phones: PhoneNumber[];
   updateRoot: (
@@ -81,6 +141,13 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
     activeSection,
     draft,
     canManage,
+    canManageTeam,
+    canReadScheduleExceptions,
+    canManageScheduleExceptions,
+    canReadChannels,
+    canManageChannels,
+    canReadIntegrations,
+    canManageIntegrations,
     voices,
     phones,
     updateRoot,
@@ -122,6 +189,66 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
               readOnly={!canManage}
               onChange={event => updateRoot("businessName", event.target.value)}
             />
+          </Field>
+
+          <Field label="Rubro">
+            <select
+              value={String(draft.profile.presetKey ?? "")}
+              disabled={!canManage}
+              onChange={event => updateProfile("presetKey", event.target.value || null)}
+            >
+              {businessPresetOptions.map(([value, label]) => (
+                <option value={value} key={value || "general"}>{label}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Moneda">
+            <select
+              value={String(draft.profile.defaultCurrency ?? "CLP")}
+              disabled={!canManage}
+              onChange={event => updateProfile("defaultCurrency", event.target.value)}
+            >
+              {["CLP", "USD", "EUR", "MXN", "COP", "PEN", "ARS", "BRL"].map(currency => (
+                <option value={currency} key={currency}>{currency}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Productos">
+            <select
+              value={profileBooleanValue(draft.profile.sellsProducts)}
+              disabled={!canManage}
+              onChange={event => updateProfile("sellsProducts", parseProfileBoolean(event.target.value))}
+            >
+              <option value="">Sin definir</option>
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
+          </Field>
+
+          <Field label="Servicios">
+            <select
+              value={profileBooleanValue(draft.profile.sellsServices)}
+              disabled={!canManage}
+              onChange={event => updateProfile("sellsServices", parseProfileBoolean(event.target.value))}
+            >
+              <option value="">Sin definir</option>
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
+          </Field>
+
+          <Field label="Reservas">
+            <select
+              value={profileBooleanValue(draft.profile.usesReservations)}
+              disabled={!canManage}
+              onChange={event => updateProfile("usesReservations", parseProfileBoolean(event.target.value))}
+            >
+              <option value="">Sin definir</option>
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
           </Field>
 
           <Field label="Descripción pública" wide>
@@ -223,15 +350,14 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             />
           </Field>
 
-          <Field label="Moneda">
-            <input
-              maxLength={3}
-              value={String(draft.profile.defaultCurrency ?? "CLP")}
-              readOnly={!canManage}
-              onChange={event => updateProfile("defaultCurrency", event.target.value)}
-            />
-          </Field>
         </div>
+
+        {draft.profile.presetKey && businessPresetSuggestions[draft.profile.presetKey] && (
+          <div className={styles.businessHint} role="status">
+            <strong>Sugerencia para este rubro</strong>
+            <span>{businessPresetSuggestions[draft.profile.presetKey]}</span>
+          </div>
+        )}
       </section>
     );
   }
@@ -307,6 +433,47 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
               onChange={event => updateAgent("instructions", event.target.value)}
             />
           </Field>
+        </div>
+
+        <label className={styles.agentToggle}>
+          <input
+            type="checkbox"
+            checked={draft.agent.active}
+            disabled={!canManage}
+            onChange={event => updateAgent("active", event.target.checked)}
+          />
+          <span>
+            <strong>Agente IA activo para este negocio</strong>
+            <small>Desactívalo para impedir que atienda aunque la configuración permanezca guardada.</small>
+          </span>
+        </label>
+
+        <div className={styles.capabilityBlock}>
+          <div>
+            <strong>Capacidades permitidas</strong>
+            <span>El backend sigue aplicando estas restricciones aunque el modelo intente excederlas.</span>
+          </div>
+          <div className={styles.capabilityGrid}>
+            {agentCapabilities.map(([value, label]) => {
+              const checked = draft.agent.capabilities.includes(value);
+              return (
+                <label className={styles.capabilityOption} key={value}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={!canManage}
+                    onChange={event => {
+                      const next = event.target.checked
+                        ? [...new Set([...draft.agent.capabilities, value])]
+                        : draft.agent.capabilities.filter(item => item !== value);
+                      updateAgent("capabilities", next);
+                    }}
+                  />
+                  <span>{label}</span>
+                </label>
+              );
+            })}
+          </div>
         </div>
 
         <div className={styles.authorityNote}>
@@ -466,6 +633,11 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             </div>
           ))}
         </div>
+
+        <ScheduleExceptionsPanel
+          canRead={canReadScheduleExceptions}
+          canManage={canManageScheduleExceptions}
+        />
       </section>
     );
   }
@@ -550,33 +722,16 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             <span className={styles.sectionIcon}><Phone size={19} aria-hidden="true" /></span>
             <div>
               <h2>Canales</h2>
-              <p>Estado observable de tus números. Las acciones de proveedor se mantienen separadas y explícitas.</p>
+              <p>Telefonía y WhatsApp Business con acciones explícitas y sin efectos automáticos al abrir la pantalla.</p>
             </div>
           </div>
         </div>
 
-        <div className={styles.channelList}>
-          {phones.length === 0 && (
-            <div className={styles.emptyCard}>
-              <Phone size={20} aria-hidden="true" />
-              <div>
-                <strong>No hay números conectados.</strong>
-                <span>Esta pantalla no aprovisiona ni activa proveedores automáticamente.</span>
-              </div>
-            </div>
-          )}
-          {phones.map(phone => (
-            <article className={styles.channelCard} key={phone.id || phone.phoneNumber}>
-              <div>
-                <strong>{phone.phoneNumber || "Número"}</strong>
-                <span>{phone.provider || "Proveedor"} · {phone.active ? "Activo" : "Inactivo"}</span>
-              </div>
-              <span className={phone.active ? styles.goodPill : styles.mutedPill}>
-                {phone.whatsappEnabled ? "WhatsApp habilitado" : "Voz"}
-              </span>
-            </article>
-          ))}
-        </div>
+        <ChannelsSettingsPanel
+          phones={phones}
+          canRead={canReadChannels}
+          canManage={canManageChannels}
+        />
       </section>
     );
   }
@@ -594,20 +749,15 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             <span className={styles.sectionIcon}><Globe2 size={19} aria-hidden="true" /></span>
             <div>
               <h2>Integraciones</h2>
-              <p>Los proveedores externos se administran con endpoints explícitos y nunca muestran credenciales completas.</p>
+              <p>Conecta capacidades comerciales sin exponer credenciales ni mezclar herramientas internas.</p>
             </div>
           </div>
         </div>
-        <div className={styles.authorityNote}>
-          <ShieldCheck size={18} aria-hidden="true" />
-          <div>
-            <strong>Zona segura de integraciones</strong>
-            <span>
-              Activación de WhatsApp, pagos y otros proveedores se migra como bloque independiente
-              con confirmación, permisos y E2E mockeado.
-            </span>
-          </div>
-        </div>
+
+        <IntegrationsSettingsPanel
+          canRead={canReadIntegrations}
+          canManage={canManageIntegrations}
+        />
       </section>
     );
   }
@@ -628,10 +778,7 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
           </div>
         </div>
       </div>
-      <a className="button secondary" href="/settings.html?section=team">
-        Abrir gestión de equipo actual
-        <ChevronRight size={15} aria-hidden="true" />
-      </a>
+<TeamSettingsPanel canManage={canManageTeam} />
     </section>
   );
 }

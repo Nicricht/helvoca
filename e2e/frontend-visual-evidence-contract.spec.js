@@ -33,7 +33,7 @@ test('release candidate captures exact-head visual evidence for every canonical 
     '/',
     '/conversations.html',
     '/inventory.html',
-    '/settings.html',
+    '/app/settings',
     '/account.html',
     '/simulator.html'
   ]) {

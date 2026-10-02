@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  getBillingStatus,
   getCurrentUser,
+  getPublicPlans,
   getSubscription,
   getUsageStatus,
   getUsageSummary,
@@ -35,7 +37,23 @@ export function usePlanConsumption() {
 
   const roles = me.data?.roles ?? [];
   const canViewDetailedUsage = roles.some(role => PRIVILEGED_ROLES.has(role));
+  const canManageBilling = roles.includes("BUSINESS_ADMIN");
   const window = usageWindow(subscription.data);
+
+  const billingStatus = useQuery({
+    queryKey: ["billing", "status"],
+    queryFn: getBillingStatus,
+    enabled: canManageBilling,
+    retry: false,
+    refetchOnWindowFocus: false
+  });
+
+  const publicPlans = useQuery({
+    queryKey: ["billing", "public-plans"],
+    queryFn: getPublicPlans,
+    retry: false,
+    refetchOnWindowFocus: false
+  });
 
   const usage = useQuery({
     queryKey: ["usage", "summary", window.from, window.to],
@@ -54,7 +72,10 @@ export function usePlanConsumption() {
     subscription,
     usage,
     usageStatus,
-    canViewDetailedUsage
+    billingStatus,
+    publicPlans,
+    canViewDetailedUsage,
+    canManageBilling
   };
 }
 

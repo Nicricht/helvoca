@@ -70,26 +70,26 @@ public class PilotActivationChecklistService {
         boolean requireHandoff = onboarding != null && onboarding.humanTransferConfigured();
 
         add(steps, blockers, "CORE_SETUP", "Negocio configurado", coreSetup, true, true,
-                "CORE_SETUP_INCOMPLETE", "/settings.html#configuration");
+                "CORE_SETUP_INCOMPLETE", "/app/settings#configuration");
         add(steps, blockers, "TECHNICAL_READINESS", "Canales y operación listos", technical, true, true,
                 "TECHNICAL_READINESS_BLOCKED", "/");
         add(steps, blockers, "PRICES_CONFIRMED", "Precios confirmados por el negocio",
-                confirmation.isPricesConfirmed(), false, true, "PRICES_CONFIRMATION_REQUIRED", "/settings.html#configuration");
+                confirmation.isPricesConfirmed(), false, true, "PRICES_CONFIRMATION_REQUIRED", "/app/settings#configuration");
         add(steps, blockers, "FAQ_REVIEWED", "FAQ revisada y aprobada",
-                confirmation.isFaqReviewed(), false, true, "FAQ_REVIEW_REQUIRED", "/settings.html#configuration");
+                confirmation.isFaqReviewed(), false, true, "FAQ_REVIEW_REQUIRED", "/app/settings#configuration");
         add(steps, blockers, "POLICIES_APPROVED", "Políticas del negocio aprobadas",
-                confirmation.isPoliciesApproved(), false, true, "POLICIES_APPROVAL_REQUIRED", "/settings.html#configuration");
+                confirmation.isPoliciesApproved(), false, true, "POLICIES_APPROVAL_REQUIRED", "/app/settings#configuration");
         add(steps, blockers, "AGENT_INSTRUCTIONS_APPROVED", "Identidad e instrucciones del agente aprobadas",
-                confirmation.isAgentInstructionsApproved(), false, true, "AGENT_INSTRUCTIONS_APPROVAL_REQUIRED", "/settings.html#configuration");
+                confirmation.isAgentInstructionsApproved(), false, true, "AGENT_INSTRUCTIONS_APPROVAL_REQUIRED", "/app/settings#configuration");
         add(steps, blockers, "PILOT_SCOPE_APPROVED", "Alcance y límites del piloto entendidos",
-                confirmation.isPilotScopeApproved(), false, true, "PILOT_SCOPE_APPROVAL_REQUIRED", "/settings.html");
+                confirmation.isPilotScopeApproved(), false, true, "PILOT_SCOPE_APPROVAL_REQUIRED", "/app/settings");
         add(steps, blockers, "CONVERSATION_TEST_COMPLETED", "Conversación real de prueba completada",
                 confirmation.isConversationTestCompleted(), false, true, "CONVERSATION_TEST_REQUIRED", "/");
         add(steps, blockers, "MUTATION_TESTS_COMPLETED", "Reservas/pedidos/pagos probados",
                 confirmation.isMutationTestsCompleted(), false, true, "MUTATION_TESTS_REQUIRED", "/");
         if (requireHandoff) {
             add(steps, blockers, "HUMAN_HANDOFF_TESTED", "Derivación humana probada",
-                    confirmation.isHumanHandoffTested(), false, true, "HUMAN_HANDOFF_TEST_REQUIRED", "/settings.html#configuration");
+                    confirmation.isHumanHandoffTested(), false, true, "HUMAN_HANDOFF_TEST_REQUIRED", "/app/settings#configuration");
         }
 
         long completed = steps.stream().filter(Step::complete).count();

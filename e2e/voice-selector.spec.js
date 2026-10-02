@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 const json = body => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 
-test('AI agent voice is selected from the backend catalog and never typed freely', async ({ page }) => {
+test('React Settings selects the AI voice from the backend catalog and never exposes free-text voice entry', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
 
   let agentPuts = 0;
@@ -10,20 +10,16 @@ test('AI agent voice is selected from the backend catalog and never typed freely
     if (request.url().endsWith('/api/v1/ai-agent') && request.method() === 'PUT') agentPuts += 1;
   });
 
-  await page.route('**/api/v1/auth/me', route => route.fulfill(json({ email: 'admin@demo.cl' })));
+  await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+    email: 'admin@demo.cl',
+    roles: ['BUSINESS_ADMIN'],
+    permissions: ['BUSINESS_READ', 'BUSINESS_MANAGE']
+  })));
   await page.route('**/api/v1/business', route => route.fulfill(json({
     name: 'Negocio E2E', timezone: 'America/Santiago', language: 'es', humanTransferPhone: null
   })));
-  await page.route('**/api/v1/onboarding/status', route => route.fulfill(json({
-    businessProfileConfigured: true,
-    servicesConfigured: true,
-    scheduleConfigured: true,
-    knowledgeConfigured: false,
-    humanTransferConfigured: false,
-    phoneConfigured: true,
-    readyForCalls: true,
-    nextStep: 'OPTIONAL_HUMAN_TRANSFER'
-  })));
+  await page.route('**/api/v1/business/profile', route => route.fulfill(json({ defaultCurrency: 'CLP' })));
+  await page.route('**/api/v1/onboarding/status', route => route.fulfill(json({ readyForCalls: true })));
   await page.route('**/api/v1/services', route => route.fulfill(json([
     { id: 'svc1', name: 'Consulta', durationMinutes: 30, price: 25000, active: true }
   ])));
@@ -42,58 +38,21 @@ test('AI agent voice is selected from the backend catalog and never typed freely
     language: 'es',
     voice: 'marin',
     greeting: 'Hola, gracias por llamar.',
-    instructions: null,
+    instructions: '',
     active: true,
     capabilities: ['GET_BUSINESS_INFORMATION', 'LIST_SERVICES']
   })));
-  await page.route('**/api/v1/phone-numbers', route => route.fulfill(json([
-    { id: 'phone1', provider: 'TWILIO', externalId: 'PNdemo', phoneNumber: '+12025550123', active: true }
-  ])));
-  await page.route('**/api/v1/phone-numbers/provisioning/status', route => route.fulfill(json({
-    enabled: false, configured: false, purchaseAvailable: false, provider: 'TWILIO', message: 'No disponible en E2E'
-  })));
-  await page.route('**/api/v1/billing/status', route => route.fulfill(json({
-    provider: null,
-    billingEnabled: false,
-    checkoutConfigured: false,
-    currentPlanCode: 'EMPRENDE',
-    currentPlanName: 'Emprende',
-    currentMonthlyPriceClp: 24990,
-    subscriptionStatus: 'TRIALING',
-    pendingPlanCode: null,
-    pendingPlanName: null,
-    pendingMonthlyPriceClp: null,
-    checkoutUrl: null,
-    awaitingProviderVerification: false
-  })));
-  await page.route('**/api/v1/subscription', route => route.fulfill(json({
-    businessId: '11111111-1111-1111-1111-111111111111',
-    plan: 'BASIC',
-    status: 'TRIALING',
-    serviceAllowed: true,
-    maxConcurrentCalls: 1,
-    includedMinutes: 100,
-    usedMinutes: 0,
-    overageMinutes: 0,
-    currentPeriodStart: '2026-09-01T00:00:00Z',
-    currentPeriodEnd: '2026-09-15T00:00:00Z',
-    graceUntil: null,
-    billingProviderConnected: false,
-    legacyFallback: false
-  })));
-  await page.route('**/api/v1/public/pricing', route => route.fulfill(json([])));
+  await page.route('**/api/v1/phone-numbers', route => route.fulfill(json([])));
 
-  await page.goto('/settings.html');
-  await page.getByRole('button', { name: '🤖 Recepcionista', exact: true }).click();
+  await page.goto('/app/settings?section=receptionist');
 
-  const selector = page.locator('#agentVoiceSelect');
+  const selector = page.locator('#settings-panel-receptionist').getByLabel('Voz');
   await expect(selector).toBeVisible();
   await expect(selector).toHaveValue('marin');
-  await expect(page.locator('#agentVoiceHelp')).toContainText('Equilibrada y conversacional');
+  await expect(selector.locator('option')).toHaveText(['Natural', 'Profesional', 'Amigable']);
   await expect(page.locator('input[name="agentVoice"]')).toHaveCount(0);
 
   await selector.selectOption('cedar');
   await expect(selector).toHaveValue('cedar');
-  await expect(page.locator('#agentVoiceHelp')).toContainText('Clara y orientada a atención');
   expect(agentPuts).toBe(0);
 });

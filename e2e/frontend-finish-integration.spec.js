@@ -4,7 +4,6 @@ const fs = require('node:fs');
 const STATIC = 'src/main/resources/static';
 const customerPages = [
   'index.html',
-  'settings.html',
   'inventory.html',
   'conversations.html',
   'simulator.html',
@@ -33,7 +32,7 @@ test('customer navigation stays coherent and never exposes internal operations',
     { href: '/app/agenda', text: 'Agenda' },
     { href: '/#customers', text: 'Clientes' },
     { href: '/app/inventory', text: 'Inventario' },
-    { href: '/settings.html', text: 'Configuración' },
+    { href: '/app/settings', text: 'Configuración' },
     { href: '/account.html', text: 'Facturación' }
   ];
 
@@ -95,7 +94,7 @@ test('customer surfaces stay contained at required responsive widths', async ({ 
   for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1024 });
 
-    for (const path of ['/', '/settings.html', '/inventory.html', '/conversations.html', '/simulator.html', '/account.html']) {
+    for (const path of ['/', '/app/settings', '/inventory.html', '/conversations.html', '/simulator.html', '/account.html']) {
       await page.goto(path);
       await page.waitForTimeout(80);
       const layout = await page.evaluate(() => {
