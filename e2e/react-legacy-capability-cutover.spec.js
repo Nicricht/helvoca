@@ -38,10 +38,11 @@ test.describe('React replacement for legacy Home capabilities', () => {
     await page.goto('/app/agenda');
     await page.getByRole('button', { name: /nueva cita/i }).click();
 
-    await page.getByRole('button', { name: /nuevo cliente/i }).click();
-    await page.getByLabel('Nombre del cliente').fill('Camila Nueva');
-    await page.getByLabel('Teléfono del cliente').fill('+56922223333');
-    await page.getByRole('button', { name: /crear cliente/i }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nueva cita' });
+    await dialog.getByRole('button', { name: /nuevo cliente/i }).click();
+    await dialog.getByLabel('Nombre del cliente').fill('Camila Nueva');
+    await dialog.getByLabel('Teléfono del cliente').fill('+56922223333');
+    await dialog.getByRole('button', { name: /crear cliente/i }).click();
 
     await expect.poll(() => createdPayload).toEqual({
       name: 'Camila Nueva',
@@ -49,8 +50,9 @@ test.describe('React replacement for legacy Home capabilities', () => {
       email: null,
       notes: null
     });
-    await expect(page.getByLabel('Cliente')).toHaveValue('cust-2');
-    await expect(page.getByLabel('Cliente').locator('option:checked')).toHaveText('Camila Nueva');
+    const customerSelect = dialog.locator('select[aria-label="Cliente"]');
+    await expect(customerSelect).toHaveValue('cust-2');
+    await expect(customerSelect.locator('option:checked')).toHaveText('Camila Nueva');
   });
 
   test('Operations carries Requests with authoritative status updates', async ({ page }) => {
@@ -119,7 +121,18 @@ test.describe('React replacement for legacy Home capabilities', () => {
 
     await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([])));
     await page.route('**/api/v1/commercial/deliveries', route => route.fulfill(json([])));
-    await page.route('**/api/v1/audit?**', route => {
+    await page.route('**/api/v1/audit**', route => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith('/export')) {
+        exportCalls += 1;
+        return route.fulfill({
+          status: 200,
+          contentType: 'text/csv',
+          headers: { 'content-disposition': 'attachment; filename="auditoria.csv"' },
+          body: 'action,resource\nBOOKING_UPDATE,BOOKING'
+        });
+      }
+
       auditUrl = route.request().url();
       return route.fulfill(json([
         {
@@ -137,15 +150,6 @@ test.describe('React replacement for legacy Home capabilities', () => {
           createdAt: '2026-10-02T15:00:00Z'
         }
       ]));
-    });
-    await page.route('**/api/v1/audit/export?**', route => {
-      exportCalls += 1;
-      return route.fulfill({
-        status: 200,
-        contentType: 'text/csv',
-        headers: { 'content-disposition': 'attachment; filename="auditoria.csv"' },
-        body: 'action,resource\nBOOKING_UPDATE,BOOKING'
-      });
     });
 
     await page.goto('/app/orders');
