@@ -284,9 +284,11 @@ test('release candidate owner traverses the complete safe business journey in on
   await expect(page.locator('#homeBusinessWorkspace')).not.toHaveClass(/owner-collapsed/);
   await expect(page.locator('[data-home-panel="customers"]')).toBeVisible();
 
-  await restoredHomeNav.getByRole('link', { name: 'Inicio', exact: true }).click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.locator('#homeBusinessWorkspace')).toHaveClass(/owner-collapsed/);
+  const canonicalHomeLink = restoredHomeNav.getByRole('link', { name: 'Inicio', exact: true });
+  await expect(canonicalHomeLink).toHaveAttribute('href', '/app');
+  await canonicalHomeLink.click();
+  await expect(page).toHaveURL(/\/app\/?$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
 
   await page.goto('/inventory.html');
   await expect(page.getByRole('heading', { level: 1, name: 'Inventario', exact: true })).toBeVisible();
