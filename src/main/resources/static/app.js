@@ -811,8 +811,12 @@ $("#logoutBtn").addEventListener("click", () => {
     try {
         const me = await api("/api/v1/auth/me");
         if (redirectPlatformAdmin(me?.roles)) return;
-        window.location.replace("/app");
-        return;
+        const publicEntry = window.location.pathname === "/" || window.location.pathname === "/index.html";
+        if (publicEntry) {
+            window.location.replace("/app");
+            return;
+        }
+        await loadDashboard({ resetScroll: true });
     } catch (_) {
         if (token) handleExpiredSession();
     }
