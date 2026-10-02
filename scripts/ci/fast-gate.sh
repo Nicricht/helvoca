@@ -49,6 +49,11 @@ add_test_file() {
 }
 
 for file in "${CHANGED[@]}"; do
+  if [[ ! -e "$file" ]]; then
+    echo "Deleted path, skipping direct checks: $file"
+    continue
+  fi
+
   case "$file" in
     pom.xml)
       POM_CHANGED=true
