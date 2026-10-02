@@ -91,7 +91,8 @@
   line-height: 1.4;
 }
 
-.workspace {
+.workspace,
+.automationWorkspace {
   min-width: 0;
   margin-top: clamp(24px, 4vw, 38px);
   overflow: hidden;
@@ -149,6 +150,131 @@
   background: rgba(255, 255, 255, .025);
   font-size: 11px;
   font-weight: 750;
+}
+
+.automationSummary {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.automationSummary span {
+  padding: 6px 9px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: var(--rv-radius-pill);
+  color: var(--rv-text-tertiary);
+  background: rgba(255, 255, 255, .025);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.automationError {
+  margin: 14px 18px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(242, 141, 141, .28);
+  border-radius: 10px;
+  color: var(--rv-danger);
+  background: rgba(242, 141, 141, .07);
+  font-size: 12px;
+}
+
+.automationGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 18px;
+}
+
+.automationPanel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 14px;
+  background: var(--rv-bg-canvas);
+}
+
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid var(--rv-border-subtle);
+}
+
+.panelHeader h3 {
+  margin: 3px 0 0;
+  color: var(--rv-text-primary);
+  font-size: 14px;
+}
+
+.panelHeader > strong {
+  min-width: 28px;
+  min-height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--rv-border-default);
+  border-radius: 9px;
+  color: var(--rv-text-primary);
+  background: var(--rv-surface-2);
+  font-size: 12px;
+}
+
+.automationList {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.automationCard {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 11px;
+  background: var(--rv-surface-1);
+}
+
+.automationCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.automationCardHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.automationCardHeader strong {
+  color: var(--rv-text-primary);
+  font-size: 13px;
+}
+
+.automationCardHeader > div > span {
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.automationMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  color: var(--rv-text-tertiary);
+  font-size: 11px;
+}
+
+.automationEmpty {
+  margin: 0;
+  padding: 8px 2px;
+  color: var(--rv-text-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .toolbar {
@@ -685,6 +811,10 @@
   .summaryGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .automationGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {
@@ -697,7 +827,8 @@
     justify-items: start;
   }
 
-  .queueSummary {
+  .queueSummary,
+  .automationSummary {
     justify-content: flex-start;
   }
 
@@ -726,6 +857,10 @@
 
   .workspaceHeader {
     padding-inline: 14px;
+  }
+
+  .automationGrid {
+    padding: 14px;
   }
 
   .table th,
