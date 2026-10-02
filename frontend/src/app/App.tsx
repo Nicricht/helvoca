@@ -11,7 +11,7 @@ export function App() {
         <Route index element={<HomePage />} />
         <Route path="/plan" element={<PlanConsumptionPage />} />
         <Route path="/inventory" element={<InventoryPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/plan" replace />} />
       </Routes>
     </AuthBoundary>
   );
