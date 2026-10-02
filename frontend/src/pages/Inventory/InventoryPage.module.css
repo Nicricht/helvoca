@@ -433,6 +433,13 @@
   border-bottom: 1px solid var(--rv-border-subtle);
 }
 
+.dialogHeaderActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .dialogHeader h2 {
   margin: 4px 0 0;
   color: var(--rv-text-primary);
@@ -522,6 +529,95 @@
   justify-content: flex-end;
   gap: 10px;
   padding-top: 2px;
+}
+
+.variantBody,
+.historyBody {
+  padding: 20px;
+}
+
+.variantBody {
+  display: grid;
+  gap: 16px;
+}
+
+.variantForm {
+  display: grid;
+  gap: 14px;
+  padding: 15px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .018);
+}
+
+.variantForm h3 {
+  margin: 0;
+  color: var(--rv-text-primary);
+  font-size: 15px;
+}
+
+.variantList {
+  display: grid;
+  gap: 12px;
+}
+
+.variantCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 12px;
+  background: var(--rv-surface-1);
+}
+
+.variantCardMain,
+.variantMetrics,
+.variantActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.variantCardMain {
+  justify-content: space-between;
+}
+
+.variantCardMain > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.variantCardMain strong {
+  color: var(--rv-text-primary);
+  font-size: 14px;
+}
+
+.variantCardMain > div > span {
+  color: var(--rv-text-tertiary);
+  font-size: 12px;
+}
+
+.variantMetrics {
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid var(--rv-border-subtle);
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+}
+
+.variantMetrics strong {
+  color: var(--rv-text-primary);
+}
+
+.variantActions {
+  flex-wrap: wrap;
+}
+
+.variantActions :global(.button) {
+  min-height: 32px;
+  padding-inline: 10px;
+  font-size: 11px;
 }
 
 .historyBody {
@@ -637,12 +733,23 @@
     padding-inline: 14px;
   }
 
+  .dialogHeader,
+  .dialogHeaderActions,
+  .variantCardMain,
   .movementHeader,
   .movementDeltas,
   .movementAfter {
     align-items: flex-start;
     flex-direction: column;
     gap: 6px;
+  }
+
+  .dialogHeaderActions {
+    width: 100%;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
   }
 }
 
