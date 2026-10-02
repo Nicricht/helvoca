@@ -13,6 +13,7 @@ public interface BusinessOrderRepository extends JpaRepository<BusinessOrder, UU
     Optional<BusinessOrder> findByOperationIdAndBusinessId(UUID operationId, UUID businessId);
     List<BusinessOrder> findTop5ByBusinessIdAndCustomerIdOrderByCreatedAtDesc(UUID businessId, UUID customerId);
     List<BusinessOrder> findTop5ByBusinessIdAndContactPhoneOrderByCreatedAtDesc(UUID businessId, String contactPhone);
+    List<BusinessOrder> findTop100ByBusinessIdOrderByCreatedAtDesc(UUID businessId);
     List<BusinessOrder> findAllByBusinessIdOrderByCreatedAtDesc(UUID businessId);
     List<BusinessOrder> findAllByBusinessIdAndOperationIdIn(UUID businessId, Collection<UUID> operationIds);
     List<BusinessOrder> findAllByBusinessIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
