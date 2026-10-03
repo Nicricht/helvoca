@@ -25,7 +25,7 @@ async function boot(page, options = {}) {
     return route.fulfill(json({
       email: 'admin@demo.cl',
       roles: options.roles || ['BUSINESS_ADMIN'],
-      permissions: options.permissions || ['BUSINESS_READ', 'BUSINESS_MANAGE']
+      permissions: options.permissions || ['BUSINESS_READ', 'BUSINESS_CONFIGURE']
     }));
   });
 

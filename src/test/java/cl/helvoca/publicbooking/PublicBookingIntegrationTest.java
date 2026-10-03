@@ -83,6 +83,24 @@ class PublicBookingIntegrationTest {
     }
 
     @Test
+    void publicPageResolvesFromDeniedIngressByElevatingOnlyForOpaqueKeyLookup() {
+        Fixture fixture = fixture(true);
+        systemScope.close();
+        systemScope = null;
+
+        try (TenantDatabaseContext.Scope ignored = databaseContext.deny()) {
+            var page = publicBooking.page(fixture.key());
+
+            assertEquals("Public Booking Test", page.name());
+            assertEquals(fixture.business().getId(),
+                    databaseContext.callAsSystem(() ->
+                            profiles.findByPublicBookingKeyAndPublicBookingEnabledTrue(fixture.key())
+                                    .orElseThrow()
+                                    .getBusinessId()));
+        }
+    }
+
+    @Test
     void publicPageExposesOnlyPublicTenantData() {
         Fixture fixture = fixture(true);
 
