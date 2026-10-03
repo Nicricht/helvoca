@@ -1,7 +1,7 @@
 (() => {
   const dashboard = document.querySelector('#dashboardView');
   const nextBanner = document.querySelector('#nextStepBanner');
-  if (!dashboard || typeof api !== 'function') return;
+  if (!dashboard || !nextBanner || typeof api !== 'function') return;
 
   const labels = {
     CORE_SETUP: 'Negocio configurado',
@@ -78,8 +78,7 @@
       <button id="pilotActivationSave" class="button small primary" type="button">Guardar confirmaciones</button>
     </div>
   `;
-  if (nextBanner) nextBanner.insertAdjacentElement('afterend', card);
-  else dashboard.appendChild(card);
+  nextBanner.insertAdjacentElement('afterend', card);
 
   const list = card.querySelector('#pilotActivationList');
   const score = card.querySelector('#pilotActivationScore');
