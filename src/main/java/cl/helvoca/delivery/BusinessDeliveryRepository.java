@@ -12,5 +12,6 @@ public interface BusinessDeliveryRepository extends JpaRepository<BusinessDelive
     List<BusinessDelivery> findTop5ByBusinessIdAndCustomerIdOrderByCreatedAtDesc(UUID businessId, UUID customerId);
     List<BusinessDelivery> findTop5ByBusinessIdAndContactPhoneOrderByCreatedAtDesc(UUID businessId, String contactPhone);
     List<BusinessDelivery> findTop5ByBusinessIdAndSourceReferenceIdOrderByCreatedAtDesc(UUID businessId, UUID sourceReferenceId);
+    List<BusinessDelivery> findTop100ByBusinessIdOrderByCreatedAtDesc(UUID businessId);
     List<BusinessDelivery> findAllByBusinessIdOrderByCreatedAtDesc(UUID businessId);
 }

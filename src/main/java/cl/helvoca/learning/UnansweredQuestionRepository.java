@@ -8,6 +8,8 @@ import java.util.UUID;
 public interface UnansweredQuestionRepository extends JpaRepository<UnansweredQuestion, UUID> {
     List<UnansweredQuestion> findAllByBusinessIdOrderByLastSeenAtDesc(UUID businessId);
     List<UnansweredQuestion> findAllByBusinessIdAndStatusOrderByLastSeenAtDesc(UUID businessId, QuestionStatus status);
+    List<UnansweredQuestion> findTop10ByBusinessIdAndStatusOrderByLastSeenAtDesc(UUID businessId, QuestionStatus status);
+    long countByBusinessIdAndStatus(UUID businessId, QuestionStatus status);
     Optional<UnansweredQuestion> findByIdAndBusinessId(UUID id, UUID businessId);
     Optional<UnansweredQuestion> findFirstByBusinessIdAndNormalizedQuestionAndStatus(UUID businessId, String normalizedQuestion, QuestionStatus status);
 }
