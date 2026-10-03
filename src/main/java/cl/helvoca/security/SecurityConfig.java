@@ -131,7 +131,8 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_CONSOLE_ASSETS).permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register",
                                 "/api/v1/auth/invitations/**",
-                                "/api/v1/public/pricing", "/actuator/health").permitAll()
+                                "/api/v1/public/pricing", "/api/v1/public/booking-pages/**",
+                                "/actuator/health").permitAll()
                         .requestMatchers("/webhooks/v1/twilio/**", "/webhooks/v1/meta/**", "/webhooks/v1/openai/**",
                                 "/webhooks/v1/mercadopago", "/webhooks/v1/payments/**").permitAll()
                         .requestMatchers("/ws/v1/twilio/**").permitAll()

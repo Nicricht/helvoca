@@ -40,7 +40,8 @@ const STATUS_LABELS: Record<string, string> = {
 const SOURCE_LABELS: Record<string, string> = {
   AI_CALL: "Voz",
   AI_WHATSAPP: "WhatsApp",
-  ADMIN: "Manual"
+  ADMIN: "Manual",
+  PUBLIC_WEB: "Web"
 };
 
 const ACTIVITY_LABELS: Record<string, string> = {
