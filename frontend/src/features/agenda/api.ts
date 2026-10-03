@@ -73,6 +73,11 @@ export interface AvailabilityResponse {
   available: boolean;
 }
 
+export interface PublicBookingState {
+  enabled: boolean;
+  key?: string | null;
+}
+
 export interface CreateBookingInput {
   customerId: string;
   serviceId: string;
@@ -155,4 +160,15 @@ export function cancelBooking(id: string) {
     "/api/v1/bookings/" + encodeURIComponent(id),
     { method: "DELETE" }
   );
+}
+
+export function getPublicBookingState() {
+  return apiRequest<PublicBookingState>("/api/v1/business/public-booking");
+}
+
+export function updatePublicBookingState(enabled: boolean) {
+  return apiRequest<PublicBookingState>("/api/v1/business/public-booking", {
+    method: "PUT",
+    body: JSON.stringify({ enabled })
+  });
 }
