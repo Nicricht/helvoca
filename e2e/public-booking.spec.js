@@ -110,7 +110,7 @@ test.describe('Public booking portal', () => {
 
     await page.goto(`/reservar/?key=${key}`);
     await page.getByRole('button', { name: /Evaluación dental/i }).click();
-    await page.getByLabel('Fecha').fill('2026-10-07');
+    await page.getByLabel('Fecha', { exact: true }).fill('2026-10-07');
 
     await expect(page.getByRole('button', { name: '10:00' })).toBeVisible();
     await expect.poll(() => availability).not.toBeNull();
@@ -128,7 +128,7 @@ test.describe('Public booking portal', () => {
 
     await page.goto(`/reservar/?key=${key}`);
     await page.getByRole('button', { name: /Evaluación dental/i }).click();
-    await page.getByLabel('Fecha').fill('2026-10-07');
+    await page.getByLabel('Fecha', { exact: true }).fill('2026-10-07');
     await page.getByRole('button', { name: '10:00' }).click();
 
     await page.getByLabel('Nombre').fill('Ana Reserva');
@@ -161,7 +161,7 @@ test.describe('Public booking portal', () => {
 
     await page.goto(`/reservar/?key=${key}`);
     await page.getByRole('button', { name: /Evaluación dental/i }).click();
-    await page.getByLabel('Fecha').fill('2026-10-07');
+    await page.getByLabel('Fecha', { exact: true }).fill('2026-10-07');
     await page.getByRole('button', { name: '10:00' }).click();
     await page.getByLabel('Nombre').fill('Ana Reserva');
     await page.getByLabel('Teléfono').fill('+56922222222');
@@ -180,7 +180,7 @@ test.describe('Public booking portal', () => {
 
     await page.goto(`/reservar/?key=${key}`);
     await page.getByRole('button', { name: /Evaluación dental/i }).click();
-    await page.getByLabel('Fecha').fill('2026-10-07');
+    await page.getByLabel('Fecha', { exact: true }).fill('2026-10-07');
     await page.getByRole('button', { name: '10:00' }).click();
     await page.getByLabel('Nombre').fill('Ana Reserva');
     await page.getByLabel('Teléfono').fill('+56922222222');
