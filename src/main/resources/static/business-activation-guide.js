@@ -101,7 +101,7 @@
 
       const link = document.createElement('a');
       link.className = 'button small primary';
-      link.href = data.nextStep.actionHref || '/settings.html';
+      link.href = data.nextStep.actionHref || '/app/settings';
       link.textContent = data.nextStep.actionLabel || 'Continuar';
       next.append(copy, link);
     }

@@ -543,6 +543,13 @@ export function SettingsPage() {
               activeSection={activeSection}
               draft={draft}
               canManage={model.canManage}
+              canManageTeam={model.canManageTeam}
+              canReadScheduleExceptions={model.canReadScheduleExceptions}
+              canManageScheduleExceptions={model.canManageScheduleExceptions}
+              canReadChannels={model.canReadChannels}
+              canManageChannels={model.canManageChannels}
+              canReadIntegrations={model.canReadIntegrations}
+              canManageIntegrations={model.canManageIntegrations}
               voices={model.voices.data ?? []}
               phones={model.phones.data ?? []}
               updateRoot={updateRoot}
