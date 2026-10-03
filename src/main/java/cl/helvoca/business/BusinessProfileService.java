@@ -32,6 +32,43 @@ public class BusinessProfileService {
                 .orElseGet(() -> BusinessProfileResponse.empty(businessId));
     }
 
+    @Transactional(readOnly = true)
+    public PublicBookingState publicBookingState() {
+        UUID businessId = tenantProvider.requireBusinessId();
+        return profiles.findById(businessId)
+                .map(profile -> new PublicBookingState(
+                        profile.isPublicBookingEnabled(),
+                        profile.getPublicBookingKey()))
+                .orElseGet(() -> new PublicBookingState(false, null));
+    }
+
+    @Transactional
+    public PublicBookingState updatePublicBooking(boolean enabled) {
+        UUID businessId = tenantProvider.requireBusinessId();
+        BusinessProfile profile = profiles.findById(businessId).orElse(null);
+        Map<String, Object> before = profile == null ? null : snapshot(profile);
+
+        if (profile == null) {
+            profile = new BusinessProfile();
+            profile.setBusinessId(businessId);
+        }
+        if (profile.getPublicBookingKey() == null) {
+            profile.setPublicBookingKey(UUID.randomUUID());
+        }
+        profile.setPublicBookingEnabled(enabled);
+
+        BusinessProfile saved = profiles.saveAndFlush(profile);
+        auditService.humanSuccess(
+                businessId,
+                "PUBLIC_BOOKING_SETTINGS_UPDATE",
+                "BUSINESS_PROFILE",
+                businessId,
+                before,
+                snapshot(saved)
+        );
+        return new PublicBookingState(saved.isPublicBookingEnabled(), saved.getPublicBookingKey());
+    }
+
     @Transactional
     public BusinessProfileResponse upsert(BusinessProfileRequest request) {
         if (request == null) throw new IllegalArgumentException("Business profile is required");
@@ -131,10 +168,13 @@ public class BusinessProfileService {
         put(out, "sellsProducts", profile.getSellsProducts());
         put(out, "sellsServices", profile.getSellsServices());
         put(out, "usesReservations", profile.getUsesReservations());
+        put(out, "publicBookingEnabled", profile.isPublicBookingEnabled());
         return out;
     }
 
     private static void put(Map<String, Object> target, String key, Object value) {
         if (value != null) target.put(key, value);
     }
+
+    public record PublicBookingState(boolean enabled, UUID key) {}
 }
