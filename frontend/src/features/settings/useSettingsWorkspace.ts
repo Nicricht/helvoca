@@ -84,7 +84,7 @@ export function useSettingsWorkspace() {
   const permissions = me.data?.permissions;
   const hasPermissionClaims = Array.isArray(permissions);
   const canManage = hasPermissionClaims
-    ? permissions.includes("BUSINESS_MANAGE")
+    ? permissions.includes("BUSINESS_CONFIGURE")
     : roles.some(role => LEGACY_MANAGE_ROLES.has(role));
 
   const canManageTeam = hasPermissionClaims
