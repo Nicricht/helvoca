@@ -39,6 +39,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -90,6 +92,121 @@ class PublicBookingIntegrationTest {
         assertEquals("America/Santiago", page.timezone());
         assertEquals(1, page.services().size());
         assertEquals(fixture.service().getId(), page.services().getFirst().id());
+    }
+
+
+    @Test
+    void publicPageDefaultsCurrencyHidesInactiveServicesAndNormalizesAddress() {
+        Fixture fixture = fixture(true);
+        BusinessProfile profile = profiles.findById(fixture.business().getId()).orElseThrow();
+        profile.setDefaultCurrency(" ");
+        profile.setAddressLine("  Av. Demo 123  ");
+        profile.setCommune("Providencia");
+        profile.setCity("Providencia");
+        profile.setRegion(" ");
+        profiles.saveAndFlush(profile);
+
+        ServiceItem hidden = new ServiceItem();
+        hidden.setBusinessId(fixture.business().getId());
+        hidden.setName("Servicio oculto");
+        hidden.setDescription("No debe exponerse");
+        hidden.setDurationMinutes(30);
+        hidden.setPrice(java.math.BigDecimal.TEN);
+        hidden.setActive(false);
+        services.saveAndFlush(hidden);
+
+        var page = publicBooking.page(fixture.key());
+
+        assertEquals(1, page.services().size());
+        assertEquals("CLP", page.services().getFirst().currency());
+        assertEquals("Av. Demo 123, Providencia", page.address());
+    }
+
+    @Test
+    void availabilityRejectsMissingDateAndInactiveService() {
+        Fixture fixture = fixture(true);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> publicBooking.availability(fixture.key(), fixture.service().getId(), null));
+
+        fixture.service().setActive(false);
+        services.saveAndFlush(fixture.service());
+
+        assertThrows(
+                NotFoundException.class,
+                () -> publicBooking.availability(
+                        fixture.key(), fixture.service().getId(), futureDate()));
+    }
+
+    @Test
+    void idempotencyValidationRejectsMissingShortAndOversizedKeys() {
+        Fixture fixture = fixture(true);
+        var bookingRequest = request(
+                fixture.service().getId(),
+                publicStartAt(),
+                "Clave Inválida",
+                "+56911117777");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> publicBooking.create(fixture.key(), null, bookingRequest));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> publicBooking.create(fixture.key(), "short", bookingRequest));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> publicBooking.create(fixture.key(), "x".repeat(129), bookingRequest));
+    }
+
+    @Test
+    void blankEmailIsNormalizedAndExistingPhoneReusesTheTenantCustomer() {
+        Fixture fixture = fixture(true);
+        String phone = "+56911118888";
+
+        publicBooking.create(
+                fixture.key(),
+                "idem-customer-reuse-0001",
+                requestWithEmail(
+                        fixture.service().getId(),
+                        publicStartAt(),
+                        "Ana Reutilizada",
+                        phone,
+                        "   "));
+
+        publicBooking.create(
+                fixture.key(),
+                "idem-customer-reuse-0002",
+                requestWithEmail(
+                        fixture.service().getId(),
+                        publicStartAt().plusSeconds(1800),
+                        "Ana Reutilizada",
+                        phone,
+                        "new@example.cl"));
+
+        var tenantCustomers = customers.findAllByBusinessIdOrderByCreatedAtDesc(
+                fixture.business().getId());
+        assertEquals(1, tenantCustomers.size());
+        assertNull(tenantCustomers.getFirst().getEmail());
+        assertEquals(
+                2,
+                bookings.findAllByBusinessIdOrderByStartAtDesc(fixture.business().getId()).size());
+    }
+
+    @Test
+    void businessProfileRegeneratesPublicBookingKeyWhenPersistedWithoutOne() {
+        Business business = new Business();
+        business.setName("Key Generation Test");
+        business.setTimezone("America/Santiago");
+        business.setLanguage("es");
+        business = businesses.saveAndFlush(business);
+
+        BusinessProfile profile = new BusinessProfile();
+        profile.setBusinessId(business.getId());
+        profile.setPublicBookingKey(null);
+        profile = profiles.saveAndFlush(profile);
+
+        assertNotNull(profile.getPublicBookingKey());
     }
 
     @Test
@@ -290,13 +407,19 @@ class PublicBookingIntegrationTest {
             Instant startAt,
             String name,
             String phone) {
+        return requestWithEmail(serviceId, startAt, name, phone, "web@example.cl");
+    }
+
+    private static PublicBookingController.PublicBookingRequest requestWithEmail(
+            UUID serviceId,
+            Instant startAt,
+            String name,
+            String phone,
+            String email) {
         return new PublicBookingController.PublicBookingRequest(
                 serviceId,
                 startAt,
-                new PublicBookingController.CustomerInput(
-                        name,
-                        phone,
-                        "web@example.cl"));
+                new PublicBookingController.CustomerInput(name, phone, email));
     }
 
     private record Fixture(Business business, UUID key, ServiceItem service) {}
