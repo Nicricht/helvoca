@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "../../components/AppShell/AppShell";
+import { CustomerQuickCreate } from "../../features/agenda/CustomerQuickCreate";
 import { ConversationPanel } from "../../features/conversations";
 import {
   cancelBooking,
@@ -192,6 +193,12 @@ export function AgendaPage() {
   const canManage = permissions.length
     ? permissions.some(permission =>
         ["BOOKINGS_MANAGE", "PERM_BOOKINGS_MANAGE"].includes(permission)
+      )
+    : roles.some(role => ["BUSINESS_ADMIN", "BUSINESS_OWNER", "OPERATOR"].includes(role));
+
+  const canManageCustomers = permissions.length
+    ? permissions.some(permission =>
+        ["CUSTOMERS_MANAGE", "PERM_CUSTOMERS_MANAGE"].includes(permission)
       )
     : roles.some(role => ["BUSINESS_ADMIN", "BUSINESS_OWNER", "OPERATOR"].includes(role));
 
@@ -682,6 +689,15 @@ export function AgendaPage() {
                     ))}
                   </select>
                 </label>
+                {canManageCustomers && (
+                  <CustomerQuickCreate
+                    onCreated={async customer => {
+                      await customers.refetch();
+                      setCreateCustomerId(customer.id);
+                      setCreateAvailability("idle");
+                    }}
+                  />
+                )}
                 <label>
                   <span>Servicio</span>
                   <select

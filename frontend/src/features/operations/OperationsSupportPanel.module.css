@@ -1,0 +1,182 @@
+.panel {
+  min-width: 0;
+  margin-top: var(--rv-space-5);
+  overflow: hidden;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: var(--rv-radius-xl);
+  background: var(--rv-surface-1);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--rv-border-subtle);
+}
+
+.header h2 {
+  margin: 0;
+  color: var(--rv-text-primary);
+  font-size: 17px;
+}
+
+.header p {
+  margin: 4px 0 0;
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+}
+
+.tabs,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.tabs button,
+.actions button,
+.statusButton {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--rv-border-default);
+  border-radius: 9px;
+  color: var(--rv-text-secondary);
+  background: var(--rv-bg-canvas);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.tabs button[data-active="true"] {
+  border-color: var(--rv-accent-border);
+  color: var(--rv-accent);
+  background: var(--rv-accent-soft);
+}
+
+.body {
+  min-width: 0;
+  padding: 16px 20px 20px;
+}
+
+.requestList,
+.auditList {
+  display: grid;
+  gap: 9px;
+}
+
+.requestRow,
+.auditRow {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 12px 13px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 11px;
+  background: var(--rv-bg-canvas);
+}
+
+.requestRow {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.requestMain,
+.auditMain {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.requestMain strong,
+.auditMain strong {
+  color: var(--rv-text-primary);
+}
+
+.requestMain span,
+.auditMain span,
+.auditRow time {
+  color: var(--rv-text-tertiary);
+  font-size: 11px;
+}
+
+.requestActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status {
+  font-size: 10px;
+  font-weight: 850;
+  color: var(--rv-accent);
+}
+
+.auditFilters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(130px, .6fr) minmax(130px, .6fr) auto;
+  gap: 8px;
+  margin-bottom: 13px;
+}
+
+.auditFilters input {
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--rv-border-default);
+  border-radius: 9px;
+  color: var(--rv-text-primary);
+  background: var(--rv-bg-canvas);
+  font: inherit;
+}
+
+.empty,
+.message {
+  min-height: 80px;
+  display: grid;
+  place-items: center;
+  color: var(--rv-text-secondary);
+  text-align: center;
+  font-size: 12px;
+}
+
+.message {
+  min-height: auto;
+  justify-items: start;
+  margin: 8px 0 0;
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 11px 20px;
+  border-top: 1px solid var(--rv-border-subtle);
+}
+
+@media (max-width: 760px) {
+  .header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .auditFilters {
+    grid-template-columns: 1fr;
+  }
+  .requestRow {
+    grid-template-columns: 1fr;
+  }
+  .requestActions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabs button,
+  .actions button,
+  .statusButton,
+  .auditFilters input {
+    transition: none;
+  }
+}

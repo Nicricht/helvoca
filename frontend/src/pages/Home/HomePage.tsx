@@ -7,7 +7,6 @@ import {
   CalendarDays,
   CircleHelp,
   ClipboardList,
-  MessageSquare,
   PackageSearch,
   Phone,
   Settings,
@@ -273,7 +272,7 @@ function RecentActivity({ dashboard }: { dashboard: OperationsDashboard }) {
 function QuickActions() {
   const actions = [
     { label: "Agenda", href: "/app/agenda", icon: CalendarDays },
-    { label: "Conversaciones", href: "/app/agenda", icon: MessageSquare },
+    { label: "Operaciones", href: "/app/orders", icon: ClipboardList },
     { label: "Inventario", href: "/app/inventory", icon: PackageSearch },
     { label: "Configuración", href: "/app/settings", icon: Settings },
     { label: "Plan y consumo", href: "/app/plan", icon: WalletCards }
@@ -362,7 +361,7 @@ function SalesSummary({
             )}
             <span className={styles.salesMeta}>
               {data.paidOrders} pedidos pagados
-              {data.revenueChangePercent !== null
+              {data.revenueChangePercent != null
                 ? ` · ${data.revenueChangePercent >= 0 ? "+" : ""}${data.revenueChangePercent.toLocaleString("es-CL")}%`
                 : ""}
             </span>

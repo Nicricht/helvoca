@@ -282,7 +282,8 @@ test.describe('React Home migration', () => {
     const quick = page.getByRole('navigation', { name: 'Accesos rápidos' });
     await expect(quick).toBeVisible();
     await expect(quick.getByRole('link', { name: 'Agenda' })).toHaveAttribute('href', '/app/agenda');
-    await expect(quick.getByRole('link', { name: 'Conversaciones' })).toHaveAttribute('href', '/app/agenda');
+    await expect(quick.getByRole('link', { name: 'Operaciones' })).toHaveAttribute('href', '/app/orders');
+    await expect(quick.getByRole('link', { name: 'Conversaciones' })).toHaveCount(0);
     await expect(quick.getByRole('link', { name: 'Clientes' })).toHaveCount(0);
     await expect(quick.locator('a[href="/#bookings"]')).toHaveCount(0);
     await expect(quick.locator('a[href="/conversations.html"]')).toHaveCount(0);
@@ -307,6 +308,19 @@ test.describe('React Home migration', () => {
     expect(requests.some(request => request.url.includes('/operations/pilot-readiness'))).toBe(false);
     expect(requests.some(request => request.url.includes('/operations/pilot-metrics'))).toBe(false);
     expect(requests.some(request => request.url.includes('/operations/readiness'))).toBe(false);
+  });
+
+  test('sales summary survives nullable analytics fields omitted by backend JSON serialization', async ({ page }) => {
+    const analytics = { ...READY_ANALYTICS };
+    delete analytics.revenueChangePercent;
+
+    await bootHome(page, { analytics });
+
+    await page.goto('/app');
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Resumen de ventas' })).toBeVisible();
+    await expect(page.locator('#root')).not.toBeEmpty();
   });
 
   test('incomplete owner sees onboarding guidance instead of duplicated operational workspaces', async ({ page }) => {

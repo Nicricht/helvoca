@@ -30,14 +30,24 @@ test('release candidate captures exact-head visual evidence for every canonical 
   }
 
   for (const route of [
-    '/',
+    '/app',
+    '/app/agenda',
+    '/app/orders',
+    '/app/inventory',
+    '/app/settings',
+    '/app/plan'
+  ]) {
+    expect(rc).toContain(`'${route}'`);
+  }
+
+  for (const retiredRoute of [
     '/conversations.html',
     '/inventory.html',
     '/settings.html',
     '/account.html',
     '/simulator.html'
   ]) {
-    expect(rc).toContain(`'${route}'`);
+    expect(rc).not.toContain(`route: '${retiredRoute}'`);
   }
 });
 
