@@ -38,4 +38,20 @@ public class BusinessController {
     public BusinessProfileResponse updateProfile(@Valid @RequestBody BusinessProfileRequest request) {
         return profileService.upsert(request);
     }
+
+    @GetMapping("/public-booking")
+    @PreAuthorize("hasAnyRole('BUSINESS_OWNER','BUSINESS_ADMIN')")
+    public BusinessProfileService.PublicBookingState publicBooking() {
+        return profileService.publicBookingState();
+    }
+
+    @PutMapping("/public-booking")
+    @PreAuthorize("hasAnyRole('BUSINESS_OWNER','BUSINESS_ADMIN')")
+    public BusinessProfileService.PublicBookingState updatePublicBooking(
+            @RequestBody PublicBookingStateRequest request) {
+        if (request == null) throw new IllegalArgumentException("Public booking settings are required");
+        return profileService.updatePublicBooking(request.enabled());
+    }
+
+    public record PublicBookingStateRequest(boolean enabled) {}
 }
