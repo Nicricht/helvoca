@@ -1,6 +1,5 @@
 package cl.helvoca.operations;
 
-import cl.helvoca.booking.Booking;
 import cl.helvoca.booking.BookingRepository;
 import cl.helvoca.booking.BookingStatus;
 import cl.helvoca.business.Business;
@@ -65,10 +64,6 @@ public class OperationsDashboardService {
 
         List<CallSession> recentCalls = calls.findAllByBusinessIdAndCertificationFalseAndTelephonyProviderNot(
                 businessId, SIMULATOR_PROVIDER, PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "startedAt"))).getContent();
-        List<Booking> allBookings = bookings.findAllByBusinessIdOrderByStartAtDesc(businessId);
-        var allCustomers = customers.findAllByBusinessIdOrderByCreatedAtDesc(businessId);
-        var allRequests = requests.findAllByBusinessIdOrderByCreatedAtDesc(businessId);
-        var openQuestions = questions.findAllByBusinessIdAndStatusOrderByLastSeenAtDesc(businessId, QuestionStatus.OPEN);
 
         long callsToday = calls.countByBusinessIdAndCertificationFalseAndTelephonyProviderNotAndStartedAtGreaterThanEqualAndStartedAtLessThan(
                 businessId, SIMULATOR_PROVIDER, dayStart, dayEnd);
@@ -78,23 +73,27 @@ public class OperationsDashboardService {
                 businessId, dayStart, dayEnd, SIMULATOR_PROVIDER);
         Long callDurationSecondsToday = calls.sumDurationSecondsByBusinessAndPeriod(
                 businessId, dayStart, dayEnd, SIMULATOR_PROVIDER);
-        long bookingsToday = allBookings.stream()
-                .filter(b -> b.getStatus() != BookingStatus.CANCELLED && between(b.getCreatedAt(), dayStart, dayEnd)).count();
-        long customersToday = allCustomers.stream().filter(c -> between(c.getCreatedAt(), dayStart, dayEnd)).count();
-        long openRequests = allRequests.stream().filter(r -> r.getStatus() == RequestStatus.OPEN || r.getStatus() == RequestStatus.IN_PROGRESS).count();
+
+        long bookingsToday = bookings.countByBusinessIdAndStatusNotAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                businessId, BookingStatus.CANCELLED, dayStart, dayEnd);
+        long customersToday = customers.countByBusinessIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                businessId, dayStart, dayEnd);
+        long openRequests = requests.countByBusinessIdAndStatusIn(
+                businessId, List.of(RequestStatus.OPEN, RequestStatus.IN_PROGRESS));
+        long openQuestions = questions.countByBusinessIdAndStatus(businessId, QuestionStatus.OPEN);
+
+        var recentRequests = requests.findTop10ByBusinessIdOrderByCreatedAtDesc(businessId);
+        var recentOpenQuestions = questions.findTop10ByBusinessIdAndStatusOrderByLastSeenAtDesc(
+                businessId, QuestionStatus.OPEN);
 
         return new Dashboard(
                 business.getName(), business.getTimezone(), now.toOffsetDateTime().toString(),
                 callsToday, callDurationSecondsToday == null ? 0L : callDurationSecondsToday,
-                bookingsToday, customersToday, openRequests, openQuestions.size(), failuresToday,
+                bookingsToday, customersToday, openRequests, openQuestions, failuresToday,
                 estimatedCallCostToday == null ? BigDecimal.ZERO : estimatedCallCostToday,
                 recentCalls.stream().map(CallItem::from).toList(),
-                allRequests.stream().limit(10).map(RequestItem::from).toList(),
-                openQuestions.stream().limit(10).map(QuestionItem::from).toList());
-    }
-
-    private static boolean between(Instant value, Instant start, Instant end) {
-        return value != null && !value.isBefore(start) && value.isBefore(end);
+                recentRequests.stream().map(RequestItem::from).toList(),
+                recentOpenQuestions.stream().map(QuestionItem::from).toList());
     }
 
     public record Dashboard(

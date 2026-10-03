@@ -44,9 +44,18 @@ public class CommercialOperationsAdminService {
     @Transactional(readOnly = true)
     public List<OrderView> orders() {
         UUID businessId = tenantProvider.requireBusinessId();
-        return orders.findAllByBusinessIdOrderByCreatedAtDesc(businessId).stream()
-                .limit(100)
-                .map(this::orderView)
+        List<BusinessOrder> recentOrders = orders.findTop100ByBusinessIdOrderByCreatedAtDesc(businessId);
+        if (recentOrders.isEmpty()) return List.of();
+
+        List<UUID> orderIds = recentOrders.stream().map(BusinessOrder::getId).toList();
+        Map<UUID, List<OrderLineView>> linesByOrder = new LinkedHashMap<>();
+        for (BusinessOrderLine line : orderLines.findAllByOrderIdInOrderByCreatedAtAsc(orderIds)) {
+            linesByOrder.computeIfAbsent(line.getOrderId(), ignored -> new java.util.ArrayList<>())
+                    .add(OrderLineView.from(line));
+        }
+
+        return recentOrders.stream()
+                .map(order -> orderView(order, linesByOrder.getOrDefault(order.getId(), List.of())))
                 .toList();
     }
 
@@ -76,8 +85,7 @@ public class CommercialOperationsAdminService {
     @Transactional(readOnly = true)
     public List<DeliveryView> deliveries() {
         UUID businessId = tenantProvider.requireBusinessId();
-        return deliveries.findAllByBusinessIdOrderByCreatedAtDesc(businessId).stream()
-                .limit(100)
+        return deliveries.findTop100ByBusinessIdOrderByCreatedAtDesc(businessId).stream()
                 .map(DeliveryView::from)
                 .toList();
     }
@@ -100,8 +108,7 @@ public class CommercialOperationsAdminService {
     @Transactional(readOnly = true)
     public List<QuoteView> quotes() {
         UUID businessId = tenantProvider.requireBusinessId();
-        return quotes.findAllByBusinessIdOrderByCreatedAtDesc(businessId).stream()
-                .limit(100)
+        return quotes.findTop100ByBusinessIdOrderByCreatedAtDesc(businessId).stream()
                 .map(QuoteView::from)
                 .toList();
     }
@@ -124,8 +131,7 @@ public class CommercialOperationsAdminService {
     @Transactional(readOnly = true)
     public List<LeadView> leads() {
         UUID businessId = tenantProvider.requireBusinessId();
-        return leads.findAllByBusinessIdOrderByCreatedAtDesc(businessId).stream()
-                .limit(100)
+        return leads.findTop100ByBusinessIdOrderByCreatedAtDesc(businessId).stream()
                 .map(LeadView::from)
                 .toList();
     }
@@ -313,6 +319,10 @@ public class CommercialOperationsAdminService {
         List<OrderLineView> lines = orderLines.findAllByOrderIdOrderByCreatedAtAsc(order.getId()).stream()
                 .map(OrderLineView::from)
                 .toList();
+        return orderView(order, lines);
+    }
+
+    private OrderView orderView(BusinessOrder order, List<OrderLineView> lines) {
         return new OrderView(order.getId(), order.getOperationId(), order.getSourceReferenceId(),
                 order.getStatus(), order.getFulfillmentType(),
                 order.getContactName(), order.getContactPhone(), order.getDeliveryAddress(),
