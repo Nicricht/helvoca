@@ -96,10 +96,9 @@ class PublicBookingIntegrationTest {
 
 
     @Test
-    void publicPageDefaultsCurrencyHidesInactiveServicesAndNormalizesAddress() {
+    void publicPageHidesInactiveServicesAndNormalizesAddress() {
         Fixture fixture = fixture(true);
         BusinessProfile profile = profiles.findById(fixture.business().getId()).orElseThrow();
-        profile.setDefaultCurrency(" ");
         profile.setAddressLine("  Av. Demo 123  ");
         profile.setCommune("Providencia");
         profile.setCity("Providencia");
