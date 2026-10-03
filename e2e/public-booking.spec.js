@@ -167,10 +167,10 @@ test.describe('Public booking portal', () => {
     await page.getByLabel('Teléfono').fill('+56922222222');
 
     const submit = page.getByRole('button', { name: 'Confirmar reserva' });
-    await Promise.all([
-      submit.click(),
-      submit.click({ force: true }).catch(() => {})
-    ]);
+    await submit.evaluate(button => {
+      button.click();
+      button.click();
+    });
 
     await expect.poll(() => state.getCreateCount()).toBe(1);
   });
