@@ -401,4 +401,45 @@ test.describe('React Agenda migration', () => {
       )).toBe(true);
     }
   });
+
+test('lets an administrator activate the public booking link while operators cannot publish it', async ({ page }) => {
+  let updatePayload = null;
+  await bootAgenda(page);
+
+  await page.route('**/api/v1/bookings/public-page', async route => {
+    const request = route.request();
+    if (request.method() === 'PUT') {
+      updatePayload = request.postDataJSON();
+      return route.fulfill(json({
+        enabled: true,
+        key: '11111111-2222-4333-8444-555555555555'
+      }));
+    }
+    return route.fulfill(json({
+      enabled: false,
+      key: '11111111-2222-4333-8444-555555555555'
+    }));
+  });
+
+  await page.goto('/app/agenda');
+  await page.getByRole('button', { name: 'Reservas online' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Reservas online' });
+  await expect(dialog).toContainText('Desactivadas');
+  await dialog.getByRole('button', { name: 'Activar reservas online' }).click();
+
+  await expect.poll(() => updatePayload).toEqual({ enabled: true });
+  await expect(dialog.getByRole('textbox', { name: 'Enlace público' }))
+    .toHaveValue(/\/reservar\/\?key=11111111-2222-4333-8444-555555555555$/);
+
+  await page.close();
+});
+
+test('does not expose public booking publication controls to an operator', async ({ page }) => {
+  await bootAgenda(page, { roles: ['OPERATOR'] });
+  await page.goto('/app/agenda');
+
+  await expect(page.getByRole('button', { name: 'Reservas online' })).toHaveCount(0);
+});
+
 });
