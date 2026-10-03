@@ -12,8 +12,10 @@ import {
   getBookings,
   getCurrentUser,
   getCustomers,
+  getPublicBookingState,
   getServices,
   rescheduleBooking,
+  updatePublicBookingState,
   type Booking,
   type Customer,
   type ServiceItem
@@ -148,6 +150,11 @@ export function AgendaPage() {
 
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [publicBookingOpen, setPublicBookingOpen] = useState(false);
+  const [publicBookingLoading, setPublicBookingLoading] = useState(false);
+  const [publicBookingSaving, setPublicBookingSaving] = useState(false);
+  const [publicBookingError, setPublicBookingError] = useState<string | null>(null);
+  const [publicBookingState, setPublicBookingState] = useState<{ enabled: boolean; key?: string | null } | null>(null);
 
   const customerList = customers.data ?? [];
   const serviceList = services.data ?? [];
@@ -202,6 +209,40 @@ export function AgendaPage() {
         ["CUSTOMERS_MANAGE", "PERM_CUSTOMERS_MANAGE"].includes(permission)
       )
     : roles.some(role => ["BUSINESS_ADMIN", "BUSINESS_OWNER", "OPERATOR"].includes(role));
+
+  const canPublishPublicBooking = roles.some(role =>
+    ["BUSINESS_ADMIN", "BUSINESS_OWNER"].includes(role)
+  );
+
+  async function openPublicBookingSettings() {
+    setPublicBookingOpen(true);
+    setPublicBookingLoading(true);
+    setPublicBookingError(null);
+    try {
+      setPublicBookingState(await getPublicBookingState());
+    } catch (error) {
+      setPublicBookingError(
+        error instanceof Error ? error.message : "No pudimos cargar las reservas online."
+      );
+    } finally {
+      setPublicBookingLoading(false);
+    }
+  }
+
+  async function togglePublicBooking(enabled: boolean) {
+    if (publicBookingSaving) return;
+    setPublicBookingSaving(true);
+    setPublicBookingError(null);
+    try {
+      setPublicBookingState(await updatePublicBookingState(enabled));
+    } catch (error) {
+      setPublicBookingError(
+        error instanceof Error ? error.message : "No pudimos actualizar las reservas online."
+      );
+    } finally {
+      setPublicBookingSaving(false);
+    }
+  }
 
   function openBooking(booking: Booking) {
     setSelectedId(booking.id);
@@ -329,15 +370,26 @@ export function AgendaPage() {
             <h1>Agenda</h1>
             <p>Gestiona tus citas y reservas</p>
           </div>
-          {canManage && (
-            <button className={styles.primaryButton} type="button" onClick={() => {
-              setCreateOpen(true);
-              setActionError(null);
-              setCreateAvailability("idle");
-            }}>
-              + Nueva cita
-            </button>
-          )}
+          <div className={styles.formActions}>
+            {canPublishPublicBooking && (
+              <button
+                className={styles.secondaryButton}
+                type="button"
+                onClick={() => void openPublicBookingSettings()}
+              >
+                Reservas online
+              </button>
+            )}
+            {canManage && (
+              <button className={styles.primaryButton} type="button" onClick={() => {
+                setCreateOpen(true);
+                setActionError(null);
+                setCreateAvailability("idle");
+              }}>
+                + Nueva cita
+              </button>
+            )}
+          </div>
         </header>
 
         <section className={styles.metrics} aria-label="Resumen de Agenda">
@@ -654,6 +706,72 @@ export function AgendaPage() {
             </aside>
           )}
         </div>
+
+        {publicBookingOpen && canPublishPublicBooking && (
+          <div className={styles.modalBackdrop}>
+            <section className={styles.modal} role="dialog" aria-modal="true" aria-label="Reservas online">
+              <header className={styles.modalHeader}>
+                <div>
+                  <span className={styles.eyebrow}>AGENDA PÚBLICA</span>
+                  <h2>Reservas online</h2>
+                </div>
+                <button
+                  type="button"
+                  className={styles.closeButton}
+                  aria-label="Cerrar reservas online"
+                  onClick={() => setPublicBookingOpen(false)}
+                >
+                  ×
+                </button>
+              </header>
+
+              <div className={styles.formStack}>
+                {publicBookingLoading ? (
+                  <div className={styles.state} role="status">Cargando reservas online…</div>
+                ) : publicBookingError ? (
+                  <div className={styles.error} role="alert">{publicBookingError}</div>
+                ) : publicBookingState ? (
+                  <>
+                    <div className={styles.state}>
+                      <strong>{publicBookingState.enabled ? "Activadas" : "Desactivadas"}</strong>
+                      <span>
+                        {publicBookingState.enabled
+                          ? "Tus clientes pueden reservar desde el enlace público."
+                          : "Actívalas cuando quieras publicar un enlace para tus clientes."}
+                      </span>
+                    </div>
+
+                    {publicBookingState.key && (
+                      <label>
+                        <span>Enlace público</span>
+                        <input
+                          aria-label="Enlace público"
+                          readOnly
+                          value={window.location.origin + "/reservar/?key=" + publicBookingState.key}
+                        />
+                      </label>
+                    )}
+
+                    <div className={styles.formActions}>
+                      <button
+                        className={publicBookingState.enabled ? styles.secondaryButton : styles.primaryButton}
+                        type="button"
+                        disabled={publicBookingSaving}
+                        onClick={() => void togglePublicBooking(!publicBookingState.enabled)}
+                      >
+                        {publicBookingSaving
+                          ? "Guardando…"
+                          : publicBookingState.enabled
+                            ? "Desactivar reservas online"
+                            : "Activar reservas online"}
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            </section>
+          </div>
+        )}
 
         {createOpen && (
           <div className={styles.modalBackdrop}>
