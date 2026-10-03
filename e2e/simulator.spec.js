@@ -81,7 +81,7 @@ test('receptionist simulator keeps actions isolated and shows trace', async ({ p
   await page.goto('/simulator.html');
   await expect(page.getByText('Modo seguro')).toBeVisible();
   await expect(page.locator('.topbar > div strong')).toHaveText('NEGOCIO E2E');
-  await expect(page.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/settings.html');
+  await expect(page.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/app/settings');
   await expect(page.getByText(/no crea datos comerciales reales ni realiza llamadas telefónicas/i)).toBeVisible();
   await expect(page.getByText(/WhatsApp real/i)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Finalizar' })).toHaveAttribute('title', 'Inicia una prueba para poder finalizarla.');

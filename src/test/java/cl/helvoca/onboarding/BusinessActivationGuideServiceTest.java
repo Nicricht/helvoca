@@ -42,7 +42,7 @@ class BusinessActivationGuideServiceTest {
         assertEquals(7, result.total());
         assertEquals(1, result.completed());
         assertEquals("BUSINESS_SETUP", result.nextStep().code());
-        assertEquals("/#aiForm", result.nextStep().actionHref());
+        assertEquals("/app/settings?section=business", result.nextStep().actionHref());
         assertEquals(List.of(
                 "ACCOUNT",
                 "BUSINESS_SETUP",
@@ -115,7 +115,7 @@ class BusinessActivationGuideServiceTest {
         BusinessActivationGuideService.Guide result = service.current();
 
         assertEquals("WHATSAPP", result.nextStep().code());
-        assertEquals("/settings.html#configuration", result.nextStep().actionHref());
+        assertEquals("/app/settings?section=channels", result.nextStep().actionHref());
         assertEquals("Conectar WhatsApp", result.nextStep().actionLabel());
     }
 
