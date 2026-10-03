@@ -124,6 +124,26 @@ class PublicBookingIntegrationTest {
     }
 
     @Test
+    void arbitraryTimeOutsideAuthoritativeSlotGridIsRejected() {
+        Fixture fixture = fixture(true);
+        Instant arbitrary = futureDate()
+                .atTime(10, 15)
+                .atZone(ZoneId.of("America/Santiago"))
+                .toInstant();
+
+        assertThrows(
+                ConflictException.class,
+                () -> publicBooking.create(
+                        fixture.key(),
+                        "idem-arbitrary-slot-0001",
+                        request(
+                                fixture.service().getId(),
+                                arbitrary,
+                                "Cliente Arbitrario",
+                                "+56911116666")));
+    }
+
+    @Test
     void publicCreateIsIdempotentAndCreatesConfirmedWebBooking() {
         Fixture fixture = fixture(true);
         Instant startAt = publicStartAt();
