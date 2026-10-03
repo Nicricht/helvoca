@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -138,6 +139,22 @@ public class PublicBookingTenantService {
         ServiceItem service = services.findByIdAndBusinessId(request.serviceId(), businessId)
                 .filter(ServiceItem::isActive)
                 .orElseThrow(() -> new NotFoundException("Service not found"));
+
+        Business business = requireBusiness(businessId);
+        LocalDate requestedDate = request.startAt()
+                .atZone(ZoneId.of(business.getTimezone()))
+                .toLocalDate();
+        BusinessScheduleService.DailyAvailability offered = schedule.listAvailableSlots(
+                businessId,
+                service.getId(),
+                service.getDurationMinutes(),
+                requestedDate,
+                24);
+        boolean authoritativeSlot = offered.slots().stream()
+                .anyMatch(slot -> slot.startAt().equals(request.startAt()));
+        if (!authoritativeSlot) {
+            throw new ConflictException("El horario ya no está disponible.");
+        }
 
         advisoryLock(businessId, phone.hashCode());
         Customer customer = customers.findFirstRawByBusinessIdAndPhone(businessId, phone)
