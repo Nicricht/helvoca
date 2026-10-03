@@ -406,7 +406,7 @@ test('lets an administrator activate the public booking link while operators can
   let updatePayload = null;
   await bootAgenda(page);
 
-  await page.route('**/api/v1/bookings/public-page', async route => {
+  await page.route('**/api/v1/business/public-booking', async route => {
     const request = route.request();
     if (request.method() === 'PUT') {
       updatePayload = request.postDataJSON();
