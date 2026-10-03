@@ -20,6 +20,7 @@ import cl.helvoca.knowledge.KnowledgeItem;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.schedule.BusinessHour;
 import cl.helvoca.schedule.BusinessHourRepository;
+import cl.helvoca.security.TenantDatabaseContext;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import cl.helvoca.user.AppUser;
@@ -29,6 +30,9 @@ import cl.helvoca.user.RoleCode;
 import cl.helvoca.user.RoleRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -46,6 +50,26 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 class DevDataInitializerTest {
+
+    @Test
+    void enabledSeedUsesSystemDatabaseScopeBeforeOpeningItsTransaction() throws Exception {
+        DemoMocks f = new DemoMocks();
+        DevDataInitializer initializer = f.initializer(true);
+        TenantDatabaseContext databaseContext = spy(new TenantDatabaseContext());
+        PlatformTransactionManager transactionManager = mock(PlatformTransactionManager.class);
+        TransactionStatus transactionStatus = mock(TransactionStatus.class);
+
+        when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+                .thenReturn(transactionStatus);
+        initializer.setDatabaseExecution(databaseContext, transactionManager);
+
+        initializer.run();
+
+        verify(databaseContext).runAsSystem(any(Runnable.class));
+        verify(transactionManager).getTransaction(any(TransactionDefinition.class));
+        verify(transactionManager).commit(transactionStatus);
+        assertNotNull(f.business.get());
+    }
 
     @Test
     void createsCompleteCommercialBarbershopDemoTenantWhenEnabled() throws Exception {
