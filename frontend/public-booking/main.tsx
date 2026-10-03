@@ -249,10 +249,11 @@ function PublicBookingApp() {
       setConfirmation(result);
     } catch (reason) {
       if (reason instanceof PublicApiError && reason.status === 409) {
-        setError(reason.message || "El horario ya no está disponible. Elige otro.");
+        const conflictMessage = reason.message || "El horario ya no está disponible. Elige otro.";
         setSelectedSlot(null);
         idempotencyKey.current = null;
         await loadAvailability();
+        setError(conflictMessage);
       } else {
         setError(reason instanceof Error ? reason.message : "No pudimos crear la reserva.");
       }
