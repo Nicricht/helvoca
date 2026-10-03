@@ -33,6 +33,79 @@ class BusinessProfileServiceTest {
     }
 
     @Test
+    void publicBookingSettingsAreTenantScopedAndCreateOpaqueKeyOnEnable() {
+        UUID businessId = UUID.randomUUID();
+        BusinessProfileRepository profiles = mock(BusinessProfileRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService audit = mock(AuditService.class);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(profiles.findById(businessId)).thenReturn(Optional.empty());
+        when(profiles.saveAndFlush(any(BusinessProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BusinessProfileService service = new BusinessProfileService(profiles, tenantProvider, audit);
+
+        BusinessProfileService.PublicBookingState initial = service.publicBookingState();
+        assertFalse(initial.enabled());
+        assertNull(initial.key());
+
+        BusinessProfileService.PublicBookingState enabled = service.updatePublicBooking(true);
+        assertTrue(enabled.enabled());
+        assertNotNull(enabled.key());
+
+        verify(profiles, times(2)).findById(businessId);
+        verify(profiles).saveAndFlush(argThat(profile ->
+                businessId.equals(profile.getBusinessId())
+                        && profile.isPublicBookingEnabled()
+                        && profile.getPublicBookingKey() != null));
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("PUBLIC_BOOKING_SETTINGS_UPDATE"),
+                eq("BUSINESS_PROFILE"),
+                eq(businessId),
+                isNull(),
+                anyMap());
+    }
+
+    @Test
+    void publicBookingSettingsKeepExistingOpaqueKeyAndExposeEnabledState() {
+        UUID businessId = UUID.randomUUID();
+        UUID publicKey = UUID.randomUUID();
+        BusinessProfileRepository profiles = mock(BusinessProfileRepository.class);
+        TenantProvider tenantProvider = mock(TenantProvider.class);
+        AuditService audit = mock(AuditService.class);
+
+        BusinessProfile profile = new BusinessProfile();
+        profile.setBusinessId(businessId);
+        profile.setPublicBookingKey(publicKey);
+        profile.setPublicBookingEnabled(true);
+
+        when(tenantProvider.requireBusinessId()).thenReturn(businessId);
+        when(profiles.findById(businessId)).thenReturn(Optional.of(profile));
+        when(profiles.saveAndFlush(any(BusinessProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        BusinessProfileService service = new BusinessProfileService(profiles, tenantProvider, audit);
+
+        BusinessProfileService.PublicBookingState current = service.publicBookingState();
+        assertTrue(current.enabled());
+        assertEquals(publicKey, current.key());
+
+        BusinessProfileService.PublicBookingState disabled = service.updatePublicBooking(false);
+        assertFalse(disabled.enabled());
+        assertEquals(publicKey, disabled.key());
+
+        verify(profiles, times(2)).findById(businessId);
+        verify(profiles).saveAndFlush(same(profile));
+        verify(audit).humanSuccess(
+                eq(businessId),
+                eq("PUBLIC_BOOKING_SETTINGS_UPDATE"),
+                eq("BUSINESS_PROFILE"),
+                eq(businessId),
+                anyMap(),
+                anyMap());
+    }
+
+    @Test
     void upsertNormalizesProfileAndAuditsHumanChange() {
         UUID businessId = UUID.randomUUID();
         BusinessProfileRepository profiles = mock(BusinessProfileRepository.class);

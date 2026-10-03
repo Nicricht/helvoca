@@ -85,6 +85,18 @@ class BookingContextServiceTest {
         assertNull(result.whatsapp());
     }
 
+    @Test
+    void publicWebBookingNeverInventsCallOrWhatsappContext() {
+        Fixture f = new Fixture(BookingSource.PUBLIC_WEB);
+
+        BookingContextResponse result = f.service().get(f.bookingId);
+
+        assertEquals("WEB", result.channel());
+        assertNull(result.sourceReferenceId());
+        assertNull(result.call());
+        assertNull(result.whatsapp());
+    }
+
     private static final class Fixture {
         final UUID businessId = UUID.randomUUID();
         final UUID bookingId = UUID.randomUUID();

@@ -49,6 +49,7 @@ public class BookingContextService {
             case AI_CALL -> voiceContext(businessId, bookingId, history);
             case AI_WHATSAPP -> whatsappContext(history);
             case ADMIN -> new BookingContextResponse("MANUAL", null, null, null, history);
+            case PUBLIC_WEB -> new BookingContextResponse("WEB", null, null, null, history);
         };
     }
 

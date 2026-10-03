@@ -54,6 +54,12 @@ public class BusinessProfile {
     @Column(name = "uses_reservations")
     private Boolean usesReservations;
 
+    @Column(name = "public_booking_key", nullable = false, unique = true)
+    private UUID publicBookingKey = UUID.randomUUID();
+
+    @Column(name = "public_booking_enabled", nullable = false)
+    private boolean publicBookingEnabled = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -65,6 +71,7 @@ public class BusinessProfile {
         Instant now = Instant.now();
         createdAt = now;
         updatedAt = now;
+        if (publicBookingKey == null) publicBookingKey = UUID.randomUUID();
     }
 
     @PreUpdate
@@ -102,6 +109,10 @@ public class BusinessProfile {
     public void setSellsServices(Boolean sellsServices) { this.sellsServices = sellsServices; }
     public Boolean getUsesReservations() { return usesReservations; }
     public void setUsesReservations(Boolean usesReservations) { this.usesReservations = usesReservations; }
+    public UUID getPublicBookingKey() { return publicBookingKey; }
+    public void setPublicBookingKey(UUID publicBookingKey) { this.publicBookingKey = publicBookingKey; }
+    public boolean isPublicBookingEnabled() { return publicBookingEnabled; }
+    public void setPublicBookingEnabled(boolean publicBookingEnabled) { this.publicBookingEnabled = publicBookingEnabled; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
