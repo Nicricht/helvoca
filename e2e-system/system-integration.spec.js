@@ -232,7 +232,7 @@ test.describe('real React + Spring Boot + PostgreSQL system integration', () => 
     const publicContext = await browser.newContext({ timezoneId: 'America/Santiago' });
     const publicPage = await publicContext.newPage();
     await publicPage.goto(publicUrl);
-    await publicPage.getByRole('button', { name: new RegExp(publicService.name, 'i') }).click();
+    await publicPage.getByRole('button', { name: publicService.name, exact: false }).click();
     await publicPage.getByLabel('Fecha', { exact: true }).fill(publicDate);
     const slotButton = publicPage.locator('[aria-label="Horarios disponibles"] button').first();
     await expect(slotButton).toBeVisible();
