@@ -294,6 +294,23 @@ test('release candidate captures exact-head React visual evidence for every cano
       expect(layout.scrollWidth, `${surface.route} at ${viewport.width}px`)
         .toBeLessThanOrEqual(layout.clientWidth + 1);
 
+      await page.locator('img').evaluateAll(async images => {
+        await Promise.all(images.map(async image => {
+          if (!image.complete) {
+            await new Promise((resolve, reject) => {
+              image.addEventListener('load', resolve, { once: true });
+              image.addEventListener('error', reject, { once: true });
+            });
+          }
+          if (typeof image.decode === 'function') {
+            await image.decode();
+          }
+          if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+            throw new Error(`Image failed to decode: ${image.currentSrc || image.src}`);
+          }
+        }));
+      });
+
       await page.screenshot({
         path: path.join(evidenceDir, `${surface.name}-${viewport.width}x${viewport.height}.png`),
         fullPage: false,
