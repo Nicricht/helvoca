@@ -655,3 +655,9 @@
     transition-duration: .01ms;
   }
 }
+
+
+.routeStage {
+  min-width: 0;
+  will-change: transform, opacity;
+}
