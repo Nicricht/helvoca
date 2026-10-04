@@ -45,7 +45,7 @@ export function AppShell({ children }: PropsWithChildren) {
   return (
     <div className={styles.layout} data-react-app="recepvoz">
       <aside className={styles.sidebar} aria-label="Navegación de RecepVoz">
-        <a className={styles.brand} href="/app" aria-label="RecepVoz, ir al inicio">
+        <a className={styles.brand} href="/app" aria-label="RecepVoz">
           <span className={styles.brandMark} aria-hidden="true">
             <AudioLines size={25} />
           </span>
