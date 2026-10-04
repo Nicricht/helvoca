@@ -7,6 +7,7 @@ import {
   CalendarDays,
   CircleHelp,
   ClipboardList,
+  MessageCircle,
   PackageSearch,
   Phone,
   Settings,
@@ -94,30 +95,102 @@ function formatActivityTime(value: string, timeZone: string): string {
   }
 }
 
-function TodaySummary({ dashboard }: { dashboard: OperationsDashboard }) {
+
+function compactSalesValue(data?: SalesAnalytics): string {
+  if (!data) return "—";
+  const totals = data.currencyTotals?.length
+    ? data.currencyTotals
+    : data.primaryCurrency && data.totalRevenue !== null
+      ? [{ currency: data.primaryCurrency, amount: data.totalRevenue }]
+      : [];
+  if (totals.length === 0) return "$0";
+  if (totals.length > 1) return `${data.paidOrders} ventas`;
+  return formatMoney(totals[0].amount, totals[0].currency);
+}
+
+function HeroOverview({ dashboard }: { dashboard: OperationsDashboard }) {
+  const attentionCount =
+    dashboard.openRequests + dashboard.unansweredQuestions + dashboard.callFailuresToday;
+  const signals = [
+    { title: "Llamadas atendidas", detail: `${dashboard.callsToday} hoy`, icon: Phone, tone: "cyan" },
+    { title: "Reservas creadas", detail: `${dashboard.bookingsToday} hoy`, icon: CalendarDays, tone: "violet" },
+    {
+      title: attentionCount > 0 ? "Requiere atención" : "Todo al día",
+      detail: attentionCount > 0 ? `${attentionCount} pendientes` : "Sin pendientes críticos",
+      icon: MessageCircle,
+      tone: attentionCount > 0 ? "warning" : "emerald"
+    }
+  ] as const;
+
+  return (
+    <section className={styles.heroCard} aria-labelledby="homeHeroTitle">
+      <span className={styles.heroGlow} aria-hidden="true" />
+      <span className={styles.heroWave} aria-hidden="true" />
+
+      <div className={styles.heroCopy}>
+        <span className={styles.heroEyebrow}>TU NEGOCIO SIEMPRE CONTESTA</span>
+        <h2 id="homeHeroTitle">
+          Tu recepcionista IA está <span>atendiendo tu negocio</span>
+        </h2>
+        <p>
+          {dashboard.callsToday} llamadas hoy · {dashboard.bookingsToday} reservas · {dashboard.newCustomersToday} clientes nuevos
+        </p>
+
+        <div className={styles.heroSignals} aria-label="Resumen operativo rápido">
+          {signals.map(({ title, detail, icon: Icon, tone }) => (
+            <div key={title} className={styles.heroSignal} data-tone={tone}>
+              <span className={styles.heroSignalIcon} aria-hidden="true"><Icon size={18} /></span>
+              <span>
+                <strong>{title}</strong>
+                <small>{detail}</small>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={styles.heroVisual} aria-hidden="true">
+        <span className={styles.heroAura} />
+        <img src="/assets/home/hero-bot.webp" alt="" />
+      </div>
+    </section>
+  );
+}
+
+function TodaySummary({
+  dashboard,
+  sales,
+  salesLoading,
+  salesFailed
+}: {
+  dashboard: OperationsDashboard;
+  sales?: SalesAnalytics;
+  salesLoading: boolean;
+  salesFailed: boolean;
+}) {
   const quiet =
     dashboard.callsToday === 0 &&
     dashboard.bookingsToday === 0 &&
     dashboard.newCustomersToday === 0;
 
   const items = [
-    { label: "Llamadas", value: dashboard.callsToday, icon: Phone, tone: "cyan" },
-    { label: "Reservas", value: dashboard.bookingsToday, icon: CalendarDays, tone: "violet" },
-    { label: "Clientes nuevos", value: dashboard.newCustomersToday, icon: Users, tone: "emerald" }
+    { label: "Llamadas hoy", value: String(dashboard.callsToday), icon: Phone, tone: "cyan", meta: "Actividad de hoy" },
+    { label: "Reservas", value: String(dashboard.bookingsToday), icon: CalendarDays, tone: "violet", meta: "Actividad de hoy" },
+    { label: "Clientes nuevos", value: String(dashboard.newCustomersToday), icon: Users, tone: "emerald", meta: "Actividad de hoy" },
+    {
+      label: "Ventas confirmadas",
+      value: salesLoading ? "…" : salesFailed ? "—" : compactSalesValue(sales),
+      icon: ShoppingCart,
+      tone: "green",
+      meta: salesFailed ? "No disponible" : "Últimos 7 días"
+    }
   ] as const;
 
   return (
-    <section className={styles.sectionBlock} aria-labelledby="homeTodayTitle">
-      <div className={styles.sectionTitleRow}>
-        <div>
-          <span className={styles.kicker}>HOY</span>
-          <h2 id="homeTodayTitle">Qué está pasando hoy</h2>
-        </div>
-        <span className={styles.livePill}><span aria-hidden="true" /> En vivo</span>
-      </div>
-
+    <section className={styles.todaySection} aria-labelledby="homeTodayTitle">
+      <h2 id="homeTodayTitle" className={styles.srOnly}>Qué está pasando hoy</h2>
       <div className={styles.summaryGrid}>
-        {items.map(({ label, value, icon: Icon, tone }, index) => (
+        {items.map(({ label, value, icon: Icon, tone, meta }, index) => (
           <motion.article
             key={label}
             className={styles.metricCard}
@@ -126,14 +199,18 @@ function TodaySummary({ dashboard }: { dashboard: OperationsDashboard }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: .26, delay: index * .045 }}
           >
-            <span className={styles.metricIcon} aria-hidden="true"><Icon size={19} /></span>
-            <span className={styles.metricValue}>{value}</span>
-            <span className={styles.metricLabel}>{label}</span>
-            <span className={styles.metricTrace} aria-hidden="true" />
+            <span className={styles.metricIcon} aria-hidden="true"><Icon size={20} /></span>
+            <span className={styles.metricCopy}>
+              <small>{label}</small>
+              <strong>{value}</strong>
+              <em>{meta}</em>
+            </span>
+            <span className={styles.metricBars} aria-hidden="true">
+              <i /><i /><i /><i /><i /><i />
+            </span>
           </motion.article>
         ))}
       </div>
-
       {quiet && <p className={styles.emptyHint}>Todavía no hay actividad registrada hoy.</p>}
     </section>
   );
@@ -269,36 +346,81 @@ function RecentActivity({ dashboard }: { dashboard: OperationsDashboard }) {
   );
 }
 
+
 function QuickActions() {
   const actions = [
-    { label: "Agenda", href: "/app/agenda", icon: CalendarDays },
-    { label: "Operaciones", href: "/app/orders", icon: ClipboardList },
-    { label: "Inventario", href: "/app/inventory", icon: PackageSearch },
-    { label: "Configuración", href: "/app/settings", icon: Settings },
-    { label: "Plan y consumo", href: "/app/plan", icon: WalletCards }
-  ];
+    {
+      ariaLabel: "Agenda",
+      title: "Nueva cita",
+      detail: "Crea una reserva manualmente",
+      href: "/app/agenda",
+      icon: CalendarDays,
+      art: "/assets/home/agenda.webp",
+      tone: "violet"
+    },
+    {
+      ariaLabel: "Operaciones",
+      title: "Ver pedidos",
+      detail: "Revisa y gestiona pedidos",
+      href: "/app/orders",
+      icon: ShoppingCart,
+      art: "/assets/home/orders.webp",
+      tone: "green"
+    },
+    {
+      ariaLabel: "Inventario",
+      title: "Gestionar stock",
+      detail: "Actualiza tu inventario",
+      href: "/app/inventory",
+      icon: PackageSearch,
+      art: "/assets/home/inventory.webp",
+      tone: "cyan"
+    },
+    {
+      ariaLabel: "Configuración",
+      title: "Configurar IA",
+      detail: "Ajusta información de tu negocio",
+      href: "/app/settings",
+      icon: Settings,
+      art: "/assets/home/automation.webp",
+      tone: "blue"
+    },
+    {
+      ariaLabel: "Plan y consumo",
+      title: "Plan y consumo",
+      detail: "Revisa uso y límites",
+      href: "/app/plan",
+      icon: WalletCards,
+      art: null,
+      tone: "violet"
+    }
+  ] as const;
 
   return (
     <nav className={styles.quickSection} aria-label="Accesos rápidos">
-      <div className={styles.sectionTitleRow}>
-        <div>
-          <span className={styles.kicker}>ATAJOS</span>
-          <h2>Accesos rápidos</h2>
-        </div>
-      </div>
+      <h2 className={styles.srOnly}>Accesos rápidos</h2>
       <div className={styles.quickGrid}>
-        {actions.map(({ label, href, icon: Icon }, index) => (
+        {actions.map(({ ariaLabel, title, detail, href, icon: Icon, art, tone }) => (
           <motion.a
-            key={label}
+            key={ariaLabel}
             className={styles.quickAction}
+            data-tone={tone}
             href={href}
+            aria-label={ariaLabel}
             whileHover={{ y: -3 }}
             whileTap={{ scale: .985 }}
             transition={{ duration: .16 }}
           >
-            <span className={styles.quickIcon} aria-hidden="true"><Icon size={19} /></span>
-            <span>{label}</span>
-            <ArrowUpRight size={15} aria-hidden="true" />
+            {art ? (
+              <img className={styles.quickArt} src={art} alt="" aria-hidden="true" />
+            ) : (
+              <span className={styles.quickIcon} aria-hidden="true"><Icon size={20} /></span>
+            )}
+            <span className={styles.quickCopy}>
+              <strong>{title}</strong>
+              <small>{detail}</small>
+            </span>
+            <ArrowUpRight size={16} aria-hidden="true" />
           </motion.a>
         ))}
       </div>
@@ -507,7 +629,6 @@ export function HomePage() {
           <div>
             <p className="eyebrow">OPERACIÓN</p>
             <h1>Inicio</h1>
-            <p>Lo importante de tu negocio, en una sola mirada.</p>
           </div>
           <div className={styles.headerBadge}>
             <span aria-hidden="true" />
@@ -540,7 +661,14 @@ export function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: reduceMotion ? 0 : .24 }}
           >
-            <TodaySummary dashboard={operationsQuery.data} />
+            <HeroOverview dashboard={operationsQuery.data} />
+
+            <TodaySummary
+              dashboard={operationsQuery.data}
+              sales={salesQuery.data}
+              salesLoading={salesQuery.isPending}
+              salesFailed={salesQuery.isError}
+            />
 
             <div className={styles.mainGrid}>
               <AttentionPanel dashboard={operationsQuery.data} />
