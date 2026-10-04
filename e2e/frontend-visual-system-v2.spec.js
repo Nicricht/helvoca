@@ -39,11 +39,11 @@ test.describe('RecepVoz visual system v2 contract', () => {
   test('every principal screen declares its approved v2 visual identity', async () => {
     const screens = [
       ['frontend/src/pages/Home/HomePage.tsx', 'data-visual-page="home"'],
-      ['frontend/src/pages/Agenda/AgendaPage.tsx', 'data-visual-page="agenda"', '/assets/recepvoz/v2/agenda/hero-calendar-robot.webp'],
-      ['frontend/src/pages/Orders/OrdersPage.tsx', 'data-visual-page="operations"', '/assets/recepvoz/v2/operations/hero-order-robot.webp'],
-      ['frontend/src/pages/Inventory/InventoryPage.tsx', 'data-visual-page="inventory"', '/assets/recepvoz/v2/inventory/hero-stock-robot.webp'],
-      ['frontend/src/pages/Settings/SettingsPage.tsx', 'data-visual-page="settings"', '/assets/recepvoz/v2/settings/hero-ai-settings.webp'],
-      ['frontend/src/pages/PlanConsumption/PlanConsumptionPage.tsx', 'data-visual-page="plan"', '/assets/recepvoz/v2/plan/hero-usage-robot.webp']
+      ['frontend/src/pages/Agenda/AgendaPage.tsx', 'data-visual-page="agenda"', '/app/assets/recepvoz/v2/agenda/hero-calendar-robot.webp'],
+      ['frontend/src/pages/Orders/OrdersPage.tsx', 'data-visual-page="operations"', '/app/assets/recepvoz/v2/operations/hero-order-robot.webp'],
+      ['frontend/src/pages/Inventory/InventoryPage.tsx', 'data-visual-page="inventory"', '/app/assets/recepvoz/v2/inventory/hero-stock-robot.webp'],
+      ['frontend/src/pages/Settings/SettingsPage.tsx', 'data-visual-page="settings"', '/app/assets/recepvoz/v2/settings/hero-ai-settings.webp'],
+      ['frontend/src/pages/PlanConsumption/PlanConsumptionPage.tsx', 'data-visual-page="plan"', '/app/assets/recepvoz/v2/plan/hero-usage-robot.webp']
     ];
 
     for (const [path, ...needles] of screens) {
