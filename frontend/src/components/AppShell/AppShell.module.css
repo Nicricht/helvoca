@@ -501,6 +501,22 @@
   filter: drop-shadow(0 0 6px rgba(76, 231, 203, .38));
 }
 
+
+
+.mobileLogout {
+  display: none;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid rgba(74, 145, 194, .18);
+  border-radius: 10px;
+  color: #abc0cf;
+  background: rgba(6, 29, 47, .66);
+  font-size: 10px;
+  font-weight: 760;
+}
+
 @keyframes shellActivePulse {
   0% { transform: scale(.86); opacity: .55; }
   45% { transform: scale(1); opacity: 1; }
@@ -584,11 +600,16 @@
   }
 
   .ambient {
-    inset-left: 0;
+    inset: 0;
   }
 
   .topbarInner {
     width: calc(100% - 40px);
+    justify-content: space-between;
+  }
+
+  .mobileLogout {
+    display: inline-flex;
   }
 }
 
