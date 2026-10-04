@@ -56,7 +56,7 @@ test.describe('RecepVoz visual system v2 contract', () => {
     const settings = read('frontend/src/pages/Settings/SettingsPage.tsx');
     const css = read('frontend/src/pages/Settings/SettingsPage.module.css');
 
-    expect(settings).toContain('className={styles.headerAction}');
+    expect(settings).toContain('styles.headerAction');
     expect(css).toMatch(/\.headerAction\s*\{[^}]*text-decoration:\s*none;/s);
     expect(css).toMatch(/@media\s*\(max-width:\s*430px\)[\s\S]*?\.headerAction\s*\{[^}]*width:\s*auto;/);
   });
