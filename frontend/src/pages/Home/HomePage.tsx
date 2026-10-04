@@ -405,8 +405,8 @@ function AttentionPanel({ dashboard }: { dashboard: OperationsDashboard }) {
         <div className={styles.calmState}>
           <Sparkles size={20} aria-hidden="true" />
           <div>
-            <strong>No necesitas hacer nada ahora</strong>
-            <span>RecepVoz puede seguir trabajando solo.</span>
+            <strong>Todo bajo control</strong>
+            <span>No necesitas hacer nada ahora. RecepVoz puede seguir trabajando solo.</span>
           </div>
         </div>
       ) : (
