@@ -474,7 +474,7 @@ export function SettingsPage() {
               <ShieldCheck size={15} aria-hidden="true" />
               {readiness}
             </span>
-            <a className="button secondary" href="/business-import.html">
+            <a className={`button secondary ${styles.headerAction}`} href="/business-import.html">
               <CloudUpload size={16} aria-hidden="true" />
               Importar o actualizar
             </a>
