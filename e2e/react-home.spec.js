@@ -256,6 +256,12 @@ test.describe('React Home migration', () => {
 
     await expect(page).toHaveURL(/\/app\/?$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inicio' })).toHaveAttribute('aria-current', 'page');
+
+    const hero = page.getByRole('region', { name: 'RecepVoz trabajando' });
+    await expect(hero).toBeVisible();
+    await expect(hero.getByRole('heading', { name: /tu recepcionista ia está atendiendo tu negocio/i })).toBeVisible();
+    await expect(hero).toContainText(/conversaciones en curso/i);
 
     const today = page.getByRole('region', { name: 'Qué está pasando hoy' });
     await expect(today).toBeVisible();

@@ -94,6 +94,76 @@ function formatActivityTime(value: string, timeZone: string): string {
   }
 }
 
+function LiveHero({ dashboard }: { dashboard: OperationsDashboard }) {
+  const activeConversations = dashboard.recentCalls.filter(
+    call => call.status === "IN_PROGRESS"
+  ).length;
+
+  const signals = [
+    {
+      label: "Llamadas hoy",
+      value: dashboard.callsToday,
+      detail: dashboard.callsToday === 1 ? "atención registrada" : "atenciones registradas",
+      icon: Phone,
+      tone: "cyan"
+    },
+    {
+      label: "Reservas",
+      value: dashboard.bookingsToday,
+      detail: "gestionadas hoy",
+      icon: CalendarDays,
+      tone: "violet"
+    },
+    {
+      label: "Por revisar",
+      value: dashboard.unansweredQuestions,
+      detail: "preguntas sin respuesta",
+      icon: CircleHelp,
+      tone: "emerald"
+    }
+  ] as const;
+
+  return (
+    <section className={styles.hero} aria-label="RecepVoz trabajando">
+      <div className={styles.heroGlow} aria-hidden="true" />
+      <div className={styles.heroCopy}>
+        <span className={styles.heroKicker}>TU NEGOCIO SIEMPRE CONTESTA</span>
+        <h2>
+          Tu recepcionista IA
+          <span> está atendiendo tu negocio</span>
+        </h2>
+        <p className={styles.heroStatus}>
+          {activeConversations} conversaciones en curso
+          <span aria-hidden="true"> · </span>
+          {dashboard.bookingsToday} reservas hoy
+          <span aria-hidden="true"> · </span>
+          {dashboard.openRequests} solicitudes necesitan atención
+        </p>
+
+        <div className={styles.heroSignals}>
+          {signals.map(({ label, value, detail, icon: Icon, tone }) => (
+            <div key={label} className={styles.heroSignal} data-tone={tone}>
+              <span className={styles.heroSignalIcon} aria-hidden="true">
+                <Icon size={18} />
+              </span>
+              <div>
+                <strong>{value}</strong>
+                <span>{label}</span>
+                <small>{detail}</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={styles.heroVisual} aria-hidden="true">
+        <span className={styles.heroLive}><i /> En vivo</span>
+        <img src="/assets/recepvoz-home-assistant.png" alt="" />
+      </div>
+    </section>
+  );
+}
+
 function TodaySummary({ dashboard }: { dashboard: OperationsDashboard }) {
   const quiet =
     dashboard.callsToday === 0 &&
@@ -540,6 +610,7 @@ export function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: reduceMotion ? 0 : .24 }}
           >
+            <LiveHero dashboard={operationsQuery.data} />
             <TodaySummary dashboard={operationsQuery.data} />
 
             <div className={styles.mainGrid}>

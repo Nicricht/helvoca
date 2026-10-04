@@ -27,16 +27,15 @@ export function AppShell({ children }: PropsWithChildren) {
     window.location.assign("/");
   }
 
-  function isCurrentNavigation(label: string): boolean {
-    if (label === "Inicio") return location.pathname === "/";
-    if (label === "Agenda") return location.pathname.startsWith("/agenda");
-    if (label === "Operaciones") return location.pathname.startsWith("/orders");
-    if (label === "Inventario") return location.pathname.startsWith("/inventory");
-    if (label === "Configuración") return location.pathname.startsWith("/settings");
-    return false;
+  function isCurrentNavigation(href: string): boolean {
+    if (href === "/app") {
+      return location.pathname === "/app" || location.pathname === "/app/";
+    }
+    return location.pathname === href || location.pathname.startsWith(`${href}/`);
   }
 
-  const planIsCurrent = location.pathname.startsWith("/plan");
+  const planIsCurrent =
+    location.pathname === "/app/plan" || location.pathname.startsWith("/app/plan/");
 
   return (
     <div className={styles.layout} data-react-app="recepvoz">
@@ -48,7 +47,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
         <nav className={styles.nav} aria-label="Navegación principal">
           {navigation.map(({ href, label, icon: Icon }) => {
-            const current = isCurrentNavigation(label);
+            const current = isCurrentNavigation(href);
             return (
               <a
                 key={label}
