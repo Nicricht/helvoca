@@ -1220,3 +1220,481 @@
     transition: none;
   }
 }
+
+
+/* Mockup-aligned operational cockpit composition */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.header > div:first-child > p:last-child {
+  display: none;
+}
+
+.headerBadge {
+  min-height: 38px;
+  padding-inline: 15px;
+  border-color: rgba(35, 217, 190, .34);
+  color: #27edc4;
+  background: rgba(3, 38, 45, .72);
+  box-shadow: inset 0 0 24px rgba(27, 229, 202, .035);
+}
+
+.hero {
+  min-height: 292px;
+  grid-template-columns: minmax(0, 1.18fr) minmax(360px, .82fr);
+  gap: 10px;
+  margin-top: 12px;
+  padding: 22px 20px 18px 30px;
+  border-color: rgba(46, 152, 230, .36);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 78% 24%, rgba(34, 131, 255, .2), transparent 29%),
+    radial-gradient(circle at 88% 78%, rgba(112, 67, 255, .15), transparent 34%),
+    linear-gradient(112deg, rgba(4, 28, 47, .99), rgba(5, 29, 50, .98) 48%, rgba(8, 20, 57, .98));
+  box-shadow:
+    0 20px 54px rgba(0, 5, 18, .25),
+    inset 0 1px 0 rgba(114, 216, 255, .035);
+}
+
+.hero::before,
+.hero::after {
+  left: 39%;
+}
+
+.heroGlow {
+  width: 500px;
+  height: 500px;
+  right: -70px;
+  top: -180px;
+  opacity: .85;
+}
+
+.heroKicker {
+  min-height: 28px;
+  padding-inline: 11px;
+  border-color: rgba(25, 220, 247, .48);
+  color: #47edff;
+  background: rgba(3, 65, 91, .32);
+}
+
+.heroCopy h2 {
+  max-width: 660px;
+  margin-top: 12px;
+  font-size: clamp(33px, 3.7vw, 49px);
+  line-height: 1.01;
+}
+
+.heroCopy h2 span {
+  color: #27cceb;
+  text-shadow: 0 0 22px rgba(26, 216, 246, .13);
+}
+
+.heroStatus {
+  margin-top: 11px;
+  color: #bdd4e5;
+}
+
+.heroSignals {
+  max-width: 760px;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.heroSignal {
+  min-height: 66px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: rgba(4, 25, 43, .72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .018);
+}
+
+.heroSignalIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.heroSignal strong {
+  font-size: 15px;
+}
+
+.heroSignal span {
+  margin-top: 2px;
+  font-size: 10px;
+}
+
+.heroSignal small {
+  margin-top: 1px;
+  font-size: 8px;
+}
+
+.heroVisual {
+  min-height: 250px;
+  align-self: stretch;
+}
+
+.heroVisual::before {
+  width: min(440px, 100%);
+}
+
+.heroVisual img {
+  width: min(520px, 118%);
+  max-width: none;
+  max-height: 310px;
+  transform-origin: 50% 52%;
+  filter:
+    drop-shadow(0 20px 38px rgba(0, 0, 0, .31))
+    drop-shadow(0 0 20px rgba(34, 203, 255, .08));
+}
+
+.heroLive {
+  top: 10px;
+  right: 4px;
+  border-color: rgba(34, 233, 189, .32);
+  color: #58efc8;
+  background: rgba(3, 42, 48, .7);
+}
+
+.sectionBlock {
+  margin-top: 11px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.summaryGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 11px;
+  margin-top: 0;
+}
+
+.metricCard {
+  min-height: 104px;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-color: rgba(63, 137, 193, .26);
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--tone) 12%, transparent), transparent 34%),
+    linear-gradient(145deg, rgba(9, 34, 53, .97), rgba(7, 25, 43, .98));
+  box-shadow:
+    0 10px 24px rgba(0, 7, 20, .13),
+    inset 0 1px 0 rgba(255, 255, 255, .016);
+}
+
+.metricCard[data-tone="sales"] {
+  --tone: #38e58d;
+}
+
+.metricIcon {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+}
+
+.metricCopy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.metricLabel {
+  margin-top: 0;
+  color: #bed1df;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.metricValue {
+  margin-top: 5px;
+  font-size: clamp(25px, 2.7vw, 34px);
+  line-height: .95;
+}
+
+.metricMeta,
+.metricOrigin {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: #7d9aaf;
+  font-size: 8px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metricOrigin {
+  color: #5e8298;
+}
+
+.metricTrace {
+  right: 12px;
+  bottom: 8px;
+  left: 12px;
+  opacity: .38;
+}
+
+.salesMetric {
+  display: contents;
+}
+
+.metricCurrencyStack {
+  display: grid;
+  gap: 1px;
+  margin-top: 5px;
+}
+
+.metricCurrencyStack strong {
+  color: #f6fbff;
+  font-size: clamp(15px, 1.7vw, 20px);
+  line-height: 1.1;
+  letter-spacing: -.03em;
+}
+
+.metricCurrencyStack small {
+  color: #57e2ae;
+  font-size: 7px;
+  letter-spacing: .06em;
+}
+
+.metricError {
+  display: block;
+  margin-top: 8px;
+  color: #ffbd55;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.mainGrid {
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+  gap: 11px;
+  margin-top: 11px;
+}
+
+.panel {
+  padding: 16px 17px;
+  border-color: rgba(62, 137, 192, .22);
+  border-radius: 16px;
+  background:
+    linear-gradient(150deg, rgba(8, 30, 48, .97), rgba(5, 23, 39, .98));
+}
+
+.panelHeading h2 {
+  font-size: 17px;
+}
+
+.attentionList,
+.activityList {
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.attentionItem {
+  min-height: 61px;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 11px;
+}
+
+.attentionIcon {
+  width: 32px;
+  height: 32px;
+}
+
+.attentionItem strong,
+.activityCopy strong {
+  font-size: 11px;
+}
+
+.attentionItem span:not(.attentionIcon),
+.activityCopy span {
+  font-size: 9px;
+}
+
+.activityItem {
+  min-height: 50px;
+  grid-template-columns: 31px minmax(0, 1fr) auto;
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: 10px;
+}
+
+.activityIcon {
+  width: 30px;
+  height: 30px;
+}
+
+.activityItem time {
+  font-size: 8px;
+}
+
+.quickSection {
+  margin-top: 11px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.quickGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 11px;
+  margin-top: 0;
+}
+
+.quickAction {
+  min-height: 72px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 8px 11px 8px 8px;
+  border-color: rgba(62, 140, 199, .3);
+  border-radius: 13px;
+  background:
+    linear-gradient(145deg, rgba(8, 33, 52, .97), rgba(6, 25, 43, .98));
+}
+
+.quickAction:hover,
+.quickAction:focus-visible {
+  border-color: rgba(35, 205, 240, .48);
+  background:
+    radial-gradient(circle at 10% 50%, rgba(27, 164, 255, .1), transparent 34%),
+    linear-gradient(145deg, rgba(9, 40, 62, .98), rgba(8, 27, 48, .98));
+  box-shadow: 0 12px 28px rgba(0, 9, 26, .2);
+}
+
+.quickArt {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+}
+
+.quickArt img {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  filter: drop-shadow(0 7px 10px rgba(0, 4, 24, .28));
+}
+
+.quickCopy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.quickCopy strong {
+  overflow: hidden;
+  color: #f3f9fd;
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quickCopy small {
+  overflow: hidden;
+  color: #8ca6ba;
+  font-size: 8px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quickAction > svg {
+  color: #9eb7c8;
+}
+
+.emptyHint {
+  margin: 8px 2px 0;
+  font-size: 10px;
+}
+
+@media (max-width: 1180px) {
+  .hero {
+    grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
+  }
+
+  .heroCopy h2 {
+    font-size: clamp(31px, 4vw, 43px);
+  }
+
+  .summaryGrid,
+  .quickGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .hero {
+    grid-template-columns: minmax(0, 1.1fr) minmax(260px, .9fr);
+    padding: 22px;
+  }
+
+  .heroSignals {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .heroVisual img {
+    width: min(430px, 118%);
+  }
+
+  .mainGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .hero {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .heroCopy h2 {
+    max-width: 100%;
+  }
+
+  .heroSignals {
+    grid-template-columns: 1fr;
+  }
+
+  .heroVisual {
+    min-height: 210px;
+  }
+
+  .heroVisual img {
+    width: min(390px, 108vw);
+    max-height: 230px;
+  }
+
+  .summaryGrid,
+  .quickGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .metricCard {
+    min-height: 94px;
+  }
+
+  .quickAction {
+    min-height: 68px;
+  }
+}
