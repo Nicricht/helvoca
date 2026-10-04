@@ -1,12 +1,15 @@
 import type { PropsWithChildren } from "react";
 import { useLocation } from "react-router-dom";
 import {
+  AudioLines,
   CalendarDays,
+  ChevronRight,
+  Crown,
   LayoutDashboard,
+  LogOut,
   PackageSearch,
   Settings,
-  ShoppingBag,
-  WalletCards
+  ShoppingBag
 } from "lucide-react";
 import { clearAccessToken } from "../../api/client";
 import styles from "./AppShell.module.css";
@@ -41,8 +44,13 @@ export function AppShell({ children }: PropsWithChildren) {
     <div className={styles.layout} data-react-app="recepvoz">
       <aside className={styles.sidebar} aria-label="Navegación de RecepVoz">
         <a className={styles.brand} href="/app" aria-label="RecepVoz, ir al inicio">
-          <span className={styles.brandMark} aria-hidden="true">R</span>
-          <span>RECEPVOZ</span>
+          <span className={styles.brandMark} aria-hidden="true">
+            <AudioLines size={25} />
+          </span>
+          <span className={styles.brandCopy}>
+            <strong>Recep<span>Voz</span></strong>
+            <small>Tu recepcionista IA</small>
+          </span>
         </a>
 
         <nav className={styles.nav} aria-label="Navegación principal">
@@ -55,30 +63,43 @@ export function AppShell({ children }: PropsWithChildren) {
                 data-current={current ? "true" : undefined}
                 aria-current={current ? "page" : undefined}
               >
-                <Icon size={18} aria-hidden="true" />
+                <Icon size={19} aria-hidden="true" />
                 <span>{label}</span>
               </a>
             );
           })}
+        </nav>
+
+        <div className={styles.sidebarMeta}>
           <a
-            className={styles.accountLink}
+            className={styles.planCard}
             href="/app/plan"
             data-current={planIsCurrent ? "true" : undefined}
             aria-current={planIsCurrent ? "page" : undefined}
+            aria-label="Plan y consumo"
           >
-            <WalletCards size={18} aria-hidden="true" />
-            <span>Plan y consumo</span>
+            <span className={styles.planIcon} aria-hidden="true"><Crown size={18} /></span>
+            <span className={styles.planCopy}>
+              <strong>Plan y consumo</strong>
+              <small>Uso, minutos y facturación</small>
+            </span>
+            <ChevronRight size={16} aria-hidden="true" />
           </a>
-        </nav>
+
+          <button className={styles.accountCard} type="button" onClick={logout}>
+            <span className={styles.avatar} aria-hidden="true">R</span>
+            <span className={styles.accountCopy}>
+              <strong>Mi cuenta</strong>
+              <small>Cerrar sesión</small>
+            </span>
+            <LogOut size={16} aria-hidden="true" />
+          </button>
+        </div>
       </aside>
 
       <div className={styles.main}>
         <header className="rv-frame-topbar">
-          <div className={styles.topbarInner}>
-            <button className={`button ghost ${styles.logout}`} type="button" onClick={logout}>
-              Salir
-            </button>
-          </div>
+          <div className={styles.topbarInner} aria-hidden="true" />
         </header>
         {children}
       </div>
