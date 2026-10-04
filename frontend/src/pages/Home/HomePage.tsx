@@ -165,7 +165,7 @@ function HeroOverview({ dashboard }: { dashboard: OperationsDashboard }) {
       <div className={styles.heroCopy}>
         <span className={styles.heroStatus} data-tone={pending > 0 ? "attention" : "calm"}>
           <i aria-hidden="true" />
-          {pending > 0 ? pending + " asuntos necesitan tu atención" : "Todo bajo control"}
+          {pending > 0 ? "Necesita tu atención · " + pending + " asuntos" : "Todo bajo control"}
         </span>
 
         <h2>Tu negocio está siendo atendido.</h2>
@@ -293,7 +293,7 @@ function ValueGenerated({
           </div>
 
           <p className={styles.valueNote}>
-            Atribución por origen registrado en RecepVoz. No representa utilidad neta ni retorno de inversión.
+            Atribución por origen registrado en RecepVoz. No representa utilidad neta ni rentabilidad garantizada.
           </p>
         </div>
       ) : null}
