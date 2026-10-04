@@ -153,6 +153,10 @@ export function AppShell({ children }: PropsWithChildren) {
               <Sparkles size={14} aria-hidden="true" />
               <span>RecepVoz está trabajando</span>
             </div>
+            <button className={styles.mobileLogout} type="button" onClick={logout} aria-label="Salir">
+              <LogOut size={16} aria-hidden="true" />
+              <span>Salir</span>
+            </button>
           </div>
         </header>
         {children}
