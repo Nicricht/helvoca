@@ -9,7 +9,8 @@ import {
   LogOut,
   PackageSearch,
   Settings,
-  ShoppingBag
+  ShoppingBag,
+  WalletCards
 } from "lucide-react";
 import { clearAccessToken } from "../../api/client";
 import styles from "./AppShell.module.css";
@@ -19,7 +20,8 @@ const navigation = [
   { href: "/app/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/app/orders", label: "Operaciones", icon: ShoppingBag },
   { href: "/app/inventory", label: "Inventario", icon: PackageSearch },
-  { href: "/app/settings", label: "Configuración", icon: Settings }
+  { href: "/app/settings", label: "Configuración", icon: Settings },
+  { href: "/app/plan", label: "Plan y consumo", icon: WalletCards }
 ];
 
 export function AppShell({ children }: PropsWithChildren) {
@@ -76,12 +78,12 @@ export function AppShell({ children }: PropsWithChildren) {
             href="/app/plan"
             data-current={planIsCurrent ? "true" : undefined}
             aria-current={planIsCurrent ? "page" : undefined}
-            aria-label="Plan y consumo"
+            aria-label="Gestionar plan"
           >
             <span className={styles.planIcon} aria-hidden="true"><Crown size={18} /></span>
             <span className={styles.planCopy}>
-              <strong>Plan y consumo</strong>
-              <small>Uso, minutos y facturación</small>
+              <strong>Tu plan</strong>
+              <small>Minutos IA y facturación</small>
             </span>
             <ChevronRight size={16} aria-hidden="true" />
           </a>
