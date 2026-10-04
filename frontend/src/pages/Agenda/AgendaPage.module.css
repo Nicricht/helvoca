@@ -616,3 +616,412 @@
     transition: none;
   }
 }
+
+
+/* === Visual System v2: Agenda ========================================== */
+.page {
+  position: relative;
+  width: min(var(--rv-frame-content-max), calc(100% - (var(--rv-frame-gutter-desktop) * 2)));
+  margin-inline: auto;
+  padding: 28px 0 58px;
+  isolation: isolate;
+}
+
+.pageHeader {
+  margin-bottom: 16px;
+}
+
+.visualHero {
+  position: relative;
+  min-height: 300px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, .92fr);
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 14px;
+  padding: clamp(26px, 3vw, 42px);
+  overflow: hidden;
+  border: 1px solid rgba(78, 155, 217, .28);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 79% 38%, rgba(28, 207, 255, .15), transparent 29%),
+    radial-gradient(circle at 92% 82%, rgba(139, 92, 246, .14), transparent 32%),
+    linear-gradient(118deg, rgba(6, 31, 52, .98), rgba(7, 29, 52, .96) 50%, rgba(12, 23, 64, .95));
+  box-shadow:
+    0 24px 62px rgba(0, 5, 20, .18),
+    inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+.visualHero::before,
+.visualHero::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.visualHero::before {
+  width: 82%;
+  height: 1px;
+  right: -10%;
+  top: 52%;
+  background: linear-gradient(90deg, transparent, rgba(36, 220, 255, .40), rgba(129, 80, 255, .28), transparent);
+  box-shadow: 0 0 26px rgba(36, 220, 255, .13);
+  transform: rotate(-7deg);
+  animation: agendaWave 8s ease-in-out infinite alternate;
+}
+
+.visualHero::after {
+  width: 360px;
+  height: 360px;
+  right: 5%;
+  top: 50%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(27, 219, 255, .13), rgba(85, 78, 255, .06) 48%, transparent 70%);
+  transform: translateY(-50%);
+  filter: blur(7px);
+  animation: agendaBreathe 5.8s ease-in-out infinite;
+}
+
+.visualHeroCopy {
+  position: relative;
+  z-index: 3;
+  max-width: 690px;
+}
+
+.visualHeroKicker {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 11px;
+  border: 1px solid rgba(53, 224, 247, .28);
+  border-radius: 99px;
+  color: #6decff;
+  background: rgba(5, 65, 86, .31);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .13em;
+}
+
+.visualHeroCopy h2 {
+  max-width: 720px;
+  margin: 13px 0 0;
+  color: #f5fbff;
+  font-size: clamp(34px, 3.5vw, 54px);
+  line-height: .99;
+  letter-spacing: -.052em;
+}
+
+.visualHeroCopy h2 span {
+  color: #50e4ff;
+  background: linear-gradient(90deg, #3ee8ff, #78b8ff 50%, #b57cff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.visualHeroCopy p {
+  max-width: 620px;
+  margin: 13px 0 0;
+  color: #9fb6c8;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.visualHeroSignals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 20px;
+}
+
+.visualHeroSignals span {
+  min-height: 35px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid rgba(76, 145, 193, .19);
+  border-radius: 10px;
+  color: #c3d4e1;
+  background: rgba(4, 27, 45, .66);
+  font-size: 10px;
+  font-weight: 730;
+}
+
+.visualHeroSignals i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #35e4ff;
+  box-shadow: 0 0 10px rgba(53,228,255,.65);
+  animation: agendaSignal 2.1s ease-out infinite;
+}
+
+.visualHeroSignals i[data-tone="green"] {
+  background: #3ce4a2;
+  box-shadow: 0 0 10px rgba(60,228,162,.58);
+}
+
+.visualHeroSignals i[data-tone="violet"] {
+  background: #a77cff;
+  box-shadow: 0 0 10px rgba(167,124,255,.58);
+}
+
+.visualHeroArt {
+  position: relative;
+  z-index: 2;
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+}
+
+.visualHeroOrbit {
+  position: absolute;
+  width: 270px;
+  height: 270px;
+  border: 1px solid rgba(67, 220, 255, .11);
+  border-radius: 50%;
+  box-shadow:
+    0 0 34px rgba(36, 205, 255, .07),
+    inset 0 0 30px rgba(134, 81, 255, .04);
+  animation: agendaOrbit 17s linear infinite;
+}
+
+.visualHeroRobot {
+  position: relative;
+  z-index: 2;
+  width: min(410px, 100%);
+  max-height: 280px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 22px 38px rgba(0,0,0,.35))
+    drop-shadow(0 0 18px rgba(42, 211, 255, .11));
+  animation: agendaFloat 5.6s ease-in-out infinite;
+}
+
+.visualHeroCalendar {
+  position: absolute;
+  z-index: 3;
+  width: 112px;
+  right: -4px;
+  bottom: 4px;
+  filter:
+    drop-shadow(0 14px 22px rgba(0,0,0,.34))
+    drop-shadow(0 0 14px rgba(137, 87, 255, .10));
+  animation: agendaCalendarFloat 6.2s ease-in-out infinite .35s;
+}
+
+.metrics {
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.metrics article {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(64, 139, 193, .22);
+  border-radius: 17px;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(31, 211, 255, .07), transparent 38%),
+    linear-gradient(145deg, rgba(8, 33, 53, .95), rgba(5, 22, 39, .98));
+  box-shadow: 0 14px 32px rgba(0, 7, 24, .10);
+  transition:
+    transform var(--rv-motion-fast) var(--rv-ease-out),
+    border-color var(--rv-motion-fast) ease,
+    box-shadow var(--rv-motion-fast) ease;
+}
+
+.metrics article:hover {
+  transform: translateY(-3px);
+  border-color: rgba(61, 210, 241, .32);
+  box-shadow: 0 20px 40px rgba(0, 7, 26, .16);
+}
+
+.metrics article::after {
+  position: absolute;
+  width: 70px;
+  height: 2px;
+  right: 16px;
+  bottom: 14px;
+  content: "";
+  border-radius: 99px;
+  background: linear-gradient(90deg, transparent, rgba(52, 222, 255, .62), rgba(141, 82, 255, .48));
+  box-shadow: 0 0 14px rgba(52, 222, 255, .18);
+  animation: agendaMetricTrace 4.6s ease-in-out infinite;
+}
+
+.filters,
+.listPane,
+.detailPane {
+  border-color: rgba(65, 139, 191, .20);
+  background: linear-gradient(150deg, rgba(7, 31, 49, .96), rgba(5, 22, 38, .98));
+  box-shadow:
+    0 18px 42px rgba(0, 6, 20, .11),
+    inset 0 1px 0 rgba(255,255,255,.014);
+}
+
+.filters {
+  border-radius: 17px;
+}
+
+.workspace {
+  gap: 12px;
+}
+
+.listPane,
+.detailPane {
+  border-radius: 18px;
+}
+
+.tableWrap tbody tr {
+  transition:
+    background var(--rv-motion-fast) ease,
+    transform var(--rv-motion-fast) var(--rv-ease-out),
+    box-shadow var(--rv-motion-fast) ease;
+}
+
+.tableWrap tbody tr:hover {
+  transform: translateX(2px);
+  background: rgba(25, 169, 214, .055);
+  box-shadow: inset 3px 0 0 rgba(44, 213, 245, .20);
+}
+
+.statusBadge,
+.sourceBadge {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+.detailPane {
+  animation: agendaDetailIn var(--rv-motion-medium) var(--rv-ease-out) both;
+}
+
+.primaryButton,
+.secondaryButton {
+  position: relative;
+  overflow: hidden;
+}
+
+.primaryButton::after {
+  position: absolute;
+  width: 44px;
+  height: 150%;
+  top: -25%;
+  left: -72px;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+  transform: rotate(20deg);
+  transition: left 520ms var(--rv-ease-out);
+}
+
+.primaryButton:hover::after {
+  left: calc(100% + 24px);
+}
+
+@keyframes agendaFloat {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-.35deg); }
+  50% { transform: translate3d(0, -11px, 0) rotate(.55deg); }
+}
+
+@keyframes agendaCalendarFloat {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(2deg); }
+  50% { transform: translate3d(-7px, -10px, 0) rotate(-2deg); }
+}
+
+@keyframes agendaOrbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes agendaWave {
+  0% { transform: translate3d(-6%, 10px, 0) rotate(-8deg) scaleX(.95); opacity: .45; }
+  100% { transform: translate3d(6%, -12px, 0) rotate(-4deg) scaleX(1.05); opacity: 1; }
+}
+
+@keyframes agendaBreathe {
+  0%, 100% { opacity: .62; transform: translateY(-50%) scale(.94); }
+  50% { opacity: 1; transform: translateY(-50%) scale(1.08); }
+}
+
+@keyframes agendaSignal {
+  0% { box-shadow: 0 0 0 0 currentColor; transform: scale(.86); }
+  65% { box-shadow: 0 0 0 7px transparent; transform: scale(1); }
+  100% { box-shadow: 0 0 0 0 transparent; transform: scale(.86); }
+}
+
+@keyframes agendaMetricTrace {
+  0%, 100% { transform: scaleX(.55); opacity: .38; }
+  50% { transform: scaleX(1); opacity: .9; }
+}
+
+@keyframes agendaDetailIn {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (max-width: 980px) {
+  .page {
+    width: calc(100% - (var(--rv-frame-gutter-compact) * 2));
+    padding-top: 22px;
+  }
+
+  .visualHero {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, .8fr);
+  }
+
+  .visualHeroCopy h2 {
+    font-size: clamp(32px, 5vw, 46px);
+  }
+}
+
+@media (max-width: 760px) {
+  .visualHero {
+    grid-template-columns: 1fr;
+  }
+
+  .visualHeroArt {
+    min-height: 230px;
+  }
+
+  .visualHeroCalendar {
+    right: 8%;
+  }
+}
+
+@media (max-width: 620px) {
+  .page {
+    width: calc(100% - (var(--rv-frame-gutter-mobile) * 2));
+    padding-top: 18px;
+  }
+
+  .visualHero {
+    padding: 20px 17px;
+    border-radius: 19px;
+  }
+
+  .visualHeroCopy h2 {
+    font-size: clamp(31px, 10vw, 42px);
+  }
+
+  .visualHeroSignals {
+    display: grid;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .visualHero::before,
+  .visualHero::after,
+  .visualHeroSignals i,
+  .visualHeroOrbit,
+  .visualHeroRobot,
+  .visualHeroCalendar,
+  .metrics article::after,
+  .detailPane {
+    animation: none !important;
+  }
+
+  .metrics article,
+  .tableWrap tbody tr,
+  .primaryButton,
+  .secondaryButton {
+    transition-duration: .01ms !important;
+  }
+}
