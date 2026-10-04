@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
+import { Link, useLocation } from "react-router-dom";
 import {
   AudioLines,
   CalendarDays,
@@ -21,12 +22,12 @@ import { getSubscription } from "../../features/billing/api";
 import styles from "./AppShell.module.css";
 
 const navigation = [
-  { href: "/app", label: "Inicio", icon: LayoutDashboard },
-  { href: "/app/agenda", label: "Agenda", icon: CalendarDays },
-  { href: "/app/orders", label: "Operaciones", icon: ShoppingBag },
-  { href: "/app/inventory", label: "Inventario", icon: PackageSearch },
-  { href: "/app/settings", label: "Configuración", icon: Settings },
-  { href: "/app/plan", label: "Plan y consumo", icon: WalletCards }
+  { to: "/", label: "Inicio", icon: LayoutDashboard },
+  { to: "/agenda", label: "Agenda", icon: CalendarDays },
+  { to: "/orders", label: "Operaciones", icon: ShoppingBag },
+  { to: "/inventory", label: "Inventario", icon: PackageSearch },
+  { to: "/settings", label: "Configuración", icon: Settings },
+  { to: "/plan", label: "Plan y consumo", icon: WalletCards }
 ];
 
 function roleLabel(roles: string[] | undefined) {
@@ -39,6 +40,7 @@ function roleLabel(roles: string[] | undefined) {
 
 export function AppShell({ children }: PropsWithChildren) {
   const location = useLocation();
+  const reduceMotion = useReducedMotion();
   const me = useQuery({
     queryKey: ["auth", "me"],
     queryFn: getCurrentUser,
@@ -57,8 +59,7 @@ export function AppShell({ children }: PropsWithChildren) {
     window.location.assign("/");
   }
 
-  function isCurrentNavigation(href: string): boolean {
-    const route = href.replace(/^\/app/, "") || "/";
+  function isCurrentNavigation(route: string): boolean {
     if (route === "/") return location.pathname === "/" || location.pathname === "";
     return location.pathname === route || location.pathname.startsWith(route + "/");
   }
@@ -78,7 +79,7 @@ export function AppShell({ children }: PropsWithChildren) {
     <div className={styles.layout} data-react-app="recepvoz" data-visual-system="v2">
       <aside className={styles.sidebar} aria-label="Navegación de RecepVoz">
         <div className={styles.sidebarGlow} aria-hidden="true" />
-        <a className={styles.brand} href="/app" aria-label="RecepVoz">
+        <Link className={styles.brand} to="/" aria-label="RecepVoz">
           <span className={styles.brandMark} aria-hidden="true">
             <AudioLines size={24} />
           </span>
@@ -86,7 +87,7 @@ export function AppShell({ children }: PropsWithChildren) {
             <strong>Recep<span>Voz</span></strong>
             <small>Tu recepcionista IA</small>
           </span>
-        </a>
+        </Link>
 
         <div className={styles.liveStatus} aria-label="RecepVoz activo">
           <span className={styles.liveDot} aria-hidden="true" />
@@ -97,25 +98,25 @@ export function AppShell({ children }: PropsWithChildren) {
         </div>
 
         <nav className={styles.nav} aria-label="Navegación principal">
-          {navigation.map(({ href, label, icon: Icon }) => {
-            const current = isCurrentNavigation(href);
+          {navigation.map(({ to, label, icon: Icon }) => {
+            const current = isCurrentNavigation(to);
             return (
-              <a
+              <Link
                 key={label}
-                href={href}
+                to={to}
                 data-current={current ? "true" : undefined}
                 aria-current={current ? "page" : undefined}
               >
                 <span className={styles.navIcon} aria-hidden="true"><Icon size={18} /></span>
                 <span>{label}</span>
                 <ChevronRight className={styles.navArrow} size={15} aria-hidden="true" />
-              </a>
+              </Link>
             );
           })}
         </nav>
 
         <div className={styles.sidebarMeta}>
-          <a className={styles.planCard} href="/app/plan">
+          <Link className={styles.planCard} to="/plan">
             <span className={styles.planIcon} aria-hidden="true"><Crown size={18} /></span>
             <span className={styles.planCopy}>
               <small>Tu plan</small>
@@ -124,7 +125,7 @@ export function AppShell({ children }: PropsWithChildren) {
               <i aria-hidden="true"><b style={{ width: `${usagePercent}%` }} /></i>
             </span>
             <ChevronRight size={15} aria-hidden="true" />
-          </a>
+          </Link>
 
           <button className={styles.accountCard} type="button" onClick={logout} aria-label="Salir">
             <span className={styles.avatar} aria-hidden="true">
@@ -159,7 +160,15 @@ export function AppShell({ children }: PropsWithChildren) {
             </button>
           </div>
         </header>
-        {children}
+        <motion.div
+          key={location.pathname}
+          className={styles.routeStage}
+          initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: reduceMotion ? 0 : .28, ease: [.2, .8, .2, 1] }}
+        >
+          {children}
+        </motion.div>
       </div>
     </div>
   );
