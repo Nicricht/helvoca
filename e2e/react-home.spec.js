@@ -296,9 +296,18 @@ test.describe('React Home migration', () => {
     await expect(quick.getByRole('link', { name: 'Inventario' })).toHaveAttribute('href', '/app/inventory');
     await expect(quick.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/app/settings');
     await expect(quick.locator('a[href="/settings.html"]')).toHaveCount(0);
-    await expect(quick.getByRole('link', { name: 'Plan y consumo' })).toHaveAttribute('href', '/app/plan');
+    await expect(quick.getByText('Nueva cita', { exact: true })).toBeVisible();
+    await expect(quick.getByText('Ver pedidos', { exact: true })).toBeVisible();
+    await expect(quick.getByText('Gestionar stock', { exact: true })).toBeVisible();
+    await expect(quick.getByText('Configurar IA', { exact: true })).toBeVisible();
+    await expect(quick.getByRole('link', { name: 'Plan y consumo' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /Plan y consumo/i })).toHaveAttribute('href', '/app/plan');
 
-    const sales = page.getByRole('region', { name: 'Resumen de ventas' });
+    const heroImage = hero.locator('img');
+    await expect(heroImage).toBeVisible();
+    await expect.poll(() => heroImage.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
+
+    const sales = today.getByRole('region', { name: 'Resumen de ventas' });
     await expect(sales).toBeVisible();
     await expect(sales).toContainText('$189.900');
     await expect(sales).toContainText('5');
