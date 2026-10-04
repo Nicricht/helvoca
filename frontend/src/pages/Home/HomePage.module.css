@@ -2118,8 +2118,12 @@
 }
 
 .heroCard {
+  height: 168px;
   min-height: 168px;
+  max-height: 168px;
   grid-template-columns: minmax(0, 1.45fr) minmax(250px, .55fr);
+  gap: 0;
+  padding: 0;
   border-radius: 18px;
   background:
     radial-gradient(circle at 77% 18%, rgba(22, 217, 245, .13), transparent 25%),
@@ -2877,7 +2881,9 @@
 
 @media (max-width: 980px) {
   .heroCard {
+    height: 178px;
     min-height: 178px;
+    max-height: 178px;
     grid-template-columns: minmax(0, 1.3fr) minmax(190px, .7fr);
   }
 
@@ -2921,8 +2927,11 @@
   }
 
   .heroCard {
+    height: 176px;
     min-height: 176px;
+    max-height: 176px;
     display: block;
+    padding: 0;
   }
 
   .heroCopy {
