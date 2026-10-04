@@ -462,7 +462,7 @@ export function SettingsPage() {
 
   return (
     <AppShell>
-      <main className={`rv-page-frame ${styles.page}`}>
+      <main className={`rv-page-frame ${styles.page}`} data-visual-page="settings">
         <header className={`rv-page-header ${styles.pageHeader}`}>
           <div>
             <p className="eyebrow">TU NEGOCIO</p>
@@ -484,19 +484,31 @@ export function SettingsPage() {
         <section className={styles.hero} aria-label="Configuración asistida">
           <div className={styles.heroGlow} aria-hidden="true" />
           <div className={styles.heroCopy}>
-            <span className={styles.heroIcon}><Sparkles size={20} aria-hidden="true" /></span>
+            <span className={styles.heroKicker}>CENTRO DE CONTROL IA</span>
             <div>
-              <strong>Configura tu negocio sin pelearte con formularios gigantes.</strong>
+              <strong>Configura cómo RecepVoz <span>representa a tu negocio</span></strong>
               <p>
-                Puedes importar lo que ya tienes y luego revisar cada dato antes de convertirlo
-                en información autoritativa del negocio.
+                Importa información, define horarios, servicios, conocimiento y comportamiento.
+                Cada cambio queda conectado a una recepción que sigue trabajando.
               </p>
+              <div className={styles.heroSignals}>
+                <span><i data-tone="green" />{readiness}</span>
+                <span><i data-tone="cyan" />{draft.services.length} servicios</span>
+                <span><i data-tone="violet" />{draft.knowledge.length} fuentes de conocimiento</span>
+              </div>
+              <a className={styles.heroAction} href="/business-import.html">
+                <CloudUpload size={16} aria-hidden="true" />
+                Importar información
+                <ChevronRight size={16} aria-hidden="true" />
+              </a>
             </div>
           </div>
-          <a className={styles.heroAction} href="/business-import.html">
-            Revisar importación
-            <ChevronRight size={16} aria-hidden="true" />
-          </a>
+          <div className={styles.heroArt} aria-hidden="true">
+            <span className={styles.heroOrbit} />
+            <img className={styles.heroRobot} src="/app/assets/recepvoz/v2/settings/hero-ai-settings.webp" alt="" />
+            <img className={styles.heroDocument} src="/app/assets/recepvoz/v2/settings/hero-document-organizer.webp" alt="" />
+            <img className={styles.heroBusiness} src="/app/assets/recepvoz/v2/settings/business-storefront.webp" alt="" />
+          </div>
         </section>
 
         {model.partialErrors.length > 0 && (
