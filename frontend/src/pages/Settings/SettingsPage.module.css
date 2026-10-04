@@ -15,6 +15,20 @@
   flex-wrap: wrap;
 }
 
+.headerAction {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 13px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .readiness {
   min-height: 36px;
   display: inline-flex;
@@ -775,7 +789,11 @@
   }
 
   .headerMeta :global(.button) {
-    width: 100%;
+    width: auto;
+  }
+
+  .headerAction {
+    width: auto;
     justify-content: center;
   }
 
