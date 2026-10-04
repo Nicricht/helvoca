@@ -1,21 +1,17 @@
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MotionConfig, motion, useReducedMotion } from "framer-motion";
-import { Link } from "react-router-dom";
 import {
   Activity,
   ArrowUpRight,
-  BarChart3,
   CalendarDays,
   CircleHelp,
   ClipboardList,
-  MessageCircle,
-  PackageSearch,
+  Clock3,
   Phone,
-  Settings,
   ShoppingCart,
   Sparkles,
   TriangleAlert,
-  Users,
   WalletCards
 } from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
@@ -97,121 +93,250 @@ function formatActivityTime(value: string, timeZone: string): string {
 }
 
 
-function compactSalesValue(data?: SalesAnalytics): string {
-  if (!data) return "—";
-  const totals = data.currencyTotals?.length
-    ? data.currencyTotals
-    : data.primaryCurrency && data.totalRevenue !== null
-      ? [{ currency: data.primaryCurrency, amount: data.totalRevenue }]
-      : [];
-  if (totals.length === 0) return "$0";
-  if (totals.length > 1) return `${data.paidOrders} ventas`;
-  return formatMoney(totals[0].amount, totals[0].currency);
+function attributedTotals(data?: SalesAnalytics): Array<{ currency: string; amount: number }> {
+  if (!data) return [];
+
+  const totals = new Map<string, number>();
+  const add = (currency: string | null, amount: number | null) => {
+    if (!currency || amount == null) return;
+    totals.set(currency, (totals.get(currency) || 0) + amount);
+  };
+
+  add(data.primaryCurrency, data.recepVozRevenue);
+  add(data.bookingCurrency, data.recepVozBookingRevenue);
+
+  return Array.from(totals, ([currency, amount]) => ({ currency, amount }));
+}
+
+function useAnimatedNumber(value: number, reducedMotion: boolean, duration = 900): number {
+  const previous = useRef(0);
+  const [display, setDisplay] = useState(reducedMotion ? value : 0);
+
+  useEffect(() => {
+    const from = previous.current;
+    previous.current = value;
+
+    if (reducedMotion) {
+      setDisplay(value);
+      return;
+    }
+
+    let frame = 0;
+    const startedAt = performance.now();
+
+    const tick = (now: number) => {
+      const raw = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - raw, 3);
+      setDisplay(from + (value - from) * eased);
+      if (raw < 1) frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [duration, reducedMotion, value]);
+
+  return display;
+}
+
+function AnimatedMoney({ amount, currency }: { amount: number; currency: string }) {
+  const reduceMotion = useReducedMotion();
+  const animated = useAnimatedNumber(amount, Boolean(reduceMotion));
+  return <>{formatMoney(animated, currency)}</>;
+}
+
+function attentionTotal(dashboard: OperationsDashboard): number {
+  return dashboard.openRequests + dashboard.unansweredQuestions + dashboard.callFailuresToday;
 }
 
 function HeroOverview({ dashboard }: { dashboard: OperationsDashboard }) {
-  const attentionCount =
-    dashboard.openRequests + dashboard.unansweredQuestions + dashboard.callFailuresToday;
-  const signals = [
-    { title: "Llamadas atendidas", detail: `${dashboard.callsToday} hoy`, icon: Phone, tone: "cyan" },
-    { title: "Reservas creadas", detail: `${dashboard.bookingsToday} hoy`, icon: CalendarDays, tone: "violet" },
-    {
-      title: attentionCount > 0 ? "Requiere atención" : "Todo al día",
-      detail: attentionCount > 0 ? `${attentionCount} pendientes` : "Sin pendientes críticos",
-      icon: MessageCircle,
-      tone: attentionCount > 0 ? "warning" : "emerald"
-    }
-  ] as const;
+  const pending = attentionTotal(dashboard);
+  const liveCall = dashboard.recentCalls.find(call =>
+    ["IN_PROGRESS", "RINGING", "ACTIVE"].includes(call.status || "")
+  );
 
   return (
-    <section className={styles.heroCard} aria-labelledby="homeHeroTitle">
-      <span className={styles.heroGlow} aria-hidden="true" />
-      <span className={styles.heroWave} aria-hidden="true" />
-
+    <motion.section
+      className={styles.heroCard}
+      aria-label="Estado de tu negocio"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: .42, ease: [0.16, 1, 0.3, 1] }}
+    >
       <div className={styles.heroCopy}>
-        <span className={styles.heroEyebrow}>TU NEGOCIO SIEMPRE CONTESTA</span>
-        <h2 id="homeHeroTitle">
-          Tu recepcionista IA está <span>atendiendo tu negocio</span>
-        </h2>
+        <span className={styles.heroStatus} data-tone={pending > 0 ? "attention" : "calm"}>
+          <i aria-hidden="true" />
+          {pending > 0 ? pending + " asuntos necesitan tu atención" : "Todo bajo control"}
+        </span>
+
+        <h2>Tu negocio está siendo atendido.</h2>
         <p>
-          {dashboard.callsToday} llamadas hoy · {dashboard.bookingsToday} reservas · {dashboard.newCustomersToday} clientes nuevos
+          RecepVoz atendió <strong>{dashboard.callsToday}</strong> llamadas hoy y creó{" "}
+          <strong>{dashboard.bookingsToday}</strong> reservas.
         </p>
 
-        <div className={styles.heroSignals} aria-label="Resumen operativo rápido">
-          {signals.map(({ title, detail, icon: Icon, tone }) => (
-            <div key={title} className={styles.heroSignal} data-tone={tone}>
-              <span className={styles.heroSignalIcon} aria-hidden="true"><Icon size={18} /></span>
-              <span>
-                <strong>{title}</strong>
-                <small>{detail}</small>
-              </span>
-            </div>
-          ))}
-        </div>
+        {pending > 0 && (
+          <a className={styles.heroAction} href="#home-attention">
+            Revisar pendientes <ArrowUpRight size={15} aria-hidden="true" />
+          </a>
+        )}
       </div>
 
       <div className={styles.heroVisual} aria-hidden="true">
         <span className={styles.heroAura} />
         <span className={styles.heroOrbit} />
-        <span className={styles.heroFloatIcon} data-position="phone"><Phone size={19} /></span>
-        <span className={styles.heroFloatIcon} data-position="message"><MessageCircle size={19} /></span>
-        <span className={styles.heroFloatIcon} data-position="calendar"><CalendarDays size={19} /></span>
+        <span className={styles.heroFloatIcon} data-position="phone"><Phone size={17} /></span>
+        <span className={styles.heroFloatIcon} data-position="calendar"><CalendarDays size={17} /></span>
         <img src="/app/assets/home/hero-bot.webp" alt="" />
+        {liveCall && (
+          <span className={styles.liveChip}>
+            <i /><i /><i /><i />
+            Atendiendo ahora
+          </span>
+        )}
       </div>
-    </section>
+    </motion.section>
   );
 }
 
-function TodaySummary({
-  dashboard,
-  sales,
-  salesLoading,
-  salesFailed
+function ValueGenerated({
+  data,
+  loading,
+  refreshing,
+  failed,
+  days,
+  onDaysChange
 }: {
-  dashboard: OperationsDashboard;
-  sales?: SalesAnalytics;
-  salesLoading: boolean;
-  salesFailed: boolean;
+  data?: SalesAnalytics;
+  loading: boolean;
+  refreshing: boolean;
+  failed: boolean;
+  days: number;
+  onDaysChange: (days: number) => void;
 }) {
-  const quiet =
-    dashboard.callsToday === 0 &&
-    dashboard.bookingsToday === 0 &&
-    dashboard.newCustomersToday === 0;
-
-  const items = [
-    { label: "Llamadas hoy", value: String(dashboard.callsToday), icon: Phone, tone: "cyan", meta: "Actividad de hoy" },
-    { label: "Reservas", value: String(dashboard.bookingsToday), icon: CalendarDays, tone: "violet", meta: "Actividad de hoy" },
-    { label: "Clientes nuevos", value: String(dashboard.newCustomersToday), icon: Users, tone: "emerald", meta: "Actividad de hoy" },
-    {
-      label: "Ventas confirmadas",
-      value: salesLoading ? "…" : salesFailed ? "—" : compactSalesValue(sales),
-      icon: ShoppingCart,
-      tone: "green",
-      meta: salesFailed ? "No disponible" : "Últimos 7 días"
-    }
+  const totals = attributedTotals(data);
+  const single = totals.length === 1 ? totals[0] : null;
+  const periods = [
+    { days: 1, label: "Hoy" },
+    { days: 7, label: "7 días" },
+    { days: 30, label: "30 días" }
   ] as const;
 
   return (
+    <motion.section
+      className={styles.valueCard}
+      aria-labelledby="homeValueTitle"
+      aria-busy={loading || refreshing}
+      initial={{ opacity: 0, y: 9 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: .38, delay: .16, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <div className={styles.valueTop}>
+        <div className={styles.valueTitle}>
+          <span className={styles.valueIcon} aria-hidden="true"><WalletCards size={20} /></span>
+          <div>
+            <span className={styles.kicker}>VALOR COMERCIAL</span>
+            <h2 id="homeValueTitle">Valor generado por RecepVoz</h2>
+          </div>
+        </div>
+
+        <div className={styles.periodTabs} aria-label="Periodo del valor generado">
+          {periods.map(period => (
+            <button
+              key={period.days}
+              type="button"
+              className={styles.periodButton}
+              aria-pressed={days === period.days}
+              onClick={() => onDaysChange(period.days)}
+            >
+              {period.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className={styles.inlineLoading} role="status">Calculando valor atribuido…</div>
+      ) : failed ? (
+        <div className={styles.valueError} role="alert">
+          No pudimos cargar el valor atribuido. Tu operación diaria sigue disponible.
+        </div>
+      ) : data ? (
+        <div className={styles.valueBody}>
+          <div className={styles.valueAmount}>
+            {totals.length === 0 ? (
+              <strong>$0</strong>
+            ) : single ? (
+              <strong><AnimatedMoney amount={single.amount} currency={single.currency} /></strong>
+            ) : (
+              <div className={styles.moneyStack}>
+                {totals.map(total => (
+                  <strong key={total.currency}>
+                    <small>{total.currency}</small>
+                    {formatMoney(total.amount, total.currency)}
+                  </strong>
+                ))}
+              </div>
+            )}
+            <span>valor comercial atribuido a RecepVoz</span>
+            {refreshing && <em>Actualizando…</em>}
+          </div>
+
+          <div className={styles.sourceSummary}>
+            <div>
+              <ShoppingCart size={17} aria-hidden="true" />
+              <span><strong>{data.recepVozOrders}</strong> pedidos con origen RecepVoz</span>
+            </div>
+            <div>
+              <CalendarDays size={17} aria-hidden="true" />
+              <span><strong>{data.recepVozPaidBookings}</strong> reservas pagadas con origen RecepVoz</span>
+            </div>
+          </div>
+
+          <p className={styles.valueNote}>
+            Atribución por origen registrado en RecepVoz. No representa utilidad neta ni retorno de inversión.
+          </p>
+        </div>
+      ) : null}
+    </motion.section>
+  );
+}
+
+function TodaySummary({ dashboard }: { dashboard: OperationsDashboard }) {
+  const managedMinutes = dashboard.callDurationSecondsToday > 0
+    ? Math.max(1, Math.round(dashboard.callDurationSecondsToday / 60))
+    : 0;
+
+  const items = [
+    { label: "Llamadas atendidas", value: dashboard.callsToday, meta: "hoy", icon: Phone, tone: "cyan" },
+    { label: "Reservas generadas", value: dashboard.bookingsToday, meta: "hoy", icon: CalendarDays, tone: "violet" },
+    { label: "Minutos gestionados por IA", value: managedMinutes, meta: "en llamadas", icon: Clock3, tone: "emerald" }
+  ] as const;
+
+  const quiet = dashboard.callsToday === 0 && dashboard.bookingsToday === 0;
+
+  return (
     <section className={styles.todaySection} aria-labelledby="homeTodayTitle">
-      <h2 id="homeTodayTitle" className={styles.srOnly}>Qué está pasando hoy</h2>
+      <div className={styles.sectionHeading}>
+        <h2 id="homeTodayTitle">Resultados de hoy</h2>
+      </div>
       <div className={styles.summaryGrid}>
-        {items.map(({ label, value, icon: Icon, tone, meta }, index) => (
+        {items.map(({ label, value, meta, icon: Icon, tone }, index) => (
           <motion.article
             key={label}
             className={styles.metricCard}
             data-tone={tone}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: .26, delay: index * .045 }}
+            transition={{ duration: .3, delay: .38 + index * .07, ease: [0.16, 1, 0.3, 1] }}
           >
             <span className={styles.metricIcon} aria-hidden="true"><Icon size={20} /></span>
             <span className={styles.metricCopy}>
-              <small>{label}</small>
               <strong>{value}</strong>
+              <small>{label}</small>
               <em>{meta}</em>
             </span>
             <span className={styles.metricBars} aria-hidden="true">
-              <i /><i /><i /><i /><i /><i />
+              <i /><i /><i /><i /><i />
             </span>
           </motion.article>
         ))}
@@ -222,14 +347,15 @@ function TodaySummary({
 }
 
 function AttentionPanel({ dashboard }: { dashboard: OperationsDashboard }) {
+  const total = attentionTotal(dashboard);
   const alerts = [
     dashboard.openRequests > 0
       ? {
           key: "requests",
           icon: ClipboardList,
           tone: "warning",
-          title: `${dashboard.openRequests} solicitudes pendientes`,
-          detail: "Revisa las solicitudes que esperan una decisión."
+          title: dashboard.openRequests + " solicitudes pendientes",
+          detail: "Hay solicitudes esperando una decisión."
         }
       : null,
     dashboard.unansweredQuestions > 0
@@ -237,8 +363,8 @@ function AttentionPanel({ dashboard }: { dashboard: OperationsDashboard }) {
           key: "questions",
           icon: CircleHelp,
           tone: "violet",
-          title: `${dashboard.unansweredQuestions} pregunta${dashboard.unansweredQuestions === 1 ? "" : "s"} sin respuesta`,
-          detail: "La IA encontró conocimiento que conviene completar."
+          title: dashboard.unansweredQuestions + " pregunta" + (dashboard.unansweredQuestions === 1 ? "" : "s") + " sin respuesta",
+          detail: "La IA necesita información adicional para responder mejor."
         }
       : null,
     dashboard.callFailuresToday > 0
@@ -246,7 +372,7 @@ function AttentionPanel({ dashboard }: { dashboard: OperationsDashboard }) {
           key: "failures",
           icon: TriangleAlert,
           tone: "danger",
-          title: `${dashboard.callFailuresToday} fallo${dashboard.callFailuresToday === 1 ? "" : "s"} de llamada`,
+          title: dashboard.callFailuresToday + " fallo" + (dashboard.callFailuresToday === 1 ? "" : "s") + " de llamada",
           detail: "Hay llamadas que no terminaron normalmente."
         }
       : null
@@ -259,21 +385,28 @@ function AttentionPanel({ dashboard }: { dashboard: OperationsDashboard }) {
   }>;
 
   return (
-    <section className={styles.panel} aria-labelledby="homeAttentionTitle">
+    <motion.section
+      id="home-attention"
+      className={styles.panel}
+      aria-labelledby="homeAttentionTitle"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: .34, delay: .66, ease: [0.16, 1, 0.3, 1] }}
+    >
       <div className={styles.panelHeading}>
         <div>
-          <span className={styles.kicker}>PRIORIDAD</span>
+          <span className={styles.kicker}>SOLO LO IMPORTANTE</span>
           <h2 id="homeAttentionTitle">Necesita tu atención</h2>
         </div>
-        {alerts.length > 0 && <span className={styles.countPill}>{alerts.length}</span>}
+        {total > 0 && <span className={styles.countPill}>{total}</span>}
       </div>
 
       {alerts.length === 0 ? (
         <div className={styles.calmState}>
-          <Sparkles size={21} aria-hidden="true" />
+          <Sparkles size={20} aria-hidden="true" />
           <div>
-            <strong>Todo bajo control</strong>
-            <span>Sin pendientes críticos por ahora.</span>
+            <strong>No necesitas hacer nada ahora</strong>
+            <span>RecepVoz puede seguir trabajando solo.</span>
           </div>
         </div>
       ) : (
@@ -285,239 +418,92 @@ function AttentionPanel({ dashboard }: { dashboard: OperationsDashboard }) {
                 <strong>{title}</strong>
                 <span>{detail}</span>
               </div>
-              <ArrowUpRight size={16} aria-hidden="true" />
             </div>
           ))}
         </div>
       )}
-    </section>
+    </motion.section>
   );
 }
 
-function RecentActivity({ dashboard }: { dashboard: OperationsDashboard }) {
+const activityLabels: Record<string, string> = {
+  BOOKING_CREATED: "Reserva creada",
+  COMPLETED: "Completada",
+  FAILED: "Fallida",
+  IN_PROGRESS: "En curso",
+  INFORMATION_ONLY: "Solo información",
+  OPEN: "Abierta",
+  PENDING: "Pendiente",
+  RESOLVED: "Resuelta"
+};
+
+function activityLabel(value: string | null): string {
+  if (!value) return "";
+  return activityLabels[value] || value.replaceAll("_", " ").toLowerCase();
+}
+
+function LatestActivity({ dashboard }: { dashboard: OperationsDashboard }) {
   const requestItems = dashboard.recentRequests.map(item => ({
-    id: `request-${item.id}`,
+    id: "request-" + item.id,
     title: item.title,
-    detail: item.status ? item.status.replaceAll("_", " ") : "Solicitud",
+    detail: activityLabel(item.status) || "Solicitud",
     timestamp: item.createdAt,
     icon: ClipboardList,
     tone: item.priority === "HIGH" ? "warning" : "cyan"
   }));
 
   const callItems = dashboard.recentCalls.map(item => ({
-    id: `call-${item.id}`,
-    title: item.callerNumber ? `Llamada ${item.callerNumber}` : "Llamada reciente",
-    detail: item.resolution
-      ? item.resolution.replaceAll("_", " ")
-      : item.status?.replaceAll("_", " ") || "Llamada",
+    id: "call-" + item.id,
+    title: item.callerNumber ? "Llamada " + item.callerNumber : "Llamada reciente",
+    detail: activityLabel(item.resolution) || activityLabel(item.status) || "Llamada",
     timestamp: item.startedAt,
     icon: Phone,
     tone: item.status === "FAILED" ? "danger" : "emerald"
   }));
 
-  const activity = [...requestItems, ...callItems]
-    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
-    .slice(0, 6);
+  const latest = [...requestItems, ...callItems]
+    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
 
   return (
-    <section className={styles.panel} aria-labelledby="homeRecentTitle">
+    <motion.section
+      className={styles.latestPanel}
+      aria-labelledby="homeLatestTitle"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: .34, delay: .78, ease: [0.16, 1, 0.3, 1] }}
+    >
       <div className={styles.panelHeading}>
         <div>
-          <span className={styles.kicker}>TRAZABILIDAD</span>
-          <h2 id="homeRecentTitle">Actividad reciente</h2>
+          <span className={styles.kicker}>AHORA</span>
+          <h2 id="homeLatestTitle">Última actividad</h2>
         </div>
         <Activity size={18} aria-hidden="true" />
       </div>
 
-      {activity.length === 0 ? (
+      {!latest ? (
         <p className={styles.emptyPanel}>Todavía no hay actividad reciente para mostrar.</p>
       ) : (
-        <div className={styles.activityList}>
-          {activity.map(({ id, title, detail, timestamp, icon: Icon, tone }) => (
-            <div key={id} className={styles.activityItem}>
-              <span className={styles.activityIcon} data-tone={tone} aria-hidden="true">
-                <Icon size={17} />
-              </span>
-              <div className={styles.activityCopy}>
-                <strong>{title}</strong>
-                <span>{detail}</span>
-              </div>
-              <time dateTime={timestamp}>{formatActivityTime(timestamp, dashboard.timezone)}</time>
-            </div>
-          ))}
-        </div>
+        <motion.div
+          key={latest.id}
+          className={styles.latestItem}
+          initial={{ opacity: 0, x: 8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: .28 }}
+        >
+          <span className={styles.activityIcon} data-tone={latest.tone} aria-hidden="true">
+            <latest.icon size={18} />
+          </span>
+          <div className={styles.activityCopy}>
+            <strong>{latest.title}</strong>
+            <span>{latest.detail}</span>
+          </div>
+          <time dateTime={latest.timestamp}>{formatActivityTime(latest.timestamp, dashboard.timezone)}</time>
+        </motion.div>
       )}
-    </section>
+    </motion.section>
   );
 }
 
-
-function QuickActions() {
-  const actions = [
-    {
-      ariaLabel: "Agenda",
-      title: "Nueva cita",
-      detail: "Crea una reserva manualmente",
-      href: "/app/agenda",
-      icon: CalendarDays,
-      art: "/app/assets/home/agenda.webp",
-      tone: "violet"
-    },
-    {
-      ariaLabel: "Operaciones",
-      title: "Ver pedidos",
-      detail: "Revisa y gestiona pedidos",
-      href: "/app/orders",
-      icon: ShoppingCart,
-      art: "/app/assets/home/orders.webp",
-      tone: "green"
-    },
-    {
-      ariaLabel: "Inventario",
-      title: "Gestionar stock",
-      detail: "Actualiza tu inventario",
-      href: "/app/inventory",
-      icon: PackageSearch,
-      art: "/app/assets/home/inventory.webp",
-      tone: "cyan"
-    },
-    {
-      ariaLabel: "Configuración",
-      title: "Configurar IA",
-      detail: "Ajusta información de tu negocio",
-      href: "/app/settings",
-      icon: Settings,
-      art: "/app/assets/home/automation.webp",
-      tone: "blue"
-    },
-    {
-      ariaLabel: "Plan y consumo",
-      title: "Plan y consumo",
-      detail: "Revisa uso y límites",
-      href: "/app/plan",
-      icon: WalletCards,
-      art: null,
-      tone: "violet"
-    }
-  ] as const;
-
-  return (
-    <nav className={styles.quickSection} aria-label="Accesos rápidos">
-      <h2 className={styles.srOnly}>Accesos rápidos</h2>
-      <div className={styles.quickGrid}>
-        {actions.map(({ ariaLabel, title, detail, href, icon: Icon, art, tone }) => (
-          <Link
-            key={ariaLabel}
-            className={styles.quickAction}
-            data-tone={tone}
-            to={href.replace(/^\/app/, "") || "/"}
-            aria-label={ariaLabel}
-          >
-            {art ? (
-              <img className={styles.quickArt} src={art} alt="" aria-hidden="true" />
-            ) : (
-              <span className={styles.quickIcon} aria-hidden="true"><Icon size={20} /></span>
-            )}
-            <span className={styles.quickCopy}>
-              <strong>{title}</strong>
-              <small>{detail}</small>
-            </span>
-            <ArrowUpRight size={16} aria-hidden="true" />
-          </Link>
-        ))}
-      </div>
-    </nav>
-  );
-}
-
-function SalesSummary({
-  data,
-  loading,
-  failed
-}: {
-  data?: SalesAnalytics;
-  loading: boolean;
-  failed: boolean;
-}) {
-  const totals = data?.currencyTotals?.length
-    ? data.currencyTotals
-    : data?.primaryCurrency && data.totalRevenue !== null
-      ? [{ currency: data.primaryCurrency, amount: data.totalRevenue }]
-      : [];
-
-  const multipleCurrencies = totals.length > 1;
-  const maxRevenue = Math.max(1, ...(data?.salesOverTime?.map(point => point.revenue) || [0]));
-
-  return (
-    <section className={styles.salesSection} aria-labelledby="homeSalesTitle">
-      <div className={styles.sectionTitleRow}>
-        <div>
-          <span className={styles.kicker}>ÚLTIMOS 7 DÍAS</span>
-          <h2 id="homeSalesTitle">Resumen de ventas</h2>
-        </div>
-        <BarChart3 size={18} aria-hidden="true" />
-      </div>
-
-      {loading && <div className={styles.inlineLoading} role="status">Cargando resumen de ventas…</div>}
-
-      {failed && (
-        <div className={styles.salesError} role="alert">
-          No pudimos cargar el resumen de ventas. Tu operación diaria sigue disponible.
-        </div>
-      )}
-
-      {!loading && !failed && data && (
-        <div className={styles.salesGrid}>
-          <div className={styles.salesTotal}>
-            <span>Ventas confirmadas</span>
-            {totals.length === 0 ? (
-              <strong>$0</strong>
-            ) : multipleCurrencies ? (
-              <div className={styles.currencyStack}>
-                {totals.map(total => (
-                  <strong key={total.currency}>
-                    <small>{total.currency}</small> {formatMoney(total.amount, total.currency)}
-                  </strong>
-                ))}
-              </div>
-            ) : (
-              <strong>{formatMoney(totals[0].amount, totals[0].currency)}</strong>
-            )}
-            <span className={styles.salesMeta}>
-              {data.paidOrders} pedidos pagados
-              {data.revenueChangePercent != null
-                ? ` · ${data.revenueChangePercent >= 0 ? "+" : ""}${data.revenueChangePercent.toLocaleString("es-CL")}%`
-                : ""}
-            </span>
-          </div>
-
-          <div className={styles.miniChart} aria-label="Tendencia de ventas de los últimos siete días">
-            {(data.salesOverTime || []).map((point, index) => {
-              const height = Math.max(8, Math.round((point.revenue / maxRevenue) * 100));
-              return (
-                <motion.span
-                  key={point.date}
-                  title={`${point.date}: ${point.revenue}`}
-                  initial={{ height: "8%" }}
-                  animate={{ height: `${height}%` }}
-                  transition={{ duration: .45, delay: index * .045, ease: "easeOut" }}
-                />
-              );
-            })}
-          </div>
-
-          <div className={styles.originNote}>
-            <ShoppingCart size={18} aria-hidden="true" />
-            <div>
-              <strong>{data.recepVozOrders} pedidos con origen registrado en RecepVoz</strong>
-              <span>Atribución descriptiva por origen Voz / WhatsApp, no una estimación causal.</span>
-            </div>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
 
 function OnboardingCard({ status }: { status: OnboardingStatus }) {
   const completed = coreOnboardingSteps.filter(step => status[step.key]).length;
@@ -580,6 +566,7 @@ function OnboardingCard({ status }: { status: OnboardingStatus }) {
 
 export function HomePage() {
   const reduceMotion = useReducedMotion();
+  const [salesDays, setSalesDays] = useState(7);
 
   const meQuery = useQuery({
     queryKey: ["home", "me"],
@@ -603,8 +590,8 @@ export function HomePage() {
   });
 
   const salesQuery = useQuery({
-    queryKey: ["home", "sales", 7],
-    queryFn: getSalesAnalytics,
+    queryKey: ["home", "sales", salesDays],
+    queryFn: () => getSalesAnalytics(salesDays),
     enabled: readyToLoad
   });
 
@@ -627,15 +614,8 @@ export function HomePage() {
           <span className={styles.orb} />
         </div>
 
-        <header className={`rv-page-header ${styles.header}`}>
-          <div>
-            <p className="eyebrow">OPERACIÓN</p>
-            <h1>Inicio</h1>
-          </div>
-          <div className={styles.headerBadge}>
-            <span aria-hidden="true" />
-            RecepVoz activo
-          </div>
+        <header className={styles.compactHeader}>
+          <h1>Inicio</h1>
         </header>
 
         {onboardingIncomplete && onboardingQuery.data ? (
@@ -659,31 +639,28 @@ export function HomePage() {
         ) : operationsQuery.data ? (
           <motion.div
             className={styles.dashboard}
+            data-home-motion="premium"
             initial={reduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: reduceMotion ? 0 : .24 }}
           >
             <HeroOverview dashboard={operationsQuery.data} />
 
-            <TodaySummary
-              dashboard={operationsQuery.data}
-              sales={salesQuery.data}
-              salesLoading={salesQuery.isPending}
-              salesFailed={salesQuery.isError}
+            <ValueGenerated
+              data={salesQuery.data}
+              loading={salesQuery.isPending}
+              refreshing={salesQuery.isFetching && !salesQuery.isPending}
+              failed={salesQuery.isError}
+              days={salesDays}
+              onDaysChange={setSalesDays}
             />
+
+            <TodaySummary dashboard={operationsQuery.data} />
 
             <div className={styles.mainGrid}>
               <AttentionPanel dashboard={operationsQuery.data} />
-              <RecentActivity dashboard={operationsQuery.data} />
+              <LatestActivity dashboard={operationsQuery.data} />
             </div>
-
-            <QuickActions />
-
-            <SalesSummary
-              data={salesQuery.data}
-              loading={salesQuery.isPending}
-              failed={salesQuery.isError}
-            />
           </motion.div>
         ) : null}
       </main>
