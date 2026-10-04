@@ -86,7 +86,7 @@ export function AppShell({ children }: PropsWithChildren) {
             <ChevronRight size={16} aria-hidden="true" />
           </a>
 
-          <button className={styles.accountCard} type="button" onClick={logout}>
+          <button className={styles.accountCard} type="button" onClick={logout} aria-label="Salir">
             <span className={styles.avatar} aria-hidden="true">R</span>
             <span className={styles.accountCopy}>
               <strong>Mi cuenta</strong>
