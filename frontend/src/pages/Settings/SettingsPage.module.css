@@ -1733,3 +1733,26 @@
     transition-duration: .01ms !important;
   }
 }
+
+
+.heroSources {
+  position: absolute;
+  z-index: 4;
+  width: 84px;
+  right: 5%;
+  bottom: -2%;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 14px 22px rgba(0,0,0,.35))
+    drop-shadow(0 0 12px rgba(133,91,255,.10));
+  animation: settingsTileC 7.1s ease-in-out infinite .55s;
+}
+
+@keyframes settingsTileC {
+  0%,100% { transform: translate3d(0,0,0) rotate(-1deg); }
+  50% { transform: translate3d(-5px,-8px,0) rotate(2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroSources { animation: none !important; }
+}
