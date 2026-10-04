@@ -1451,7 +1451,12 @@
 }
 
 .salesMetric {
-  display: contents;
+  min-width: 0;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
 }
 
 .metricCurrencyStack {
