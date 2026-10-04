@@ -151,7 +151,7 @@ function HeroOverview({ dashboard }: { dashboard: OperationsDashboard }) {
 
       <div className={styles.heroVisual} aria-hidden="true">
         <span className={styles.heroAura} />
-        <img src="/assets/home/hero-bot.webp" alt="" />
+        <img src="/app/assets/home/hero-bot.webp" alt="" />
       </div>
     </section>
   );
@@ -355,7 +355,7 @@ function QuickActions() {
       detail: "Crea una reserva manualmente",
       href: "/app/agenda",
       icon: CalendarDays,
-      art: "/assets/home/agenda.webp",
+      art: "/app/assets/home/agenda.webp",
       tone: "violet"
     },
     {
@@ -364,7 +364,7 @@ function QuickActions() {
       detail: "Revisa y gestiona pedidos",
       href: "/app/orders",
       icon: ShoppingCart,
-      art: "/assets/home/orders.webp",
+      art: "/app/assets/home/orders.webp",
       tone: "green"
     },
     {
@@ -373,7 +373,7 @@ function QuickActions() {
       detail: "Actualiza tu inventario",
       href: "/app/inventory",
       icon: PackageSearch,
-      art: "/assets/home/inventory.webp",
+      art: "/app/assets/home/inventory.webp",
       tone: "cyan"
     },
     {
@@ -382,7 +382,7 @@ function QuickActions() {
       detail: "Ajusta información de tu negocio",
       href: "/app/settings",
       icon: Settings,
-      art: "/assets/home/automation.webp",
+      art: "/app/assets/home/automation.webp",
       tone: "blue"
     },
     {
