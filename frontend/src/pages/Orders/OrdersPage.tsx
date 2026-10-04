@@ -452,7 +452,7 @@ export function OrdersPage() {
             <p>
               RecepVoz mantiene pedidos, clientes y conversaciones enlazados para que tu equipo actúe sin perder contexto.
             </p>
-            <div className={styles.visualHeroFlow} aria-label="Estado del flujo operativo">
+            <div className={styles.visualHeroFlow} aria-label="Flujo operativo en tiempo real">
               <span><i data-tone="cyan" />{activeCount} activos</span>
               <b aria-hidden="true">→</b>
               <span><i data-tone="violet" />{preparingCount} preparando</span>
