@@ -151,6 +151,10 @@ function HeroOverview({ dashboard }: { dashboard: OperationsDashboard }) {
 
       <div className={styles.heroVisual} aria-hidden="true">
         <span className={styles.heroAura} />
+        <span className={styles.heroOrbit} />
+        <span className={styles.heroFloatIcon} data-position="phone"><Phone size={19} /></span>
+        <span className={styles.heroFloatIcon} data-position="message"><MessageCircle size={19} /></span>
+        <span className={styles.heroFloatIcon} data-position="calendar"><CalendarDays size={19} /></span>
         <img src="/app/assets/home/hero-bot.webp" alt="" />
       </div>
     </section>
@@ -619,7 +623,7 @@ export function HomePage() {
   return (
     <AppShell>
       <MotionConfig reducedMotion="user">
-      <main className={`rv-page-frame ${styles.page}`}>
+      <main className={`rv-page-frame ${styles.page}`} data-visual-page="home">
         <div className={styles.ambient} aria-hidden="true">
           <span className={styles.wave} />
           <span className={styles.orb} />
