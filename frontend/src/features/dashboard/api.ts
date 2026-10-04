@@ -104,6 +104,7 @@ export function getOperationsDashboard(): Promise<OperationsDashboard> {
   return apiRequest<OperationsDashboard>("/api/v1/operations/dashboard");
 }
 
-export function getSalesAnalytics(): Promise<SalesAnalytics> {
-  return apiRequest<SalesAnalytics>("/api/v1/commercial/analytics?days=7");
+export function getSalesAnalytics(days = 7): Promise<SalesAnalytics> {
+  const boundedDays = Math.max(1, Math.min(days, 365));
+  return apiRequest<SalesAnalytics>("/api/v1/commercial/analytics?days=" + boundedDays);
 }
