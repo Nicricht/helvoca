@@ -10,7 +10,7 @@ test.describe('RecepVoz visual system v2 contract', () => {
 
     expect(shell).toContain('data-visual-system="v2"');
     expect(shell).toContain('Tu recepcionista IA');
-    expect(shell).toContain('Plan Pro');
+    expect(shell).toContain('Tu plan');
     expect(shell).toContain('Minutos IA');
     expect(shell).toContain('Administrador');
     expect(shell).toContain('RecepVoz activo');
