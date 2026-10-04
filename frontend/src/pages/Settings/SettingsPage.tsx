@@ -508,6 +508,7 @@ export function SettingsPage() {
             <img className={styles.heroRobot} src="/app/assets/recepvoz/v2/settings/hero-ai-settings.webp" alt="" />
             <img className={styles.heroDocument} src="/app/assets/recepvoz/v2/settings/hero-document-organizer.webp" alt="" />
             <img className={styles.heroBusiness} src="/app/assets/recepvoz/v2/settings/business-storefront.webp" alt="" />
+            <img className={styles.heroSources} src="/app/assets/recepvoz/v2/settings/import-sources.webp" alt="" />
           </div>
         </section>
 
