@@ -145,7 +145,7 @@ export function PlanConsumptionPage() {
 
   return (
     <AppShell>
-      <main className={`rv-page-frame ${styles.page}`}>
+      <main className={`rv-page-frame ${styles.page}`} data-visual-page="plan">
         <div className={styles.ambient} aria-hidden="true"><span className={styles.wave} /></div>
 
         <header className="rv-page-header">
@@ -174,6 +174,11 @@ export function PlanConsumptionPage() {
             <div className={styles.headerActions}>
               <a className="button primary" href="/pricing.html">Ver planes</a>
             </div>
+          </div>
+
+          <div className={styles.planArt} aria-hidden="true">
+            <span className={styles.planArtOrbit} />
+            <img src="/app/assets/recepvoz/v2/plan/hero-usage-robot.webp" alt="" />
           </div>
 
           <div className={styles.usageHero}>

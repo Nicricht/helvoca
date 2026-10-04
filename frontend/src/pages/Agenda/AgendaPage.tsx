@@ -363,7 +363,7 @@ export function AgendaPage() {
 
   return (
     <AppShell>
-      <main className={styles.page}>
+      <main className={styles.page} data-visual-page="agenda">
         <header className={styles.pageHeader}>
           <div>
             <p className={styles.eyebrow}>OPERACIÓN</p>
@@ -391,6 +391,26 @@ export function AgendaPage() {
             )}
           </div>
         </header>
+
+        <section className={styles.visualHero} aria-label="Agenda asistida por RecepVoz">
+          <div className={styles.visualHeroCopy}>
+            <span className={styles.visualHeroKicker}>AGENDA EN VIVO</span>
+            <h2>RecepVoz organiza tus citas <span>mientras tú trabajas</span></h2>
+            <p>
+              Reservas, clientes y conversaciones permanecen conectados en una sola vista operativa.
+            </p>
+            <div className={styles.visualHeroSignals}>
+              <span><i data-tone="cyan" />{bookingList.length} reservas visibles</span>
+              <span><i data-tone="green" />{bookingList.filter(item => item.status === "CONFIRMED").length} confirmadas</span>
+              <span><i data-tone="violet" />{bookingList.filter(item => item.status === "PENDING").length} por revisar</span>
+            </div>
+          </div>
+          <div className={styles.visualHeroArt} aria-hidden="true">
+            <span className={styles.visualHeroOrbit} />
+            <img className={styles.visualHeroRobot} src="/app/assets/recepvoz/v2/agenda/hero-calendar-robot.webp" alt="" />
+            <img className={styles.visualHeroCalendar} src="/app/assets/recepvoz/v2/agenda/appointments-calendar.webp" alt="" />
+          </div>
+        </section>
 
         <section className={styles.metrics} aria-label="Resumen de Agenda">
           <article>

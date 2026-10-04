@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { MotionConfig, motion, useReducedMotion } from "framer-motion";
+import { Link } from "react-router-dom";
 import {
   Activity,
   ArrowUpRight,
@@ -151,6 +152,10 @@ function HeroOverview({ dashboard }: { dashboard: OperationsDashboard }) {
 
       <div className={styles.heroVisual} aria-hidden="true">
         <span className={styles.heroAura} />
+        <span className={styles.heroOrbit} />
+        <span className={styles.heroFloatIcon} data-position="phone"><Phone size={19} /></span>
+        <span className={styles.heroFloatIcon} data-position="message"><MessageCircle size={19} /></span>
+        <span className={styles.heroFloatIcon} data-position="calendar"><CalendarDays size={19} /></span>
         <img src="/app/assets/home/hero-bot.webp" alt="" />
       </div>
     </section>
@@ -401,15 +406,12 @@ function QuickActions() {
       <h2 className={styles.srOnly}>Accesos rápidos</h2>
       <div className={styles.quickGrid}>
         {actions.map(({ ariaLabel, title, detail, href, icon: Icon, art, tone }) => (
-          <motion.a
+          <Link
             key={ariaLabel}
             className={styles.quickAction}
             data-tone={tone}
-            href={href}
+            to={href.replace(/^\/app/, "") || "/"}
             aria-label={ariaLabel}
-            whileHover={{ y: -3 }}
-            whileTap={{ scale: .985 }}
-            transition={{ duration: .16 }}
           >
             {art ? (
               <img className={styles.quickArt} src={art} alt="" aria-hidden="true" />
@@ -421,7 +423,7 @@ function QuickActions() {
               <small>{detail}</small>
             </span>
             <ArrowUpRight size={16} aria-hidden="true" />
-          </motion.a>
+          </Link>
         ))}
       </div>
     </nav>
@@ -619,7 +621,7 @@ export function HomePage() {
   return (
     <AppShell>
       <MotionConfig reducedMotion="user">
-      <main className={`rv-page-frame ${styles.page}`}>
+      <main className={`rv-page-frame ${styles.page}`} data-visual-page="home">
         <div className={styles.ambient} aria-hidden="true">
           <span className={styles.wave} />
           <span className={styles.orb} />

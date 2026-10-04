@@ -705,7 +705,7 @@ export function InventoryPage() {
 
   return (
     <AppShell>
-      <main className={`rv-page-frame ${styles.page}`}>
+      <main className={`rv-page-frame ${styles.page}`} data-visual-page="inventory">
         <header className="rv-page-header">
           <div>
             <p className="eyebrow">OPERACIÓN</p>
@@ -717,6 +717,27 @@ export function InventoryPage() {
           </div>
           <span className={styles.rolePill}>{roleLabel}</span>
         </header>
+
+        <section className={styles.visualHero} aria-label="Inventario inteligente RecepVoz">
+          <div className={styles.visualHeroCopy}>
+            <span className={styles.visualHeroKicker}>STOCK INTELIGENTE</span>
+            <h2>Tu inventario visible <span>antes de prometer una venta</span></h2>
+            <p>
+              RecepVoz cruza stock físico, reservado y disponible para que la operación responda con datos reales.
+            </p>
+            <div className={styles.visualHeroSignals}>
+              <span><i data-tone="cyan" />{rows.length} productos</span>
+              <span><i data-tone="green" />{tracked.length} controlados</span>
+              <span><i data-tone="warning" />{lowStockTotal} requieren atención</span>
+            </div>
+          </div>
+          <div className={styles.visualHeroArt} aria-hidden="true">
+            <span className={styles.visualHeroOrbit} />
+            <img className={styles.visualHeroRobot} src="/app/assets/recepvoz/v2/inventory/hero-stock-robot.webp" alt="" />
+            <img className={styles.visualHealthy} src="/app/assets/recepvoz/v2/inventory/stock-confirmed.webp" alt="" />
+            <img className={styles.visualWarning} src="/app/assets/recepvoz/v2/inventory/stock-warning.webp" alt="" />
+          </div>
+        </section>
 
         <section className={styles.summaryGrid} aria-label="Resumen de inventario">
           <SummaryCard

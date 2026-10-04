@@ -430,7 +430,7 @@ export function OrdersPage() {
 
   return (
     <AppShell>
-      <main className={`rv-page-frame ${styles.page}`}>
+      <main className={`rv-page-frame ${styles.page}`} data-visual-page="operations">
         <header className="rv-page-header">
           <div>
             <p className="eyebrow">OPERACIONES</p>
@@ -444,6 +444,30 @@ export function OrdersPage() {
             {model.canManage || model.canPrepare ? "Gestión habilitada" : "Solo lectura"}
           </span>
         </header>
+
+        <section className={styles.visualHero} aria-label="Centro de operaciones RecepVoz">
+          <div className={styles.visualHeroCopy}>
+            <span className={styles.visualHeroKicker}>FLUJO EN TIEMPO REAL</span>
+            <h2>De pedido recibido a <span>entrega completada</span></h2>
+            <p>
+              RecepVoz mantiene pedidos, clientes y conversaciones enlazados para que tu equipo actúe sin perder contexto.
+            </p>
+            <div className={styles.visualHeroFlow} aria-label="Flujo operativo en tiempo real">
+              <span><i data-tone="cyan" />{activeCount} activos</span>
+              <b aria-hidden="true">→</b>
+              <span><i data-tone="violet" />{preparingCount} preparando</span>
+              <b aria-hidden="true">→</b>
+              <span><i data-tone="green" />{readyCount} listos</span>
+            </div>
+          </div>
+          <div className={styles.visualHeroArt} aria-hidden="true">
+            <span className={styles.visualHeroOrbit} />
+            <span className={styles.visualRoute} />
+            <img className={styles.visualHeroRobot} src="/app/assets/recepvoz/v2/operations/hero-order-robot.webp" alt="" />
+            <img className={styles.visualPackage} src="/app/assets/recepvoz/v2/operations/order-package.webp" alt="" />
+            <img className={styles.visualTruck} src="/app/assets/recepvoz/v2/operations/delivery-truck.webp" alt="" />
+          </div>
+        </section>
 
         <section className={styles.summaryGrid} aria-label="Resumen de pedidos">
           <article className={styles.summaryCard}>

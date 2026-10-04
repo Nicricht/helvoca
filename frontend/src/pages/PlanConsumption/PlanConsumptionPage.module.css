@@ -50,6 +50,19 @@
   gap: var(--rv-space-3);
 }
 
+.headerActions a {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .planCard,
 .metric,
 .projectionCard,
@@ -407,11 +420,11 @@
 @media (max-width: 620px) {
   .headerActions {
     width: 100%;
+    justify-content: flex-start;
   }
 
   .headerActions a {
-    width: 100%;
-    justify-content: center;
+    width: auto;
   }
 
   .planCard,
@@ -434,5 +447,278 @@
   .wave::after,
   .spinner {
     animation: none;
+  }
+}
+
+
+/* === Visual System v2: Plan & consumption ============================== */
+.planCard {
+  min-height: 410px;
+  padding: clamp(28px, 3.4vw, 44px);
+  border-color: rgba(69,153,216,.29);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 79% 33%, rgba(28,205,255,.15), transparent 28%),
+    radial-gradient(circle at 90% 83%, rgba(142,76,255,.16), transparent 31%),
+    linear-gradient(116deg, rgba(5,31,51,.98), rgba(7,29,52,.97) 49%, rgba(14,21,65,.95));
+  box-shadow:
+    0 24px 64px rgba(0,5,20,.18),
+    inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+.planCard::before {
+  position: absolute;
+  width: 78%;
+  height: 1px;
+  right: -10%;
+  top: 55%;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(39,223,255,.38), rgba(138,81,255,.31), transparent);
+  box-shadow: 0 0 25px rgba(39,223,255,.13);
+  transform: rotate(-7deg);
+  animation: planWave 8.6s ease-in-out infinite alternate;
+}
+
+.planTop {
+  max-width: 61%;
+}
+
+.planArt {
+  position: absolute;
+  z-index: 1;
+  width: 43%;
+  min-width: 340px;
+  height: 90%;
+  right: 1.5%;
+  top: 5%;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.planArt::after {
+  position: absolute;
+  width: 84%;
+  height: 44%;
+  left: 8%;
+  bottom: 4%;
+  content: "";
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(31,191,255,.16), rgba(108,65,255,.08) 48%, transparent 72%);
+  filter: blur(15px);
+  animation: planBreathe 6.2s ease-in-out infinite;
+}
+
+.planArtOrbit {
+  position: absolute;
+  width: 310px;
+  height: 310px;
+  border: 1px solid rgba(66,220,255,.11);
+  border-radius: 50%;
+  box-shadow:
+    0 0 38px rgba(42,203,255,.07),
+    inset 0 0 32px rgba(126,78,255,.04);
+  animation: planOrbit 19s linear infinite;
+}
+
+.planArt img {
+  position: relative;
+  z-index: 2;
+  width: min(440px, 108%);
+  max-height: 330px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 24px 40px rgba(0,0,0,.36))
+    drop-shadow(0 0 18px rgba(42,211,255,.11));
+  animation: planFloat 5.8s ease-in-out infinite;
+}
+
+.usageHero,
+.planFooter {
+  width: 56%;
+  max-width: 650px;
+}
+
+.usageHero {
+  margin-top: clamp(34px, 5vw, 54px);
+}
+
+.usageNumber strong {
+  background: linear-gradient(90deg, #f7fcff, #aeefff 62%, #c2b0ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: #f7fcff;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
+.progressTrack {
+  height: 11px;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.36);
+}
+
+.progressBar {
+  background: linear-gradient(90deg,#2ce4ff 0%,#5f9dff 58%,#9b70ff 100%);
+  box-shadow:
+    0 0 18px rgba(22,217,245,.34),
+    0 0 28px rgba(111,84,255,.15);
+}
+
+.metric,
+.projectionCard,
+.billingCard {
+  border-color: rgba(64,139,193,.20);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(33,213,255,.055), transparent 38%),
+    linear-gradient(145deg,rgba(8,33,53,.96),rgba(5,22,39,.98));
+  box-shadow:
+    0 16px 36px rgba(0,7,24,.10),
+    inset 0 1px 0 rgba(255,255,255,.014);
+  transition:
+    transform var(--rv-motion-fast) var(--rv-ease-out),
+    border-color var(--rv-motion-fast) ease,
+    box-shadow var(--rv-motion-fast) ease;
+}
+
+.metric:hover,
+.projectionCard:hover,
+.billingCard:hover {
+  transform: translateY(-3px);
+  border-color: rgba(62,210,242,.30);
+  box-shadow: 0 22px 42px rgba(0,7,26,.16);
+}
+
+.metricIcon {
+  box-shadow: 0 0 22px rgba(22,217,245,.07);
+  animation: planMetricGlow 4.3s ease-in-out infinite;
+}
+
+.activePill {
+  position: relative;
+  box-shadow: 0 0 20px rgba(61,220,151,.07);
+}
+
+.activePill::before {
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  content: "";
+  border-radius: 50%;
+  background: #42e3a4;
+  box-shadow: 0 0 9px rgba(66,227,164,.64);
+  animation: planStatusPulse 2.2s ease-out infinite;
+}
+
+@keyframes planFloat {
+  0%,100% { transform: translate3d(0,0,0) rotate(-.35deg); }
+  50% { transform: translate3d(0,-12px,0) rotate(.55deg); }
+}
+
+@keyframes planOrbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes planWave {
+  0% { transform: translate3d(-6%,9px,0) rotate(-8deg) scaleX(.95); opacity: .46; }
+  100% { transform: translate3d(7%,-11px,0) rotate(-4deg) scaleX(1.05); opacity: 1; }
+}
+
+@keyframes planBreathe {
+  0%,100% { opacity: .60; transform: scale(.94); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes planMetricGlow {
+  0%,100% { filter: drop-shadow(0 0 0 rgba(22,217,245,0)); }
+  50% { filter: drop-shadow(0 0 8px rgba(22,217,245,.18)); }
+}
+
+@keyframes planStatusPulse {
+  0% { transform: scale(.82); opacity: .55; }
+  45% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.45); opacity: .1; }
+}
+
+@media (max-width: 980px) {
+  .planCard {
+    min-height: 390px;
+  }
+
+  .planTop,
+  .usageHero,
+  .planFooter {
+    width: 58%;
+    max-width: none;
+  }
+
+  .planArt {
+    width: 42%;
+    min-width: 290px;
+  }
+}
+
+@media (max-width: 760px) {
+  .planCard {
+    min-height: 0;
+  }
+
+  .planTop,
+  .usageHero,
+  .planFooter {
+    width: 100%;
+    max-width: none;
+  }
+
+  .planArt {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    height: 240px;
+    right: auto;
+    top: auto;
+    margin-top: 12px;
+  }
+
+  .planArt img {
+    max-height: 240px;
+  }
+
+  .usageHero {
+    margin-top: 10px;
+  }
+}
+
+@media (max-width: 620px) {
+  .planCard {
+    padding: 21px 17px;
+    border-radius: 19px;
+  }
+
+  .planArt {
+    height: 210px;
+  }
+
+  .planArtOrbit {
+    width: 220px;
+    height: 220px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planCard::before,
+  .planArt::after,
+  .planArtOrbit,
+  .planArt img,
+  .metricIcon,
+  .activePill::before {
+    animation: none !important;
+  }
+
+  .metric,
+  .projectionCard,
+  .billingCard {
+    transition-duration: .01ms !important;
   }
 }

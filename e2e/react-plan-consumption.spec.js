@@ -163,6 +163,27 @@ test.describe('React Plan y consumo pilot', () => {
     await expect(page).toHaveURL('http://127.0.0.1:4173/');
   });
 
+  test('keeps the mobile plan CTA compact and polished', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await bootAuthenticated(page);
+    await page.goto('/app/index.html');
+
+    const cta = page.getByRole('link', { name: /cambiar plan|ver planes/i });
+    await expect(cta).toBeVisible();
+
+    const appearance = await cta.evaluate(element => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return {
+        textDecorationLine: style.textDecorationLine,
+        width: rect.width
+      };
+    });
+
+    expect(appearance.textDecorationLine).toBe('none');
+    expect(appearance.width).toBeLessThan(180);
+  });
+
   test('stays contained at desktop, tablet and mobile widths', async ({ page }) => {
     await bootAuthenticated(page);
 
