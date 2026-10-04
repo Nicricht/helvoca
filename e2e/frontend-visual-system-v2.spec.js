@@ -52,6 +52,15 @@ test.describe('RecepVoz visual system v2 contract', () => {
     }
   });
 
+  test('settings mobile import action is presented as a polished compact control', async () => {
+    const settings = read('frontend/src/pages/Settings/SettingsPage.tsx');
+    const css = read('frontend/src/pages/Settings/SettingsPage.module.css');
+
+    expect(settings).toContain('className={styles.headerAction}');
+    expect(css).toMatch(/\.headerAction\s*\{[^}]*text-decoration:\s*none;/s);
+    expect(css).toMatch(/@media\s*\(max-width:\s*430px\)[\s\S]*?\.headerAction\s*\{[^}]*width:\s*auto;/);
+  });
+
   test('screen motion remains substantial but reduced-motion safe', async () => {
     const cssFiles = [
       'frontend/src/pages/Home/HomePage.module.css',
