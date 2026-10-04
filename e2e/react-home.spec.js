@@ -290,7 +290,7 @@ test.describe('React Home migration', () => {
     await expect(recent).toContainText('+56911112222');
 
     await expect(page.getByRole('navigation', { name: 'Accesos rápidos' })).toHaveCount(0);
-    await expect(page.getByRole('region', { name: 'Valor generado por RecepVoz' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Resumen de ventas' })).toHaveCount(0);
 
     const apiRequests = requests.filter(request => request.url.includes('/api/v1/'));
     for (const request of apiRequests) {
