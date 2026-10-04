@@ -50,6 +50,19 @@
   gap: var(--rv-space-3);
 }
 
+.headerActions a {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .planCard,
 .metric,
 .projectionCard,
@@ -407,11 +420,11 @@
 @media (max-width: 620px) {
   .headerActions {
     width: 100%;
+    justify-content: flex-start;
   }
 
   .headerActions a {
-    width: 100%;
-    justify-content: center;
+    width: auto;
   }
 
   .planCard,
