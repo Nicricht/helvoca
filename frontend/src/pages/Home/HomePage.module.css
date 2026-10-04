@@ -1,6 +1,8 @@
 .page {
   position: relative;
   isolation: isolate;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .header {
@@ -952,7 +954,7 @@
 
 .ambient {
   top: -90px;
-  right: -22px;
+  right: 0;
   width: min(860px, 70vw);
   height: 360px;
   opacity: .8;
