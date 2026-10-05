@@ -49,7 +49,7 @@ Visual certification covers:
 | Agenda | Home Agenda workspace / canonical agenda route if later separated |
 | Clientes | Home Clientes workspace / canonical customers route if later separated |
 | Inventario | `/inventory.html` |
-| Configuración | `/settings.html` |
+| Configuración | `/app/settings` |
 | Facturación | `/account.html` |
 | Simulador | `/simulator.html` |
 
