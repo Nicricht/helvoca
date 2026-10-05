@@ -7,6 +7,8 @@
 :root {
   color-scheme: dark;
 
+  --rv-font-ui: Inter, "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
   --rv-bg-canvas: #06111c;
   --rv-bg-shell: #081825;
   --rv-surface-1: #0b1b29;
@@ -109,6 +111,10 @@ body {
   margin: 0;
   background-color: var(--rv-bg-canvas);
   color: var(--rv-text-primary);
+  font-family: var(--rv-font-ui);
+  font-synthesis: none;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
 }
 
 body.home-page:has(#dashboardView:not(.hidden)),

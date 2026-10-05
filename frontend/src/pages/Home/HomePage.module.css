@@ -3081,3 +3081,336 @@
     transform: none !important;
   }
 }
+
+
+/* =========================================================
+   Home visual atmosphere V4
+   Petroleum stays dark; cyan/violet energy moves underneath.
+   ========================================================= */
+
+.page {
+  --home-petrol-cyan: rgba(22, 217, 245, .18);
+  --home-petrol-blue: rgba(36, 112, 255, .15);
+  --home-petrol-violet: rgba(139, 92, 246, .14);
+  --home-petrol-emerald: rgba(61, 220, 151, .09);
+}
+
+.petrolAtmosphere {
+  position: absolute;
+  z-index: -1;
+  inset: -110px -24px -240px;
+  overflow: hidden;
+  pointer-events: none;
+  contain: paint;
+}
+
+.petrolFlow,
+.petrolGrid,
+.petrolParticles,
+.petrolHalo {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  will-change: transform, opacity, background-position;
+}
+
+.petrolFlow {
+  width: 132%;
+  height: 58%;
+  left: -18%;
+  top: 64px;
+  opacity: .62;
+  border-radius: 44% 56% 48% 52%;
+  background:
+    radial-gradient(ellipse at 28% 54%, rgba(22, 217, 245, .15), transparent 31%),
+    radial-gradient(ellipse at 72% 46%, rgba(139, 92, 246, .14), transparent 32%),
+    repeating-radial-gradient(
+      ellipse at 48% 58%,
+      transparent 0 17px,
+      rgba(22, 217, 245, .07) 18px 19px,
+      transparent 20px 29px,
+      rgba(82, 102, 255, .045) 30px 31px,
+      transparent 32px 46px
+    );
+  filter: blur(.15px) saturate(1.2);
+  mask-image: linear-gradient(90deg, transparent 1%, #000 13%, #000 88%, transparent 99%);
+  animation: homePetrolFlow 18s cubic-bezier(.45, 0, .28, 1) infinite alternate;
+}
+
+.petrolGrid {
+  width: 118%;
+  height: 86%;
+  left: -9%;
+  top: 3%;
+  opacity: .22;
+  background-image:
+    linear-gradient(rgba(72, 202, 232, .12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(72, 202, 232, .09) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image:
+    radial-gradient(ellipse at 48% 36%, #000 0 18%, rgba(0,0,0,.78) 42%, transparent 76%);
+  transform: perspective(720px) rotateX(64deg) translateY(20%);
+  transform-origin: 50% 40%;
+  animation: homeGridDrift 20s linear infinite;
+}
+
+.petrolParticles {
+  width: 104%;
+  height: 100%;
+  left: -2%;
+  top: 0;
+  opacity: .52;
+  background:
+    radial-gradient(circle at 8% 18%, rgba(74, 231, 255, .55) 0 1px, transparent 2px),
+    radial-gradient(circle at 19% 63%, rgba(67, 177, 255, .42) 0 1px, transparent 2px),
+    radial-gradient(circle at 31% 29%, rgba(126, 101, 255, .45) 0 1px, transparent 2px),
+    radial-gradient(circle at 42% 77%, rgba(44, 221, 244, .36) 0 1px, transparent 2px),
+    radial-gradient(circle at 56% 44%, rgba(69, 237, 213, .34) 0 1px, transparent 2px),
+    radial-gradient(circle at 66% 14%, rgba(139, 92, 246, .48) 0 1.2px, transparent 2.2px),
+    radial-gradient(circle at 78% 69%, rgba(43, 207, 255, .42) 0 1px, transparent 2px),
+    radial-gradient(circle at 91% 33%, rgba(169, 112, 255, .38) 0 1.2px, transparent 2.2px),
+    radial-gradient(circle at 96% 84%, rgba(42, 220, 179, .32) 0 1px, transparent 2px);
+  filter: drop-shadow(0 0 5px rgba(22, 217, 245, .2));
+  animation: homeParticleDrift 14s ease-in-out infinite alternate;
+}
+
+.petrolHalo {
+  width: 86%;
+  height: 76%;
+  right: -15%;
+  top: -5%;
+  opacity: .82;
+  background:
+    radial-gradient(circle at 66% 20%, rgba(22, 217, 245, .13), transparent 24%),
+    radial-gradient(circle at 78% 42%, rgba(60, 112, 255, .12), transparent 31%),
+    radial-gradient(circle at 61% 64%, rgba(139, 92, 246, .10), transparent 30%),
+    radial-gradient(circle at 16% 72%, rgba(22, 217, 245, .055), transparent 28%);
+  filter: blur(12px);
+  animation: homeHaloDrift 16s ease-in-out infinite alternate;
+}
+
+/* Put visible current-lines inside the two large petroleum surfaces too. */
+.heroCard::after {
+  display: block;
+  position: absolute;
+  z-index: 0;
+  width: auto;
+  left: -8%;
+  right: -5%;
+  top: auto;
+  bottom: -52px;
+  height: 126px;
+  content: "";
+  pointer-events: none;
+  opacity: .56;
+  background:
+    repeating-radial-gradient(
+      ellipse at 50% 110%,
+      transparent 0 15px,
+      rgba(22, 217, 245, .12) 16px 17px,
+      transparent 18px 25px,
+      rgba(115, 92, 246, .09) 26px 27px,
+      transparent 28px 38px
+    );
+  filter: drop-shadow(0 0 13px rgba(22, 217, 245, .08));
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 84%, transparent);
+  animation: homeCardCurrent 13s ease-in-out infinite alternate;
+}
+
+.heroCopy,
+.heroVisual {
+  position: relative;
+  z-index: 2;
+}
+
+.valueCard::before {
+  position: absolute;
+  z-index: 0;
+  inset: -34% -8% -38% -12%;
+  content: "";
+  pointer-events: none;
+  opacity: .52;
+  background:
+    radial-gradient(ellipse at 42% 54%, rgba(22, 217, 245, .10), transparent 29%),
+    repeating-radial-gradient(
+      ellipse at 45% 68%,
+      transparent 0 18px,
+      rgba(22, 217, 245, .075) 19px 20px,
+      transparent 21px 30px,
+      rgba(139, 92, 246, .06) 31px 32px,
+      transparent 33px 45px
+    );
+  mask-image: linear-gradient(90deg, transparent 0, #000 13%, #000 80%, transparent 100%);
+  animation: homeValueCurrent 17s ease-in-out infinite alternate;
+}
+
+.metricCard::after {
+  animation: homeMetricGlow 11s ease-in-out infinite alternate;
+}
+
+.panel,
+.latestPanel {
+  background-image:
+    radial-gradient(circle at 86% 18%, rgba(22, 217, 245, .045), transparent 26%),
+    radial-gradient(circle at 12% 88%, rgba(139, 92, 246, .035), transparent 27%),
+    linear-gradient(148deg, rgba(7, 28, 45, .985), rgba(5, 22, 37, .985));
+  background-size: 150% 150%, 160% 160%, 100% 100%;
+  animation: homePanelBreath 16s ease-in-out infinite alternate;
+}
+
+.valueAmount > strong,
+.moneyStack strong,
+.metricCopy strong,
+.countPill,
+.latestItem time {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes homePetrolFlow {
+  0% {
+    transform: translate3d(-2.5%, 2%, 0) rotate(-4deg) scaleX(.98) scaleY(.94);
+    opacity: .48;
+  }
+  48% {
+    opacity: .72;
+  }
+  100% {
+    transform: translate3d(4%, -3.5%, 0) rotate(-1deg) scaleX(1.035) scaleY(1.04);
+    opacity: .60;
+  }
+}
+
+@keyframes homeGridDrift {
+  from {
+    background-position: 0 0, 0 0;
+    transform: perspective(720px) rotateX(64deg) translate3d(-1.5%, 20%, 0);
+  }
+  to {
+    background-position: 42px 42px, 42px 42px;
+    transform: perspective(720px) rotateX(64deg) translate3d(1.5%, 17%, 0);
+  }
+}
+
+@keyframes homeParticleDrift {
+  0% {
+    transform: translate3d(-4px, 3px, 0);
+    opacity: .36;
+  }
+  50% {
+    opacity: .62;
+  }
+  100% {
+    transform: translate3d(10px, -13px, 0);
+    opacity: .47;
+  }
+}
+
+@keyframes homeHaloDrift {
+  from {
+    transform: translate3d(-3%, -2%, 0) scale(.96);
+    opacity: .66;
+  }
+  to {
+    transform: translate3d(4%, 5%, 0) scale(1.06);
+    opacity: .92;
+  }
+}
+
+@keyframes homeCardCurrent {
+  from {
+    transform: translate3d(-2%, 4px, 0) rotate(-1.2deg) scaleX(.98);
+    opacity: .40;
+  }
+  to {
+    transform: translate3d(3%, -7px, 0) rotate(.8deg) scaleX(1.025);
+    opacity: .66;
+  }
+}
+
+@keyframes homeValueCurrent {
+  from {
+    transform: translate3d(-3%, 5px, 0) rotate(-1.5deg) scale(.98);
+    opacity: .38;
+  }
+  to {
+    transform: translate3d(4%, -5px, 0) rotate(1deg) scale(1.035);
+    opacity: .58;
+  }
+}
+
+@keyframes homeMetricGlow {
+  from {
+    transform: translate3d(-4px, -2px, 0) scale(.94);
+    opacity: .45;
+  }
+  to {
+    transform: translate3d(9px, 7px, 0) scale(1.08);
+    opacity: .78;
+  }
+}
+
+@keyframes homePanelBreath {
+  from {
+    background-position: 100% 0, 0 100%, 0 0;
+  }
+  to {
+    background-position: 72% 24%, 18% 74%, 0 0;
+  }
+}
+
+@media (max-width: 980px) {
+  .petrolAtmosphere {
+    inset: -90px -20px -180px;
+  }
+
+  .petrolGrid {
+    opacity: .16;
+    background-size: 38px 38px;
+  }
+
+  .petrolFlow {
+    height: 48%;
+    opacity: .52;
+  }
+}
+
+@media (max-width: 620px) {
+  .petrolAtmosphere {
+    inset: -70px -12px -130px;
+  }
+
+  .petrolFlow {
+    width: 150%;
+    left: -30%;
+    opacity: .43;
+  }
+
+  .petrolGrid {
+    opacity: .11;
+    background-size: 34px 34px;
+  }
+
+  .petrolParticles {
+    opacity: .36;
+  }
+
+  .petrolHalo {
+    width: 120%;
+    right: -42%;
+    opacity: .64;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .petrolFlow,
+  .petrolGrid,
+  .petrolParticles,
+  .petrolHalo,
+  .heroCard::after,
+  .valueCard::before,
+  .metricCard::after,
+  .panel,
+  .latestPanel {
+    animation: none !important;
+  }
+}
