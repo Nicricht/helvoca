@@ -74,6 +74,36 @@ test.describe('RecepVoz visual system v2 contract', () => {
     expect(css).toContain('@media (prefers-reduced-motion: reduce)');
   });
 
+  test('shared product typography is an explicit professional sans stack', async () => {
+    const foundation = read('src/main/resources/static/frontend-foundation.css');
+
+    expect(foundation).toContain('--rv-font-ui:');
+    expect(foundation).toMatch(/--rv-font-ui:[^;]*(?:Inter|Segoe UI)[^;]*sans-serif;/);
+    expect(foundation).toMatch(/body\s*\{[^}]*font-family:\s*var\(--rv-font-ui\)/s);
+    expect(foundation).not.toMatch(/--rv-font-ui:[^;]*(?:Times New Roman|Georgia|ui-serif)/i);
+  });
+
+  test('Home petrol field is built from four restrained ambient layers', async () => {
+    const home = read('frontend/src/pages/Home/HomePage.tsx');
+    const css = read('frontend/src/pages/Home/HomePage.module.css');
+
+    for (const layer of ['flow', 'grid', 'particles', 'halo']) {
+      expect(home).toContain(`data-home-ambient-layer="${layer}"`);
+    }
+
+    for (const keyframe of [
+      'homePetrolFlow',
+      'homeGridDrift',
+      'homeParticleDrift',
+      'homeHaloDrift'
+    ]) {
+      expect(css).toContain(`@keyframes ${keyframe}`);
+    }
+
+    expect(css).toMatch(/\.petrolAtmosphere\s*\{[^}]*pointer-events:\s*none;/s);
+    expect(css).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.petrolFlow[\s\S]*?animation:\s*none\s*!important;/);
+  });
+
   test('screen motion remains substantial but reduced-motion safe', async () => {
     const cssFiles = [
       'frontend/src/pages/Home/HomePage.module.css',
