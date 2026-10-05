@@ -28,6 +28,33 @@ function subscription(overrides = {}) {
   };
 }
 
+function billingStatus(overrides = {}) {
+  return {
+    provider: null,
+    billingEnabled: false,
+    checkoutConfigured: false,
+    currentPlanCode: 'PRO',
+    currentPlanName: 'Pro',
+    currentMonthlyPriceClp: 69990,
+    subscriptionStatus: 'ACTIVE',
+    pendingPlanCode: null,
+    pendingPlanName: null,
+    pendingMonthlyPriceClp: null,
+    checkoutUrl: null,
+    awaitingProviderVerification: false,
+    ...overrides
+  };
+}
+
+function publicPlans() {
+  return [
+    { code: 'EMPRENDE', name: 'Emprende', monthlyPriceClp: 24990, includedMinutes: 100, maxConcurrentCalls: 1, overagePerMinuteClp: 149, customPricing: false, recommended: false },
+    { code: 'NEGOCIO', name: 'Negocio', monthlyPriceClp: 39990, includedMinutes: 250, maxConcurrentCalls: 3, overagePerMinuteClp: 129, customPricing: false, recommended: true },
+    { code: 'PRO', name: 'Pro', monthlyPriceClp: 69990, includedMinutes: 500, maxConcurrentCalls: 10, overagePerMinuteClp: 109, customPricing: false, recommended: false },
+    { code: 'ENTERPRISE', name: 'Enterprise', monthlyPriceClp: 119990, includedMinutes: 1000, maxConcurrentCalls: 10, overagePerMinuteClp: null, customPricing: true, recommended: false }
+  ];
+}
+
 async function bootAuthenticated(page, options = {}) {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
 
@@ -45,6 +72,33 @@ async function bootAuthenticated(page, options = {}) {
       });
     }
     return route.fulfill(json(subscription(options.subscription)));
+  });
+
+  let billingStatusReads = 0;
+  let checkoutCalls = 0;
+  let checkoutPayload = null;
+
+  await page.route('**/api/v1/billing/status', route => {
+    billingStatusReads += 1;
+    return route.fulfill(json(billingStatus(options.billingStatus)));
+  });
+
+  await page.route('**/api/v1/public/pricing', route => route.fulfill(json(options.publicPlans || publicPlans())));
+
+  await page.route('**/api/v1/billing/checkout', async route => {
+    checkoutCalls += 1;
+    checkoutPayload = route.request().postDataJSON();
+    const response = typeof options.checkoutResponse === 'function'
+      ? await options.checkoutResponse(checkoutPayload)
+      : options.checkoutResponse;
+    return route.fulfill(json(response || {
+      subscriptionId: 'pre-e2e-default',
+      checkoutUrl: 'https://checkout.example.test/default',
+      planCode: checkoutPayload.plan,
+      planName: checkoutPayload.plan,
+      monthlyPriceClp: 0,
+      reused: false
+    }));
   });
 
   await page.route('**/api/v1/usage/status', route => route.fulfill(json({
@@ -83,6 +137,12 @@ async function bootAuthenticated(page, options = {}) {
       }
     ]));
   });
+
+  return {
+    billingStatusReads: () => billingStatusReads,
+    checkoutCalls: () => checkoutCalls,
+    checkoutPayload: () => checkoutPayload
+  };
 }
 
 test.describe('React Plan y consumo pilot', () => {
@@ -110,6 +170,73 @@ test.describe('React Plan y consumo pilot', () => {
     await expect(page.locator('body')).not.toContainText('Protección excepcional');
     await expect(page.locator('body')).not.toContainText('Exceso estimado');
     await expect(page.locator('body')).not.toContainText('Llamadas simultáneas');
+  });
+
+  test('starts a plan checkout only after confirmation and keeps the current plan until payment is verified', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__openedCheckoutUrls = [];
+      window.open = url => {
+        window.__openedCheckoutUrls.push(url);
+        return { closed: false };
+      };
+    });
+
+    const calls = await bootAuthenticated(page, {
+      subscription: {
+        plan: 'BASIC',
+        publicPlanCode: 'EMPRENDE',
+        planName: 'Emprende',
+        includedMinutes: 100,
+        usedMinutes: 37
+      },
+      billingStatus: {
+        provider: null,
+        billingEnabled: true,
+        checkoutConfigured: true,
+        currentPlanCode: 'EMPRENDE',
+        currentPlanName: 'Emprende',
+        currentMonthlyPriceClp: 24990,
+        subscriptionStatus: 'TRIALING'
+      },
+      checkoutResponse: {
+        subscriptionId: 'pre-e2e-1',
+        checkoutUrl: 'https://checkout.example.test/pre-e2e-1',
+        planCode: 'NEGOCIO',
+        planName: 'Negocio',
+        monthlyPriceClp: 39990,
+        reused: false
+      }
+    });
+
+    await page.goto('/app/plan');
+
+    await expect(page.getByRole('heading', { name: 'Gestionar plan' })).toBeVisible();
+    await expect(page.getByTestId('billing-current-plan')).toContainText('Emprende');
+    expect(calls.checkoutCalls()).toBe(0);
+
+    page.once('dialog', async dialog => {
+      expect(dialog.message()).toContain('no se activará hasta verificar el pago');
+      await dialog.accept();
+    });
+    await page.getByRole('button', { name: 'Elegir Negocio' }).click();
+
+    await expect.poll(() => calls.checkoutCalls()).toBe(1);
+    expect(calls.checkoutPayload()).toEqual({ plan: 'NEGOCIO' });
+    await expect(page.getByTestId('billing-current-plan')).toContainText('Emprende');
+    await expect(page.getByTestId('billing-pending-plan')).toContainText('Negocio');
+    await expect(page.getByTestId('billing-pending-plan')).toContainText('verificar');
+    await expect.poll(() => page.evaluate(() => window.__openedCheckoutUrls)).toEqual([
+      'https://checkout.example.test/pre-e2e-1'
+    ]);
+  });
+
+  test('does not request admin-only billing management for an operator', async ({ page }) => {
+    const calls = await bootAuthenticated(page, { roles: ['OPERATOR'], usageForbidden: true });
+    await page.goto('/app/plan');
+
+    await expect(page.getByTestId('plan-name')).toHaveText('Pro');
+    await expect(page.getByRole('heading', { name: 'Gestionar plan' })).toHaveCount(0);
+    expect(calls.billingStatusReads()).toBe(0);
   });
 
   test('shows an intentional loading state before subscription data arrives', async ({ page }) => {
