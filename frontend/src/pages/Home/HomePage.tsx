@@ -609,9 +609,11 @@ export function HomePage() {
     <AppShell>
       <MotionConfig reducedMotion="user">
       <main className={`rv-page-frame ${styles.page}`} data-visual-page="home">
-        <div className={styles.ambient} aria-hidden="true">
-          <span className={styles.wave} />
-          <span className={styles.orb} />
+        <div className={styles.petrolAtmosphere} aria-hidden="true">
+          <span className={styles.petrolFlow} data-home-ambient-layer="flow" />
+          <span className={styles.petrolGrid} data-home-ambient-layer="grid" />
+          <span className={styles.petrolParticles} data-home-ambient-layer="particles" />
+          <span className={styles.petrolHalo} data-home-ambient-layer="halo" />
         </div>
 
         <header className={styles.compactHeader}>
