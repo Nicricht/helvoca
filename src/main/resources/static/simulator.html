@@ -1,28 +1,19 @@
 <!doctype html>
 <html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#06111c"><title>Probar mi recepcionista</title><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/simulator.css?v=20260928-2"><link rel="stylesheet" href="/frontend-foundation.css?v=20260930-2"></head>
-<body class="simulator-page">
-<header class="topbar"><div><strong>TU NEGOCIO</strong><span>Prueba de recepcionista</span></div><nav aria-label="Navegación principal">
-    <a href="/">Inicio</a>
-    <a href="/app/agenda">Agenda</a>
-            <a class="nav-orders" href="/app/orders">Operaciones</a>
-    <a href="/#customers">Clientes</a>
-    <a href="/app/inventory">Inventario</a>
-    <a href="/app/settings">Configuración</a>
-    <a href="/app/plan">Plan y consumo</a>
-  </nav></header>
-<main>
-<section class="hero"><div><p class="eyebrow">SIMULADOR SEGURO</p><h1>Prueba cómo atendería RecepVoz, sin tocar el mundo real.</h1><p>Conversa con la configuración de tu negocio y revisa qué respondería la IA antes de usarla con clientes.</p></div><div id="sessionBadge" class="badge">Sin prueba activa</div></section>
-<section class="sim-grid">
-<article class="panel chat-panel">
-<div class="panel-head"><div><p class="eyebrow">CONVERSACIÓN</p><h2>Probar mi recepcionista</h2></div><div class="actions"><a class="button ghost simulator-history-link" href="/app/agenda">Ver historial</a><button id="startBtn">Nueva prueba</button><button id="finishBtn" class="ghost" disabled>Finalizar</button></div></div>
-<div class="safe-note"><span class="safe-icon" aria-hidden="true">✓</span><div><strong>Modo seguro</strong><span>No crea datos comerciales reales ni realiza llamadas telefónicas. Tampoco envía WhatsApp real ni modifica clientes, reservas o pedidos reales.</span></div></div>
-<div id="simStatus" class="sim-feedback hidden" role="status" aria-live="polite"></div>
-<div id="chat" class="chat" aria-live="polite"><div class="empty">Inicia una prueba para comenzar.</div></div>
-<form id="messageForm" class="composer"><button id="micBtn" class="mic" type="button" title="Hablar" aria-label="Usar micrófono" aria-pressed="false" disabled>🎙</button><input id="messageInput" autocomplete="off" placeholder="Escribe o usa el micrófono…" aria-label="Mensaje de prueba" disabled maxlength="1000"><button id="sendBtn" type="submit" disabled>Enviar</button></form>
-<p id="voiceHint" class="hint">Si tu navegador admite reconocimiento de voz, puedes hablar y la recepcionista leerá sus respuestas en voz alta.</p>
-</article>
-<aside class="panel trace-panel"><div class="panel-head"><div><p class="eyebrow">RESULTADO</p><h2>Qué haría RecepVoz</h2></div></div><div class="trace-stat"><span>Resultado actual</span><strong id="resolution">Sin acción</strong></div><div class="trace-stat"><span>Acciones verificadas</span><strong id="actionCount">0</strong></div><div id="traceList" class="trace-list"><div class="empty">Las acciones aparecerán aquí en lenguaje claro.</div></div></aside>
-</section>
-<p id="message" class="toast hidden" role="alert" aria-live="assertive"></p>
-</main><script src="/simulator.js?v=20260928-1" defer></script></body></html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="0; url=/app/simulator">
+  <link rel="canonical" href="/app/simulator">
+  <title>RecepVoz · Simulador</title>
+  <script>
+    window.location.replace('/app/simulator');
+  </script>
+</head>
+<body>
+  <main>
+    <p>El simulador ahora vive dentro de la aplicación de RecepVoz.</p>
+    <a href="/app/simulator">Abrir Simulador</a>
+  </main>
+</body>
+</html>

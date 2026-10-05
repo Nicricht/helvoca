@@ -6,6 +6,7 @@ import { InventoryPage } from "../pages/Inventory/InventoryPage";
 import { AgendaPage } from "../pages/Agenda/AgendaPage";
 import { OrdersPage } from "../pages/Orders/OrdersPage";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
+import { SimulatorPage } from "../pages/Simulator/SimulatorPage";
 
 export function App() {
   return (
@@ -17,6 +18,7 @@ export function App() {
         <Route path="/agenda" element={<AgendaPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/simulator" element={<SimulatorPage />} />
         <Route path="*" element={<Navigate to="/plan" replace />} />
       </Routes>
     </AuthBoundary>

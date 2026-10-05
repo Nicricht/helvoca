@@ -39,7 +39,7 @@ public class SecurityConfig {
             "/account.html",
             "/settings.html",
             "/inventory.html",
-            "/simulator.html", "/simulator.js", "/simulator.css",
+            "/simulator.html",
             "/conversations.html",
             "/manifest.webmanifest", "/service-worker.js", "/recepvoz-icon-192.png", "/recepvoz-icon-512.png",
             "/favicon.ico", "/error"

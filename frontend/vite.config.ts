@@ -13,16 +13,19 @@ function directReactRoutes() {
       const ordersDir = fileURLToPath(new URL("../src/main/resources/static/app/orders/", import.meta.url));
       const settingsDir = fileURLToPath(new URL("../src/main/resources/static/app/settings/", import.meta.url));
       const planDir = fileURLToPath(new URL("../src/main/resources/static/app/plan/", import.meta.url));
+      const simulatorDir = fileURLToPath(new URL("../src/main/resources/static/app/simulator/", import.meta.url));
       mkdirSync(inventoryDir, { recursive: true });
       mkdirSync(agendaDir, { recursive: true });
       mkdirSync(ordersDir, { recursive: true });
       mkdirSync(settingsDir, { recursive: true });
       mkdirSync(planDir, { recursive: true });
+      mkdirSync(simulatorDir, { recursive: true });
       copyFileSync(`${appDir}index.html`, `${inventoryDir}index.html`);
       copyFileSync(`${appDir}index.html`, `${agendaDir}index.html`);
       copyFileSync(`${appDir}index.html`, `${ordersDir}index.html`);
       copyFileSync(`${appDir}index.html`, `${settingsDir}index.html`);
       copyFileSync(`${appDir}index.html`, `${planDir}index.html`);
+      copyFileSync(`${appDir}index.html`, `${simulatorDir}index.html`);
     }
   };
 }
