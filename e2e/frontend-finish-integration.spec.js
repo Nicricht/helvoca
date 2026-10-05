@@ -95,7 +95,7 @@ test('customer surfaces stay contained at required responsive widths', async ({ 
   for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1024 });
 
-    for (const path of ['/', '/settings.html', '/inventory.html', '/conversations.html', '/simulator.html', '/account.html']) {
+    for (const path of ['/', '/app/settings', '/inventory.html', '/conversations.html', '/simulator.html', '/account.html']) {
       await page.goto(path);
       await page.waitForTimeout(80);
       const layout = await page.evaluate(() => {
