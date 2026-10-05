@@ -510,7 +510,7 @@ function OnboardingCard({ status }: { status: OnboardingStatus }) {
   const percent = Math.round((completed / coreOnboardingSteps.length) * 100);
   const next = nextStepCopy[status.nextStep || ""] || {
     text: "Completa la configuración pendiente para comenzar.",
-    href: "/settings.html"
+    href: "/app/settings"
   };
 
   return (
