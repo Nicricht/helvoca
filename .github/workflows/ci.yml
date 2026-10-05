@@ -633,8 +633,8 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Validate conversations JavaScript
-        run: node --check src/main/resources/static/conversations.js
+      - name: Validate contextual conversations contract
+        run: node --check e2e/react-agenda.spec.js
 
       - name: Install conversations test dependencies
         run: |
