@@ -350,7 +350,6 @@ jobs:
           node --check src/main/resources/static/voice-selector.js
           node --check src/main/resources/static/ux-simplification.js
           node --check src/main/resources/static/pricing.js
-          node --check src/main/resources/static/simulator.js
 
       - name: Install frontend test dependencies
         run: |
@@ -1146,8 +1145,8 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Validate simulator JavaScript
-        run: node --check src/main/resources/static/simulator.js
+      - name: Validate React simulator contract
+        run: node --check e2e/react-simulator.spec.js
 
       - name: Install simulator test dependencies
         run: |
@@ -1155,7 +1154,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run simulator frontend E2E
-        run: npx playwright test e2e/simulator.spec.js
+        run: npx playwright test e2e/react-simulator.spec.js
 
       - name: Report simulator QA status
         if: always()
@@ -1204,7 +1203,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Run navigation and responsive E2E
-        run: npx playwright test e2e/frontend-ux.spec.js e2e/react-home.spec.js e2e/react-agenda.spec.js e2e/react-orders.spec.js e2e/simulator.spec.js
+        run: npx playwright test e2e/frontend-ux.spec.js e2e/react-home.spec.js e2e/react-agenda.spec.js e2e/react-orders.spec.js e2e/react-simulator.spec.js
 
       - name: Report navigation QA status
         if: always()
@@ -1249,7 +1248,7 @@ jobs:
 
       - name: Validate interaction JavaScript
         run: |
-          node --check src/main/resources/static/simulator.js
+          node --check e2e/react-simulator.spec.js
           node --check e2e/interaction-audit.spec.js
 
       - name: Install interaction test dependencies
