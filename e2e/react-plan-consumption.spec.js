@@ -216,6 +216,13 @@ test.describe('React Plan y consumo pilot', () => {
 
     page.once('dialog', async dialog => {
       expect(dialog.message()).toContain('no se activará hasta verificar el pago');
+      await dialog.dismiss();
+    });
+    await page.getByRole('button', { name: 'Elegir Negocio' }).click();
+    expect(calls.checkoutCalls()).toBe(0);
+
+    page.once('dialog', async dialog => {
+      expect(dialog.message()).toContain('no se activará hasta verificar el pago');
       await dialog.accept();
     });
     await page.getByRole('button', { name: 'Elegir Negocio' }).click();
@@ -227,6 +234,51 @@ test.describe('React Plan y consumo pilot', () => {
     await expect(page.getByTestId('billing-pending-plan')).toContainText('verificar');
     await expect.poll(() => page.evaluate(() => window.__openedCheckoutUrls)).toEqual([
       'https://checkout.example.test/pre-e2e-1'
+    ]);
+  });
+
+  test('continues an existing pending checkout without creating a duplicate checkout', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__openedCheckoutUrls = [];
+      window.open = url => {
+        window.__openedCheckoutUrls.push(url);
+        return { closed: false };
+      };
+    });
+
+    const calls = await bootAuthenticated(page, {
+      subscription: {
+        plan: 'BASIC',
+        publicPlanCode: 'EMPRENDE',
+        planName: 'Emprende',
+        includedMinutes: 100,
+        usedMinutes: 37
+      },
+      billingStatus: {
+        provider: 'mercadopago',
+        billingEnabled: true,
+        checkoutConfigured: true,
+        currentPlanCode: 'EMPRENDE',
+        currentPlanName: 'Emprende',
+        currentMonthlyPriceClp: 24990,
+        subscriptionStatus: 'TRIALING',
+        pendingPlanCode: 'NEGOCIO',
+        pendingPlanName: 'Negocio',
+        pendingMonthlyPriceClp: 39990,
+        checkoutUrl: 'https://checkout.example.test/pending',
+        awaitingProviderVerification: true
+      }
+    });
+
+    await page.goto('/app/plan');
+
+    await expect(page.getByTestId('billing-current-plan')).toContainText('Emprende');
+    await expect(page.getByTestId('billing-pending-plan')).toContainText('Negocio');
+    await page.getByRole('button', { name: /Continuar checkout/ }).click();
+
+    expect(calls.checkoutCalls()).toBe(0);
+    await expect.poll(() => page.evaluate(() => window.__openedCheckoutUrls)).toEqual([
+      'https://checkout.example.test/pending'
     ]);
   });
 
