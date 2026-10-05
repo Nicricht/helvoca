@@ -51,7 +51,7 @@ Visual certification covers:
 | Inventario | `/app/inventory` |
 | Configuración | `/app/settings` |
 | Plan y consumo | `/app/plan` |
-| Simulador | `/simulator.html` |
+| Simulador | `/app/simulator` |
 
 If routing changes, update this table before certification.
 
