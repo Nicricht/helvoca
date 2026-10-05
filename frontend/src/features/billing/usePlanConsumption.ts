@@ -1,9 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  createBillingCheckout,
+  getBillingStatus,
   getCurrentUser,
+  getPublicPlans,
   getSubscription,
   getUsageStatus,
   getUsageSummary,
+  type BillingStatus,
   type Subscription,
   type UsageItem
 } from "./api";
@@ -23,6 +27,8 @@ function usageWindow(subscription?: Subscription) {
 }
 
 export function usePlanConsumption() {
+  const queryClient = useQueryClient();
+
   const me = useQuery({
     queryKey: ["auth", "me"],
     queryFn: getCurrentUser
@@ -35,6 +41,7 @@ export function usePlanConsumption() {
 
   const roles = me.data?.roles ?? [];
   const canViewDetailedUsage = roles.some(role => PRIVILEGED_ROLES.has(role));
+  const canManageBilling = roles.includes("BUSINESS_ADMIN");
   const window = usageWindow(subscription.data);
 
   const usage = useQuery({
@@ -49,12 +56,46 @@ export function usePlanConsumption() {
     enabled: Boolean(subscription.data) && canViewDetailedUsage
   });
 
+  const billingStatus = useQuery({
+    queryKey: ["billing", "status"],
+    queryFn: getBillingStatus,
+    enabled: canManageBilling
+  });
+
+  const publicPlans = useQuery({
+    queryKey: ["billing", "public-plans"],
+    queryFn: getPublicPlans,
+    enabled: canManageBilling
+  });
+
+  const checkout = useMutation({
+    mutationFn: createBillingCheckout,
+    onSuccess: response => {
+      queryClient.setQueryData<BillingStatus>(["billing", "status"], current => {
+        if (!current) return current;
+        return {
+          ...current,
+          provider: current.provider || "mercadopago",
+          pendingPlanCode: response.planCode,
+          pendingPlanName: response.planName,
+          pendingMonthlyPriceClp: response.monthlyPriceClp,
+          checkoutUrl: response.checkoutUrl,
+          awaitingProviderVerification: true
+        };
+      });
+    }
+  });
+
   return {
     me,
     subscription,
     usage,
     usageStatus,
-    canViewDetailedUsage
+    billingStatus,
+    publicPlans,
+    checkout,
+    canViewDetailedUsage,
+    canManageBilling
   };
 }
 

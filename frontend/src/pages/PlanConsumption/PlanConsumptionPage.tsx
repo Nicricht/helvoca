@@ -1,8 +1,17 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { BarChart3, Crown, MessageSquareText, PhoneCall, ReceiptText, Timer } from "lucide-react";
+import {
+  BarChart3,
+  Crown,
+  ExternalLink,
+  MessageSquareText,
+  PhoneCall,
+  ReceiptText,
+  ShieldCheck,
+  Timer
+} from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { usePlanConsumption, usageMetrics } from "../../features/billing/usePlanConsumption";
-import type { Subscription } from "../../features/billing/api";
+import type { PublicPlan, Subscription } from "../../features/billing/api";
 import styles from "./PlanConsumptionPage.module.css";
 
 const statusLabels: Record<string, string> = {
@@ -32,6 +41,15 @@ function formatDate(value?: string) {
   }).format(date);
 }
 
+function formatClp(value?: number | null) {
+  if (value == null || !Number.isFinite(Number(value))) return null;
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0
+  }).format(Number(value));
+}
+
 function projection(subscription: Subscription) {
   const used = safeNumber(subscription.usedMinutes);
   const included = safeNumber(subscription.includedMinutes);
@@ -49,6 +67,11 @@ function projection(subscription: Subscription) {
     projected: Math.max(Math.round(used / ratio), Math.round(used)),
     included
   };
+}
+
+function openCheckout(url?: string | null) {
+  if (!url) return;
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 function Metric({
@@ -139,9 +162,27 @@ export function PlanConsumptionPage() {
 
   const planName = subscription.planName || subscription.publicPlanCode || subscription.plan || "Plan";
   const status = statusLabels[String(subscription.status ?? "").toUpperCase()] || "Sin estado";
-  const billingText = subscription.billingProviderConnected
-    ? "Facturación conectada."
-    : "Pagos automáticos aún no habilitados.";
+  const billing = model.billingStatus.data;
+  const billingText = model.canManageBilling && model.billingStatus.isError
+    ? "No pudimos cargar el estado de facturación."
+    : billing?.awaitingProviderVerification && billing.pendingPlanName
+      ? `Cambio a ${billing.pendingPlanName} pendiente de verificación.`
+      : billing?.billingEnabled && billing.checkoutConfigured
+        ? "Facturación lista para gestionar tu plan."
+        : subscription.billingProviderConnected
+          ? "Facturación conectada."
+          : "Pagos automáticos aún no habilitados.";
+
+  const startCheckout = (plan: PublicPlan) => {
+    if (!plan.code || plan.customPricing || model.checkout.isPending) return;
+    const confirmed = window.confirm(
+      `Vas a iniciar el checkout para ${plan.name}. El plan no se activará hasta verificar el pago. ¿Continuar?`
+    );
+    if (!confirmed) return;
+    model.checkout.mutate(plan.code, {
+      onSuccess: response => openCheckout(response.checkoutUrl)
+    });
+  };
 
   return (
     <AppShell>
@@ -272,6 +313,110 @@ export function PlanConsumptionPage() {
             </div>
           </section>
         </div>
+
+        {model.canManageBilling && (
+          <section className={styles.manageSection} aria-labelledby="managePlanTitle">
+            <div className={styles.manageHeader}>
+              <div>
+                <span className={styles.cardEyebrow}>FACTURACIÓN SEGURA</span>
+                <h2 id="managePlanTitle" className={styles.sectionHeading}>Gestionar plan</h2>
+                <p>El cambio solo se hace efectivo después de que el backend verifica un cobro aprobado.</p>
+              </div>
+              <ShieldCheck size={24} aria-hidden="true" />
+            </div>
+
+            {model.billingStatus.isPending && (
+              <div className={styles.manageStatus} role="status">Cargando estado de facturación…</div>
+            )}
+
+            {model.billingStatus.isError && (
+              <div className={styles.manageError} role="alert">
+                No pudimos cargar la gestión del plan. Tu plan actual no fue modificado.
+              </div>
+            )}
+
+            {billing && (
+              <>
+                <div className={styles.currentPlanRow} data-testid="billing-current-plan">
+                  <div>
+                    <span>Plan actual</span>
+                    <strong>{billing.currentPlanName || planName}</strong>
+                  </div>
+                  {formatClp(billing.currentMonthlyPriceClp) && (
+                    <span className={styles.planPrice}>{formatClp(billing.currentMonthlyPriceClp)} / mes</span>
+                  )}
+                </div>
+
+                {billing.awaitingProviderVerification && billing.pendingPlanName ? (
+                  <div className={styles.pendingPlan} data-testid="billing-pending-plan">
+                    <div>
+                      <strong>Cambio pendiente: {billing.pendingPlanName}</strong>
+                      <span>Tu plan actual sigue vigente hasta verificar un cobro aprobado.</span>
+                    </div>
+                    {billing.checkoutUrl && (
+                      <button
+                        type="button"
+                        className="button primary"
+                        onClick={() => openCheckout(billing.checkoutUrl)}
+                      >
+                        Continuar checkout <ExternalLink size={14} aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+                ) : !billing.billingEnabled || !billing.checkoutConfigured ? (
+                  <div className={styles.manageStatus}>
+                    El checkout automático todavía no está habilitado para esta cuenta.
+                  </div>
+                ) : model.publicPlans.isPending ? (
+                  <div className={styles.manageStatus} role="status">Cargando planes disponibles…</div>
+                ) : model.publicPlans.isError ? (
+                  <div className={styles.manageError} role="alert">
+                    No pudimos cargar los planes disponibles.
+                  </div>
+                ) : (
+                  <div className={styles.planChoices}>
+                    {(model.publicPlans.data ?? []).map(plan => {
+                      const isCurrent = plan.code === billing.currentPlanCode;
+                      const price = formatClp(plan.monthlyPriceClp);
+                      return (
+                        <article className={styles.planChoice} key={plan.code}>
+                          <div>
+                            <div className={styles.choiceTitle}>
+                              <strong>{plan.name}</strong>
+                              {plan.recommended && <span>Recomendado</span>}
+                            </div>
+                            <p>
+                              {price ? `${price} / mes` : "Precio personalizado"}
+                              {plan.includedMinutes ? ` · ${plan.includedMinutes} min incluidos` : ""}
+                            </p>
+                          </div>
+                          {plan.customPricing ? (
+                            <a className="button ghost" href="/pricing.html">Cotización personalizada</a>
+                          ) : (
+                            <button
+                              type="button"
+                              className={isCurrent ? "button ghost" : "button primary"}
+                              disabled={isCurrent || model.checkout.isPending}
+                              onClick={() => startCheckout(plan)}
+                            >
+                              {isCurrent ? "Plan actual" : `Elegir ${plan.name}`}
+                            </button>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {model.checkout.isError && (
+                  <div className={styles.manageError} role="alert">
+                    No pudimos crear el checkout. Tu plan actual no cambió.
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        )}
       </main>
     </AppShell>
   );
