@@ -365,7 +365,7 @@
         '      <div class="owner-quick-grid">',
         '        <a href="/app/agenda">Agenda</a>',
         '        <a href="/?tab=requests#homeBusinessWorkspace">Pendientes</a>',
-        '        <a href="/conversations.html">Conversaciones</a>',
+        '        <a href="/app/orders">Operaciones</a>',
         '        <a href="/app/inventory">Inventario</a>',
         '      </div>',
         '    </nav>',

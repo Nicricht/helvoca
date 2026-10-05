@@ -199,6 +199,44 @@ test.describe('React Inventory migration', () => {
     await expect(page.getByRole('button', { name: /ajustar stock/i })).toHaveCount(0);
   });
 
+  test('applies an explicit stock adjustment through the React workspace', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+
+    let adjustmentPayload = null;
+    await page.route('**/api/v1/inventory/prod-1/adjustments', async route => {
+      adjustmentPayload = route.request().postDataJSON();
+      await route.fulfill(json({
+        id: 'stock-1',
+        catalogItemId: 'prod-1',
+        sku: 'TAL-18V',
+        trackingEnabled: true,
+        onHand: 12,
+        reserved: 3,
+        available: 9,
+        reorderThreshold: 4,
+        lowStock: false
+      }));
+    });
+
+    await page.goto('/app/inventory');
+
+    const row = page.getByTestId('inventory-row-prod-1');
+    await row.getByRole('button', { name: 'Ajustar stock' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Ajustar stock · Taladro percutor' });
+    await dialog.getByLabel('Ajuste').fill('4');
+    await dialog.getByLabel('Nota').fill('Reposición manual');
+    await dialog.getByRole('button', { name: 'Aplicar ajuste' }).click();
+
+    await expect.poll(() => adjustmentPayload).toEqual({
+      delta: 4,
+      referenceType: 'MANUAL',
+      referenceId: null,
+      note: 'Reposición manual'
+    });
+    await expect(dialog).toHaveCount(0);
+  });
+
   test('does not expose manage actions to a restricted role', async ({ page }) => {
     await bootInventory(page, { roles: ['OPERATOR'] });
     await page.goto('/app/inventory');

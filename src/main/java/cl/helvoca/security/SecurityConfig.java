@@ -36,11 +36,11 @@ public class SecurityConfig {
             "/privacy.html", "/terms.html",
             "/pricing.html", "/pricing.js", "/pricing.css",
             "/app/**", "/reservar/**",
-            "/account.html", "/account.js", "/account.css",
+            "/account.html",
             "/settings.html",
-            "/inventory.html", "/inventory.js", "/inventory.css",
+            "/inventory.html",
             "/simulator.html", "/simulator.js", "/simulator.css",
-            "/conversations.html", "/conversations.js", "/conversations.css",
+            "/conversations.html",
             "/manifest.webmanifest", "/service-worker.js", "/recepvoz-icon-192.png", "/recepvoz-icon-512.png",
             "/favicon.ico", "/error"
     };

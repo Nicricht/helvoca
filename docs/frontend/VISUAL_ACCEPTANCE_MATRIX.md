@@ -44,13 +44,13 @@ Visual certification covers:
 | Login | login state |
 | Registration | registration state |
 | Onboarding | incomplete first-user state |
-| Inicio | `/` ready authenticated owner |
-| Conversaciones | `/conversations.html` |
-| Agenda | Home Agenda workspace / canonical agenda route if later separated |
-| Clientes | Home Clientes workspace / canonical customers route if later separated |
-| Inventario | `/inventory.html` |
+| Inicio | `/app` ready authenticated owner |
+| Conversaciones | Contextuales dentro de `/app/agenda` y `/app/orders` |
+| Agenda | `/app/agenda` |
+| Clientes | Vista contextual dentro de Agenda / Operaciones |
+| Inventario | `/app/inventory` |
 | Configuración | `/app/settings` |
-| Facturación | `/account.html` |
+| Plan y consumo | `/app/plan` |
 | Simulador | `/simulator.html` |
 
 If routing changes, update this table before certification.
@@ -175,7 +175,7 @@ Required:
 - the operational summary surfaces calls and current business activity without turning the page into a KPI mosaic;
 - **Necesita tu atención** is visually prominent whenever there are unresolved items;
 - **Actividad reciente** remains scannable and translates technical events into human language;
-- **Accesos rápidos** provides direct navigation to Agenda, Clientes, Conversaciones, Inventario, Configuración and Facturación;
+- **Accesos rápidos** provides direct navigation to Agenda, Operaciones, Inventario, Configuración and Plan y consumo; conversations and customer context remain inside the operational surfaces.
 - ready, empty and degraded states preserve the same hierarchy instead of replacing the page with a giant blank card;
 - no giant empty whitespace or duplicate global navigation.
 
@@ -199,7 +199,9 @@ Tablet/mobile:
 - sales metrics and trend remain readable without page-level horizontal overflow;
 - tables/charts may stack or scroll inside their own containers but must not widen the page.
 
-## 9. Conversaciones acceptance
+## 9. Conversaciones contextuales acceptance
+
+Conversaciones se certifican dentro de Agenda y Operaciones; no existe un destino global independiente.
 
 Required:
 

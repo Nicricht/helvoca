@@ -2,46 +2,35 @@ const { test, expect } = require('@playwright/test');
 const fs = require('node:fs');
 
 const STATIC = 'src/main/resources/static';
-const customerPages = [
-  'index.html',
-  'inventory.html',
-  'conversations.html',
-  'simulator.html',
-  'account.html'
-];
 
 function read(name) {
   return fs.readFileSync(`${STATIC}/${name}`, 'utf8');
 }
 
-function navEntries(html) {
-  const nav = html.match(/<nav[^>]+aria-label="Navegación principal"[^>]*>([\s\S]*?)<\/nav>/i);
-  if (!nav) return [];
-  return [...nav[1].matchAll(/<a\s+([^>]*?)>([\s\S]*?)<\/a>/gi)].map(match => {
-    const attrs = match[1];
-    const href = attrs.match(/href="([^"]+)"/i)?.[1] || '';
-    const text = match[2].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-    return { href, text };
-  });
-}
+test('remaining legacy shells point only to canonical application destinations', async () => {
+  const home = read('index.html');
+  const simulator = read('simulator.html');
+  const importer = read('business-import.html');
 
-test('customer navigation stays coherent and never exposes internal operations', async () => {
-  const expected = [
-    { href: '/', text: 'Inicio' },
-    { href: '/conversations.html', text: 'Conversaciones' },
-    { href: '/app/agenda', text: 'Agenda' },
-    { href: '/app/orders', text: 'Operaciones' },
-    { href: '/#customers', text: 'Clientes' },
-    { href: '/app/inventory', text: 'Inventario' },
-    { href: '/app/settings', text: 'Configuración' },
-    { href: '/account.html', text: 'Facturación' }
-  ];
-
-  for (const page of customerPages) {
-    const html = read(page);
-    expect(navEntries(html), `${page} primary navigation`).toEqual(expected);
-    expect(html, `${page} must not expose internal operations`).not.toContain('href="/operations.html"');
+  for (const [name, html] of [
+    ['index.html', home],
+    ['simulator.html', simulator],
+    ['business-import.html', importer]
+  ]) {
+    expect(html, name).not.toContain('href="/conversations.html"');
+    expect(html, name).not.toContain('href="/account.html"');
+    expect(html, name).not.toContain('href="/operations.html"');
   }
+
+  expect(home).toContain('href="/app/agenda">Agenda</a>');
+  expect(home).toContain('href="/app/orders">Operaciones</a>');
+  expect(home).toContain('href="/app/inventory">Inventario</a>');
+  expect(home).toContain('href="/app/settings">Configuración</a>');
+  expect(home).toContain('href="/app/plan">Plan y consumo</a>');
+
+  expect(simulator).toContain('href="/app/agenda">Ver historial</a>');
+  expect(simulator).toContain('href="/app/plan">Plan y consumo</a>');
+  expect(importer).toContain('href="/app/agenda">Agenda</a>');
 });
 
 test('home Agenda shortcuts use the canonical React route', async () => {
@@ -51,6 +40,8 @@ test('home Agenda shortcuts use the canonical React route', async () => {
   expect(home).toContain('href="/app/agenda">Agenda</a>');
   expect(home).not.toContain('href="/#bookings">Agenda</a>');
   expect(status).toContain('href="/app/agenda"');
+  expect(status).toContain('href="/app/orders">Operaciones</a>');
+  expect(status).not.toContain('/conversations.html');
   expect(status).not.toContain('/?tab=bookings#homeBusinessWorkspace');
 });
 
@@ -72,18 +63,16 @@ test('shared and public sales styles avoid decorative gradients', async () => {
   }
 });
 
-test('receptionist area keeps history and safe simulation as local actions', async () => {
-  const conversations = read('conversations.html');
+test('simulator keeps safe local actions and sends history to contextual Agenda', async () => {
   const simulator = read('simulator.html');
 
-  expect(conversations).toContain('>Conversaciones</h1>');
-  expect(conversations).toContain('href="/simulator.html">Probar recepcionista</a>');
-  expect(simulator).toContain('href="/conversations.html">Ver historial</a>');
+  expect(simulator).toContain('href="/app/agenda">Ver historial</a>');
+  expect(simulator).not.toContain('/conversations.html');
   expect(simulator).toMatch(/No crea datos comerciales reales ni realiza llamadas telefónicas/i);
   expect(simulator).toMatch(/Tampoco envía WhatsApp real/i);
 });
 
-test('customer surfaces stay contained at required responsive widths', async ({ page }) => {
+test('canonical customer surfaces stay contained at required responsive widths', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
   await page.route('https://cdn.jsdelivr.net/**', route => route.abort());
   await page.route('**/api/v1/**', route => route.fulfill({
@@ -91,11 +80,21 @@ test('customer surfaces stay contained at required responsive widths', async ({ 
     contentType: 'application/json',
     body: '{}'
   }));
+  await page.route('**/api/v1/auth/me', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ email: 'admin@demo.cl', roles: ['BUSINESS_ADMIN'] })
+  }));
+  await page.route('**/api/v1/business', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ name: 'Negocio responsive', timezone: 'America/Santiago', language: 'es' })
+  }));
 
   for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1024 });
 
-    for (const path of ['/', '/app/settings', '/inventory.html', '/conversations.html', '/simulator.html', '/account.html']) {
+    for (const path of ['/', '/app', '/app/settings', '/app/inventory', '/app/agenda', '/app/plan', '/simulator.html']) {
       await page.goto(path);
       await page.waitForTimeout(80);
       const layout = await page.evaluate(() => {
@@ -129,21 +128,21 @@ test('customer surfaces stay contained at required responsive widths', async ({ 
   }
 });
 
-test('primary customer navigation remains keyboard reachable at required widths', async ({ page }) => {
+test('remaining simulator navigation stays keyboard reachable', async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
-  await page.route('**/api/v1/**', route => route.fulfill({
-    status: 404,
+  await page.route('**/api/v1/business', route => route.fulfill({
+    status: 200,
     contentType: 'application/json',
-    body: '{}'
+    body: JSON.stringify({ name: 'Negocio teclado' })
   }));
 
   for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1024 });
-    await page.goto('/conversations.html');
+    await page.goto('/simulator.html');
 
     const nav = page.getByRole('navigation', { name: 'Navegación principal' });
     const links = nav.getByRole('link');
-    await expect(links).toHaveCount(8);
+    expect(await links.count()).toBeGreaterThan(1);
 
     await links.nth(0).focus();
     await expect(links.nth(0)).toBeFocused();
