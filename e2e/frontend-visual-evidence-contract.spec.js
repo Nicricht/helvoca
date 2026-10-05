@@ -35,6 +35,7 @@ test('release candidate captures exact-head visual evidence for every canonical 
     '/app/orders',
     '/app/inventory',
     '/app/settings',
+    '/app/simulator',
     '/app/plan'
   ]) {
     expect(rc).toContain(`'${route}'`);
