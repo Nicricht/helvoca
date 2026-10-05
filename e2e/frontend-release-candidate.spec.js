@@ -28,7 +28,7 @@ async function mockCanonicalApp(page) {
       email: 'admin@ferreteria-rc.cl',
       roles: ['BUSINESS_ADMIN'],
       permissions: [
-        'BUSINESS_READ', 'BUSINESS_MANAGE', 'CATALOG_READ', 'CATALOG_MANAGE',
+        'BUSINESS_READ', 'BUSINESS_CONFIGURE', 'CATALOG_READ', 'CATALOG_MANAGE',
         'CUSTOMERS_READ', 'CUSTOMERS_MANAGE', 'CUSTOMERS_EXPORT',
         'BOOKINGS_READ', 'BOOKINGS_MANAGE', 'ORDERS_READ', 'ORDERS_MANAGE',
         'INVENTORY_READ', 'INVENTORY_MANAGE', 'ANALYTICS_READ',

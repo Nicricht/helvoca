@@ -21,7 +21,7 @@ async function bootReactSettings(page) {
       return route.fulfill(json({
         email: 'admin@demo.cl',
         roles: ['BUSINESS_ADMIN'],
-        permissions: ['BUSINESS_READ', 'BUSINESS_MANAGE']
+        permissions: ['BUSINESS_READ', 'BUSINESS_CONFIGURE']
       }));
     }
     if (path === '/api/v1/business') {
