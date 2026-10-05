@@ -311,6 +311,23 @@ test('release candidate captures exact-head React visual evidence for every cano
         }));
       });
 
+      if (surface.name === 'home') {
+        const animatedRegions = [
+          page.getByRole('region', { name: 'Estado de tu negocio' }),
+          page.getByRole('region', { name: 'Valor generado por RecepVoz' }),
+          page.getByRole('region', { name: 'Necesita tu atención' }),
+          page.getByRole('region', { name: 'Última actividad' })
+        ];
+
+        for (const region of animatedRegions) {
+          await expect(region).toBeVisible();
+          await expect.poll(
+            async () => Number(await region.evaluate(node => getComputedStyle(node).opacity)),
+            { message: 'Home visual evidence must wait for motion sections to finish entering' }
+          ).toBeGreaterThanOrEqual(0.99);
+        }
+      }
+
       await page.screenshot({
         path: path.join(evidenceDir, `${surface.name}-${viewport.width}x${viewport.height}.png`),
         fullPage: false,
