@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CircleUserRound,
   Crown,
+  FlaskConical,
   LayoutDashboard,
   LogOut,
   PackageSearch,
@@ -27,6 +28,7 @@ const navigation = [
   { to: "/orders", label: "Operaciones", icon: ShoppingBag },
   { to: "/inventory", label: "Inventario", icon: PackageSearch },
   { to: "/settings", label: "Configuración", icon: Settings },
+  { to: "/simulator", label: "Simulador", icon: FlaskConical },
   { to: "/plan", label: "Plan y consumo", icon: WalletCards }
 ];
 
