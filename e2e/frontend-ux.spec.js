@@ -165,6 +165,7 @@ test('React primary navigation fits desktop tablet and mobile viewports', async 
     await expect(nav.getByRole('link', { name: 'Operaciones' })).toHaveAttribute('href', '/app/orders');
     await expect(nav.getByRole('link', { name: 'Inventario' })).toHaveAttribute('href', '/app/inventory');
     await expect(nav.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/app/settings');
+    await expect(nav.getByRole('link', { name: 'Simulador' })).toHaveAttribute('href', '/app/simulator');
     await expect(nav.getByRole('link', { name: 'Plan y consumo' })).toHaveAttribute('href', '/app/plan');
     expect(await page.evaluate(() =>
       document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
