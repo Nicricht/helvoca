@@ -421,7 +421,7 @@ test('Meta embedded signup completes inside React and clears the registration PI
     phoneNumberId: '112233445566',
     pin: '123456'
   });
-  await expect(pinInput).toHaveValue('');
+  await expect(pinInput).toHaveCount(0);
   await expect(page.getByText('temporary-e2e-code')).toHaveCount(0);
   await expect(page.getByText('123456')).toHaveCount(0);
 });
