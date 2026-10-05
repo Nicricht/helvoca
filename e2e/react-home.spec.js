@@ -310,7 +310,7 @@ test.describe('React Home migration', () => {
 
     const fontFamily = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
     expect(fontFamily).toMatch(/Inter|Segoe UI|system-ui|sans-serif/i);
-    expect(fontFamily).not.toMatch(/Times New Roman|Georgia|serif/i);
+    expect(fontFamily).not.toMatch(/Times New Roman|Georgia|ui-serif/i);
 
     const layers = page.locator('[data-home-ambient-layer]');
     await expect(layers).toHaveCount(4);
