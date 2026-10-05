@@ -77,25 +77,18 @@ test('static interaction markup has unique targets and complete controls', async
   expect(failures, failures.join('\n')).toEqual([]);
 });
 
-test('Meta state handlers fail closed before privileged actions', async () => {
-  const settings = fs.readFileSync(path.join(staticDir, 'settings-page.js'), 'utf8');
+test('React channel handlers fail closed before privileged actions', async () => {
+  const channels = fs.readFileSync(
+    path.resolve(__dirname, '../frontend/src/pages/Settings/ChannelsSettingsPanel.tsx'),
+    'utf8'
+  );
 
-  expect(settings).toMatch(
-    /button\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
+  expect(channels).toMatch(
+    /function doProvision\(item: AvailablePhoneNumber\) \{\s*if \(!canManage \|\| provisionPhone\.isPending\) return;/
   );
-  expect(settings).toMatch(
-    /activationButton\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
+  expect(channels).toMatch(
+    /async function beginMetaSignup\(\) \{\s*if \(!canManage \|\| metaActionLock\.current\) return;/
   );
-  expect(settings).toMatch(
-    /deactivationButton\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
-  );
-  expect(settings).toMatch(
-    /wabaConfirmButton\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
-  );
-  expect(settings).toMatch(
-    /phoneConfirmButton\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
-  );
-  expect(settings).toMatch(
-    /finalizePhoneButton\?\.addEventListener\("click", async \(\) => \{\s*if \(!canManageMeta\) return;/
-  );
+  expect(channels).toMatch(/\{canManage && !metaStatus\.data\?\.configured && \(/);
+  expect(channels).toMatch(/\{canManage && metaStatus\.data\?\.configured && metaStatus\.data\.enabled === false && \(/);
 });

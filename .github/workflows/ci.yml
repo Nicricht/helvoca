@@ -186,7 +186,6 @@ jobs:
           node --check src/main/resources/static/voice-selector.js
           node --check src/main/resources/static/ux-simplification.js
           node --check src/main/resources/static/pricing.js
-          node --check src/main/resources/static/settings-page.js
           node --check src/main/resources/static/simulator.js
 
       - name: Run backend tests with JaCoCo
@@ -352,7 +351,6 @@ jobs:
           node --check src/main/resources/static/voice-selector.js
           node --check src/main/resources/static/ux-simplification.js
           node --check src/main/resources/static/pricing.js
-          node --check src/main/resources/static/settings-page.js
           node --check src/main/resources/static/simulator.js
 
       - name: Install frontend test dependencies
@@ -691,7 +689,6 @@ jobs:
         run: |
           node --check src/main/resources/static/app.js
           node --check src/main/resources/static/commercial-status.js
-          node --check src/main/resources/static/settings-page.js
           node --check src/main/resources/static/ux-simplification.js
           node --check src/main/resources/static/voice-selector.js
           node --check src/main/resources/static/phone-provisioning.js
@@ -1052,7 +1049,6 @@ jobs:
       - name: Check changed operational JavaScript syntax
         run: |
           node --check src/main/resources/static/app.js
-          node --check src/main/resources/static/settings-page.js
           node --check src/main/resources/static/ux-simplification.js
 
       - name: Report operational JavaScript QA status
@@ -1099,7 +1095,6 @@ jobs:
 
       - name: Validate operational redesign JavaScript
         run: |
-          node --check src/main/resources/static/settings-page.js
 
       - name: Install operational redesign test dependencies
         run: |
