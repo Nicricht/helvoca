@@ -3194,8 +3194,10 @@
   display: block;
   position: absolute;
   z-index: 0;
+  width: auto;
   left: -8%;
   right: -5%;
+  top: auto;
   bottom: -52px;
   height: 126px;
   content: "";
