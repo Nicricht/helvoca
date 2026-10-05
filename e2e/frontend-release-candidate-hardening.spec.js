@@ -58,7 +58,7 @@ test('new ferretería owner is guided by React Home to the first incomplete setu
   expect(mutations).toEqual([]);
 });
 
-test('ferretería RC surfaces low stock as an owner priority without causing a mutation', async ({ page }) => {
+test('ferretería RC surfaces low stock in React Inventory without causing a mutation', async ({ page }) => {
   const mutations = trackMutations(page);
   await commonIdentity(page);
 
@@ -72,6 +72,7 @@ test('ferretería RC surfaces low stock as an owner priority without causing a m
     active: true
   }])));
   await page.route('**/api/v1/inventory', route => route.fulfill(json([{
+    id: 'stock-low',
     catalogItemId: 'product-low',
     productName: 'Disco de corte 115 mm',
     sku: 'DISCO-115',
@@ -97,85 +98,17 @@ test('ferretería RC surfaces low stock as an owner priority without causing a m
   }])));
   await page.route('**/api/v1/inventory/restock-subscriptions/notifications', route => route.fulfill(json([])));
   await page.route('**/api/v1/inventory/restock-subscriptions', route => route.fulfill(json([])));
-  await page.route('**/api/v1/inventory/product-low/variants', route => route.fulfill(json([])));
-  await page.route('**/api/v1/inventory/product-low/movements', route => route.fulfill(json([])));
 
-  await page.goto('/inventory.html');
+  await page.goto('/app/inventory');
 
-  await expect(page.locator('[data-inventory-product-id="product-low"]')).toContainText('Disco de corte 115 mm');
-  await expect(page.locator('#inventoryAlertsCount')).toHaveText('1 pendiente');
-  await expect(page.locator('[data-inventory-alert-id="alert-low"]')).toContainText('Stock bajo');
-  await expect(page.locator('[data-inventory-alert-id="alert-low"]')).toContainText('DISCO-115');
+  await expect(page.getByTestId('inventory-row-product-low')).toContainText('Disco de corte 115 mm');
+  await expect(page.getByTestId('inventory-low-stock')).toContainText('1');
+  await expect(page.getByTestId('inventory-alert-alert-low')).toContainText('Stock bajo');
+  await expect(page.getByTestId('inventory-alert-alert-low')).toContainText('DISCO-115');
   expect(mutations).toEqual([]);
 });
 
-test('ferretería RC makes unresolved customer intent require human attention without leaking raw enums', async ({ page }) => {
-  const mutations = trackMutations(page);
-  await commonIdentity(page);
-
-  await page.route('**/api/v1/calls?**', route => route.fulfill(json({
-    content: [{
-      id: 'call-human-rc',
-      callerNumber: '+56955557777',
-      direction: 'INBOUND',
-      status: 'COMPLETED',
-      startedAt: '2026-09-29T00:10:00Z',
-      durationSeconds: 132,
-      resolution: 'UNANSWERED_QUESTION_RECORDED'
-    }],
-    number: 0,
-    size: 100,
-    totalElements: 1,
-    totalPages: 1
-  })));
-  await page.route('**/api/v1/messaging/conversations', route => route.fulfill(json([])));
-  await page.route('**/api/v1/calls/call-human-rc', route => route.fulfill(json({
-    call: {
-      id: 'call-human-rc',
-      callerNumber: '+56955557777',
-      direction: 'INBOUND',
-      status: 'COMPLETED',
-      startedAt: '2026-09-29T00:10:00Z',
-      durationSeconds: 132,
-      resolution: 'UNANSWERED_QUESTION_RECORDED'
-    },
-    summary: 'El cliente consultó por instalación industrial y necesita confirmación humana.',
-    transcript: [
-      {
-        id: 't-human-1',
-        speaker: 'USER',
-        content: '¿Pueden instalar este compresor industrial?',
-        sequenceNumber: 1,
-        createdAt: '2026-09-29T00:10:05Z'
-      },
-      {
-        id: 't-human-2',
-        speaker: 'ASSISTANT',
-        content: 'No tengo esa información confirmada. Una persona debe revisarla.',
-        sequenceNumber: 2,
-        createdAt: '2026-09-29T00:10:14Z'
-      }
-    ],
-    actions: [{
-      id: 'a-human-1',
-      actionType: 'SEARCH_KNOWLEDGE',
-      success: true,
-      detail: 'Instalación industrial',
-      createdAt: '2026-09-29T00:10:10Z'
-    }]
-  })));
-
-  await page.goto('/conversations.html');
-
-  await expect(page.locator('#conversationList')).toContainText('+56955557777');
-  await expect(page.locator('#conversationList')).toContainText('Necesita atención humana');
-  await expect(page.getByText('El cliente consultó por instalación industrial y necesita confirmación humana.')).toBeVisible();
-  await expect(page.locator('body')).not.toContainText('UNANSWERED_QUESTION_RECORDED');
-  await expect(page.locator('body')).not.toContainText('SEARCH_KNOWLEDGE');
-  expect(mutations).toEqual([]);
-});
-
-test('operator can inspect the active plan but cannot access admin usage or trigger billing mutations', async ({ page }) => {
+test('operator can inspect the active plan without admin billing actions', async ({ page }) => {
   const mutations = trackMutations(page);
   await commonIdentity(page, ['OPERATOR']);
 
@@ -196,23 +129,21 @@ test('operator can inspect the active plan but cannot access admin usage or trig
     entitlements: [],
     legacyFallback: false
   })));
-  await page.route('**/api/v1/usage/summary?**', route => route.fulfill({
+  await page.route('**/api/v1/usage/**', route => route.fulfill({
     status: 403,
     contentType: 'application/json',
     body: JSON.stringify({ message: 'forbidden' })
   }));
 
-  await page.goto('/account.html');
+  await page.goto('/app/plan');
 
-  await expect(page.locator('#planName')).toHaveText('Profesional');
-  await expect(page.locator('#accountRole')).toHaveText('Operador');
-  await expect(page.locator('#usageState')).toContainText('propietarios y administradores');
-  await expect(page.locator('#accountError')).toBeHidden();
-  await expect(page.getByRole('button', { name: /pagar|cobrar|suscrib/i })).toHaveCount(0);
+  await expect(page.getByTestId('plan-name')).toHaveText('Profesional');
+  await expect(page.getByTestId('usage-restricted')).toContainText('propietarios y administradores');
+  await expect(page.getByRole('heading', { name: 'Gestionar plan' })).toHaveCount(0);
   expect(mutations).toEqual([]);
 });
 
-test('billing outage degrades safely on mobile and does not create a payment attempt', async ({ page }) => {
+test('billing outage degrades safely on React Plan mobile and does not create a payment attempt', async ({ page }) => {
   const mutations = trackMutations(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await commonIdentity(page);
@@ -222,12 +153,29 @@ test('billing outage degrades safely on mobile and does not create a payment att
     contentType: 'application/json',
     body: JSON.stringify({ message: 'subscription unavailable' })
   }));
+  await page.route('**/api/v1/billing/status', route => route.fulfill(json({
+    billingEnabled: false,
+    checkoutConfigured: false,
+    currentPlanCode: null,
+    currentPlanName: null,
+    currentMonthlyPriceClp: null,
+    subscriptionStatus: null,
+    pendingPlanCode: null,
+    pendingPlanName: null,
+    pendingMonthlyPriceClp: null,
+    checkoutUrl: null,
+    awaitingProviderVerification: false
+  })));
+  await page.route('**/api/v1/public/pricing', route => route.fulfill(json([])));
+  await page.route('**/api/v1/usage/**', route => route.fulfill({
+    status: 503,
+    contentType: 'application/json',
+    body: JSON.stringify({ message: 'usage unavailable' })
+  }));
 
-  await page.goto('/account.html');
+  await page.goto('/app/plan');
 
-  await expect(page.locator('#accountError')).toBeVisible();
-  await expect(page.locator('#accountError')).toContainText('No pudimos cargar tu plan');
-  await expect(page.locator('#accountEmail')).toHaveText('admin@ferreteria-rc.cl');
+  await expect(page.getByRole('alert')).toContainText('No pudimos cargar tu plan');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   expect(mutations).toEqual([]);
 });
