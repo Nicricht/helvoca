@@ -14,7 +14,6 @@ test('remaining legacy shells point only to canonical application destinations',
 
   for (const [name, html] of [
     ['index.html', home],
-    ['simulator.html', simulator],
     ['business-import.html', importer]
   ]) {
     expect(html, name).not.toContain('href="/conversations.html"');
@@ -28,8 +27,8 @@ test('remaining legacy shells point only to canonical application destinations',
   expect(home).toContain('href="/app/settings">Configuración</a>');
   expect(home).toContain('href="/app/plan">Plan y consumo</a>');
 
-  expect(simulator).toContain('href="/app/agenda">Ver historial</a>');
-  expect(simulator).toContain('href="/app/plan">Plan y consumo</a>');
+  expect(simulator).toContain('url=/app/simulator');
+  expect(simulator).toContain("window.location.replace('/app/simulator')");
   expect(importer).toContain('href="/app/agenda">Agenda</a>');
 });
 
@@ -63,13 +62,12 @@ test('shared and public sales styles avoid decorative gradients', async () => {
   }
 });
 
-test('simulator keeps safe local actions and sends history to contextual Agenda', async () => {
+test('legacy simulator document is compatibility-only', async () => {
   const simulator = read('simulator.html');
 
-  expect(simulator).toContain('href="/app/agenda">Ver historial</a>');
-  expect(simulator).not.toContain('/conversations.html');
-  expect(simulator).toMatch(/No crea datos comerciales reales ni realiza llamadas telefónicas/i);
-  expect(simulator).toMatch(/Tampoco envía WhatsApp real/i);
+  expect(simulator).toContain('url=/app/simulator');
+  expect(simulator).not.toContain('/simulator.js');
+  expect(simulator).not.toContain('/simulator.css');
 });
 
 test('canonical customer surfaces stay contained at required responsive widths', async ({ page }) => {
@@ -94,7 +92,7 @@ test('canonical customer surfaces stay contained at required responsive widths',
   for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1024 });
 
-    for (const path of ['/', '/app', '/app/settings', '/app/inventory', '/app/agenda', '/app/plan', '/simulator.html']) {
+    for (const path of ['/', '/app', '/app/settings', '/app/inventory', '/app/agenda', '/app/plan', '/app/simulator']) {
       await page.goto(path);
       await page.waitForTimeout(80);
       const layout = await page.evaluate(() => {
@@ -138,7 +136,7 @@ test('remaining simulator navigation stays keyboard reachable', async ({ page })
 
   for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1024 });
-    await page.goto('/simulator.html');
+    await page.goto('/app/simulator');
 
     const nav = page.getByRole('navigation', { name: 'Navegación principal' });
     const links = nav.getByRole('link');
