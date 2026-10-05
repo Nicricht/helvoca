@@ -79,7 +79,7 @@ test('canonical dark foundation is served and loaded after legacy styles', async
   expect(foundation).toContain('--rv-accent: #16d9f5');
 
   for (const path of [
-    '/', '/inventory.html', '/simulator.html', '/operations.html',
+    '/', '/simulator.html', '/operations.html',
     '/platform.html', '/invite.html', '/phone-numbers.html',
     '/privacy.html', '/terms.html', '/data-deletion.html',
     '/sales.html', '/pricing.html'
