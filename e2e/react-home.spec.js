@@ -304,6 +304,24 @@ test.describe('React Home migration', () => {
     expect(requests.some(request => request.url.includes('/operations/readiness'))).toBe(false);
   });
 
+  test('renders the approved sans typography and layered petroleum atmosphere', async ({ page }) => {
+    await bootHome(page);
+    await page.goto('/app');
+
+    const fontFamily = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
+    expect(fontFamily).toMatch(/Inter|Segoe UI|system-ui|sans-serif/i);
+    expect(fontFamily).not.toMatch(/Times New Roman|Georgia|serif/i);
+
+    const layers = page.locator('[data-home-ambient-layer]');
+    await expect(layers).toHaveCount(4);
+
+    for (const layer of ['flow', 'grid', 'particles', 'halo']) {
+      await expect(page.locator(`[data-home-ambient-layer="${layer}"]`)).toBeAttached();
+    }
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  });
+
   test('value period controls query real analytics windows instead of faking client-side numbers', async ({ page }) => {
     const { requests } = await bootHome(page);
     await page.goto('/app');
