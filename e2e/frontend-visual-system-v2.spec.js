@@ -61,6 +61,19 @@ test.describe('RecepVoz visual system v2 contract', () => {
     expect(css).toMatch(/@media\s*\(max-width:\s*430px\)[\s\S]*?\.headerAction\s*\{[^}]*width:\s*auto;/);
   });
 
+  test('Home owns a compact premium motion hierarchy without touching the shared frame', async () => {
+    const home = read('frontend/src/pages/Home/HomePage.tsx');
+    const css = read('frontend/src/pages/Home/HomePage.module.css');
+
+    expect(home).toContain('data-home-motion="premium"');
+    expect(home).not.toContain('QuickActions');
+    expect(css).toContain('@keyframes homeRobotFloat');
+    expect(css).toContain('@keyframes homeStatusBreathe');
+    expect(css).toContain('@keyframes homeChartReveal');
+    expect(css).toMatch(/\.heroCard\s*\{[^}]*min-height:\s*(?:1[4-8]\d|auto)px;/s);
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+  });
+
   test('screen motion remains substantial but reduced-motion safe', async () => {
     const cssFiles = [
       'frontend/src/pages/Home/HomePage.module.css',

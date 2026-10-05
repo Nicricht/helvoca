@@ -249,54 +249,48 @@ async function expectNoHorizontalOverflow(page) {
 }
 
 test.describe('React Home migration', () => {
-  test('owner-ready state is a cockpit with today, attention, recent activity, quick access and bounded sales', async ({ page }) => {
+  test('owner-ready state focuses on value, attention and latest activity without duplicated navigation', async ({ page }) => {
     const { requests } = await bootHome(page);
 
     await page.goto('/app');
 
     await expect(page).toHaveURL(/\/app\/?$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Estado de tu negocio' })).toContainText(/todo bajo control|necesita tu atención/i);
 
-    const today = page.getByRole('region', { name: 'Qué está pasando hoy' });
+    const heroBox = await page.getByRole('region', { name: 'Estado de tu negocio' }).boundingBox();
+    expect(heroBox).not.toBeNull();
+    expect(heroBox.height).toBeLessThanOrEqual(190);
+
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toBeVisible();
+    await expect(value).toContainText(/valor.*atribuido|ventas.*atribuidas/i);
+    await expect(value).toContainText('$209.900');
+    await expect(value).toContainText(/4 pedidos|2 reservas/i);
+    await expect(value).not.toContainText(/ganancia|beneficio estimado|ROI|retorno de inversi/i);
+
+    const today = page.getByRole('region', { name: 'Resultados de hoy' });
     await expect(today).toBeVisible();
     await expect(today).toContainText('6');
-    await expect(today).toContainText('Llamadas');
+    await expect(today).toContainText(/llamadas atendidas/i);
     await expect(today).toContainText('4');
-    await expect(today).toContainText('Reservas');
-    await expect(today).toContainText('2');
-    await expect(today).toContainText('Clientes');
+    await expect(today).toContainText(/reservas generadas/i);
+    await expect(today).toContainText('15');
+    await expect(today).toContainText(/minutos.*IA|min.*gestionados/i);
 
     const attention = page.getByRole('region', { name: 'Necesita tu atención' });
     await expect(attention).toBeVisible();
-    await expect(attention).toContainText('2');
+    await expect(attention).toContainText('4');
     await expect(attention).toContainText(/solicitudes|pendientes/i);
-    await expect(attention).toContainText('1');
     await expect(attention).toContainText(/pregunta|sin respuesta/i);
     await expect(attention).toContainText(/fallo/i);
 
-    const recent = page.getByRole('region', { name: 'Actividad reciente' });
+    const recent = page.getByRole('region', { name: 'Última actividad' });
     await expect(recent).toBeVisible();
-    await expect(recent).toContainText('Cliente pidió devolución de llamada');
     await expect(recent).toContainText('+56911112222');
 
-    const quick = page.getByRole('navigation', { name: 'Accesos rápidos' });
-    await expect(quick).toBeVisible();
-    await expect(quick.getByRole('link', { name: 'Agenda' })).toHaveAttribute('href', '/app/agenda');
-    await expect(quick.getByRole('link', { name: 'Operaciones' })).toHaveAttribute('href', '/app/orders');
-    await expect(quick.getByRole('link', { name: 'Conversaciones' })).toHaveCount(0);
-    await expect(quick.getByRole('link', { name: 'Clientes' })).toHaveCount(0);
-    await expect(quick.locator('a[href="/#bookings"]')).toHaveCount(0);
-    await expect(quick.locator('a[href="/conversations.html"]')).toHaveCount(0);
-    await expect(quick.getByRole('link', { name: 'Inventario' })).toHaveAttribute('href', '/app/inventory');
-    await expect(quick.getByRole('link', { name: 'Configuración' })).toHaveAttribute('href', '/app/settings');
-    await expect(quick.locator('a[href="/settings.html"]')).toHaveCount(0);
-    await expect(quick.getByRole('link', { name: 'Plan y consumo' })).toHaveAttribute('href', '/app/plan');
-
-    const sales = page.getByRole('region', { name: 'Resumen de ventas' });
-    await expect(sales).toBeVisible();
-    await expect(sales).toContainText('$189.900');
-    await expect(sales).toContainText('5');
-    await expect(sales).not.toContainText(/ROI/i);
+    await expect(page.getByRole('navigation', { name: 'Accesos rápidos' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Resumen de ventas' })).toHaveCount(0);
 
     const apiRequests = requests.filter(request => request.url.includes('/api/v1/'));
     for (const request of apiRequests) {
@@ -310,7 +304,21 @@ test.describe('React Home migration', () => {
     expect(requests.some(request => request.url.includes('/operations/readiness'))).toBe(false);
   });
 
-  test('sales summary survives nullable analytics fields omitted by backend JSON serialization', async ({ page }) => {
+  test('value period controls query real analytics windows instead of faking client-side numbers', async ({ page }) => {
+    const { requests } = await bootHome(page);
+    await page.goto('/app');
+
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value.getByRole('button', { name: '7 días' })).toHaveAttribute('aria-pressed', 'true');
+
+    await value.getByRole('button', { name: 'Hoy' }).click();
+    await expect.poll(() => requests.filter(request => request.url.includes('/api/v1/commercial/analytics?days=1')).length).toBeGreaterThan(0);
+
+    await value.getByRole('button', { name: '30 días' }).click();
+    await expect.poll(() => requests.filter(request => request.url.includes('/api/v1/commercial/analytics?days=30')).length).toBeGreaterThan(0);
+  });
+
+  test('value panel survives nullable analytics fields omitted by backend JSON serialization', async ({ page }) => {
     const analytics = { ...READY_ANALYTICS };
     delete analytics.revenueChangePercent;
 
@@ -319,7 +327,7 @@ test.describe('React Home migration', () => {
     await page.goto('/app');
 
     await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Resumen de ventas' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Valor generado por RecepVoz' })).toBeVisible();
     await expect(page.locator('#root')).not.toBeEmpty();
   });
 
@@ -338,7 +346,7 @@ test.describe('React Home migration', () => {
       /\/app\/settings\?section=services/
     );
 
-    await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Resumen de ventas' })).toHaveCount(0);
   });
 
@@ -360,7 +368,7 @@ test.describe('React Home migration', () => {
       'href',
       /\/app\/settings\?section=receptionist/
     );
-    await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
   });
 
   test('shows an explicit loading state while the daily summary is pending', async ({ page }) => {
@@ -374,7 +382,7 @@ test.describe('React Home migration', () => {
     await expect(page.getByRole('status')).toContainText(/cargando/i);
 
     releaseOperations();
-    await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
   });
 
   test('empty state preserves the Home hierarchy without inventing activity', async ({ page }) => {
@@ -386,10 +394,10 @@ test.describe('React Home migration', () => {
     await page.goto('/app');
 
     await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toContainText(/sin actividad|todavía no/i);
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toContainText(/sin actividad|todavía no/i);
     await expect(page.getByRole('region', { name: 'Necesita tu atención' })).toContainText(/todo bajo control|sin pendientes/i);
-    await expect(page.getByRole('region', { name: 'Actividad reciente' })).toContainText(/todavía no|sin actividad/i);
-    await expect(page.getByRole('navigation', { name: 'Accesos rápidos' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Última actividad' })).toContainText(/todavía no|sin actividad/i);
+    await expect(page.getByRole('navigation', { name: 'Accesos rápidos' })).toHaveCount(0);
   });
 
   test('sales failure is partial and never takes down daily operations', async ({ page }) => {
@@ -397,35 +405,36 @@ test.describe('React Home migration', () => {
 
     await page.goto('/app');
 
-    await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Necesita tu atención' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Actividad reciente' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Última actividad' })).toBeVisible();
 
-    const sales = page.getByRole('region', { name: 'Resumen de ventas' });
+    const sales = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
     await expect(sales).toBeVisible();
     await expect(sales.getByRole('alert')).toContainText(/no pudimos cargar|no disponible/i);
   });
 
-  test('sales summary keeps currencies separate and describes source attribution without causal ROI claims', async ({ page }) => {
+  test('value panel keeps currencies separate and describes source attribution without causal ROI claims', async ({ page }) => {
     await bootHome(page, {
       analytics: {
         ...READY_ANALYTICS,
-        primaryCurrency: null,
+        primaryCurrency: 'USD',
         totalRevenue: null,
         averageTicket: null,
         currencyTotals: [
           { currency: 'CLP', amount: 189900 },
           { currency: 'USD', amount: 30 }
         ],
-        recepVozRevenue: null,
+        recepVozRevenue: 30,
         bookingCurrency: 'CLP',
+        recepVozBookingRevenue: 50000,
         bookingCurrencyTotals: [{ currency: 'CLP', amount: 75000 }]
       }
     });
 
     await page.goto('/app');
 
-    const sales = page.getByRole('region', { name: 'Resumen de ventas' });
+    const sales = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
     await expect(sales).toContainText('CLP');
     await expect(sales).toContainText('USD');
     await expect(sales).toContainText(/origen|atribuci/i);
@@ -468,8 +477,8 @@ test.describe('React Home migration', () => {
     await page.goto('/app');
 
     await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Actividad reciente' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Última actividad' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Configura tu negocio' })).toHaveCount(0);
     expect(state.onboardingRequests()).toBe(0);
   });
@@ -502,10 +511,10 @@ test.describe('React Home migration', () => {
       await page.goto('/app');
 
       await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
-      await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toBeVisible();
+      await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
       await expect(page.getByRole('region', { name: 'Necesita tu atención' })).toBeVisible();
-      await expect(page.getByRole('region', { name: 'Actividad reciente' })).toBeVisible();
-      await expect(page.getByRole('navigation', { name: 'Accesos rápidos' })).toBeVisible();
+      await expect(page.getByRole('region', { name: 'Última actividad' })).toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'Accesos rápidos' })).toHaveCount(0);
       await expectNoHorizontalOverflow(page);
     });
   }

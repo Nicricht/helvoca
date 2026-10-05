@@ -79,7 +79,7 @@ test('React Home stays usable when the user requests reduced motion', async ({ p
   await page.goto('/app');
 
   await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Qué está pasando hoy' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
   expect(await page.evaluate(() =>
     document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
   )).toBe(true);
