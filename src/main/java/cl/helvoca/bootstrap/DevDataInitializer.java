@@ -24,6 +24,7 @@ import cl.helvoca.knowledge.KnowledgeItem;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.schedule.BusinessHour;
 import cl.helvoca.schedule.BusinessHourRepository;
+import cl.helvoca.security.TenantDatabaseContext;
 import cl.helvoca.servicecatalog.ServiceItem;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
 import cl.helvoca.user.*;
@@ -34,7 +35,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
@@ -73,6 +75,8 @@ public class DevDataInitializer implements CommandLineRunner {
     private BookingRepository bookings;
     private InventoryStockRepository inventoryStocks;
     private DeliveryZoneRepository deliveryZones;
+    private TenantDatabaseContext databaseContext;
+    private PlatformTransactionManager transactionManager;
 
     @Value("${app.seed.enabled:false}") private boolean enabled;
     @Value("${app.seed.admin-email:admin@helvoca.local}") private String adminEmail;
@@ -127,10 +131,29 @@ public class DevDataInitializer implements CommandLineRunner {
         this.deliveryZones = deliveryZones;
     }
 
-    @Override @Transactional
+    @Autowired
+    void setDatabaseExecution(TenantDatabaseContext databaseContext,
+                              PlatformTransactionManager transactionManager) {
+        this.databaseContext = databaseContext;
+        this.transactionManager = transactionManager;
+    }
+
+    @Override
     public void run(String... args) {
         if (!enabled) return;
 
+        if (databaseContext == null || transactionManager == null) {
+            seedDemoTenant();
+            return;
+        }
+
+        databaseContext.runAsSystem(() -> {
+            TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+            transaction.executeWithoutResult(status -> seedDemoTenant());
+        });
+    }
+
+    private void seedDemoTenant() {
         Optional<AppUser> existingAdmin = users.findByEmailIgnoreCase(adminEmail);
         if (existingAdmin.isPresent()) {
             Business existingBusiness = existingAdmin.get().getBusiness();

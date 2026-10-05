@@ -64,7 +64,7 @@ async function bootSettingsCore(page, options = {}) {
       roles: options.roles || ['BUSINESS_ADMIN'],
       permissions: options.permissions || [
         'BUSINESS_READ',
-        'BUSINESS_MANAGE',
+        'BUSINESS_CONFIGURE',
         'CATALOG_READ',
         'CATALOG_MANAGE'
       ]

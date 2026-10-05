@@ -7,7 +7,8 @@
   "scripts": {
     "frontend:build": "npm --workspace frontend run build",
     "frontend:typecheck": "npm --workspace frontend run typecheck",
-    "test:e2e": "npm run frontend:build && playwright test"
+    "test:e2e": "npm run frontend:build && playwright test",
+    "test:e2e:system": "playwright test --config=playwright.system.config.js"
   },
   "devDependencies": {
     "@playwright/test": "1.55.0"
