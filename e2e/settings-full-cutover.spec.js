@@ -88,6 +88,27 @@ test.describe('Settings full cutover RED contract', () => {
 });
 
 
+test('legacy Settings URL redirects to canonical React Settings without loading page-only legacy assets', async ({ page }) => {
+  await bootReactSettings(page);
+  const requested = [];
+  page.on('request', request => requested.push(new URL(request.url()).pathname));
+
+  await page.goto('/settings.html');
+
+  await expect(page).toHaveURL(/\/app\/settings\/?$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Configuración' })).toBeVisible();
+
+  for (const retiredAsset of [
+    '/settings-page.js',
+    '/team-invitations.js',
+    '/schedule-exceptions.js',
+    '/payment-sandbox-onboarding.js',
+    '/pilot-activation.js'
+  ]) {
+    expect(requested).not.toContain(retiredAsset);
+  }
+});
+
 test('Team is managed inside React Settings without legacy fallback', async ({ page }) => {
   await bootReactSettings(page);
 
