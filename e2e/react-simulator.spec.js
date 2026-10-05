@@ -40,7 +40,9 @@ test.describe('React Simulator migration', () => {
     await expect(page.getByText(/WhatsApp real/i)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Nueva prueba' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Finalizar' })).toBeDisabled();
-    await expect(page.getByRole('link', { name: 'Agenda' })).toHaveAttribute('href', '/app/agenda');
+    await expect(
+      page.getByRole('navigation', { name: 'Navegación principal' }).getByRole('link', { name: 'Agenda' })
+    ).toHaveAttribute('href', '/app/agenda');
   });
 
   test('starts, chats, exposes verified trace and finishes without browser-side commercial mutations', async ({ page }) => {
@@ -227,7 +229,7 @@ test.describe('React Simulator migration', () => {
     await bootSimulator(page);
     await page.addInitScript(() => {
       class ListeningRecognition {
-        start() { setTimeout(() => this.onstart?.(), 300); }
+        start() { this.onstart?.(); }
         stop() { this.onend?.(); }
       }
       Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: ListeningRecognition });
