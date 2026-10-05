@@ -368,6 +368,25 @@ test.describe('React Home migration', () => {
     await expect(page.getByRole('region', { name: 'Resumen de ventas' })).toHaveCount(0);
   });
 
+  test('unknown onboarding steps still stay inside canonical React Settings', async ({ page }) => {
+    await bootHome(page, {
+      onboarding: {
+        ...INCOMPLETE_ONBOARDING,
+        nextStep: 'FUTURE_ONBOARDING_STEP'
+      }
+    });
+
+    await page.goto('/app');
+
+    const onboarding = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(onboarding).toBeVisible();
+    await expect(onboarding.getByRole('link', { name: /continuar/i })).toHaveAttribute(
+      'href',
+      '/app/settings'
+    );
+    await expect(page.locator('a[href^="/settings.html"]')).toHaveCount(0);
+  });
+
   test('phone onboarding parity points the owner to the receptionist setup', async ({ page }) => {
     await bootHome(page, {
       onboarding: {
