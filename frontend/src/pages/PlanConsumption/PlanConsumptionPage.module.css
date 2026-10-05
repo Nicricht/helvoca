@@ -722,3 +722,208 @@
     transition-duration: .01ms !important;
   }
 }
+
+
+/* === React billing management ========================================== */
+.manageSection {
+  margin-top: var(--rv-space-5);
+  padding: clamp(22px, 3vw, 30px);
+  border: 1px solid rgba(64, 139, 193, .22);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(22, 217, 245, .075), transparent 24%),
+    linear-gradient(145deg, rgba(8, 33, 53, .97), rgba(5, 22, 39, .99));
+  box-shadow:
+    0 18px 42px rgba(0, 7, 24, .12),
+    inset 0 1px 0 rgba(255, 255, 255, .018);
+}
+
+.manageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rv-space-4);
+  color: var(--rv-accent);
+}
+
+.manageHeader h2 {
+  margin-bottom: 6px;
+}
+
+.manageHeader p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--rv-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.currentPlanRow,
+.pendingPlan,
+.planChoice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rv-space-4);
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .018);
+}
+
+.currentPlanRow {
+  margin-top: var(--rv-space-5);
+  padding: 16px 18px;
+}
+
+.currentPlanRow > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.currentPlanRow span {
+  color: var(--rv-text-tertiary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.currentPlanRow strong {
+  color: var(--rv-text-primary);
+  font-size: 18px;
+}
+
+.currentPlanRow .planPrice {
+  color: var(--rv-text-secondary);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.pendingPlan {
+  margin-top: var(--rv-space-3);
+  padding: 16px 18px;
+  border-color: rgba(250, 190, 88, .28);
+  background: rgba(250, 190, 88, .045);
+}
+
+.pendingPlan > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pendingPlan strong {
+  color: var(--rv-text-primary);
+  font-size: 14px;
+}
+
+.pendingPlan span {
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.pendingPlan button,
+.planChoice button,
+.planChoice a {
+  flex: 0 0 auto;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.manageStatus,
+.manageError {
+  margin-top: var(--rv-space-4);
+  padding: 13px 15px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 12px;
+  color: var(--rv-text-secondary);
+  background: rgba(255, 255, 255, .02);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.manageError {
+  border-color: rgba(255, 104, 116, .25);
+  color: #ffc5ca;
+  background: rgba(255, 104, 116, .05);
+}
+
+.planChoices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--rv-space-3);
+  margin-top: var(--rv-space-4);
+}
+
+.planChoice {
+  min-width: 0;
+  padding: 16px;
+}
+
+.choiceTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.choiceTitle strong {
+  color: var(--rv-text-primary);
+  font-size: 15px;
+}
+
+.choiceTitle span {
+  padding: 3px 7px;
+  border: 1px solid rgba(61, 220, 151, .22);
+  border-radius: var(--rv-radius-pill);
+  color: var(--rv-success);
+  background: rgba(61, 220, 151, .06);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.planChoice p {
+  margin: 5px 0 0;
+  color: var(--rv-text-tertiary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 840px) {
+  .planChoices {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .manageSection {
+    padding: 18px 15px;
+    border-radius: 17px;
+  }
+
+  .manageHeader,
+  .currentPlanRow,
+  .pendingPlan,
+  .planChoice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pendingPlan button,
+  .planChoice button,
+  .planChoice a {
+    width: 100%;
+  }
+}
