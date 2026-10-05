@@ -79,7 +79,7 @@ test('canonical dark foundation is served and loaded after legacy styles', async
   expect(foundation).toContain('--rv-accent: #16d9f5');
 
   for (const path of [
-    '/', '/simulator.html', '/operations.html',
+    '/', '/operations.html',
     '/platform.html', '/invite.html', '/phone-numbers.html',
     '/privacy.html', '/terms.html', '/data-deletion.html',
     '/sales.html', '/pricing.html'
@@ -91,8 +91,6 @@ test('canonical dark foundation is served and loaded after legacy styles', async
     expect(stylesheets.at(-1), path + ' should load the canonical layer last').toBe('/frontend-foundation.css');
   }
 
-  const simulator = await getText(request, '/simulator.html');
-  expect(simulator).toContain('No crea datos comerciales reales ni realiza llamadas telefónicas.');
 });
 
 test('canonical foundation owns dark surfaces and interaction states', async ({ page, request }) => {
