@@ -190,7 +190,7 @@ test.describe('React business import migration', () => {
       onHand: null
     });
 
-    await expect(page.getByText('Importación aplicada')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Importación aplicada' })).toBeVisible();
     await expect(page.getByTestId('business-import-created')).toHaveText('2');
     await expect(page.getByTestId('business-import-updated')).toHaveText('0');
     await expect(page.getByTestId('business-import-inventory')).toHaveText('1');
