@@ -217,7 +217,7 @@ export function ChannelsSettingsPanel({
   const detach = useMutation({
     mutationFn: detachPhoneNumber,
     onSuccess: async () => {
-      setPhoneMessage("Número desvinculado.");
+      setPhoneMessage("Número desvinculado de este negocio. El número del proveedor sigue existiendo.");
       await refreshChannels();
     },
     onError: error => setPhoneMessage(errorMessage(error, "No pudimos desvincular el número."))
@@ -262,7 +262,7 @@ export function ChannelsSettingsPanel({
 
   function doDetach(phone: PhoneNumber) {
     if (!phone.id || detach.isPending) return;
-    if (!window.confirm("¿Desvincular " + (phone.phoneNumber || "este número") + "?")) return;
+    if (!window.confirm("¿Desvincular " + (phone.phoneNumber || "este número") + " de este negocio? El número seguirá existiendo en Twilio/proveedor y no será liberado ni eliminado.")) return;
     detach.mutate(phone.id);
   }
 
