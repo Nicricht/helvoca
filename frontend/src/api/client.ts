@@ -20,6 +20,11 @@ export function clearAccessToken(): void {
   sessionStorage.removeItem(TOKEN_KEY);
 }
 
+export function setAccessToken(token: string): void {
+  if (token) sessionStorage.setItem(TOKEN_KEY, token);
+  else clearAccessToken();
+}
+
 async function readPayload(response: Response): Promise<unknown> {
   if (response.status === 204) return null;
   const contentType = response.headers.get("content-type") ?? "";
@@ -64,9 +69,9 @@ export async function apiRequest<T>(
   const response = await fetch(path, { ...init, headers });
   const payload = await readPayload(response);
 
-  if (response.status === 401) {
+  if (response.status === 401 && authenticated) {
     clearAccessToken();
-    window.location.replace("/");
+    window.location.replace("/app/auth");
     throw new ApiError(401, "La sesión expiró.", payload);
   }
 

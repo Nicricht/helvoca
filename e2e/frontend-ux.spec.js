@@ -198,7 +198,9 @@ test('public commercial layer no longer depends on retired Home assets', async (
     links => links.map(link => new URL(link.href).pathname)
   );
   expect(stylesheets).not.toContain('/home-business.css');
-  expect(stylesheets).toContain('/commercial-ui-v3.css');
+  expect(stylesheets).not.toContain('/commercial-ui-v3.css');
+  expect(stylesheets.some(path => /^\/app\/assets\/index-.*\.css$/.test(path))).toBe(true);
+  await expect(page.locator('[data-auth-page="recepvoz"]')).toBeVisible();
   await expect(page.locator('script[src*="home-business.js"]')).toHaveCount(0);
 });
 

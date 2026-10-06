@@ -117,7 +117,7 @@ test.describe('React settings hardening RED contract', () => {
   test('expired auth returns to the login surface', async ({ page }) => {
     await boot(page, { expired: true });
     await page.goto('/app/settings');
-    await expect(page).toHaveURL('http://127.0.0.1:4173/');
+    await expect(page).toHaveURL(/\/app\/auth\/?$/);
   });
 
   for (const scenario of [

@@ -10,7 +10,7 @@ const json = (body, status = 200) => ({
 
 async function mockCanonicalApp(page) {
   await page.addInitScript(() => {
-    if (window.location.pathname.startsWith('/app')) {
+    if (window.location.pathname.startsWith('/app') && !window.location.pathname.startsWith('/app/auth')) {
       sessionStorage.setItem('helvoca_access_token', 'rc-react-token');
     }
   });
@@ -244,7 +244,7 @@ test('release candidate owner traverses every canonical React workspace', async 
 
   await page.goto('/app');
   await page.getByRole('button', { name: 'Salir' }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/app\/auth\/?$/);
   await expect(page.locator('#authView')).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBeFalsy();
 });

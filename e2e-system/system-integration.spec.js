@@ -5,7 +5,7 @@ const ADMIN_PASSWORD = process.env.SYSTEM_E2E_ADMIN_PASSWORD || 'ChangeMe123!';
 
 async function login(page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+  await page.getByRole('tab', { name: 'Ingresar', exact: true }).click();
   await page.locator('#loginForm input[name="email"]').fill(ADMIN_EMAIL);
   await page.locator('#loginForm input[name="password"]').fill(ADMIN_PASSWORD);
   await page.locator('#loginForm button[type="submit"]').click();

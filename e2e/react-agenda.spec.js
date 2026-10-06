@@ -382,7 +382,7 @@ test.describe('React Agenda migration', () => {
     await bootAgenda(page, { expired: true });
     await page.goto('/app/agenda');
 
-    await expect(page).toHaveURL('http://127.0.0.1:4173/');
+    await expect(page).toHaveURL(/\/app\/auth\/?$/);
   });
 
   test('stays contained at desktop, tablet and mobile widths', async ({ page }) => {

@@ -58,7 +58,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
   function logout() {
     clearAccessToken();
-    window.location.assign("/");
+    window.location.assign("/app/auth");
   }
 
   function isCurrentNavigation(route: string): boolean {

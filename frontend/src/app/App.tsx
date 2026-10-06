@@ -13,6 +13,7 @@ import { PlatformPage } from "../pages/Platform/PlatformPage";
 import { InvitePage } from "../pages/Invite/InvitePage";
 import { SalesPage } from "../pages/Sales/SalesPage";
 import { PricingPage } from "../pages/Pricing/PricingPage";
+import { AuthPage } from "../pages/Auth/AuthPage";
 
 function ProtectedOutlet() {
   return (
@@ -28,6 +29,7 @@ export function App() {
       <Route path="/invite" element={<InvitePage />} />
       <Route path="/sales" element={<SalesPage />} />
       <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/auth" element={<AuthPage />} />
       <Route element={<ProtectedOutlet />}>
         <Route index element={<HomePage />} />
         <Route path="/plan" element={<PlanConsumptionPage />} />

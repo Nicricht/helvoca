@@ -57,6 +57,6 @@ test.describe('React frontend foundation', () => {
 
   test('redirects an unauthenticated React visit back to the existing auth surface', async ({ page }) => {
     await page.goto('/app/index.html');
-    await expect(page).toHaveURL('http://127.0.0.1:4173/');
+    await expect(page).toHaveURL(/\/app\/auth\/?$/);
   });
 });
