@@ -43,14 +43,14 @@ function money(values?: Record<string, number>) {
           maximumFractionDigits: currency === "CLP" ? 0 : 2
         }).format(Number(value || 0));
       } catch {
-        return \`\${currency} \${Number(value || 0).toLocaleString("es-CL")}\`;
+        return `\${currency} \${Number(value || 0).toLocaleString("es-CL")}`;
       }
     })
     .join(" · ");
 }
 
 function pct(value?: number) {
-  return \`\${Number(value || 0).toLocaleString("es-CL", { maximumFractionDigits: 1 })}%\`;
+  return `\${Number(value || 0).toLocaleString("es-CL", { maximumFractionDigits: 1 })}%`;
 }
 
 function localDateTime(value?: string | null) {
@@ -58,7 +58,7 @@ function localDateTime(value?: string | null) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   const pad = (part: number) => String(part).padStart(2, "0");
-  return \`\${date.getFullYear()}-\${pad(date.getMonth() + 1)}-\${pad(date.getDate())}T\${pad(date.getHours())}:\${pad(date.getMinutes())}\`;
+  return `\${date.getFullYear()}-\${pad(date.getMonth() + 1)}-\${pad(date.getDate())}T\${pad(date.getHours())}:\${pad(date.getMinutes())}`;
 }
 
 function trafficLabel(mode?: string | null) {
@@ -73,7 +73,7 @@ function trafficLabel(mode?: string | null) {
 
 function controlSummary(control: PilotControl) {
   const blockers = control.blockers ?? [];
-  if (blockers.length) return \`Bloqueos: \${blockers.join(", ")}.\`;
+  if (blockers.length) return `Bloqueos: \${blockers.join(", ")}.`;
   if (control.status === "RUNNING") {
     return "Piloto en ejecución. Las acciones reales siguen sujetas al guard global y al estado del tenant.";
   }
@@ -223,7 +223,7 @@ export function InternalOperationsPage() {
 
   return (
     <AppShell>
-      <main className={\`rv-page-frame \${styles.page}\`} data-visual-page="internal-operations">
+      <main className={`rv-page-frame \${styles.page}`} data-visual-page="internal-operations">
         <div className={styles.atmosphere} aria-hidden="true">
           <span className={styles.orbCyan} />
           <span className={styles.orbViolet} />
@@ -266,7 +266,7 @@ export function InternalOperationsPage() {
             </div>
             <div className={styles.score}>
               <strong data-testid="pilot-readiness-score">
-                {readinessData ? \`\${Number(readinessData.passed || 0)}/\${Number(readinessData.total || readinessData.checks?.length || 0)}\` : "–"}
+                {readinessData ? `\${Number(readinessData.passed || 0)}/\${Number(readinessData.total || readinessData.checks?.length || 0)}` : "–"}
               </strong>
               <span>COMPONENTES LISTOS</span>
             </div>
@@ -291,7 +291,7 @@ export function InternalOperationsPage() {
               {readinessData?.ready
                 ? "Todo el circuito crítico reportado por backend está listo para certificación."
                 : readinessData?.blockers?.length
-                  ? \`Falta: \${readinessData.blockers.join(", ")}.\`
+                  ? `Falta: \${readinessData.blockers.join(", ")}.`
                   : "Esperando la evaluación de readiness."}
             </span>
             <a className="button small ghost" href="/app/settings">Corregir configuración</a>
@@ -442,9 +442,9 @@ export function InternalOperationsPage() {
               <div className={styles.cardFoot}>
                 <span>
                   {preflightBlockers.length
-                    ? \`NO-GO: \${preflightBlockers.join(", ")}\`
+                    ? `NO-GO: \${preflightBlockers.join(", ")}`
                     : preflightWarnings.length
-                      ? \`GO con observaciones: \${preflightWarnings.join(", ")}\`
+                      ? `GO con observaciones: \${preflightWarnings.join(", ")}`
                       : "GO: no hay bloqueos detectados. La activación real sigue requiriendo autorización explícita."}
                 </span>
               </div>
