@@ -1,171 +1,20 @@
 <!doctype html>
 <html lang="es">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>RecepVoz · Importar negocio</title>
-    <meta name="description" content="Importa productos, servicios y stock desde Excel, CSV, PDF o fotos para configurar un negocio rápidamente en RecepVoz.">
-    <meta name="theme-color" content="#06111c">
-    <link rel="manifest" href="/manifest.webmanifest">
-    <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/frontend-foundation.css?v=20260930-2">
-    <link rel="stylesheet" href="/commercial-ui-v3.css?v=20260928-2">
-    <link rel="stylesheet" href="/business-import.css?v=20260930-1">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Importar negocio · RecepVoz</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/frontend-foundation.css?v=20261005-v4">
+  <meta http-equiv="refresh" content="0;url=/app/settings/import">
+  <script>
+    window.location.replace('/app/settings/import');
+  </script>
 </head>
-<body class="business-import-page">
-<div class="shell">
-    <header class="topbar">
-        <div>
-            <div id="importBrand" class="brand">RECEPVOZ</div>
-            <div class="subtitle">Onboarding express de negocios</div>
-        </div>
-        <nav class="import-nav" aria-label="Navegación principal">
-            <a href="/">Inicio</a>
-            <a href="/app/agenda">Agenda</a>
-            <a href="/app/inventory">Inventario</a>
-            <a href="/app/settings">Configuración</a>
-        </nav>
-        <div class="top-actions">
-            <span id="importRoleBadge" class="badge muted">Cargando</span>
-            <button id="importLogoutBtn" class="button ghost" type="button">Salir</button>
-        </div>
-    </header>
-
-    <main class="import-main">
-        <section id="importLoading" class="card import-loading">
-            <div class="import-spinner" aria-hidden="true"></div>
-            <div>
-                <strong>Preparando importador</strong>
-                <p>Comprobando tu negocio y permisos.</p>
-            </div>
-        </section>
-
-        <section id="importAuthRequired" class="card import-auth hidden">
-            <div class="eyebrow">Sesión requerida</div>
-            <h1>Ingresa como administrador del negocio.</h1>
-            <p>Solo un BUSINESS_ADMIN puede revisar y aplicar información importada.</p>
-            <a class="button primary" href="/">Ir a iniciar sesión</a>
-        </section>
-
-        <section id="importApp" class="hidden">
-            <div class="import-heading">
-                <div>
-                    <div class="eyebrow">Onboarding express</div>
-                    <h1>Convierte lo que el negocio ya tiene en datos de RecepVoz</h1>
-                    <p>Excel y CSV se leen localmente en el backend cuando son claros. Fotos y PDF se usan como material de análisis y siempre generan un borrador antes de guardar.</p>
-                </div>
-                <div class="import-heading-side">
-                    <span class="import-safety">Vista previa → revisión → aplicar</span>
-                </div>
-            </div>
-
-            <div id="importMessage" class="message hidden" role="status"></div>
-
-            <section class="import-grid">
-                <article class="card import-upload-card">
-                    <div class="import-step"><span>1</span><div><strong>Material del negocio</strong><small>Sube todo junto</small></div></div>
-
-                    <label class="import-business-name">
-                        Nombre del negocio
-                        <input id="importBusinessName" maxlength="150" autocomplete="organization" placeholder="Hamburguesería Don Pepe">
-                    </label>
-
-                    <label id="importDropzone" class="import-dropzone" for="importFiles">
-                        <input id="importFiles" type="file" multiple
-                               accept=".csv,.tsv,.xls,.xlsx,.pdf,image/jpeg,image/png,image/webp">
-                        <span class="import-drop-icon" aria-hidden="true">↥</span>
-                        <strong>Arrastra archivos aquí o selecciónalos</strong>
-                        <small>Excel, CSV, PDF, JPG, PNG o WEBP · máximo 10 MB por archivo</small>
-                    </label>
-
-                    <div id="importFileList" class="import-file-list"></div>
-
-                    <div class="import-cost-note">
-                        <strong>Modo ahorro automático</strong>
-                        <span>Las planillas reconocibles se procesan sin IA. La IA se reserva para imágenes y PDF.</span>
-                    </div>
-
-                    <button id="importPreviewBtn" class="button primary import-primary-action" type="button" disabled>
-                        Analizar y crear borrador
-                    </button>
-                </article>
-
-                <article class="card import-guide-card">
-                    <div class="import-step"><span>?</span><div><strong>¿Qué puedes entregar?</strong><small>No necesitas preparar un formato especial</small></div></div>
-                    <div class="import-guide-list">
-                        <div><b>Excel / CSV</b><span>Productos, servicios, precios, duración, SKU, stock, clientes o ventas históricas.</span></div>
-                        <div><b>Fotos</b><span>Menús, carteles, listas de precios o vitrinas con información legible.</span></div>
-                        <div><b>PDF</b><span>Menús, catálogos, tarifarios y documentos del negocio.</span></div>
-                    </div>
-                    <div class="import-history-note">
-                        <strong>Ventas y boletas históricas</strong>
-                        <p>Se detectan como datos históricos. Esta importación no las transforma en pedidos, cobros ni pagos reales.</p>
-                    </div>
-                </article>
-            </section>
-
-            <section id="importPreviewSection" class="card import-preview-section hidden">
-                <div class="import-section-head">
-                    <div class="import-step"><span>2</span><div><strong>Revisa el borrador</strong><small>Solo se guardará lo que dejes seleccionado</small></div></div>
-                    <div class="import-preview-actions">
-                        <span id="importDetectedCount" class="badge muted">0 elementos</span>
-                        <button id="importSelectAllBtn" class="button ghost" type="button">Seleccionar todos</button>
-                    </div>
-                </div>
-
-                <div id="importSourceSummary" class="import-source-summary"></div>
-                <div id="importWarnings" class="import-warnings hidden"></div>
-
-                <div class="import-table-wrap">
-                    <table class="import-table">
-                        <thead>
-                        <tr>
-                            <th aria-label="Importar"></th>
-                            <th>Tipo</th>
-                            <th>Nombre</th>
-                            <th>Categoría</th>
-                            <th>Duración</th>
-                            <th>SKU</th>
-                            <th>Precio</th>
-                            <th>Stock</th>
-                            <th>Origen</th>
-                        </tr>
-                        </thead>
-                        <tbody id="importProductRows"></tbody>
-                    </table>
-                </div>
-
-                <div id="importNoProducts" class="import-empty hidden">
-                    <strong>No hay productos o servicios listos para aplicar.</strong>
-                    <span>Puedes cambiar los archivos o revisar las advertencias detectadas.</span>
-                </div>
-
-                <div class="import-apply-bar">
-                    <div>
-                        <strong id="importSelectedText">0 seleccionados</strong>
-                        <span>Los precios o stock vacíos se mantienen como “sin dato”. Los servicios requieren duración y nunca usan inventario.</span>
-                    </div>
-                    <button id="importApplyBtn" class="button primary" type="button" disabled>
-                        Importar al negocio
-                    </button>
-                </div>
-            </section>
-
-            <section id="importResultSection" class="card import-result hidden">
-                <div class="import-step"><span>✓</span><div><strong>Importación aplicada</strong><small>RecepVoz ya usa estos datos como verdad del negocio</small></div></div>
-                <div class="import-result-kpis">
-                    <div><span>Nuevos</span><strong id="importCreatedCount">0</strong></div>
-                    <div><span>Actualizados</span><strong id="importUpdatedCount">0</strong></div>
-                    <div><span>Inventario</span><strong id="importInventoryCount">0</strong></div>
-                </div>
-                <div class="import-result-actions">
-                    <a class="button primary" href="/app/inventory">Ver inventario</a>
-                    <button id="importAnotherBtn" class="button ghost" type="button">Importar otro archivo</button>
-                </div>
-            </section>
-        </section>
-    </main>
-</div>
-<script src="/business-import.js?v=20260930-1"></script>
+<body>
+  <main class="rv-page-frame">
+    <p>Abriendo el importador del negocio…</p>
+    <a href="/app/settings/import">Continuar</a>
+  </main>
 </body>
 </html>

@@ -18,6 +18,8 @@ public class ReactFrontendController {
             "/app/orders/",
             "/app/settings",
             "/app/settings/",
+            "/app/settings/import",
+            "/app/settings/import/",
             "/app/simulator",
             "/app/simulator/",
             "/app/internal/operations",

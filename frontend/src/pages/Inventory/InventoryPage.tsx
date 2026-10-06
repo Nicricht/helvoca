@@ -806,7 +806,7 @@ export function InventoryPage() {
             <div className={styles.workspaceActions}>
               {model.canManageCatalog && (
                 <>
-                  <a className="button secondary" href="/business-import.html">
+                  <a className="button secondary" href="/app/settings/import">
                     Importar archivos
                   </a>
                   <button
