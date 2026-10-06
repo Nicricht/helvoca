@@ -185,7 +185,6 @@ jobs:
           node --check src/main/resources/static/commercial-status.js
           node --check src/main/resources/static/voice-selector.js
           node --check src/main/resources/static/ux-simplification.js
-          node --check src/main/resources/static/pricing.js
 
       - name: Run backend tests with JaCoCo
         run: |
@@ -349,7 +348,6 @@ jobs:
           node --check src/main/resources/static/commercial-status.js
           node --check src/main/resources/static/voice-selector.js
           node --check src/main/resources/static/ux-simplification.js
-          node --check src/main/resources/static/pricing.js
 
       - name: Install frontend test dependencies
         run: |
@@ -929,10 +927,18 @@ jobs:
       - name: Verify pricing page and public catalog in production
         run: |
           BASE_URL="https://helvoca-api-production.up.railway.app"
-          PAGE_CODE=$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 30 -sS -L -o pricing-production.html -w "%{http_code}" "$BASE_URL/pricing.html")
-          test "$PAGE_CODE" = "200"
-          grep -F "Planes para empezar" pricing-production.html
-          grep -F '<script src="/pricing.js" defer></script>' pricing-production.html
+          LEGACY_CODE=$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 30 -sS -o pricing-legacy.html -w "%{http_code}" "$BASE_URL/pricing.html")
+          test "$LEGACY_CODE" = "200"
+          grep -F "/app/pricing" pricing-legacy.html
+          if grep -Eq "/pricing\\.(js|css)" pricing-legacy.html; then
+            echo "Legacy pricing document still loads retired pricing assets"
+            exit 1
+          fi
+
+          CANONICAL_CODE=$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 30 -sS -L -o pricing-react.html -w "%{http_code}" "$BASE_URL/app/pricing")
+          test "$CANONICAL_CODE" = "200"
+          grep -F '<div id="root"></div>' pricing-react.html
+          grep -E '/app/assets/index-[^"]+\\.js' pricing-react.html
 
           API_CODE=$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 30 -sS -L -o pricing-production.json -w "%{http_code}" "$BASE_URL/api/v1/public/pricing")
           test "$API_CODE" = "200"

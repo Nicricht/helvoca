@@ -145,7 +145,7 @@ export function SalesPage() {
             <a href="#como-funciona">Cómo funciona</a>
             <a href="#producto">Qué hace</a>
             <a href="#negocios">Para quién sirve</a>
-            <a href="/pricing.html">Planes</a>
+            <a href="/app/pricing">Planes</a>
           </nav>
 
           <a className={styles.headerCta} href="/">
@@ -180,7 +180,7 @@ export function SalesPage() {
                 <a className={styles.primaryButton} href="/">
                   Probar con mi negocio <ArrowRight size={16} aria-hidden="true" />
                 </a>
-                <a className={styles.secondaryButton} href="/pricing.html">
+                <a className={styles.secondaryButton} href="/app/pricing">
                   Planes desde $24.990
                 </a>
               </div>
@@ -402,7 +402,7 @@ export function SalesPage() {
               <a className={styles.primaryButton} href="/">
                 Configurar mi prueba <ArrowRight size={16} aria-hidden="true" />
               </a>
-              <a className={styles.secondaryButton} href="/pricing.html">Ver planes</a>
+              <a className={styles.secondaryButton} href="/app/pricing">Ver planes</a>
             </div>
           </section>
         </main>
@@ -413,7 +413,7 @@ export function SalesPage() {
             <span><strong>RecepVoz</strong><small>Atención digital con IA para empresas.</small></span>
           </div>
           <nav aria-label="Información pública">
-            <a href="/pricing.html">Planes</a>
+            <a href="/app/pricing">Planes</a>
             <a href="/privacy.html">Privacidad</a>
             <a href="/terms.html">Términos</a>
           </nav>
