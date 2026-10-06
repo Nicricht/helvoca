@@ -139,7 +139,7 @@ public class TeamInvitationService {
                     invitation.getId());
         }
 
-        String path = "/invite.html?businessId=" + businessId + "&token=" + rawToken;
+        String path = "/app/invite?businessId=" + businessId + "&token=" + rawToken;
         return response(invitation, path);
     }
 

@@ -69,7 +69,7 @@ class TeamInvitationServiceTest {
         TeamInvitation saved = captor.getValue();
 
         assertNotNull(result.invitePath());
-        assertTrue(result.invitePath().startsWith("/invite.html?businessId=" + businessId + "&token="));
+        assertTrue(result.invitePath().startsWith("/app/invite?businessId=" + businessId + "&token="));
         String rawToken = result.invitePath().substring(result.invitePath().indexOf("&token=") + 7);
         assertTrue(rawToken.length() >= 40);
         assertEquals(64, saved.getTokenHash().length());

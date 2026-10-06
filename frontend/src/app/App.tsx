@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AuthBoundary } from "./AuthBoundary";
 import { HomePage } from "../pages/Home/HomePage";
 import { PlanConsumptionPage } from "../pages/PlanConsumption/PlanConsumptionPage";
@@ -10,11 +10,21 @@ import { SimulatorPage } from "../pages/Simulator/SimulatorPage";
 import { InternalOperationsPage } from "../pages/InternalOperations/InternalOperationsPage";
 import { BusinessImportPage } from "../pages/BusinessImport/BusinessImportPage";
 import { PlatformPage } from "../pages/Platform/PlatformPage";
+import { InvitePage } from "../pages/Invite/InvitePage";
+
+function ProtectedOutlet() {
+  return (
+    <AuthBoundary>
+      <Outlet />
+    </AuthBoundary>
+  );
+}
 
 export function App() {
   return (
-    <AuthBoundary>
-      <Routes>
+    <Routes>
+      <Route path="/invite" element={<InvitePage />} />
+      <Route element={<ProtectedOutlet />}>
         <Route index element={<HomePage />} />
         <Route path="/plan" element={<PlanConsumptionPage />} />
         <Route path="/inventory" element={<InventoryPage />} />
@@ -26,7 +36,7 @@ export function App() {
         <Route path="/internal/operations" element={<InternalOperationsPage />} />
         <Route path="/platform" element={<PlatformPage />} />
         <Route path="*" element={<Navigate to="/plan" replace />} />
-      </Routes>
-    </AuthBoundary>
+      </Route>
+    </Routes>
   );
 }
