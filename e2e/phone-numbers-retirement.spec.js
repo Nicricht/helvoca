@@ -129,7 +129,7 @@ test.describe('legacy phone numbers retirement', () => {
 
     await page.goto('/phone-numbers.html');
 
-    await expect(page).toHaveURL(/\/app\/settings\?section=channels$/);
+    await expect(page).toHaveURL(/\/app\/settings\/?\?section=channels$/);
     await expect(page.getByRole('heading', { name: 'Canales' })).toBeVisible();
     await expect(page.getByText('+56220001111')).toBeVisible();
     expect(state.writes).toEqual([]);
@@ -163,6 +163,6 @@ test.describe('legacy phone numbers retirement', () => {
     await expect.poll(() => state.writes).toEqual([
       { method: 'DELETE', path: '/api/v1/phone-numbers/phone-1' }
     ]);
-    await expect(page.getByText('Número desvinculado.', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Número desvinculado de este negocio\./)).toBeVisible();
   });
 });
