@@ -23,7 +23,9 @@ public class ReactFrontendController {
             "/app/simulator",
             "/app/simulator/",
             "/app/internal/operations",
-            "/app/internal/operations/"
+            "/app/internal/operations/",
+            "/app/platform",
+            "/app/platform/"
     })
     public String application() {
         return "forward:/app/index.html";
