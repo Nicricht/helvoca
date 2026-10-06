@@ -91,7 +91,7 @@ function isPlatformAdmin(roles) {
 
 function redirectPlatformAdmin(roles) {
     if (!isPlatformAdmin(roles)) return false;
-    location.replace("/platform.html");
+    location.replace("/app/platform");
     return true;
 }
 

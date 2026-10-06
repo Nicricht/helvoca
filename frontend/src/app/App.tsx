@@ -9,6 +9,7 @@ import { SettingsPage } from "../pages/Settings/SettingsPage";
 import { SimulatorPage } from "../pages/Simulator/SimulatorPage";
 import { InternalOperationsPage } from "../pages/InternalOperations/InternalOperationsPage";
 import { BusinessImportPage } from "../pages/BusinessImport/BusinessImportPage";
+import { PlatformPage } from "../pages/Platform/PlatformPage";
 
 export function App() {
   return (
@@ -23,6 +24,7 @@ export function App() {
         <Route path="/settings/import" element={<BusinessImportPage />} />
         <Route path="/simulator" element={<SimulatorPage />} />
         <Route path="/internal/operations" element={<InternalOperationsPage />} />
+        <Route path="/platform" element={<PlatformPage />} />
         <Route path="*" element={<Navigate to="/plan" replace />} />
       </Routes>
     </AuthBoundary>

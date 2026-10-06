@@ -31,7 +31,7 @@ public class SecurityConfig {
             "/styles.css", "/frontend-foundation.css", "/commercial-ui-v3.css", "/auth-visual-refresh.css", "/landing-motion.css", "/recepvoz-auth-hero.svg", "/recepvoz-phone-hero.svg", "/dashboard-finish.css", "/dashboard-motion.css",
             "/business-activation-guide.js",
             "/invite.html", "/invite.js",
-            "/platform.html", "/platform.js", "/operations.html",
+            "/platform.html", "/operations.html",
             "/sales.html", "/sales.css",
             "/privacy.html", "/terms.html",
             "/pricing.html", "/pricing.js", "/pricing.css",
