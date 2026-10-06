@@ -71,7 +71,7 @@ public class BusinessActivationGuideService {
                 pilotConfigured
                         ? "El piloto ya tiene responsable, objetivo y ciclo operativo."
                         : "Define responsable, objetivo y fecha de cierre para habilitar el piloto.",
-                "Configurar piloto", "/#pilotControlCard"));
+                "Configurar piloto", "/app/internal/operations"));
 
         long completed = steps.stream().filter(Step::complete).count();
         Step next = steps.stream().filter(item -> !item.complete()).findFirst().orElse(null);
