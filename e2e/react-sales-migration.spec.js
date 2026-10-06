@@ -62,7 +62,7 @@ test.describe('React public sales landing migration', () => {
     { width: 768, height: 1024 },
     { width: 390, height: 844 }
   ]) {
-    test(\`sales landing stays contained at \${viewport.width}px\`, async ({ page }) => {
+    test('sales landing stays contained at ' + viewport.width + 'px', async ({ page }) => {
       await page.setViewportSize(viewport);
       await page.goto('/app/sales');
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
