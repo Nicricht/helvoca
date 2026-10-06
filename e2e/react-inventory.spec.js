@@ -250,7 +250,7 @@ test.describe('React Inventory migration', () => {
     await bootInventory(page, { expired: true });
     await page.goto('/app/inventory');
 
-    await expect(page).toHaveURL('http://127.0.0.1:4173/');
+    await expect(page).toHaveURL(/\/app\/auth\/?$/);
   });
 
   test('stays contained at desktop tablet and mobile widths', async ({ page }) => {

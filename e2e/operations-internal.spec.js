@@ -211,6 +211,6 @@ test.describe('React internal operations migration', () => {
 
   test('unauthenticated visitors are redirected to the owner entry', async ({ page }) => {
     await page.goto('/app/internal/operations');
-    await expect.poll(() => new URL(page.url()).pathname).toBe('/');
+    await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/app\/auth\/?$/);
   });
 });

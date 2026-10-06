@@ -63,15 +63,13 @@ async function bootReactSettings(page) {
 }
 
 test.describe('Settings full cutover RED contract', () => {
-  for (const surface of [
-    { path: '/', selector: '.nav-config' }
-  ]) {
-    test(`${surface.path} sends Configuración to the canonical React route`, async ({ page }) => {
-      await page.goto(surface.path);
-      const links = page.locator(surface.selector);
-      await expect(links.first()).toHaveAttribute('href', /^\/app\/settings(?:[?#].*)?$/);
-    });
-  }
+  test('public entry keeps protected Settings out of unauthenticated navigation', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/app\/auth\/?$/);
+    await expect(page.getByRole('link', { name: 'Cómo funciona' })).toHaveAttribute('href', '/app/sales');
+    await expect(page.getByRole('link', { name: 'Planes' })).toHaveAttribute('href', '/app/pricing');
+    await expect(page.locator('a[href^="/app/settings"]')).toHaveCount(0);
+  });
 
   test('React Settings no longer sends users back to the legacy Settings screen', async ({ page }) => {
     await bootReactSettings(page);

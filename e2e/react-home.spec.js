@@ -490,7 +490,7 @@ test.describe('React Home migration', () => {
 
     await page.goto('/app');
 
-    await expect(page).toHaveURL('http://127.0.0.1:4173/');
+    await expect(page).toHaveURL(/\/app\/auth\/?$/);
     await expect(page.locator('[data-auth-entry]')).toBeVisible();
     expect(await page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBeNull();
   });

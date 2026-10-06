@@ -339,7 +339,7 @@ test.describe('React Plan y consumo pilot', () => {
     await page.route('**/api/v1/subscription', route => route.fulfill(json(subscription())));
 
     await page.goto('/app/index.html');
-    await expect(page).toHaveURL('http://127.0.0.1:4173/');
+    await expect(page).toHaveURL(/\/app\/auth\/?$/);
   });
 
   test('keeps the mobile plan CTA compact and polished', async ({ page }) => {

@@ -228,3 +228,16 @@ The public entry is now implemented in React:
 - legacy Java/root-text contracts were migrated to compatibility behavior.
 
 The historical root-only script files remain in the repository for a later dead-asset cleanup pass so specialized historical CI references can be retired deliberately. They are no longer executed by the public root.
+
+
+## Part 2 hardening checkpoint
+
+The first implementation CI confirmed the ten new public-entry migration cases GREEN and exposed only old-route contract drift plus two product-preservation details. Hardening now:
+- uses `/app/auth` as the canonical expired-session and logout target;
+- preserves the PWA manifest and service-worker registration in the React bootstrap;
+- teaches static interaction auditing that `/app/auth` is a valid React route;
+- updates real system E2E to use the semantic auth tab;
+- removes the compatibility root from authenticated layout loops;
+- avoids transient horizontal auth-card motion at 1280px.
+
+No backend authentication rule or database schema changed.
