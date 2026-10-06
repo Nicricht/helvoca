@@ -11,14 +11,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ConsoleFormSubmissionTest {
 
     @Test
-    void busyStateMustNotDisableFormFieldsBeforeFormDataIsBuilt() throws Exception {
-        var resource = new ClassPathResource("static/app.js");
-        String script;
-        try (var input = resource.getInputStream()) {
-            script = new String(input.readAllBytes(), StandardCharsets.UTF_8);
-        }
+    void legacyRootIsCompatibilityOnlyAndDoesNotOwnForms() throws Exception {
+        String html = read("static/index.html");
 
-        assertTrue(script.contains("$$(\"button\", form).forEach(el => el.disabled = busy)"));
-        assertFalse(script.contains("button, input, select, textarea"));
+        assertTrue(html.contains("/app/auth"));
+        assertFalse(html.contains("<form"));
+        assertFalse(html.contains("/app.js"));
+        assertFalse(html.contains("id=\"registerForm\""));
+        assertFalse(html.contains("id=\"loginForm\""));
+    }
+
+    private static String read(String path) throws Exception {
+        var resource = new ClassPathResource(path);
+        try (var input = resource.getInputStream()) {
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 }

@@ -1,6 +1,6 @@
 # Public Entry / Authentication React migration
 
-**Status:** Audited / RED contract
+**Status:** Implementation candidate / GREEN pending CI
 **Branch:** `feat/react-public-entry-migration`
 **Base:** `main@32acedbaf39b69fdf269710841f1e3725d96e396`
 **Risk:** HIGH
@@ -211,3 +211,20 @@ GREEN requires:
 - no backend auth rule or database schema change unless a proven defect requires it;
 - merged exact `main` SHA deploys through Railway only after CI;
 - `checkSuites=true` remains enabled.
+
+
+## Part 2 implementation checkpoint
+
+The public entry is now implemented in React:
+- `AuthPage.tsx` and `AuthPage.module.css`;
+- canonical public `/app/auth` route outside `AuthBoundary`;
+- root and `/index.html` reduced to compatibility-only redirect;
+- existing token validation through `GET /api/v1/auth/me`;
+- business login/registration -> `/app`;
+- platform admin -> `/app/platform`;
+- API 401 and `AuthBoundary` redirect directly to `/app/auth`;
+- direct-route Vite packaging and Spring forwarding;
+- legacy root scripts are no longer requested by the entry surface;
+- legacy Java/root-text contracts were migrated to compatibility behavior.
+
+The historical root-only script files remain in the repository for a later dead-asset cleanup pass so specialized historical CI references can be retired deliberately. They are no longer executed by the public root.

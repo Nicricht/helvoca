@@ -7,40 +7,28 @@ function read(name) {
   return fs.readFileSync(`${STATIC}/${name}`, 'utf8');
 }
 
-test('remaining legacy shells point only to canonical application destinations', async () => {
+test('remaining legacy shells are compatibility-only and target canonical React destinations', async () => {
   const home = read('index.html');
   const simulator = read('simulator.html');
   const importer = read('business-import.html');
 
-  for (const [name, html] of [
-    ['index.html', home],
-    ['business-import.html', importer]
-  ]) {
-    expect(html, name).not.toContain('href="/conversations.html"');
-    expect(html, name).not.toContain('href="/account.html"');
-    expect(html, name).not.toContain('href="/operations.html"');
-  }
-
-  expect(home).toContain('href="/app/agenda">Agenda</a>');
-  expect(home).toContain('href="/app/orders">Operaciones</a>');
-  expect(home).toContain('href="/app/inventory">Inventario</a>');
-  expect(home).toContain('href="/app/settings">Configuración</a>');
-  expect(home).toContain('href="/app/plan">Plan y consumo</a>');
+  expect(home).toContain('url=/app/auth');
+  expect(home).toContain("window.location.replace('/app/auth')");
+  expect(home).not.toContain('/app.js');
+  expect(home).not.toContain('/commercial-status.js');
+  expect(home).not.toContain('id="dashboardView"');
 
   expect(simulator).toContain('url=/app/simulator');
   expect(simulator).toContain("window.location.replace('/app/simulator')");
   expect(importer).toContain('url=/app/settings/import');
-  expect(importer).toContain("window.location.replace(\'/app/settings/import\')");
+  expect(importer).toContain("window.location.replace(\\'/app/settings/import\\')");
   expect(importer).not.toContain('/business-import.js');
   expect(importer).not.toContain('/business-import.css');
 });
 
-test('home Agenda shortcuts use the canonical React route', async () => {
-  const home = read('index.html');
+test('retained commercial-status artifact does not point back to retired legacy destinations', async () => {
   const status = read('commercial-status.js');
 
-  expect(home).toContain('href="/app/agenda">Agenda</a>');
-  expect(home).not.toContain('href="/#bookings">Agenda</a>');
   expect(status).toContain('href="/app/agenda"');
   expect(status).toContain('href="/app/orders">Operaciones</a>');
   expect(status).not.toContain('/conversations.html');

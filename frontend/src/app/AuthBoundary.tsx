@@ -6,7 +6,7 @@ export function AuthBoundary({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!authenticated) {
-      window.location.replace("/");
+      window.location.replace("/app/auth");
     }
   }, [authenticated]);
 
