@@ -164,7 +164,7 @@ test.describe('React internal operations migration', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Operación y certificación' })).toBeVisible();
     await expect(page.getByText('Preparación para operar')).toBeVisible();
     await expect(page.getByTestId('pilot-readiness-score')).toHaveText('3/3');
-    await expect(page.getByText('Launch cage')).toBeVisible();
+    await expect(page.getByText('Launch cage', { exact: true })).toBeVisible();
     await expect(page.getByTestId('pilot-preflight-decision')).toHaveText('GO');
     await expect(page.getByTestId('pilot-preflight-traffic')).toContainText('bloqueado globalmente');
     await expect(page.getByText('Métricas del piloto')).toBeVisible();
