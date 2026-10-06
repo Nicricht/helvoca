@@ -1,17 +1,26 @@
 const { test, expect } = require('@playwright/test');
 
-const json = body => ({
-  status: 200,
+const json = (body, status = 200) => ({
+  status,
   contentType: 'application/json',
   body: JSON.stringify(body)
 });
 
-test('internal operations surface hosts readiness control and pilot metrics away from owner home', async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'e2e-token'));
+async function bootInternalOperations(page, roles = ['BUSINESS_ADMIN']) {
+  await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'internal-operations-e2e'));
 
   await page.route('**/api/v1/auth/me', route => route.fulfill(json({
     email: 'ops@demo.cl',
-    roles: ['BUSINESS_ADMIN']
+    roles
+  })));
+
+  await page.route('**/api/v1/subscription', route => route.fulfill(json({
+    plan: 'PRO',
+    publicPlanCode: 'PRO',
+    planName: 'Profesional',
+    status: 'ACTIVE',
+    includedMinutes: 500,
+    usedMinutes: 35
   })));
 
   await page.route('**/api/v1/operations/pilot-readiness', route => route.fulfill(json({
@@ -59,6 +68,45 @@ test('internal operations surface hosts readiness control and pilot metrics away
     await route.fulfill(json(control));
   });
 
+  await page.route('**/api/v1/operations/pilot-control/pause', async route => {
+    control = {
+      ...control,
+      status: 'PAUSED',
+      launchDecision: 'PAUSED',
+      canStart: false,
+      canPause: false,
+      canResume: true,
+      canComplete: true
+    };
+    await route.fulfill(json(control));
+  });
+
+  await page.route('**/api/v1/operations/pilot-control/resume', async route => {
+    control = {
+      ...control,
+      status: 'RUNNING',
+      launchDecision: 'RUNNING',
+      canStart: false,
+      canPause: true,
+      canResume: false,
+      canComplete: true
+    };
+    await route.fulfill(json(control));
+  });
+
+  await page.route('**/api/v1/operations/pilot-control/complete', async route => {
+    control = {
+      ...control,
+      status: 'COMPLETED',
+      launchDecision: 'COMPLETED',
+      canStart: false,
+      canPause: false,
+      canResume: false,
+      canComplete: false
+    };
+    await route.fulfill(json(control));
+  });
+
   await page.route('**/api/v1/operations/pilot-preflight', route => route.fulfill(json({
     decision: 'GO',
     pilotStatus: 'READY',
@@ -97,32 +145,72 @@ test('internal operations surface hosts readiness control and pilot metrics away
       callFailureRatePct: 6.7, humanTransferRatePct: 10
     }
   })));
+}
 
-  await page.goto('/operations.html');
+test.describe('React internal operations migration', () => {
+  test('specialized internal route preserves readiness, launch cage, metrics and pilot lifecycle', async ({ page }) => {
+    await bootInternalOperations(page);
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Operación y certificación' })).toBeVisible();
-  await expect(page.locator('#operationalOverview')).toHaveCount(0);
-  await expect(page.locator('#pilotReadinessCard')).toBeVisible();
-  await expect(page.locator('#pilotReadinessScore')).toHaveText('3/3');
-  await expect(page.locator('#pilotControlCard')).toBeVisible();
-  await expect(page.locator('#pilotControlBadge')).toHaveText('GO');
-  await expect(page.locator('#pilotMetricsCard')).toBeVisible();
-  await expect(page.locator('#pilotPreflightCard')).toBeVisible();
-  await expect(page.locator('#pilotPreflightDecision')).toHaveText('GO');
-  await expect(page.locator('#pilotPreflightTraffic')).toContainText('bloqueado globalmente');
-  await expect(page.locator('#pilotMetricConversations')).toHaveText('7');
-  await expect(page.locator('#pilotMetricRevenue')).toContainText('$18.990');
+    const writes = [];
+    page.on('request', request => {
+      const url = new URL(request.url());
+      if (url.pathname.startsWith('/api/v1/') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method())) {
+        writes.push({ method: request.method(), path: url.pathname });
+      }
+    });
 
-  await page.locator('#pilotStart').click();
-  await expect(page.locator('#pilotControlBadge')).toHaveText('RUNNING');
-  await expect(page.locator('#pilotPause')).toBeVisible();
+    await page.goto('/app/internal/operations');
 
-  await page.locator('[data-pilot-period="last7Days"]').click();
-  await expect(page.locator('#pilotMetricConversations')).toHaveText('50');
-  await expect(page.locator('#pilotMetricRevenue')).toContainText('$145.000');
-});
+    await expect(page.getByRole('heading', { level: 1, name: 'Operación y certificación' })).toBeVisible();
+    await expect(page.getByText('Preparación para operar')).toBeVisible();
+    await expect(page.getByTestId('pilot-readiness-score')).toHaveText('3/3');
+    await expect(page.getByText('Launch cage', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('pilot-preflight-decision')).toHaveText('GO');
+    await expect(page.getByTestId('pilot-preflight-traffic')).toContainText('bloqueado globalmente');
+    await expect(page.getByText('Métricas del piloto')).toBeVisible();
+    await expect(page.getByTestId('pilot-metric-conversations')).toHaveText('7');
+    await expect(page.getByTestId('pilot-metric-revenue')).toContainText('$18.990');
 
-test('internal operations surface redirects unauthenticated visitors to owner entry', async ({ page }) => {
-  await page.goto('/operations.html');
-  await expect.poll(() => new URL(page.url()).pathname).toBe('/');
+    await page.getByRole('button', { name: 'Iniciar piloto' }).click();
+    await expect(page.getByTestId('pilot-control-state')).toHaveText('RUNNING');
+    await expect(page.getByRole('button', { name: 'Pausar' })).toBeVisible();
+
+    expect(writes).toEqual([
+      { method: 'POST', path: '/api/v1/operations/pilot-control/start' }
+    ]);
+  });
+
+  test('legacy URL is compatibility-only and no retired operations assets are requested', async ({ page }) => {
+    await bootInternalOperations(page);
+    const requested = [];
+    page.on('request', request => requested.push(new URL(request.url()).pathname));
+
+    await page.goto('/operations.html');
+
+    await expect(page).toHaveURL(/\/app\/internal\/operations\/?$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Operación y certificación' })).toBeVisible();
+
+    for (const legacyAsset of [
+      '/operations.js',
+      '/pilot-readiness.js',
+      '/pilot-control.js',
+      '/pilot-preflight.js',
+      '/pilot-metrics.js'
+    ]) {
+      expect(requested).not.toContain(legacyAsset);
+    }
+  });
+
+  test('internal operations stays out of normal customer navigation', async ({ page }) => {
+    await bootInternalOperations(page);
+    await page.goto('/app/internal/operations');
+
+    const nav = page.getByRole('navigation', { name: 'Navegación principal' });
+    await expect(nav.getByRole('link', { name: /piloto|certificación|operación interna/i })).toHaveCount(0);
+  });
+
+  test('unauthenticated visitors are redirected to the owner entry', async ({ page }) => {
+    await page.goto('/app/internal/operations');
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/');
+  });
 });

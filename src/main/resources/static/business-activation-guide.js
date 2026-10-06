@@ -85,10 +85,10 @@
     next.replaceChildren();
     if (data?.readyForPilot) {
       const copy = document.createElement('div');
-      copy.innerHTML = '<strong>Ruta de activación completa</strong><small>Ya puedes operar el control del piloto desde Inicio.</small>';
+      copy.innerHTML = '<strong>Ruta de activación completa</strong><small>Ya puedes abrir la consola interna de certificación del piloto.</small>';
       const link = document.createElement('a');
       link.className = 'button small primary';
-      link.href = '/#pilotControlCard';
+      link.href = '/app/internal/operations';
       link.textContent = 'Ir al piloto';
       next.append(copy, link);
     } else if (data?.nextStep) {

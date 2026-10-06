@@ -52,6 +52,7 @@ class BusinessActivationGuideServiceTest {
                 "ACTIVATION",
                 "PILOT"),
                 result.steps().stream().map(BusinessActivationGuideService.Step::code).toList());
+        assertEquals("/app/internal/operations", result.steps().get(6).actionHref());
     }
 
     @Test
