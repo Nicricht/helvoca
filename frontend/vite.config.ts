@@ -17,6 +17,7 @@ function directReactRoutes() {
       const simulatorDir = fileURLToPath(new URL("../src/main/resources/static/app/simulator/", import.meta.url));
       const internalOperationsDir = fileURLToPath(new URL("../src/main/resources/static/app/internal/operations/", import.meta.url));
       const platformDir = fileURLToPath(new URL("../src/main/resources/static/app/platform/", import.meta.url));
+      const inviteDir = fileURLToPath(new URL("../src/main/resources/static/app/invite/", import.meta.url));
       mkdirSync(inventoryDir, { recursive: true });
       mkdirSync(agendaDir, { recursive: true });
       mkdirSync(ordersDir, { recursive: true });
@@ -26,6 +27,7 @@ function directReactRoutes() {
       mkdirSync(simulatorDir, { recursive: true });
       mkdirSync(internalOperationsDir, { recursive: true });
       mkdirSync(platformDir, { recursive: true });
+      mkdirSync(inviteDir, { recursive: true });
       copyFileSync(`${appDir}index.html`, `${inventoryDir}index.html`);
       copyFileSync(`${appDir}index.html`, `${agendaDir}index.html`);
       copyFileSync(`${appDir}index.html`, `${ordersDir}index.html`);
@@ -35,6 +37,7 @@ function directReactRoutes() {
       copyFileSync(`${appDir}index.html`, `${simulatorDir}index.html`);
       copyFileSync(`${appDir}index.html`, `${internalOperationsDir}index.html`);
       copyFileSync(`${appDir}index.html`, `${platformDir}index.html`);
+      copyFileSync(`${appDir}index.html`, `${inviteDir}index.html`);
     }
   };
 }

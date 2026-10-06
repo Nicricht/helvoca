@@ -30,7 +30,7 @@ public class SecurityConfig {
             "/voice-selector.js", "/ux-simplification.js", "/first-user-ux-v2.js", "/first-user-ux-v2.css",
             "/styles.css", "/frontend-foundation.css", "/commercial-ui-v3.css", "/auth-visual-refresh.css", "/landing-motion.css", "/recepvoz-auth-hero.svg", "/recepvoz-phone-hero.svg", "/dashboard-finish.css", "/dashboard-motion.css",
             "/business-activation-guide.js",
-            "/invite.html", "/invite.js",
+            "/invite.html",
             "/platform.html", "/operations.html",
             "/sales.html", "/sales.css",
             "/privacy.html", "/terms.html",
