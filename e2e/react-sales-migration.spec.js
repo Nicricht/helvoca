@@ -27,7 +27,7 @@ test.describe('React public sales landing migration', () => {
       'Que una llamada o un WhatsApp sin responder'
     );
     await expect(page.getByRole('link', { name: 'Probar con mi negocio' })).toHaveAttribute('href', '/');
-    await expect(page.getByRole('link', { name: /Planes desde \$24\.990/ })).toHaveAttribute('href', '/pricing.html');
+    await expect(page.getByRole('link', { name: /Planes desde \$24\.990/ })).toHaveAttribute('href', '/app/pricing');
     await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toHaveCount(0);
     expect(writes).toEqual([]);
   });

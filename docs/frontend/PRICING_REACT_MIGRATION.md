@@ -1,6 +1,6 @@
 # Pricing React migration
 
-**Status:** Audited / RED contract
+**Status:** Implementation candidate / GREEN pending CI
 **Branch:** `feat/react-pricing-migration`
 **Base:** `main@6b4e15855c5b756c1ec897f74cf326adde01f40c`
 **Risk:** MEDIUM
@@ -150,3 +150,8 @@ GREEN requires:
 - production deployment uses the exact merged `main` SHA;
 - Railway health and logs are clean;
 - `Wait for CI` remains enabled.
+
+
+## Part 2 implementation checkpoint
+
+The React implementation now reads the existing public pricing catalog, adds the canonical public route, keeps legacy compatibility, retires the legacy Pricing JS/CSS, updates Sales links and production smoke expectations, and adds direct-route coverage. No backend business rule or database migration was introduced.
