@@ -55,7 +55,7 @@ test.describe('React public invitation migration', () => {
 
     await page.goto('/app/invite?businessId=11111111-1111-1111-1111-111111111111&token=test-token');
 
-    await expect(page).toHaveURL(/\/app\/invite\?businessId=.*&token=test-token$/);
+    await expect(page).toHaveURL(/\/app\/invite\/?\?businessId=.*&token=test-token$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Únete a Negocio E2E' })).toBeVisible();
     await expect(page.getByText('Camila Soto')).toBeVisible();
     await expect(page.getByText(/camila@negocio\.cl.*Operador/)).toBeVisible();
@@ -165,7 +165,7 @@ test.describe('React public invitation migration', () => {
 
     await page.goto('/invite.html?businessId=11111111-1111-1111-1111-111111111111&token=legacy-token');
 
-    await expect(page).toHaveURL(/\/app\/invite\?businessId=11111111-1111-1111-1111-111111111111&token=legacy-token$/);
+    await expect(page).toHaveURL(/\/app\/invite\/?\?businessId=11111111-1111-1111-1111-111111111111&token=legacy-token$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Únete a Negocio E2E' })).toBeVisible();
     expect(requests).not.toContain('/invite.js');
   });
