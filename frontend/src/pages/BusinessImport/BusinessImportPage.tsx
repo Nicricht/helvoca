@@ -259,7 +259,7 @@ export function BusinessImportPage() {
     try {
       const next = await applyBusinessImport(payload);
       setResult(next);
-      setMessage("Importación aplicada correctamente.");
+      setMessage("Datos del negocio guardados correctamente.");
     } catch (value) {
       setError(value instanceof Error ? value.message : "No pudimos aplicar la importación.");
     } finally {
