@@ -104,7 +104,7 @@ export function configurePilotControl(configuration: PilotControlConfiguration) 
 }
 
 export function transitionPilotControl(action: "start" | "pause" | "resume" | "complete") {
-  return apiRequest<PilotControl>(\`/api/v1/operations/pilot-control/\${action}\`, {
+  return apiRequest<PilotControl>(`/api/v1/operations/pilot-control/\${action}`, {
     method: "POST"
   });
 }
