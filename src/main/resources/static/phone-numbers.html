@@ -1,123 +1,20 @@
 <!doctype html>
 <html lang="es">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>RecepVoz · Números telefónicos</title>
-    <meta name="theme-color" content="#080b12">
-    <link rel="stylesheet" href="/styles.css">
-    <style>
-        main { width:min(760px,calc(100% - 32px)); margin:48px auto; }
-        main > .brand { color:var(--accent-2); }
-        h1 { margin:8px 0; font-size:clamp(28px,5vw,42px); letter-spacing:-.035em; }
-        p { color:var(--muted); line-height:1.6; }
-        .card { margin-top:20px; padding:24px; }
-        .phone { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:16px 0; border-top:1px solid var(--border); }
-        .phone:first-child { border-top:0; }
-        .number { font-weight:800; }
-        .state { font-size:12px; color:#90f0c5; }
-        button,.back { display:inline-flex; align-items:center; justify-content:center; min-height:40px; border-radius:var(--radius-md); padding:0 14px; font:inherit; font-weight:800; cursor:pointer; text-decoration:none; }
-        button { border:1px solid rgba(255,113,135,.28); background:var(--danger-soft); color:#ff9dad; }
-        button:hover:not(:disabled) { background:rgba(255,113,135,.16); }
-        button:disabled { opacity:.5; cursor:wait; }
-        .back { margin-top:18px; border:1px solid var(--border); background:rgba(255,255,255,.025); color:#e3e8f0; }
-        .back:hover { background:var(--surface-hover); }
-        .msg { margin-top:16px; padding:12px 14px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--surface-2); color:#d4dbe7; }
-        .error { border-color:rgba(255,113,135,.28); background:var(--danger-soft); color:#ff9dad; }
-        .success { border-color:rgba(61,220,151,.26); background:var(--success-soft); color:#90f0c5; }
-        @media (max-width:560px) { main { margin:28px auto; } .card { padding:18px; } .phone { align-items:flex-start; flex-direction:column; } }
-    </style>
-  <link rel="stylesheet" href="/frontend-foundation.css?v=20260930-2">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Canales · RecepVoz</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/frontend-foundation.css?v=20261005-v4">
+  <meta http-equiv="refresh" content="0;url=/app/settings?section=channels">
+  <script>
+    window.location.replace('/app/settings?section=channels');
+  </script>
 </head>
 <body>
-<main>
-    <div class="brand">RECEPVOZ</div>
-    <h1>Números telefónicos</h1>
-    <p>Administra únicamente los números conectados a tu negocio actual. Desvincular un número no compra, libera ni elimina el número en Twilio. Solo quita su asociación con este negocio para que puedas conectarlo a otro.</p>
-    <section class="card">
-        <div id="list">Cargando…</div>
-        <div id="message" class="msg" hidden></div>
-        <a class="back" href="/">← Volver a RecepVoz</a>
-    </section>
-</main>
-<script>
-const TOKEN_KEY = "helvoca_access_token";
-const token = sessionStorage.getItem(TOKEN_KEY) || "";
-const list = document.querySelector("#list");
-const message = document.querySelector("#message");
-
-function showMessage(text, kind = "") {
-    message.textContent = text;
-    message.hidden = false;
-    message.className = `msg ${kind}`.trim();
-}
-
-async function api(path, options = {}) {
-    const headers = new Headers(options.headers || {});
-    if (token) headers.set("Authorization", `Bearer ${token}`);
-    const response = await fetch(path, { ...options, headers });
-    if (!response.ok) {
-        let text = `Error HTTP ${response.status}`;
-        try { const body = await response.json(); text = body.message || body.detail || body.error || text; } catch (_) {}
-        throw new Error(text);
-    }
-    if (response.status === 204) return null;
-    return response.json();
-}
-
-async function detach(phone) {
-    const accepted = window.confirm(`¿Desvincular ${phone.phoneNumber} de este negocio? El número seguirá existiendo en Twilio.`);
-    if (!accepted) return;
-    const button = document.querySelector(`[data-id="${phone.id}"]`);
-    if (button) button.disabled = true;
-    try {
-        await api(`/api/v1/phone-numbers/${phone.id}`, { method: "DELETE" });
-        showMessage("Número desvinculado correctamente. Ya puedes conectarlo a otro negocio.", "success");
-        await load();
-    } catch (error) {
-        showMessage(error.message || "No fue posible desvincular el número.", "error");
-        if (button) button.disabled = false;
-    }
-}
-
-async function load() {
-    if (!token) {
-        list.innerHTML = "No hay una sesión activa. Ingresa primero a RecepVoz con la cuenta propietaria del número.";
-        return;
-    }
-    try {
-        const phones = await api("/api/v1/phone-numbers");
-        if (!phones.length) {
-            list.innerHTML = "No hay números conectados a este negocio.";
-            return;
-        }
-        list.innerHTML = "";
-        phones.forEach(phone => {
-            const row = document.createElement("div");
-            row.className = "phone";
-            const info = document.createElement("div");
-            const number = document.createElement("div");
-            number.className = "number";
-            number.textContent = phone.phoneNumber;
-            const state = document.createElement("div");
-            state.className = "state";
-            state.textContent = phone.active ? "ACTIVO" : "INACTIVO";
-            info.append(number, state);
-            const button = document.createElement("button");
-            button.type = "button";
-            button.dataset.id = phone.id;
-            button.textContent = "Desvincular";
-            button.addEventListener("click", () => detach(phone));
-            row.append(info, button);
-            list.appendChild(row);
-        });
-    } catch (error) {
-        list.innerHTML = "";
-        showMessage(error.message || "No fue posible cargar los números.", "error");
-    }
-}
-
-load();
-</script>
+  <main class="rv-page-frame">
+    <p>Abriendo la configuración de canales…</p>
+    <a href="/app/settings?section=channels">Continuar</a>
+  </main>
 </body>
 </html>

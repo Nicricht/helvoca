@@ -39,6 +39,7 @@ public class SecurityConfig {
             "/account.html",
             "/settings.html",
             "/business-import.html",
+            "/phone-numbers.html",
             "/inventory.html",
             "/simulator.html",
             "/conversations.html",
