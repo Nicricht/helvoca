@@ -285,7 +285,7 @@ export function AuthPage() {
               </div>
             </motion.article>
 
-            <motion.article className={`${styles.authCard} rv-auth-card`} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: .4, delay: .08 }}>
+            <motion.article className={`${styles.authCard} rv-auth-card`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4, delay: .08 }}>
               <div className={styles.cardHead}>
                 <span className={styles.cardIcon}><LockKeyhole size={17} /></span>
                 <div><strong>{mode === "register" ? "Comienza con RecepVoz" : "Bienvenido de vuelta"}</strong><small>{mode === "register" ? "Crea tu cuenta en menos de un minuto." : "Ingresa a la operación de tu negocio."}</small></div>
