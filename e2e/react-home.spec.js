@@ -491,7 +491,7 @@ test.describe('React Home migration', () => {
     await page.goto('/app');
 
     await expect(page).toHaveURL(/\/app\/auth\/?$/);
-    await expect(page.locator('[data-auth-entry]')).toBeVisible();
+    await expect(page.locator('[data-auth-page="recepvoz"]')).toBeVisible();
     expect(await page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBeNull();
   });
 

@@ -66,7 +66,7 @@ test.describe('Settings full cutover RED contract', () => {
   test('public entry keeps protected Settings out of unauthenticated navigation', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveURL(/\/app\/auth\/?$/);
-    await expect(page.getByRole('link', { name: 'Cómo funciona' })).toHaveAttribute('href', '/app/sales');
+    await expect(page.getByRole('link', { name: 'Cómo funciona', exact: true })).toHaveAttribute('href', '/app/sales');
     await expect(page.getByRole('link', { name: 'Planes' })).toHaveAttribute('href', '/app/pricing');
     await expect(page.locator('a[href^="/app/settings"]')).toHaveCount(0);
   });

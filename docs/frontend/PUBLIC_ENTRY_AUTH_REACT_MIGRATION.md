@@ -241,3 +241,13 @@ The first implementation CI confirmed the ten new public-entry migration cases G
 - avoids transient horizontal auth-card motion at 1280px.
 
 No backend authentication rule or database schema changed.
+
+
+## Final Part 2 contract alignment
+
+The remaining three browser failures were test-fixture drift, not product regressions:
+- release-candidate auth fixture no longer reseeds a token on `/app/auth`;
+- Home expired-session assertion now targets the canonical React auth marker;
+- Settings public-entry assertion uses the exact top-level “Cómo funciona” link.
+
+No application backend, auth rule or database behavior changed in this alignment.

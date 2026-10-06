@@ -10,7 +10,7 @@ const json = (body, status = 200) => ({
 
 async function mockCanonicalApp(page) {
   await page.addInitScript(() => {
-    if (window.location.pathname.startsWith('/app')) {
+    if (window.location.pathname.startsWith('/app') && !window.location.pathname.startsWith('/app/auth')) {
       sessionStorage.setItem('helvoca_access_token', 'rc-react-token');
     }
   });
