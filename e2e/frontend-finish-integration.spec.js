@@ -58,11 +58,14 @@ test('canonical foundation remains dark, solid and readable', async () => {
   expect(css).toContain('.app-nav a,.inventory-nav a,.topbar nav a,.account-nav a,.rv-nav a{font-size:14px}');
 });
 
-test('shared and public sales styles avoid decorative gradients', async () => {
-  for (const stylesheet of ['styles.css', 'sales.css']) {
-    const css = read(stylesheet);
-    expect(css, stylesheet).not.toMatch(/(?:linear|radial)-gradient/i);
-  }
+test('shared legacy styles stay solid and retired sales stylesheet stays absent', async () => {
+  const css = read('styles.css');
+
+  expect(css, 'styles.css').not.toMatch(/(?:linear|radial)-gradient/i);
+  expect(
+    fs.existsSync(`${STATIC}/sales.css`),
+    'sales.css should remain retired after the React sales migration'
+  ).toBe(false);
 });
 
 test('legacy simulator document is compatibility-only', async () => {
