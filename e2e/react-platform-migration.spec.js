@@ -85,7 +85,7 @@ test.describe('React PLATFORM_ADMIN console migration', () => {
     await expect(page).toHaveURL(/\/app\/platform\/?$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Control de plataforma' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Centro de Demos' })).toBeVisible();
-    await expect(page.getByText('PLATFORM ADMIN', { exact: true })).toBeVisible();
+    await expect(page.locator('header').getByText('PLATFORM ADMIN', { exact: true })).toBeVisible();
     await expect(page.getByText('RecepVoz activo', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toHaveCount(0);
     expect(state.writes).toEqual([]);
