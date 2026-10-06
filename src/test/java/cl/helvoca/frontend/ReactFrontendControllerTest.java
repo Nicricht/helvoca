@@ -45,5 +45,13 @@ class ReactFrontendControllerTest {
         mvc.perform(get("/app/simulator/"))
                 .andExpect(status().isOk())
                 .andExpect(forwardedUrl("/app/index.html"));
+
+        mvc.perform(get("/app/sales"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/app/index.html"));
+
+        mvc.perform(get("/app/sales/"))
+                .andExpect(status().isOk())
+                .andExpect(forwardedUrl("/app/index.html"));
     }
 }

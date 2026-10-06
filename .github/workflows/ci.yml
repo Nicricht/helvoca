@@ -996,11 +996,21 @@ jobs:
 
       - name: Verify sales landing in production
         run: |
-          URL="https://helvoca-api-production.up.railway.app/sales.html"
-          HTTP_CODE=$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 30 -sS -L -o sales-production.html -w "%{http_code}" "$URL")
-          test "$HTTP_CODE" = "200"
-          grep -F "Que una llamada o un WhatsApp sin responder no se convierta en un cliente perdido." sales-production.html
-          grep -F 'Planes desde $24.990' sales-production.html
+          set -euo pipefail
+          BASE_URL="https://helvoca-api-production.up.railway.app"
+
+          LEGACY_CODE=$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 30 -sS -o sales-legacy.html -w "%{http_code}" "$BASE_URL/sales.html")
+          test "$LEGACY_CODE" = "200"
+          grep -F "/app/sales" sales-legacy.html
+          if grep -Fq "/sales.css" sales-legacy.html; then
+            echo "Legacy sales document still loads retired sales.css"
+            exit 1
+          fi
+
+          CANONICAL_CODE=$(curl --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 10 --max-time 30 -sS -L -o sales-react.html -w "%{http_code}" "$BASE_URL/app/sales")
+          test "$CANONICAL_CODE" = "200"
+          grep -F '<div id="root"></div>' sales-react.html
+          grep -E '/app/assets/index-[^"]+\.js' sales-react.html
 
       - name: Report sales production smoke status
         if: always()
