@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
@@ -83,6 +83,7 @@ function controlSummary(control: PilotControl) {
 }
 
 export function InternalOperationsPage() {
+  const queryClient = useQueryClient();
   const mutationLock = useRef(false);
   const [period, setPeriod] = useState<MetricPeriod>("today");
   const [busy, setBusy] = useState(false);
@@ -172,7 +173,7 @@ export function InternalOperationsPage() {
     setFeedback("");
     try {
       const next = await transitionPilotControl(action);
-      control.setData(next);
+      queryClient.setQueryData(["internal-operations", "pilot-control"], next);
       setFeedback("Estado del piloto actualizado.");
       await Promise.all([readiness.refetch(), preflight.refetch(), metrics.refetch()]);
     } catch (error) {
@@ -196,7 +197,7 @@ export function InternalOperationsPage() {
         goal: goal.trim(),
         plannedEndAt: end && !Number.isNaN(end.getTime()) ? end.toISOString() : null
       });
-      control.setData(next);
+      queryClient.setQueryData(["internal-operations", "pilot-control"], next);
       setFeedback("Configuración del piloto guardada.");
       await Promise.all([readiness.refetch(), preflight.refetch()]);
     } catch (error) {
