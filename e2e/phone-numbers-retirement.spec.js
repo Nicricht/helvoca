@@ -163,6 +163,6 @@ test.describe('legacy phone numbers retirement', () => {
     await expect.poll(() => state.writes).toEqual([
       { method: 'DELETE', path: '/api/v1/phone-numbers/phone-1' }
     ]);
-    await expect(page.getByRole('status')).toContainText(/desvinculado/i);
+    await expect(page.getByText('Número desvinculado.', { exact: true })).toBeVisible();
   });
 });
