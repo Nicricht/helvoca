@@ -8,6 +8,7 @@ import { OrdersPage } from "../pages/Orders/OrdersPage";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
 import { SimulatorPage } from "../pages/Simulator/SimulatorPage";
 import { InternalOperationsPage } from "../pages/InternalOperations/InternalOperationsPage";
+import { BusinessImportPage } from "../pages/BusinessImport/BusinessImportPage";
 
 export function App() {
   return (
@@ -19,6 +20,7 @@ export function App() {
         <Route path="/agenda" element={<AgendaPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/settings/import" element={<BusinessImportPage />} />
         <Route path="/simulator" element={<SimulatorPage />} />
         <Route path="/internal/operations" element={<InternalOperationsPage />} />
         <Route path="*" element={<Navigate to="/plan" replace />} />

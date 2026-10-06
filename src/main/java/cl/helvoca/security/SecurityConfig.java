@@ -38,6 +38,7 @@ public class SecurityConfig {
             "/app/**", "/reservar/**",
             "/account.html",
             "/settings.html",
+            "/business-import.html",
             "/inventory.html",
             "/simulator.html",
             "/conversations.html",

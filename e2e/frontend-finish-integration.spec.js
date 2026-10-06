@@ -29,7 +29,10 @@ test('remaining legacy shells point only to canonical application destinations',
 
   expect(simulator).toContain('url=/app/simulator');
   expect(simulator).toContain("window.location.replace('/app/simulator')");
-  expect(importer).toContain('href="/app/agenda">Agenda</a>');
+  expect(importer).toContain('url=/app/settings/import');
+  expect(importer).toContain("window.location.replace(\'/app/settings/import\')");
+  expect(importer).not.toContain('/business-import.js');
+  expect(importer).not.toContain('/business-import.css');
 });
 
 test('home Agenda shortcuts use the canonical React route', async () => {
@@ -92,7 +95,7 @@ test('canonical customer surfaces stay contained at required responsive widths',
   for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1024 });
 
-    for (const path of ['/', '/app', '/app/settings', '/app/inventory', '/app/agenda', '/app/plan', '/app/simulator']) {
+    for (const path of ['/', '/app', '/app/settings', '/app/settings/import', '/app/inventory', '/app/agenda', '/app/plan', '/app/simulator']) {
       await page.goto(path);
       await page.waitForTimeout(80);
       const layout = await page.evaluate(() => {

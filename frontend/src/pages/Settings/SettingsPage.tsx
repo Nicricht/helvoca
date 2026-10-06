@@ -474,7 +474,7 @@ export function SettingsPage() {
               <ShieldCheck size={15} aria-hidden="true" />
               {readiness}
             </span>
-            <a className={`button secondary ${styles.headerAction}`} href="/business-import.html">
+            <a className={`button secondary ${styles.headerAction}`} href="/app/settings/import">
               <CloudUpload size={16} aria-hidden="true" />
               Importar o actualizar
             </a>
@@ -496,7 +496,7 @@ export function SettingsPage() {
                 <span><i data-tone="cyan" />{draft.services.length} servicios</span>
                 <span><i data-tone="violet" />{draft.knowledge.length} fuentes de conocimiento</span>
               </div>
-              <a className={styles.heroAction} href="/business-import.html">
+              <a className={styles.heroAction} href="/app/settings/import">
                 <CloudUpload size={16} aria-hidden="true" />
                 Importar información
                 <ChevronRight size={16} aria-hidden="true" />

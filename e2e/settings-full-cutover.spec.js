@@ -64,8 +64,7 @@ async function bootReactSettings(page) {
 
 test.describe('Settings full cutover RED contract', () => {
   for (const surface of [
-    { path: '/', selector: '.nav-config' },
-    { path: '/business-import.html', selector: 'a[href*="settings"]' }
+    { path: '/', selector: '.nav-config' }
   ]) {
     test(`${surface.path} sends Configuración to the canonical React route`, async ({ page }) => {
       await page.goto(surface.path);
