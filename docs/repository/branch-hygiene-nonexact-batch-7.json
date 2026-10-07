@@ -1,0 +1,271 @@
+{
+  "schema": "helvoca.branch-hygiene.nonexact-compare.v1",
+  "batch": 7,
+  "base_sha": "0780f372a1ac8963f0e1c937596e4ea20bc4c051",
+  "rows": [
+    {
+      "branch": "perf/voice-latency-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 8,
+      "behind_by": 1293,
+      "total_commits": 8,
+      "too_large": null,
+      "changed_files": [
+        ".env.example",
+        "src/main/java/cl/helvoca/ai/gemini/GeminiLiveProperties.java",
+        "src/main/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSession.java",
+        "src/main/resources/application.yml",
+        "src/test/java/cl/helvoca/ai/gemini/GeminiLiveLowLatencySetupTest.java",
+        "src/test/java/cl/helvoca/ai/gemini/GeminiLivePropertiesLatencyTest.java",
+        "src/test/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSessionTest.java"
+      ]
+    },
+    {
+      "branch": "pilot/first-business-readiness-v1-certify",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 5,
+      "behind_by": 1252,
+      "total_commits": 5,
+      "too_large": null,
+      "changed_files": [
+        "docs/FIRST_REAL_BUSINESS_PILOT_READINESS_V1.md",
+        "src/main/java/cl/helvoca/operations/PilotRealBusinessPreflightController.java",
+        "src/main/java/cl/helvoca/operations/PilotRealBusinessPreflightService.java",
+        "src/test/java/cl/helvoca/operations/PilotRealBusinessPreflightControllerContractTest.java",
+        "src/test/java/cl/helvoca/operations/PilotRealBusinessPreflightServiceTest.java"
+      ]
+    },
+    {
+      "branch": "pilot/first-business-readiness-v1-certify-2",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 6,
+      "behind_by": 1252,
+      "total_commits": 6,
+      "too_large": null,
+      "changed_files": [
+        "docs/FIRST_REAL_BUSINESS_PILOT_READINESS_V1.md",
+        "src/main/java/cl/helvoca/operations/PilotRealBusinessPreflightController.java",
+        "src/main/java/cl/helvoca/operations/PilotRealBusinessPreflightService.java",
+        "src/test/java/cl/helvoca/operations/PilotRealBusinessPreflightControllerContractTest.java",
+        "src/test/java/cl/helvoca/operations/PilotRealBusinessPreflightServiceTest.java"
+      ]
+    },
+    {
+      "branch": "pilot/first-business-readiness-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 6,
+      "behind_by": 1252,
+      "total_commits": 6,
+      "too_large": null,
+      "changed_files": [
+        "docs/FIRST_REAL_BUSINESS_PILOT_READINESS_V1.md",
+        "src/main/java/cl/helvoca/operations/PilotRealBusinessPreflightController.java",
+        "src/main/java/cl/helvoca/operations/PilotRealBusinessPreflightService.java",
+        "src/test/java/cl/helvoca/operations/PilotRealBusinessPreflightControllerContractTest.java",
+        "src/test/java/cl/helvoca/operations/PilotRealBusinessPreflightServiceTest.java"
+      ]
+    },
+    {
+      "branch": "pilot/first-real-customer-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 3,
+      "behind_by": 969,
+      "total_commits": 3,
+      "too_large": null,
+      "changed_files": [
+        "docs/FIRST_PROSPECTS_TRACKER.csv"
+      ]
+    },
+    {
+      "branch": "qa/frontend-full-20260918-2",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 2886,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "docs/qa/frontend-full-20260918-2.txt"
+      ]
+    },
+    {
+      "branch": "qa/frontend-full-20260918",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 2894,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "docs/qa/frontend-full-20260918.txt"
+      ]
+    },
+    {
+      "branch": "release/recepvoz-certified-stack-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 11,
+      "behind_by": 1322,
+      "total_commits": 11,
+      "too_large": null,
+      "changed_files": [
+        ".env.example",
+        ".github/workflows/ci.yml",
+        "docs/voice-bakeoff.md",
+        "src/main/java/cl/helvoca/agent/AgentVoiceProfile.java",
+        "src/main/java/cl/helvoca/ai/gemini/GeminiLiveVoiceProvider.java",
+        "src/main/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSession.java",
+        "src/main/java/cl/helvoca/ai/gemini/VoiceBakeOffCatalog.java",
+        "src/main/java/cl/helvoca/ai/realtime/RealtimeCallContext.java",
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioCertificationStartupRunner.java",
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioMediaRouteSigner.java",
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioMediaStreamHandler.java",
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioMediaStreamTwimlFactory.java",
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioVoiceController.java",
+        "src/main/java/cl/helvoca/voice/VoiceCallRouter.java",
+        "src/test/java/cl/helvoca/agent/AgentVoiceProfileTest.java",
+        "src/test/java/cl/helvoca/ai/gemini/GeminiLiveVoiceProviderBakeOffTest.java",
+        "src/test/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSessionTest.java",
+        "src/test/java/cl/helvoca/ai/gemini/VoiceBakeOffCatalogTest.java",
+        "src/test/java/cl/helvoca/customer/CustomerCommercialTimelineMappingTest.java",
+        "src/test/java/cl/helvoca/inventory/InventoryRestockSubscriptionServiceBranchCoverageTest.java",
+        "src/test/java/cl/helvoca/inventory/InventoryServiceBranchCoverageTest.java",
+        "src/test/java/cl/helvoca/operations/CommercialPipelineServiceBranchCoverageTest.java",
+        "src/test/java/cl/helvoca/telephony/twilio/TwilioCertificationStartupRunnerTest.java",
+        "src/test/java/cl/helvoca/telephony/twilio/TwilioMediaRouteSignerTest.java",
+        "src/test/java/cl/helvoca/telephony/twilio/TwilioMediaStreamHandlerTest.java",
+        "src/test/java/cl/helvoca/telephony/twilio/TwilioMediaStreamTwimlFactoryTest.java",
+        "src/test/java/cl/helvoca/telephony/twilio/TwilioVoiceControllerTest.java",
+        "src/test/java/cl/helvoca/voice/VoiceCallRouterTest.java"
+      ]
+    },
+    {
+      "branch": "release/recepvoz-v1-pilot",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1031,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "release/recepvoz-v1-pilot-rc",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 36,
+      "behind_by": 1111,
+      "total_commits": 36,
+      "too_large": null,
+      "changed_files": [
+        ".github/workflows/ci.yml",
+        "README.md",
+        "docs/COMMERCIAL_DEMO_ONBOARDING.md",
+        "docs/COMMERCIAL_LAUNCH.md",
+        "docs/COMMERCIAL_LAUNCH_STATUS.md",
+        "docs/COMMERCIAL_RELEASE_CANDIDATE_GATE.md",
+        "docs/COMMERCIAL_RELEASE_HARDENING.md",
+        "docs/FIRST_CUSTOMER_ONBOARDING_FORM.md",
+        "docs/FIRST_CUSTOMER_OPERATION.md",
+        "docs/FIRST_SALES_SPRINT.md",
+        "docs/FIRST_SALE_TOMORROW.md",
+        "docs/SAAS_BILLING_COMMERCIAL_READINESS.md",
+        "e2e/home-operational.spec.js",
+        "scripts/ci/pilot-e2e-certification.sh",
+        "scripts/ci/voice-commercial-certification.sh",
+        "src/main/java/cl/helvoca/billing/BillingSubscriptionService.java",
+        "src/main/java/cl/helvoca/billing/BusinessSubscription.java",
+        "src/main/java/cl/helvoca/billing/BusinessSubscriptionRepository.java",
+        "src/main/java/cl/helvoca/billing/MercadoPagoSubscriptionGateway.java",
+        "src/main/java/cl/helvoca/billing/SubscriptionPaymentGateway.java",
+        "src/main/java/cl/helvoca/bootstrap/DevDataInitializer.java",
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioVoiceTransportSession.java",
+        "src/main/resources/db/migration/V77__saas_billing_webhook_idempotency.sql",
+        "src/main/resources/static/commercial-status.js",
+        "src/main/resources/static/pricing.js",
+        "src/main/resources/static/sales.html",
+        "src/test/java/cl/helvoca/ai/gemini/VoiceCommercialLifecycleCertificationTest.java",
+        "src/test/java/cl/helvoca/billing/BillingSubscriptionServiceEdgeCasesTest.java",
+        "src/test/java/cl/helvoca/billing/BillingSubscriptionServiceTest.java",
+        "src/test/java/cl/helvoca/billing/MercadoPagoSubscriptionGatewayTest.java",
+        "src/test/java/cl/helvoca/billing/MercadoPagoWebhookControllerTest.java",
+        "src/test/java/cl/helvoca/bootstrap/DevDataInitializerTest.java",
+        "src/test/java/cl/helvoca/operations/GoldenJourneyCommercialV1IntegrationTest.java",
+        "src/test/java/cl/helvoca/telephony/twilio/TwilioVoiceTransportSessionTest.java"
+      ]
+    },
+    {
+      "branch": "release/recepvoz-v1.0",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1101,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "tdd/operations-asset-cache-bust",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 3060,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "e2e/operations.spec.js"
+      ]
+    },
+    {
+      "branch": "test/booking-confirmed-structured-log",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 2,
+      "behind_by": 1866,
+      "total_commits": 2,
+      "too_large": null,
+      "changed_files": [
+        "src/test/java/cl/helvoca/booking/BookingConfirmedStructuredLogTest.java"
+      ]
+    },
+    {
+      "branch": "test/commercial-demo-postgres-certification",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 7,
+      "behind_by": 1135,
+      "total_commits": 7,
+      "too_large": null,
+      "changed_files": [
+        "README.md",
+        "docs/COMMERCIAL_DEMO_ONBOARDING.md",
+        "docs/FIRST_CUSTOMER_ONBOARDING_FORM.md",
+        "src/main/java/cl/helvoca/bootstrap/DevDataInitializer.java",
+        "src/test/java/cl/helvoca/bootstrap/DevDataInitializerPostgresIntegrationTest.java",
+        "src/test/java/cl/helvoca/bootstrap/DevDataInitializerTest.java"
+      ]
+    },
+    {
+      "branch": "test/commercial-demo-postgres-certification-v2",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 6,
+      "behind_by": 1101,
+      "total_commits": 6,
+      "too_large": null,
+      "changed_files": [
+        "README.md",
+        "docs/COMMERCIAL_DEMO_ONBOARDING.md",
+        "docs/FIRST_CUSTOMER_ONBOARDING_FORM.md",
+        "src/main/java/cl/helvoca/bootstrap/DevDataInitializer.java",
+        "src/test/java/cl/helvoca/bootstrap/DevDataInitializerPostgresIntegrationTest.java",
+        "src/test/java/cl/helvoca/bootstrap/DevDataInitializerTest.java"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,299 @@
+{
+  "schema": "helvoca.branch-hygiene.safe-content-equivalent.v1",
+  "base_main_sha": "0780f372a1ac8963f0e1c937596e4ea20bc4c051",
+  "criterion": "Conservative GitHub compare: no unique commits ahead of main, or non-truncated compare with zero changed files on the branch side.",
+  "note": "These refs are content-redundant under this conservative compare, but Part 2 automatic deletion remains restricted to SAFE_EXACT_MERGED.",
+  "count": 29,
+  "branches": [
+    {
+      "branch": "chore/recepvoz-section-assets-20261003",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 122,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "design/live-demo-center-v1-rebase-cabafd",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 477,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "diag/whatsapp-booking-flow-state",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1892,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/booking-payment-attendance-revenue",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 572,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/frontend-billing-account-finish",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 878,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/frontend-commerce-operations-finish",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 865,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/frontend-conversations-calls-finish",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 854,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/frontend-dashboard-finish",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 859,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/frontend-foundation-dark",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 886,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/frontend-onboarding-settings-finish",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 865,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/home-owner-value-dashboard",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 537,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/inventory-admin-alerts-restock-v1",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1521,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/omnichannel-core",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 3393,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/omnichannel-inventory-integration-v1",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1530,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/owner-commercial-timeline-v1",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1510,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/platform-assisted-onboarding",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1626,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/sales-business-analytics",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 584,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/universal-business-import",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 610,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "fix/frontend-desktop-nav-labels",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 546,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "fix/whatsapp-separate-twilio-credentials-20260919",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 2632,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "release/recepvoz-v1-pilot",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1031,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "release/recepvoz-v1.0",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1101,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "test/business-import-real-world-hardening",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 609,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "test/frontend-foundation-red-ci",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 908,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "test/rc-preflight-red-base",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1076,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "test/rc-preflight-red-v1",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1075,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "verify-main-post-rc-529",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1303,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "verify-main-post-v6-534",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1276,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "verify/main-recepvoz-v1-final",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1101,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": []
+    }
+  ]
+}

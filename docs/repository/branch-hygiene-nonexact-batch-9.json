@@ -1,0 +1,17 @@
+{
+  "schema": "helvoca.branch-hygiene.nonexact-compare.v1",
+  "batch": 9,
+  "base_sha": "0780f372a1ac8963f0e1c937596e4ea20bc4c051",
+  "rows": [
+    {
+      "branch": "verify-main-post-v6-534",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1276,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": []
+    }
+  ]
+}

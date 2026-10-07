@@ -1,0 +1,208 @@
+{
+  "schema": "helvoca.branch-hygiene.nonexact-compare.v1",
+  "batch": 2,
+  "base_sha": "0780f372a1ac8963f0e1c937596e4ea20bc4c051",
+  "rows": [
+    {
+      "branch": "chore/verify-agenda-production-smoke-51ce746",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 243,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "branch": "chore/verify-orders-navigation-production-5b2f951",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 199,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "branch": "ci/voice-chilean-sensual-hangup-repeat-v2",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 9,
+      "behind_by": 1583,
+      "total_commits": 9,
+      "too_large": null,
+      "changed_files": [
+        "docs/ci/VOICE_CHILEAN_SENSUAL_HANGUP_V2_CERTIFICATION.md",
+        "src/main/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSession.java",
+        "src/main/java/cl/helvoca/ai/realtime/CertificationGuardedRealtimeToolService.java",
+        "src/main/java/cl/helvoca/ai/realtime/RecepVozConversationPolicyService.java",
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioVoiceTransportSession.java",
+        "src/test/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSessionTest.java",
+        "src/test/java/cl/helvoca/ai/realtime/RecepVozConversationPolicyServiceTest.java"
+      ]
+    },
+    {
+      "branch": "design/frontend-finalization-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 3,
+      "behind_by": 968,
+      "total_commits": 3,
+      "too_large": null,
+      "changed_files": [
+        "docs/superpowers/plans/2026-09-28-recepvoz-frontend-finalization-batch-1.md",
+        "docs/superpowers/specs/2026-09-28-recepvoz-frontend-finalization-v1-design.md"
+      ]
+    },
+    {
+      "branch": "design/live-demo-center-v1-rebase-cabafd",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 477,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "design/universal-workspaces-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 534,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "docs/superpowers/specs/2026-10-01-universal-workspaces-v1-design.md"
+      ]
+    },
+    {
+      "branch": "diag/channel-provider-probes",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 2,
+      "behind_by": 3192,
+      "total_commits": 2,
+      "too_large": null,
+      "changed_files": [
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioDiagnosticStartupProbe.java",
+        "src/test/java/cl/helvoca/telephony/twilio/TwilioDiagnosticStartupProbeTest.java"
+      ]
+    },
+    {
+      "branch": "diag/log-full-waba-id",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1850,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "src/main/java/cl/helvoca/messaging/meta/MetaWhatsAppWabaSubscriptionStartupRunner.java"
+      ]
+    },
+    {
+      "branch": "diag/whatsapp-booking-flow-state",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1892,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "diag/whatsapp-booking-proposal-probe",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1880,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "src/main/java/cl/helvoca/messaging/WhatsAppBookingProposalProbeStartupRunner.java"
+      ]
+    },
+    {
+      "branch": "diagnostic/e2e-main-20260917",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 3100,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "docs/ci/e2e-main-reproduction-20260917.md"
+      ]
+    },
+    {
+      "branch": "docs/commercial-external-gates-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 5,
+      "behind_by": 1101,
+      "total_commits": 5,
+      "too_large": null,
+      "changed_files": [
+        "docs/COMMERCIAL_EXTERNAL_GATES_V1.md",
+        "docs/CONTROLLED_REAL_BUSINESS_PILOT_V1.md",
+        "docs/FIRST_CUSTOMER_ONBOARDING_FORM.md",
+        "docs/FIRST_CUSTOMER_OPERATION.md",
+        "docs/FIRST_CUSTOMER_ROLLBACK_SUPPORT.md"
+      ]
+    },
+    {
+      "branch": "docs/frontend-reference-visual-spec",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 5,
+      "behind_by": 709,
+      "total_commits": 5,
+      "too_large": null,
+      "changed_files": [
+        "docs/frontend/COMPONENT_CONTRACTS.md",
+        "docs/frontend/SCREEN_BLUEPRINTS.md",
+        "docs/frontend/VISUAL_ACCEPTANCE_MATRIX.md",
+        "docs/frontend/VISUAL_PRODUCT_SOURCE_OF_TRUTH.md",
+        "docs/frontend/VISUAL_RECONSTRUCTION_ROADMAP.md"
+      ]
+    },
+    {
+      "branch": "docs/recepvoz-engineering-operating-system",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 3,
+      "behind_by": 968,
+      "total_commits": 3,
+      "too_large": null,
+      "changed_files": [
+        "AGENTS.md",
+        "docs/RECEPVOZ_ENGINEERING_OPERATING_SYSTEM.md",
+        "src/test/java/cl/helvoca/governance/EngineeringOperatingSystemContractTest.java"
+      ]
+    },
+    {
+      "branch": "feat/capability-aware-readiness-20260918",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 2720,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "e2e/settings.spec.js",
+        "src/main/java/cl/helvoca/onboarding/OnboardingService.java",
+        "src/main/java/cl/helvoca/onboarding/OnboardingStatusResponse.java",
+        "src/main/java/cl/helvoca/onboarding/SelfServiceReadinessService.java",
+        "src/main/resources/static/app.js",
+        "src/test/java/cl/helvoca/onboarding/CommercialReadinessServiceTest.java",
+        "src/test/java/cl/helvoca/onboarding/OnboardingServiceTest.java",
+        "src/test/java/cl/helvoca/onboarding/OnboardingSynchronizationTest.java"
+      ]
+    }
+  ]
+}

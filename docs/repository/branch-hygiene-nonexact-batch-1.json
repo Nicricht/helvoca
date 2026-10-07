@@ -1,0 +1,219 @@
+{
+  "schema": "helvoca.branch-hygiene.nonexact-compare.v1",
+  "batch": 1,
+  "base_sha": "0780f372a1ac8963f0e1c937596e4ea20bc4c051",
+  "rows": [
+    {
+      "branch": "chore/commercial-release-candidate-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1032,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "docs/COMMERCIAL_RELEASE_CANDIDATE_V1.md"
+      ]
+    },
+    {
+      "branch": "feat/booking-payment-attendance-revenue",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 572,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/home-owner-value-dashboard",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 537,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/sales-business-analytics",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 584,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "feat/universal-business-import",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 610,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "fix/chilean-greeting-and-cert-transcript",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 7,
+      "behind_by": 1594,
+      "total_commits": 7,
+      "too_large": null,
+      "changed_files": [
+        "src/main/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSession.java",
+        "src/main/java/cl/helvoca/ai/realtime/RealtimeToolService.java",
+        "src/main/java/cl/helvoca/call/CallCertificationAuditRunner.java",
+        "src/main/java/cl/helvoca/call/CallCertificationService.java",
+        "src/test/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSessionTest.java",
+        "src/test/java/cl/helvoca/ai/realtime/RealtimeToolServiceTest.java",
+        "src/test/java/cl/helvoca/call/CallCertificationServiceTest.java"
+      ]
+    },
+    {
+      "branch": "fix/complete-goodbye-and-voice-profiles",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 20,
+      "behind_by": 1586,
+      "total_commits": 20,
+      "too_large": null,
+      "changed_files": [
+        "src/main/java/cl/helvoca/agent/AgentVoiceProfile.java",
+        "src/main/java/cl/helvoca/agent/AiAgentController.java",
+        "src/main/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSession.java",
+        "src/main/java/cl/helvoca/ai/realtime/CertificationGuardedRealtimeToolService.java",
+        "src/main/java/cl/helvoca/ai/realtime/RealtimeToolDefinitions.java",
+        "src/main/java/cl/helvoca/ai/realtime/RealtimeToolService.java",
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioMediaStreamHandler.java",
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioVoiceTransportSession.java",
+        "src/main/java/cl/helvoca/voice/VoiceTransportSession.java",
+        "src/test/java/cl/helvoca/agent/AgentVoiceProfileTest.java",
+        "src/test/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSessionTest.java",
+        "src/test/java/cl/helvoca/ai/realtime/RealtimeEndCallToolTest.java",
+        "src/test/java/cl/helvoca/telephony/twilio/TwilioMediaStreamHandlerTest.java"
+      ]
+    },
+    {
+      "branch": "fix/frontend-desktop-nav-labels",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 546,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "fix/real-call-certification-regressions-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 2,
+      "behind_by": 1526,
+      "total_commits": 2,
+      "too_large": null,
+      "changed_files": [
+        "src/test/java/cl/helvoca/booking/BookingConfirmationWorkflowIntegrationTest.java",
+        "src/test/java/cl/helvoca/call/RealCallCertificationCleanupRunnerTest.java"
+      ]
+    },
+    {
+      "branch": "security-hardening",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 9,
+      "behind_by": 3668,
+      "total_commits": 9,
+      "too_large": null,
+      "changed_files": [
+        "src/main/java/cl/helvoca/ai/realtime/CertificationGuardedRealtimeToolService.java",
+        "src/main/java/cl/helvoca/security/SecurityConfig.java",
+        "src/main/resources/application.yml",
+        "src/test/java/cl/helvoca/ai/realtime/CertificationGuardedRealtimeToolServiceTest.java",
+        "src/test/java/cl/helvoca/booking/BookingConcurrencyIntegrationTest.java",
+        "src/test/java/cl/helvoca/security/DocumentationExposureConfigTest.java"
+      ]
+    },
+    {
+      "branch": "test/business-import-real-world-hardening",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 609,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "cert/saas-billing-sandbox-provider-run-1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 11,
+      "behind_by": 1007,
+      "total_commits": 11,
+      "too_large": null,
+      "changed_files": [
+        ".github/workflows/mercadopago-subscription-readback.yml",
+        ".github/workflows/mercadopago-test-user-probe.yml",
+        ".github/workflows/mercadopago-user-read-probe.yml",
+        ".github/workflows/saas-billing-sandbox-invoice-bridge.yml",
+        ".github/workflows/saas-billing-sandbox-one-shot.yml",
+        "src/test/java/cl/helvoca/billing/MercadoPagoSaasSandboxInvoiceBridgeIT.java",
+        "src/test/java/cl/helvoca/billing/MercadoPagoSaasSandboxProviderIT.java"
+      ]
+    },
+    {
+      "branch": "chore/commercial-release-candidate-v2",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1042,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "docs/CONTROLLED_REAL_BUSINESS_PILOT_V1.md",
+        "e2e/pilot-preflight.spec.js",
+        "src/main/java/cl/helvoca/messaging/outbound/MetaWhatsAppMessagingProvider.java",
+        "src/main/java/cl/helvoca/operations/ControlledPilotExternalEffectGuard.java",
+        "src/main/java/cl/helvoca/operations/PilotGoNoGoController.java",
+        "src/main/java/cl/helvoca/operations/PilotGoNoGoService.java",
+        "src/main/java/cl/helvoca/payment/PaymentWorkflowService.java",
+        "src/main/java/cl/helvoca/security/SecurityConfig.java",
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioVoiceController.java",
+        "src/main/resources/static/index.html",
+        "src/main/resources/static/pilot-preflight.js",
+        "src/test/java/cl/helvoca/messaging/outbound/MetaWhatsAppMessagingProviderTest.java",
+        "src/test/java/cl/helvoca/operations/ControlledPilotExternalEffectGuardTest.java",
+        "src/test/java/cl/helvoca/operations/PilotGoNoGoControllerContractTest.java",
+        "src/test/java/cl/helvoca/operations/PilotGoNoGoServiceTest.java",
+        "src/test/java/cl/helvoca/payment/PaymentWorkflowServiceTest.java",
+        "src/test/java/cl/helvoca/telephony/twilio/TwilioVoiceControllerTest.java"
+      ]
+    },
+    {
+      "branch": "chore/recepvoz-section-assets-20261003",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 122,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "chore/verify-agenda-navigation-production-25d089",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 2,
+      "behind_by": 241,
+      "total_commits": 2,
+      "too_large": null,
+      "changed_files": [
+        ".github/workflows/ci.yml"
+      ]
+    }
+  ]
+}
