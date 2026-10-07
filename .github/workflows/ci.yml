@@ -180,11 +180,11 @@ jobs:
 
       - name: Validate console JavaScript
         run: |
-          node --check src/main/resources/static/app.js
-          node --check src/main/resources/static/phone-provisioning.js
-          node --check src/main/resources/static/commercial-status.js
-          node --check src/main/resources/static/voice-selector.js
-          node --check src/main/resources/static/ux-simplification.js
+          node --check e2e/react-public-entry-migration.spec.js
+          node --check e2e/react-settings-core.spec.js
+          node --check e2e/commercial-status.spec.js
+          node --check e2e/react-settings-hardening.spec.js
+          node --check e2e/frontend-ux.spec.js
 
       - name: Run backend tests with JaCoCo
         run: |
@@ -343,11 +343,11 @@ jobs:
 
       - name: Validate frontend JavaScript
         run: |
-          node --check src/main/resources/static/app.js
-          node --check src/main/resources/static/phone-provisioning.js
-          node --check src/main/resources/static/commercial-status.js
-          node --check src/main/resources/static/voice-selector.js
-          node --check src/main/resources/static/ux-simplification.js
+          node --check e2e/react-public-entry-migration.spec.js
+          node --check e2e/react-settings-core.spec.js
+          node --check e2e/commercial-status.spec.js
+          node --check e2e/react-settings-hardening.spec.js
+          node --check e2e/frontend-ux.spec.js
 
       - name: Install frontend test dependencies
         run: |
@@ -413,7 +413,7 @@ jobs:
           node-version: "22"
 
       - name: Validate auth frontend JavaScript
-        run: node --check src/main/resources/static/app.js
+        run: node --check e2e/react-public-entry-migration.spec.js
 
       - name: Install auth test dependencies
         run: |
@@ -683,11 +683,11 @@ jobs:
 
       - name: Validate settings JavaScript
         run: |
-          node --check src/main/resources/static/app.js
-          node --check src/main/resources/static/commercial-status.js
-          node --check src/main/resources/static/ux-simplification.js
-          node --check src/main/resources/static/voice-selector.js
-          node --check src/main/resources/static/phone-provisioning.js
+          node --check e2e/react-public-entry-migration.spec.js
+          node --check e2e/commercial-status.spec.js
+          node --check e2e/frontend-ux.spec.js
+          node --check e2e/react-settings-hardening.spec.js
+          node --check e2e/react-settings-core.spec.js
 
       - name: Install settings test dependencies
         run: |
@@ -698,7 +698,7 @@ jobs:
         run: npm run frontend:build
 
       - name: Run settings frontend E2E
-        run: npx playwright test e2e/settings.spec.js e2e/react-settings-core.spec.js e2e/react-settings-hardening.spec.js e2e/voice-selector.spec.js e2e/phone-provisioning.spec.js e2e/commercial-status.spec.js e2e/frontend-ux.spec.js --grep "settings|voice|phone search|commercial dashboard|plan checkout|ready customer"
+        run: npx playwright test e2e/settings.spec.js e2e/react-settings-core.spec.js e2e/react-settings-hardening.spec.js e2e/commercial-status.spec.js e2e/frontend-ux.spec.js
 
       - name: Report settings QA status
         if: always()
@@ -1062,8 +1062,8 @@ jobs:
 
       - name: Check changed operational JavaScript syntax
         run: |
-          node --check src/main/resources/static/app.js
-          node --check src/main/resources/static/ux-simplification.js
+          node --check e2e/react-public-entry-migration.spec.js
+          node --check e2e/frontend-ux.spec.js
 
       - name: Report operational JavaScript QA status
         if: always()

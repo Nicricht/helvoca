@@ -26,13 +26,11 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableMethodSecurity
 public class SecurityConfig {
     static final String[] PUBLIC_CONSOLE_ASSETS = {
-            "/", "/index.html", "/app.js", "/phone-provisioning.js", "/commercial-status.js",
-            "/voice-selector.js", "/ux-simplification.js", "/first-user-ux-v2.js", "/first-user-ux-v2.css",
-            "/styles.css", "/frontend-foundation.css", "/commercial-ui-v3.css", "/auth-visual-refresh.css", "/landing-motion.css", "/recepvoz-auth-hero.svg", "/recepvoz-phone-hero.svg", "/dashboard-finish.css", "/dashboard-motion.css",
-            "/business-activation-guide.js",
+            "/", "/index.html",
+            "/styles.css", "/frontend-foundation.css", "/recepvoz-phone-hero.svg",
             "/invite.html",
             "/platform.html", "/operations.html",
-            "/sales.html", "/sales.css",
+            "/sales.html",
             "/privacy.html", "/terms.html",
             "/pricing.html",
             "/app/**", "/reservar/**",

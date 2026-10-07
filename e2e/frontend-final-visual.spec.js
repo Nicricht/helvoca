@@ -8,7 +8,7 @@ function read(name) {
 }
 
 async function mountAuthenticatedShell(page, request) {
-  const paths = ['/styles.css', '/first-user-ux-v2.css', '/commercial-ui-v3.css', '/frontend-foundation.css'];
+  const paths = ['/styles.css', '/frontend-foundation.css'];
   const css = [];
   for (const path of paths) {
     const response = await request.get(path);

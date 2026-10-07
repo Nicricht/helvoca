@@ -125,17 +125,19 @@ test.describe('public authentication visual refresh', () => {
     await expect(page.locator('.rv-phone-status')).toContainText('Recepcionista disponible');
   });
 
-  test('serves the new visual assets to unauthenticated visitors', async ({ request }) => {
-    const css = await request.get('/auth-visual-refresh.css');
-    const motionCss = await request.get('/landing-motion.css');
-    const phone = await request.get('/recepvoz-phone-hero.svg');
+  test('serves the active React auth visual asset without legacy CSS dependencies', async ({ page, request }) => {
+    const requests = [];
+    page.on('request', request => requests.push(new URL(request.url()).pathname));
 
-    expect(css.status()).toBe(200);
-    expect(motionCss.status()).toBe(200);
+    await page.goto('/');
+    await expect(page.locator('.rv-phone-device')).toHaveAttribute('src', '/recepvoz-phone-hero.svg');
+
+    const phone = await request.get('/recepvoz-phone-hero.svg');
     expect(phone.status()).toBe(200);
-    expect(css.headers()['content-type']).toContain('text/css');
-    expect(motionCss.headers()['content-type']).toContain('text/css');
     expect(phone.headers()['content-type']).toContain('image/svg+xml');
+
+    expect(requests).not.toContain('/auth-visual-refresh.css');
+    expect(requests).not.toContain('/landing-motion.css');
   });
 
   test('keeps the public surface visually alive without relying on user interaction', async ({ page }) => {

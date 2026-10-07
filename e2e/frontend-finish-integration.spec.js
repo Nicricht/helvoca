@@ -26,13 +26,18 @@ test('remaining legacy shells are compatibility-only and target canonical React 
   expect(importer).not.toContain('/business-import.css');
 });
 
-test('retained commercial-status artifact does not point back to retired legacy destinations', async () => {
-  const status = read('commercial-status.js');
-
-  expect(status).toContain('href="/app/agenda"');
-  expect(status).toContain('href="/app/orders">Operaciones</a>');
-  expect(status).not.toContain('/conversations.html');
-  expect(status).not.toContain('/?tab=bookings#homeBusinessWorkspace');
+test('retired root JavaScript artifacts stay physically absent', async () => {
+  for (const name of [
+    'app.js',
+    'commercial-status.js',
+    'business-activation-guide.js',
+    'ux-simplification.js',
+    'first-user-ux-v2.js',
+    'phone-provisioning.js',
+    'voice-selector.js'
+  ]) {
+    expect(fs.existsSync(`${STATIC}/${name}`), name).toBe(false);
+  }
 });
 
 test('canonical foundation remains dark, solid and readable', async () => {
