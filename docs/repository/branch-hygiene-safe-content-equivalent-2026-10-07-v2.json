@@ -1,0 +1,271 @@
+{
+  "schema": "helvoca.branch-hygiene.content-equivalent.v2",
+  "repository": "Nicricht/helvoca",
+  "certified_against_main": "86197d1166c162d0d4b3a8f3fe0a4a7cacfb3a15",
+  "generated_at": "2026-10-07",
+  "count": 29,
+  "safety_rule": "Delete only if current SHA is unchanged, branch is unprotected and not an open-PR head, and a fresh compare against certified main still has ahead_by == 0 OR zero changed files.",
+  "candidates": [
+    {
+      "branch": "chore/recepvoz-section-assets-20261003",
+      "sha": "28556e89839c7139e7f86df14d5256401f74a1bf",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 123,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "design/live-demo-center-v1-rebase-cabafd",
+      "sha": "77a71575e6d778b6a631997ee8061703dd5f68f0",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 478,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "diag/whatsapp-booking-flow-state",
+      "sha": "13e9bd4399bf31792b06501ba10a94749bad1475",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1893,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/booking-payment-attendance-revenue",
+      "sha": "94139dece55e46b2cc155339bd2611580c584036",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 573,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/frontend-billing-account-finish",
+      "sha": "ece222b811c4da6b9ec1bda3e8ccd269d5fc7c3c",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 879,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/frontend-commerce-operations-finish",
+      "sha": "a79b9e7410be45b970e1c1b72b34cc5019d18ad6",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 866,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/frontend-conversations-calls-finish",
+      "sha": "fb694b5692367a4cbe42e048bd44c2e054ed6c22",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 855,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/frontend-dashboard-finish",
+      "sha": "ac4103024d152992346a782aeea8379b1a7fb760",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 860,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/frontend-foundation-dark",
+      "sha": "f9e2585a5715095269a7ad2bc7cfeace0d24ec0b",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 887,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/frontend-onboarding-settings-finish",
+      "sha": "a9d400383b1a728686a6fb6c7675f04a66e3b183",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 866,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/home-owner-value-dashboard",
+      "sha": "103ef4baedb8793a78dab56b1a8b4934d991c9cb",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 538,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/inventory-admin-alerts-restock-v1",
+      "sha": "82d07344f4705b40e4098603d43d0c6208499d78",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1522,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/omnichannel-core",
+      "sha": "1b6bf055f6481c28b425be93f20afb81922ebed2",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 3394,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/omnichannel-inventory-integration-v1",
+      "sha": "cb09422c2c1ff29571a042d6aa24029501603464",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1531,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/owner-commercial-timeline-v1",
+      "sha": "e4f727b6b7f1d45419a2729f03ab47862591d344",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1511,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/platform-assisted-onboarding",
+      "sha": "28be93cbde792b9b6b8bd78dca936cd590ee66ca",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1627,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/sales-business-analytics",
+      "sha": "1420e853311ab6007e0c3e9f142bcbfd7dba24b9",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 585,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "feat/universal-business-import",
+      "sha": "f27c657046855a96d10d9c2e1c04c20cecf30104",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 611,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "fix/frontend-desktop-nav-labels",
+      "sha": "beb3315e440ae82afe47220a53ef5d66aa9cfb40",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 547,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "fix/whatsapp-separate-twilio-credentials-20260919",
+      "sha": "8e6f06c077fe03d7f3f8eb0ce86973b6153f1567",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 2633,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "release/recepvoz-v1-pilot",
+      "sha": "8a7fbbcbcfcac83805285677224aab2d2f078f89",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1032,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "release/recepvoz-v1.0",
+      "sha": "2adee4b06df1a52603824e52b5da3f7690a0fe52",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1102,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "test/business-import-real-world-hardening",
+      "sha": "c4d40db785a6d451ff2132af660b21a7fa51195a",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 610,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "test/frontend-foundation-red-ci",
+      "sha": "905d0f6716acd4825c91ff715a3c89953382fa5f",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 909,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "test/rc-preflight-red-base",
+      "sha": "d11a55ca1402cb5a581d2214b4c4aa7b9959da22",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1077,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "test/rc-preflight-red-v1",
+      "sha": "3c086feb4b4dc6e75de0d1d445cbbb1b1ca66ced",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1076,
+      "changed_file_count": 0,
+      "safe_reason": "NO_UNIQUE_COMMITS"
+    },
+    {
+      "branch": "verify-main-post-rc-529",
+      "sha": "da9b4c4d300f62b8505bfebadce004eef3673ff7",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1304,
+      "changed_file_count": 0,
+      "safe_reason": "ZERO_FILE_DELTA"
+    },
+    {
+      "branch": "verify-main-post-v6-534",
+      "sha": "93aca75dcabbe8a6e4746e1fd77683b5e7cd986a",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1277,
+      "changed_file_count": 0,
+      "safe_reason": "ZERO_FILE_DELTA"
+    },
+    {
+      "branch": "verify/main-recepvoz-v1-final",
+      "sha": "15ed20d4b71d4257ad6cfd0fa15ecd56a9b6eb58",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1102,
+      "changed_file_count": 0,
+      "safe_reason": "ZERO_FILE_DELTA"
+    }
+  ]
+}
