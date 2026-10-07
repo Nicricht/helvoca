@@ -111,11 +111,11 @@ test.describe('React PLATFORM_ADMIN console migration', () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
-  test('legacy auth bridge sends PLATFORM_ADMIN directly to canonical React route', async () => {
+  test('canonical React auth sends PLATFORM_ADMIN directly to the platform route', async () => {
     const root = path.resolve(__dirname, '..');
-    const appJs = fs.readFileSync(path.join(root, 'src/main/resources/static/app.js'), 'utf8');
+    const authPage = fs.readFileSync(path.join(root, 'frontend/src/pages/Auth/AuthPage.tsx'), 'utf8');
 
-    expect(appJs).toContain('location.replace("/app/platform")');
-    expect(appJs).not.toContain('location.replace("/platform.html")');
+    expect(authPage).toContain('roles.includes("PLATFORM_ADMIN") ? "/app/platform" : "/app"');
+    expect(authPage).not.toContain('/platform.html');
   });
 });

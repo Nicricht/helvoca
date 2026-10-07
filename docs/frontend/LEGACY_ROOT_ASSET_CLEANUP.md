@@ -1,6 +1,6 @@
 # Legacy root asset cleanup
 
-**Status:** Audited / RED contract
+**Status:** Implementation candidate / GREEN pending CI
 **Branch:** `chore/legacy-root-cleanup`
 **Base:** `main@4817c44428d377635899f59909c0c295baec8676`
 **Risk:** MEDIUM
@@ -159,3 +159,19 @@ GREEN requires:
 11. no backend business rule or database schema change;
 12. exact-head Fast Gate and Full Gate pass before merge;
 13. exact merged `main` SHA deploys through Railway after CI with `checkSuites=true`.
+
+
+## Part 2 implementation checkpoint
+
+The approved retirement set has now been removed from the runtime tree.
+
+Historical contracts were migrated rather than silently discarded:
+- Auth visual coverage now proves the React surface uses the active phone asset without legacy CSS requests;
+- foundation/final-visual fixtures now use only retained shared styles;
+- frontend finish verifies root-era JavaScript is physically absent;
+- Platform routing authority is asserted from the canonical React Auth source;
+- CI syntax checks now target canonical React E2E contracts instead of retired static bundles;
+- the settings verification job no longer references deleted voice/phone legacy spec filenames;
+- Spring Security no longer exposes retired root assets, reducing the public static surface.
+
+No backend business rule, database schema, authentication semantic or provider configuration changed.

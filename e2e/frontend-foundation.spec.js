@@ -42,8 +42,6 @@ async function getText(request, path) {
 async function mountFoundation(page, request) {
   const styles = await Promise.all([
     getText(request, '/styles.css'),
-    getText(request, '/first-user-ux-v2.css'),
-    getText(request, '/commercial-ui-v3.css'),
     getText(request, '/frontend-foundation.css')
   ]);
 
