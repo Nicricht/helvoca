@@ -1456,3 +1456,298 @@
     transition-duration: .01ms !important;
   }
 }
+
+
+/* === Agenda calendar workspace v1 / Part 2 ============================ */
+.scheduleFoundationHeader {
+  align-items: center;
+}
+
+.scheduleNavigation {
+  display: inline-grid;
+  grid-template-columns: 38px auto 38px;
+  align-items: center;
+  gap: 5px;
+}
+
+.scheduleNavigation button {
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid rgba(91, 163, 214, .22);
+  border-radius: 10px;
+  color: #dff5ff;
+  background: rgba(6, 35, 55, .78);
+  font: inherit;
+  font-size: .76rem;
+  font-weight: 780;
+  cursor: pointer;
+  transition:
+    border-color var(--rv-motion-fast) ease,
+    background var(--rv-motion-fast) ease,
+    transform var(--rv-motion-fast) var(--rv-ease-out);
+}
+
+.scheduleNavigation button:first-child,
+.scheduleNavigation button:last-child {
+  padding: 0;
+  font-size: 1.35rem;
+}
+
+.scheduleNavigation button:hover,
+.scheduleNavigation button:focus-visible {
+  border-color: rgba(83, 224, 255, .52);
+  background: rgba(10, 63, 88, .78);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.scheduleTimelineShell {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(32, 192, 255, .035), transparent 38%),
+    rgba(4, 19, 33, .96);
+}
+
+.scheduleTimeGutter {
+  position: sticky;
+  left: 0;
+  z-index: 8;
+  width: 58px;
+  min-width: 58px;
+  border-right: 1px solid rgba(126, 170, 214, .13);
+  background: rgba(4, 21, 36, .98);
+  box-shadow: 8px 0 18px rgba(0, 9, 25, .14);
+}
+
+.scheduleTimeHeaderSpacer {
+  height: 50px;
+  border-bottom: 1px solid rgba(126, 170, 214, .13);
+}
+
+.scheduleTimeLabels {
+  position: relative;
+}
+
+.scheduleTimeLabels span {
+  position: absolute;
+  right: 9px;
+  color: rgba(155, 184, 205, .68);
+  font-size: .64rem;
+  font-variant-numeric: tabular-nums;
+  transform: translateY(-50%);
+}
+
+.scheduleDayColumns {
+  display: grid;
+  min-width: max-content;
+  flex: 1 0 auto;
+}
+
+.scheduleTimelineDay {
+  min-width: 148px;
+  border-right: 1px solid rgba(126, 170, 214, .10);
+  background: rgba(6, 25, 42, .33);
+}
+
+.scheduleTimelineDay > header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 11px;
+  border-bottom: 1px solid rgba(126, 170, 214, .13);
+  color: #c0d5e4;
+  background: rgba(6, 27, 44, .98);
+  font-size: .75rem;
+  font-weight: 790;
+  text-transform: capitalize;
+}
+
+.scheduleTimelineDay > header small,
+.scheduleMonthDay > header small {
+  color: #5ce9ff;
+  font-size: .61rem;
+}
+
+.scheduleTimeline {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.008), transparent 38%),
+    rgba(3, 18, 31, .36);
+}
+
+.scheduleHourRule {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(126, 170, 214, .095);
+  pointer-events: none;
+}
+
+.scheduleTimeline .scheduleBooking {
+  position: absolute;
+  z-index: 2;
+  left: 6px;
+  right: 6px;
+  width: auto;
+  min-height: 34px;
+  overflow: hidden;
+  padding: 7px 9px;
+}
+
+.scheduleTimeline .scheduleBookingTime {
+  line-height: 1.05;
+}
+
+.scheduleTimeline .scheduleBooking strong {
+  line-height: 1.13;
+}
+
+.scheduleTimeline .scheduleBooking small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scheduleNowLine {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, #ff5263, rgba(255, 82, 99, .80));
+  box-shadow: 0 0 10px rgba(255, 82, 99, .25);
+  pointer-events: none;
+}
+
+.scheduleNowLine::before {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  left: -3px;
+  top: 50%;
+  content: "";
+  border-radius: 50%;
+  background: #ff6574;
+  box-shadow: 0 0 9px rgba(255, 82, 99, .48);
+  transform: translateY(-50%);
+}
+
+.scheduleNowLine span {
+  position: absolute;
+  left: 7px;
+  top: -18px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  color: #ff9ca6;
+  background: rgba(38, 12, 22, .88);
+  font-size: .56rem;
+  font-weight: 820;
+  letter-spacing: .03em;
+}
+
+.scheduleMonthGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(128px, 1fr));
+  min-width: 896px;
+  overflow-x: auto;
+  background: rgba(4, 19, 33, .94);
+}
+
+.scheduleMonthDay {
+  min-height: 146px;
+  border-right: 1px solid rgba(126, 170, 214, .10);
+  border-bottom: 1px solid rgba(126, 170, 214, .10);
+  background: rgba(6, 26, 43, .42);
+}
+
+.scheduleMonthDay > header {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 9px;
+  color: #b9cee0;
+  background: rgba(6, 26, 43, .70);
+  font-size: .68rem;
+  font-weight: 780;
+  text-transform: capitalize;
+}
+
+.scheduleMonthBookings {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding: 7px;
+}
+
+.scheduleBookingCompact {
+  min-height: 30px;
+  padding: 6px 7px;
+  border-radius: 8px;
+}
+
+.scheduleBookingCompact strong {
+  font-size: .69rem;
+}
+
+.scheduleBookingCompact > span:not(.scheduleBookingTime) {
+  font-size: .61rem;
+}
+
+.scheduleMore {
+  padding: 2px 4px;
+  color: #78dff5;
+  font-size: .61rem;
+}
+
+@media (max-width: 760px) {
+  .scheduleFoundationHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .scheduleNavigation {
+    align-self: flex-start;
+  }
+
+  .scheduleDayColumns {
+    min-width: max-content;
+  }
+
+  .scheduleTimelineShell[data-agenda-view="day"] .scheduleDayColumns {
+    min-width: calc(100vw - 150px);
+  }
+}
+
+@media (max-width: 620px) {
+  .scheduleTimeGutter {
+    width: 50px;
+    min-width: 50px;
+  }
+
+  .scheduleTimelineDay {
+    min-width: 132px;
+  }
+
+  .scheduleTimelineShell[data-agenda-view="day"] .scheduleTimelineDay {
+    min-width: calc(100vw - 116px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scheduleNavigation button {
+    transition-duration: .01ms !important;
+  }
+}
