@@ -1,0 +1,212 @@
+{
+  "schema": "helvoca.branch-hygiene.nonexact-compare.v1",
+  "batch": 6,
+  "base_sha": "0780f372a1ac8963f0e1c937596e4ea20bc4c051",
+  "rows": [
+    {
+      "branch": "fix/normalize-gemini-fallback-voice",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 2,
+      "behind_by": 1489,
+      "total_commits": 2,
+      "too_large": null,
+      "changed_files": [
+        "src/main/java/cl/helvoca/agent/AgentVoiceProfile.java",
+        "src/test/java/cl/helvoca/agent/AgentVoiceProfileTest.java"
+      ]
+    },
+    {
+      "branch": "fix/preserve-payment-journey-link",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1744,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "src/main/java/cl/helvoca/payment/PaymentWorkflowService.java"
+      ]
+    },
+    {
+      "branch": "fix/react-app-entry-cutover",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 201,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "e2e/react-entry-cutover.spec.js"
+      ]
+    },
+    {
+      "branch": "fix/real-cert-cleanup-provider-guard-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 3,
+      "behind_by": 1525,
+      "total_commits": 3,
+      "too_large": null,
+      "changed_files": [
+        ".env.example",
+        "src/main/java/cl/helvoca/call/RealCallCertificationCleanupRunner.java",
+        "src/test/java/cl/helvoca/call/RealCallCertificationCleanupRunnerTest.java"
+      ]
+    },
+    {
+      "branch": "fix/twilio-sms-fallback-20260918",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 7,
+      "behind_by": 2857,
+      "total_commits": 7,
+      "too_large": null,
+      "changed_files": [
+        "src/main/java/cl/helvoca/messaging/outbound/OutboundMessage.java",
+        "src/main/java/cl/helvoca/messaging/outbound/TwilioSmsMessagingProvider.java",
+        "src/main/java/cl/helvoca/operations/CrossChannelMessagingToolService.java",
+        "src/test/java/cl/helvoca/messaging/outbound/OutboundMessageSmsChannelTest.java",
+        "src/test/java/cl/helvoca/messaging/outbound/OutboundMessagingServiceSmsTest.java",
+        "src/test/java/cl/helvoca/messaging/outbound/TwilioSmsMessagingProviderTest.java",
+        "src/test/java/cl/helvoca/operations/CrossChannelMessagingToolServiceTest.java"
+      ]
+    },
+    {
+      "branch": "fix/voice-chilean-sensual-hangup-repeat-v2",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 8,
+      "behind_by": 1583,
+      "total_commits": 8,
+      "too_large": null,
+      "changed_files": [
+        "src/main/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSession.java",
+        "src/main/java/cl/helvoca/ai/realtime/CertificationGuardedRealtimeToolService.java",
+        "src/main/java/cl/helvoca/ai/realtime/RecepVozConversationPolicyService.java",
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioVoiceTransportSession.java",
+        "src/test/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSessionTest.java",
+        "src/test/java/cl/helvoca/ai/realtime/RecepVozConversationPolicyServiceTest.java"
+      ]
+    },
+    {
+      "branch": "fix/whatsapp-booking-intent-routing-red",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1886,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "src/test/java/cl/helvoca/messaging/UniversalWhatsAppBookingIntentRoutingTest.java"
+      ]
+    },
+    {
+      "branch": "fix/whatsapp-sandbox-sender-20260918",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 4,
+      "behind_by": 2856,
+      "total_commits": 4,
+      "too_large": null,
+      "changed_files": [
+        "src/main/java/cl/helvoca/messaging/outbound/TwilioWhatsAppMessagingProvider.java",
+        "src/main/java/cl/helvoca/telephony/twilio/TwilioProperties.java",
+        "src/main/resources/application.yml",
+        "src/test/java/cl/helvoca/messaging/outbound/TwilioWhatsAppMessagingProviderTest.java"
+      ]
+    },
+    {
+      "branch": "fix/whatsapp-separate-twilio-credentials-20260919",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 2632,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "fix-booking-flow",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 2,
+      "behind_by": 3670,
+      "total_commits": 2,
+      "too_large": null,
+      "changed_files": [
+        "docs/booking-flow-fix.md",
+        "src/main/java/cl/helvoca/ai/realtime/RealtimeToolDefinitions.java"
+      ]
+    },
+    {
+      "branch": "integration/commercial-demo-onboarding-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 5,
+      "behind_by": 1135,
+      "total_commits": 5,
+      "too_large": null,
+      "changed_files": [
+        "README.md",
+        "docs/COMMERCIAL_DEMO_ONBOARDING.md",
+        "docs/FIRST_CUSTOMER_ONBOARDING_FORM.md",
+        "src/main/java/cl/helvoca/bootstrap/DevDataInitializer.java",
+        "src/test/java/cl/helvoca/bootstrap/DevDataInitializerTest.java"
+      ]
+    },
+    {
+      "branch": "integration/commercial-demo-onboarding-v2",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 5,
+      "behind_by": 1101,
+      "total_commits": 5,
+      "too_large": null,
+      "changed_files": [
+        "README.md",
+        "docs/COMMERCIAL_DEMO_ONBOARDING.md",
+        "docs/FIRST_CUSTOMER_ONBOARDING_FORM.md",
+        "src/main/java/cl/helvoca/bootstrap/DevDataInitializer.java",
+        "src/test/java/cl/helvoca/bootstrap/DevDataInitializerTest.java"
+      ]
+    },
+    {
+      "branch": "ops/cph-receptionist-simulation-20260926",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 2,
+      "behind_by": 1609,
+      "total_commits": 2,
+      "too_large": null,
+      "changed_files": [
+        ".github/workflows/cph-receptionist-simulation.yml"
+      ]
+    },
+    {
+      "branch": "ops/cph-simulation-rehearsal-20260926",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 2,
+      "behind_by": 1610,
+      "total_commits": 2,
+      "too_large": null,
+      "changed_files": [
+        ".github/workflows/cph-simulation-rehearsal.yml"
+      ]
+    },
+    {
+      "branch": "perf/gemini-tool-schema-latency-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 2,
+      "behind_by": 1266,
+      "total_commits": 2,
+      "too_large": null,
+      "changed_files": [
+        "src/main/java/cl/helvoca/ai/gemini/GeminiLiveVoiceSession.java",
+        "src/test/java/cl/helvoca/ai/gemini/GeminiLiveLowLatencySetupTest.java"
+      ]
+    }
+  ]
+}
