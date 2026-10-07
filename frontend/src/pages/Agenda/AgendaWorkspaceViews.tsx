@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import type { Booking, Customer, ServiceItem } from "../../features/agenda/api";
 import styles from "./AgendaPage.module.css";
 
@@ -174,16 +174,35 @@ export function AgendaViewSwitcher({
   value: AgendaViewMode;
   onChange: (value: AgendaViewMode) => void;
 }) {
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex = index;
+
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % VIEW_OPTIONS.length;
+    else if (event.key === "ArrowLeft") nextIndex = (index - 1 + VIEW_OPTIONS.length) % VIEW_OPTIONS.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = VIEW_OPTIONS.length - 1;
+    else return;
+
+    event.preventDefault();
+    const next = VIEW_OPTIONS[nextIndex];
+    onChange(next.value);
+
+    const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    window.requestAnimationFrame(() => buttons?.[nextIndex]?.focus());
+  }
+
   return (
     <div className={styles.viewSwitcher} role="tablist" aria-label="Vista de Agenda">
-      {VIEW_OPTIONS.map(option => (
+      {VIEW_OPTIONS.map((option, index) => (
         <button
           key={option.value}
           type="button"
           role="tab"
           aria-selected={value === option.value}
+          tabIndex={value === option.value ? 0 : -1}
           className={value === option.value ? styles.activeView : undefined}
           onClick={() => onChange(option.value)}
+          onKeyDown={event => handleKeyDown(event, index)}
         >
           {option.label}
         </button>
@@ -325,6 +344,12 @@ export function AgendaScheduleFoundation({
         key={booking.id}
         data-testid={"agenda-row-" + booking.id}
         data-duration-minutes={duration}
+        aria-pressed={selectedId === booking.id}
+        aria-label={`${new Intl.DateTimeFormat("es-CL", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false
+        }).format(start)} · ${customer?.name ?? "Cliente"} · ${service?.name ?? "Servicio"} · ${statusLabel(booking.status)}`}
         draggable={canManage && !["CANCELLED", "CANCELED"].includes(String(booking.status).toUpperCase())}
         onDragStart={event => {
           if (!canManage) return;
@@ -365,6 +390,7 @@ export function AgendaScheduleFoundation({
     <section
       className={styles.scheduleFoundation}
       aria-label={`Vista ${view === "day" ? "Día" : view === "week" ? "Semana" : "Mes"}`}
+      data-dragging={draggingBookingId ? "true" : "false"}
     >
       <header className={styles.scheduleFoundationHeader}>
         <div>
