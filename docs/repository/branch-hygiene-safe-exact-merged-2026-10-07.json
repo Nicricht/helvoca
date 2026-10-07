@@ -1,0 +1,3488 @@
+{
+  "schema": "helvoca.branch-hygiene.safe-exact-merged.v1",
+  "generated_from": {
+    "repository": "Nicricht/helvoca",
+    "main_sha": "0780f372a1ac8963f0e1c937596e4ea20bc4c051",
+    "total_branches": 702,
+    "closed_prs": 744,
+    "merged_prs": 622
+  },
+  "invariant": "current branch HEAD exactly equals a recorded head SHA of a merged PR; main/protected refs excluded",
+  "count": 579,
+  "candidates": [
+    {
+      "branch": "cert/commercial-readiness-20260929",
+      "sha": "00d94cf5d2884e08d9a076f58da5b593cb8615bc",
+      "merged_pr": 654,
+      "merged_at": "2026-09-29T20:25:49Z"
+    },
+    {
+      "branch": "chore/autodeploy-smoke-test",
+      "sha": "9d24c6fe4e7c2edb6f9fe55a36794ff7a9ffcd81",
+      "merged_pr": 75,
+      "merged_at": "2026-09-14T04:16:41Z"
+    },
+    {
+      "branch": "chore/autodeploy-watchpatterns-smoke",
+      "sha": "827a534b14e44f296975f731a5a6a8c5e9a7f715",
+      "merged_pr": 76,
+      "merged_at": "2026-09-14T04:55:58Z"
+    },
+    {
+      "branch": "chore/branch-hygiene-rescue-20260929",
+      "sha": "b865a8d964df3fa99fdf8cf19a4e9a6bff235bef",
+      "merged_pr": 646,
+      "merged_at": "2026-09-29T15:23:07Z"
+    },
+    {
+      "branch": "chore/commercial-launch-ready",
+      "sha": "a68259f1b124f711517e1b1841c438e381f43808",
+      "merged_pr": 108,
+      "merged_at": "2026-09-16T12:58:18Z"
+    },
+    {
+      "branch": "chore/commercial-release-candidate-gate",
+      "sha": "610772c166b11e83bef240f2333a67bf4360bb24",
+      "merged_pr": 580,
+      "merged_at": "2026-09-27T22:08:24Z"
+    },
+    {
+      "branch": "chore/commercial-release-hardening",
+      "sha": "7c517a00f6db4de42a24dae86594487bda0a84b2",
+      "merged_pr": 572,
+      "merged_at": "2026-09-27T22:04:38Z"
+    },
+    {
+      "branch": "chore/fast-safe-development-gates",
+      "sha": "c383964ce055b911eb5d09bd316391a223e9e1f7",
+      "merged_pr": 503,
+      "merged_at": "2026-09-27T04:44:48Z"
+    },
+    {
+      "branch": "chore/first-pass-engineering-system",
+      "sha": "8483e21ae0c5aeb8d5af61e9a6caa292d73e1050",
+      "merged_pr": 617,
+      "merged_at": "2026-09-29T14:58:17Z"
+    },
+    {
+      "branch": "chore/first-pilot-sales-tracker",
+      "sha": "32acb860c4ebc9e1a355e23b32943a49eaaca9b8",
+      "merged_pr": 670,
+      "merged_at": "2026-10-01T01:11:38Z"
+    },
+    {
+      "branch": "chore/frontend-frame-contract",
+      "sha": "65932a4c87f3166b9de42e7b998e86b72837c4b8",
+      "merged_pr": 660,
+      "merged_at": "2026-09-30T01:00:50Z"
+    },
+    {
+      "branch": "chore/gemini-live-connectivity-probe",
+      "sha": "0bd8ddce2c929d1fe7c78774a9018ce92e131e1d",
+      "merged_pr": 47,
+      "merged_at": "2026-09-12T19:15:16Z"
+    },
+    {
+      "branch": "chore/gemini-messaging-failure-diagnostics",
+      "sha": "2b4a57ed153eaaddcfc12ceb1cc41037243b9899",
+      "merged_pr": 387,
+      "merged_at": "2026-09-23T16:02:08Z"
+    },
+    {
+      "branch": "chore/legacy-root-cleanup",
+      "sha": "4ac35b6b3feaa764f7f8441dbe7e9f6697166fc0",
+      "merged_pr": 751,
+      "merged_at": "2026-10-07T00:42:33Z"
+    },
+    {
+      "branch": "chore/recepvoz-rebrand",
+      "sha": "9fd8d418f698b6bbf14aa03109e869ce3ccbab12",
+      "merged_pr": 35,
+      "merged_at": "2026-09-11T20:35:05Z"
+    },
+    {
+      "branch": "chore/release-lifecycle-policy",
+      "sha": "21d62d0d4ff0e2e335347eeb492f2ed1d4870520",
+      "merged_pr": 645,
+      "merged_at": "2026-09-29T05:23:45Z"
+    },
+    {
+      "branch": "chore/remove-openai-webhook-probe",
+      "sha": "ee368c577144543bbf6179dc8a0d0e996e9582e1",
+      "merged_pr": 42,
+      "merged_at": "2026-09-12T00:25:53Z"
+    },
+    {
+      "branch": "chore/rescue-prospect-tracker-20260930",
+      "sha": "8c2bd1864754ea5d524462568ac44930409b6c1e",
+      "merged_pr": 663,
+      "merged_at": "2026-09-30T06:52:44Z"
+    },
+    {
+      "branch": "chore/retire-home-legacy",
+      "sha": "40c5fc2c6a38f3e752eaab683fd3d0213272333a",
+      "merged_pr": 717,
+      "merged_at": "2026-10-02T23:02:00Z"
+    },
+    {
+      "branch": "codex/fix-certification-two-phase",
+      "sha": "8a2ac4789ecc0cdec8c052e65981201355577512",
+      "merged_pr": 114,
+      "merged_at": "2026-09-17T01:52:25Z"
+    },
+    {
+      "branch": "codex/frontend-ux-simplification",
+      "sha": "ec16f7f76f7a82936e551030bbac480041b3f1fb",
+      "merged_pr": 115,
+      "merged_at": "2026-09-17T10:28:17Z"
+    },
+    {
+      "branch": "debug/full-ci-diagnostics",
+      "sha": "47dc293415f03bf41de3696b31c7b870e98bae7c",
+      "merged_pr": 116,
+      "merged_at": "2026-09-17T11:47:24Z"
+    },
+    {
+      "branch": "design/live-demo-center-v1",
+      "sha": "50a0dedeb762881b7bee09c4ef8a0bc0432e4048",
+      "merged_pr": 676,
+      "merged_at": "2026-10-01T05:03:33Z"
+    },
+    {
+      "branch": "diag/audio-dead-letter-cause",
+      "sha": "a2b8a819f33251f2394ea1718c2c12ac483dc0f9",
+      "merged_pr": 411,
+      "merged_at": "2026-09-24T03:02:27Z"
+    },
+    {
+      "branch": "diag/booking-readiness-pilot",
+      "sha": "f6c939a7179fab618f6fe1cd9e3fa6ff7e1f4e93",
+      "merged_pr": 370,
+      "merged_at": "2026-09-22T22:54:03Z"
+    },
+    {
+      "branch": "diag/meta-waba-access",
+      "sha": "c3023c89cd48f48a356203586dab6f005f913134",
+      "merged_pr": 391,
+      "merged_at": "2026-09-23T17:58:54Z"
+    },
+    {
+      "branch": "diag/whatsapp-booking-flow-state-2",
+      "sha": "331cf7371b460729db3e9b2386604e8685fbb52d",
+      "merged_pr": 371,
+      "merged_at": "2026-09-22T23:07:12Z"
+    },
+    {
+      "branch": "diag/whatsapp-booking-operation-state",
+      "sha": "1dd4205afc45a0eb092d46dbd5f7acd310122fee",
+      "merged_pr": 372,
+      "merged_at": "2026-09-22T23:16:12Z"
+    },
+    {
+      "branch": "diag/whatsapp-booking-retry-failure",
+      "sha": "9fab14af8b53ca113b395fd4a087cf909e954149",
+      "merged_pr": 375,
+      "merged_at": "2026-09-23T01:05:25Z"
+    },
+    {
+      "branch": "diag/whatsapp-sender-offline-410-20260919",
+      "sha": "bdfcb647eeb598af4d651b5bca260903646d18d2",
+      "merged_pr": 174,
+      "merged_at": "2026-09-19T14:24:19Z"
+    },
+    {
+      "branch": "docs/business-configuration-architecture-20260918",
+      "sha": "f5c819ddad8d93260bacd5150945ae8195b27b81",
+      "merged_pr": 152,
+      "merged_at": "2026-09-18T22:16:22Z"
+    },
+    {
+      "branch": "docs/commercial-rc-final-status-v1",
+      "sha": "72cb14f690c2e6f02a7494143c1907b7bd7c0f3e",
+      "merged_pr": 603,
+      "merged_at": "2026-09-27T23:38:39Z"
+    },
+    {
+      "branch": "docs/data-retention-policy-v1",
+      "sha": "91697e8b28fff3a40cd1cb8c0286d61cc286a661",
+      "merged_pr": 326,
+      "merged_at": "2026-09-22T05:42:01Z"
+    },
+    {
+      "branch": "docs/external-gates-main-v1",
+      "sha": "64827878c054c0c7040738fc7ad7fff38aeaffa4",
+      "merged_pr": 601,
+      "merged_at": "2026-09-27T23:12:57Z"
+    },
+    {
+      "branch": "docs/first-commercial-pilot",
+      "sha": "32bfa01cb3ced56e5ae8c9acf3368c6a54766877",
+      "merged_pr": 569,
+      "merged_at": "2026-09-27T21:53:39Z"
+    },
+    {
+      "branch": "docs/helvoca-mvp-design",
+      "sha": "bf70ef2311df18ca6ff83151fbffcb5448d6ca73",
+      "merged_pr": 1,
+      "merged_at": "2026-09-09T20:15:01Z"
+    },
+    {
+      "branch": "docs/meta-embedded-signup-gap-20260920",
+      "sha": "2edc9163a7c8c294b22c2015e10a9106ced3f29d",
+      "merged_pr": 211,
+      "merged_at": "2026-09-20T05:47:36Z"
+    },
+    {
+      "branch": "docs/meta-embedded-signup-verified-flow-20260920",
+      "sha": "0c03042ae21861b98a377e3f7e7aa19b46d9a432",
+      "merged_pr": 217,
+      "merged_at": "2026-09-20T15:08:40Z"
+    },
+    {
+      "branch": "docs/meta-permissions-20260920",
+      "sha": "f316eda922101abef42aebef3507bee498aa2cd6",
+      "merged_pr": 208,
+      "merged_at": "2026-09-20T05:09:17Z"
+    },
+    {
+      "branch": "docs/meta-phone-registration-20260920",
+      "sha": "500b0410c6de4d10cdc4b5efeebc2bff9715cb94",
+      "merged_pr": 209,
+      "merged_at": "2026-09-20T05:17:21Z"
+    },
+    {
+      "branch": "docs/meta-webhook-subscription-20260920",
+      "sha": "a5f6a49448966581e5407c7129927d4a38f82963",
+      "merged_pr": 210,
+      "merged_at": "2026-09-20T05:25:28Z"
+    },
+    {
+      "branch": "docs/meta-whatsapp-pilot-runbook-20260920",
+      "sha": "249c342798c3237c456784d06381a17a205efe1b",
+      "merged_pr": 205,
+      "merged_at": "2026-09-20T04:32:35Z"
+    },
+    {
+      "branch": "docs/mvp-commercial-freeze",
+      "sha": "1a94e8bebf9afcc029e9dd3c5120d2ebc6c681e6",
+      "merged_pr": 453,
+      "merged_at": "2026-09-26T16:40:25Z"
+    },
+    {
+      "branch": "docs/whatsapp-reliability-architecture",
+      "sha": "f27b88324d35f978ee62332ce10991f87d923c94",
+      "merged_pr": 400,
+      "merged_at": "2026-09-23T22:22:29Z"
+    },
+    {
+      "branch": "feat/activate-existing-sandbox-payment",
+      "sha": "5b4aa3f9ebead8fef34b0438d1f06560beebe325",
+      "merged_pr": 431,
+      "merged_at": "2026-09-26T04:03:21Z"
+    },
+    {
+      "branch": "feat/adaptive-onboarding-readiness-20260918",
+      "sha": "c85d787e13ebc02a20b1bbb2954c798c2ba35f78",
+      "merged_pr": 162,
+      "merged_at": "2026-09-19T02:31:48Z"
+    },
+    {
+      "branch": "feat/admin-panel",
+      "sha": "389d3e3f62942a5233a8b7bc5adc63fbaf882ba3",
+      "merged_pr": 20,
+      "merged_at": "2026-09-10T09:29:49Z"
+    },
+    {
+      "branch": "feat/admin-schedule-exceptions",
+      "sha": "85cd49bb66c2187e15fef8b19c95be318f897a98",
+      "merged_pr": 324,
+      "merged_at": "2026-09-22T05:18:02Z"
+    },
+    {
+      "branch": "feat/agenda-table-motion-v2",
+      "sha": "b3b172ac0f49053fab624012526bbd0597b77641",
+      "merged_pr": 689,
+      "merged_at": "2026-10-01T21:43:44Z"
+    },
+    {
+      "branch": "feat/ai-assisted-onboarding",
+      "sha": "86b110aface7f9ae8c07b26eef3f77d3f42e7086",
+      "merged_pr": 23,
+      "merged_at": "2026-09-10T13:10:03Z"
+    },
+    {
+      "branch": "feat/audit-log-retention-purge",
+      "sha": "a96df724012650351bd4e5cb02f176e3b1206fc0",
+      "merged_pr": 332,
+      "merged_at": "2026-09-22T06:47:19Z"
+    },
+    {
+      "branch": "feat/audit-manual-whatsapp-sender-disable",
+      "sha": "0ae05f807899b1319cdf4a7ee5117dd3db5d84a7",
+      "merged_pr": 303,
+      "merged_at": "2026-09-22T00:23:38Z"
+    },
+    {
+      "branch": "feat/audit-manual-whatsapp-sender-enable",
+      "sha": "cee8b097186713046e1239ad14da6c19f1497a4e",
+      "merged_pr": 302,
+      "merged_at": "2026-09-22T00:11:46Z"
+    },
+    {
+      "branch": "feat/audit-meta-pilot-certification-success",
+      "sha": "a5dc5ec15c48f955541841ab3779d34f6bb6896a",
+      "merged_pr": 293,
+      "merged_at": "2026-09-21T21:23:02Z"
+    },
+    {
+      "branch": "feat/audit-retention-legal-hold",
+      "sha": "244776d5e2a454cc818a43786890f35315e8d84c",
+      "merged_pr": 339,
+      "merged_at": "2026-09-22T07:53:38Z"
+    },
+    {
+      "branch": "feat/audit-twilio-startup-sender-activation",
+      "sha": "28a8b7c00c70c1d204c242f4035073c4ad7660c5",
+      "merged_pr": 301,
+      "merged_at": "2026-09-21T23:59:46Z"
+    },
+    {
+      "branch": "feat/audit-twilio-whatsapp-certification-success",
+      "sha": "d6ceb781b11e9aad5ecb93b926596b2ba1271542",
+      "merged_pr": 298,
+      "merged_at": "2026-09-21T22:22:12Z"
+    },
+    {
+      "branch": "feat/audit-whatsapp-certification-clear",
+      "sha": "627210ed21538d7f987d9a51261912e215880ef5",
+      "merged_pr": 292,
+      "merged_at": "2026-09-21T21:10:06Z"
+    },
+    {
+      "branch": "feat/audit-whatsapp-sender-disable-on-create-deactivate",
+      "sha": "c18950ca6f266cbc59a57bb1b3f37fa763eed43f",
+      "merged_pr": 305,
+      "merged_at": "2026-09-22T01:08:35Z"
+    },
+    {
+      "branch": "feat/audit-whatsapp-sender-disable-on-detach",
+      "sha": "fb12a9da0ba4914683aee05f2e65f443c2b6844a",
+      "merged_pr": 306,
+      "merged_at": "2026-09-22T01:20:18Z"
+    },
+    {
+      "branch": "feat/audit-whatsapp-sender-disable-on-meta-deactivate",
+      "sha": "0863de6b23fed021014153d024abbfef9a1aa131",
+      "merged_pr": 308,
+      "merged_at": "2026-09-22T02:00:48Z"
+    },
+    {
+      "branch": "feat/audit-whatsapp-sender-disable-on-meta-replace",
+      "sha": "eb704259c1a6bbd53d4d6d85bbc8ae604a2c8fbe",
+      "merged_pr": 307,
+      "merged_at": "2026-09-22T01:30:36Z"
+    },
+    {
+      "branch": "feat/audit-whatsapp-sender-disable-on-phone-deactivate",
+      "sha": "f7a282cd0e54f3bcbe457e2733d937d3f162ec83",
+      "merged_pr": 304,
+      "merged_at": "2026-09-22T00:34:35Z"
+    },
+    {
+      "branch": "feat/audit-whatsapp-sender-enable-on-meta-activate",
+      "sha": "ea36cd36360374e9f776f0b4f1e94268738f3f61",
+      "merged_pr": 309,
+      "merged_at": "2026-09-22T02:06:12Z"
+    },
+    {
+      "branch": "feat/auth-hero-phone-stage",
+      "sha": "959b14e8f7eb96e21c98a3fc443c7a3a97edf209",
+      "merged_pr": 657,
+      "merged_at": "2026-09-29T22:59:29Z"
+    },
+    {
+      "branch": "feat/auth-visual-commercial-refresh",
+      "sha": "92820be18e0344062d587fd3c1584f3e8c40cf58",
+      "merged_pr": 655,
+      "merged_at": "2026-09-29T21:59:31Z"
+    },
+    {
+      "branch": "feat/automation-first-policy-engine",
+      "sha": "7b6e234fd0f6dcc62639f0a0bba78228ad4e2381",
+      "merged_pr": 93,
+      "merged_at": "2026-09-15T13:15:05Z"
+    },
+    {
+      "branch": "feat/booking-conversation-quality",
+      "sha": "55a0e81b5f7885023395b035cb00e38cb3e60b6d",
+      "merged_pr": 12,
+      "merged_at": "2026-09-10T01:59:16Z"
+    },
+    {
+      "branch": "feat/bootstrap-first-user-ux-v2",
+      "sha": "c4f43337794687a81867625698fa815e10561252",
+      "merged_pr": 607,
+      "merged_at": "2026-09-28T03:29:10Z"
+    },
+    {
+      "branch": "feat/bootstrap-twilio-subaccount-voice",
+      "sha": "d4a1de05d3c55e7809662290d1a4675837f82c20",
+      "merged_pr": 362,
+      "merged_at": "2026-09-22T17:59:12Z"
+    },
+    {
+      "branch": "feat/business-profile-20260918",
+      "sha": "bbde8c7be82ad07a2f4b0ac399d90682609264a4",
+      "merged_pr": 153,
+      "merged_at": "2026-09-18T22:34:57Z"
+    },
+    {
+      "branch": "feat/business-profile-ui-20260918",
+      "sha": "578a3bd8a9892181de35d787638f8a784f6e7060",
+      "merged_pr": 154,
+      "merged_at": "2026-09-18T23:27:02Z"
+    },
+    {
+      "branch": "feat/call-audit-transcript",
+      "sha": "8522624fc1704dd234f625b5cc635668dd1c31a5",
+      "merged_pr": 480,
+      "merged_at": "2026-09-27T00:41:47Z"
+    },
+    {
+      "branch": "feat/call-content-retention-legal-hold",
+      "sha": "aa2e3b11868e22bf4d95f5145d5e752076f0f9a1",
+      "merged_pr": 342,
+      "merged_at": "2026-09-22T08:17:31Z"
+    },
+    {
+      "branch": "feat/call-content-retention-purge",
+      "sha": "02dda80e47a354493cdf243d5feb3059ab320d9d",
+      "merged_pr": 328,
+      "merged_at": "2026-09-22T06:05:24Z"
+    },
+    {
+      "branch": "feat/call-outcomes-dashboard",
+      "sha": "0e0dd766ba2af2cbe5a6e9e751d1b5ca59c3da59",
+      "merged_pr": 32,
+      "merged_at": "2026-09-11T15:43:08Z"
+    },
+    {
+      "branch": "feat/call-retention-legal-hold",
+      "sha": "ae0626afe76e847b0256d0c925237b4e41a5c34e",
+      "merged_pr": 336,
+      "merged_at": "2026-09-22T07:23:37Z"
+    },
+    {
+      "branch": "feat/call-session-retention-purge",
+      "sha": "beec2f9f4c1c6be3dadf143751a84672daf305af",
+      "merged_pr": 333,
+      "merged_at": "2026-09-22T06:54:58Z"
+    },
+    {
+      "branch": "feat/call-traceability",
+      "sha": "780fa369df6b0396aee5c89c28954519f38b882d",
+      "merged_pr": 33,
+      "merged_at": "2026-09-11T16:14:22Z"
+    },
+    {
+      "branch": "feat/catalog-media-whatsapp",
+      "sha": "8ebd888b6db61fa166690479384525b83a31ac09",
+      "merged_pr": 415,
+      "merged_at": "2026-09-24T04:38:48Z"
+    },
+    {
+      "branch": "feat/certification-command-runner-v1",
+      "sha": "84539ee2b21cba709a660ca54e5c4a3a34c180ba",
+      "merged_pr": 542,
+      "merged_at": "2026-09-27T19:15:02Z"
+    },
+    {
+      "branch": "feat/chilean-human-voice",
+      "sha": "78a399d9e6921f9674b0c80d423f3f70b5047380",
+      "merged_pr": 472,
+      "merged_at": "2026-09-26T22:42:16Z"
+    },
+    {
+      "branch": "feat/commercial-activation-v1",
+      "sha": "f70baf985f38f769ef08b63f08b0f634f5f0aceb",
+      "merged_pr": 68,
+      "merged_at": "2026-09-13T17:26:06Z"
+    },
+    {
+      "branch": "feat/commercial-demo-onboarding",
+      "sha": "ff75d95103d05ffb9064febbcb48dd0a4b5609a0",
+      "merged_pr": 577,
+      "merged_at": "2026-09-27T22:05:54Z"
+    },
+    {
+      "branch": "feat/commercial-observability-v1",
+      "sha": "a39d0d4f5ea9662ef167d92091444d2d077ebc52",
+      "merged_pr": 574,
+      "merged_at": "2026-09-27T22:05:07Z"
+    },
+    {
+      "branch": "feat/commercial-operation-handoff",
+      "sha": "2196c4d014d7d791c18b03907e68eb3289abd8b4",
+      "merged_pr": 416,
+      "merged_at": "2026-09-24T05:05:02Z"
+    },
+    {
+      "branch": "feat/commercial-sandbox-order-ready",
+      "sha": "87f7e42c7f1cbc23933b1794602acb7698223c40",
+      "merged_pr": 430,
+      "merged_at": "2026-09-26T03:42:39Z"
+    },
+    {
+      "branch": "feat/conversation-replay-engine-v2",
+      "sha": "3a2e1f483a5c9af14da34aac7ea9b0267b6ff8c0",
+      "merged_pr": 505,
+      "merged_at": "2026-09-27T16:58:22Z"
+    },
+    {
+      "branch": "feat/cross-provider-voice-bakeoff",
+      "sha": "219e16fed3186236b855544299fd155a751995d5",
+      "merged_pr": 673,
+      "merged_at": "2026-10-01T03:09:20Z"
+    },
+    {
+      "branch": "feat/customer-anonymize-booking-pii",
+      "sha": "9e938f3346cf25d4f4aa7c7ca60d3ec3058dfb54",
+      "merged_pr": 346,
+      "merged_at": "2026-09-22T09:04:35Z"
+    },
+    {
+      "branch": "feat/customer-anonymize-call-pii",
+      "sha": "c78a01e50008e2db2dc9efe12113bfa06af3afc7",
+      "merged_pr": 344,
+      "merged_at": "2026-09-22T08:41:44Z"
+    },
+    {
+      "branch": "feat/customer-anonymize-conversation-state-pii",
+      "sha": "f79becc25589db01249af4944a21bd0bc94a3b29",
+      "merged_pr": 357,
+      "merged_at": "2026-09-22T10:58:02Z"
+    },
+    {
+      "branch": "feat/customer-anonymize-delivery-pii",
+      "sha": "65df53fa655e653f8157687d564d23f853dc048e",
+      "merged_pr": 356,
+      "merged_at": "2026-09-22T10:45:38Z"
+    },
+    {
+      "branch": "feat/customer-anonymize-lead-pii",
+      "sha": "d7da91b7284a7ca4020b4fb999f6a24650693712",
+      "merged_pr": 350,
+      "merged_at": "2026-09-22T09:39:52Z"
+    },
+    {
+      "branch": "feat/customer-anonymize-messaging-pii",
+      "sha": "9d27638bf2dc13ae1adfac7b4d1375fdf70eacd2",
+      "merged_pr": 345,
+      "merged_at": "2026-09-22T08:54:22Z"
+    },
+    {
+      "branch": "feat/customer-anonymize-order-pii",
+      "sha": "47731e02c37fc39280597890fb44d2a9fefee726",
+      "merged_pr": 354,
+      "merged_at": "2026-09-22T10:24:54Z"
+    },
+    {
+      "branch": "feat/customer-anonymize-payment-pii",
+      "sha": "ad99c9bbd98bf9551491ba9cfdb16eb98d1615dd",
+      "merged_pr": 360,
+      "merged_at": "2026-09-22T15:55:25Z"
+    },
+    {
+      "branch": "feat/customer-anonymize-quote-pii",
+      "sha": "e687141d2126ae6ac6a1ac64170dbdb35ac67815",
+      "merged_pr": 352,
+      "merged_at": "2026-09-22T10:01:31Z"
+    },
+    {
+      "branch": "feat/customer-anonymize-request-pii",
+      "sha": "d6024eee85d26bb31d582649a6a9b68f8523e0b3",
+      "merged_pr": 348,
+      "merged_at": "2026-09-22T09:21:11Z"
+    },
+    {
+      "branch": "feat/customer-anonymize-unanswered-question-pii",
+      "sha": "911a7679b33bec707c58dd7f3de9a32f2087e027",
+      "merged_pr": 358,
+      "merged_at": "2026-09-22T15:36:51Z"
+    },
+    {
+      "branch": "feat/customer-profile-anonymization",
+      "sha": "6ed8fe547d74def20f31a21b179d6cfbb8aaae6b",
+      "merged_pr": 330,
+      "merged_at": "2026-09-22T06:21:33Z"
+    },
+    {
+      "branch": "feat/customer-retention-active-operation-guard",
+      "sha": "7781c9680e380976d8c88793e7bb000cc679a081",
+      "merged_pr": 343,
+      "merged_at": "2026-09-22T08:29:50Z"
+    },
+    {
+      "branch": "feat/customer-retention-legal-hold",
+      "sha": "177c722af2f6218afd5ddfd2a6566b41116b2da5",
+      "merged_pr": 341,
+      "merged_at": "2026-09-22T08:08:58Z"
+    },
+    {
+      "branch": "feat/dashboard-motion-system-v1",
+      "sha": "5fb341a6e5d981d0c58b8f0e577e03bd22437fbb",
+      "merged_pr": 681,
+      "merged_at": "2026-10-01T08:06:01Z"
+    },
+    {
+      "branch": "feat/data-retention-dry-run",
+      "sha": "599767d2e4443412952844fd609bd5a4a0739d99",
+      "merged_pr": 327,
+      "merged_at": "2026-09-22T05:53:29Z"
+    },
+    {
+      "branch": "feat/external-pilot-onboarding",
+      "sha": "97caf2cbe4f558169358e7d434a79840564cd27c",
+      "merged_pr": 447,
+      "merged_at": "2026-09-26T14:53:34Z"
+    },
+    {
+      "branch": "feat/failure-chaos-lab-v3",
+      "sha": "4d1ceee89741995d3a07a6aec007f7ee74f3a071",
+      "merged_pr": 517,
+      "merged_at": "2026-09-27T07:04:42Z"
+    },
+    {
+      "branch": "feat/first-sale-ready",
+      "sha": "de0667f64268841b735265bf4c273ee7e20402fc",
+      "merged_pr": 95,
+      "merged_at": "2026-09-15T14:58:38Z"
+    },
+    {
+      "branch": "feat/frontend-agenda-professional",
+      "sha": "acc9646f1e1c45a9ecf0de1479b2d804089f26d9",
+      "merged_pr": 688,
+      "merged_at": "2026-10-01T19:45:52Z"
+    },
+    {
+      "branch": "feat/frontend-commercial-redesign-v3",
+      "sha": "26a5a0ebe2c4a6db7fa5a805a53178fa3d6780fa",
+      "merged_pr": 610,
+      "merged_at": "2026-09-28T05:15:32Z"
+    },
+    {
+      "branch": "feat/frontend-final-visual-polish",
+      "sha": "c9c1d3a1041046b143caa2bba3e578c9039fde9a",
+      "merged_pr": 638,
+      "merged_at": "2026-09-29T02:30:47Z"
+    },
+    {
+      "branch": "feat/frontend-finish-integration",
+      "sha": "8d038c1bd1d86b4b1261771da3028089088db845",
+      "merged_pr": 618,
+      "merged_at": "2026-09-29T14:58:15Z"
+    },
+    {
+      "branch": "feat/frontend-visual-system-v2",
+      "sha": "7725f50e3cce8b158a3af6086eb444bb2b3a65e7",
+      "merged_pr": 734,
+      "merged_at": "2026-10-04T08:30:29Z"
+    },
+    {
+      "branch": "feat/full-commercial-sandbox-certification",
+      "sha": "80855146326ce34f5999fcb6ea38c0b330f0995b",
+      "merged_pr": 426,
+      "merged_at": "2026-09-26T02:52:16Z"
+    },
+    {
+      "branch": "feat/gemini-human-turntaking",
+      "sha": "f87fe4190b7118810f63c92437cba06cc7215f97",
+      "merged_pr": 474,
+      "merged_at": "2026-09-26T23:16:10Z"
+    },
+    {
+      "branch": "feat/gpt-live-sip-agent",
+      "sha": "031781f9ce6c2f802949c02bb749055f4700cc19",
+      "merged_pr": 40,
+      "merged_at": "2026-09-11T23:07:37Z"
+    },
+    {
+      "branch": "feat/hardware-store-demo-tenant",
+      "sha": "5e01332c31f399c915368bd22cc901a032ef75c6",
+      "merged_pr": 615,
+      "merged_at": "2026-09-29T16:12:41Z"
+    },
+    {
+      "branch": "feat/home-reference-visual",
+      "sha": "bbd2f340b33e55eb07f346dbcc32ff2678d9dc3b",
+      "merged_pr": 733,
+      "merged_at": "2026-10-04T04:46:14Z"
+    },
+    {
+      "branch": "feat/home-value-motion-v3",
+      "sha": "d769bb5a0379cff411f74a5a4be95cbc56625f9c",
+      "merged_pr": 735,
+      "merged_at": "2026-10-05T00:01:23Z"
+    },
+    {
+      "branch": "feat/human-transfer",
+      "sha": "1506602b081591a3960bb2f74b147d998373ff86",
+      "merged_pr": 18,
+      "merged_at": "2026-09-10T08:49:05Z"
+    },
+    {
+      "branch": "feat/inventory-operator-clarity",
+      "sha": "c420bf455bb2a929b38a6f2474251a4fd936dd31",
+      "merged_pr": 687,
+      "merged_at": "2026-10-01T19:19:58Z"
+    },
+    {
+      "branch": "feat/journey-trace-debug-v4",
+      "sha": "330a2241bae60daa7dafd64fdbcad8e86b339f2d",
+      "merged_pr": 516,
+      "merged_at": "2026-09-27T07:04:12Z"
+    },
+    {
+      "branch": "feat/legal-hold-foundation",
+      "sha": "eb13a3dd1b85f494fedc7e1c24a93639cf127411",
+      "merged_pr": 335,
+      "merged_at": "2026-09-22T07:15:38Z"
+    },
+    {
+      "branch": "feat/live-demo-center-foundation",
+      "sha": "6786bdfeda783e227a19889f12918386d990272c",
+      "merged_pr": 677,
+      "merged_at": "2026-10-01T05:43:20Z"
+    },
+    {
+      "branch": "feat/live-demo-inbound-autolifecycle",
+      "sha": "c545297ffe51ab05045ffcf4aa649f1b9a6d9f65",
+      "merged_pr": 683,
+      "merged_at": "2026-10-01T18:58:54Z"
+    },
+    {
+      "branch": "feat/live-demo-session-pilot-flow",
+      "sha": "3cf2114f9a8831b88e2eeac9888ac348cfb66f96",
+      "merged_pr": 680,
+      "merged_at": "2026-10-01T08:24:51Z"
+    },
+    {
+      "branch": "feat/live-demo-session-prepare",
+      "sha": "80595fe083a8d305aab62e5142d48362baad2531",
+      "merged_pr": 679,
+      "merged_at": "2026-10-01T07:25:20Z"
+    },
+    {
+      "branch": "feat/lower-launch-pricing",
+      "sha": "eb3a34028d6d4b2d990f720a92feecfd969029b7",
+      "merged_pr": 81,
+      "merged_at": "2026-09-14T15:20:03Z"
+    },
+    {
+      "branch": "feat/managed-sandbox-payment-onboarding",
+      "sha": "8c83e865b25288af7808285c717da38fa7b81bbb",
+      "merged_pr": 449,
+      "merged_at": "2026-09-26T15:27:44Z"
+    },
+    {
+      "branch": "feat/max-seductive-gemini-voice",
+      "sha": "e4d766c1d2d663ffd1b6ea2ebeb71d138d14ec3b",
+      "merged_pr": 483,
+      "merged_at": "2026-09-27T01:34:16Z"
+    },
+    {
+      "branch": "feat/mercadopago-sandbox-certification",
+      "sha": "99bc965b741fd6e7b2cf15991955600841e993ef",
+      "merged_pr": 424,
+      "merged_at": "2026-09-26T02:00:13Z"
+    },
+    {
+      "branch": "feat/mercadopago-sandbox-payments",
+      "sha": "6fb3db2281567ab1c8d880422347d0565da85c80",
+      "merged_pr": 91,
+      "merged_at": "2026-09-15T11:03:28Z"
+    },
+    {
+      "branch": "feat/mercadopago-sandbox-tenant-bootstrap",
+      "sha": "08cf38eec87e8bf3aa91a18caa3810ea5fa8c0ff",
+      "merged_pr": 422,
+      "merged_at": "2026-09-25T21:33:50Z"
+    },
+    {
+      "branch": "feat/messaging-retention-legal-hold",
+      "sha": "45fe580106ef753322af40de5dc0d6c4b8edb501",
+      "merged_pr": 337,
+      "merged_at": "2026-09-22T07:30:35Z"
+    },
+    {
+      "branch": "feat/messaging-retention-purge",
+      "sha": "f5012f4a0b57ac3256003ca947d85eab1173fe81",
+      "merged_pr": 329,
+      "merged_at": "2026-09-22T06:13:42Z"
+    },
+    {
+      "branch": "feat/meta-activation-backend-readiness",
+      "sha": "371146022b8779329d29434d925c268fa4a790d1",
+      "merged_pr": 269,
+      "merged_at": "2026-09-21T17:09:58Z"
+    },
+    {
+      "branch": "feat/meta-activation-gate-config-state",
+      "sha": "8f9541ccddf0f03f9e6aa00a9c3b80e2ecca7f98",
+      "merged_pr": 268,
+      "merged_at": "2026-09-21T17:03:16Z"
+    },
+    {
+      "branch": "feat/meta-activation-gate-ui",
+      "sha": "7636034dd52a9cf6eef68b00f24ca09308f6a433",
+      "merged_pr": 267,
+      "merged_at": "2026-09-21T16:29:17Z"
+    },
+    {
+      "branch": "feat/meta-ai-reply-durable-outbox-20260920",
+      "sha": "0abbdeb8b3a46ec9384041b73651cadd6de3e808",
+      "merged_pr": 198,
+      "merged_at": "2026-09-20T03:12:37Z"
+    },
+    {
+      "branch": "feat/meta-audit-activation-state",
+      "sha": "5205517999b32b0fed743fc2b11121ac5b1ad227",
+      "merged_pr": 277,
+      "merged_at": "2026-09-21T18:22:34Z"
+    },
+    {
+      "branch": "feat/meta-audit-authorization-code",
+      "sha": "99dfe149f87d104ea5b67cb1c8e21d6b0bad0fea",
+      "merged_pr": 286,
+      "merged_at": "2026-09-21T20:21:30Z"
+    },
+    {
+      "branch": "feat/meta-audit-config-replace",
+      "sha": "33f44dd0a0714da3929554fd0262d6c62b61a1fa",
+      "merged_pr": 285,
+      "merged_at": "2026-09-21T20:10:31Z"
+    },
+    {
+      "branch": "feat/meta-audit-phone-registration",
+      "sha": "fc2e587ce595ffff64da661cfd99833104a1f7a7",
+      "merged_pr": 290,
+      "merged_at": "2026-09-21T20:54:39Z"
+    },
+    {
+      "branch": "feat/meta-audit-phone-staging",
+      "sha": "1234abfffbdd9eca9b1e0ef32de2e2500a4b3f87",
+      "merged_pr": 291,
+      "merged_at": "2026-09-21T21:01:49Z"
+    },
+    {
+      "branch": "feat/meta-audit-phone-validation",
+      "sha": "d7e3dffcac89ee3764b5d266dfff10a6ec26c608",
+      "merged_pr": 289,
+      "merged_at": "2026-09-21T20:48:09Z"
+    },
+    {
+      "branch": "feat/meta-audit-waba-assignment",
+      "sha": "fdeeb5f8abba7b4f0852e8836be37c5df4c6d5a6",
+      "merged_pr": 287,
+      "merged_at": "2026-09-21T20:31:41Z"
+    },
+    {
+      "branch": "feat/meta-audit-waba-subscription",
+      "sha": "40c09abc0ee1b27229855d2b64fec988d97994ad",
+      "merged_pr": 288,
+      "merged_at": "2026-09-21T20:38:52Z"
+    },
+    {
+      "branch": "feat/meta-certification-readiness-ui",
+      "sha": "20333b6a196ae40f33c3bef1f35c216ebc2880a4",
+      "merged_pr": 264,
+      "merged_at": "2026-09-21T12:31:50Z"
+    },
+    {
+      "branch": "feat/meta-data-deletion-page",
+      "sha": "8640cd7fb26915323cfd743f16394693089a2100",
+      "merged_pr": 364,
+      "merged_at": "2026-09-22T19:37:27Z"
+    },
+    {
+      "branch": "feat/meta-deployment-readiness-20260920",
+      "sha": "50dee50b85a148f2dd4f4e5a4f1b102e0ba34dc9",
+      "merged_pr": 207,
+      "merged_at": "2026-09-20T04:55:07Z"
+    },
+    {
+      "branch": "feat/meta-deployment-readiness-ui",
+      "sha": "1e4bedc6759564e50d799c675fd36b6faf917b0e",
+      "merged_pr": 266,
+      "merged_at": "2026-09-21T15:06:20Z"
+    },
+    {
+      "branch": "feat/meta-embedded-credential-ref",
+      "sha": "c479eebfaeae79450e8d027aa240542a67064af3",
+      "merged_pr": 261,
+      "merged_at": "2026-09-21T11:55:20Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-assign-system-user-client-20260920",
+      "sha": "ebfdd7da93b03ccbfe2dd6202cb00f9a560999fd",
+      "merged_pr": 232,
+      "merged_at": "2026-09-20T17:41:32Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-assigned-users-client-20260920",
+      "sha": "49723db34ccf3236f87813d5a2b84104c8944e2f",
+      "merged_pr": 231,
+      "merged_at": "2026-09-20T17:32:18Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-assignment-readiness-20260920",
+      "sha": "88c256f65f3231d6aa809fafdd4278b9c81d57a6",
+      "merged_pr": 233,
+      "merged_at": "2026-09-20T17:49:04Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-bootstrap-20260920",
+      "sha": "38f8bec80508c2b68cbf103fc0a0f91e32afd6be",
+      "merged_pr": 219,
+      "merged_at": "2026-09-20T15:24:51Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-button-20260920",
+      "sha": "eb273b329bd45a6a4a0833bf09ad9850cce1acfd",
+      "merged_pr": 220,
+      "merged_at": "2026-09-20T15:33:09Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-check-waba-assignment-20260920",
+      "sha": "1d3ed349f2282a2509503be9a2e59e94f2c1c998",
+      "merged_pr": 234,
+      "merged_at": "2026-09-20T19:06:32Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-code-handoff-20260920",
+      "sha": "348a82670d2aab5a073e06f29b7ab96ba770febb",
+      "merged_pr": 223,
+      "merged_at": "2026-09-20T15:59:32Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-discover-wabas-20260920",
+      "sha": "77e25e1005d6e49fd0da979cb8272b6771848cad",
+      "merged_pr": 229,
+      "merged_at": "2026-09-20T17:20:46Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-launch-20260920",
+      "sha": "2415fe8583ae6a4e92d94361669f35e513827957",
+      "merged_pr": 222,
+      "merged_at": "2026-09-20T15:51:59Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-phone-discovery-endpoint-20260920",
+      "sha": "88ce5252596e60d9f502073b40693431bafcea94",
+      "merged_pr": 242,
+      "merged_at": "2026-09-20T22:19:28Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-phone-finalize-endpoint-20260920",
+      "sha": "f355ec1bf93cd60e37c48ea4aa7dd268045232dd",
+      "merged_pr": 250,
+      "merged_at": "2026-09-21T00:38:02Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-phone-list-client-20260920",
+      "sha": "dfb7dd8055889d03494448118d415a462d76658c",
+      "merged_pr": 240,
+      "merged_at": "2026-09-20T20:33:01Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-phone-registration-client-20260920",
+      "sha": "1470e3c061a7b157de67b5ed7e181637f11953c0",
+      "merged_pr": 246,
+      "merged_at": "2026-09-20T23:07:21Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-phone-registration-endpoint-20260920",
+      "sha": "83da17837746218a0013b6a0883d12363d520cbc",
+      "merged_pr": 248,
+      "merged_at": "2026-09-21T00:05:01Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-phone-selection-validation-20260920",
+      "sha": "7e25c2424977dfdace504fb96691efbecb98b60d",
+      "merged_pr": 243,
+      "merged_at": "2026-09-20T22:28:46Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-phone-staging-service-20260920",
+      "sha": "f7c3e7e6b10f2a806702e134aeec1c2c041b0ec6",
+      "merged_pr": 249,
+      "merged_at": "2026-09-21T00:31:34Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-provider-business-id-20260920",
+      "sha": "eb24b26b0a095390db867e5b4411e7aa33df6b7a",
+      "merged_pr": 228,
+      "merged_at": "2026-09-20T17:14:56Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-readiness-20260920",
+      "sha": "fc38c9e2c5672dea37f25a42e50d49440fb5f3b0",
+      "merged_pr": 218,
+      "merged_at": "2026-09-20T15:16:34Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-render-waba-candidates-20260920",
+      "sha": "c55e4ed8d7b669611c62def4288d45ec7dbfa64b",
+      "merged_pr": 252,
+      "merged_at": "2026-09-21T01:05:57Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-scope-validation-20260920",
+      "sha": "88d855a88aa97485d9262bf8e5bc8dbf07db821f",
+      "merged_pr": 230,
+      "merged_at": "2026-09-20T17:25:58Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-selected-phone-registration-service-20260920",
+      "sha": "796519d27607af53969b81c4153a4e3d4acc1783",
+      "merged_pr": 247,
+      "merged_at": "2026-09-20T23:51:57Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-selected-phone-validation-endpoint-20260920",
+      "sha": "0c7d9f6b2d5c3ee3eb7027f1d538ee007a5fa24a",
+      "merged_pr": 245,
+      "merged_at": "2026-09-20T22:39:51Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-selected-waba-assignment-service-20260920",
+      "sha": "aaa09623b105eeeb4efce493e56856952c4d457a",
+      "merged_pr": 235,
+      "merged_at": "2026-09-20T19:36:43Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-selected-waba-phone-discovery-20260920",
+      "sha": "2e67c6e19c70720162eaff442b1556a59417ee9f",
+      "merged_pr": 241,
+      "merged_at": "2026-09-20T22:09:42Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-selected-waba-subscription-service-20260920",
+      "sha": "e482425e130bd98cb8ce0423c582ead46a898bc8",
+      "merged_pr": 238,
+      "merged_at": "2026-09-20T20:04:12Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-shared-waba-client-20260920",
+      "sha": "ce7adbca096ba1ed4af29ae8d36033a98cc0ab1c",
+      "merged_pr": 227,
+      "merged_at": "2026-09-20T17:08:21Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-subscribe-app-client-20260920",
+      "sha": "99b6d2f2f74e86f9319b7a0334357314a9ec1859",
+      "merged_pr": 237,
+      "merged_at": "2026-09-20T19:57:09Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-token-client-20260920",
+      "sha": "0a0a85c71a45621814260e5dd755a5c96a5dc364",
+      "merged_pr": 224,
+      "merged_at": "2026-09-20T16:12:15Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-token-debug-client-20260920",
+      "sha": "0269884d37c221eeeb5df819a322a22c4f913504",
+      "merged_pr": 225,
+      "merged_at": "2026-09-20T16:46:29Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-token-validation-flow-20260920",
+      "sha": "63cdd3910a36dba4914d4e08361037ea35602d08",
+      "merged_pr": 226,
+      "merged_at": "2026-09-20T16:59:08Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-waba-assignment-endpoint-20260920",
+      "sha": "07287dcd5ae728215a7652f3a4cff2621e892df6",
+      "merged_pr": 236,
+      "merged_at": "2026-09-20T19:43:37Z"
+    },
+    {
+      "branch": "feat/meta-embedded-signup-waba-subscription-endpoint-20260920",
+      "sha": "4c4f1bde2940e84bd842204f79358f900bf49d51",
+      "merged_pr": 239,
+      "merged_at": "2026-09-20T20:25:52Z"
+    },
+    {
+      "branch": "feat/meta-facebook-sdk-loader-20260920",
+      "sha": "3ed7eca93cf9f6c8af699735c4822e92e61f3a4a",
+      "merged_pr": 221,
+      "merged_at": "2026-09-20T15:44:55Z"
+    },
+    {
+      "branch": "feat/meta-manual-activation-control",
+      "sha": "d0c35f354eb9385b755f66d5594759d0775142a9",
+      "merged_pr": 270,
+      "merged_at": "2026-09-21T17:21:07Z"
+    },
+    {
+      "branch": "feat/meta-manual-deactivation-control",
+      "sha": "158c24a40f618fa26c7b4d90d5d2fa9825a66021",
+      "merged_pr": 273,
+      "merged_at": "2026-09-21T17:54:11Z"
+    },
+    {
+      "branch": "feat/meta-phone-candidates-ui",
+      "sha": "702d262fbcfecb78d618514354accb20cfff3ccb",
+      "merged_pr": 256,
+      "merged_at": "2026-09-21T11:00:47Z"
+    },
+    {
+      "branch": "feat/meta-phone-finalize-call",
+      "sha": "07f8537d412560be473b9601658d866c5e8c5f88",
+      "merged_pr": 262,
+      "merged_at": "2026-09-21T12:10:06Z"
+    },
+    {
+      "branch": "feat/meta-phone-pin-ui",
+      "sha": "fe8c649e9f51695b8d7b13c86d1573fae9b05c2f",
+      "merged_pr": 259,
+      "merged_at": "2026-09-21T11:26:43Z"
+    },
+    {
+      "branch": "feat/meta-phone-registration-call",
+      "sha": "7348b833f3025bf744251ecdcfbeef71c4b6d4bd",
+      "merged_pr": 260,
+      "merged_at": "2026-09-21T11:38:26Z"
+    },
+    {
+      "branch": "feat/meta-phone-selection-ui",
+      "sha": "3c04fea2658f34e2de714e80ed6679dc01c453ef",
+      "merged_pr": 257,
+      "merged_at": "2026-09-21T11:09:35Z"
+    },
+    {
+      "branch": "feat/meta-phone-validation-call",
+      "sha": "24426410fd99d00df0fd31d8f605675c41f418a6",
+      "merged_pr": 258,
+      "merged_at": "2026-09-21T11:20:25Z"
+    },
+    {
+      "branch": "feat/meta-restore-enabled-state",
+      "sha": "f68cd0b1e384a5d78404d4a66113ea17e7acaf02",
+      "merged_pr": 271,
+      "merged_at": "2026-09-21T17:34:10Z"
+    },
+    {
+      "branch": "feat/meta-restore-prepared-state",
+      "sha": "c06a92e09a4f3e806b63682321a65d47caa8bd39",
+      "merged_pr": 265,
+      "merged_at": "2026-09-21T14:56:25Z"
+    },
+    {
+      "branch": "feat/meta-show-deactivate-after-activate",
+      "sha": "56615ff393af530b74736938495f1f8cced1742c",
+      "merged_pr": 274,
+      "merged_at": "2026-09-21T17:59:43Z"
+    },
+    {
+      "branch": "feat/meta-test-number-bootstrap",
+      "sha": "52dd5c801a1e0e3a95fdd272ad5769d464692475",
+      "merged_pr": 363,
+      "merged_at": "2026-09-22T19:11:23Z"
+    },
+    {
+      "branch": "feat/meta-waba-config-api-20260920",
+      "sha": "7b8b630cd0c06e026a7b8d2fe4569cbc9b1184e3",
+      "merged_pr": 215,
+      "merged_at": "2026-09-20T14:57:38Z"
+    },
+    {
+      "branch": "feat/meta-waba-persistence-20260920",
+      "sha": "548d542c5ae9b23b42a39b8c2d1a40070ace80ad",
+      "merged_pr": 213,
+      "merged_at": "2026-09-20T14:20:25Z"
+    },
+    {
+      "branch": "feat/meta-waba-phone-discovery-call",
+      "sha": "9e729544a05498e77c20682653c8577bfcab0f60",
+      "merged_pr": 255,
+      "merged_at": "2026-09-21T10:51:36Z"
+    },
+    {
+      "branch": "feat/meta-waba-selection-ui",
+      "sha": "26decdb469b3a48d65592944d2aa2da8632ef268",
+      "merged_pr": 253,
+      "merged_at": "2026-09-21T10:30:43Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-ai-reply-delivery-20260919",
+      "sha": "3229f3f0009c201e1fc227cc2e4c00add0536779",
+      "merged_pr": 197,
+      "merged_at": "2026-09-20T02:43:50Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-architecture-20260919",
+      "sha": "230c1d0b55a6408d4c89b57afa830d33d65b4c99",
+      "merged_pr": 179,
+      "merged_at": "2026-09-19T22:00:40Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-base-config-20260919",
+      "sha": "a44cacc3e12fde4e76fdb522b05010196ca7d273",
+      "merged_pr": 180,
+      "merged_at": "2026-09-19T22:10:45Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-certification-readiness-20260920",
+      "sha": "8c8ff099076b4303bc18d34495b06613372ed69c",
+      "merged_pr": 203,
+      "merged_at": "2026-09-20T04:27:50Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-channel-health-20260920",
+      "sha": "01fbdcfb8646827a4e1d0a07c856484280eb8104",
+      "merged_pr": 202,
+      "merged_at": "2026-09-20T03:53:18Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-error-diagnostics-20260920",
+      "sha": "651bbf6c0098c8987def89cb5e21e0e0acf303d3",
+      "merged_pr": 200,
+      "merged_at": "2026-09-20T03:40:36Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-payload-parser-20260919",
+      "sha": "e8d2aa820547e847252f9ed265beb6766253bc10",
+      "merged_pr": 183,
+      "merged_at": "2026-09-19T22:50:58Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-post-signature-20260919",
+      "sha": "1e3847912b1ad19cb98775ae097356a864e43be5",
+      "merged_pr": 182,
+      "merged_at": "2026-09-19T22:36:09Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-prepared-state",
+      "sha": "89659be98b2928bd33a360f0b25089b59a21887e",
+      "merged_pr": 263,
+      "merged_at": "2026-09-21T12:23:52Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-provider-client-20260919",
+      "sha": "765d21cf6201b46a0fda1ec35869d5f7e364411e",
+      "merged_pr": 189,
+      "merged_at": "2026-09-20T00:44:31Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-provider-shell-20260919",
+      "sha": "7c991f7e62955caa35f78b643847270d31c39177",
+      "merged_pr": 187,
+      "merged_at": "2026-09-20T00:01:14Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-receptionist-20260919",
+      "sha": "ff3b78f2773a34ea4a934d7345fc2bdf51e0980c",
+      "merged_pr": 185,
+      "merged_at": "2026-09-19T23:48:40Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-status-callbacks-20260920",
+      "sha": "77fcacb5798ff0005909cc4a5c1d27405d9dbb9f",
+      "merged_pr": 199,
+      "merged_at": "2026-09-20T03:27:25Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-tenant-activation-20260919",
+      "sha": "fe6715f3273849af66c843a9651be51352582846",
+      "merged_pr": 195,
+      "merged_at": "2026-09-20T02:07:45Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-tenant-config-api-20260919",
+      "sha": "8f8a74c7c233a4e7c723e2e1e835e089234f7192",
+      "merged_pr": 191,
+      "merged_at": "2026-09-20T01:44:25Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-tenant-credentials-20260919",
+      "sha": "778bd229c4757deef95ffb8f417a930c0dc5d2b8",
+      "merged_pr": 190,
+      "merged_at": "2026-09-20T00:54:58Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-tenant-deactivation-20260919",
+      "sha": "22090ed93f3edac734c0046fe88475d5a85cc352",
+      "merged_pr": 196,
+      "merged_at": "2026-09-20T02:16:15Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-tenant-routing-20260919",
+      "sha": "ac2a0fcab5ef9bc87367326e3534867916b65eec",
+      "merged_pr": 184,
+      "merged_at": "2026-09-19T23:09:48Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-tenant-status-api-20260919",
+      "sha": "a0bfeb262aa8bd0617d246a4ad802f253cfc2d5a",
+      "merged_pr": 194,
+      "merged_at": "2026-09-20T01:54:40Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-text-http-20260919",
+      "sha": "2847c98b20b31026348b5a1052f961c19b8c1a5c",
+      "merged_pr": 188,
+      "merged_at": "2026-09-20T00:28:48Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-usage-metering-20260920",
+      "sha": "e46f828ae6b53a5dde10830362cc9add8fed8773",
+      "merged_pr": 201,
+      "merged_at": "2026-09-20T03:45:57Z"
+    },
+    {
+      "branch": "feat/meta-whatsapp-webhook-verification-20260919",
+      "sha": "5f1d3c99ca33f5f46622df75de96f0a61d90a122",
+      "merged_pr": 181,
+      "merged_at": "2026-09-19T22:26:51Z"
+    },
+    {
+      "branch": "feat/mi-negocio-nav-20260918",
+      "sha": "1f1653d8a0155851a361b95c425d0e8ee9b48bc3",
+      "merged_pr": 155,
+      "merged_at": "2026-09-19T00:38:54Z"
+    },
+    {
+      "branch": "feat/multi-provider-voice-edge",
+      "sha": "b475896a8fbfec4d2fef022fb3fde76927733d60",
+      "merged_pr": 46,
+      "merged_at": "2026-09-12T15:32:07Z"
+    },
+    {
+      "branch": "feat/nonfinancial-operation-retention",
+      "sha": "6e62746da5bcd1979f378eafd705994f9b13b403",
+      "merged_pr": 331,
+      "merged_at": "2026-09-22T06:31:33Z"
+    },
+    {
+      "branch": "feat/omnichannel-audio-payment-continuity",
+      "sha": "516aaf5ea18df78af67bc273d0a97df52ec024a0",
+      "merged_pr": 396,
+      "merged_at": "2026-09-23T19:56:14Z"
+    },
+    {
+      "branch": "feat/omnichannel-commerce-v1",
+      "sha": "7ce9d8b62199d9f90239c4590f33b212c723fa36",
+      "merged_pr": 485,
+      "merged_at": "2026-09-27T16:58:23Z"
+    },
+    {
+      "branch": "feat/onboarding-business-capabilities-20260918",
+      "sha": "b0365acaea3b5a60c3be3c89f4fa5db6535ba537",
+      "merged_pr": 156,
+      "merged_at": "2026-09-19T00:54:01Z"
+    },
+    {
+      "branch": "feat/onboarding-business-capabilities-ui-20260918",
+      "sha": "d767b84084c920763b5122fefbd3679e6ef24333",
+      "merged_pr": 157,
+      "merged_at": "2026-09-19T01:33:35Z"
+    },
+    {
+      "branch": "feat/operation-retention-legal-hold",
+      "sha": "ab3bdd2812d3cf74c79ea060f226c93e70311292",
+      "merged_pr": 338,
+      "merged_at": "2026-09-22T07:37:12Z"
+    },
+    {
+      "branch": "feat/operations-certification-v1",
+      "sha": "02292a148ce04b7410bc2f8f3993b07ac2953a97",
+      "merged_pr": 70,
+      "merged_at": "2026-09-13T18:28:37Z"
+    },
+    {
+      "branch": "feat/outbound-message-content-retention",
+      "sha": "bddf13c73c8e9c7d0e6d313f678bb9e54f0654c9",
+      "merged_pr": 334,
+      "merged_at": "2026-09-22T07:04:24Z"
+    },
+    {
+      "branch": "feat/outbound-retention-legal-hold",
+      "sha": "55e527040a44d11469cd3a65c98a5ba4ecc14696",
+      "merged_pr": 340,
+      "merged_at": "2026-09-22T07:59:50Z"
+    },
+    {
+      "branch": "feat/owner-commercial-dashboard-v1",
+      "sha": "6e1b544ff6bf3ed8f98b6740f42518a5e6aac2c9",
+      "merged_pr": 579,
+      "merged_at": "2026-09-27T22:08:05Z"
+    },
+    {
+      "branch": "feat/owner-commercial-pipeline-v1",
+      "sha": "e0e1f536592e9c38c854a360ca3f5b8110eeb171",
+      "merged_pr": 518,
+      "merged_at": "2026-09-27T07:05:07Z"
+    },
+    {
+      "branch": "feat/owner-internal-surface-separation-v1",
+      "sha": "496cf181d7f7ba28a5ddbc259587b40a0576c7ae",
+      "merged_pr": 566,
+      "merged_at": "2026-09-27T21:56:30Z"
+    },
+    {
+      "branch": "feat/payment-operations-admin",
+      "sha": "0bf91979765ed3b10e1cd11ccf1e7ea865d5c94e",
+      "merged_pr": 442,
+      "merged_at": "2026-09-26T13:20:30Z"
+    },
+    {
+      "branch": "feat/performance-cost-engine-v5",
+      "sha": "591f4e5aee80378ce629c8974f19bdfa25d43ad0",
+      "merged_pr": 514,
+      "merged_at": "2026-09-27T16:58:22Z"
+    },
+    {
+      "branch": "feat/phone-setup-clean",
+      "sha": "430a5e30a18090a3e36ca1f917a5fb5b24003984",
+      "merged_pr": 67,
+      "merged_at": "2026-09-13T16:58:52Z"
+    },
+    {
+      "branch": "feat/pilot-launch-control",
+      "sha": "d1a3a6446367417ab7e7085733c1bab96a71880d",
+      "merged_pr": 446,
+      "merged_at": "2026-09-26T14:30:35Z"
+    },
+    {
+      "branch": "feat/pilot-metrics-dashboard",
+      "sha": "dc4b470d0d31ce3ead5c68539ae12ca83774f314",
+      "merged_pr": 445,
+      "merged_at": "2026-09-26T14:06:55Z"
+    },
+    {
+      "branch": "feat/pilot-readiness-dashboard",
+      "sha": "79f26575b0b228cccb9a7f9fc6a1a04b3b8e8661",
+      "merged_pr": 444,
+      "merged_at": "2026-09-26T13:54:06Z"
+    },
+    {
+      "branch": "feat/platform-assisted-business-provisioning",
+      "sha": "51df0d1c7441e22e74009ef9362e2be311d5e29c",
+      "merged_pr": 455,
+      "merged_at": "2026-09-26T17:05:46Z"
+    },
+    {
+      "branch": "feat/platform-certification-run-endpoint-v1",
+      "sha": "cc90f32408eb99b29da0fd38333b7304f79b5c89",
+      "merged_pr": 546,
+      "merged_at": "2026-09-27T20:14:48Z"
+    },
+    {
+      "branch": "feat/premium-petrol-motion-typography-v4",
+      "sha": "783afe0436c43ca695e309d5ce10d68f85eeb0b5",
+      "merged_pr": 736,
+      "merged_at": "2026-10-05T05:17:55Z"
+    },
+    {
+      "branch": "feat/preset-presentation-suggestions-20260918",
+      "sha": "44330419f5d617b6851e4877aa215a0d0a4060a9",
+      "merged_pr": 158,
+      "merged_at": "2026-09-19T02:00:43Z"
+    },
+    {
+      "branch": "feat/public-booking-portal",
+      "sha": "88ff6f7fe8387c1929424dcfa0686082736b6b10",
+      "merged_pr": 726,
+      "merged_at": "2026-10-03T06:26:55Z"
+    },
+    {
+      "branch": "feat/public-landing-motion-assets",
+      "sha": "da9ebeb5e1bbaff1e7844271891c8916ebc7a736",
+      "merged_pr": 678,
+      "merged_at": "2026-10-01T06:16:45Z"
+    },
+    {
+      "branch": "feat/quote-selected-product",
+      "sha": "589740ae7c7da7bc211f00512981a287b3edbcfb",
+      "merged_pr": 420,
+      "merged_at": "2026-09-24T06:21:07Z"
+    },
+    {
+      "branch": "feat/react-agenda-conversations-integration",
+      "sha": "74d43c2d339337feec751bc545c2c225f3ffc85e",
+      "merged_pr": 712,
+      "merged_at": "2026-10-02T19:11:10Z"
+    },
+    {
+      "branch": "feat/react-business-import-migration",
+      "sha": "c585ac23fa43bd49c3df4dba03a30878d28fc07c",
+      "merged_pr": 744,
+      "merged_at": "2026-10-06T05:10:57Z"
+    },
+    {
+      "branch": "feat/react-frontend-foundation",
+      "sha": "06d2ca48b798c22957a53f7a346c739688716bcb",
+      "merged_pr": 690,
+      "merged_at": "2026-10-02T00:39:05Z"
+    },
+    {
+      "branch": "feat/react-home-migration",
+      "sha": "86f178437da4422beb5ed52431201eca5a65adad",
+      "merged_pr": 711,
+      "merged_at": "2026-10-02T20:30:48Z"
+    },
+    {
+      "branch": "feat/react-internal-operations-migration",
+      "sha": "dcb9e80e92bce2230d258295fdc4ce5b200fb95e",
+      "merged_pr": 743,
+      "merged_at": "2026-10-06T03:57:51Z"
+    },
+    {
+      "branch": "feat/react-inventory-migration",
+      "sha": "a0b20573bf131b0b4c470b980151a87e50e29c07",
+      "merged_pr": 698,
+      "merged_at": "2026-10-02T09:12:08Z"
+    },
+    {
+      "branch": "feat/react-invite-migration",
+      "sha": "87cc1d3ea8cfb138d3730f9ad35fe75f7135f114",
+      "merged_pr": 747,
+      "merged_at": "2026-10-06T11:21:18Z"
+    },
+    {
+      "branch": "feat/react-orders-operations-migration",
+      "sha": "8deef89f54bc7d98a978d7f57833d564c9fc7766",
+      "merged_pr": 710,
+      "merged_at": "2026-10-02T20:52:53Z"
+    },
+    {
+      "branch": "feat/react-plan-billing-management",
+      "sha": "77b2c12f4476415bde9a2e87c988966ccc775ff5",
+      "merged_pr": 737,
+      "merged_at": "2026-10-05T07:25:12Z"
+    },
+    {
+      "branch": "feat/react-platform-console-migration",
+      "sha": "d8419c5a08991fe81fe00a24576f57096950e6ff",
+      "merged_pr": 746,
+      "merged_at": "2026-10-06T07:59:41Z"
+    },
+    {
+      "branch": "feat/react-pricing-migration",
+      "sha": "b528d8b2314111af991c0f8aee7c9c9d8b150a64",
+      "merged_pr": 749,
+      "merged_at": "2026-10-06T19:44:49Z"
+    },
+    {
+      "branch": "feat/react-public-entry-migration",
+      "sha": "7a8235c91a382354d60a7c4eb94edc18b7bd7100",
+      "merged_pr": 750,
+      "merged_at": "2026-10-06T23:28:13Z"
+    },
+    {
+      "branch": "feat/react-sales-landing",
+      "sha": "9cc35892b9a0b0515d9e24807962c4c92bc2979a",
+      "merged_pr": 748,
+      "merged_at": "2026-10-06T15:24:27Z"
+    },
+    {
+      "branch": "feat/react-settings-migration",
+      "sha": "af7ecef6cb5d5a5d79a8de405ba21a015f38a9ee",
+      "merged_pr": 708,
+      "merged_at": "2026-10-02T19:35:39Z"
+    },
+    {
+      "branch": "feat/react-simulator-migration",
+      "sha": "097ad47900f4286f69dee4e419b8869be52dfccb",
+      "merged_pr": 742,
+      "merged_at": "2026-10-05T21:27:19Z"
+    },
+    {
+      "branch": "feat/receptionist-simulator",
+      "sha": "41247b714f14abd333e7c723a070e5e27b310da9",
+      "merged_pr": 34,
+      "merged_at": "2026-09-11T16:41:24Z"
+    },
+    {
+      "branch": "feat/recepvoz-public-site-20260919",
+      "sha": "92b2021cb627c0aa272d74ffd2a021fc85310db7",
+      "merged_pr": 177,
+      "merged_at": "2026-09-19T19:32:27Z"
+    },
+    {
+      "branch": "feat/resolve-showcase-ordinal-selection",
+      "sha": "93f2d36c197322299759ca95b298c657e3b86081",
+      "merged_pr": 417,
+      "merged_at": "2026-09-24T05:31:56Z"
+    },
+    {
+      "branch": "feat/retire-legacy-settings-surface",
+      "sha": "946878f8667d95f6541ba27ffaefe3d5dfce832b",
+      "merged_pr": 740,
+      "merged_at": "2026-10-05T17:26:49Z"
+    },
+    {
+      "branch": "feat/safe-operation-retry-engine",
+      "sha": "c2d93e12137f1ac3a3309fe8045d783f7a74d829",
+      "merged_pr": 94,
+      "merged_at": "2026-09-15T13:54:10Z"
+    },
+    {
+      "branch": "feat/sales-funnel",
+      "sha": "c74a013bc23c2ec4bee96d74877e4c95f68bb09d",
+      "merged_pr": 82,
+      "merged_at": "2026-09-14T15:57:47Z"
+    },
+    {
+      "branch": "feat/sales-ready-omnichannel",
+      "sha": "b76b9c717c21e3d37c80e83d37ed7be2c67b540c",
+      "merged_pr": 80,
+      "merged_at": "2026-09-14T14:55:13Z"
+    },
+    {
+      "branch": "feat/seductive-chilean-voice",
+      "sha": "bc74ae2d36d873740ec4af721bff1f1a0d9ce976",
+      "merged_pr": 481,
+      "merged_at": "2026-09-27T01:07:20Z"
+    },
+    {
+      "branch": "feat/self-guided-business-activation",
+      "sha": "06703381a1a80f29f075d14d81ed11e2ee772282",
+      "merged_pr": 450,
+      "merged_at": "2026-09-26T15:50:22Z"
+    },
+    {
+      "branch": "feat/self-healing-reconciliation-v6",
+      "sha": "30d6282b760879904ad05da1670ab9c777d67457",
+      "merged_pr": 534,
+      "merged_at": "2026-09-27T17:48:11Z"
+    },
+    {
+      "branch": "feat/self-service-ai-agent-v1",
+      "sha": "1abba0263f337442b588932ac6cbbd1bd36f17de",
+      "merged_pr": 64,
+      "merged_at": "2026-09-13T16:41:11Z"
+    },
+    {
+      "branch": "feat/self-service-onboarding",
+      "sha": "ddcdd93a50a8d1a458d5bb4728c6ffb3dd41454f",
+      "merged_pr": 19,
+      "merged_at": "2026-09-10T09:15:56Z"
+    },
+    {
+      "branch": "feat/settings-schedule-exceptions",
+      "sha": "83fe9bfe347aa34a7ed1e261292cb86f4a27c1c4",
+      "merged_pr": 325,
+      "merged_at": "2026-09-22T05:29:01Z"
+    },
+    {
+      "branch": "feat/showcase-order-payment-journey",
+      "sha": "0c7ddd6b8c06e03be4b7cbd16bc6cca3449571b2",
+      "merged_pr": 421,
+      "merged_at": "2026-09-24T06:49:48Z"
+    },
+    {
+      "branch": "feat/showcase-product-selection",
+      "sha": "5b0fb4b3e42393d4e469d938c0433d8e992ff4f8",
+      "merged_pr": 418,
+      "merged_at": "2026-09-24T05:52:34Z"
+    },
+    {
+      "branch": "feat/sprint4-openai-realtime",
+      "sha": "53fade78fde6a11edeb934dba3c317ab0581276b",
+      "merged_pr": 2,
+      "merged_at": "2026-09-09T20:44:26Z"
+    },
+    {
+      "branch": "feat/strong-human-handoff",
+      "sha": "04fe95e00f6f4cddb90249e955aabef3302f2a07",
+      "merged_pr": 96,
+      "merged_at": "2026-09-15T15:25:24Z"
+    },
+    {
+      "branch": "feat/sulafat-production-voice-v2",
+      "sha": "268bc75a601e1a0302d3e8b02481506283717e8e",
+      "merged_pr": 535,
+      "merged_at": "2026-09-27T17:35:26Z"
+    },
+    {
+      "branch": "feat/team-access-v2",
+      "sha": "605cc44c032b8f68bd062ceb16826b76a9ba63cc",
+      "merged_pr": 672,
+      "merged_at": "2026-10-01T03:30:14Z"
+    },
+    {
+      "branch": "feat/team-invitations",
+      "sha": "cebd73e0804e43c4f93f2f1821b88a9cfddb85a0",
+      "merged_pr": 451,
+      "merged_at": "2026-09-26T16:17:39Z"
+    },
+    {
+      "branch": "feat/team-members-onboarding-visibility",
+      "sha": "931b93382828f76f9c3251ad8ca8bc0ca72c3b2c",
+      "merged_pr": 452,
+      "merged_at": "2026-09-26T16:37:46Z"
+    },
+    {
+      "branch": "feat/trial-generative-voice",
+      "sha": "c21a3c8565d5cc2e4a5a4ebb48e2c0f170dd880d",
+      "merged_pr": 11,
+      "merged_at": "2026-09-10T01:12:37Z"
+    },
+    {
+      "branch": "feat/trial-outbound",
+      "sha": "cf49aea5e669ac339675f6505629f9d078a24d1a",
+      "merged_pr": 5,
+      "merged_at": "2026-09-09T22:41:13Z"
+    },
+    {
+      "branch": "feat/trial-voice-mode",
+      "sha": "24f8d4a75c172b1bd97aa1eb91da4a121b39a8ef",
+      "merged_pr": 4,
+      "merged_at": "2026-09-09T22:29:48Z"
+    },
+    {
+      "branch": "feat/universal-booking-operation",
+      "sha": "1b641b788be900ec404372b8cfed7e813201cec4",
+      "merged_pr": 88,
+      "merged_at": "2026-09-15T00:59:45Z"
+    },
+    {
+      "branch": "feat/universal-business-operations",
+      "sha": "16caac1ba4f59b0440d2957fa4a91cf0d7f4acfd",
+      "merged_pr": 86,
+      "merged_at": "2026-09-15T00:17:24Z"
+    },
+    {
+      "branch": "feat/universal-delivery-operation",
+      "sha": "fde4a48d5f210853c1311f602439aa37ca6e0542",
+      "merged_pr": 89,
+      "merged_at": "2026-09-15T01:18:55Z"
+    },
+    {
+      "branch": "feat/universal-operation-engine",
+      "sha": "fab3dffa28f80e4c3eac49918dba8f762fcacb2f",
+      "merged_pr": 87,
+      "merged_at": "2026-09-15T00:39:44Z"
+    },
+    {
+      "branch": "feat/universal-operation-event-log",
+      "sha": "8d472cdd0d7c67daf54826d975d8d776bb5fb946",
+      "merged_pr": 92,
+      "merged_at": "2026-09-15T11:28:02Z"
+    },
+    {
+      "branch": "feat/universal-payment-foundation",
+      "sha": "581719bfc8c63d3387a767c5ca7b7c818eb9b68f",
+      "merged_pr": 90,
+      "merged_at": "2026-09-15T10:31:02Z"
+    },
+    {
+      "branch": "feat/usage-cost-margin-guard",
+      "sha": "db8aba3ae70331cd57ec2d9a90572825c9e7fa42",
+      "merged_pr": 675,
+      "merged_at": "2026-10-01T04:44:34Z"
+    },
+    {
+      "branch": "feat/v1-operations-core",
+      "sha": "4f0087571ecbf3e5c60718609a32798c945c2efa",
+      "merged_pr": 27,
+      "merged_at": "2026-09-11T11:59:21Z"
+    },
+    {
+      "branch": "feat/v33-omnichannel-core",
+      "sha": "576fd627e09c07aba0839f948f9af02381ed32a5",
+      "merged_pr": 98,
+      "merged_at": "2026-09-15T16:10:02Z"
+    },
+    {
+      "branch": "feat/v34-outbound-messaging",
+      "sha": "9cccdaddf6279e6e1a6013fb37fe4746a3f5b9c0",
+      "merged_pr": 99,
+      "merged_at": "2026-09-15T16:23:19Z"
+    },
+    {
+      "branch": "feat/v35-universal-confirmation",
+      "sha": "a0865bf7c718e6fc5cef7d88c8960f2d5b67983a",
+      "merged_pr": 100,
+      "merged_at": "2026-09-15T18:56:56Z"
+    },
+    {
+      "branch": "feat/v36-exactly-once-hardening",
+      "sha": "6dcf1a5a1d8cd4a3df594700c6c7832dc2bf5e1a",
+      "merged_pr": 101,
+      "merged_at": "2026-09-15T20:08:46Z"
+    },
+    {
+      "branch": "feat/v37-persistent-job-outbox",
+      "sha": "16d81b9bf3f78b190416af161f0c6d399fde6211",
+      "merged_pr": 102,
+      "merged_at": "2026-09-15T20:43:07Z"
+    },
+    {
+      "branch": "feat/v38-calendar-meeting-integrations",
+      "sha": "0b87c10edd3c3963eeb4939106508a106c0fa1de",
+      "merged_pr": 103,
+      "merged_at": "2026-09-15T21:33:37Z"
+    },
+    {
+      "branch": "feat/v39-observability",
+      "sha": "6c012c31ebefe42f7fc77076ceda1e723bc70373",
+      "merged_pr": 104,
+      "merged_at": "2026-09-15T21:47:14Z"
+    },
+    {
+      "branch": "feat/v40-postgresql-rls",
+      "sha": "afe240458de051517510a2a0e422ed99aecc94f1",
+      "merged_pr": 105,
+      "merged_at": "2026-09-16T01:47:04Z"
+    },
+    {
+      "branch": "feat/v41-usage-cost-metering",
+      "sha": "c459f16668323b93e84e62c77bed416a3c70f2b2",
+      "merged_pr": 106,
+      "merged_at": "2026-09-16T09:20:25Z"
+    },
+    {
+      "branch": "feat/v42-plan-entitlements-billing",
+      "sha": "59b9634e6746ed115344311cf736a59bab9035dd",
+      "merged_pr": 107,
+      "merged_at": "2026-09-16T18:59:43Z"
+    },
+    {
+      "branch": "feat/voice-bakeoff-harness-v1",
+      "sha": "c8fbccb14e01c0518ba97e151884abdf2d97bb3b",
+      "merged_pr": 524,
+      "merged_at": "2026-09-27T14:50:23Z"
+    },
+    {
+      "branch": "feat/voice-booking-management",
+      "sha": "63dc15fbae5dbb4254590cece7192f7a3e503303",
+      "merged_pr": 14,
+      "merged_at": "2026-09-10T07:00:59Z"
+    },
+    {
+      "branch": "feat/voice-finalist-conversation-v1",
+      "sha": "d4fd0272b7c2bc93f692ec49c2c29dca0327931d",
+      "merged_pr": 530,
+      "merged_at": "2026-09-27T16:24:03Z"
+    },
+    {
+      "branch": "feat/voice-profiles-v1",
+      "sha": "b58e077e69213b3a10fd0b1d5120634b45219772",
+      "merged_pr": 69,
+      "merged_at": "2026-09-13T18:19:33Z"
+    },
+    {
+      "branch": "feat/voice-whatsapp-handoff",
+      "sha": "afd4b7d27c327c6e0a3e000099678a9ee7a1a3c6",
+      "merged_pr": 443,
+      "merged_at": "2026-09-26T13:38:08Z"
+    },
+    {
+      "branch": "feat/whatsapp-async-text-worker",
+      "sha": "90ac2d8e6ee31f8ecec22d54a4792d79e8469b8c",
+      "merged_pr": 402,
+      "merged_at": "2026-09-23T23:32:44Z"
+    },
+    {
+      "branch": "feat/whatsapp-audio-durable",
+      "sha": "d5f8b5165c84ec01f559e0fadce3857949552cdf",
+      "merged_pr": 404,
+      "merged_at": "2026-09-24T00:56:16Z"
+    },
+    {
+      "branch": "feat/whatsapp-durable-inbound-primitives",
+      "sha": "49175cfd8dc1921281dbeb51891eb7d32ae520b8",
+      "merged_pr": 401,
+      "merged_at": "2026-09-23T22:39:02Z"
+    },
+    {
+      "branch": "feat/young-chilean-female-voice-v1",
+      "sha": "342e7bf91a69ebd21ecde96c7eaa90cbd1ade741",
+      "merged_pr": 515,
+      "merged_at": "2026-09-27T07:04:28Z"
+    },
+    {
+      "branch": "feature/voice-whatsapp-continuity",
+      "sha": "fcecd25e86471bd058a60729714e782d77c96ffe",
+      "merged_pr": 117,
+      "merged_at": "2026-09-17T13:08:35Z"
+    },
+    {
+      "branch": "fix-booking-contract-clean",
+      "sha": "e58e8cbe556f0cd89a5cbdc1dac32b63bb1bd808",
+      "merged_pr": 53,
+      "merged_at": "2026-09-13T03:30:51Z"
+    },
+    {
+      "branch": "fix-certification-backend-guard",
+      "sha": "5b67373a42c7a68e24c9a2ae4151ccbbc60808fe",
+      "merged_pr": 54,
+      "merged_at": "2026-09-13T03:45:13Z"
+    },
+    {
+      "branch": "fix/agenda-canonical-navigation",
+      "sha": "f25965a9d455718e412971b16a494c935d83e88b",
+      "merged_pr": 714,
+      "merged_at": "2026-10-02T20:10:09Z"
+    },
+    {
+      "branch": "fix/agenda-next-reservation-clock",
+      "sha": "2657bb40a277d686eccf4a112598c95fa92b80e1",
+      "merged_pr": 692,
+      "merged_at": "2026-10-01T23:20:05Z"
+    },
+    {
+      "branch": "fix/audio-provider-observability",
+      "sha": "d406f9bd0f33ea82aaed5530fada526d28fcf0f2",
+      "merged_pr": 412,
+      "merged_at": "2026-09-24T03:11:18Z"
+    },
+    {
+      "branch": "fix/audio-rate-limit-backoff",
+      "sha": "1734de57db5f9bbe61856dd1eebe1c1de6d6476f",
+      "merged_pr": 413,
+      "merged_at": "2026-09-24T03:20:34Z"
+    },
+    {
+      "branch": "fix/audit-business-config-mutations",
+      "sha": "839a84c575eca3145f21b050bbb7aa9d7c6f163b",
+      "merged_pr": 322,
+      "merged_at": "2026-09-22T05:05:04Z"
+    },
+    {
+      "branch": "fix/audit-certification-clear-on-existing-phone-update",
+      "sha": "8606e74c3819976776cfc43503907344d2803e1a",
+      "merged_pr": 295,
+      "merged_at": "2026-09-21T21:58:31Z"
+    },
+    {
+      "branch": "fix/audit-certification-clear-on-meta-config-replace",
+      "sha": "3fffec397bd7bf9b6268441a3e2fefea11bf5f98",
+      "merged_pr": 297,
+      "merged_at": "2026-09-21T22:13:51Z"
+    },
+    {
+      "branch": "fix/audit-certification-clear-on-phone-deactivation",
+      "sha": "3c612d082708717b0271698d2d8a244a1ff7f16f",
+      "merged_pr": 294,
+      "merged_at": "2026-09-21T21:29:40Z"
+    },
+    {
+      "branch": "fix/audit-certification-clear-on-phone-detach",
+      "sha": "b2a664863b7ae2974977a46b0cbd647410bbe5b0",
+      "merged_pr": 296,
+      "merged_at": "2026-09-21T22:04:35Z"
+    },
+    {
+      "branch": "fix/auth-hero-1280-responsive",
+      "sha": "6115bff367ee7b71b7327c117c276b00c734ebe1",
+      "merged_pr": 658,
+      "merged_at": "2026-09-29T23:41:06Z"
+    },
+    {
+      "branch": "fix/auth-hero-text-wrap",
+      "sha": "c374b27c25aa29106d147c10e82a61d26d8f4677",
+      "merged_pr": 656,
+      "merged_at": "2026-09-29T22:25:42Z"
+    },
+    {
+      "branch": "fix/availability-next-slots",
+      "sha": "6ce378953305a66877d62f9be7914ca78152094e",
+      "merged_pr": 476,
+      "merged_at": "2026-09-26T23:48:55Z"
+    },
+    {
+      "branch": "fix/backend-booking-conversation-state",
+      "sha": "4aa02d27aa6a46006f9116821ad487e4936e2128",
+      "merged_pr": 500,
+      "merged_at": "2026-09-27T04:25:55Z"
+    },
+    {
+      "branch": "fix/booking-confirmation-concurrency-release-v1",
+      "sha": "4c4b61332151cc4af93e3daa5f184c74d7d1ae98",
+      "merged_pr": 602,
+      "merged_at": "2026-09-27T23:12:17Z"
+    },
+    {
+      "branch": "fix/booking-confirmation-time-safe-20260918",
+      "sha": "90d0c69b581edbb320f7f57ef7c8b9b86289ed3e",
+      "merged_pr": 163,
+      "merged_at": "2026-09-19T02:27:16Z"
+    },
+    {
+      "branch": "fix/booking-confirmation-wording",
+      "sha": "edb57186d41c02786cb4ef5999208fa643099d77",
+      "merged_pr": 482,
+      "merged_at": "2026-09-27T01:22:31Z"
+    },
+    {
+      "branch": "fix/booking-drawer-explicit-focus-20260919",
+      "sha": "99fb0bfdb8be3a537291f2f531d8140c953fce66",
+      "merged_pr": 192,
+      "merged_at": "2026-09-20T01:18:08Z"
+    },
+    {
+      "branch": "fix/booking-drawer-focus-final-20260920",
+      "sha": "62575dfb100e7c8382de7d543e110c6c6325d7c6",
+      "merged_pr": 212,
+      "merged_at": "2026-09-20T05:43:34Z"
+    },
+    {
+      "branch": "fix/booking-drawer-focus-race-20260919",
+      "sha": "a990867d194c20e758727b0187ea45688eb80191",
+      "merged_pr": 193,
+      "merged_at": "2026-09-20T01:38:26Z"
+    },
+    {
+      "branch": "fix/booking-drawer-focus-restore-20260919",
+      "sha": "e793dd3194306d7b73b8907a1779c62f1681caf2",
+      "merged_pr": 186,
+      "merged_at": "2026-09-19T23:43:17Z"
+    },
+    {
+      "branch": "fix/booking-drawer-focus-stability-20260920",
+      "sha": "839edd2cb51c55798b706bc05c8d690b956511d7",
+      "merged_pr": 204,
+      "merged_at": "2026-09-20T04:22:52Z"
+    },
+    {
+      "branch": "fix/booking-focus-event-order-20260920",
+      "sha": "cd3bd384cc36f6b0156fd8f927972f12e469a3f2",
+      "merged_pr": 214,
+      "merged_at": "2026-09-20T14:15:31Z"
+    },
+    {
+      "branch": "fix/booking-focus-post-event-20260920",
+      "sha": "06eab1742e993d9f8314f1aad797b24fdeff5f37",
+      "merged_pr": 216,
+      "merged_at": "2026-09-20T14:40:28Z"
+    },
+    {
+      "branch": "fix/booking-operation-lifecycle",
+      "sha": "55f7e0587545c6489fb3d670b06219fca1d2f7f2",
+      "merged_pr": 410,
+      "merged_at": "2026-09-24T02:49:01Z"
+    },
+    {
+      "branch": "fix/business-profile-e164-phone-constraint",
+      "sha": "73c870af14e2cac776d5e82cb8361eea77d662ad",
+      "merged_pr": 458,
+      "merged_at": "2026-09-26T17:29:56Z"
+    },
+    {
+      "branch": "fix/call-flag-479",
+      "sha": "bf059d17492a1be7e4d3497c46b3e6dc02ee7c5c",
+      "merged_pr": 479,
+      "merged_at": "2026-09-27T00:33:37Z"
+    },
+    {
+      "branch": "fix/certification-created-booking-entity",
+      "sha": "d83b50b24db88af52f80ac07443c5e4a33af4d20",
+      "merged_pr": 469,
+      "merged_at": "2026-09-26T21:44:04Z"
+    },
+    {
+      "branch": "fix/certification-forbidden-target-guard",
+      "sha": "89b26bc2c4a781c276a609b9539030b09db69a10",
+      "merged_pr": 462,
+      "merged_at": "2026-09-26T18:37:22Z"
+    },
+    {
+      "branch": "fix/certification-gate-lazy-db",
+      "sha": "03d22cb8aea9f8502ddebcbe318f3e307497f208",
+      "merged_pr": 74,
+      "merged_at": "2026-09-14T03:57:04Z"
+    },
+    {
+      "branch": "fix/certification-review-hook-2",
+      "sha": "6af6ca99bb24e91b1bcf8013f1e198a68abec525",
+      "merged_pr": 478,
+      "merged_at": "2026-09-27T00:22:57Z"
+    },
+    {
+      "branch": "fix/certification-state-machine",
+      "sha": "eba5a758757b96e9e38d3dd15c284605858c7746",
+      "merged_pr": 50,
+      "merged_at": "2026-09-13T02:24:05Z"
+    },
+    {
+      "branch": "fix/certification-token-path-v1",
+      "sha": "955738eba68fc85381817f923f18c9225305014d",
+      "merged_pr": 547,
+      "merged_at": "2026-09-27T20:29:26Z"
+    },
+    {
+      "branch": "fix/commercial-realtime-voice",
+      "sha": "33be7d5c9e01e5b6962a89b15ca268a3ec14c44d",
+      "merged_pr": 30,
+      "merged_at": "2026-09-11T13:11:38Z"
+    },
+    {
+      "branch": "fix/commercial-sandbox-generated-catalog-id",
+      "sha": "3f86d34ac2eaf4fb5a9db7bb38c25c12a826c714",
+      "merged_pr": 427,
+      "merged_at": "2026-09-26T03:00:17Z"
+    },
+    {
+      "branch": "fix/commercial-sandbox-generated-journey-id",
+      "sha": "a8dc28bdfa17050a9f5b922ca4fd910152f69ec3",
+      "merged_pr": 428,
+      "merged_at": "2026-09-26T03:08:29Z"
+    },
+    {
+      "branch": "fix/console-formdata-null",
+      "sha": "ed00446e32424497e5824b7bbf20777db5c02a76",
+      "merged_pr": 21,
+      "merged_at": "2026-09-10T10:54:31Z"
+    },
+    {
+      "branch": "fix/console-interaction-audit",
+      "sha": "52cfc6b13a55fd12d90531474d5731ad6949aeb7",
+      "merged_pr": 22,
+      "merged_at": "2026-09-10T11:42:13Z"
+    },
+    {
+      "branch": "fix/contextual-no-closes-call",
+      "sha": "20e2fb46fa6f03a508156d40da2ac31147c90a35",
+      "merged_pr": 491,
+      "merged_at": "2026-09-27T02:58:32Z"
+    },
+    {
+      "branch": "fix/conversation-quality",
+      "sha": "31e03d153a3dfced0a28f69b075aab79c8e60b76",
+      "merged_pr": 73,
+      "merged_at": "2026-09-14T03:51:12Z"
+    },
+    {
+      "branch": "fix/conversation-sales-hangup",
+      "sha": "2b58b5e10231e1b37e691859c6a87c01ec97828e",
+      "merged_pr": 77,
+      "merged_at": "2026-09-14T12:22:37Z"
+    },
+    {
+      "branch": "fix/customer-anonymize-referenced-identities",
+      "sha": "85d5dfd7856255d96813f7bb5491a420df9d5af7",
+      "merged_pr": 359,
+      "merged_at": "2026-09-22T15:48:20Z"
+    },
+    {
+      "branch": "fix/dashboard-motion-scroll-e2e",
+      "sha": "81ef444cc157fca3ac9c827eebfb8e590e58fd9f",
+      "merged_pr": 721,
+      "merged_at": "2026-10-02T21:52:10Z"
+    },
+    {
+      "branch": "fix/delete-reregister-whatsapp-20260919",
+      "sha": "89abbc95769e0350387cf3afd87d87cf571bc0e9",
+      "merged_pr": 173,
+      "merged_at": "2026-09-19T14:12:40Z"
+    },
+    {
+      "branch": "fix/delivery-terminal-operation-status",
+      "sha": "63eece767f581de34a160b65e619ac4ae6b5316a",
+      "merged_pr": 355,
+      "merged_at": "2026-09-22T10:35:08Z"
+    },
+    {
+      "branch": "fix/explicit-end-call-intent",
+      "sha": "dd85a85872c6b35ed735d782f7bb2ded7b87ec9c",
+      "merged_pr": 487,
+      "merged_at": "2026-09-27T02:26:14Z"
+    },
+    {
+      "branch": "fix/extreme-chilean-no-repeat-close",
+      "sha": "30a4643e9d34ff76f6dff0697fd68c77ed95adf0",
+      "merged_pr": 494,
+      "merged_at": "2026-09-27T03:29:57Z"
+    },
+    {
+      "branch": "fix/feminine-max-seductive-voice",
+      "sha": "46ce95228e6e19a2adec701c63414f36f6b00161",
+      "merged_pr": 484,
+      "merged_at": "2026-09-27T01:46:20Z"
+    },
+    {
+      "branch": "fix/final-commercial-hardening-20260929",
+      "sha": "5fa9f17108e769e276214754053b87ee3524bc85",
+      "merged_pr": 653,
+      "merged_at": "2026-09-29T19:50:17Z"
+    },
+    {
+      "branch": "fix/force-whatsapp-reregister-20260919",
+      "sha": "7c6bcba872b90dd9201444c5944c971f1e9c6c31",
+      "merged_pr": 172,
+      "merged_at": "2026-09-19T14:03:38Z"
+    },
+    {
+      "branch": "fix/frontend-agenda-navigation",
+      "sha": "0930b1240888b027db053ff21a4522dabe5994e6",
+      "merged_pr": 685,
+      "merged_at": "2026-10-01T18:40:14Z"
+    },
+    {
+      "branch": "fix/gemini-binary-live-frames",
+      "sha": "c9391d4f4985fdbc118f5d5d5aad3958edb11915",
+      "merged_pr": 48,
+      "merged_at": "2026-09-12T20:58:50Z"
+    },
+    {
+      "branch": "fix/gemini-certification-client-content",
+      "sha": "594d86dfde2449abfd21e515869939c1231b11cf",
+      "merged_pr": 467,
+      "merged_at": "2026-09-26T20:32:40Z"
+    },
+    {
+      "branch": "fix/gemini-certification-generation-boundary",
+      "sha": "5004007a3c015591629c524ac15e61ac957dd9fe",
+      "merged_pr": 470,
+      "merged_at": "2026-09-26T21:55:16Z"
+    },
+    {
+      "branch": "fix/gemini-certification-post-tool-boundary",
+      "sha": "bcd4427809acf33139d94c973ea3eb5d524c1965",
+      "merged_pr": 471,
+      "merged_at": "2026-09-26T22:06:36Z"
+    },
+    {
+      "branch": "fix/gemini-certification-tool-advance",
+      "sha": "cbf09e692097935ac0f0914a9095fabfdcde9145",
+      "merged_pr": 466,
+      "merged_at": "2026-09-26T20:21:17Z"
+    },
+    {
+      "branch": "fix/gemini-certification-turn-boundary",
+      "sha": "2f740a31524b25c70b677c918e31c6088314e025",
+      "merged_pr": 468,
+      "merged_at": "2026-09-26T21:33:38Z"
+    },
+    {
+      "branch": "fix/gemini-function-response-id",
+      "sha": "016aac85d2c38b7976c859dc13070ad4c6f4fcc3",
+      "merged_pr": 368,
+      "merged_at": "2026-09-22T20:39:17Z"
+    },
+    {
+      "branch": "fix/gemini-live-certification-input",
+      "sha": "07ca25385c0db221790e9d788f0f8a411c9f63d4",
+      "merged_pr": 51,
+      "merged_at": "2026-09-13T02:40:06Z"
+    },
+    {
+      "branch": "fix/gemini-live-tool-schema",
+      "sha": "37add428f552a00b5bc3a136b643e42716ec3ffd",
+      "merged_pr": 463,
+      "merged_at": "2026-09-26T18:46:41Z"
+    },
+    {
+      "branch": "fix/gemini-messaging-timeout-retry",
+      "sha": "17eb5fd3913134f9f095282052ca6cc8d043d377",
+      "merged_pr": 386,
+      "merged_at": "2026-09-23T15:45:59Z"
+    },
+    {
+      "branch": "fix/gemini-semantic-read-dedupe",
+      "sha": "99aec9ef3dfa4f79e2b17feb72acaae9e607f732",
+      "merged_pr": 473,
+      "merged_at": "2026-09-26T22:59:18Z"
+    },
+    {
+      "branch": "fix/gemini-whatsapp-429-openai-failover",
+      "sha": "53b1f0e817f40acac7b18f7087672c1629e20bbd",
+      "merged_pr": 405,
+      "merged_at": "2026-09-24T01:23:00Z"
+    },
+    {
+      "branch": "fix/gemini-whatsapp-timeout",
+      "sha": "24ea2df436dba3bfc97d76d929931098a65ba362",
+      "merged_pr": 393,
+      "merged_at": "2026-09-23T18:38:41Z"
+    },
+    {
+      "branch": "fix/ground-availability-explanations",
+      "sha": "a6ded09401f73668f1ba0d8a31c648d4c7f1a4b1",
+      "merged_pr": 497,
+      "merged_at": "2026-09-27T03:58:41Z"
+    },
+    {
+      "branch": "fix/hide-technical-business-settings-20260919",
+      "sha": "06b6c63f5f866d3dc70648b1120f5d5c3d0d915f",
+      "merged_pr": 169,
+      "merged_at": "2026-09-19T13:15:13Z"
+    },
+    {
+      "branch": "fix/home-drawer-focus-trap-20260918",
+      "sha": "6ce043be6db15668da9b01815a836c31239dbe64",
+      "merged_pr": 159,
+      "merged_at": "2026-09-19T01:55:46Z"
+    },
+    {
+      "branch": "fix/home-quick-actions-operational",
+      "sha": "644210f5c3abf03f70a9a8d86db355f80c770aaf",
+      "merged_pr": 725,
+      "merged_at": "2026-10-03T04:57:41Z"
+    },
+    {
+      "branch": "fix/home-settings-canonical-fallback",
+      "sha": "a0c92198fa83f3de8148412886b62c4ba26104c4",
+      "merged_pr": 739,
+      "merged_at": "2026-10-05T08:57:20Z"
+    },
+    {
+      "branch": "fix/lead-terminal-operation-status",
+      "sha": "0bd63357a385f11324094ecc56a92388ce856a62",
+      "merged_pr": 349,
+      "merged_at": "2026-09-22T09:29:48Z"
+    },
+    {
+      "branch": "fix/leda-global-fallback-migration",
+      "sha": "db10befd46123ee4194a565e930a9fdcb479186d",
+      "merged_pr": 523,
+      "merged_at": "2026-09-27T13:46:39Z"
+    },
+    {
+      "branch": "fix/live-only-voice-routing",
+      "sha": "35e2430ac439e0e94d0827e1809bb4c03d98eae5",
+      "merged_pr": 43,
+      "merged_at": "2026-09-12T08:57:16Z"
+    },
+    {
+      "branch": "fix/log-durable-job-outcomes",
+      "sha": "9d90b20ff7e6b1c2eb4d81079d4beef0fa7f5168",
+      "merged_pr": 409,
+      "merged_at": "2026-09-24T02:29:02Z"
+    },
+    {
+      "branch": "fix/mercadopago-bootstrap-webhook-before-secrets",
+      "sha": "2aa1c9cd5a6a0924a0e767e48d637baa7a1843f2",
+      "merged_pr": 423,
+      "merged_at": "2026-09-25T21:43:11Z"
+    },
+    {
+      "branch": "fix/mercadopago-error-details",
+      "sha": "a7d47f22fff31d8466513db732da3800f5204890",
+      "merged_pr": 433,
+      "merged_at": "2026-09-26T04:22:10Z"
+    },
+    {
+      "branch": "fix/mercadopago-idempotency-key",
+      "sha": "a8bc95e3711d01f410b512a5768f1dfbc58d5c2f",
+      "merged_pr": 432,
+      "merged_at": "2026-09-26T04:12:49Z"
+    },
+    {
+      "branch": "fix/mercadopago-integer-total-amount",
+      "sha": "b2279f0afa55e62e2f1627ac0d11ce8cb14a5051",
+      "merged_pr": 435,
+      "merged_at": "2026-09-26T04:45:39Z"
+    },
+    {
+      "branch": "fix/mercadopago-status-diagnostics",
+      "sha": "9ffc5d5eb79b8eea54ea122a3999fe381f11e3ce",
+      "merged_pr": 437,
+      "merged_at": "2026-09-26T05:55:41Z"
+    },
+    {
+      "branch": "fix/meta-admin-only-connect-control",
+      "sha": "ace5e3e4e5e9f726c5d491283d282267cc486774",
+      "merged_pr": 279,
+      "merged_at": "2026-09-21T18:40:51Z"
+    },
+    {
+      "branch": "fix/meta-admin-only-state-controls",
+      "sha": "031bc8d93c09492cabc00429c16ec2a82b84bd5c",
+      "merged_pr": 278,
+      "merged_at": "2026-09-21T18:29:47Z"
+    },
+    {
+      "branch": "fix/meta-connect-handler-fail-closed",
+      "sha": "1dd2c21c89426cbd65feacd31a40836238eb4340",
+      "merged_pr": 282,
+      "merged_at": "2026-09-21T19:48:29Z"
+    },
+    {
+      "branch": "fix/meta-deletion-url-fallback",
+      "sha": "8dc682afe126277afd8facfa3e58787b668fa39c",
+      "merged_pr": 365,
+      "merged_at": "2026-09-22T19:54:36Z"
+    },
+    {
+      "branch": "fix/meta-embedded-signup-resolve-phone-record-20260920",
+      "sha": "972c7bca2ca4d12121e02c581eb9934cade02767",
+      "merged_pr": 251,
+      "merged_at": "2026-09-21T00:49:11Z"
+    },
+    {
+      "branch": "fix/meta-embedded-write-handlers-fail-closed",
+      "sha": "bef8dc075404e475749b286bfaea064346527e99",
+      "merged_pr": 283,
+      "merged_at": "2026-09-21T19:54:11Z"
+    },
+    {
+      "branch": "fix/meta-hide-preflight-while-enabled",
+      "sha": "6d5ba02b9220ac5e45ab8fd46d59b691c08d5dcc",
+      "merged_pr": 276,
+      "merged_at": "2026-09-21T18:13:01Z"
+    },
+    {
+      "branch": "fix/meta-hide-prepared-after-activation",
+      "sha": "fe5f85921f7830bd1da54d2dd8882bd43eca5b1e",
+      "merged_pr": 275,
+      "merged_at": "2026-09-21T18:06:06Z"
+    },
+    {
+      "branch": "fix/meta-operator-state-controls-fail-closed",
+      "sha": "895971706bc2e5e3e2dae966be79782880dae806",
+      "merged_pr": 281,
+      "merged_at": "2026-09-21T19:37:35Z"
+    },
+    {
+      "branch": "fix/meta-outbound-replay",
+      "sha": "fa0c2ee51e9da488e15e59221f2d1c01377b5a31",
+      "merged_pr": 369,
+      "merged_at": "2026-09-22T21:14:20Z"
+    },
+    {
+      "branch": "fix/meta-pin-finalize-e2e",
+      "sha": "0d81902b88ee8ccd98938adc5ca90ab95621781f",
+      "merged_pr": 738,
+      "merged_at": "2026-10-05T07:52:18Z"
+    },
+    {
+      "branch": "fix/meta-waba-subscription-fail-open",
+      "sha": "2d94df08181a95102e593f5561017feeb888d07d",
+      "merged_pr": 390,
+      "merged_at": "2026-09-23T17:44:23Z"
+    },
+    {
+      "branch": "fix/meta-waba-webhook-subscription",
+      "sha": "cef9481f6dc14c1f47435c834c1655477574b030",
+      "merged_pr": 366,
+      "merged_at": "2026-09-22T20:12:11Z"
+    },
+    {
+      "branch": "fix/meta-whatsapp-concurrent-idempotency",
+      "sha": "3ebc8611db90ab957a5caf6c0fd9ca32290a9743",
+      "merged_pr": 380,
+      "merged_at": "2026-09-23T05:02:27Z"
+    },
+    {
+      "branch": "fix/meta-whatsapp-ingress-canonicalization",
+      "sha": "7391d4f652a572ce01d8388d67c99a2c6cb732a1",
+      "merged_pr": 379,
+      "merged_at": "2026-09-23T04:38:24Z"
+    },
+    {
+      "branch": "fix/meta-whatsapp-pilot-certification-cycle",
+      "sha": "17b16ffd2f69d90d491194fcfb78115cb10d0d9e",
+      "merged_pr": 361,
+      "merged_at": "2026-09-22T16:26:25Z"
+    },
+    {
+      "branch": "fix/meta-whatsapp-provider-phone-canonicalization",
+      "sha": "5065aacac9d830034b4f6c9cf8293a1c8a2dd1b7",
+      "merged_pr": 378,
+      "merged_at": "2026-09-23T04:08:39Z"
+    },
+    {
+      "branch": "fix/migrate-legacy-despina-to-leda",
+      "sha": "98fdb3349596a5d645b01282adacda18d4c9ad07",
+      "merged_pr": 521,
+      "merged_at": "2026-09-27T07:16:37Z"
+    },
+    {
+      "branch": "fix/natural-receptionist-dialogue",
+      "sha": "0092fcfed7705cbaf8ee8217d74c991887add83d",
+      "merged_pr": 39,
+      "merged_at": "2026-09-11T22:47:12Z"
+    },
+    {
+      "branch": "fix/openai-env-fallback",
+      "sha": "fc773be31c7da86b9d1dbed5bb934061bb445ed4",
+      "merged_pr": 10,
+      "merged_at": "2026-09-10T00:05:09Z"
+    },
+    {
+      "branch": "fix/openai-webhook-bootstrap-probe",
+      "sha": "84929be9bde1c8384f771f538a7658845719c66a",
+      "merged_pr": 41,
+      "merged_at": "2026-09-11T23:36:11Z"
+    },
+    {
+      "branch": "fix/order-terminal-operation-status",
+      "sha": "aae37c158dc01087e7ae99c15f3dccec6fe3d964",
+      "merged_pr": 353,
+      "merged_at": "2026-09-22T10:14:47Z"
+    },
+    {
+      "branch": "fix/orders-canonical-navigation",
+      "sha": "efcc45a9da5294267d591d0a6e19b2b85581ad3f",
+      "merged_pr": 718,
+      "merged_at": "2026-10-02T21:31:12Z"
+    },
+    {
+      "branch": "fix/outbound-test-call",
+      "sha": "61d865c522f5029b588ef6445e034406c7eee505",
+      "merged_pr": 36,
+      "merged_at": "2026-09-11T21:14:41Z"
+    },
+    {
+      "branch": "fix/outbound-test-no-auto-hangup",
+      "sha": "5639c2739cc7e3a9fa230b2968ef3b3cc55e4ded",
+      "merged_pr": 72,
+      "merged_at": "2026-09-14T02:27:19Z"
+    },
+    {
+      "branch": "fix/payment-provider-idempotency-by-revision",
+      "sha": "9dc24b1e10e6681f7ee360cf82c059ad87428d0a",
+      "merged_pr": 436,
+      "merged_at": "2026-09-26T05:07:52Z"
+    },
+    {
+      "branch": "fix/payment-status-detail-diagnostic",
+      "sha": "d6ad4f64f03ed66ddcc92f9669910d735f15988f",
+      "merged_pr": 438,
+      "merged_at": "2026-09-26T06:20:11Z"
+    },
+    {
+      "branch": "fix/payment-status-reconciliation-fallback",
+      "sha": "7f29807726252ec0a33630e0478d70ae5d90e3f7",
+      "merged_pr": 425,
+      "merged_at": "2026-09-26T02:33:05Z"
+    },
+    {
+      "branch": "fix/pilot-start-requires-activation",
+      "sha": "410897660e63f0a2a468ae87e9235a50c2f31787",
+      "merged_pr": 448,
+      "merged_at": "2026-09-26T15:08:43Z"
+    },
+    {
+      "branch": "fix/preserve-payment-journey-linkage",
+      "sha": "408b2e39796a4aecd0ff1d86515be41441621695",
+      "merged_pr": 441,
+      "merged_at": "2026-09-26T07:16:01Z"
+    },
+    {
+      "branch": "fix/public-legal-pages",
+      "sha": "b409d895f064650ee6b85adcc4db107e76c0db5d",
+      "merged_pr": 321,
+      "merged_at": "2026-09-22T04:11:01Z"
+    },
+    {
+      "branch": "fix/pwa-api-routing",
+      "sha": "3a471eade06bd1ae4b5faa9bff1fdea1f1900063",
+      "merged_pr": 254,
+      "merged_at": "2026-09-21T10:23:33Z"
+    },
+    {
+      "branch": "fix/quote-terminal-operation-status",
+      "sha": "17e371e529147bc5cf9e6a0f3eb0ca0ad4e4c3fa",
+      "merged_pr": 351,
+      "merged_at": "2026-09-22T09:51:40Z"
+    },
+    {
+      "branch": "fix/react-home-nullable-analytics",
+      "sha": "7d0c7c05936d2cb9d2fd3c91900a24fa888f3778",
+      "merged_pr": 722,
+      "merged_at": "2026-10-02T22:09:52Z"
+    },
+    {
+      "branch": "fix/react-settings-cutover-rescue",
+      "sha": "1d5891270a38f51c7f4e7994e2612dce6f608ae0",
+      "merged_pr": 729,
+      "merged_at": "2026-10-03T07:08:32Z"
+    },
+    {
+      "branch": "fix/readiness-respects-agent-state",
+      "sha": "9f00e66e9f4d36c851ce8816bdffe3b9f0a3f249",
+      "merged_pr": 65,
+      "merged_at": "2026-09-13T16:45:13Z"
+    },
+    {
+      "branch": "fix/real-cert-cleanup-provider-call-guard",
+      "sha": "17c2825bc24f1a8fd85f29082fee33d80c4a9e3a",
+      "merged_pr": 511,
+      "merged_at": "2026-09-27T06:13:56Z"
+    },
+    {
+      "branch": "fix/realtime-stream-handshake",
+      "sha": "db39025cabbba0a778f8ba310f97a9520a9ad721",
+      "merged_pr": 38,
+      "merged_at": "2026-09-11T22:10:29Z"
+    },
+    {
+      "branch": "fix/recepvoz-public-brand-only-20260919",
+      "sha": "cf9b347b244c757fa142f4aa2af35fd10b77b244",
+      "merged_pr": 178,
+      "merged_at": "2026-09-19T21:48:51Z"
+    },
+    {
+      "branch": "fix/recover-missing-provider-order",
+      "sha": "bf47f635b5d56456efe1588fe61b435fcd50198a",
+      "merged_pr": 439,
+      "merged_at": "2026-09-26T06:31:45Z"
+    },
+    {
+      "branch": "fix/refresh-existing-payment-confirmation",
+      "sha": "5dde7606504328961c6f53ff64202fde52f6147f",
+      "merged_pr": 434,
+      "merged_at": "2026-09-26T04:36:25Z"
+    },
+    {
+      "branch": "fix/refresh-existing-payment-runner",
+      "sha": "c7ea81bc73187f2a82897486a5d0dfeec4826f9d",
+      "merged_pr": 440,
+      "merged_at": "2026-09-26T06:38:15Z"
+    },
+    {
+      "branch": "fix/remove-conversations-section-20260919",
+      "sha": "1a6d09b32a2498ab0819f59b423945a84c2785da",
+      "merged_pr": 165,
+      "merged_at": "2026-09-19T03:11:40Z"
+    },
+    {
+      "branch": "fix/remove-operations-section-20260919",
+      "sha": "98c52f35d6eeef4e7f5ef2e4911157e29fc2c15e",
+      "merged_pr": 166,
+      "merged_at": "2026-09-19T03:35:12Z"
+    },
+    {
+      "branch": "fix/remove-unsupported-gemini-proactivity",
+      "sha": "5a463a796bdb44c883aa64571cc0b8b09bb9633d",
+      "merged_pr": 475,
+      "merged_at": "2026-09-26T23:24:49Z"
+    },
+    {
+      "branch": "fix/repair-whatsapp-booking-time",
+      "sha": "fa9b5bff422c046da39d363bd549c8ecd8ea934e",
+      "merged_pr": 407,
+      "merged_at": "2026-09-24T01:51:35Z"
+    },
+    {
+      "branch": "fix/request-resolved-operation-status",
+      "sha": "d940e24ae8742769258e985e3ca8c81497d3ba21",
+      "merged_pr": 347,
+      "merged_at": "2026-09-22T09:14:22Z"
+    },
+    {
+      "branch": "fix/simplify-business-settings-20260919",
+      "sha": "4283b23d32010588f268b167adafd14f754c8da0",
+      "merged_pr": 167,
+      "merged_at": "2026-09-19T03:52:19Z"
+    },
+    {
+      "branch": "fix/simulator-gemini-provider-fallback",
+      "sha": "c92ae049b68652bff7cb79b0d0c9c9aabe493ee8",
+      "merged_pr": 461,
+      "merged_at": "2026-09-26T18:08:07Z"
+    },
+    {
+      "branch": "fix/simulator-openai-429-recovery",
+      "sha": "436458aa1083c5b7cb4d826fc26e26b62fe37001",
+      "merged_pr": 460,
+      "merged_at": "2026-09-26T17:57:37Z"
+    },
+    {
+      "branch": "fix/stt-model-fallbacks",
+      "sha": "718eee941f5a25ab2bb1c5c673b6bde071f36b2e",
+      "merged_pr": 414,
+      "merged_at": "2026-09-24T03:40:13Z"
+    },
+    {
+      "branch": "fix/trial-booking-management-flow",
+      "sha": "f844bb55bd1d10aa11caf426c0fb10d320fd5c38",
+      "merged_pr": 15,
+      "merged_at": "2026-09-10T07:36:30Z"
+    },
+    {
+      "branch": "fix/trial-e2e-observability",
+      "sha": "971bb566f248d989abe99d143bf6424b82d30d5f",
+      "merged_pr": 13,
+      "merged_at": "2026-09-10T02:33:55Z"
+    },
+    {
+      "branch": "fix/trial-fast-mutating-tool-ack",
+      "sha": "d678673f56cc3c17db3aa459e8b81e93dc95d863",
+      "merged_pr": 16,
+      "merged_at": "2026-09-10T07:53:23Z"
+    },
+    {
+      "branch": "fix/trial-immediate-tool-replies",
+      "sha": "e62bcba075261371cc6bc4ac3093f7bd57f2c81f",
+      "merged_pr": 17,
+      "merged_at": "2026-09-10T08:24:23Z"
+    },
+    {
+      "branch": "fix/trial-open-webhook",
+      "sha": "79feb1e4f3e741e3340d23d742fb2199fb3ebe31",
+      "merged_pr": 7,
+      "merged_at": "2026-09-09T22:58:33Z"
+    },
+    {
+      "branch": "fix/trial-phone-claim-history-safe",
+      "sha": "e1b90fd31a722c766dbe0b29566acc3b7b94b2bd",
+      "merged_pr": 28,
+      "merged_at": "2026-09-11T11:57:27Z"
+    },
+    {
+      "branch": "fix/trial-phone-ownership",
+      "sha": "d5db0169556b38b81ace1a8de0251ad8f68fcbeb",
+      "merged_pr": 24,
+      "merged_at": "2026-09-10T15:08:09Z"
+    },
+    {
+      "branch": "fix/trial-phone-self-claim",
+      "sha": "dedef6363454e3c3274e428d12b95f449b0f1d01",
+      "merged_pr": 25,
+      "merged_at": "2026-09-11T01:22:52Z"
+    },
+    {
+      "branch": "fix/trial-provider-fallback",
+      "sha": "5cb608a3068fc00b2369f8d9e94dd27d5fb64621",
+      "merged_pr": 9,
+      "merged_at": "2026-09-09T23:51:06Z"
+    },
+    {
+      "branch": "fix/trial-webhook-auth",
+      "sha": "759b7d487ad755b3f22830f73acafc0cc05ff426",
+      "merged_pr": 6,
+      "merged_at": "2026-09-09T22:51:17Z"
+    },
+    {
+      "branch": "fix/trim-business-settings-20260919",
+      "sha": "a1a9ebed0b659672c4cb7188bd8afc3ba3ddf667",
+      "merged_pr": 168,
+      "merged_at": "2026-09-19T04:08:21Z"
+    },
+    {
+      "branch": "fix/tryout-outbound-signature",
+      "sha": "371811a3861a4db141c6e9eac7b9da712f8388d4",
+      "merged_pr": 37,
+      "merged_at": "2026-09-11T21:35:36Z"
+    },
+    {
+      "branch": "fix/twilio-certification-system-scope",
+      "sha": "401da42ff25fcd2c39e960b4b9a40e61fb106369",
+      "merged_pr": 694,
+      "merged_at": "2026-10-01T23:43:06Z"
+    },
+    {
+      "branch": "fix/twilio-startup-reject-meta-sender",
+      "sha": "7a5c005e3ae1b6d417ac237f5295d1ddaa69b4a8",
+      "merged_pr": 300,
+      "merged_at": "2026-09-21T23:26:21Z"
+    },
+    {
+      "branch": "fix/twilio-whatsapp-filter-provider-sender",
+      "sha": "0fb502f67186f36ff5765aaa026fbe723afb34a2",
+      "merged_pr": 299,
+      "merged_at": "2026-09-21T23:16:50Z"
+    },
+    {
+      "branch": "fix/v32-handoff-contract-tests",
+      "sha": "8373ae521f3148c478d9f88f5049447631eefea2",
+      "merged_pr": 97,
+      "merged_at": "2026-09-15T15:41:03Z"
+    },
+    {
+      "branch": "fix/verified-whatsapp-omnichannel-rebind",
+      "sha": "c7a467d3a261117691a50f297288e87368f7a7e4",
+      "merged_pr": 376,
+      "merged_at": "2026-09-23T02:01:10Z"
+    },
+    {
+      "branch": "fix/voice-bakeoff-deterministic-completion",
+      "sha": "ec06b47897a732674675e7cb4e6b23fe99a4e6e9",
+      "merged_pr": 525,
+      "merged_at": "2026-09-27T15:15:04Z"
+    },
+    {
+      "branch": "fix/voice-booking-flow-20260917",
+      "sha": "682444391c1a36a07c1e39d80f3e51da75c2b13f",
+      "merged_pr": 134,
+      "merged_at": "2026-09-17T22:25:28Z"
+    },
+    {
+      "branch": "fix/voice-commercial-certification",
+      "sha": "a4f44c0e7fe9a231c9ed29b28232739f2cd7517e",
+      "merged_pr": 575,
+      "merged_at": "2026-09-27T22:05:27Z"
+    },
+    {
+      "branch": "fix/voice-concise-sales-20260917",
+      "sha": "9fa24e1a9ebc2aae7ef060e8906da5c4202568a3",
+      "merged_pr": 132,
+      "merged_at": "2026-09-17T21:49:41Z"
+    },
+    {
+      "branch": "fix/voice-gemini-38-live-20260917",
+      "sha": "ca4afc90e870e4b721a00814afe49c19c4223c4f",
+      "merged_pr": 133,
+      "merged_at": "2026-09-17T22:14:13Z"
+    },
+    {
+      "branch": "fix/voice-low-latency-barge-in-v1",
+      "sha": "7b76346e7adec177476f52512bb3c0a9514c1c9f",
+      "merged_pr": 507,
+      "merged_at": "2026-09-27T05:23:01Z"
+    },
+    {
+      "branch": "fix/voice-speed-repeat-chilean-stability",
+      "sha": "547cd8d72978a7a19fd23ad3a5bd9b8473e15970",
+      "merged_pr": 490,
+      "merged_at": "2026-09-27T02:43:32Z"
+    },
+    {
+      "branch": "fix/voice-tenant-tool-publication",
+      "sha": "e19096a84b95db00f1af6d3c2da6fd5bef4fbf95",
+      "merged_pr": 83,
+      "merged_at": "2026-09-14T22:46:28Z"
+    },
+    {
+      "branch": "fix/whatsapp-ai-rate-limit-fallback",
+      "sha": "8308322f41f5f378754272b787d7bd920b5597b6",
+      "merged_pr": 367,
+      "merged_at": "2026-09-22T20:27:27Z"
+    },
+    {
+      "branch": "fix/whatsapp-approval-path-20260918",
+      "sha": "fe063228da01648034ca484fb7f6a261c0e6d7e5",
+      "merged_pr": 145,
+      "merged_at": "2026-09-18T18:00:37Z"
+    },
+    {
+      "branch": "fix/whatsapp-approval-status-poll-20260918",
+      "sha": "d01d7d96b17594463ec8ae9e85e2e849ce218362",
+      "merged_pr": 146,
+      "merged_at": "2026-09-18T18:12:56Z"
+    },
+    {
+      "branch": "fix/whatsapp-audio-resilience",
+      "sha": "c94c48d194f82602e4cfab59d5693b4c333aef4a",
+      "merged_pr": 399,
+      "merged_at": "2026-09-23T21:31:49Z"
+    },
+    {
+      "branch": "fix/whatsapp-audio-transcription-fallback",
+      "sha": "d6110763f93cc65cb968a9505bbddf89b85b5e68",
+      "merged_pr": 397,
+      "merged_at": "2026-09-23T20:09:01Z"
+    },
+    {
+      "branch": "fix/whatsapp-booking-confirmation-guard",
+      "sha": "4f486ce3b246283de07661b5e49d967ed3b56e7a",
+      "merged_pr": 382,
+      "merged_at": "2026-09-23T06:51:10Z"
+    },
+    {
+      "branch": "fix/whatsapp-booking-intent-routing",
+      "sha": "ef230d6e98054c0c940126117d075380c328a638",
+      "merged_pr": 373,
+      "merged_at": "2026-09-23T00:04:19Z"
+    },
+    {
+      "branch": "fix/whatsapp-delivery-observability-20260919",
+      "sha": "64ab0e21a93daafdcbedabd0db149351686053a3",
+      "merged_pr": 170,
+      "merged_at": "2026-09-19T13:41:57Z"
+    },
+    {
+      "branch": "fix/whatsapp-gemini-tool-rounds",
+      "sha": "65de307d9601e717605b667479434357991d08fd",
+      "merged_pr": 394,
+      "merged_at": "2026-09-23T18:53:03Z"
+    },
+    {
+      "branch": "fix/whatsapp-local-booking-time",
+      "sha": "32e9e89be5c58c4f12bf4f41fcb06b9a93c1a459",
+      "merged_pr": 406,
+      "merged_at": "2026-09-24T01:36:45Z"
+    },
+    {
+      "branch": "fix/whatsapp-reregister-63051-20260919",
+      "sha": "696d38fbf22af029e306e530ccfcc321f38bce9c",
+      "merged_pr": 171,
+      "merged_at": "2026-09-19T13:53:53Z"
+    },
+    {
+      "branch": "fix/whatsapp-sandbox-outbound-20260919",
+      "sha": "f87ae9b94248a74621d944dd1fb736012674639f",
+      "merged_pr": 176,
+      "merged_at": "2026-09-19T15:21:35Z"
+    },
+    {
+      "branch": "fix/whatsapp-sandbox-routing-20260919",
+      "sha": "400e8f724cd9ab0c4b6fc27e7c4f45c33c425c79",
+      "merged_pr": 175,
+      "merged_at": "2026-09-19T14:49:05Z"
+    },
+    {
+      "branch": "hardening/booking-tenant-integrity",
+      "sha": "3e0a79c4ea43a8db34263edd7b15ee6391727745",
+      "merged_pr": 696,
+      "merged_at": "2026-10-02T00:59:40Z"
+    },
+    {
+      "branch": "hardening/fail-closed-db-recovery",
+      "sha": "0cb55afa4d23e3e8ec4d2966e53f9749f2a1527f",
+      "merged_pr": 691,
+      "merged_at": "2026-10-01T22:56:25Z"
+    },
+    {
+      "branch": "hardening/payment-tenant-integrity",
+      "sha": "7cae88dbafc91269f19d692d3d28605ca178d23b",
+      "merged_pr": 697,
+      "merged_at": "2026-10-02T01:27:02Z"
+    },
+    {
+      "branch": "integration-recepvoz-certified-stack-v1",
+      "sha": "030e8592e010530a5982938d24aaddd412249bc7",
+      "merged_pr": 528,
+      "merged_at": "2026-09-27T15:38:48Z"
+    },
+    {
+      "branch": "integration/golden-journey-commercial-v1",
+      "sha": "64d9811befb7a2670d615231682714cf73fe1373",
+      "merged_pr": 570,
+      "merged_at": "2026-09-27T22:03:08Z"
+    },
+    {
+      "branch": "integration/rc-onboarding-reconcile-v1",
+      "sha": "7eb067c6bf4c3877ebe55205cce1bdfae27ed429",
+      "merged_pr": 571,
+      "merged_at": "2026-09-27T21:55:49Z"
+    },
+    {
+      "branch": "ops/activate-whatsapp-sender-20260918",
+      "sha": "8c6a4894089aa891b623994d4c6fe8ddd29eb830",
+      "merged_pr": 141,
+      "merged_at": "2026-09-18T17:06:45Z"
+    },
+    {
+      "branch": "ops/configure-twilio-template-events-20260918",
+      "sha": "c8e2add59e491cec7ef281a285e631f345b28806",
+      "merged_pr": 151,
+      "merged_at": "2026-09-18T21:53:19Z"
+    },
+    {
+      "branch": "ops/configure-whatsapp-webhook-20260918",
+      "sha": "00d162dead0f60b43a936eb2b23c26935e213099",
+      "merged_pr": 142,
+      "merged_at": "2026-09-18T17:16:07Z"
+    },
+    {
+      "branch": "ops/diagnose-whatsapp-approval-payload-20260918",
+      "sha": "af6ff124f215292442e680a119e3e0713f26f883",
+      "merged_pr": 148,
+      "merged_at": "2026-09-18T21:21:23Z"
+    },
+    {
+      "branch": "ops/diagnose-whatsapp-template-state-20260918",
+      "sha": "b56b895143b3be7842bb188742348e9630470d3a",
+      "merged_pr": 147,
+      "merged_at": "2026-09-18T21:14:40Z"
+    },
+    {
+      "branch": "ops/inspect-whatsapp-templates-20260918",
+      "sha": "55cfb8153827153dd3c8700fc2952e4f3e814151",
+      "merged_pr": 143,
+      "merged_at": "2026-09-18T17:34:52Z"
+    },
+    {
+      "branch": "ops/one-shot-phone-transfer",
+      "sha": "296e44a21859e9c735d756b7db3f3783dcc512b5",
+      "merged_pr": 71,
+      "merged_at": "2026-09-13T21:54:31Z"
+    },
+    {
+      "branch": "ops/prepare-whatsapp-fallback-template-20260918",
+      "sha": "89520197ddd4959c27814592a14bf733413a2728",
+      "merged_pr": 149,
+      "merged_at": "2026-09-18T21:31:39Z"
+    },
+    {
+      "branch": "ops/purge-pilot-bookings",
+      "sha": "1612092d729d175dc3a4be23e49628d8ab5dfd51",
+      "merged_pr": 395,
+      "merged_at": "2026-09-23T19:20:28Z"
+    },
+    {
+      "branch": "ops/twilio-template-event-stream-webhook-20260918",
+      "sha": "d92b4597af7ba652098bf8442fd89943ca5c1551",
+      "merged_pr": 150,
+      "merged_at": "2026-09-18T21:44:57Z"
+    },
+    {
+      "branch": "ops/whatsapp-production-certification-20260918",
+      "sha": "95d8ebd971e8e488feea9a51e10a735440aa5fc1",
+      "merged_pr": 144,
+      "merged_at": "2026-09-18T17:44:23Z"
+    },
+    {
+      "branch": "p0-call-certification",
+      "sha": "d7ce510ef956c4bd8b059dc13f139bf43d8575d6",
+      "merged_pr": 49,
+      "merged_at": "2026-09-13T01:01:17Z"
+    },
+    {
+      "branch": "p2-commercial-readiness",
+      "sha": "e586c42a966a8879bd93421c8e9d1b9ed417ec88",
+      "merged_pr": 56,
+      "merged_at": "2026-09-13T09:40:21Z"
+    },
+    {
+      "branch": "p2-load-testing",
+      "sha": "84e402a4abaede53a119dd4ecb1ed513c22c93c0",
+      "merged_pr": 57,
+      "merged_at": "2026-09-13T10:37:56Z"
+    },
+    {
+      "branch": "p3-commercial-pricing",
+      "sha": "88ca23f9a044830c886dac32cb0c85c3d77493a5",
+      "merged_pr": 60,
+      "merged_at": "2026-09-13T11:53:02Z"
+    },
+    {
+      "branch": "p3-saas-subscriptions",
+      "sha": "7d3781af09d730a08e9dd66c44e75e74db6290f3",
+      "merged_pr": 59,
+      "merged_at": "2026-09-13T11:36:33Z"
+    },
+    {
+      "branch": "p4-whatsapp-mercadopago",
+      "sha": "38adf644cea1521819b9443200be53643475ab07",
+      "merged_pr": 61,
+      "merged_at": "2026-09-13T12:49:46Z"
+    },
+    {
+      "branch": "p5-distributed-rate-limiting",
+      "sha": "0a151057faffdac049dfe65b9a3f3f9d3ad747e4",
+      "merged_pr": 62,
+      "merged_at": "2026-09-13T13:04:38Z"
+    },
+    {
+      "branch": "p6-self-service-readiness",
+      "sha": "8d75821be082c006236f7a8980629dd174703bc6",
+      "merged_pr": 63,
+      "merged_at": "2026-09-13T15:41:43Z"
+    },
+    {
+      "branch": "perf/backend-db-performance-hardening",
+      "sha": "d92e1f0347169122ee7c686d6f6c2a779834ed1e",
+      "merged_pr": 720,
+      "merged_at": "2026-10-03T05:26:36Z"
+    },
+    {
+      "branch": "perf/latency-certification-readonly-v1",
+      "sha": "6adeeaecb8d6027cd4b5fd02b9d3f8958ce71a0b",
+      "merged_pr": 548,
+      "merged_at": "2026-09-27T21:22:33Z"
+    },
+    {
+      "branch": "perf/skip-rate-limited-openai",
+      "sha": "de2ce16fa6ddfd0bd23bca1797586f7ac834a0d6",
+      "merged_pr": 398,
+      "merged_at": "2026-09-23T20:29:53Z"
+    },
+    {
+      "branch": "perf/voice-latency-v2",
+      "sha": "aead08b7c9a8ec143f18b34d1bca270d18514fa5",
+      "merged_pr": 538,
+      "merged_at": "2026-09-27T18:06:51Z"
+    },
+    {
+      "branch": "perf/voice-tool-latency-budget-v1",
+      "sha": "818b452dc9d0cbb72be1e3e3037b3c6512367c28",
+      "merged_pr": 513,
+      "merged_at": "2026-09-27T06:41:18Z"
+    },
+    {
+      "branch": "pilot/controlled-real-business-v1",
+      "sha": "07ad8162738754b054ead860c3d437712c0f313e",
+      "merged_pr": 541,
+      "merged_at": "2026-09-27T22:25:51Z"
+    },
+    {
+      "branch": "pilot/end-to-end-certification-v1",
+      "sha": "9cb75bf794a9a8af457ac12a2b1c65e1f0c3bfb0",
+      "merged_pr": 539,
+      "merged_at": "2026-09-27T18:30:59Z"
+    },
+    {
+      "branch": "qa/mandatory-quality-ownership",
+      "sha": "9b12ec5e298f058e463a332ae95be618a75a9018",
+      "merged_pr": 704,
+      "merged_at": "2026-10-02T07:19:31Z"
+    },
+    {
+      "branch": "refactor/adaptive-policy",
+      "sha": "507d1bad1b28291fb2ed4bfe31d915fe17f66c89",
+      "merged_pr": 78,
+      "merged_at": "2026-09-14T12:37:45Z"
+    },
+    {
+      "branch": "refactor/provider-independent-voice",
+      "sha": "93cc6400afa382f454765eae944f0d3988198139",
+      "merged_pr": 8,
+      "merged_at": "2026-09-09T23:33:58Z"
+    },
+    {
+      "branch": "refactor/remove-trial-voice-legacy",
+      "sha": "b1ff588cf2ee6a79ccaa93f1adc905aac6707b74",
+      "merged_pr": 44,
+      "merged_at": "2026-09-12T09:22:42Z"
+    },
+    {
+      "branch": "refactor/rename-simulator-model",
+      "sha": "b92e5d3c26f5c1f58f8839943dcfb91a46dfac1f",
+      "merged_pr": 45,
+      "merged_at": "2026-09-12T09:26:04Z"
+    },
+    {
+      "branch": "refactor/retire-legacy-phone-numbers",
+      "sha": "8a1a40b6a73e64fc1eca3bece16be2cf8df1167b",
+      "merged_pr": 745,
+      "merged_at": "2026-10-06T06:35:21Z"
+    },
+    {
+      "branch": "refactor/retire-redundant-legacy-surfaces",
+      "sha": "76e98affd0eb1cf60ba376016c1f6b166326632e",
+      "merged_pr": 741,
+      "merged_at": "2026-10-05T18:15:49Z"
+    },
+    {
+      "branch": "release-recepvoz-certified-stack-v1",
+      "sha": "235edbc80d01eed334aeba5f6e5095926e613607",
+      "merged_pr": 529,
+      "merged_at": "2026-09-27T16:58:21Z"
+    },
+    {
+      "branch": "sales/cph-first-contact-20260926",
+      "sha": "a6986e294bceac03434a1aa384e6233f1f995dfb",
+      "merged_pr": 456,
+      "merged_at": "2026-09-26T17:12:27Z"
+    },
+    {
+      "branch": "sales/first-prospect-route-providencia",
+      "sha": "0b233e830d9ddcb071a36bbaf1bc143e01529ce6",
+      "merged_pr": 109,
+      "merged_at": "2026-09-16T13:16:00Z"
+    },
+    {
+      "branch": "sales/v42-launch-and-next-prospects",
+      "sha": "7ab7eb6e11bc532a8f0d53d72b1f65dad5f13742",
+      "merged_pr": 110,
+      "merged_at": "2026-09-16T19:10:02Z"
+    },
+    {
+      "branch": "security/conversation-state-tenant-integrity-hardening",
+      "sha": "91f049a4a82475a44560637febcf156ebc7de09a",
+      "merged_pr": 703,
+      "merged_at": "2026-10-02T06:06:01Z"
+    },
+    {
+      "branch": "security/delivery-tenant-integrity-hardening",
+      "sha": "1f4a1a08a89a2cc61f4e589630688cb59b19933d",
+      "merged_pr": 700,
+      "merged_at": "2026-10-02T02:54:19Z"
+    },
+    {
+      "branch": "security/final-tenant-integrity-v1",
+      "sha": "28353b8c2793e98e82be9ed243dd24429354fdcd",
+      "merged_pr": 705,
+      "merged_at": "2026-10-02T08:33:34Z"
+    },
+    {
+      "branch": "security/operation-tenant-integrity-hardening",
+      "sha": "e56f31a5c19a80a53e7fb07f199e327e4fce6574",
+      "merged_pr": 701,
+      "merged_at": "2026-10-02T03:51:03Z"
+    },
+    {
+      "branch": "security/order-tenant-integrity-hardening",
+      "sha": "42fc37a33fda095ac2bcb3d633d6dedba577b68a",
+      "merged_pr": 699,
+      "merged_at": "2026-10-02T02:24:20Z"
+    },
+    {
+      "branch": "security/projection-tenant-integrity-hardening",
+      "sha": "8a9d4c35f96b11e3012044ceaa9c3adcb208fdff",
+      "merged_pr": 702,
+      "merged_at": "2026-10-02T05:08:23Z"
+    },
+    {
+      "branch": "test/adaptation-contract",
+      "sha": "8e8ded9e1e0dbcf51f174e7d01e96c4ac3445f21",
+      "merged_pr": 79,
+      "merged_at": "2026-09-14T14:00:26Z"
+    },
+    {
+      "branch": "test/adversarial-hardware-store-v1",
+      "sha": "08ee65641aacf1409cb09fc9fe32f1a84b1f0dcb",
+      "merged_pr": 650,
+      "merged_at": "2026-09-29T15:38:39Z"
+    },
+    {
+      "branch": "test/audio-provider-neutral-routing",
+      "sha": "052a89bbef91a847dcc7640f51b5f7983fedbc9c",
+      "merged_pr": 403,
+      "merged_at": "2026-09-24T00:07:30Z"
+    },
+    {
+      "branch": "test/booking-confirmed-post-commit-log",
+      "sha": "6f3bee5db135088fb462ce73cb86881f29e1a2f6",
+      "merged_pr": 385,
+      "merged_at": "2026-09-23T15:23:11Z"
+    },
+    {
+      "branch": "test/commercial-pilot-rehearsal-v1",
+      "sha": "adfdf8e7fcbf753edeb4ad5d9892b72fc6baf057",
+      "merged_pr": 606,
+      "merged_at": "2026-09-28T00:36:32Z"
+    },
+    {
+      "branch": "test/confirmed-whatsapp-booking-render",
+      "sha": "61b7698feabe5f812ac37656d8c2a3cc9409a48a",
+      "merged_pr": 381,
+      "merged_at": "2026-09-23T06:10:20Z"
+    },
+    {
+      "branch": "test/conversation-certification-pack-v1",
+      "sha": "0ec4e1d8ff04e049f91dfe12e3aebfeaaa6c150b",
+      "merged_pr": 506,
+      "merged_at": "2026-09-27T04:56:24Z"
+    },
+    {
+      "branch": "test/first-fictional-customer-week-v1",
+      "sha": "ff76eac2698187e79e765dbec51630e6293dc5bb",
+      "merged_pr": 608,
+      "merged_at": "2026-09-28T04:07:11Z"
+    },
+    {
+      "branch": "test/frontend-release-candidate-v1",
+      "sha": "3d73320848c7d81956701af6eb60f516f9eb1c80",
+      "merged_pr": 639,
+      "merged_at": "2026-09-29T02:52:43Z"
+    },
+    {
+      "branch": "test/frontend-visual-evidence-gate",
+      "sha": "fb84b969f4f1b766a0db715b7601fd8981defa3f",
+      "merged_pr": 665,
+      "merged_at": "2026-09-30T17:03:49Z"
+    },
+    {
+      "branch": "test/gemini-booking-tool-round-limit",
+      "sha": "33e0d7bb56a3f558c8df5e0eeba3ce76373577e8",
+      "merged_pr": 374,
+      "merged_at": "2026-09-23T00:44:28Z"
+    },
+    {
+      "branch": "test/gemini-live-two-phase-booking",
+      "sha": "dc4c1b5cd7a6922b65d50b6747b926b7ddba5cdf",
+      "merged_pr": 389,
+      "merged_at": "2026-09-23T16:48:59Z"
+    },
+    {
+      "branch": "test/golden-journey-commercial-v1",
+      "sha": "b2d2e00cda88fade9569c276464355f699f548fc",
+      "merged_pr": 576,
+      "merged_at": "2026-09-27T22:05:40Z"
+    },
+    {
+      "branch": "test/inventory-commercial-depletion-certification",
+      "sha": "e96e3b2576e0eac0419b85e77e41f34304fab494",
+      "merged_pr": 604,
+      "merged_at": "2026-09-27T23:12:47Z"
+    },
+    {
+      "branch": "test/meta-activation-no-duplicate-sender-enable-audit",
+      "sha": "cf6f072504a8facca632633a4b15e9f3190bbfa8",
+      "merged_pr": 310,
+      "merged_at": "2026-09-22T02:12:24Z"
+    },
+    {
+      "branch": "test/meta-certification-ambiguous-senders-fail-closed",
+      "sha": "2872cabf636e589597c212e1163f6edb3a4f40bd",
+      "merged_pr": 315,
+      "merged_at": "2026-09-22T02:58:49Z"
+    },
+    {
+      "branch": "test/meta-certification-ignores-twilio-sender",
+      "sha": "2446a48ae15bf961db7a5755e1be1605afb5a016",
+      "merged_pr": 317,
+      "merged_at": "2026-09-22T03:38:58Z"
+    },
+    {
+      "branch": "test/meta-certification-mixed-provider-isolation",
+      "sha": "4b43d273bb504f772ad0f0c7a5eb6ee3454928d8",
+      "merged_pr": 319,
+      "merged_at": "2026-09-22T03:44:39Z"
+    },
+    {
+      "branch": "test/meta-certification-no-duplicate-audit",
+      "sha": "bce50a24315cf9a2c2a01b2564f410824c9bc41a",
+      "merged_pr": 314,
+      "merged_at": "2026-09-22T02:51:59Z"
+    },
+    {
+      "branch": "test/meta-certification-no-sender-fail-closed",
+      "sha": "451bdcb82984f632572cae82751c4061a33be3cf",
+      "merged_pr": 316,
+      "merged_at": "2026-09-22T03:04:40Z"
+    },
+    {
+      "branch": "test/meta-deactivate-no-duplicate-audit",
+      "sha": "d7838b3b0bf15e87457316e547ec3e45e3b73971",
+      "merged_pr": 311,
+      "merged_at": "2026-09-22T02:29:13Z"
+    },
+    {
+      "branch": "test/meta-failed-status-never-certifies",
+      "sha": "15c3b9812392ecfd4acc5770422211b83f42ff25",
+      "merged_pr": 320,
+      "merged_at": "2026-09-22T03:50:32Z"
+    },
+    {
+      "branch": "test/meta-replace-no-false-disable-audits",
+      "sha": "2ebd828d28e93d049b3da9bce48cb1822fa65bd5",
+      "merged_pr": 312,
+      "merged_at": "2026-09-22T02:38:59Z"
+    },
+    {
+      "branch": "test/meta-webhook-public-smoke-20260920",
+      "sha": "11a7f2daa3910a55ff10198709e7bc113d0519e2",
+      "merged_pr": 206,
+      "merged_at": "2026-09-20T04:43:53Z"
+    },
+    {
+      "branch": "test/meta-write-endpoints-admin-contract",
+      "sha": "7d3b5064a3149b1017fba1067c00655413ab5a38",
+      "merged_pr": 284,
+      "merged_at": "2026-09-21T20:03:16Z"
+    },
+    {
+      "branch": "test/operations-browser-e2e",
+      "sha": "3fde16fe2bd514a2fb3a58f3c25c314eaa90fddf",
+      "merged_pr": 29,
+      "merged_at": "2026-09-11T12:08:53Z"
+    },
+    {
+      "branch": "test/reconcile-commercial-readiness-20260929",
+      "sha": "2eca0474b7da5f963761129b07366c928d4b7330",
+      "merged_pr": 647,
+      "merged_at": "2026-09-29T15:36:10Z"
+    },
+    {
+      "branch": "test/saas-billing-commercial-readiness",
+      "sha": "a279f2bf78fc2e0121bf4e26958a1b9627a6a4c1",
+      "merged_pr": 573,
+      "merged_at": "2026-09-27T22:04:52Z"
+    },
+    {
+      "branch": "test/saas-billing-provider-sandbox-certification-v1",
+      "sha": "10627aeefee9c8e3f6015806fd0aec184bc5db9d",
+      "merged_pr": 598,
+      "merged_at": "2026-09-27T22:39:02Z"
+    },
+    {
+      "branch": "test/saas-billing-sandbox-manual-gate-v1",
+      "sha": "8051a0fea7e0519bf77ca5ecb8bb7546feb58d79",
+      "merged_pr": 605,
+      "merged_at": "2026-09-27T23:47:13Z"
+    },
+    {
+      "branch": "test/showcase-selection-e2e",
+      "sha": "78d78b5bacd67ca5c200354c19d434d20b8434f4",
+      "merged_pr": 419,
+      "merged_at": "2026-09-24T06:05:27Z"
+    },
+    {
+      "branch": "test/stabilize-booking-reschedule-focus-race",
+      "sha": "0bc81c703986819570b423920331701a982d7767",
+      "merged_pr": 318,
+      "merged_at": "2026-09-22T03:32:53Z"
+    },
+    {
+      "branch": "test/system-e2e-integration",
+      "sha": "32de658faad6c6c2a5c6f9213eed5565d244e2f0",
+      "merged_pr": 731,
+      "merged_at": "2026-10-05T06:21:01Z"
+    },
+    {
+      "branch": "test/twilio-startup-no-duplicate-activation-audit",
+      "sha": "d7387292825d14f2e003fb19010f995e9ffb438d",
+      "merged_pr": 313,
+      "merged_at": "2026-09-22T02:45:58Z"
+    },
+    {
+      "branch": "test/voice-booking-two-phase-regression",
+      "sha": "38271ce8bf07f34ee9fe76b344b38e26db2747c2",
+      "merged_pr": 388,
+      "merged_at": "2026-09-23T16:30:06Z"
+    },
+    {
+      "branch": "test/wait-for-reschedule-refresh-before-escape",
+      "sha": "87196c5df6e0ae5e737568057b88cbed6c52e14b",
+      "merged_pr": 323,
+      "merged_at": "2026-09-22T04:35:41Z"
+    },
+    {
+      "branch": "test/whatsapp-booking-confirmation-success-path",
+      "sha": "6651d3b7b088be719307c2233eeae4a1283c7943",
+      "merged_pr": 383,
+      "merged_at": "2026-09-23T07:00:29Z"
+    },
+    {
+      "branch": "test/whatsapp-customer-identity",
+      "sha": "d29dc05a175666a7b6cc8f5d0bd88d5b016e5f4b",
+      "merged_pr": 122,
+      "merged_at": "2026-09-17T14:57:59Z"
+    },
+    {
+      "branch": "test/whatsapp-idempotency",
+      "sha": "8933093e6d85adf35e842b8922308a1305091ee0",
+      "merged_pr": 120,
+      "merged_at": "2026-09-17T14:27:48Z"
+    },
+    {
+      "branch": "test/whatsapp-ignore-stale-handoff-history",
+      "sha": "78e9018968e8fc3622053beecf048b9fd148eced",
+      "merged_pr": 377,
+      "merged_at": "2026-09-23T03:45:24Z"
+    },
+    {
+      "branch": "test/whatsapp-inbound-persistence-order",
+      "sha": "464850ddab46fbde6b9810fa6e18d8028231ee76",
+      "merged_pr": 123,
+      "merged_at": "2026-09-17T15:04:22Z"
+    },
+    {
+      "branch": "test/whatsapp-message-extraction",
+      "sha": "25492a483ed8e11b3fa18224c4c35317959f864c",
+      "merged_pr": 119,
+      "merged_at": "2026-09-17T14:10:25Z"
+    },
+    {
+      "branch": "test/whatsapp-outbound-persistence",
+      "sha": "c04d6717309bd6a0749f6db92a2945d793540f2c",
+      "merged_pr": 124,
+      "merged_at": "2026-09-17T16:17:32Z"
+    },
+    {
+      "branch": "test/whatsapp-tenant-resolution",
+      "sha": "3e28ecf8b6817dd222f437f4ff106deb656c392d",
+      "merged_pr": 121,
+      "merged_at": "2026-09-17T14:37:04Z"
+    },
+    {
+      "branch": "test/whatsapp-webhook-signature",
+      "sha": "4a0cacec603e41bcf3f25763fb2cda50baa24866",
+      "merged_pr": 118,
+      "merged_at": "2026-09-17T13:58:38Z"
+    }
+  ]
+}
