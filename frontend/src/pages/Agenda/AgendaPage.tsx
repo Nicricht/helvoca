@@ -20,6 +20,7 @@ import {
   type Customer,
   type ServiceItem
 } from "../../features/agenda/api";
+import { AgendaScheduleFoundation, AgendaViewSwitcher, type AgendaViewMode } from "./AgendaWorkspaceViews";
 import styles from "./AgendaPage.module.css";
 
 type DetailTab = "summary" | "conversation" | "customer" | "activity";
@@ -133,6 +134,7 @@ export function AgendaPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>("summary");
+  const [viewMode, setViewMode] = useState<AgendaViewMode>("week");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createCustomerId, setCreateCustomerId] = useState("");
@@ -427,6 +429,14 @@ export function AgendaPage() {
           </article>
         </section>
 
+        <section className={styles.agendaCommandBar} aria-label="Controles de visualización">
+          <AgendaViewSwitcher value={viewMode} onChange={setViewMode} />
+          <div className={styles.agendaCommandHint}>
+            <span>{viewMode === "week" ? "Semana operativa" : viewMode === "day" ? "Foco del día" : viewMode === "month" ? "Panorama mensual" : "Búsqueda y administración"}</span>
+            <small>Clientes, conversación e historial permanecen en el detalle contextual.</small>
+          </div>
+        </section>
+
         <section className={styles.filters} aria-label="Filtros de Agenda">
           <label className={styles.search}>
             <span className={styles.srOnly}>Buscar reservas</span>
@@ -491,7 +501,7 @@ export function AgendaPage() {
                 <strong>No hay reservas que coincidan.</strong>
                 <span>Prueba con otros filtros o una búsqueda distinta.</span>
               </div>
-            ) : (
+            ) : viewMode === "list" ? (
               <div className={styles.tableWrap}>
                 <table aria-label="Reservas">
                   <thead>
@@ -536,6 +546,15 @@ export function AgendaPage() {
                   </tbody>
                 </table>
               </div>
+            ) : (
+              <AgendaScheduleFoundation
+                view={viewMode}
+                bookings={filtered}
+                customers={customerList}
+                services={serviceList}
+                selectedId={selectedId}
+                onSelect={openBooking}
+              />
             )}
           </section>
 
