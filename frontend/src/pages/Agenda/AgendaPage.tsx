@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { CustomerQuickCreate } from "../../features/agenda/CustomerQuickCreate";
@@ -136,6 +136,11 @@ export function AgendaPage() {
   const [detailTab, setDetailTab] = useState<DetailTab>("summary");
   const [viewMode, setViewMode] = useState<AgendaViewMode>("week");
 
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 620px)");
+    if (mobile.matches) setViewMode(current => current === "week" ? "day" : current);
+  }, []);
+
   const [createOpen, setCreateOpen] = useState(false);
   const [createCustomerId, setCreateCustomerId] = useState("");
   const [createServiceId, setCreateServiceId] = useState("");
@@ -252,6 +257,25 @@ export function AgendaPage() {
     setRescheduleOpen(false);
     setActionError(null);
   }
+
+  function openCreateAt(date = "", time = "") {
+    setCreateOpen(true);
+    setCreateDate(date);
+    setCreateTime(time);
+    setActionError(null);
+    setCreateAvailability("idle");
+  }
+
+  function prepareVisualReschedule(booking: Booking, date: string, time: string) {
+    setSelectedId(booking.id);
+    setDetailTab("summary");
+    setRescheduleDate(date);
+    setRescheduleTime(time);
+    setRescheduleAvailability("idle");
+    setActionError(null);
+    setRescheduleOpen(true);
+  }
+
 
   function closeBooking() {
     setSelectedId(null);
@@ -383,11 +407,7 @@ export function AgendaPage() {
               </button>
             )}
             {canManage && (
-              <button className={styles.primaryButton} type="button" onClick={() => {
-                setCreateOpen(true);
-                setActionError(null);
-                setCreateAvailability("idle");
-              }}>
+              <button className={styles.primaryButton} type="button" onClick={() => openCreateAt()}>
                 + Nueva cita
               </button>
             )}
@@ -553,7 +573,10 @@ export function AgendaPage() {
                 customers={customerList}
                 services={serviceList}
                 selectedId={selectedId}
+                canManage={canManage}
                 onSelect={openBooking}
+                onCreateSlot={openCreateAt}
+                onPrepareReschedule={prepareVisualReschedule}
               />
             )}
           </section>
