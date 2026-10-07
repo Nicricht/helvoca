@@ -1,152 +1,147 @@
 # Repository branch hygiene audit — 2026-10-07
 
-**Status:** Part 1 complete / no refs deleted
-**Repository:** `Nicricht/helvoca`
-**Baseline main:** `0780f372a1ac8963f0e1c937596e4ea20bc4c051`
+**Repository:** `Nicricht/helvoca`  
+**Audit PR:** #752  
+**Audit branch:** `chore/branch-hygiene-20261007`  
+**Baseline main:** `0780f372a1ac8963f0e1c937596e4ea20bc4c051`  
 **FRAME CHANGE:** NO
 
-## Fresh current snapshot
+## Executive result
 
-The audit was recomputed from GitHub after PR #751 and after opening this audit PR.
+The repository-wide branch hygiene audit and first destructive cleanup pass are complete.
 
-- current total branches: **702**
-- non-main branches: **701**
-- protected branches: **1**
-- protected/default branch: `main`
-- closed pull requests scanned: **744**
-- merged pull requests scanned: **622**
-- current open pull requests: **1**
-- open PR: **#752**, head `chore/branch-hygiene-20261007`
-- branch refs deleted in Part 1: **0**
+Initial live snapshot after opening the audit branch:
 
-The earlier 701-branch number was the pre-audit-branch baseline. Creating `chore/branch-hygiene-20261007` raised the live total to 702.
+- total branches: **702**
+- protected branches: **1** (`main`)
+- merged PRs scanned: **622**
+- closed PRs scanned: **744**
+- open PRs: **1** (#752)
 
-## Final conservative classification
+Conservative partition:
 
-The 702 current branches partition exactly into:
-
-| Category | Count | Automatic Part 2 deletion? |
+| Category | Count | Ruling |
 | --- | ---: | --- |
-| SAFE_EXACT_MERGED | **579** | **YES**, after runtime rechecks |
-| SAFE_CONTENT_EQUIVALENT | **29** | **NO** in the first pass |
-| REVIEW_REQUIRED | **92** | **NO** |
-| SPECIAL_KEEP | **2** | **NO** |
+| SAFE_EXACT_MERGED | **579** | deleted in Part 2 after runtime revalidation |
+| SAFE_CONTENT_EQUIVALENT | **29** | retained |
+| REVIEW_REQUIRED | **92** | retained |
+| SPECIAL_KEEP | **2** | retained during execution |
 | **TOTAL** | **702** | |
 
-Partition check: `579 + 29 + 92 + 2 = 702`.
+## Part 1 — audit
 
-## SAFE_EXACT_MERGED — 579
+Part 1 recomputed branch and pull-request state directly from GitHub and deleted **zero** refs.
 
-Invariant:
+### SAFE_EXACT_MERGED — 579
 
-1. branch is not `main`;
-2. branch is not protected;
-3. current branch HEAD SHA exactly equals a recorded `head.sha` from a merged pull request;
-4. therefore the ref has not moved since that merged PR head.
+A branch qualified only when its current HEAD exactly matched the recorded head SHA of a merged pull request, while excluding `main`, protected refs and open-PR heads.
 
-The complete machine-readable candidate list is:
+Durable certificate:
 
 `docs/repository/branch-hygiene-safe-exact-merged-2026-10-07.json`
 
-This is the only category authorized for the first automatic retirement pass in Part 2.
+### SAFE_CONTENT_EQUIVALENT — 29
 
-## SAFE_CONTENT_EQUIVALENT — 29
-
-These branches are not exact merged-head matches, but a conservative GitHub compare against `main` proves no unique file content remains on the branch side:
+These branches are not exact merged-head matches, but conservative compare evidence shows no unique branch-side file content:
 
 - `ahead_by == 0`, or
-- the compare is not marked too large and returns zero changed files.
+- the compare is not marked too large and reports zero changed files.
 
-They are intentionally **not** included in the first automatic delete pass. They can be considered separately after the exact class is retired.
+They were intentionally excluded from the destructive pass.
 
-Complete evidence:
+Durable evidence:
 
 `docs/repository/branch-hygiene-safe-content-equivalent-2026-10-07.json`
 
-Branches:
+### REVIEW_REQUIRED — 92
 
-- `chore/recepvoz-section-assets-20261003`
-- `design/live-demo-center-v1-rebase-cabafd`
-- `diag/whatsapp-booking-flow-state`
-- `feat/booking-payment-attendance-revenue`
-- `feat/frontend-billing-account-finish`
-- `feat/frontend-commerce-operations-finish`
-- `feat/frontend-conversations-calls-finish`
-- `feat/frontend-dashboard-finish`
-- `feat/frontend-foundation-dark`
-- `feat/frontend-onboarding-settings-finish`
-- `feat/home-owner-value-dashboard`
-- `feat/inventory-admin-alerts-restock-v1`
-- `feat/omnichannel-core`
-- `feat/omnichannel-inventory-integration-v1`
-- `feat/owner-commercial-timeline-v1`
-- `feat/platform-assisted-onboarding`
-- `feat/sales-business-analytics`
-- `feat/universal-business-import`
-- `fix/frontend-desktop-nav-labels`
-- `fix/whatsapp-separate-twilio-credentials-20260919`
-- `release/recepvoz-v1-pilot`
-- `release/recepvoz-v1.0`
-- `test/business-import-real-world-hardening`
-- `test/frontend-foundation-red-ci`
-- `test/rc-preflight-red-base`
-- `test/rc-preflight-red-v1`
-- `verify-main-post-rc-529`
-- `verify-main-post-v6-534`
-- `verify/main-recepvoz-v1-final`
+These branches retain non-empty branch-side file deltas versus `main` and are not proven redundant. They were not deleted.
 
-## REVIEW_REQUIRED — 92
-
-These branches still have a non-empty branch-side file delta in GitHub compare and therefore are **not proven redundant**.
-
-They include moved/reused historical branches and old branches without a same-name merged PR. They must not be automatically deleted.
-
-Complete compare evidence:
+Durable evidence:
 
 `docs/repository/branch-hygiene-review-required-2026-10-07.json`
 
-## SPECIAL_KEEP — 2
+The raw compare batches are retained as:
 
-- `main` — protected/default branch.
-- `chore/branch-hygiene-20261007` — active head of open draft PR #752 and contains this audit.
+`docs/repository/branch-hygiene-nonexact-batch-*.json`
 
-## Runtime safety contract for Part 2
+## Part 2 — exact merged-head cleanup
 
-Before deleting any SAFE_EXACT_MERGED ref, recompute and require all of the following at execution time:
+Execution commit:
 
-1. branch still exists;
-2. branch is not protected;
-3. branch is not `main`;
-4. branch is not the head of any open PR;
-5. current branch HEAD still exactly equals a merged PR head SHA.
+`7ddb8cad674461bbb40660342903008b0a5cd5ef`
 
-Any failed invariant means **skip**, not force.
+GitHub Actions run:
 
-No SAFE_CONTENT_EQUIVALENT, REVIEW_REQUIRED or SPECIAL_KEEP branch may be deleted by the first automated pass.
+- workflow: **Branch hygiene Part 2 exact merged cleanup**
+- run ID: **37570687075**
+- conclusion: **SUCCESS**
+- certified candidates: **579**
+- deleted: **579**
+- skipped: **0**
+- failed or unverified: **0**
+- exact candidates remaining: **0**
+- branch count after execution: **123**
+
+Before each DELETE ref call, the executor revalidated:
+
+1. the branch still existed;
+2. it was not protected;
+3. it was not `main` or the audit branch;
+4. it was not the head of an open PR;
+5. its current SHA still matched the certified SHA;
+6. the associated PR was still merged;
+7. the merged PR head SHA still matched exactly;
+8. a final branch/SHA read still matched immediately before deletion.
+
+Execution artifact:
+
+- name: `branch-hygiene-part2-evidence`
+- artifact ID: `11461081814`
+- SHA-256: `745e44884eebbf6dc8ca8f1d1c03591f20d2923d890410710b8a5f5c031632bd`
+
+## Independent post-delete re-audit
+
+A separate fresh GitHub enumeration after the workflow confirmed:
+
+- current branches: **123**
+- deleted SAFE_EXACT_MERGED still present: **0 / 579**
+- SAFE_CONTENT_EQUIVALENT present: **29 / 29**
+- REVIEW_REQUIRED present: **92 / 92**
+- special refs present during audit finalization:
+  - `main`
+  - `chore/branch-hygiene-20261007`
+- unexpected remaining branches: **0**
+- protected branches: **main only**
+- open PRs at finalization: **#752 only**
+
+Post-cleanup partition:
+
+`29 SAFE_CONTENT_EQUIVALENT + 92 REVIEW_REQUIRED + main + audit branch = 123`.
+
+## Railway / production verification
+
+The branch cleanup did not alter the production source branch and did not trigger a production deployment.
+
+Post-cleanup Railway verification:
+
+- environment: `production`
+- no staged changes
+- no pending work
+- `helvoca-api`: online, 1/1 replicas running, 0 crashes, 0 warnings, 0 criticals, 0 recent failures
+- PostgreSQL: online, 1/1 replicas running, 0 warnings, 0 criticals, 0 recent failures
+- latest API deployment: `de4a3298-db03-4c0f-a160-8f0b98e00853`
+- deployed commit: `0780f372a1ac8963f0e1c937596e4ea20bc4c051`
+- deployed branch: `main`
 
 ## Recovery
 
-Deleting an exact merged-head branch removes only the branch ref. The merged PR and exact commit SHA remain in GitHub history.
+Deleting these branches removed branch refs only. Their merged pull requests and commit SHAs remain recoverable from GitHub history.
 
-The Part 2 execution report must record branch name, SHA, merged PR number, deletion result, and any skip reason.
+## Finalization
 
-## Tool limitation
+The temporary destructive executor was deliberately limited to the audit branch and is removed before integration so it cannot become a standing repository capability.
 
-The connected GitHub toolset currently exposes `update_ref` but no direct safe `delete_branch` / `delete_ref` mutation.
+This audit does **not** authorize deletion of the remaining 29 SAFE_CONTENT_EQUIVALENT branches or any of the 92 REVIEW_REQUIRED branches.
 
-`update_ref` must never be used to simulate deletion.
-
-Part 2 must re-check the available tool catalog. If direct deletion is still unavailable, use only a narrowly scoped repository-side executor that performs the runtime safety contract above and emits a machine-readable report.
-
-## Part 1 acceptance
-
-Part 1 is complete because:
-
-- `main` and Railway production were revalidated;
-- all current branches were enumerated;
-- all closed/merged PR history required for matching was scanned;
-- exact branch HEAD vs merged-PR-head matching was recomputed;
-- every non-exact historical branch was compared conservatively against `main`;
-- current open PR heads and protected refs were separated;
-- complete machine-readable lists are persisted;
-- **zero branch refs were deleted**.
+Any future cleanup of those branches requires a separate fresh decision and fresh runtime evidence.
