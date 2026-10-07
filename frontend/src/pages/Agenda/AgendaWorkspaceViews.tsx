@@ -293,7 +293,7 @@ export function AgendaScheduleFoundation({
       day: "numeric",
       month: "short"
     }).format(date);
-    return `Nueva cita · ${label} · ${time}`;
+    return `Crear cita · ${label} · ${time}`;
   }
 
   function handleDrop(date: Date, time: string) {
