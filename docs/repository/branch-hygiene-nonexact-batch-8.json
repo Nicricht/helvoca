@@ -1,0 +1,190 @@
+{
+  "schema": "helvoca.branch-hygiene.nonexact-compare.v1",
+  "batch": 8,
+  "base_sha": "0780f372a1ac8963f0e1c937596e4ea20bc4c051",
+  "rows": [
+    {
+      "branch": "test/commercial-release-readiness-first-business-v1",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 15,
+      "behind_by": 709,
+      "total_commits": 15,
+      "too_large": null,
+      "changed_files": [
+        ".github/workflows/commercial-release-readiness-safe-ci.yml",
+        ".github/workflows/rc-first-business-safe-ci.yml",
+        "docs/COMMERCIAL_EXTERNAL_GATES_V1.md",
+        "docs/COMMERCIAL_RELEASE_READINESS_FIRST_BUSINESS_V1.md",
+        "e2e/frontend-release-candidate-hardening.spec.js",
+        "scripts/ci/commercial-release-readiness-first-business.sh",
+        "src/test/java/cl/helvoca/operations/CommercialReleaseReadinessGateContractTest.java"
+      ]
+    },
+    {
+      "branch": "test/frontend-foundation-html-red",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 891,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "e2e/frontend-foundation.spec.js"
+      ]
+    },
+    {
+      "branch": "test/frontend-foundation-red-baseline",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 915,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "e2e/frontend-foundation.spec.js"
+      ]
+    },
+    {
+      "branch": "test/frontend-foundation-red-ci",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 908,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "test/golden-journey-commercial-v1-hardening",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 6,
+      "behind_by": 1101,
+      "total_commits": 6,
+      "too_large": null,
+      "changed_files": [
+        "scripts/ci/fast-gate.sh",
+        "src/test/java/cl/helvoca/operations/GoldenJourneyCommercialV1IntegrationTest.java"
+      ]
+    },
+    {
+      "branch": "test/golden-journey-release-contract-v2",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 12,
+      "behind_by": 1101,
+      "total_commits": 12,
+      "too_large": null,
+      "changed_files": [
+        ".github/workflows/ci.yml",
+        "docs/GOLDEN_JOURNEY_RELEASE_CONTRACT.md",
+        "src/main/java/cl/helvoca/booking/BookingConfirmationWorkflowService.java",
+        "src/main/java/cl/helvoca/booking/DiagnosticBookingConfirmationWorkflowService.java",
+        "src/main/resources/db/migration/V79__booking_projection_concurrency_guard.sql",
+        "src/test/java/cl/helvoca/operations/GoldenJourneyCommercialV1IntegrationTest.java"
+      ]
+    },
+    {
+      "branch": "test/rc-preflight-red-base",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1076,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "test/rc-preflight-red-v1",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "behind",
+      "ahead_by": 0,
+      "behind_by": 1075,
+      "total_commits": 0,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "test/release-candidate-first-business-hardening",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 3,
+      "behind_by": 709,
+      "total_commits": 3,
+      "too_large": null,
+      "changed_files": [
+        ".github/workflows/rc-first-business-safe-ci.yml",
+        "e2e/frontend-release-candidate-hardening.spec.js"
+      ]
+    },
+    {
+      "branch": "test/twilio-whatsapp-outbound-request",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 3104,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "src/test/java/cl/helvoca/messaging/outbound/TwilioWhatsAppMessagingProviderTest.java"
+      ]
+    },
+    {
+      "branch": "test/whatsapp-twilio-outbound-request",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 3115,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "src/test/java/cl/helvoca/messaging/outbound/TwilioWhatsAppMessagingProviderTest.java"
+      ]
+    },
+    {
+      "branch": "ux/home-operational-red",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 3092,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "e2e/home-operational.spec.js"
+      ]
+    },
+    {
+      "branch": "verify/frontend-redesign-full-20260917",
+      "classification": "REVIEW_REQUIRED",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 3017,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": [
+        "docs/superpowers/verification/frontend-redesign-ci.md"
+      ]
+    },
+    {
+      "branch": "verify/main-recepvoz-v1-final",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1101,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": []
+    },
+    {
+      "branch": "verify-main-post-rc-529",
+      "classification": "SAFE_CONTENT_EQUIVALENT",
+      "status": "diverged",
+      "ahead_by": 1,
+      "behind_by": 1303,
+      "total_commits": 1,
+      "too_large": null,
+      "changed_files": []
+    }
+  ]
+}
