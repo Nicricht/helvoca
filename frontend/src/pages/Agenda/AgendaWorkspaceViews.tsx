@@ -332,16 +332,7 @@ export function AgendaScheduleFoundation({
           event.dataTransfer.effectAllowed = "move";
           event.dataTransfer.setData("text/plain", booking.id);
         }}
-        onDragEnd={event => {
-          const target = document
-            .elementFromPoint(event.clientX, event.clientY)
-            ?.closest<HTMLElement>('[data-agenda-slot="true"]');
-          setDraggingBookingId(null);
-          if (!target || !canManage) return;
-          const date = target.dataset.slotDate;
-          const time = target.dataset.slotTime;
-          if (date && time) onPrepareReschedule(booking, date, time);
-        }}
+        onDragEnd={() => setDraggingBookingId(null)}
         className={
           styles.scheduleBooking +
           " " +
@@ -485,6 +476,23 @@ export function AgendaScheduleFoundation({
                   <div
                     className={styles.scheduleTimeline}
                     style={{ height: `${timelineHeight}px` }}
+                    onDragOver={event => {
+                      if (!canManage || !draggingBookingId) return;
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                    }}
+                    onDrop={event => {
+                      if (!canManage) return;
+                      event.preventDefault();
+                      const bookingId = event.dataTransfer.getData("text/plain") || draggingBookingId;
+                      if (!bookingId) return;
+
+                      const bounds = event.currentTarget.getBoundingClientRect();
+                      const pointerY = Math.max(0, Math.min(timelineHeight - 1, event.clientY - bounds.top));
+                      const rawMinutes = startHour * 60 + (pointerY / HOUR_HEIGHT) * 60;
+                      const roundedMinutes = Math.floor(rawMinutes / 30) * 30;
+                      handleDrop(bookingId, date, slotTime(roundedMinutes));
+                    }}
                   >
                     {hours.slice(0, -1).map(hour => (
                       <i
@@ -516,16 +524,7 @@ export function AgendaScheduleFoundation({
                             height: `${HOUR_HEIGHT / 2}px`
                           }}
                           onClick={() => onCreateSlot(dateKey(date), time)}
-                          onDragOver={event => {
-                            if (!draggingBookingId) return;
-                            event.preventDefault();
-                            event.dataTransfer.dropEffect = "move";
-                          }}
-                          onDrop={event => {
-                            event.preventDefault();
-                            const bookingId = event.dataTransfer.getData("text/plain") || draggingBookingId;
-                            handleDrop(bookingId || null, date, time);
-                          }}
+
                         />
                       );
                     })}
