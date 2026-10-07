@@ -198,17 +198,24 @@ export function AgendaScheduleFoundation({
   customers,
   services,
   selectedId,
-  onSelect
+  canManage,
+  onSelect,
+  onCreateSlot,
+  onPrepareReschedule
 }: {
   view: Exclude<AgendaViewMode, "list">;
   bookings: Booking[];
   customers: Customer[];
   services: ServiceItem[];
   selectedId: string | null;
+  canManage: boolean;
   onSelect: (booking: Booking) => void;
+  onCreateSlot: (date: string, time: string) => void;
+  onPrepareReschedule: (booking: Booking, date: string, time: string) => void;
 }) {
   const [anchorDate, setAnchorDate] = useState(() => startOfDay(new Date()));
   const [now, setNow] = useState(() => new Date());
+  const [draggingBookingId, setDraggingBookingId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
@@ -274,6 +281,29 @@ export function AgendaScheduleFoundation({
     });
   }
 
+  function slotTime(minutes: number) {
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  }
+
+  function slotLabel(date: Date, time: string) {
+    const label = new Intl.DateTimeFormat("es-CL", {
+      weekday: "long",
+      day: "numeric",
+      month: "short"
+    }).format(date);
+    return `Nueva cita · ${label} · ${time}`;
+  }
+
+  function handleDrop(date: Date, time: string) {
+    if (!draggingBookingId || !canManage) return;
+    const booking = bookings.find(item => item.id === draggingBookingId);
+    setDraggingBookingId(null);
+    if (!booking) return;
+    onPrepareReschedule(booking, dateKey(date), time);
+  }
+
   function bookingStyle(booking: Booking) {
     const start = new Date(booking.startAt);
     const startMinutes = minutesSinceMidnight(start);
@@ -295,6 +325,14 @@ export function AgendaScheduleFoundation({
         key={booking.id}
         data-testid={"agenda-row-" + booking.id}
         data-duration-minutes={duration}
+        draggable={canManage && !["CANCELLED", "CANCELED"].includes(String(booking.status).toUpperCase())}
+        onDragStart={event => {
+          if (!canManage) return;
+          setDraggingBookingId(booking.id);
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", booking.id);
+        }}
+        onDragEnd={() => setDraggingBookingId(null)}
         className={
           styles.scheduleBooking +
           " " +
@@ -447,6 +485,37 @@ export function AgendaScheduleFoundation({
                         style={{ top: `${(hour - startHour) * HOUR_HEIGHT}px` }}
                       />
                     ))}
+
+                    {canManage && Array.from(
+                      { length: (endHour - startHour) * 2 },
+                      (_, index) => startHour * 60 + index * 30
+                    ).map(minutes => {
+                      const time = slotTime(minutes);
+                      const key = `${dateKey(date)}-${time.replace(":", "")}`;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          className={styles.scheduleSlot}
+                          data-testid={`agenda-slot-${key}`}
+                          aria-label={slotLabel(date, time)}
+                          style={{
+                            top: `${((minutes - startHour * 60) / 60) * HOUR_HEIGHT}px`,
+                            height: `${HOUR_HEIGHT / 2}px`
+                          }}
+                          onClick={() => onCreateSlot(dateKey(date), time)}
+                          onDragOver={event => {
+                            if (!draggingBookingId) return;
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "move";
+                          }}
+                          onDrop={event => {
+                            event.preventDefault();
+                            handleDrop(date, time);
+                          }}
+                        />
+                      );
+                    })}
 
                     {isToday && showNow && (
                       <div
