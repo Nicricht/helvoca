@@ -1751,3 +1751,140 @@
     transition-duration: .01ms !important;
   }
 }
+
+
+/* === Agenda calendar workspace v1 / Part 3 ============================ */
+.scheduleSlot {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  width: 100%;
+  border: 0;
+  border-top: 1px dashed transparent;
+  border-bottom: 1px dashed transparent;
+  padding: 0;
+  color: transparent;
+  background: transparent;
+  cursor: crosshair;
+}
+
+.scheduleSlot:hover,
+.scheduleSlot:focus-visible {
+  border-color: rgba(86, 220, 255, .18);
+  background:
+    linear-gradient(90deg, rgba(33, 197, 255, .035), rgba(101, 93, 255, .055));
+  outline: none;
+}
+
+.scheduleSlot:hover::after,
+.scheduleSlot:focus-visible::after {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  content: "+ Nueva cita";
+  color: rgba(119, 229, 255, .72);
+  font-size: .58rem;
+  font-weight: 760;
+  transform: translateY(-50%);
+}
+
+.scheduleBooking[draggable="true"] {
+  cursor: grab;
+}
+
+.scheduleBooking[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.scheduleTimeline:has(.scheduleBooking[draggable="true"]:active) .scheduleSlot {
+  border-color: rgba(87, 223, 255, .09);
+}
+
+@media (max-width: 620px) {
+  .visualHero {
+    min-height: auto;
+    padding: 15px 16px;
+  }
+
+  .visualHeroCopy h2 {
+    max-width: 100%;
+    font-size: clamp(24px, 8vw, 32px);
+  }
+
+  .visualHeroCopy p {
+    display: none;
+  }
+
+  .visualHeroSignals {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .metrics {
+    display: flex;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .metrics::-webkit-scrollbar {
+    display: none;
+  }
+
+  .metrics article {
+    min-width: 142px;
+  }
+
+  .filters {
+    gap: 8px;
+  }
+
+  .scheduleTimelineShell[data-agenda-view="day"] .scheduleDayColumns,
+  .scheduleTimelineShell[data-agenda-view="day"] .scheduleTimelineDay {
+    min-width: calc(100vw - 92px);
+  }
+
+  .scheduleTimelineShell[data-agenda-view="week"] .scheduleDayColumns {
+    min-width: max-content;
+  }
+
+  .scheduleSlot:hover::after,
+  .scheduleSlot:focus-visible::after {
+    display: none;
+  }
+
+  .detailPane {
+    min-height: min(720px, calc(100vh - 110px));
+  }
+
+  .detailHeader {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: rgba(8, 25, 39, .98);
+    backdrop-filter: blur(12px);
+  }
+
+  .detailActions {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background: rgba(7, 21, 34, .97);
+    backdrop-filter: blur(12px);
+  }
+}
+
+@media (pointer: coarse) {
+  .scheduleBooking[draggable="true"] {
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scheduleSlot {
+    transition: none !important;
+  }
+}
