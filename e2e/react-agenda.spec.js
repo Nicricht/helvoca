@@ -296,7 +296,12 @@ test.describe('React Agenda migration', () => {
 
     const booking = page.getByTestId('agenda-row-b1');
     const target = page.getByTestId('agenda-slot-2026-10-07-1130');
-    await booking.dragTo(target);
+    const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+
+    await booking.dispatchEvent('dragstart', { dataTransfer });
+    await target.dispatchEvent('dragover', { dataTransfer });
+    await target.dispatchEvent('drop', { dataTransfer });
+    await booking.dispatchEvent('dragend', { dataTransfer });
 
     const dialog = page.getByRole('dialog', { name: 'Reserva · Ana Reserva' });
     await expect(dialog).toBeVisible();
