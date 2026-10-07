@@ -1,0 +1,319 @@
+name: Branch hygiene Part 5 review analysis
+
+on:
+  push:
+    branches:
+      - chore/branch-hygiene-review-analysis-20261007
+    paths:
+      - .github/workflows/branch-hygiene-part5-analysis.yml
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: branch-hygiene-part5-20261007
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_MAIN_SHA: 9aa1038caf321a7cf5ed44b7111372a64aeb537b
+      AUDIT_BRANCH: chore/branch-hygiene-review-analysis-20261007
+      EXPECTED_PR: "754"
+      REVIEW_FILE: docs/repository/branch-hygiene-review-required-2026-10-07.json
+      OUTPUT_JSON: docs/repository/branch-hygiene-review-analysis-2026-10-07.json
+      OUTPUT_MD: docs/repository/branch-hygiene-review-analysis-2026-10-07.md
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Recompute all REVIEW_REQUIRED branches
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import collections
+          import datetime
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          expected_main = os.environ["EXPECTED_MAIN_SHA"]
+          audit_branch = os.environ["AUDIT_BRANCH"]
+          expected_pr = int(os.environ["EXPECTED_PR"])
+
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "helvoca-branch-hygiene-part5",
+          }
+
+          def api(method, path, query=None):
+              url = "https://api.github.com" + path
+              if query:
+                  url += "?" + urllib.parse.urlencode(query)
+              request = urllib.request.Request(url, method=method, headers=headers)
+              try:
+                  with urllib.request.urlopen(request, timeout=60) as response:
+                      body = response.read().decode("utf-8")
+                      return response.status, json.loads(body) if body else None
+              except urllib.error.HTTPError as exc:
+                  body = exc.read().decode("utf-8", errors="replace")
+                  try:
+                      payload = json.loads(body) if body else None
+                  except json.JSONDecodeError:
+                      payload = {"raw": body}
+                  return exc.code, payload
+
+          def paginate(path, query=None):
+              query = dict(query or {})
+              out = []
+              page = 1
+              while True:
+                  q = {**query, "per_page": 100, "page": page}
+                  status, payload = api("GET", path, q)
+                  if status != 200:
+                      raise RuntimeError(f"pagination failed {path}: HTTP {status}: {payload}")
+                  out.extend(payload)
+                  if len(payload) < 100:
+                      return out
+                  page += 1
+
+          with open(os.environ["REVIEW_FILE"], encoding="utf-8") as handle:
+              source = json.load(handle)
+          review_names = [row["branch"] for row in source["branches"]]
+          if len(review_names) != 92 or len(set(review_names)) != 92:
+              raise SystemExit("ABORT: expected 92 unique REVIEW_REQUIRED branches")
+
+          branches = paginate(f"/repos/{repo}/branches")
+          by_name = {b["name"]: b for b in branches}
+          if len(branches) != 94:
+              raise SystemExit(f"ABORT: expected 94 live branches with Part 5 audit branch, got {len(branches)}")
+          if set(review_names) - set(by_name):
+              raise SystemExit(f"ABORT: REVIEW_REQUIRED branch missing: {sorted(set(review_names)-set(by_name))}")
+
+          main = by_name.get("main")
+          if not main or main["commit"]["sha"] != expected_main:
+              raise SystemExit("ABORT: main moved during Part 5 analysis")
+          if not main.get("protected"):
+              raise SystemExit("ABORT: main is unexpectedly unprotected")
+
+          open_prs = paginate(f"/repos/{repo}/pulls", {"state": "open"})
+          if len(open_prs) != 1 or open_prs[0]["number"] != expected_pr or open_prs[0]["head"]["ref"] != audit_branch:
+              raise SystemExit("ABORT: unexpected open PR state during Part 5 analysis")
+
+          closed_prs = paginate(f"/repos/{repo}/pulls", {"state": "closed", "sort": "created", "direction": "asc"})
+          prs_by_head = collections.defaultdict(list)
+          for pr in closed_prs:
+              ref = (pr.get("head") or {}).get("ref")
+              if ref:
+                  prs_by_head[ref].append(pr)
+
+          def classify_surface(files):
+              flags = set()
+              for path in files:
+                  if path.startswith("src/main/java/"):
+                      flags.add("PROD_JAVA")
+                  elif path.startswith("src/main/resources/db/migration/"):
+                      flags.add("DB_MIGRATION")
+                  elif path.startswith("src/main/resources/static/"):
+                      flags.add("LEGACY_STATIC")
+                  elif path.startswith("frontend/"):
+                      flags.add("REACT_FRONTEND")
+                  elif path.startswith("src/test/"):
+                      flags.add("JAVA_TEST")
+                  elif path.startswith("e2e/"):
+                      flags.add("E2E_TEST")
+                  elif path.startswith(".github/workflows/"):
+                      flags.add("CI_WORKFLOW")
+                  elif path.startswith("scripts/"):
+                      flags.add("SCRIPT")
+                  elif path.startswith("docs/") or path in {"README.md", "AGENTS.md"}:
+                      flags.add("DOCS")
+                  elif path.startswith("src/main/resources/application") or path in {".env.example", "pom.xml", "package.json", "package-lock.json"}:
+                      flags.add("RUNTIME_CONFIG")
+                  else:
+                      flags.add("OTHER")
+              return sorted(flags)
+
+          rows = []
+          for name in review_names:
+              branch = by_name[name]
+              encoded = urllib.parse.quote("main..." + name, safe=".")
+              status, compare = api("GET", f"/repos/{repo}/compare/{encoded}")
+              if status != 200:
+                  raise RuntimeError(f"compare failed for {name}: HTTP {status}: {compare}")
+
+              files = [f["filename"] for f in compare.get("files", [])]
+              surfaces = classify_surface(files)
+              prs = sorted(prs_by_head.get(name, []), key=lambda p: p["number"])
+              merged = [p for p in prs if p.get("merged_at")]
+              unmerged = [p for p in prs if not p.get("merged_at")]
+              latest = prs[-1] if prs else None
+              current_sha = branch["commit"]["sha"]
+
+              if merged:
+                  history_class = "HAS_MERGED_PR"
+              elif unmerged:
+                  history_class = "CLOSED_UNMERGED_PR"
+              else:
+                  history_class = "NO_PR_HISTORY"
+
+              latest_head_sha = (latest.get("head") or {}).get("sha") if latest else None
+              moved_since_latest_pr = bool(latest and latest_head_sha != current_sha)
+
+              runtime_flags = {"PROD_JAVA", "DB_MIGRATION", "LEGACY_STATIC", "REACT_FRONTEND", "RUNTIME_CONFIG", "OTHER"}
+              runtime_bearing = bool(set(surfaces) & runtime_flags)
+
+              rows.append({
+                  "branch": name,
+                  "current_sha": current_sha,
+                  "protected": bool(branch.get("protected")),
+                  "compare_status": compare.get("status"),
+                  "ahead_by": compare.get("ahead_by"),
+                  "behind_by": compare.get("behind_by"),
+                  "total_commits": compare.get("total_commits"),
+                  "changed_file_count": len(files),
+                  "changed_files": files,
+                  "compare_files_may_be_truncated": len(files) >= 300,
+                  "surfaces": surfaces,
+                  "runtime_bearing": runtime_bearing,
+                  "pr_numbers": [p["number"] for p in prs],
+                  "merged_pr_numbers": [p["number"] for p in merged],
+                  "closed_unmerged_pr_numbers": [p["number"] for p in unmerged],
+                  "latest_pr": latest["number"] if latest else None,
+                  "latest_pr_head_sha": latest_head_sha,
+                  "moved_since_latest_pr": moved_since_latest_pr,
+                  "history_class": history_class,
+                  "prefix_family": name.split("/", 1)[0] if "/" in name else name.split("-", 1)[0],
+              })
+
+          # Duplicate HEAD detection.
+          sha_groups = collections.defaultdict(list)
+          for row in rows:
+              sha_groups[row["current_sha"]].append(row["branch"])
+          duplicates = {sha: names for sha, names in sha_groups.items() if len(names) > 1}
+          for row in rows:
+              peers = [n for n in duplicates.get(row["current_sha"], []) if n != row["branch"]]
+              row["duplicate_head_peers"] = peers
+
+              if row["history_class"] == "HAS_MERGED_PR" and row["moved_since_latest_pr"]:
+                  triage = "MERGED_BRANCH_MOVED_MANUAL"
+              elif peers and not row["runtime_bearing"]:
+                  triage = "DUPLICATE_HEAD_LOW_RISK_REVIEW"
+              elif peers:
+                  triage = "DUPLICATE_HEAD_MANUAL"
+              elif row["runtime_bearing"]:
+                  triage = "RESCUE_OR_SUPERSESSION_REVIEW"
+              else:
+                  triage = "EVIDENCE_ONLY_RETIREMENT_REVIEW"
+              row["triage"] = triage
+
+          history_counts = collections.Counter(r["history_class"] for r in rows)
+          triage_counts = collections.Counter(r["triage"] for r in rows)
+          prefix_counts = collections.Counter(r["prefix_family"] for r in rows)
+          surface_counts = collections.Counter(s for r in rows for s in r["surfaces"])
+
+          summary = {
+              "schema": "helvoca.branch-hygiene.review-analysis.v1",
+              "repository": repo,
+              "analyzed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "main_sha": expected_main,
+              "audit_branch": audit_branch,
+              "review_required_count": len(rows),
+              "history_counts": dict(sorted(history_counts.items())),
+              "triage_counts": dict(sorted(triage_counts.items())),
+              "prefix_counts": dict(sorted(prefix_counts.items())),
+              "surface_counts": dict(sorted(surface_counts.items())),
+              "runtime_bearing_count": sum(r["runtime_bearing"] for r in rows),
+              "nonruntime_only_count": sum(not r["runtime_bearing"] for r in rows),
+              "duplicate_head_group_count": len(duplicates),
+              "duplicate_head_groups": [
+                  {"sha": sha, "branches": names}
+                  for sha, names in sorted(duplicates.items(), key=lambda kv: kv[1])
+              ],
+              "moved_after_any_pr_count": sum(r["moved_since_latest_pr"] for r in rows),
+              "merged_history_count": sum(r["history_class"] == "HAS_MERGED_PR" for r in rows),
+              "closed_unmerged_history_count": sum(r["history_class"] == "CLOSED_UNMERGED_PR" for r in rows),
+              "no_pr_history_count": sum(r["history_class"] == "NO_PR_HISTORY" for r in rows),
+          }
+
+          output = {"summary": summary, "branches": rows}
+          with open(os.environ["OUTPUT_JSON"], "w", encoding="utf-8") as handle:
+              json.dump(output, handle, indent=2, ensure_ascii=False)
+              handle.write("\n")
+
+          md = []
+          md.append("# Branch hygiene Part 5 — REVIEW_REQUIRED analysis")
+          md.append("")
+          md.append(f"**Repository:** `{repo}`  ")
+          md.append(f"**Exact main:** `{expected_main}`  ")
+          md.append(f"**Branches analyzed:** **{len(rows)}**  ")
+          md.append("**Deletion authorized:** **NO**")
+          md.append("")
+          md.append("## Executive classification")
+          md.append("")
+          md.append("| Triage | Count | Meaning |")
+          md.append("| --- | ---: | --- |")
+          meanings = {
+              "MERGED_BRANCH_MOVED_MANUAL": "Prior merged history exists and the surviving branch moved afterward; inspect manually.",
+              "DUPLICATE_HEAD_LOW_RISK_REVIEW": "Same HEAD as another review branch and no runtime-bearing files; strong later dedupe candidate.",
+              "DUPLICATE_HEAD_MANUAL": "Same HEAD as another review branch but runtime-bearing; dedupe only after choosing the canonical ref.",
+              "RESCUE_OR_SUPERSESSION_REVIEW": "Contains runtime-bearing content; determine whether to rescue or prove it superseded.",
+              "EVIDENCE_ONLY_RETIREMENT_REVIEW": "Only docs/tests/CI/scripts evidence; lower-risk later retirement candidate after confirmation.",
+          }
+          for key in sorted(triage_counts):
+              md.append(f"| `{key}` | **{triage_counts[key]}** | {meanings[key]} |")
+          md.append("")
+          md.append("## PR-history split")
+          md.append("")
+          for key, value in sorted(history_counts.items()):
+              md.append(f"- `{key}`: **{value}**")
+          md.append("")
+          md.append("## Duplicate HEAD groups")
+          md.append("")
+          if duplicates:
+              for sha, names in sorted(duplicates.items(), key=lambda kv: kv[1]):
+                  md.append(f"- `{sha}`: " + ", ".join(f"`{n}`" for n in names))
+          else:
+              md.append("- None.")
+          md.append("")
+          md.append("## Branch matrix")
+          md.append("")
+          md.append("| Branch | History | Ahead | Files | Runtime | Triage |")
+          md.append("| --- | --- | ---: | ---: | --- | --- |")
+          for r in sorted(rows, key=lambda x: (x["triage"], x["branch"])):
+              md.append(
+                  f"| `{r['branch']}` | {r['history_class']} | {r['ahead_by']} | "
+                  f"{r['changed_file_count']} | {'yes' if r['runtime_bearing'] else 'no'} | `{r['triage']}` |"
+              )
+          md.append("")
+          md.append("## Guardrail")
+          md.append("")
+          md.append("This report is analytical only. No REVIEW_REQUIRED branch is authorized for deletion by Part 5.")
+          md.append("Any retirement pass must revalidate exact SHA, current compare, open-PR status, protection, and selected canonical duplicate refs at execution time.")
+          md.append("")
+
+          with open(os.environ["OUTPUT_MD"], "w", encoding="utf-8") as handle:
+              handle.write("\n".join(md))
+
+          print(json.dumps(summary, indent=2, ensure_ascii=False))
+          PY
+
+      - name: Commit analysis evidence
+        shell: bash
+        run: |
+          git config user.name "Nicolás Iván Vega Linero"
+          git config user.email "nic.vegal@duocuc.cl"
+          git add "$OUTPUT_JSON" "$OUTPUT_MD"
+          git commit -m "docs(repo): classify remaining review-required branches"
+          git push origin "HEAD:$AUDIT_BRANCH"
