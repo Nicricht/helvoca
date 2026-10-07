@@ -1,0 +1,271 @@
+name: Branch hygiene Part 4 content-equivalent cleanup
+
+on:
+  push:
+    branches:
+      - chore/branch-hygiene-equivalent-20261007
+    paths:
+      - .github/workflows/branch-hygiene-part4.yml
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: branch-hygiene-part4-20261007
+  cancel-in-progress: false
+
+jobs:
+  delete-content-equivalent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      EXPECTED_MAIN_SHA: 86197d1166c162d0d4b3a8f3fe0a4a7cacfb3a15
+      AUDIT_BRANCH: chore/branch-hygiene-equivalent-20261007
+      CANDIDATES_FILE: docs/repository/branch-hygiene-safe-content-equivalent-2026-10-07-v2.json
+      REVIEW_FILE: docs/repository/branch-hygiene-review-required-2026-10-07.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Revalidate and retire content-equivalent refs
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import datetime
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          owner = repo.split("/", 1)[0]
+          token = os.environ["GH_TOKEN"]
+          expected_main = os.environ["EXPECTED_MAIN_SHA"]
+          audit_branch = os.environ["AUDIT_BRANCH"]
+
+          def api(method, path, query=None):
+              url = "https://api.github.com" + path
+              if query:
+                  url += "?" + urllib.parse.urlencode(query)
+              request = urllib.request.Request(
+                  url,
+                  method=method,
+                  headers={
+                      "Authorization": "Bearer " + token,
+                      "Accept": "application/vnd.github+json",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      "User-Agent": "helvoca-branch-hygiene-part4",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=60) as response:
+                      body = response.read().decode("utf-8")
+                      return response.status, json.loads(body) if body else None
+              except urllib.error.HTTPError as exc:
+                  body = exc.read().decode("utf-8", errors="replace")
+                  try:
+                      payload = json.loads(body) if body else None
+                  except json.JSONDecodeError:
+                      payload = {"raw": body}
+                  return exc.code, payload
+
+          def get_branch(name):
+              encoded = urllib.parse.quote(name, safe="")
+              return api("GET", f"/repos/{repo}/branches/{encoded}")
+
+          def compare_to_main(name):
+              basehead = urllib.parse.quote("main..." + name, safe=".")
+              return api("GET", f"/repos/{repo}/compare/{basehead}")
+
+          def list_all_branches():
+              result = []
+              page = 1
+              while True:
+                  status, payload = api("GET", f"/repos/{repo}/branches", {"per_page": 100, "page": page})
+                  if status != 200:
+                      raise RuntimeError(f"branch listing failed: HTTP {status}: {payload}")
+                  result.extend(payload)
+                  if len(payload) < 100:
+                      return result
+                  page += 1
+
+          with open(os.environ["CANDIDATES_FILE"], encoding="utf-8") as handle:
+              certificate = json.load(handle)
+          with open(os.environ["REVIEW_FILE"], encoding="utf-8") as handle:
+              review_required = json.load(handle)
+
+          if certificate.get("certified_against_main") != expected_main or certificate.get("count") != 29:
+              raise SystemExit("ABORT: certificate baseline/count mismatch")
+
+          main_status, main_before = get_branch("main")
+          if main_status != 200 or main_before["commit"]["sha"] != expected_main:
+              raise SystemExit("ABORT: main changed before Part 4")
+
+          pre_branches = list_all_branches()
+          if len(pre_branches) != 123:
+              raise SystemExit(f"ABORT: expected 123 branches with audit ref, got {len(pre_branches)}")
+
+          report = []
+          deleted = 0
+          skipped = 0
+          failed = 0
+          started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+          for candidate in certificate["candidates"]:
+              branch = candidate["branch"]
+              certified_sha = candidate["sha"]
+              row = {"branch": branch, "certified_sha": certified_sha}
+
+              def skip(reason, **extra):
+                  row.update({"outcome": "SKIPPED", "reason": reason, **extra})
+                  report.append(row)
+
+              if branch in {"main", audit_branch}:
+                  skip("SPECIAL_KEEP")
+                  skipped += 1
+                  continue
+
+              status, branch_data = get_branch(branch)
+              if status != 200:
+                  skip("BRANCH_NOT_READABLE", http_status=status)
+                  skipped += 1
+                  continue
+              if branch_data.get("protected"):
+                  skip("PROTECTED")
+                  skipped += 1
+                  continue
+              if branch_data["commit"]["sha"] != certified_sha:
+                  skip("SHA_CHANGED", current_sha=branch_data["commit"]["sha"])
+                  skipped += 1
+                  continue
+
+              status, open_prs = api(
+                  "GET",
+                  f"/repos/{repo}/pulls",
+                  {"state": "open", "head": f"{owner}:{branch}", "per_page": 1},
+              )
+              if status != 200:
+                  skip("OPEN_PR_CHECK_FAILED", http_status=status)
+                  skipped += 1
+                  continue
+              if open_prs:
+                  skip("OPEN_PR_HEAD", open_pr=open_prs[0]["number"])
+                  skipped += 1
+                  continue
+
+              status, comparison = compare_to_main(branch)
+              if status != 200:
+                  skip("COMPARE_FAILED", http_status=status)
+                  skipped += 1
+                  continue
+
+              ahead_by = comparison.get("ahead_by")
+              files = comparison.get("files")
+              file_count = len(files) if isinstance(files, list) else None
+              safe = ahead_by == 0 or file_count == 0
+              if not safe:
+                  skip(
+                      "UNIQUE_CONTENT_DETECTED",
+                      ahead_by=ahead_by,
+                      file_count=file_count,
+                      compare_status=comparison.get("status"),
+                  )
+                  skipped += 1
+                  continue
+
+              # Final lease-style read immediately before DELETE.
+              status, final_branch = get_branch(branch)
+              if status != 200 or final_branch.get("protected"):
+                  skip("FINAL_BRANCH_REVALIDATION_FAILED", http_status=status)
+                  skipped += 1
+                  continue
+              if final_branch["commit"]["sha"] != certified_sha:
+                  skip("SHA_CHANGED_ON_FINAL_READ", current_sha=final_branch["commit"]["sha"])
+                  skipped += 1
+                  continue
+
+              ref = urllib.parse.quote("heads/" + branch, safe="/")
+              status, payload = api("DELETE", f"/repos/{repo}/git/refs/{ref}")
+              if status != 204:
+                  row.update({"outcome": "DELETE_FAILED", "reason": "DELETE_API_FAILED", "http_status": status, "response": payload})
+                  report.append(row)
+                  failed += 1
+                  continue
+
+              verify_status, _ = get_branch(branch)
+              if verify_status != 404:
+                  row.update({"outcome": "DELETE_UNVERIFIED", "reason": "BRANCH_STILL_READABLE", "http_status": verify_status})
+                  report.append(row)
+                  failed += 1
+                  continue
+
+              row.update({
+                  "outcome": "DELETED",
+                  "reason": "CONTENT_EQUIVALENT_REVALIDATED",
+                  "ahead_by": ahead_by,
+                  "file_count": file_count,
+                  "compare_status": comparison.get("status"),
+              })
+              report.append(row)
+              deleted += 1
+
+          post_branches = list_all_branches()
+          post_by_name = {b["name"]: b for b in post_branches}
+          main_after = post_by_name.get("main", {}).get("commit", {}).get("sha")
+          exact_remaining = [c["branch"] for c in certificate["candidates"] if c["branch"] in post_by_name]
+          review_missing = [b["branch"] for b in review_required["branches"] if b["branch"] not in post_by_name]
+          audit_present = audit_branch in post_by_name
+
+          summary = {
+              "schema": "helvoca.branch-hygiene.part4.v1",
+              "started_at": started_at,
+              "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "repository": repo,
+              "main_sha": main_after,
+              "certified_candidates": len(certificate["candidates"]),
+              "deleted": deleted,
+              "skipped": skipped,
+              "failed_or_unverified": failed,
+              "candidates_remaining": exact_remaining,
+              "review_required_expected": len(review_required["branches"]),
+              "review_required_missing": review_missing,
+              "audit_branch_present": audit_present,
+              "post_branch_count": len(post_branches),
+          }
+
+          with open("branch-hygiene-part4-report.json", "w", encoding="utf-8") as handle:
+              json.dump({"summary": summary, "branches": report}, handle, indent=2, ensure_ascii=False)
+              handle.write("\n")
+          with open("branch-hygiene-part4-summary.json", "w", encoding="utf-8") as handle:
+              json.dump(summary, handle, indent=2, ensure_ascii=False)
+              handle.write("\n")
+
+          print(json.dumps(summary, indent=2, ensure_ascii=False))
+
+          ok = (
+              deleted == 29
+              and skipped == 0
+              and failed == 0
+              and not exact_remaining
+              and not review_missing
+              and audit_present
+              and main_after == expected_main
+              and len(post_branches) == 94
+          )
+          if not ok:
+              sys.exit(1)
+          PY
+
+      - name: Upload Part 4 deletion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-hygiene-part4-evidence
+          path: |
+            branch-hygiene-part4-report.json
+            branch-hygiene-part4-summary.json
+          if-no-files-found: error
+          retention-days: 30
