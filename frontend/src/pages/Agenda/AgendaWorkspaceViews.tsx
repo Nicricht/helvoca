@@ -332,7 +332,16 @@ export function AgendaScheduleFoundation({
           event.dataTransfer.effectAllowed = "move";
           event.dataTransfer.setData("text/plain", booking.id);
         }}
-        onDragEnd={() => setDraggingBookingId(null)}
+        onDragEnd={event => {
+          const target = document
+            .elementFromPoint(event.clientX, event.clientY)
+            ?.closest<HTMLElement>('[data-agenda-slot="true"]');
+          setDraggingBookingId(null);
+          if (!target || !canManage) return;
+          const date = target.dataset.slotDate;
+          const time = target.dataset.slotTime;
+          if (date && time) onPrepareReschedule(booking, date, time);
+        }}
         className={
           styles.scheduleBooking +
           " " +
@@ -498,6 +507,9 @@ export function AgendaScheduleFoundation({
                           type="button"
                           className={styles.scheduleSlot}
                           data-testid={`agenda-slot-${key}`}
+                          data-agenda-slot="true"
+                          data-slot-date={dateKey(date)}
+                          data-slot-time={time}
                           aria-label={slotLabel(date, time)}
                           style={{
                             top: `${((minutes - startHour * 60) / 60) * HOUR_HEIGHT}px`,
