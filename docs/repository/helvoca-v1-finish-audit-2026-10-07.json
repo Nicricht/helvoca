@@ -1,0 +1,176 @@
+{
+  "schema": "helvoca.v1-finish-audit.v1",
+  "repository": "Nicricht/helvoca",
+  "audited_main_sha": "bbc30cad7c75c53f858e71a72edd3bd56b653474",
+  "exact_main_ci": {
+    "run_id": 37595789186,
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "railway": {
+    "deployment_id": "ea122483-82f2-44d4-8b15-387197f78b05",
+    "commit_sha": "bbc30cad7c75c53f858e71a72edd3bd56b653474",
+    "api_state": "online",
+    "postgres_state": "online",
+    "issues": 0,
+    "pending_work": 0
+  },
+  "source_inventory": {
+    "total_files": 1559,
+    "frontend_files": 95,
+    "java_production_files": 665,
+    "java_test_files": 424,
+    "browser_e2e_files": 46,
+    "flyway_migrations": 93
+  },
+  "ruling": {
+    "software_p0_blockers_found": 0,
+    "pending_p1_launch_gates": [
+      "VOICE_REAL_TENANT_CERTIFICATION",
+      "WHATSAPP_REAL_TENANT_CERTIFICATION",
+      "MERCADOPAGO_TEST_ROUNDTRIP",
+      "FIRST_CUSTOMER_ACTIVATION_EVIDENCE"
+    ],
+    "strategy": "Freeze V1 scope. In Part 2, inspect historical branches only for code/evidence that closes these P1 launch gates or a concrete main gap. Do not resume blanket branch archaeology."
+  },
+  "capabilities": [
+    {
+      "capability": "AUTH_AND_SESSION",
+      "status": "READY",
+      "priority": "P0",
+      "evidence": "React AuthPage + AuthBoundary; backend AuthController/AuthService/RegistrationService; auth/role/permission tests exist."
+    },
+    {
+      "capability": "TENANT_ISOLATION_SECURITY",
+      "status": "READY",
+      "priority": "P0",
+      "evidence": "TenantProvider/TenantAwareDataSource/RLS integration coverage, JWT/permission/rate-limit tests; APIs derive tenant server-side."
+    },
+    {
+      "capability": "ONBOARDING_IMPORT_READINESS",
+      "status": "READY",
+      "priority": "P1",
+      "evidence": "Onboarding, auto-onboarding, business import preview/apply, activation guide and readiness services/controllers are present with tests."
+    },
+    {
+      "capability": "BUSINESS_CONFIG_SERVICES_HOURS_KNOWLEDGE",
+      "status": "READY",
+      "priority": "P1",
+      "evidence": "Business/service/knowledge APIs plus business hours and schedule-exception services/tests exist; Settings React surface exists."
+    },
+    {
+      "capability": "CUSTOMERS",
+      "status": "READY",
+      "priority": "P1",
+      "evidence": "Customer API exists; current product architecture embeds customer work in Agenda/Operations instead of standalone Customers page."
+    },
+    {
+      "capability": "BOOKINGS_AGENDA",
+      "status": "READY",
+      "priority": "P0",
+      "evidence": "Booking CRUD/availability/concurrency/confirmation lifecycle plus React Agenda and dedicated E2E/integration tests."
+    },
+    {
+      "capability": "ORDERS_OPERATIONS",
+      "status": "READY",
+      "priority": "P1",
+      "evidence": "Order workflow, React Orders/Operations and E2E coverage present."
+    },
+    {
+      "capability": "INVENTORY",
+      "status": "READY",
+      "priority": "P1",
+      "evidence": "Stock, variants, reservations, alerts, restock flows, concurrency tests and multiple React inventory E2E suites exist."
+    },
+    {
+      "capability": "HUMAN_HANDOFF",
+      "status": "READY",
+      "priority": "P1",
+      "evidence": "HumanHandoffService/Controller, realtime transfer tool coverage and integration tests exist."
+    },
+    {
+      "capability": "VOICE_SOFTWARE_STACK",
+      "status": "READY_WITH_EXTERNAL_GATE",
+      "priority": "P0",
+      "evidence": "Multi-provider voice edge, Twilio transport, Gemini Live/OpenAI Live, tools, fail-closed routing and extensive tests exist. Real tenant-specific carrier matrix remains an external activation gate."
+    },
+    {
+      "capability": "WHATSAPP_SOFTWARE_STACK",
+      "status": "READY_WITH_EXTERNAL_GATE",
+      "priority": "P1",
+      "evidence": "Twilio/Meta WhatsApp, tenant routing, embedded signup/config/readiness, booking/tool flows and extensive tests exist. Real tenant pilot delivery certification remains external."
+    },
+    {
+      "capability": "SAAS_BILLING_SOFTWARE",
+      "status": "READY_WITH_EXTERNAL_GATE",
+      "priority": "P1",
+      "evidence": "Plans, entitlements, usage, Mercado Pago recurring checkout/webhook reconciliation and hardening tests exist. Real Mercado Pago TEST provider round-trip remains pending."
+    },
+    {
+      "capability": "REACT_PRODUCT_SURFACES",
+      "status": "READY",
+      "priority": "P1",
+      "evidence": "Canonical React routes exist for Auth, Home, Plan, Inventory, Agenda, Orders, Settings, Import, Simulator, Internal Operations, Platform, Invite, Sales and Pricing."
+    },
+    {
+      "capability": "PILOT_SAFETY_OBSERVABILITY",
+      "status": "READY",
+      "priority": "P0",
+      "evidence": "Controlled pilot guard, GO/NO-GO, launch control/readiness, kill switches and certification/reconciliation surfaces exist with tests."
+    },
+    {
+      "capability": "DATABASE_MIGRATIONS",
+      "status": "READY",
+      "priority": "P0",
+      "evidence": "PostgreSQL/Flyway is authoritative; current tree contains 93 migrations and exact-main CI passed integration/system tests."
+    },
+    {
+      "capability": "CI_RELEASE_PIPELINE",
+      "status": "READY",
+      "priority": "P0",
+      "evidence": "Exact main CI 37595789186 completed SUCCESS; Railway exact-SHA deployment is online and healthy."
+    },
+    {
+      "capability": "VOICE_REAL_TENANT_CERTIFICATION",
+      "status": "PENDING_EXTERNAL",
+      "priority": "P1",
+      "evidence": "Controlled human call evidence exists, but the full tenant-specific carrier/interruption matrix must be completed only in an authorized launch window when voice is in scope."
+    },
+    {
+      "capability": "WHATSAPP_REAL_TENANT_CERTIFICATION",
+      "status": "PENDING_EXTERNAL",
+      "priority": "P1",
+      "evidence": "Meta pilot runbook explicitly keeps real traffic disabled until tenant/provider prerequisites and an authorized real pilot certification are completed."
+    },
+    {
+      "capability": "MERCADOPAGO_TEST_ROUNDTRIP",
+      "status": "PENDING_EXTERNAL",
+      "priority": "P1",
+      "evidence": "Local/state-machine certification is green, but real TEST recurring checkout + signed webhook/provider round-trip is not yet certified."
+    },
+    {
+      "capability": "FIRST_CUSTOMER_ACTIVATION_EVIDENCE",
+      "status": "PENDING_OPERATIONAL",
+      "priority": "P1",
+      "evidence": "Requires completed onboarding form, owners, exact sold scope, success metric, channel certification, rollback owner, payment method and tenant Launch Cage GO."
+    },
+    {
+      "capability": "MERCHANT_PAYMENT_LIVE",
+      "status": "OUT_OF_V1",
+      "priority": "DEFER",
+      "evidence": "Current commercial launch status explicitly says merchant payment LIVE is not commercially available. Do not block booking-first assisted V1 on it."
+    },
+    {
+      "capability": "THIRD_VOICE_PROVIDER",
+      "status": "OUT_OF_V1",
+      "priority": "DEFER",
+      "evidence": "README lists this as a future commercial milestone; Gemini Live + OpenAI Live already provide the current multi-provider architecture."
+    },
+    {
+      "capability": "FULL_SELF_SERVICE_EXTERNAL_ACTIVATION",
+      "status": "OUT_OF_V1",
+      "priority": "DEFER",
+      "evidence": "Assisted controlled-pilot launch is the current sellable stage; fully self-service provider onboarding should follow real pilot evidence."
+    }
+  ]
+}
