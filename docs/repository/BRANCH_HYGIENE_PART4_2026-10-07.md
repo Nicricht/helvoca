@@ -1,11 +1,12 @@
 # Repository branch hygiene Part 4 — content-equivalent retirement
 
 **Repository:** `Nicricht/helvoca`  
+**PR:** #753  
 **Baseline main:** `86197d1166c162d0d4b3a8f3fe0a4a7cacfb3a15`  
 **Audit branch:** `chore/branch-hygiene-equivalent-20261007`  
 **FRAME CHANGE:** NO
 
-## Fresh baseline
+## Baseline
 
 Before Part 4:
 - total branches: **122**
@@ -13,51 +14,99 @@ Before Part 4:
 - protected branches: **main only**
 - retained categories: **29 SAFE_CONTENT_EQUIVALENT + 92 REVIEW_REQUIRED + main**
 
-Creating this audit branch temporarily raises the live count to **123**.
+Creating the audit branch temporarily raised the live count to **123**.
 
-## Fresh revalidation of the 29 branches
+## Fresh revalidation
 
-All 29 prior SAFE_CONTENT_EQUIVALENT branches were re-compared against the new exact `main`.
+All 29 previously classified SAFE_CONTENT_EQUIVALENT branches were compared again against exact `main@86197d1166c162d0d4b3a8f3fe0a4a7cacfb3a15`.
 
 Result:
-- **26** are strictly behind `main` with `ahead_by = 0`
-- **3** are commit-diverged by one commit but have **zero changed files**
-- **0** have unique file content
-- **29 / 29** remain eligible for a second retirement pass
+- **26** had `ahead_by = 0`
+- **3** were one-commit divergent but had **zero changed files**
+- **0** had unique file content
+- **29 / 29** remained safe retirement candidates
 
-The complete SHA-pinned certificate is:
+SHA-pinned certificate:
 
 `docs/repository/branch-hygiene-safe-content-equivalent-2026-10-07-v2.json`
 
-## Runtime deletion contract
+## Runtime safety contract
 
-A candidate may be deleted only if, immediately before deletion:
+Before each DELETE ref call, the executor required:
 
-1. `main` still equals `86197d1166c162d0d4b3a8f3fe0a4a7cacfb3a15`;
-2. the candidate branch still exists;
-3. it is not protected;
-4. it is not `main` or this audit branch;
-5. it is not the head of an open PR;
-6. its current SHA still equals the certified SHA;
-7. a fresh GitHub compare against exact `main` still proves either:
-   - `ahead_by == 0`, or
-   - zero changed files;
-8. a final branch read immediately before DELETE still returns the same SHA.
+1. exact `main` still matched the certified SHA;
+2. the candidate still existed;
+3. the candidate was not protected;
+4. the candidate was not `main` or the audit branch;
+5. the candidate was not the head of an open PR;
+6. current branch SHA still matched the certificate;
+7. a fresh compare still proved `ahead_by == 0` or zero changed files;
+8. a final branch read immediately before deletion still matched the same SHA.
 
-Any failed invariant means **skip**.
+Any failed invariant meant **skip**.
 
-## Explicit exclusions
+The 92 REVIEW_REQUIRED branches were explicitly excluded.
 
-The 92 REVIEW_REQUIRED branches are not authorized for deletion by Part 4.
+## Part 4 execution
 
-## Expected post-delete state
+GitHub Actions:
+- workflow: **Branch hygiene Part 4 content-equivalent cleanup**
+- run ID: **37580110631**
+- execution HEAD: `102dff17ebcdc1c4d6eaa177cd4bd8a2c97913f5`
+- conclusion: **SUCCESS**
 
-While this audit branch remains open:
+Results:
+- certified candidates: **29**
+- deleted: **29**
+- skipped: **0**
+- failed/unverified: **0**
+- candidates remaining: **0**
+- REVIEW_REQUIRED missing: **0**
+- post-delete branch count: **94**
+
+Execution evidence:
+- artifact: `branch-hygiene-part4-evidence`
+- artifact ID: `11464566084`
+- artifact SHA-256: `635f56363a91ee1a55475fcea7b2c1ee95e1e9f737d276857697ad10c832fd5a`
+
+## Independent post-delete re-audit
+
+Fresh GitHub enumeration after the workflow independently confirmed:
 - total branches: **94**
-- 29 content-equivalent candidates remaining: **0**
-- REVIEW_REQUIRED: **92 / 92**
-- plus `main` and this audit branch
+- protected branches: **main only**
+- open PRs: **#753 only**
+- Part 4 candidates remaining: **0 / 29**
+- REVIEW_REQUIRED retained: **92 / 92**
+- audit branch retained during finalization
+- unexpected remaining branches: **0**
 
-After this PR is merged and its source branch retired:
-- final branches: **93**
-- partition: `main + 92 REVIEW_REQUIRED`
+Partition while this PR remains open:
+
+`main + 92 REVIEW_REQUIRED + audit branch = 94`.
+
+## Railway / production safety
+
+The destructive branch cleanup did not modify `main` and did not trigger a Railway deployment.
+
+Post-cleanup production verification:
+- `helvoca-api`: online, 1/1 replicas running
+- PostgreSQL: online, 1/1 replicas running
+- no warnings or criticals
+- no recent failures
+- no pending work
+- latest API deployment remains `7a44c364-290c-4266-a482-a4b85ac10650`
+- deployed commit remains `86197d1166c162d0d4b3a8f3fe0a4a7cacfb3a15`
+- deployed branch remains `main`
+
+## Finalization
+
+The destructive workflow is a one-shot audit executor and is removed from the final PR diff before integration.
+
+After #753 is merged and its source branch retired, the expected repository state is:
+- **93 total branches**
+- **main**
+- **92 REVIEW_REQUIRED**
+- no SAFE_EXACT_MERGED branches from Part 2
+- no SAFE_CONTENT_EQUIVALENT branches from Part 4
+
+No REVIEW_REQUIRED branch is authorized for deletion by this task.
