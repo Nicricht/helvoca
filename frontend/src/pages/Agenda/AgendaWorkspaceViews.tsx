@@ -524,7 +524,18 @@ export function AgendaScheduleFoundation({
                             height: `${HOUR_HEIGHT / 2}px`
                           }}
                           onClick={() => onCreateSlot(dateKey(date), time)}
-
+                          onDragOver={event => {
+                            if (!canManage) return;
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "move";
+                          }}
+                          onDrop={event => {
+                            if (!canManage) return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const bookingId = event.dataTransfer.getData("text/plain") || draggingBookingId;
+                            handleDrop(bookingId || null, date, time);
+                          }}
                         />
                       );
                     })}
