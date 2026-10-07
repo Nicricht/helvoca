@@ -477,7 +477,7 @@ export function AgendaScheduleFoundation({
                     className={styles.scheduleTimeline}
                     style={{ height: `${timelineHeight}px` }}
                     onDragOver={event => {
-                      if (!canManage || !draggingBookingId) return;
+                      if (!canManage) return;
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
                     }}
