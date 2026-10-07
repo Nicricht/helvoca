@@ -185,7 +185,7 @@ test.describe('React Agenda migration', () => {
     await page.goto('/app/agenda');
 
     await expect(page.getByRole('heading', { level: 1, name: 'Agenda' })).toBeVisible();
-    await expect(page.getByText('Gestiona tus citas y reservas')).toBeVisible();
+    await expect(page.getByText('Qué está pasando hoy y qué está haciendo RecepVoz al respecto.')).toBeVisible();
 
     const switcher = page.getByRole('tablist', { name: 'Vista de Agenda' });
     await expect(switcher.getByRole('tab', { name: 'Semana' })).toHaveAttribute('aria-selected', 'true');
