@@ -247,10 +247,17 @@ export function AgendaScheduleFoundation({
     });
   }, [bookings, dates]);
 
-  const { startHour, endHour } = useMemo(
-    () => scheduleBounds(visibleBookings, serviceMap),
-    [serviceMap, visibleBookings]
-  );
+  const { startHour, endHour } = useMemo(() => {
+    const bounds = scheduleBounds(visibleBookings, serviceMap);
+    const includesToday = dates.some(date => dateKey(date) === dateKey(now));
+    if (!includesToday) return bounds;
+
+    const currentHour = now.getHours();
+    return {
+      startHour: Math.min(bounds.startHour, currentHour),
+      endHour: Math.max(bounds.endHour, Math.min(24, currentHour + 1))
+    };
+  }, [dates, now, serviceMap, visibleBookings]);
 
   const hours = useMemo(
     () => Array.from({ length: endHour - startHour + 1 }, (_, index) => startHour + index),
