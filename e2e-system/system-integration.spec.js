@@ -108,6 +108,7 @@ test.describe('real React + Spring Boot + PostgreSQL system integration', () => 
     await expect(dialog.getByText('Horario disponible', { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: 'Crear reserva' }).click();
 
+    await page.getByRole('tab', { name: 'Lista' }).click();
     const row = page.getByRole('row').filter({ hasText: customerName });
     await expect(row).toBeVisible();
     const testId = await row.getAttribute('data-testid');
@@ -251,6 +252,7 @@ test.describe('real React + Spring Boot + PostgreSQL system integration', () => 
     await publicContext.close();
 
     await page.goto('/app/agenda');
+    await page.getByRole('tab', { name: 'Lista' }).click();
     const internalRow = page.getByRole('row').filter({ hasText: customerName });
     await expect(internalRow).toBeVisible();
     await expect(internalRow).toContainText('Web');

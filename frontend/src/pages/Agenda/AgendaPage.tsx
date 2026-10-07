@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { CustomerQuickCreate } from "../../features/agenda/CustomerQuickCreate";
@@ -20,6 +20,7 @@ import {
   type Customer,
   type ServiceItem
 } from "../../features/agenda/api";
+import { AgendaScheduleFoundation, AgendaViewSwitcher, type AgendaViewMode } from "./AgendaWorkspaceViews";
 import styles from "./AgendaPage.module.css";
 
 type DetailTab = "summary" | "conversation" | "customer" | "activity";
@@ -133,6 +134,12 @@ export function AgendaPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>("summary");
+  const [viewMode, setViewMode] = useState<AgendaViewMode>("week");
+
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 620px)");
+    if (mobile.matches) setViewMode(current => current === "week" ? "day" : current);
+  }, []);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createCustomerId, setCreateCustomerId] = useState("");
@@ -251,6 +258,25 @@ export function AgendaPage() {
     setActionError(null);
   }
 
+  function openCreateAt(date = "", time = "") {
+    setCreateOpen(true);
+    setCreateDate(date);
+    setCreateTime(time);
+    setActionError(null);
+    setCreateAvailability("idle");
+  }
+
+  function prepareVisualReschedule(booking: Booking, date: string, time: string) {
+    setSelectedId(booking.id);
+    setDetailTab("summary");
+    setRescheduleDate(date);
+    setRescheduleTime(time);
+    setRescheduleAvailability("idle");
+    setActionError(null);
+    setRescheduleOpen(true);
+  }
+
+
   function closeBooking() {
     setSelectedId(null);
     setDetailTab("summary");
@@ -368,7 +394,7 @@ export function AgendaPage() {
           <div>
             <p className={styles.eyebrow}>OPERACIÓN</p>
             <h1>Agenda</h1>
-            <p>Gestiona tus citas y reservas</p>
+            <p>Qué está pasando hoy y qué está haciendo RecepVoz al respecto.</p>
           </div>
           <div className={styles.formActions}>
             {canPublishPublicBooking && (
@@ -381,11 +407,7 @@ export function AgendaPage() {
               </button>
             )}
             {canManage && (
-              <button className={styles.primaryButton} type="button" onClick={() => {
-                setCreateOpen(true);
-                setActionError(null);
-                setCreateAvailability("idle");
-              }}>
+              <button className={styles.primaryButton} type="button" onClick={() => openCreateAt()}>
                 + Nueva cita
               </button>
             )}
@@ -425,6 +447,14 @@ export function AgendaPage() {
             <span>Requieren atención</span>
             <strong>{bookingList.filter(item => item.status === "PENDING").length}</strong>
           </article>
+        </section>
+
+        <section className={styles.agendaCommandBar} aria-label="Controles de visualización">
+          <AgendaViewSwitcher value={viewMode} onChange={setViewMode} />
+          <div className={styles.agendaCommandHint}>
+            <span>{viewMode === "week" ? "Semana operativa" : viewMode === "day" ? "Foco del día" : viewMode === "month" ? "Panorama mensual" : "Búsqueda y administración"}</span>
+            <small>Clientes, conversación e historial permanecen en el detalle contextual.</small>
+          </div>
         </section>
 
         <section className={styles.filters} aria-label="Filtros de Agenda">
@@ -491,7 +521,7 @@ export function AgendaPage() {
                 <strong>No hay reservas que coincidan.</strong>
                 <span>Prueba con otros filtros o una búsqueda distinta.</span>
               </div>
-            ) : (
+            ) : viewMode === "list" ? (
               <div className={styles.tableWrap}>
                 <table aria-label="Reservas">
                   <thead>
@@ -536,6 +566,18 @@ export function AgendaPage() {
                   </tbody>
                 </table>
               </div>
+            ) : (
+              <AgendaScheduleFoundation
+                view={viewMode}
+                bookings={filtered}
+                customers={customerList}
+                services={serviceList}
+                selectedId={selectedId}
+                canManage={canManage}
+                onSelect={openBooking}
+                onCreateSlot={openCreateAt}
+                onPrepareReschedule={prepareVisualReschedule}
+              />
             )}
           </section>
 
@@ -693,8 +735,8 @@ export function AgendaPage() {
                       >
                         Comprobar disponibilidad
                       </button>
-                      {rescheduleAvailability === "available" && <span className={styles.available}>Horario disponible</span>}
-                      {rescheduleAvailability === "unavailable" && <span className={styles.unavailable}>Horario no disponible</span>}
+                      {rescheduleAvailability === "available" && <span className={styles.available} role="status" aria-live="polite">Horario disponible</span>}
+                      {rescheduleAvailability === "unavailable" && <span className={styles.unavailable} role="status" aria-live="polite">Horario no disponible</span>}
                       <button
                         className={styles.primaryButton}
                         type="button"

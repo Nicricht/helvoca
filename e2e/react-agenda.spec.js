@@ -180,12 +180,25 @@ async function bootAgenda(page, options = {}) {
 }
 
 test.describe('React Agenda migration', () => {
-  test('renders Agenda as a table-first operational workspace', async ({ page }) => {
+  test('opens Agenda in week mode and preserves the operational List view', async ({ page }) => {
     await bootAgenda(page);
     await page.goto('/app/agenda');
 
     await expect(page.getByRole('heading', { level: 1, name: 'Agenda' })).toBeVisible();
-    await expect(page.getByText('Gestiona tus citas y reservas')).toBeVisible();
+    await expect(page.getByText('Qué está pasando hoy y qué está haciendo RecepVoz al respecto.')).toBeVisible();
+
+    const switcher = page.getByRole('tablist', { name: 'Vista de Agenda' });
+    await expect(switcher.getByRole('tab', { name: 'Semana' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('agenda-calendar-foundation')).toHaveAttribute('data-agenda-view', 'week');
+
+    const weekBooking = page.getByTestId('agenda-row-b1');
+    await expect(weekBooking).toContainText('Ana Reserva');
+    await expect(weekBooking).toContainText('Evaluación dental');
+    await expect(weekBooking).toContainText('Voz');
+    await expect(weekBooking).toContainText('Confirmada');
+
+    await switcher.getByRole('tab', { name: 'Lista' }).click();
+    await expect(switcher.getByRole('tab', { name: 'Lista' })).toHaveAttribute('aria-selected', 'true');
 
     const table = page.getByRole('table', { name: 'Reservas' });
     await expect(table).toBeVisible();
@@ -196,12 +209,144 @@ test.describe('React Agenda migration', () => {
       'Origen',
       'Estado'
     ]);
+    await expect(page.getByTestId('agenda-row-b1')).toContainText('Ana Reserva');
+  });
 
-    const row = page.getByTestId('agenda-row-b1');
-    await expect(row).toContainText('Ana Reserva');
-    await expect(row).toContainText('Evaluación dental');
-    await expect(row).toContainText('Voz');
-    await expect(row).toContainText('Confirmada');
+  test('switches Day, Week and Month without losing filtered booking context', async ({ page }) => {
+    await bootAgenda(page);
+    await page.goto('/app/agenda');
+
+    const switcher = page.getByRole('tablist', { name: 'Vista de Agenda' });
+
+    await switcher.getByRole('tab', { name: 'Día' }).click();
+    await expect(page.getByTestId('agenda-calendar-foundation')).toHaveAttribute('data-agenda-view', 'day');
+
+    await switcher.getByRole('tab', { name: 'Mes' }).click();
+    await expect(page.getByTestId('agenda-calendar-foundation')).toHaveAttribute('data-agenda-view', 'month');
+
+    await switcher.getByRole('tab', { name: 'Semana' }).click();
+    await page.getByRole('searchbox', { name: 'Buscar reservas' }).fill('Ana');
+    await expect(page.getByTestId('agenda-row-b1')).toBeVisible();
+    await expect(page.getByTestId('agenda-row-b2')).toHaveCount(0);
+
+    await switcher.getByRole('tab', { name: 'Lista' }).click();
+    await expect(page.getByTestId('agenda-row-b1')).toBeVisible();
+    await expect(page.getByTestId('agenda-row-b2')).toHaveCount(0);
+    await expect(page.getByRole('searchbox', { name: 'Buscar reservas' })).toHaveValue('Ana');
+  });
+
+  test('supports keyboard navigation across Agenda views', async ({ page }) => {
+    await bootAgenda(page);
+    await page.goto('/app/agenda');
+
+    const switcher = page.getByRole('tablist', { name: 'Vista de Agenda' });
+    const week = switcher.getByRole('tab', { name: 'Semana' });
+    const month = switcher.getByRole('tab', { name: 'Mes' });
+
+    await week.focus();
+    await page.keyboard.press('ArrowRight');
+
+    await expect(month).toHaveAttribute('aria-selected', 'true');
+    await expect(month).toBeFocused();
+    await expect(page.getByTestId('agenda-calendar-foundation')).toHaveAttribute('data-agenda-view', 'month');
+
+    await page.keyboard.press('ArrowLeft');
+    await expect(week).toHaveAttribute('aria-selected', 'true');
+    await expect(week).toBeFocused();
+  });
+
+  test('positions bookings on the real time grid and scales block height by duration', async ({ page }) => {
+    await bootAgenda(page);
+    await page.goto('/app/agenda');
+
+    const calendar = page.getByTestId('agenda-calendar-foundation');
+    await expect(calendar).toHaveAttribute('data-agenda-view', 'week');
+
+    const shortBooking = page.getByTestId('agenda-row-b1');
+    const longBooking = page.getByTestId('agenda-row-b2');
+
+    await expect(shortBooking).toHaveAttribute('data-duration-minutes', '30');
+    await expect(longBooking).toHaveAttribute('data-duration-minutes', '60');
+
+    expect(await shortBooking.evaluate(element => getComputedStyle(element).position)).toBe('absolute');
+    expect(await longBooking.evaluate(element => getComputedStyle(element).position)).toBe('absolute');
+
+    const shortBox = await shortBooking.boundingBox();
+    const longBox = await longBooking.boundingBox();
+    expect(shortBox).not.toBeNull();
+    expect(longBox).not.toBeNull();
+    expect(longBox.height).toBeGreaterThan(shortBox.height);
+
+    await expect(page.getByText('07:00', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('agenda-now-line')).toBeVisible();
+  });
+
+  test('navigates weeks and returns to today without losing the selected view', async ({ page }) => {
+    await bootAgenda(page);
+    await page.goto('/app/agenda');
+
+    await expect(page.getByTestId('agenda-row-b1')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Semana siguiente' }).click();
+    await expect(page.getByTestId('agenda-row-b1')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Hoy', exact: true }).click();
+    await expect(page.getByTestId('agenda-row-b1')).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Semana' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('clicks an empty calendar slot and prefills a new appointment without mutating first', async ({ page }) => {
+    let created = null;
+    await bootAgenda(page, { onCreate: value => { created = value; } });
+    await page.goto('/app/agenda');
+
+    await page.getByTestId('agenda-slot-2026-10-07-1000').click();
+
+    const dialog = page.getByRole('dialog', { name: 'Nueva cita' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel('Fecha')).toHaveValue('2026-10-07');
+    await expect(dialog.getByLabel('Hora')).toHaveValue('10:00');
+    expect(created).toBeNull();
+  });
+
+  test('dragging a booking prepares a safe reschedule and never patches before confirmation', async ({ page }) => {
+    let patch = null;
+    await bootAgenda(page, { onPatch: value => { patch = value; } });
+    await page.goto('/app/agenda');
+
+    const booking = page.getByTestId('agenda-row-b1');
+    const target = page.getByTestId('agenda-slot-2026-10-07-1130');
+    const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+
+    await booking.dispatchEvent('dragstart', { dataTransfer });
+    await target.dispatchEvent('dragover', { dataTransfer });
+    await target.dispatchEvent('drop', { dataTransfer });
+    await booking.dispatchEvent('dragend', { dataTransfer });
+
+    const dialog = page.getByRole('dialog', { name: 'Reserva · Ana Reserva' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Reprogramar' })).toBeVisible();
+    await expect(dialog.getByLabel('Fecha')).toHaveValue('2026-10-07');
+    await expect(dialog.getByLabel('Hora')).toHaveValue('11:30');
+    expect(patch).toBeNull();
+  });
+
+  test('uses Day as the mobile default and keeps detail navigation contained', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await bootAgenda(page);
+    await page.goto('/app/agenda');
+
+    await expect(page.getByRole('tab', { name: 'Día' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('agenda-calendar-foundation')).toHaveAttribute('data-agenda-view', 'day');
+
+    await page.getByRole('tab', { name: 'Semana' }).click();
+    await page.getByTestId('agenda-row-b1').click();
+    const dialog = page.getByRole('dialog', { name: 'Reserva · Ana Reserva' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('button', { name: '← Volver a Agenda' })).toBeVisible();
+
+    await dialog.getByRole('button', { name: '← Volver a Agenda' }).click();
+    await expect(page.getByTestId('agenda-calendar-foundation')).toBeVisible();
   });
 
   test('renders WhatsApp booking source and authoritative status in React Agenda', async ({ page }) => {
@@ -286,7 +431,7 @@ test.describe('React Agenda migration', () => {
     expect(mutations).toEqual([]);
   });
 
-  test('keeps the table usable if contextual conversation fails', async ({ page }) => {
+  test('keeps the schedule usable if contextual conversation fails', async ({ page }) => {
     await bootAgenda(page, { contextError: true });
     await page.goto('/app/agenda');
 
