@@ -238,15 +238,31 @@ La ruta interna `/webhooks/v1/twilio/inbound-certification` está deshabilitada 
 - `docs/API.md`
 - `docs/design/`
 
-## Próximos hitos comerciales
+## Estado de cierre V1
 
-1. configurar al menos un proveedor Live con credenciales y capacidad activa
-2. certificar una llamada real completa con audio, interrupciones y tool calling
-3. agregar un tercer proveedor full-duplex como contingencia comercial
-4. configuración del agente por tenant
-5. horarios y excepciones
-6. transferencia humana
-7. dashboard mínimo
-8. onboarding self-service
-9. medición de uso y costo por llamada
-10. planes, límites y billing
+El core V1 ya implementa en `main`:
+
+- configuración del agente por tenant;
+- horarios y excepciones;
+- transferencia humana;
+- dashboard/operación;
+- onboarding e importación asistida;
+- medición de uso;
+- planes, límites, entitlements y billing SaaS;
+- Agenda/reservas, pedidos e inventario;
+- voz multi-provider y stack Meta WhatsApp;
+- launch cage, readiness, kill switches y observabilidad de piloto.
+
+Para un primer cliente, el trabajo pendiente ya no es construir estos subsistemas. Son compuertas de activación que dependen del alcance vendido:
+
+1. certificar voz real para el tenant si el plan incluye voz;
+2. certificar entrega real de Meta WhatsApp si se incluye ese canal;
+3. completar un round-trip de Mercado Pago TEST si el cobro SaaS automático se exige desde el primer lanzamiento;
+4. completar onboarding, responsables, alcance, criterio de éxito y obtener `Launch Cage GO`.
+
+No bloquean V1: un tercer proveedor de voz, merchant payments LIVE para los clientes del negocio ni la automatización total de todos los proveedores externos.
+
+La matriz de cierre y su cruce contra las ramas históricas están en:
+
+- `docs/repository/HELVOCA_V1_FINISH_AUDIT_2026-10-07.md`;
+- `docs/repository/HELVOCA_V1_FINISH_BRANCH_CROSS_2026-10-07.md`.
