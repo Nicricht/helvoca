@@ -1,163 +1,152 @@
 # Repository branch hygiene audit — 2026-10-07
 
-**Status:** Audited / no refs deleted yet
+**Status:** Part 1 complete / no refs deleted
 **Repository:** `Nicricht/helvoca`
 **Baseline main:** `0780f372a1ac8963f0e1c937596e4ea20bc4c051`
 **FRAME CHANGE:** NO
 
-## Purpose
+## Fresh current snapshot
 
-Reduce historical branch debt without deleting work that has not been proven redundant.
+The audit was recomputed from GitHub after PR #751 and after opening this audit PR.
 
-This cleanup is deliberately conservative. Branch age, naming style, or apparent purpose is **not** enough to delete a ref.
-
-## Fresh repository snapshot
-
-A fresh GitHub audit after PR #751 found:
-
-- total branches: **701**
+- current total branches: **702**
+- non-main branches: **701**
 - protected branches: **1**
-- protected branch: `main`
-- non-main branches: **700**
+- protected/default branch: `main`
 - closed pull requests scanned: **744**
 - merged pull requests scanned: **622**
-- open pull requests at the baseline: **0**
+- current open pull requests: **1**
+- open PR: **#752**, head `chore/branch-hygiene-20261007`
+- branch refs deleted in Part 1: **0**
 
-## High-confidence classification
+The earlier 701-branch number was the pre-audit-branch baseline. Creating `chore/branch-hygiene-20261007` raised the live total to 702.
 
-### Class A — exact merged-head branches
+## Final conservative classification
 
-**579 branches**
+The 702 current branches partition exactly into:
 
-A branch belongs to Class A only when all of the following are true:
+| Category | Count | Automatic Part 2 deletion? |
+| --- | ---: | --- |
+| SAFE_EXACT_MERGED | **579** | **YES**, after runtime rechecks |
+| SAFE_CONTENT_EQUIVALENT | **29** | **NO** in the first pass |
+| REVIEW_REQUIRED | **92** | **NO** |
+| SPECIAL_KEEP | **2** | **NO** |
+| **TOTAL** | **702** | |
 
-1. it is not `main`;
-2. its current branch HEAD SHA exactly equals the recorded `head.sha` of a pull request;
-3. that pull request is actually merged;
-4. the branch has not moved since that merge.
+Partition check: `579 + 29 + 92 + 2 = 702`.
 
-This is the strongest automated retirement class.
+## SAFE_EXACT_MERGED — 579
 
-Examples from the newest end of the set include:
+Invariant:
 
-- `chore/legacy-root-cleanup` -> PR #751
-- `feat/react-public-entry-migration` -> PR #750
-- `feat/react-pricing-migration` -> PR #749
-- `feat/react-sales-landing` -> PR #748
-- `feat/react-invite-migration` -> PR #747
-- `feat/react-platform-console-migration` -> PR #746
-- `refactor/retire-legacy-phone-numbers` -> PR #745
-- `feat/react-business-import-migration` -> PR #744
-- `feat/react-internal-operations-migration` -> PR #743
-- `feat/react-simulator-migration` -> PR #742
+1. branch is not `main`;
+2. branch is not protected;
+3. current branch HEAD SHA exactly equals a recorded `head.sha` from a merged pull request;
+4. therefore the ref has not moved since that merged PR head.
 
-Because each branch still points to the exact PR head that GitHub records for the merged PR, the branch ref is redundant with permanent pull-request and commit history.
+The complete machine-readable candidate list is:
 
-### Class B — branch name was merged, but the branch moved afterward
+`docs/repository/branch-hygiene-safe-exact-merged-2026-10-07.json`
 
-**11 branches**
+This is the only category authorized for the first automatic retirement pass in Part 2.
 
-These are **not automatically deletable**.
+## SAFE_CONTENT_EQUIVALENT — 29
 
-A merged PR exists for the same branch name, but the current branch SHA differs from the SHA that was merged. This can mean the branch was reused or received additional commits.
+These branches are not exact merged-head matches, but a conservative GitHub compare against `main` proves no unique file content remains on the branch side:
 
-Examples include:
+- `ahead_by == 0`, or
+- the compare is not marked too large and returns zero changed files.
 
-- `chore/commercial-release-candidate-v1`
+They are intentionally **not** included in the first automatic delete pass. They can be considered separately after the exact class is retired.
+
+Complete evidence:
+
+`docs/repository/branch-hygiene-safe-content-equivalent-2026-10-07.json`
+
+Branches:
+
+- `chore/recepvoz-section-assets-20261003`
+- `design/live-demo-center-v1-rebase-cabafd`
+- `diag/whatsapp-booking-flow-state`
 - `feat/booking-payment-attendance-revenue`
+- `feat/frontend-billing-account-finish`
+- `feat/frontend-commerce-operations-finish`
+- `feat/frontend-conversations-calls-finish`
+- `feat/frontend-dashboard-finish`
+- `feat/frontend-foundation-dark`
+- `feat/frontend-onboarding-settings-finish`
 - `feat/home-owner-value-dashboard`
+- `feat/inventory-admin-alerts-restock-v1`
+- `feat/omnichannel-core`
+- `feat/omnichannel-inventory-integration-v1`
+- `feat/owner-commercial-timeline-v1`
+- `feat/platform-assisted-onboarding`
 - `feat/sales-business-analytics`
 - `feat/universal-business-import`
 - `fix/frontend-desktop-nav-labels`
-- `security-hardening`
+- `fix/whatsapp-separate-twilio-credentials-20260919`
+- `release/recepvoz-v1-pilot`
+- `release/recepvoz-v1.0`
 - `test/business-import-real-world-hardening`
+- `test/frontend-foundation-red-ci`
+- `test/rc-preflight-red-base`
+- `test/rc-preflight-red-v1`
+- `verify-main-post-rc-529`
+- `verify-main-post-v6-534`
+- `verify/main-recepvoz-v1-final`
 
-Class B requires an explicit compare/content audit before any retirement.
+## REVIEW_REQUIRED — 92
 
-### Class C — no merged PR found under the same branch name
+These branches still have a non-empty branch-side file delta in GitHub compare and therefore are **not proven redundant**.
 
-**110 branches**
+They include moved/reused historical branches and old branches without a same-name merged PR. They must not be automatically deleted.
 
-These are also **not automatically deletable**.
+Complete compare evidence:
 
-This group includes historical diagnostics, verification refs, experiments, abandoned migrations and possibly unique work. The absence of a same-name merged PR is not proof that the branch is valuable, but it is also not proof that it is redundant.
+`docs/repository/branch-hygiene-review-required-2026-10-07.json`
 
-Examples include:
+## SPECIAL_KEEP — 2
 
-- `feat/react-agenda-migration`
-- `feat/react-conversations-migration`
-- `feat/react-customers-migration`
-- `feat/react-settings-full-cutover`
-- `feat/frontend-orphan-branch-rescue`
-- `feat/frontend-dashboard-finish`
-- `feat/landing-hero-dark-v1`
-- `cert/saas-billing-sandbox-provider-run-1`
-- several diagnostic and production-verification branches
+- `main` — protected/default branch.
+- `chore/branch-hygiene-20261007` — active head of open draft PR #752 and contains this audit.
 
-Class C requires separate evidence before retirement.
+## Runtime safety contract for Part 2
 
-## Safety policy for deletion
-
-Part 2 may delete **only Class A** automatically.
-
-Before deleting each ref, the cleanup executor must re-check at execution time:
+Before deleting any SAFE_EXACT_MERGED ref, recompute and require all of the following at execution time:
 
 1. branch still exists;
 2. branch is not protected;
 3. branch is not `main`;
-4. no open pull request currently uses the branch as its head;
-5. current branch SHA still exactly matches a merged PR head SHA.
+4. branch is not the head of any open PR;
+5. current branch HEAD still exactly equals a merged PR head SHA.
 
-If any check fails, skip the branch.
+Any failed invariant means **skip**, not force.
 
-No Class B or Class C ref may be deleted by the automated pass.
+No SAFE_CONTENT_EQUIVALENT, REVIEW_REQUIRED or SPECIAL_KEEP branch may be deleted by the first automated pass.
 
-## Recovery model
+## Recovery
 
-Deleting a Class A branch removes only the branch ref.
+Deleting an exact merged-head branch removes only the branch ref. The merged PR and exact commit SHA remain in GitHub history.
 
-Recovery remains possible because GitHub permanently records the merged pull request and its exact head SHA. A retired branch can therefore be recreated from the PR head SHA if needed.
+The Part 2 execution report must record branch name, SHA, merged PR number, deletion result, and any skip reason.
 
-The execution report must record:
-- branch name;
-- SHA;
-- merged PR number;
-- deletion result or skip reason.
+## Tool limitation
 
-## Execution design
+The connected GitHub toolset currently exposes `update_ref` but no direct safe `delete_branch` / `delete_ref` mutation.
 
-The connected GitHub API available in this chat does not expose a direct branch-ref delete action.
+`update_ref` must never be used to simulate deletion.
 
-Therefore Part 2 should use a narrowly scoped, one-time GitHub Actions cleanup executor with `contents: write` that:
-
-1. recomputes Class A from GitHub at runtime;
-2. performs all safety checks again;
-3. emits a machine-readable audit artifact before deletion;
-4. deletes only refs that still satisfy the Class A invariant;
-5. never deletes the current workflow branch, `main`, protected refs, open-PR heads, Class B, or Class C;
-6. reports exact deleted/skipped totals.
-
-The executor itself should then be removed after the cleanup is certified.
-
-## Expected first-pass effect
-
-If repository state does not change between audit and execution:
-
-- branches before: **701**
-- high-confidence Class A candidates: **579**
-- expected branches after Class A retirement: approximately **122**
-  - `main`
-  - 11 Class B refs
-  - 110 Class C refs
-
-The final number may be higher if runtime safety checks skip any candidate.
+Part 2 must re-check the available tool catalog. If direct deletion is still unavailable, use only a narrowly scoped repository-side executor that performs the runtime safety contract above and emits a machine-readable report.
 
 ## Part 1 acceptance
 
-Part 1 is complete when:
+Part 1 is complete because:
 
-- fresh counts are recorded;
-- the high-confidence criterion is explicit;
-- Class B/C are protected from automatic deletion;
-- the execution and recovery procedure is documented;
-- no branch refs have been deleted yet.
+- `main` and Railway production were revalidated;
+- all current branches were enumerated;
+- all closed/merged PR history required for matching was scanned;
+- exact branch HEAD vs merged-PR-head matching was recomputed;
+- every non-exact historical branch was compared conservatively against `main`;
+- current open PR heads and protected refs were separated;
+- complete machine-readable lists are persisted;
+- **zero branch refs were deleted**.
