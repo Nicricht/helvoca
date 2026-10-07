@@ -1,0 +1,230 @@
+{
+  "schema": "helvoca.v1-finish-branch-cross.v1",
+  "repository": "Nicricht/helvoca",
+  "audited_main_sha": "10fe716c462d5c8d32b4c004ddbc45bb4938c1c8",
+  "retained_historical_refs_considered": 60,
+  "conclusion": {
+    "whole_branch_merges_required_for_v1": 0,
+    "production_code_rescues_required_for_v1": 0,
+    "optional_nonblocking_test_hardening_sources": [
+      "fix/real-call-certification-regressions-v1"
+    ],
+    "external_or_operational_p1_gates_remaining": [
+      "VOICE_REAL_TENANT_CERTIFICATION",
+      "WHATSAPP_REAL_TENANT_CERTIFICATION",
+      "MERCADOPAGO_TEST_ROUNDTRIP",
+      "FIRST_CUSTOMER_ACTIVATION_EVIDENCE"
+    ],
+    "rule": "Historical branches cannot substitute for provider/customer evidence. Do not delay the V1 RC for branch archaeology."
+  },
+  "gates": [
+    {
+      "gate": "VOICE_REAL_TENANT_CERTIFICATION",
+      "can_be_closed_by_branch_merge": false,
+      "branch_findings": [
+        {
+          "branch": "fix/real-call-certification-regressions-v1",
+          "verdict": "OPTIONAL_TEST_HARDENING_ONLY",
+          "evidence": [
+            "PR #509 was merged at an earlier head; the ref later moved by two test-only commits.",
+            "Current main already contains the guarded cleanup implementation, including exact Twilio provider CallSid matching.",
+            "Current main already tests missing linked booking under a renamed scenario.",
+            "Two useful branch-only coverage ideas remain: malformed premature confirmation identifiers fail closed; unexpected booking status fails closed."
+          ]
+        },
+        {
+          "branch": "fix/real-cert-cleanup-provider-guard-v1",
+          "verdict": "SUPERSEDED_BY_MAIN",
+          "evidence": [
+            "Current main RealCallCertificationCleanupRunner binds cleanup to providerCallId.",
+            "Current main includes refusesCleanupWhenProviderCallSidDoesNotMatchExactCertificationCall."
+          ]
+        },
+        {
+          "branch": "perf/voice-latency-v1",
+          "verdict": "SUPERSEDED_BY_MAIN",
+          "evidence": [
+            "GeminiLiveLowLatencySetupTest blob is byte-identical between this branch and current main."
+          ]
+        },
+        {
+          "branch": "ci/voice-chilean-sensual-hangup-repeat-v2",
+          "verdict": "CERTIFICATION_ONLY_NO_MERGE",
+          "evidence": [
+            "PR #493 explicitly says DO NOT MERGE and identifies PR #492 as the implementation source."
+          ]
+        },
+        {
+          "branch": "release/recepvoz-v1-pilot-rc",
+          "verdict": "SUPERSEDED_BY_MAIN",
+          "evidence": [
+            "VoiceCommercialLifecycleCertificationTest is byte-identical in current main.",
+            "Current main contains later production and certification work beyond this historical RC."
+          ]
+        }
+      ],
+      "remaining_action": "External tenant-specific carrier/interruption certification in an explicitly authorized pilot window, only if voice is sold."
+    },
+    {
+      "gate": "WHATSAPP_REAL_TENANT_CERTIFICATION",
+      "can_be_closed_by_branch_merge": false,
+      "branch_findings": [
+        {
+          "branch": "feat/meta-embedded-signup-selected-phone-validation-20260920",
+          "verdict": "SUPERSEDED_BY_MAIN",
+          "evidence": [
+            "PR #244 explicitly says it was superseded by merged PR #243.",
+            "Current main has the same selected-phone validation concept plus WABA app-subscription enforcement and human audit."
+          ]
+        },
+        {
+          "branch": "fix/meta-operator-connect-fail-closed",
+          "verdict": "SUPERSEDED_BY_MAIN",
+          "evidence": [
+            "PR #280 explicitly says it was superseded by merged PR #282."
+          ]
+        },
+        {
+          "branch": "fix/meta-activation-require-disabled-state",
+          "verdict": "SUPERSEDED_BY_CURRENT_ACTIVATION_MODEL",
+          "evidence": [
+            "The historical branch enforced a disabled-before-activate invariant.",
+            "Current main intentionally uses a newer staged activation model: tests include activateArmsUncertifiedTenantWhenPilotPreflightIsReady and idempotent/audited sender behavior.",
+            "Current main additionally gates activation on certification preflight and deployment readiness while global delivery remains separately controlled."
+          ]
+        },
+        {
+          "branch": "diag/log-full-waba-id",
+          "verdict": "DIAGNOSTIC_ONLY",
+          "evidence": [
+            "Single diagnostic startup-runner change; it cannot prove real provider delivery."
+          ]
+        },
+        {
+          "branch": "fix/whatsapp-sandbox-sender-20260918",
+          "verdict": "NOT_THE_CURRENT_META_GATE",
+          "evidence": [
+            "This is historical Twilio WhatsApp sandbox configuration, while the current P1 is tenant-specific Meta WhatsApp real delivery certification."
+          ]
+        }
+      ],
+      "remaining_action": "Authorized real Meta tenant certification with actual provider delivery/status evidence, only if WhatsApp is sold."
+    },
+    {
+      "gate": "MERCADOPAGO_TEST_ROUNDTRIP",
+      "can_be_closed_by_branch_merge": false,
+      "branch_findings": [
+        {
+          "branch": "cert/saas-billing-sandbox-provider-run-1",
+          "verdict": "ARCHIVE_EVIDENCE_ONLY_FOR_V1",
+          "evidence": [
+            "Current main already contains SaaS Billing Sandbox Provider Certification workflow and MercadoPagoSaasSandboxProviderIT.",
+            "The branch one-shot workflow hardcodes a historical test-user email rather than improving the current parameterized manual-dispatch gate.",
+            "The unique invoice-bridge IT hardcodes historical subscription/invoice/business identifiers.",
+            "Neither the branch nor a merge can substitute for actual signed provider webhook delivery and a completed TEST buyer flow."
+          ]
+        },
+        {
+          "branch": "release/recepvoz-v1-pilot-rc",
+          "verdict": "SUPERSEDED_BY_MAIN",
+          "evidence": [
+            "V77 SaaS billing idempotency migration is byte-identical in current main.",
+            "BillingSubscriptionServiceEdgeCasesTest is byte-identical in current main.",
+            "Current main retains the provider workflow and newer billing readiness documentation."
+          ]
+        },
+        {
+          "branch": "fix/mercadopago-order-idempotency-uuid",
+          "verdict": "OUT_OF_V1_GATE",
+          "evidence": [
+            "This branch concerns merchant/order payments, not the SaaS subscription billing provider round-trip defined as the V1 P1."
+          ]
+        }
+      ],
+      "remaining_action": "Run the existing current-main TEST workflow with authorized Mercado Pago TEST credentials/user and capture real provider round-trip evidence if automatic SaaS billing is required for launch."
+    },
+    {
+      "gate": "FIRST_CUSTOMER_ACTIVATION_EVIDENCE",
+      "can_be_closed_by_branch_merge": false,
+      "branch_findings": [
+        {
+          "branch": "pilot/first-business-readiness-v1",
+          "verdict": "FUNCTIONALLY_SUPERSEDED_BY_MAIN",
+          "evidence": [
+            "Historical branch added GET /api/v1/operations/pilot-preflight.",
+            "Current main exposes the same endpoint through PilotGoNoGoController.",
+            "Current PilotGoNoGoService is broader: technical readiness, activation checklist, lifecycle, external-effect guard, inventory, stock alerts, reconciliation and metrics."
+          ]
+        },
+        {
+          "branch": "pilot/first-business-readiness-v1-certify",
+          "verdict": "CERTIFICATION_ONLY",
+          "evidence": [
+            "PR #544 explicitly says DRAFT / NO MERGE and that it introduced no additional code."
+          ]
+        },
+        {
+          "branch": "chore/commercial-release-candidate-v2",
+          "verdict": "SUPERSEDED_BY_MAIN",
+          "evidence": [
+            "The current main contains Controlled Real Business Pilot V1, PilotGoNoGoService/Controller and the launch-cage safety model."
+          ]
+        },
+        {
+          "branch": "release/recepvoz-v1-pilot-rc",
+          "verdict": "SUPERSEDED_BY_MAIN",
+          "evidence": [
+            "Key release hardening, voice certification and billing files are exact or evolved in current main.",
+            "GoldenJourneyCommercialV1IntegrationTest is substantially larger in current main than in the historical RC."
+          ]
+        },
+        {
+          "branch": "integration/commercial-demo-onboarding-v1",
+          "verdict": "NO_CUSTOMER_EVIDENCE",
+          "evidence": [
+            "Historical onboarding/demo scaffolding cannot replace a completed customer-specific onboarding record, owners, sold scope, success metric and launch authorization."
+          ]
+        }
+      ],
+      "remaining_action": "Complete actual first-customer onboarding/ownership/scope/success/payment evidence and obtain tenant Launch Cage GO. This is operational evidence, not missing branch code."
+    }
+  ],
+  "part6_special_refs_finish_ruling": [
+    {
+      "branch": "fix/real-call-certification-regressions-v1",
+      "ruling": "OPTIONAL_NONBLOCKING_TEST_HARDENING"
+    },
+    {
+      "branch": "cert/saas-billing-sandbox-provider-run-1",
+      "ruling": "ARCHIVE_EVIDENCE_ONLY_FOR_V1"
+    },
+    {
+      "branch": "docs/recepvoz-engineering-operating-system",
+      "ruling": "DEFER_POST_V1"
+    },
+    {
+      "branch": "feat/frontend-orphan-branch-rescue",
+      "ruling": "DEFER_POST_V1_ARCHIVE"
+    },
+    {
+      "branch": "feat/recepvoz-commercial-mvp",
+      "ruling": "DEFER_POST_V1_ARCHIVE"
+    },
+    {
+      "branch": "chore/commercial-release-candidate-v1",
+      "ruling": "DEFER_POST_V1_ARCHIVE"
+    },
+    {
+      "branch": "pilot/first-business-readiness-v1",
+      "ruling": "REFERENCE_ONLY_FUNCTIONALLY_SUPERSEDED"
+    }
+  ],
+  "part3_contract": [
+    "Do not merge any historical branch wholesale.",
+    "Do not delay RC for branch archaeology.",
+    "Optionally re-express only the two useful missing voice regression test ideas against current main APIs.",
+    "Fix documentation drift that still presents already-implemented capabilities as future milestones.",
+    "Build/certify one final RC from current main.",
+    "Do not perform real voice, WhatsApp or payment effects without explicit external authorization."
+  ]
+}
