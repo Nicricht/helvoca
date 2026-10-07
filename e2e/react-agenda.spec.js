@@ -230,6 +230,46 @@ test.describe('React Agenda migration', () => {
     await expect(page.getByTestId('agenda-row-b2')).toHaveCount(0);
   });
 
+  test('positions bookings on the real time grid and scales block height by duration', async ({ page }) => {
+    await bootAgenda(page);
+    await page.goto('/app/agenda');
+
+    const calendar = page.getByTestId('agenda-calendar-foundation');
+    await expect(calendar).toHaveAttribute('data-agenda-view', 'week');
+
+    const shortBooking = page.getByTestId('agenda-row-b1');
+    const longBooking = page.getByTestId('agenda-row-b2');
+
+    await expect(shortBooking).toHaveAttribute('data-duration-minutes', '30');
+    await expect(longBooking).toHaveAttribute('data-duration-minutes', '60');
+
+    expect(await shortBooking.evaluate(element => getComputedStyle(element).position)).toBe('absolute');
+    expect(await longBooking.evaluate(element => getComputedStyle(element).position)).toBe('absolute');
+
+    const shortBox = await shortBooking.boundingBox();
+    const longBox = await longBooking.boundingBox();
+    expect(shortBox).not.toBeNull();
+    expect(longBox).not.toBeNull();
+    expect(longBox.height).toBeGreaterThan(shortBox.height);
+
+    await expect(page.getByText('07:00', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('agenda-now-line')).toBeVisible();
+  });
+
+  test('navigates weeks and returns to today without losing the selected view', async ({ page }) => {
+    await bootAgenda(page);
+    await page.goto('/app/agenda');
+
+    await expect(page.getByTestId('agenda-row-b1')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Semana siguiente' }).click();
+    await expect(page.getByTestId('agenda-row-b1')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Hoy', exact: true }).click();
+    await expect(page.getByTestId('agenda-row-b1')).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Semana' })).toHaveAttribute('aria-selected', 'true');
+  });
+
   test('renders WhatsApp booking source and authoritative status in React Agenda', async ({ page }) => {
     await bootAgenda(page);
     await page.goto('/app/agenda');
