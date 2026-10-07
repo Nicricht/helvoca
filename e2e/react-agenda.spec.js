@@ -235,6 +235,26 @@ test.describe('React Agenda migration', () => {
     await expect(page.getByRole('searchbox', { name: 'Buscar reservas' })).toHaveValue('Ana');
   });
 
+  test('supports keyboard navigation across Agenda views', async ({ page }) => {
+    await bootAgenda(page);
+    await page.goto('/app/agenda');
+
+    const switcher = page.getByRole('tablist', { name: 'Vista de Agenda' });
+    const week = switcher.getByRole('tab', { name: 'Semana' });
+    const month = switcher.getByRole('tab', { name: 'Mes' });
+
+    await week.focus();
+    await page.keyboard.press('ArrowRight');
+
+    await expect(month).toHaveAttribute('aria-selected', 'true');
+    await expect(month).toBeFocused();
+    await expect(page.getByTestId('agenda-calendar-foundation')).toHaveAttribute('data-agenda-view', 'month');
+
+    await page.keyboard.press('ArrowLeft');
+    await expect(week).toHaveAttribute('aria-selected', 'true');
+    await expect(week).toBeFocused();
+  });
+
   test('positions bookings on the real time grid and scales block height by duration', async ({ page }) => {
     await bootAgenda(page);
     await page.goto('/app/agenda');
