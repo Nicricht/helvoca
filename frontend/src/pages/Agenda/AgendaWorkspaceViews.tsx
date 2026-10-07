@@ -296,9 +296,9 @@ export function AgendaScheduleFoundation({
     return `Crear cita · ${label} · ${time}`;
   }
 
-  function handleDrop(date: Date, time: string) {
-    if (!draggingBookingId || !canManage) return;
-    const booking = bookings.find(item => item.id === draggingBookingId);
+  function handleDrop(bookingId: string | null, date: Date, time: string) {
+    if (!bookingId || !canManage) return;
+    const booking = bookings.find(item => item.id === bookingId);
     setDraggingBookingId(null);
     if (!booking) return;
     onPrepareReschedule(booking, dateKey(date), time);
@@ -511,7 +511,8 @@ export function AgendaScheduleFoundation({
                           }}
                           onDrop={event => {
                             event.preventDefault();
-                            handleDrop(date, time);
+                            const bookingId = event.dataTransfer.getData("text/plain") || draggingBookingId;
+                            handleDrop(bookingId || null, date, time);
                           }}
                         />
                       );
