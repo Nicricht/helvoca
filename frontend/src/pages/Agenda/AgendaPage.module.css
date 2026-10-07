@@ -1025,3 +1025,434 @@
     transition-duration: .01ms !important;
   }
 }
+
+
+/* === Agenda calendar workspace v1 / Part 1 ============================ */
+.visualHero {
+  min-height: 188px;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 0.56fr);
+  padding: 22px 26px;
+}
+
+.visualHeroCopy h2 {
+  max-width: 620px;
+  margin-top: 9px;
+  font-size: clamp(28px, 2.75vw, 42px);
+  line-height: 1.02;
+}
+
+.visualHeroCopy p {
+  margin-top: 9px;
+}
+
+.visualHeroSignals {
+  margin-top: 13px;
+}
+
+.visualHeroArt {
+  min-height: 145px;
+}
+
+.visualHeroOrbit {
+  width: 178px;
+  height: 178px;
+}
+
+.visualHeroRobot {
+  width: min(250px, 100%);
+  max-height: 174px;
+}
+
+.visualHeroCalendar {
+  width: 78px;
+  right: 4%;
+}
+
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.metrics article {
+  flex: 0 1 auto;
+  min-width: 160px;
+  min-height: 46px;
+  gap: 20px;
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+
+.metrics span {
+  font-size: 0.74rem;
+}
+
+.metrics strong {
+  font-size: 1.1rem;
+}
+
+.metrics article::after {
+  display: none;
+}
+
+.agendaCommandBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.viewSwitcher {
+  display: inline-grid;
+  grid-template-columns: repeat(4, minmax(82px, 1fr));
+  padding: 4px;
+  border: 1px solid rgba(65, 139, 191, .24);
+  border-radius: 14px;
+  background: rgba(5, 25, 42, .92);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.02);
+}
+
+.viewSwitcher button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  color: #9fb6c8;
+  background: transparent;
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 760;
+  cursor: pointer;
+  transition:
+    color var(--rv-motion-fast) ease,
+    background var(--rv-motion-fast) ease,
+    box-shadow var(--rv-motion-fast) ease,
+    transform var(--rv-motion-fast) var(--rv-ease-out);
+}
+
+.viewSwitcher button:hover {
+  color: #ecfaff;
+  transform: translateY(-1px);
+}
+
+.viewSwitcher .activeView {
+  color: #fff;
+  background:
+    linear-gradient(135deg, rgba(0, 190, 255, .94), rgba(89, 99, 255, .92));
+  box-shadow:
+    0 8px 22px rgba(0, 169, 255, .18),
+    inset 0 1px 0 rgba(255,255,255,.22);
+}
+
+.agendaCommandHint {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  text-align: right;
+}
+
+.agendaCommandHint span {
+  color: #dceef9;
+  font-size: .78rem;
+  font-weight: 760;
+}
+
+.agendaCommandHint small {
+  color: var(--agenda-muted);
+  font-size: .7rem;
+}
+
+.scheduleFoundation {
+  min-width: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(32, 192, 255, .045), transparent 36%),
+    linear-gradient(155deg, rgba(7, 31, 49, .98), rgba(4, 19, 34, .99));
+}
+
+.scheduleFoundationHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(126, 170, 214, .13);
+}
+
+.scheduleFoundationHeader > div {
+  display: grid;
+  gap: 3px;
+}
+
+.scheduleFoundationHeader span {
+  color: #5fe7ff;
+  font-size: .65rem;
+  font-weight: 840;
+  letter-spacing: .12em;
+}
+
+.scheduleFoundationHeader strong {
+  color: #f4fbff;
+  font-size: 1rem;
+  text-transform: capitalize;
+}
+
+.scheduleFoundationHeader p {
+  max-width: 420px;
+  margin: 0;
+  color: var(--agenda-muted);
+  font-size: .7rem;
+  text-align: right;
+}
+
+.scheduleDateGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(150px, 1fr));
+  min-height: 420px;
+  overflow-x: auto;
+}
+
+.scheduleDateGrid[data-agenda-view="day"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.scheduleDateGrid[data-agenda-view="month"] {
+  grid-template-columns: repeat(7, minmax(128px, 1fr));
+  min-width: 896px;
+  min-height: 520px;
+}
+
+.scheduleDay {
+  min-width: 0;
+  min-height: 420px;
+  border-right: 1px solid rgba(126, 170, 214, .10);
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 47px,
+      rgba(126, 170, 214, .055) 48px
+    );
+}
+
+.scheduleDateGrid[data-agenda-view="month"] .scheduleDay {
+  min-height: 132px;
+  border-bottom: 1px solid rgba(126, 170, 214, .10);
+  background: rgba(6, 26, 43, .42);
+}
+
+.scheduleDay > header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 11px;
+  border-bottom: 1px solid rgba(126, 170, 214, .12);
+  color: #b9cee0;
+  background: rgba(6, 26, 43, .96);
+  font-size: .76rem;
+  font-weight: 780;
+  text-transform: capitalize;
+}
+
+.scheduleDay > header small {
+  color: #5ce9ff;
+  font-size: .62rem;
+}
+
+.scheduleToday {
+  background-color: rgba(18, 137, 255, .045);
+  box-shadow: inset 0 2px 0 rgba(43, 215, 255, .48);
+}
+
+.scheduleDayBookings {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 10px;
+}
+
+.scheduleEmpty {
+  display: block;
+  padding: 12px 4px;
+  color: rgba(142, 174, 198, .44);
+  font-size: .67rem;
+}
+
+.scheduleBooking {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border: 1px solid rgba(40, 166, 255, .30);
+  border-radius: 11px;
+  color: #eaf7ff;
+  background:
+    linear-gradient(135deg, rgba(12, 105, 196, .70), rgba(43, 77, 208, .64));
+  box-shadow:
+    0 8px 18px rgba(0, 10, 32, .18),
+    inset 0 1px 0 rgba(255,255,255,.07);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform var(--rv-motion-fast) var(--rv-ease-out),
+    border-color var(--rv-motion-fast) ease,
+    box-shadow var(--rv-motion-fast) ease;
+}
+
+.scheduleBooking:hover,
+.scheduleBooking:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(83, 223, 255, .78);
+  box-shadow:
+    0 12px 26px rgba(0, 14, 42, .25),
+    0 0 18px rgba(34, 195, 255, .10);
+  outline: none;
+}
+
+.scheduleBooking strong {
+  overflow: hidden;
+  font-size: .78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scheduleBooking > span:not(.scheduleBookingTime) {
+  overflow: hidden;
+  color: #c9deeb;
+  font-size: .68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scheduleBooking small {
+  color: #a9c8da;
+  font-size: .62rem;
+}
+
+.scheduleBookingTime {
+  color: #72eeff;
+  font-size: .66rem;
+  font-weight: 820;
+}
+
+.scheduleStatus_CONFIRMED {
+  border-color: rgba(46, 222, 155, .36);
+  background: linear-gradient(135deg, rgba(7, 126, 113, .74), rgba(18, 109, 167, .66));
+}
+
+.scheduleStatus_PENDING {
+  border-color: rgba(255, 180, 48, .42);
+  background: linear-gradient(135deg, rgba(153, 90, 18, .72), rgba(116, 59, 135, .60));
+}
+
+.scheduleStatus_CANCELLED,
+.scheduleStatus_CANCELED {
+  opacity: .68;
+  border-color: rgba(255, 82, 99, .34);
+  background: linear-gradient(135deg, rgba(114, 40, 67, .64), rgba(68, 49, 91, .58));
+}
+
+.scheduleBookingSelected {
+  border-color: #67ebff;
+  box-shadow:
+    0 0 0 2px rgba(51, 220, 255, .16),
+    0 14px 28px rgba(0, 10, 38, .28);
+}
+
+@media (max-width: 980px) {
+  .visualHero {
+    grid-template-columns: minmax(0, 1fr) minmax(210px, .5fr);
+    min-height: 172px;
+  }
+
+  .visualHeroCopy h2 {
+    font-size: clamp(27px, 4.2vw, 36px);
+  }
+
+  .agendaCommandBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .agendaCommandHint {
+    text-align: left;
+  }
+}
+
+@media (max-width: 760px) {
+  .visualHero {
+    grid-template-columns: minmax(0, 1fr) 142px;
+    padding: 18px;
+  }
+
+  .visualHeroArt {
+    min-height: 120px;
+  }
+
+  .visualHeroRobot {
+    width: 150px;
+  }
+
+  .visualHeroCalendar {
+    width: 54px;
+    right: 0;
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .metrics article {
+    min-width: 0;
+  }
+
+  .viewSwitcher {
+    width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .viewSwitcher button {
+    padding-inline: 6px;
+  }
+
+  .scheduleFoundationHeader p {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .visualHero {
+    grid-template-columns: 1fr;
+  }
+
+  .visualHeroArt {
+    display: none;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics article {
+    min-height: 40px;
+  }
+
+  .scheduleDateGrid[data-agenda-view="week"] {
+    grid-template-columns: repeat(7, minmax(136px, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viewSwitcher button,
+  .scheduleBooking {
+    transition-duration: .01ms !important;
+  }
+}
