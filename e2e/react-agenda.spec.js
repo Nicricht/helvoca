@@ -314,6 +314,7 @@ test.describe('React Agenda migration', () => {
     await expect(page.getByRole('tab', { name: 'Día' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('agenda-calendar-foundation')).toHaveAttribute('data-agenda-view', 'day');
 
+    await page.getByRole('tab', { name: 'Semana' }).click();
     await page.getByTestId('agenda-row-b1').click();
     const dialog = page.getByRole('dialog', { name: 'Reserva · Ana Reserva' });
     await expect(dialog).toBeVisible();
