@@ -394,7 +394,7 @@ export function AgendaPage() {
           <div>
             <p className={styles.eyebrow}>OPERACIÓN</p>
             <h1>Agenda</h1>
-            <p>Gestiona tus citas y reservas</p>
+            <p>Qué está pasando hoy y qué está haciendo RecepVoz al respecto.</p>
           </div>
           <div className={styles.formActions}>
             {canPublishPublicBooking && (
@@ -735,8 +735,8 @@ export function AgendaPage() {
                       >
                         Comprobar disponibilidad
                       </button>
-                      {rescheduleAvailability === "available" && <span className={styles.available}>Horario disponible</span>}
-                      {rescheduleAvailability === "unavailable" && <span className={styles.unavailable}>Horario no disponible</span>}
+                      {rescheduleAvailability === "available" && <span className={styles.available} role="status" aria-live="polite">Horario disponible</span>}
+                      {rescheduleAvailability === "unavailable" && <span className={styles.unavailable} role="status" aria-live="polite">Horario no disponible</span>}
                       <button
                         className={styles.primaryButton}
                         type="button"
