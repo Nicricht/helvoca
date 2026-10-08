@@ -663,6 +663,31 @@ test.describe('React Orders / Operations migration', () => {
   });
 
 
+  test('keeps general request tracking out of Orders while retaining customer exports where authorized', async ({ page }) => {
+    await bootOrders(page, {
+      permissions: ['ORDERS_READ', 'ORDERS_MANAGE', 'CUSTOMERS_EXPORT']
+    });
+    await page.goto('/app/orders');
+    await expect(page.getByRole('heading', { level: 1, name: 'Pedidos' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Seguimiento operativo' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Historial y auditoría' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Clientes', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Exportación de clientes' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Exportar CSV' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Exportar XLSX' })).toBeVisible();
+  });
+
+  test('never exposes customer export to an orders reader without its permission', async ({ page }) => {
+    await bootOrders(page, {
+      roles: ['STAFF'],
+      permissions: ['ORDERS_READ']
+    });
+    await page.goto('/app/orders');
+    await page.getByRole('button', { name: 'Clientes', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Exportación de clientes' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Seguimiento operativo' })).toHaveCount(0);
+  });
+
   test('keeps the actual Operations workspace inside the protected frame at six canonical viewports', async ({ page }) => {
     await bootOrders(page);
     for (const viewport of [

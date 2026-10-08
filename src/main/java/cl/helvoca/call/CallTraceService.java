@@ -1,6 +1,9 @@
 package cl.helvoca.call;
 
+import cl.helvoca.request.RequestCreationObservationDispatcher;
+import cl.helvoca.request.RequestSource;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +27,9 @@ public class CallTraceService {
             Map.entry("HUMAN_TRANSFERRED", 100),
             Map.entry("FAILED", 100)
     );
+
+    @Autowired(required = false)
+    private RequestCreationObservationDispatcher requestObservations;
 
     private final CallSessionRepository calls;
     private final CallActionRepository actions;
@@ -68,6 +74,15 @@ public class CallTraceService {
         if (success) {
             String resolution = resolution(toolName, data);
             if (resolution != null) markResolution(call, resolution);
+
+            // The trace is a trusted backend boundary. Observe only the real
+            // create_request tool result, never the LLM's summary or transcript.
+            // The dispatcher waits for COMMIT; this does not close the request.
+            if (requestObservations != null && "create_request".equals(toolName) && data != null) {
+                requestObservations.afterSuccessfulCommit(
+                        businessId, callId, RequestSource.AI_CALL,
+                        entityId(toolName, data), optionalUuid(data.optString("operationId", null)));
+            }
         }
     }
 
@@ -165,6 +180,15 @@ public class CallTraceService {
             case "record_unanswered_question" -> "UNANSWERED_QUESTION";
             default -> null;
         };
+    }
+
+    private static UUID optionalUuid(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private static UUID entityId(String toolName, JSONObject data) {

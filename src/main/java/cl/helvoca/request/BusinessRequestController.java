@@ -12,8 +12,13 @@ import java.util.UUID;
 @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
 public class BusinessRequestController {
     private final BusinessRequestService service;
+    private final RequestLifecycleEventService lifecycleEvents;
 
-    public BusinessRequestController(BusinessRequestService service) { this.service = service; }
+    public BusinessRequestController(BusinessRequestService service,
+                                     RequestLifecycleEventService lifecycleEvents) {
+        this.service = service;
+        this.lifecycleEvents = lifecycleEvents;
+    }
 
     @GetMapping
     public List<BusinessRequestDtos.Response> list() { return service.list(); }
@@ -21,6 +26,11 @@ public class BusinessRequestController {
     @PostMapping
     public BusinessRequestDtos.Response create(@Valid @RequestBody BusinessRequestDtos.Create input) {
         return service.create(input);
+    }
+
+    @GetMapping("/{id}/history")
+    public List<RequestLifecycleEventService.Transition> history(@PathVariable UUID id) {
+        return lifecycleEvents.history(id);
     }
 
     @PatchMapping("/{id}/status")

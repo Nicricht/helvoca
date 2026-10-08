@@ -1,6 +1,9 @@
 package cl.helvoca.call;
 
+import cl.helvoca.request.RequestCreationObservationDispatcher;
+import cl.helvoca.request.RequestSource;
 import org.json.JSONObject;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -160,4 +163,46 @@ class CallTraceServiceTest {
         service.recordHumanTransfer(businessId, callId, true, "+56911111111");
         assertEquals("HUMAN_TRANSFERRED", call.getResolution());
     }
+    @Test
+    void realSuccessfulRequestToolResultSchedulesCommitBoundVoiceObservation() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallActionRepository actions = mock(CallActionRepository.class);
+        RequestCreationObservationDispatcher dispatcher = mock(RequestCreationObservationDispatcher.class);
+        UUID businessId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+        UUID operationId = UUID.randomUUID();
+        when(calls.findByIdAndBusinessId(callId, businessId))
+                .thenReturn(Optional.of(new CallSession()));
+
+        CallTraceService service = new CallTraceService(calls, actions);
+        ReflectionTestUtils.setField(service, "requestObservations", dispatcher);
+        JSONObject result = new JSONObject().put("success", true).put("data",
+                new JSONObject().put("requestId", requestId.toString())
+                        .put("operationId", operationId.toString()));
+
+        service.recordTool(businessId, callId, "create_request", result);
+        verify(dispatcher).afterSuccessfulCommit(
+                businessId, callId, RequestSource.AI_CALL, requestId, operationId);
+        verify(actions).save(any(CallAction.class));
+    }
+
+    @Test
+    void failedRequestToolResultNeverSchedulesObservation() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallActionRepository actions = mock(CallActionRepository.class);
+        RequestCreationObservationDispatcher dispatcher = mock(RequestCreationObservationDispatcher.class);
+        UUID businessId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        when(calls.findByIdAndBusinessId(callId, businessId))
+                .thenReturn(Optional.of(new CallSession()));
+
+        CallTraceService service = new CallTraceService(calls, actions);
+        ReflectionTestUtils.setField(service, "requestObservations", dispatcher);
+        JSONObject failed = new JSONObject().put("success", false)
+                .put("error", new JSONObject().put("code", "REQUEST_OPERATION_FAILED"));
+        service.recordTool(businessId, callId, "create_request", failed);
+        verifyNoInteractions(dispatcher);
+    }
+
 }

@@ -13,6 +13,26 @@ async function seed(page, roles, permissions) {
     roles,
     permissions
   })));
+  // Home is now the canonical place for request attention and history.
+  await page.route('**/api/v1/onboarding/status', route => route.fulfill(json({
+    readyForCalls: true, businessProfileConfigured: true, servicesConfigured: true,
+    scheduleConfigured: true, phoneConfigured: true, nextStep: 'DONE'
+  })));
+  await page.route('**/api/v1/operations/dashboard', route => route.fulfill(json({
+    businessName: 'Negocio E2E', timezone: 'America/Santiago',
+    localNow: '2026-10-08T13:30:00-03:00', callsToday: 0,
+    callDurationSecondsToday: 0, bookingsToday: 0, newCustomersToday: 0,
+    openRequests: 1, unansweredQuestions: 0, callFailuresToday: 0,
+    estimatedCallCostTodayUsd: 0, recentCalls: [], recentRequests: [], unanswered: []
+  })));
+  await page.route('**/api/v1/commercial/analytics**', route => route.fulfill(json({
+    days: 7, timezone: 'America/Santiago', primaryCurrency: 'CLP',
+    totalRevenue: 0, paidOrders: 0, unitsSold: 0, averageTicket: 0,
+    currencyTotals: [], salesOverTime: [], recepVozOrders: 0,
+    recepVozRevenue: 0, bookingCurrency: 'CLP', paidBookings: 0,
+    bookingRevenue: 0, recepVozPaidBookings: 0, recepVozBookingRevenue: 0,
+    bookingCurrencyTotals: []
+  })));
 }
 
 test.describe('React replacement for legacy Home capabilities', () => {
@@ -55,25 +75,24 @@ test.describe('React replacement for legacy Home capabilities', () => {
     await expect(customerSelect.locator('option:checked')).toHaveText('Camila Nueva');
   });
 
-  test('Operations carries Requests with authoritative status updates', async ({ page }) => {
+  test('Home carries actionable Requests with authoritative status updates', async ({ page }) => {
     await seed(page, ['BUSINESS_ADMIN'], ['ORDERS_READ', 'REQUESTS_READ', 'REQUESTS_MANAGE']);
     let requestStatus = 'OPEN';
     let statusPayload = null;
 
-    await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([])));
-    await page.route('**/api/v1/commercial/deliveries', route => route.fulfill(json([])));
+    await page.route('**/api/v1/operations/attention', route => route.fulfill(json(
+      requestStatus === 'RESOLVED' ? [] : [{
+        kind: 'REQUEST', id: 'req-1', operationId: 'op-1',
+        title: 'Devolver llamada', priority: 'HIGH',
+        status: requestStatus, createdAt: '2026-10-02T14:00:00Z'
+      }]
+    )));
     await page.route('**/api/v1/requests', route => route.fulfill(json([
       {
-        id: 'req-1',
-        requestType: 'CALLBACK',
-        title: 'Devolver llamada',
-        description: 'Cliente necesita confirmación',
-        contactName: 'Ana Cliente',
-        contactPhone: '+56933334444',
-        priority: 'HIGH',
-        status: requestStatus,
-        source: 'AI_CALL',
-        createdAt: '2026-10-02T14:00:00Z'
+        id: 'req-1', requestType: 'CALLBACK', title: 'Devolver llamada',
+        description: 'Cliente necesita confirmación', contactName: 'Ana Cliente',
+        contactPhone: '+56933334444', priority: 'HIGH', status: requestStatus,
+        source: 'AI_CALL', createdAt: '2026-10-02T14:00:00Z'
       }
     ])));
     await page.route('**/api/v1/requests/req-1/status', route => {
@@ -82,13 +101,18 @@ test.describe('React replacement for legacy Home capabilities', () => {
       return route.fulfill(json({ id: 'req-1', status: requestStatus }));
     });
 
-    await page.goto('/app/orders');
-    await page.getByRole('button', { name: 'Solicitudes' }).click();
-
-    await expect(page.getByText('Devolver llamada')).toBeVisible();
-    await expect(page.getByText('Ana Cliente')).toBeVisible();
-    await page.getByRole('button', { name: /marcar en progreso/i }).click();
+    await page.goto('/app');
+    const attention = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(attention).toContainText('Devolver llamada');
+    await attention.getByRole('button', { name: 'Empezar gestión' }).click();
     await expect.poll(() => statusPayload).toEqual({ status: 'IN_PROGRESS' });
+    await expect(attention).toContainText('En progreso');
+
+    await page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/i }).click();
+    await expect(page.getByText('Ana Cliente')).toBeVisible();
+
+    await page.goto('/app/orders');
+    await expect(page.getByRole('heading', { name: 'Seguimiento operativo' })).toHaveCount(0);
   });
 
   test('Operations keeps customer export available inside the contextual customer view', async ({ page }) => {
@@ -114,7 +138,7 @@ test.describe('React replacement for legacy Home capabilities', () => {
     await expect.poll(() => exportCalls).toBe(1);
   });
 
-  test('business admin can inspect filter and export Audit inside Operations', async ({ page }) => {
+  test('business admin can inspect filter and export Audit from optional Home history', async ({ page }) => {
     await seed(page, ['BUSINESS_ADMIN'], ['ORDERS_READ', 'AUDIT_READ']);
     let auditUrl = '';
     let exportCalls = 0;
@@ -152,8 +176,11 @@ test.describe('React replacement for legacy Home capabilities', () => {
       ]));
     });
 
-    await page.goto('/app/orders');
-    await page.getByRole('button', { name: 'Auditoría' }).click();
+    await page.route('**/api/v1/operations/attention', route => route.fulfill(json([])));
+    await page.route('**/api/v1/requests', route => route.fulfill(json([])));
+    await page.goto('/app');
+    await page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/i }).click();
+    await page.getByRole('button', { name: 'Auditoría', exact: true }).click();
     await expect(page.getByText('Carolina Soto')).toBeVisible();
 
     await page.getByLabel('Actor de auditoría').fill('Carolina');
@@ -164,15 +191,23 @@ test.describe('React replacement for legacy Home capabilities', () => {
     await expect.poll(() => exportCalls).toBe(1);
   });
 
-  test('operator sees Requests but not the admin-only Audit surface', async ({ page }) => {
+  test('operator can see requests in Home but cannot open admin-only Audit', async ({ page }) => {
     await seed(page, ['OPERATOR'], ['ORDERS_READ', 'REQUESTS_READ']);
-    await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([])));
-    await page.route('**/api/v1/commercial/deliveries', route => route.fulfill(json([])));
+    await page.route('**/api/v1/operations/attention', route => route.fulfill(json([{
+      kind: 'REQUEST', id: 'req-operator', operationId: 'op-operator',
+      title: 'Cliente necesita seguimiento', priority: 'NORMAL',
+      status: 'OPEN', createdAt: '2026-10-02T14:00:00Z'
+    }])));
     await page.route('**/api/v1/requests', route => route.fulfill(json([])));
 
-    await page.goto('/app/orders');
+    await page.goto('/app');
 
-    await expect(page.getByRole('button', { name: 'Solicitudes' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Auditoría' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Necesita tu atención' }))
+      .toContainText('Cliente necesita seguimiento');
+    await page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/i }).click();
+    await expect(page.getByRole('button', { name: 'Solicitudes', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Auditoría', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Empezar gestión' })).toHaveCount(0);
   });
+
 });

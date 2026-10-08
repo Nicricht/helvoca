@@ -15,6 +15,9 @@ import {
   WalletCards
 } from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
+import { getHumanAttention, type HumanAttentionItem } from "../../features/operations/api";
+import { OperationsSupportPanel } from "../../features/operations/OperationsSupportPanel";
+import { HomeAttentionRows } from "./HomeAttentionRows";
 import {
   getCurrentUser,
   getOnboardingStatus,
@@ -144,12 +147,23 @@ function AnimatedMoney({ amount, currency }: { amount: number; currency: string 
   return <>{formatMoney(animated, currency)}</>;
 }
 
-function attentionTotal(dashboard: OperationsDashboard): number {
-  return dashboard.openRequests + dashboard.unansweredQuestions + dashboard.callFailuresToday;
+function attentionTotal(items?: HumanAttentionItem[]): number {
+  return items?.length ?? 0;
 }
 
-function HeroOverview({ dashboard }: { dashboard: OperationsDashboard }) {
-  const pending = attentionTotal(dashboard);
+interface AttentionState {
+  items?: HumanAttentionItem[];
+  loading: boolean;
+  failed: boolean;
+  refreshing: boolean;
+  authorized: boolean;
+  canManageRequests: boolean;
+  onRefresh: () => void;
+}
+
+function HeroOverview({ dashboard, attention }: { dashboard: OperationsDashboard; attention: AttentionState }) {
+  const pending = attentionTotal(attention.items);
+  const unknown = attention.authorized && (attention.loading || attention.failed);
   const liveCall = dashboard.recentCalls.find(call =>
     ["IN_PROGRESS", "RINGING", "ACTIVE"].includes(call.status || "")
   );
@@ -163,9 +177,11 @@ function HeroOverview({ dashboard }: { dashboard: OperationsDashboard }) {
       transition={{ duration: .42, ease: [0.16, 1, 0.3, 1] }}
     >
       <div className={styles.heroCopy}>
-        <span className={styles.heroStatus} data-tone={pending > 0 ? "attention" : "calm"}>
+        <span className={styles.heroStatus} data-tone={unknown || pending > 0 ? "attention" : "calm"}>
           <i aria-hidden="true" />
-          {pending > 0 ? "Necesita tu atención · " + pending + " asuntos" : "Todo bajo control"}
+          {unknown ? "Verificando pendientes…" : attention.authorized
+            ? (pending > 0 ? "Necesita tu atención · " + (pending === 100 ? "100 casos recientes" : pending + " asuntos") : "Todo bajo control")
+            : "Atención según permisos de tu rol"}
         </span>
 
         <h2>Tu negocio está siendo atendido.</h2>
@@ -346,25 +362,18 @@ function TodaySummary({ dashboard }: { dashboard: OperationsDashboard }) {
   );
 }
 
-function AttentionPanel({ dashboard }: { dashboard: OperationsDashboard }) {
-  const total = attentionTotal(dashboard);
-  const alerts = [
-    dashboard.openRequests > 0
-      ? {
-          key: "requests",
-          icon: ClipboardList,
-          tone: "warning",
-          title: dashboard.openRequests + " solicitudes pendientes",
-          detail: "Hay solicitudes esperando una decisión."
-        }
-      : null,
+function AttentionPanel({ dashboard, attention }: {
+  dashboard: OperationsDashboard; attention: AttentionState;
+}) {
+  const total = attentionTotal(attention.items);
+  const signals = [
     dashboard.unansweredQuestions > 0
       ? {
           key: "questions",
           icon: CircleHelp,
           tone: "violet",
           title: dashboard.unansweredQuestions + " pregunta" + (dashboard.unansweredQuestions === 1 ? "" : "s") + " sin respuesta",
-          detail: "La IA necesita información adicional para responder mejor."
+          detail: "Información que el negocio puede completar para ayudar a la IA."
         }
       : null,
     dashboard.callFailuresToday > 0
@@ -373,15 +382,11 @@ function AttentionPanel({ dashboard }: { dashboard: OperationsDashboard }) {
           icon: TriangleAlert,
           tone: "danger",
           title: dashboard.callFailuresToday + " fallo" + (dashboard.callFailuresToday === 1 ? "" : "s") + " de llamada",
-          detail: "Hay llamadas que no terminaron normalmente."
+          detail: "Incidencias para revisar, no solicitudes nuevas."
         }
       : null
   ].filter(Boolean) as Array<{
-    key: string;
-    icon: typeof ClipboardList;
-    tone: string;
-    title: string;
-    detail: string;
+    key: string; icon: typeof CircleHelp; tone: string; title: string; detail: string;
   }>;
 
   return (
@@ -395,31 +400,39 @@ function AttentionPanel({ dashboard }: { dashboard: OperationsDashboard }) {
     >
       <div className={styles.panelHeading}>
         <div>
-          <span className={styles.kicker}>SOLO LO IMPORTANTE</span>
+          <span className={styles.kicker}>INTERVENCIÓN HUMANA</span>
           <h2 id="homeAttentionTitle">Necesita tu atención</h2>
         </div>
-        {total > 0 && <span className={styles.countPill}>{total}</span>}
+        {attention.authorized && !attention.loading && !attention.failed && total > 0 && (
+          <span className={styles.countPill} aria-label="Casos visibles">{total === 100 ? "100 casos recientes" : total + " pendientes"}</span>
+        )}
       </div>
 
-      {alerts.length === 0 ? (
-        <div className={styles.calmState}>
-          <Sparkles size={20} aria-hidden="true" />
-          <div>
-            <strong>Todo bajo control</strong>
-            <span>No necesitas hacer nada ahora. RecepVoz puede seguir trabajando solo.</span>
-          </div>
-        </div>
-      ) : (
-        <div className={styles.attentionList}>
-          {alerts.map(({ key, icon: Icon, tone, title, detail }) => (
-            <div key={key} className={styles.attentionItem} data-tone={tone}>
-              <span className={styles.attentionIcon} aria-hidden="true"><Icon size={18} /></span>
-              <div>
-                <strong>{title}</strong>
-                <span>{detail}</span>
+      <HomeAttentionRows
+        items={attention.items}
+        loading={attention.loading}
+        failed={attention.failed}
+        refreshing={attention.refreshing}
+        authorized={attention.authorized}
+        canManageRequests={attention.canManageRequests}
+        onRefresh={attention.onRefresh}
+      />
+
+      {signals.length > 0 && (
+        <div className={styles.attentionSignals}>
+          <h3>Señales adicionales para revisar</h3>
+          <p>Estos indicadores pueden coincidir con otros casos y no se suman a la bandeja.</p>
+          <div className={styles.attentionList}>
+            {signals.map(({ key, icon: Icon, tone, title, detail }) => (
+              <div key={key} className={styles.attentionItem} data-tone={tone}>
+                <span className={styles.attentionIcon} aria-hidden="true"><Icon size={18} /></span>
+                <div>
+                  <strong>{title}</strong>
+                  <span>{detail}</span>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </motion.section>
@@ -567,6 +580,7 @@ function OnboardingCard({ status }: { status: OnboardingStatus }) {
 export function HomePage() {
   const reduceMotion = useReducedMotion();
   const [salesDays, setSalesDays] = useState(7);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const meQuery = useQuery({
     queryKey: ["home", "me"],
@@ -582,6 +596,32 @@ export function HomePage() {
 
   const adminReady = !isAdmin || onboardingQuery.data?.readyForCalls === true;
   const readyToLoad = Boolean(meQuery.data) && adminReady;
+  const roles = meQuery.data?.roles ?? [];
+  const canReadAttention = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
+  const permissions = meQuery.data?.permissions;
+  const canManageRequests = canReadAttention && (!Array.isArray(permissions)
+    || permissions.includes("REQUESTS_MANAGE")
+    || permissions.includes("PERM_REQUESTS_MANAGE"));
+
+  const attentionQuery = useQuery({
+    queryKey: ["operations", "attention"],
+    queryFn: getHumanAttention,
+    enabled: readyToLoad && canReadAttention,
+    retry: false,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true
+  });
+  const attention: AttentionState = {
+    items: attentionQuery.data,
+    loading: attentionQuery.isPending && readyToLoad && canReadAttention,
+    failed: attentionQuery.isError,
+    refreshing: attentionQuery.isFetching,
+    authorized: canReadAttention,
+    canManageRequests,
+    onRefresh: () => { void attentionQuery.refetch(); }
+  };
 
   const operationsQuery = useQuery({
     queryKey: ["home", "operations"],
@@ -646,7 +686,7 @@ export function HomePage() {
             animate={{ opacity: 1 }}
             transition={{ duration: reduceMotion ? 0 : .24 }}
           >
-            <HeroOverview dashboard={operationsQuery.data} />
+            <HeroOverview dashboard={operationsQuery.data} attention={attention} />
 
             <ValueGenerated
               data={salesQuery.data}
@@ -660,9 +700,23 @@ export function HomePage() {
             <TodaySummary dashboard={operationsQuery.data} />
 
             <div className={styles.mainGrid}>
-              <AttentionPanel dashboard={operationsQuery.data} />
+              <AttentionPanel dashboard={operationsQuery.data} attention={attention} />
               <LatestActivity dashboard={operationsQuery.data} />
             </div>
+            {canReadAttention && (
+              <section id="home-history" className={styles.historySection} aria-label="Historial de gestión">
+                <button type="button" className={styles.historyToggle}
+                  aria-expanded={historyOpen}
+                  onClick={() => setHistoryOpen(previous => !previous)}>
+                  <ClipboardList size={17} aria-hidden="true" />
+                  {historyOpen ? "Ocultar historial y auditoría" : "Consultar historial de solicitudes y auditoría"}
+                  <ArrowUpRight size={15} aria-hidden="true" />
+                </button>
+                {historyOpen && (
+                  <OperationsSupportPanel user={meQuery.data} showCustomerTools={false} />
+                )}
+              </section>
+            )}
           </motion.div>
         ) : null}
       </main>

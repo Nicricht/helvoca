@@ -1,0 +1,30 @@
+.panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 16px 20px;
+  margin-top: 16px;
+  border: 1px solid rgba(67, 118, 140, .45);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(9, 33, 50, .92), rgba(7, 23, 39, .92));
+  color: #eaf7ff;
+}
+.panel > div:first-child { flex: 1 1 200px; }
+.panel strong { font-size: 14px; }
+.panel p { margin: 4px 0 0; font-size: 12px; color: #9eb7c8; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(79, 155, 164, .5);
+  background: rgba(20, 64, 77, .5);
+  color: #eaffff;
+  cursor: pointer;
+}
+.actions button:focus-visible { outline: 2px solid #63ddd4; outline-offset: 2px; }
+.actions button:disabled { opacity: .5; cursor: wait; }
+.panel .feedback { width: 100%; }

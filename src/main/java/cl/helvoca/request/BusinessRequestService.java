@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
+import java.util.Set;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,15 +19,18 @@ public class BusinessRequestService {
     private final TenantProvider tenantProvider;
     private final UniversalOperationWorkflowService universalOperations;
     private final BusinessOperationRepository operations;
+    private final RequestLifecycleEventService lifecycleEvents;
 
     public BusinessRequestService(BusinessRequestRepository repository,
                                   TenantProvider tenantProvider,
                                   UniversalOperationWorkflowService universalOperations,
-                                  BusinessOperationRepository operations) {
+                                  BusinessOperationRepository operations,
+                                  RequestLifecycleEventService lifecycleEvents) {
         this.repository = repository;
         this.tenantProvider = tenantProvider;
         this.universalOperations = universalOperations;
         this.operations = operations;
+        this.lifecycleEvents = lifecycleEvents;
     }
 
     @Transactional(readOnly = true)
@@ -58,10 +62,16 @@ public class BusinessRequestService {
     public BusinessRequestDtos.Response setStatus(UUID id, RequestStatus status) {
         if (status == null) throw new IllegalArgumentException("status is required");
         UUID businessId = tenantProvider.requireBusinessId();
-        BusinessRequest request = repository.findByIdAndBusinessId(id, businessId)
+        // Serialize concurrent browser and worker updates before reading current state.
+        BusinessRequest request = repository.lockByIdAndBusinessId(id, businessId)
                 .orElseThrow(() -> new NotFoundException("Request not found"));
+        RequestStatus previous = request.getStatus();
+        if (previous == status) return BusinessRequestDtos.Response.from(request);
+        if (!allowedNext(previous).contains(status)) {
+            throw new IllegalArgumentException("Invalid request status transition: " + previous + " -> " + status);
+        }
         request.setStatus(status);
-        request = repository.save(request);
+        request = repository.saveAndFlush(request);
 
         BusinessRequest saved = request;
         operations.findByIdAndBusinessId(saved.getOperationId(), businessId).ifPresent(operation -> {
@@ -77,6 +87,7 @@ public class BusinessRequestService {
             operation.setMetadata(metadata);
             operations.save(operation);
         });
+        lifecycleEvents.recordBusinessUser(businessId, request.getId(), request.getOperationId(), previous, status);
         return BusinessRequestDtos.Response.from(request);
     }
 
@@ -116,6 +127,14 @@ public class BusinessRequestService {
             request = repository.save(request);
         }
         return request;
+    }
+
+    static Set<RequestStatus> allowedNext(RequestStatus current) {
+        return switch (current) {
+            case OPEN -> Set.of(RequestStatus.IN_PROGRESS, RequestStatus.RESOLVED, RequestStatus.CANCELLED);
+            case IN_PROGRESS -> Set.of(RequestStatus.RESOLVED, RequestStatus.CANCELLED);
+            case RESOLVED, CANCELLED -> Set.of();
+        };
     }
 
     private static String clean(String value, int max) {
