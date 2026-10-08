@@ -47,6 +47,8 @@ Use real PostgreSQL/Testcontainers when correctness depends on PostgreSQL semant
 
 For tenant-integrity changes, privileged/owner execution must be tested when appropriate so relational isolation does not accidentally depend only on application filters.
 
+Every changed or affected database invariant must have 100% mapped PostgreSQL evidence. A database-affecting change is incomplete while any applicable persistence, rejection, isolation, transaction, migration, concurrency or reference outcome remains untested.
+
 ## Security and adversarial verification
 
 ### Adversarial verification
@@ -72,26 +74,55 @@ A test that was weakened, skipped, broadened into irrelevance, or changed merely
 
 ## Coverage policy
 
-Coverage is a structural signal, not proof that assertions are useful.
+Coverage is a structural signal, not proof that assertions are useful. Helvoca nevertheless uses a **100% quality contract**: no applicable coverage dimension for changed or affected production behavior may be certified below 100%.
 
-Current CI floor for changed executable Java:
-- differential Lines: at least 80%;
-- differential Branches: at least 70% when branches exist.
+### Backend / Java
 
-Engineering target for HIGH-risk new or materially modified business logic:
-- meaningful Lines: 100%;
-- meaningful Branches: 100%;
-- meaningful Methods: 100%.
+For every new or modified executable Java scope:
+- differential Lines: **100%**;
+- differential Branches: **100%** when branches exist;
+- differential Methods: **100%** when methods are affected.
 
-This target must not be met with assertion-free, duplicate, unreachable-only, or behavior-free tests. Any meaningful exception must be documented in the PR with a technical reason.
+The automated differential gate must reject any value below 100%. A method that is executed without meaningful assertions does not satisfy the behavioral requirement even if JaCoCo marks it covered.
 
-Historical code follows a ratchet rule: touching an under-tested critical area should improve its protection rather than preserve known weakness. Do not claim global or module-level 100% unless the measured report proves it.
+### Frontend / React / browser behavior
 
-Mutation testing should be introduced for critical business logic as an additional strength signal. Surviving meaningful mutations must be investigated; mutation score is not a substitute for integration, security or E2E evidence.
+For every changed or affected frontend scope:
+- executable Statements/Lines: **100%** when instrumented source coverage is available;
+- Branches: **100%** when branches exist;
+- Functions/Methods: **100%** when functions are affected;
+- changed interactive controls and state transitions: **100% behavior coverage**;
+- release-critical user journeys: **100% mapped journey coverage**.
+
+Every affected button, link, tab, menu action, form submission, keyboard action, drag/drop interaction or other meaningful control must have automated evidence for its intended observable result at the lowest correct level. Rendering an element is not proof that the interaction works. Playwright pass count is not a substitute for proving that the interaction inventory is complete.
+
+### Database / PostgreSQL
+
+Database completeness is measured by behavior and invariants, not by pretending SQL has a JaCoCo-style line metric. For every changed or affected data scope, **100% of applicable database invariants and outcomes must be mapped to real PostgreSQL evidence**, including:
+- successful persistence and reload;
+- relevant validation/constraint rejection;
+- FK, CHECK, UNIQUE and RLS behavior;
+- Flyway forward migration behavior;
+- transaction commit/rollback semantics;
+- tenant isolation;
+- concurrency/idempotency behavior when applicable;
+- delete/update/reference behavior when applicable.
+
+Mocks never count toward PostgreSQL completeness.
+
+### Cross-layer system behavior
+
+When a feature crosses layers, **100% of its acceptance criteria and material failure outcomes must be mapped to automated evidence across the required layers**. Frontend coverage cannot compensate for missing backend or PostgreSQL evidence, and backend coverage cannot compensate for an untested browser interaction.
+
+No assertion-free, duplicate, unreachable-only or behavior-free test may be added merely to reach 100%. No threshold below 100% may be introduced as a convenience exception. If a metric is technically inapplicable, the PR must state why and provide the behavior-level evidence that replaces it; "too hard to test" is not sufficient.
+
+Historical code does not authorize new uncovered behavior. Any touched production scope must satisfy this 100% contract before completion. Global/module 100% may be claimed only when the measured reports actually prove it.
+
+Mutation testing should be introduced for critical business logic as an additional strength signal. Surviving meaningful mutations must be investigated; mutation score is not a substitute for integration, security, frontend interaction, PostgreSQL or E2E evidence.
 
 ## E2E and Golden Journey
 
-Browser E2E proves user-visible system behavior, not every internal branch. Keep E2E focused on important journeys and regressions that can fail across UI/API/system boundaries.
+Browser E2E proves user-visible system behavior, not every internal branch. For every changed or affected frontend surface, maintain a complete interaction inventory and automate 100% of meaningful controls/state transitions at the lowest correct test level. Keep E2E focused on journeys and regressions that can fail across UI/API/system boundaries, while component/unit tests cover local branches more cheaply.
 
 Golden Journey or equivalent release contracts protect a smaller set of business-critical flows. They complement rather than replace unit and integration tests.
 
