@@ -931,7 +931,7 @@ export function OrdersPage() {
                         {aiEvents.map(event => (
                           <li key={event.id}>
                             <strong>{event.eventType}</strong>
-                            <small>{[event.channel, dateTime(event.createdAt)].filter(Boolean).join(" · ")}</small>
+                            <small>{[event.channel ? (sourceLabels[event.channel as OrderSource] ?? event.channel) : null, dateTime(event.createdAt)].filter(Boolean).join(" · ")}</small>
                           </li>
                         ))}
                       </ol>
