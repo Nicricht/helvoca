@@ -464,7 +464,7 @@ export function OrdersPage() {
         <header className="rv-page-header">
           <div>
             <p className="eyebrow">OPERACIONES</p>
-            <h1>Pedidos</h1>
+            <h1>{quoteOnly ? "Cotizaciones" : "Pedidos"}</h1>
             <p>
               {quoteOnly ? "Gestiona las cotizaciones del negocio según los permisos de tu rol." : "Gestiona pedidos, preparación, entregas y cotizaciones autorizadas sin salir del flujo."}
             </p>
