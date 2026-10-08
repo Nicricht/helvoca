@@ -42,6 +42,8 @@ Mandatory rules:
 
 Coverage is a guardrail, not proof of correctness. Helvoca now uses a **100% quality contract** for every changed or affected production scope. Backend executable Java must reach 100% differential line, branch and method coverage when those counters apply. Frontend executable logic must reach 100% statement/line, branch and function/method coverage when instrumented, and 100% of affected meaningful interactive controls and state transitions must have automated behavioral evidence. Database work must map 100% of affected persistence, constraint, migration, transaction, tenant-isolation and concurrency/idempotency invariants to real PostgreSQL evidence. One layer's 100% never compensates for missing evidence in another layer. Do not claim 100% unless the measured reports and behavior matrix actually prove it.
 
+A repository-wide "100% QA coverage" claim is stronger than a green suite or differential gate. It requires measured 100% backend line/branch/method coverage, measured 100% frontend statement/line/branch/function coverage for executable source, 100% automated meaningful frontend interactions/state transitions, 100% mapped real-PostgreSQL database invariants, and 100% mapped release-critical journeys. Until those reports exist and are green, never describe the whole product as 100% covered.
+
 ## Required workflow
 
 1. Never develop directly on `main`. Refresh `main`, then create a dedicated branch.
