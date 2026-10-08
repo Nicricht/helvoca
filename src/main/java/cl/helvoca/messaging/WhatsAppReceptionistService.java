@@ -8,6 +8,7 @@ import cl.helvoca.omnichannel.CustomerIdentityService;
 import cl.helvoca.operations.BusinessOperationCapabilityService;
 import cl.helvoca.messaging.outbound.MetaWhatsAppMessagingProvider;
 import cl.helvoca.messaging.outbound.WhatsAppAssistantReplyDeliveryService;
+import cl.helvoca.request.RequestReplyCorrelationService;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.platform.DemoSessionCorrelationService;
@@ -55,6 +56,9 @@ public class WhatsAppReceptionistService {
 
     @Autowired(required = false)
     private WhatsAppAssistantReplyDeliveryService replyDelivery;
+
+    @Autowired(required = false)
+    private RequestReplyCorrelationService requestReplyCorrelations;
 
     @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
@@ -235,6 +239,7 @@ public class WhatsAppReceptionistService {
 
         String reply;
         boolean[] successfulBookingCreation = {false};
+        List<RequestReplyCorrelationService.CreatedRequest> createdRequests = new ArrayList<>();
         try {
             MessagingConversation current = conversation;
             Set<String> allowedTools = allowedTools(phone.getBusinessId());
@@ -249,10 +254,15 @@ public class WhatsAppReceptionistService {
                         if (isSuccessfulBookingCreation(name, result)) {
                             successfulBookingCreation[0] = true;
                         }
+                        var created = RequestReplyCorrelationService.verifiedToolResult(name, result);
+                        if (created != null) createdRequests.add(created);
                         return result;
                     });
             reply = guardUnverifiedBookingConfirmation(text, reply, successfulBookingCreation[0]);
         } catch (Exception e) {
+            // A generic error/fallback reply cannot be treated as a verified
+            // response to any request executed earlier in this model turn.
+            createdRequests.clear();
             log.warn("WhatsApp assistant failed message={} business={} type={}",
                     messageId, phone.getBusinessId(), e.getClass().getSimpleName());
             reply = "No pude completar tu solicitud en este momento. Por favor intenta nuevamente en unos minutos.";
@@ -267,6 +277,13 @@ public class WhatsAppReceptionistService {
 
         inbound.setReplyText(reply);
         messages.save(inbound);
+        if (!createdRequests.isEmpty() && requestReplyCorrelations != null && reply != null && !reply.isBlank()) {
+            // Flush the persisted response before the JDBC evidence check.
+            // This records correlation only, never delivery or resolution.
+            messages.flush();
+            requestReplyCorrelations.capture(phone.getBusinessId(), conversation.getId(),
+                    inbound.getId(), createdRequests);
+        }
         conversation.setLastMessageAt(Instant.now());
         conversations.save(conversation);
 
