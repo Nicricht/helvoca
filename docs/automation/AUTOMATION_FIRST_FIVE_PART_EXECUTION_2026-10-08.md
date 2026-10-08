@@ -173,16 +173,63 @@ linked to a specific resolved request still needs evidence integration
 and certification before backend automatic status updates can be
 turned on. No new AI/provider calls are needed just for case bookkeeping.
 
-## Part 5/5: system certification and controlled delivery (not started)
+## Part 5/5: release certification and safe closure evidence audit
 
-- JUnit unit and integration tests; PostgreSQL concurrency, tenant/RLS,
-  idempotency, lifecycle and actor attribution verification.
-- Playwright for desktop/mobile and role-specific Inbox/Orders interactions.
-- Assert zero *extra* AI/provider calls due solely to follow-up classification.
-- Certify exact-HEAD CI, review, squash merge only after checks pass,
-  exact-main CI, Railway exact-SHA deployment and health.
-- Do not activate real outgoing WhatsApp, voice test calls, external calendar
-  or payment actions as a side effect.
+### Implemented
+
+- Checked exact Part 4 run `37843924116`: commercial, Fast Gate,
+  webhooks and backend/DB system E2E passed. Full test job failed on
+  four Playwright expectations of the old Operations support panel or
+  old Home empty-state wording: 277 passed, four failed.
+- Migrated `e2e/react-legacy-capability-cutover.spec.js` checks to
+  Home's actual human-attention inbox and collapsed history/audit, while
+  still verifying authorized CSV export remains with Customers in Orders.
+- Updated the empty Home expectation to the accurate server-confirmed
+  `Sin intervenciones pendientes` state.
+- Added PostgreSQL/Testcontainers regression checks proving
+  direct SQL cannot reopen a terminal request and a fabricated
+  `AUTOMATION` transition without evidence ID is rejected.
+- Re-run the exact final commit's CI after these changes. Do not
+  certify, merge or deploy unless Fast Gate, Golden Journey, system E2E,
+  Java/JaCoCo and the full Playwright suite pass for that exact SHA.
+
+### Verified limits, not postponed by silent assumption
+
+- `MessagingMessage.providerDeliveryStatus` and WhatsApp outbound
+  delivery services can represent `DELIVERED`/`READ`, but no trusted
+  persisted relation yet establishes which *specific request resolution*
+  a particular provider delivery confirms.
+- The voice transport observes Twilio playback marks, but a mark does
+  **not** independently verify whether the customer heard and accepted
+  an information answer or whether a complaint was resolved.
+- `REQUEST_CREATED` only proves durable creation. The backend
+  conservatively keeps new requests OPEN. No automatic request
+  completion is enabled in this release, and no one should claim otherwise.
+- An automatic RESOLVE path may only be introduced in a later
+  separately certified change after: exact request-to-outcome
+  correlation, authenticated provider delivery or equivalent call
+  evidence, allowed work type, policy, immutable event ownership,
+  atomic audit persistence and idempotency. Never use an LLM's claim
+  of resolution as proof.
+- The new Home queue represents active requests and handoffs
+  currently known to backend. Because no automatic request closing
+  is switched on, open AI-created requests may still appear as human
+  pending even if a conversation handled the initial question. This
+  is intentionally fail-closed and must not be marketed as fully
+  autonomous request resolution.
+- Message delivery status is **not** proof of semantic correctness,
+  fulfillment or customer satisfaction.
+
+### Release gate
+
+- Release only when exact-HEAD CI is green and `main` has not moved,
+  after setting the PR ready for review and verifying protections.
+- Prefer squash merge by exact HEAD; observe exact-main CI and Railway
+  deployment status. No new outbound-provider flags, model calls,
+  payment providers or external calendars should be activated.
+- Report remaining automatic-resolution limitation explicitly rather
+  than silently enabling unsafe behavior.
+- PR `#763`, branch `feat/automation-first-receipts-20261008`.
 
 ## Important existing components to reuse
 
