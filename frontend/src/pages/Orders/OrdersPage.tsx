@@ -390,7 +390,7 @@ export function OrdersPage() {
 
   const hasFilters = Boolean(search.trim()) || status !== "ALL" || source !== "ALL";
   const loading = model.orders.isPending;
-  const failed = model.orders.isError;
+  const failed = model.orders.isError && !model.orders.data;
 
   if (loading) {
     return (
@@ -460,6 +460,11 @@ export function OrdersPage() {
                 <> Última consulta: {new Intl.DateTimeFormat("es-CL", { timeStyle: "short" }).format(model.orders.dataUpdatedAt)}.</>
               )}
             </p>
+            {model.orders.isRefetchError && (
+              <p className={styles.syncError} role="alert">
+                No pudimos actualizar los pedidos. Se mantienen los últimos datos disponibles.
+              </p>
+            )}
           </div>
           <button
             className={styles.refreshButton}
