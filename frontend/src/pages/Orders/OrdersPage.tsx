@@ -8,6 +8,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
+  Bot,
   CalendarClock,
   ChevronRight,
   Clock3,
@@ -205,6 +206,19 @@ export function OrdersPage() {
   const [mutationPending, setMutationPending] = useState(false);
   const [mutationError, setMutationError] = useState("");
   const mutationLock = useRef(false);
+  const [online, setOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine
+  );
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
 
   const orders = model.orders.data ?? [];
   const quoteOnly = !model.canReadOrders && model.canReadQuotes;
@@ -269,6 +283,10 @@ export function OrdersPage() {
   ).length;
   const preparingCount = orders.filter(order => order.status === "PREPARING").length;
   const readyCount = orders.filter(order => order.status === "READY").length;
+  const aiEvents = context.events
+    .filter(event => event.actorType?.trim().toUpperCase() === "AI")
+    .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
+    .slice(0, 3);
 
   useEffect(() => {
     if (!selected) {
@@ -357,6 +375,7 @@ export function OrdersPage() {
   }, [
     selectedId,
     selected?.operationId,
+    selected?.updatedAt,
     selected?.source,
     selected?.sourceReferenceId,
     model.canReadConversations
@@ -476,11 +495,15 @@ export function OrdersPage() {
 
         {model.canReadOrders && <section className={styles.operationalBar} aria-label="Actualización de pedidos">
           <div className={styles.operationalBarCopy}>
-            <span className={styles.syncLabel}><span className={styles.syncDot} aria-hidden="true" /> Consulta bajo demanda</span>
+            <span className={styles.syncLabel}>
+              <span className={styles.syncDot} data-offline={!online} aria-hidden="true" />
+              {online ? "Sincronización automática" : "Sin conexión"}
+            </span>
             <p>
               Mostrando los últimos pedidos disponibles (máximo 100).
+              {online ? " Sincronización periódica cada 60 s con pestaña visible." : " Se conservan los últimos datos consultados."}
               {model.orders.dataUpdatedAt > 0 && (
-                <> Última consulta: {new Intl.DateTimeFormat("es-CL", { timeStyle: "short" }).format(model.orders.dataUpdatedAt)}.</>
+                <> Última consulta correcta: {new Intl.DateTimeFormat("es-CL", { timeStyle: "short" }).format(model.orders.dataUpdatedAt)}.</>
               )}
             </p>
             {model.orders.isRefetchError && (
@@ -894,6 +917,26 @@ export function OrdersPage() {
                         <p className={styles.contextMuted}>No hay conversación visible asociada a este pedido.</p>
                       )}
                   </section>
+
+                  {aiEvents.length > 0 && (
+                    <section className={styles.aiEvidence} role="region" aria-label="Actividad de IA registrada">
+                      <div className={styles.aiEvidenceHeading}>
+                        <Bot size={17} aria-hidden="true" />
+                        <div>
+                          <h3>Actividad de IA registrada</h3>
+                          <span>Historial registrado en la operación. No indica una acción en curso.</span>
+                        </div>
+                      </div>
+                      <ol className={styles.aiEvidenceList}>
+                        {aiEvents.map(event => (
+                          <li key={event.id}>
+                            <strong>{event.eventType}</strong>
+                            <small>{[event.channel, dateTime(event.createdAt)].filter(Boolean).join(" · ")}</small>
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+                  )}
 
                   <section className={styles.detailSection} aria-labelledby="historyTitle">
                     <div className={styles.sectionTitle}>
