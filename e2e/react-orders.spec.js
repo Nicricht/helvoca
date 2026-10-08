@@ -662,4 +662,30 @@ test.describe('React Orders / Operations migration', () => {
     await expect(failed.getByRole('region', { name: 'Actividad de IA registrada' })).toHaveCount(0);
   });
 
+
+  test('keeps the actual Operations workspace inside the protected frame at six canonical viewports', async ({ page }) => {
+    await bootOrders(page);
+    for (const viewport of [
+      { width: 1536, height: 950 },
+      { width: 1440, height: 900 },
+      { width: 1366, height: 768 },
+      { width: 1280, height: 720 },
+      { width: 768, height: 1024 },
+      { width: 390, height: 844 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/app/orders');
+      await expect(page.getByRole('heading', { level: 1, name: 'Pedidos' })).toBeVisible();
+      await expect(page.getByTestId('orders-row-order-1')).toBeAttached();
+      await expect(page.getByRole('heading', { name: 'Flujo operativo' })).toBeAttached();
+      expect(await page.evaluate(() =>
+        document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
+      ), `horizontal document overflow at ${viewport.width}x${viewport.height}`).toBe(true);
+      if (viewport.width <= 680) {
+        await expect(page.getByTestId('orders-mobile-list')).toBeVisible();
+      } else {
+        await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+      }
+    }
+  });
 });
