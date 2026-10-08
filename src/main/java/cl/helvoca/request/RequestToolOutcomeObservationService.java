@@ -8,6 +8,7 @@ import cl.helvoca.operations.BusinessOrder;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -44,7 +45,7 @@ public class RequestToolOutcomeObservationService {
         this.metrics = metrics;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
     public Observation observeCreatedRequest(UUID businessId,
                                              UUID sourceReferenceId,
                                              RequestSource source,
