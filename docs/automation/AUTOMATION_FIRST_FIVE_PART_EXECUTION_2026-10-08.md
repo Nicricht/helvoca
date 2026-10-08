@@ -132,15 +132,46 @@ retention lifecycle: deleting that request under the existing data
 retention process cascades the associated transition records. Runtime
 cannot update or directly delete ledger events.
 
-## Part 4/5: React surfaces (not started)
+## Part 4/5: Home and Orders React (implemented in branch, pending CI)
 
-- Move the main human-exception inbox into `HomePage` with real action links.
-- Keep `OrdersPage` focused on orders and contextual quotations.
-- Retain authorized audit/history access without a second general-purpose
-  `Seguimiento operativo` inbox in Operations.
-- Do not change the global app shell or show fictional AI metrics.
-- Refresh affected React Query data efficiently; respect permissions, loading
-  and offline conditions.
+- Home now queries `GET /api/v1/operations/attention` for authorized
+  business administrators and operators only. React Query synchronizes
+  authoritative cases every 60 seconds while visible, on focus/reconnect
+  and after explicit mutations. No extra LLM or provider call is made.
+- The premium Home attention panel shows actionable `REQUEST` and
+  `HANDOFF` cases with their real status/priority/date and no
+  fabricated AI completion metrics. Active handoffs replace their matching
+  request in the backend read model, so there is one visible case.
+- Human status actions use existing authenticated request/handoff
+  endpoints. User confirms terminal transitions. A handoff closure
+  does not imply the customer's request was resolved.
+- A failed read renders **"No pudimos verificar los pendientes"**, never
+  a false `Todo bajo control`. Unauthorized roles do not even request
+  the restricted endpoint. Request actions honor `REQUESTS_MANAGE`
+  when the server supplies permission claims.
+- Questions without knowledge and recent call failures remain visible as
+  `Señales adicionales` separate from the canonical human-case count,
+  because they can overlap with existing handoffs.
+- `OperationsSupportPanel` (full historical requests, audit filtering,
+  export) is now secondary and mounts only when Home's user chooses
+  `Consultar historial de solicitudes y auditoría`. Its title is
+  `Historial y auditoría`, not a second frontline inbox.
+- Orders no longer embeds general request tracking. The authorized
+  `CUSTOMERS_EXPORT` functionality was preserved in a compact
+  `CustomerExportTools` panel only in the Customers perspective.
+  Orders, contextual quotes, conversation and event history are preserved.
+- E2E regressions cover live role-gated inbox, load/error/empty,
+  explicit human actions, cross-panel cache invalidation, no automatic
+  external writes, customer exports, and responsive routes.
+- The shared application frame, typography and existing premium visual
+  assets remain unchanged. Reduced motion is respected.
+
+**Important limit:** Part 4 does NOT enable AI-driven automatic resolution:
+the Part 3 request ledger exists, but a provider-confirmed specific
+`DELIVERED` WhatsApp reply or actual audio playback/acknowledgement
+linked to a specific resolved request still needs evidence integration
+and certification before backend automatic status updates can be
+turned on. No new AI/provider calls are needed just for case bookkeeping.
 
 ## Part 5/5: system certification and controlled delivery (not started)
 
@@ -166,6 +197,6 @@ cannot update or directly delete ledger events.
 
 ## Release state
 
-Parts 1, 2 and 3 are implemented *as code*; certify the latest PR commit before advancing. They are **not** a
-customer-visible end-to-end automation until Parts 4-5 and verified delivery-driven resolution are implemented and
+Parts 1–4 are implemented *as code*; certify the latest PR commit before advancing. They are **not** a
+customer-visible end-to-end automation until Part 5 and verified delivery-driven resolution are implemented and
 certified. Keep the PR draft until the complete release is ready.
