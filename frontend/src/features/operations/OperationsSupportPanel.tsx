@@ -91,7 +91,7 @@ export function OperationsSupportPanel({
     ["BUSINESS_ADMIN", "BUSINESS_OWNER"]
   );
 
-  const [view, setView] = useState<PanelView>("REQUESTS");
+  const [view, setView] = useState<PanelView>(canReadRequests ? "REQUESTS" : "AUDIT");
   const [requestBusy, setRequestBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [actor, setActor] = useState("");
@@ -163,10 +163,10 @@ export function OperationsSupportPanel({
     <section className={styles.panel} aria-labelledby="operationsSupportTitle">
       <header className={styles.header}>
         <div>
-          <h2 id="operationsSupportTitle">Seguimiento operativo</h2>
-          <p>Solicitudes y trazabilidad viven aquí, sin volver a crear módulos aislados.</p>
+          <h2 id="operationsSupportTitle">Historial y auditoría</h2>
+          <p>Consulta solicitudes anteriores y registros auditables. Los casos que requieren atención están arriba.</p>
         </div>
-        <div className={styles.tabs} aria-label="Seguimiento operativo">
+        <div className={styles.tabs} aria-label="Historial y auditoría">
           {canReadRequests && (
             <button
               type="button"
@@ -196,7 +196,7 @@ export function OperationsSupportPanel({
             ) : requests.isError ? (
               <div className={styles.empty} role="alert">No pudimos cargar las solicitudes.</div>
             ) : (requests.data ?? []).length === 0 ? (
-              <div className={styles.empty}>No hay solicitudes pendientes.</div>
+              <div className={styles.empty}>No hay solicitudes registradas.</div>
             ) : (
               <div className={styles.requestList}>
                 {(requests.data ?? []).map(item => {
