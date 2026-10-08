@@ -14,6 +14,7 @@ import {
   MessageSquareText,
   PackageCheck,
   Search,
+  RefreshCw,
   ShoppingBag,
   Truck,
   UserRound,
@@ -38,7 +39,7 @@ import {
 import { useOrdersWorkspace } from "../../features/orders/useOrdersWorkspace";
 import styles from "./OrdersPage.module.css";
 
-type StatusFilter = "ALL" | OrderStatus;
+type StatusFilter = "ALL" | "ACTIVE" | OrderStatus;
 type SourceFilter = "ALL" | OrderSource;
 type SortMode = "NEWEST" | "OLDEST" | "STATUS";
 type EmbeddedView = "ORDERS" | "CUSTOMERS" | "CONVERSATIONS";
@@ -95,6 +96,11 @@ function dateTime(value?: string | null) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
+}
+
+// This is a display reference, not a business folio. Full UUID remains authoritative.
+function orderReference(id: string) {
+  return id.length > 20 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
 }
 
 function fulfillmentLabel(order: BusinessOrder) {
@@ -207,7 +213,8 @@ export function OrdersPage() {
     const query = search.trim().toLocaleLowerCase("es");
     const filtered = orders.filter(order => {
       if (query && !orderSearchText(order).includes(query)) return false;
-      if (status !== "ALL" && order.status !== status) return false;
+      if (status === "ACTIVE" && ["COMPLETED", "CANCELLED"].includes(order.status)) return false;
+      if (status !== "ALL" && status !== "ACTIVE" && order.status !== status) return false;
       if (source !== "ALL" && order.source !== source) return false;
       if (
         view === "CONVERSATIONS"
@@ -436,8 +443,7 @@ export function OrdersPage() {
             <p className="eyebrow">OPERACIONES</p>
             <h1>Pedidos</h1>
             <p>
-              Controla pedidos, preparación y entrega. Clientes y conversaciones viven aquí como contexto,
-              no como módulos aislados.
+              Gestiona los pedidos pendientes, la preparación y la entrega. Consulta clientes y conversaciones sin salir del flujo.
             </p>
           </div>
           <span className={styles.permissionPill}>
@@ -445,43 +451,46 @@ export function OrdersPage() {
           </span>
         </header>
 
-        <section className={styles.visualHero} aria-label="Centro de operaciones RecepVoz">
-          <div className={styles.visualHeroCopy}>
-            <span className={styles.visualHeroKicker}>FLUJO EN TIEMPO REAL</span>
-            <h2>De pedido recibido a <span>entrega completada</span></h2>
+        <section className={styles.operationalBar} aria-label="Actualización de pedidos">
+          <div className={styles.operationalBarCopy}>
+            <span className={styles.syncLabel}><span className={styles.syncDot} aria-hidden="true" /> Consulta bajo demanda</span>
             <p>
-              RecepVoz mantiene pedidos, clientes y conversaciones enlazados para que tu equipo actúe sin perder contexto.
+              Mostrando los últimos pedidos disponibles (máximo 100).
+              {model.orders.dataUpdatedAt > 0 && (
+                <> Última consulta: {new Intl.DateTimeFormat("es-CL", { timeStyle: "short" }).format(model.orders.dataUpdatedAt)}.</>
+              )}
             </p>
-            <div className={styles.visualHeroFlow} aria-label="Flujo operativo en tiempo real">
-              <span><i data-tone="cyan" />{activeCount} activos</span>
-              <b aria-hidden="true">→</b>
-              <span><i data-tone="violet" />{preparingCount} preparando</span>
-              <b aria-hidden="true">→</b>
-              <span><i data-tone="green" />{readyCount} listos</span>
-            </div>
           </div>
-          <div className={styles.visualHeroArt} aria-hidden="true">
-            <span className={styles.visualHeroOrbit} />
-            <span className={styles.visualRoute} />
-            <img className={styles.visualHeroRobot} src="/app/assets/recepvoz/v2/operations/hero-order-robot.webp" alt="" />
-            <img className={styles.visualPackage} src="/app/assets/recepvoz/v2/operations/order-package.webp" alt="" />
-            <img className={styles.visualTruck} src="/app/assets/recepvoz/v2/operations/delivery-truck.webp" alt="" />
-          </div>
+          <button
+            className={styles.refreshButton}
+            type="button"
+            disabled={model.orders.isFetching}
+            onClick={() => { void model.orders.refetch(); }}
+          >
+            <RefreshCw size={15} aria-hidden="true" />
+            {model.orders.isFetching ? "Actualizando…" : "Actualizar pedidos"}
+          </button>
+          <img
+            className={styles.operationalRobot}
+            src="/app/assets/recepvoz/v2/operations/hero-order-robot.webp"
+            alt=""
+            aria-hidden="true"
+          />
         </section>
 
         <section className={styles.summaryGrid} aria-label="Resumen de pedidos">
-          <article className={styles.summaryCard}>
+          <button type="button" className={styles.summaryCard} aria-label="Mostrar pedidos activos" aria-pressed={status === "ACTIVE" && view === "ORDERS"} onClick={() => { setStatus("ACTIVE"); setView("ORDERS"); }}>
             <span className={styles.summaryIcon}><ShoppingBag size={18} aria-hidden="true" /></span>
-            <div><span>Activos</span><strong>{activeCount}</strong><small>requieren seguimiento</small></div>
-          </article>
-          <article className={styles.summaryCard}>
+            <div><span>Activos</span><strong>{activeCount}</strong><small>de los más recientes</small></div>
+          </button>
+          <button type="button" className={styles.summaryCard} aria-label="Mostrar pedidos preparando" aria-pressed={status === "PREPARING" && view === "ORDERS"} onClick={() => { setStatus("PREPARING"); setView("ORDERS"); }}>
             <span className={styles.summaryIcon}><Clock3 size={18} aria-hidden="true" /></span>
-            <div><span>Preparando</span><strong>{preparingCount}</strong><small>en proceso ahora</small></div>
-          </article>
-          <article className={styles.summaryCard}>
+            <div><span>Preparando</span><strong>{preparingCount}</strong><small>de los más recientes</small></div>
+          </button>
+          <button type="button" className={styles.summaryCard} aria-label="Mostrar pedidos listos" aria-pressed={status === "READY" && view === "ORDERS"} onClick={() => { setStatus("READY"); setView("ORDERS"); }}>
             <span className={styles.summaryIcon}><PackageCheck size={18} aria-hidden="true" /></span>
-            <div><span>Listos</span><strong>{readyCount}</strong><small>esperando retiro o despacho</small></div>
-          </article>
+            <div><span>Listos</span><strong>{readyCount}</strong><small>por retirar o despachar</small></div>
+          </button>
         </section>
 
         <section className={styles.workspace} aria-labelledby="ordersWorkspaceTitle">
@@ -536,6 +545,7 @@ export function OrdersPage() {
                 onChange={event => setStatus(event.target.value as StatusFilter)}
               >
                 <option value="ALL">Todos</option>
+                <option value="ACTIVE">Activos</option>
                 <option value="CONFIRMED">Confirmados</option>
                 <option value="PREPARING">Preparando</option>
                 <option value="READY">Listos</option>
@@ -647,7 +657,7 @@ export function OrdersPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: reduceMotion ? 0 : .2, delay: reduceMotion ? 0 : Math.min(index * .025, .16) }}
                           >
-                            <td><strong className={styles.orderId}>#{order.id}</strong></td>
+                            <td><strong className={styles.orderId} title={order.id}>Ref. {orderReference(order.id)}</strong></td>
                             <td>
                               <span className={styles.customerCell}>
                                 <strong>{order.contactName || "Cliente"}</strong>
@@ -682,7 +692,7 @@ export function OrdersPage() {
                           <span className={statusClass(order.status)}>{statusLabels[order.status]}</span>
                         </span>
                         <span className={styles.mobileOrderMeta}>
-                          <span>#{order.id}</span>
+                          <span title={order.id}>Ref. {orderReference(order.id)}</span>
                           <span>{fulfillmentLabel(order)}</span>
                           <span>{sourceLabels[order.source]}</span>
                         </span>
@@ -729,7 +739,7 @@ export function OrdersPage() {
               >
                 <header className={styles.drawerHeader}>
                   <div>
-                    <span className={styles.drawerEyebrow}>Pedido #{selected.id}</span>
+                    <span className={styles.drawerEyebrow} title={selected.id}>Ref. {orderReference(selected.id)}</span>
                     <h2>{selected.contactName || "Cliente"}</h2>
                     <div className={styles.drawerBadges}>
                       <span className={statusClass(selected.status)}>{statusLabels[selected.status]}</span>
