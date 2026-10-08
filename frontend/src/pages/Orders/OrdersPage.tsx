@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Clock3,
   MessageSquareText,
+  FileText,
   PackageCheck,
   Search,
   RefreshCw,
@@ -24,6 +25,7 @@ import {
 import { ApiError } from "../../api/client";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { OperationsSupportPanel } from "../../features/operations/OperationsSupportPanel";
+import { OperationsQuotesPanel } from "../../features/operations/OperationsQuotesPanel";
 import {
   getCallContext,
   getConversation,
@@ -42,7 +44,7 @@ import styles from "./OrdersPage.module.css";
 type StatusFilter = "ALL" | "ACTIVE" | OrderStatus;
 type SourceFilter = "ALL" | OrderSource;
 type SortMode = "NEWEST" | "OLDEST" | "STATUS";
-type EmbeddedView = "ORDERS" | "CUSTOMERS" | "CONVERSATIONS";
+type EmbeddedView = "ORDERS" | "CUSTOMERS" | "CONVERSATIONS" | "QUOTES";
 
 interface ContextState {
   loading: boolean;
@@ -205,6 +207,8 @@ export function OrdersPage() {
   const mutationLock = useRef(false);
 
   const orders = model.orders.data ?? [];
+  const quoteOnly = !model.canReadOrders && model.canReadQuotes;
+  const activeView: EmbeddedView = quoteOnly ? "QUOTES" : view;
   const selected = selectedId
     ? orders.find(order => order.id === selectedId) ?? null
     : null;
@@ -217,7 +221,7 @@ export function OrdersPage() {
       if (status !== "ALL" && status !== "ACTIVE" && order.status !== status) return false;
       if (source !== "ALL" && order.source !== source) return false;
       if (
-        view === "CONVERSATIONS"
+        activeView === "CONVERSATIONS"
         && (!order.sourceReferenceId || (order.source !== "WHATSAPP" && order.source !== "VOICE"))
       ) {
         return false;
@@ -238,7 +242,7 @@ export function OrdersPage() {
     return [...filtered].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-  }, [orders, search, status, source, sort, view]);
+  }, [orders, search, status, source, sort, activeView]);
 
   const customerGroups = useMemo(() => {
     const groups = new Map<string, BusinessOrder[]>();
@@ -389,8 +393,8 @@ export function OrdersPage() {
   }
 
   const hasFilters = Boolean(search.trim()) || status !== "ALL" || source !== "ALL";
-  const loading = model.orders.isPending;
-  const failed = model.orders.isError && !model.orders.data;
+  const loading = model.me.isPending || (model.canReadOrders && model.orders.isPending);
+  const failed = model.me.isError || (model.canReadOrders && model.orders.isError && !model.orders.data);
 
   if (loading) {
     return (
@@ -426,9 +430,28 @@ export function OrdersPage() {
           <section className={styles.errorCard} role="alert">
             <strong>No pudimos cargar los pedidos.</strong>
             <p>La operación no se mostrará como vacía si el servidor no respondió.</p>
-            <button className="button primary" type="button" onClick={() => model.orders.refetch()}>
+            <button className="button primary" type="button" onClick={() => { void (model.me.isError ? model.me.refetch() : model.orders.refetch()); }}>
               Reintentar
             </button>
+          </section>
+        </main>
+      </AppShell>
+    );
+  }
+
+  if (!model.canReadOrders && !model.canReadQuotes) {
+    return (
+      <AppShell>
+        <main className="rv-page-frame" data-visual-page="operations">
+          <header className="rv-page-header">
+            <div>
+              <p className="eyebrow">OPERACIONES</p>
+              <h1>Pedidos</h1>
+            </div>
+          </header>
+          <section className={styles.errorCard} role="alert">
+            <strong>No tienes permiso para consultar pedidos ni cotizaciones.</strong>
+            <p>Solicita acceso a una persona administradora de tu negocio.</p>
           </section>
         </main>
       </AppShell>
@@ -443,15 +466,15 @@ export function OrdersPage() {
             <p className="eyebrow">OPERACIONES</p>
             <h1>Pedidos</h1>
             <p>
-              Gestiona los pedidos pendientes, la preparación y la entrega. Consulta clientes y conversaciones sin salir del flujo.
+              {quoteOnly ? "Gestiona las cotizaciones del negocio según los permisos de tu rol." : "Gestiona pedidos, preparación, entregas y cotizaciones autorizadas sin salir del flujo."}
             </p>
           </div>
           <span className={styles.permissionPill}>
-            {model.canManage || model.canPrepare ? "Gestión habilitada" : "Solo lectura"}
+            {model.canManage || model.canPrepare || model.canManageQuotes ? "Gestión habilitada" : "Solo lectura"}
           </span>
         </header>
 
-        <section className={styles.operationalBar} aria-label="Actualización de pedidos">
+        {model.canReadOrders && <section className={styles.operationalBar} aria-label="Actualización de pedidos">
           <div className={styles.operationalBarCopy}>
             <span className={styles.syncLabel}><span className={styles.syncDot} aria-hidden="true" /> Consulta bajo demanda</span>
             <p>
@@ -481,9 +504,9 @@ export function OrdersPage() {
             alt=""
             aria-hidden="true"
           />
-        </section>
+        </section>}
 
-        <section className={styles.summaryGrid} aria-label="Resumen de pedidos">
+        {model.canReadOrders && <section className={styles.summaryGrid} aria-label="Resumen de pedidos">
           <button type="button" className={styles.summaryCard} aria-label="Mostrar pedidos activos" aria-pressed={status === "ACTIVE" && view === "ORDERS"} onClick={() => { setStatus("ACTIVE"); setView("ORDERS"); }}>
             <span className={styles.summaryIcon}><ShoppingBag size={18} aria-hidden="true" /></span>
             <div><span>Activos</span><strong>{activeCount}</strong><small>de los más recientes</small></div>
@@ -496,40 +519,47 @@ export function OrdersPage() {
             <span className={styles.summaryIcon}><PackageCheck size={18} aria-hidden="true" /></span>
             <div><span>Listos</span><strong>{readyCount}</strong><small>por retirar o despachar</small></div>
           </button>
-        </section>
+        </section>}
 
         <section className={styles.workspace} aria-labelledby="ordersWorkspaceTitle">
           <div className={styles.workspaceHeader}>
             <div>
-              <h2 id="ordersWorkspaceTitle">Flujo operativo</h2>
-              <p>Una sola superficie para pedido, cliente y contexto de conversación.</p>
+              <h2 id="ordersWorkspaceTitle">{quoteOnly ? "Cotizaciones" : "Flujo operativo"}</h2>
+              <p>Pedidos como actividad principal, con clientes, conversaciones y cotizaciones en contexto.</p>
             </div>
             <div className={styles.viewSwitch} aria-label="Vista de operaciones">
-              <button
+              {model.canReadOrders && <button
                 type="button"
-                data-active={view === "ORDERS"}
+                data-active={activeView === "ORDERS"}
                 onClick={() => setView("ORDERS")}
               >
                 <ShoppingBag size={15} aria-hidden="true" />Pedidos
-              </button>
-              <button
+              </button>}
+              {model.canReadOrders && <button
                 type="button"
-                data-active={view === "CUSTOMERS"}
+                data-active={activeView === "CUSTOMERS"}
                 onClick={() => setView("CUSTOMERS")}
               >
                 <UsersRound size={15} aria-hidden="true" />Clientes
-              </button>
-              <button
+              </button>}
+              {model.canReadOrders && <button
                 type="button"
-                data-active={view === "CONVERSATIONS"}
+                data-active={activeView === "CONVERSATIONS"}
                 onClick={() => setView("CONVERSATIONS")}
               >
                 <MessageSquareText size={15} aria-hidden="true" />Conversaciones
-              </button>
+              </button>}
+              {model.canReadQuotes && <button
+                type="button"
+                data-active={activeView === "QUOTES"}
+                onClick={() => setView("QUOTES")}
+              >
+                <FileText size={15} aria-hidden="true" />Cotizaciones
+              </button>}
             </div>
           </div>
 
-          <div className={styles.toolbar}>
+          {activeView !== "QUOTES" && <div className={styles.toolbar}>
             <label className={styles.searchField}>
               <Search size={17} aria-hidden="true" />
               <span className={styles.visuallyHidden}>Buscar pedidos</span>
@@ -587,9 +617,11 @@ export function OrdersPage() {
                 <option value="STATUS">Por estado</option>
               </select>
             </label>
-          </div>
+          </div>}
 
-          {view === "CUSTOMERS" ? (
+          {activeView === "QUOTES" ? (
+            <OperationsQuotesPanel canManage={model.canManageQuotes} />
+          ) : activeView === "CUSTOMERS" ? (
             <div className={styles.customerGrid} data-testid="orders-customer-view">
               {customerGroups.length === 0 ? (
                 <div className={styles.emptyState}>
@@ -716,7 +748,7 @@ export function OrdersPage() {
 
         <OperationsSupportPanel
           user={model.me.data}
-          showCustomerTools={view === "CUSTOMERS"}
+          showCustomerTools={activeView === "CUSTOMERS"}
         />
 
         <AnimatePresence>
