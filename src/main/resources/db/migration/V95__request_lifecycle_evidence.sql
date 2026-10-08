@@ -32,6 +32,11 @@ CREATE TABLE public.business_request_transition_event (
         CHECK (actor_type IN ('BUSINESS_USER','AUTOMATION')),
     CONSTRAINT ck_request_transition_real_change
         CHECK (status <> previous_status),
+    CONSTRAINT ck_request_transition_automatic_evidence
+        CHECK (
+            (actor_type = 'BUSINESS_USER' AND evidence_event_id IS NULL)
+            OR (actor_type = 'AUTOMATION' AND evidence_event_id IS NOT NULL)
+        ),
     CONSTRAINT ck_request_transition_reason_length
         CHECK (char_length(reason_code) BETWEEN 1 AND 80)
 );
@@ -64,3 +69,30 @@ BEGIN
     );
 END
 $$;
+
+-- Deny illegal transitions even if a future writer bypasses the Java service.
+-- A request is terminal once RESOLVED or CANCELLED.
+CREATE OR REPLACE FUNCTION public.guard_business_request_lifecycle()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.status IS DISTINCT FROM NEW.status THEN
+        IF NOT (
+            (OLD.status = 'OPEN' AND NEW.status IN ('IN_PROGRESS','RESOLVED','CANCELLED'))
+            OR (OLD.status = 'IN_PROGRESS' AND NEW.status IN ('RESOLVED','CANCELLED'))
+        ) THEN
+            RAISE EXCEPTION 'Invalid request lifecycle transition: % -> %',
+                OLD.status, NEW.status USING ERRCODE = '23514';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_guard_business_request_lifecycle
+BEFORE UPDATE OF status ON public.business_request
+FOR EACH ROW EXECUTE FUNCTION public.guard_business_request_lifecycle();
+
+-- The lifecycle ledger is application append-only. Retention may delete the
+-- owning business_request, cascading its associated lifecycle audit.
+COMMENT ON TABLE public.business_request_transition_event IS
+    'Business request transition audit: tenant scoped; runtime SELECT/INSERT only; cascades on intentional request retention purge.';
