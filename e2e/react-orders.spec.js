@@ -101,7 +101,7 @@ async function bootOrders(page, options = {}) {
     expect(url.searchParams.has('businessId')).toBe(false);
     listCalls += 1;
     if (options.ordersGate) await options.ordersGate;
-    if (options.ordersError) {
+    if (options.ordersError || (options.refetchError && listCalls > 1)) {
       return route.fulfill(json({ message: 'orders unavailable' }, 503));
     }
     const orders = (options.orders || defaultOrders).map(order =>
@@ -439,6 +439,18 @@ test.describe('React Orders / Operations migration', () => {
     await page.getByRole('button', { name: 'Mostrar pedidos listos' }).click();
     await expect(page.getByRole('button', { name: 'Mostrar pedidos listos' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('orders-customer-view')).toHaveCount(0);
+  });
+
+  test('keeps previously loaded orders visible when manual refresh fails', async ({ page }) => {
+    const api = await bootOrders(page, { refetchError: true });
+    await page.goto('/app/orders');
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Actualizar pedidos' }).click();
+    await expect.poll(api.listCalls).toBe(2);
+    await expect(page.getByRole('alert')).toContainText('No pudimos actualizar los pedidos');
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Actualizar pedidos' })).toBeEnabled();
   });
 
   test('renders a compact visual reference while retaining the full authoritative UUID', async ({ page }) => {
