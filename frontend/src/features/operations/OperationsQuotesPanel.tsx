@@ -59,7 +59,10 @@ export function OperationsQuotesPanel({ canManage }: Props) {
     queryKey: ["commercial", "quotes"],
     queryFn: getCommercialQuotes,
     retry: false,
-    refetchOnWindowFocus: false
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true
   });
   const mutationLock = useRef(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -87,7 +90,12 @@ export function OperationsQuotesPanel({ canManage }: Props) {
         <div>
           <h3>Cotizaciones</h3>
           <p>Solicitudes de presupuesto asociadas a este negocio. No se convierten automáticamente en pedidos.</p>
-          <small>Mostrando hasta 100 cotizaciones recientes.</small>
+          <small>Hasta 100 cotizaciones recientes. Sincronización periódica cada 60 s con pestaña visible.</small>
+          {quotes.dataUpdatedAt > 0 && (
+            <small className={styles.syncedAt}>
+              Última consulta correcta: {new Intl.DateTimeFormat("es-CL", { timeStyle: "short" }).format(quotes.dataUpdatedAt)}
+            </small>
+          )}
         </div>
         <button type="button" className={styles.refresh} disabled={quotes.isFetching}
           onClick={() => { void quotes.refetch(); }}>
