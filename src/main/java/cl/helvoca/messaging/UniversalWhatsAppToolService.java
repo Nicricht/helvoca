@@ -18,6 +18,7 @@ import cl.helvoca.operations.CommercialToolDefinitions;
 import cl.helvoca.operations.SafeOperationRetryEngine;
 import cl.helvoca.operations.ShowcaseSelectionContextService;
 import cl.helvoca.request.BusinessRequest;
+import cl.helvoca.request.RequestCreationObservationDispatcher;
 import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.request.RequestPriority;
 import cl.helvoca.request.RequestSource;
@@ -57,6 +58,9 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
 
     @Autowired(required = false)
     private SafeOperationRetryEngine retryEngine;
+
+    @Autowired(required = false)
+    private RequestCreationObservationDispatcher requestObservations;
 
     @Autowired(required = false)
     private ShowcaseSelectionContextService showcaseSelectionContext;
@@ -250,6 +254,14 @@ public class UniversalWhatsAppToolService extends WhatsAppToolService {
                     requestPriority(optional(args, "priority")),
                     detailsJson,
                     RequestSource.AI_WHATSAPP);
+
+            // Only observe after the enclosing tool transaction COMMIT.
+            // No new WhatsApp message is sent and no request status is changed.
+            if (requestObservations != null) {
+                requestObservations.afterSuccessfulCommit(
+                        conversation.getBusinessId(), conversation.getId(),
+                        RequestSource.AI_WHATSAPP, request.getId(), request.getOperationId());
+            }
 
             return success(new JSONObject()
                     .put("requestId", request.getId().toString())
