@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
+import java.util.Arrays;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -65,9 +66,38 @@ class RequestReplyCorrelationServiceTest {
     void missingEvidenceDoesNotTouchDatabase() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         RequestReplyCorrelationService service = new RequestReplyCorrelationService(jdbc);
-        service.capture(null, UUID.randomUUID(), UUID.randomUUID(),
-                List.of(new RequestReplyCorrelationService.CreatedRequest(UUID.randomUUID(), UUID.randomUUID())));
-        service.capture(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), List.of());
+        UUID tenant = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        UUID message = UUID.randomUUID();
+        UUID request = UUID.randomUUID();
+        UUID operation = UUID.randomUUID();
+        var valid = new RequestReplyCorrelationService.CreatedRequest(request, operation);
+        service.capture(null, conversation, message, List.of(valid));
+        service.capture(tenant, null, message, List.of(valid));
+        service.capture(tenant, conversation, null, List.of(valid));
+        service.capture(tenant, conversation, message, null);
+        service.capture(tenant, conversation, message, List.of());
+        service.capture(tenant, conversation, message, Arrays.asList(
+                null, new RequestReplyCorrelationService.CreatedRequest(null, operation),
+                new RequestReplyCorrelationService.CreatedRequest(request, null)));
         verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void parserRejectsAllMissingOrInvalidToolReceipts() {
+        var parser = RequestReplyCorrelationService.class;
+        assertNull(RequestReplyCorrelationService.verifiedToolResult(null, "{}"));
+        assertNull(RequestReplyCorrelationService.verifiedToolResult("create_request", null));
+        assertNull(RequestReplyCorrelationService.verifiedToolResult("create_request", " "));
+        assertNull(RequestReplyCorrelationService.verifiedToolResult("create_request", "{}"));
+        assertNull(RequestReplyCorrelationService.verifiedToolResult("create_request",
+                "{\\"success\\":true}"));
+        assertNull(RequestReplyCorrelationService.verifiedToolResult("create_request",
+                "{\\"success\\":true,\\"data\\":{\\"status\\":\\"OPEN\\"}}"));
+        assertNull(RequestReplyCorrelationService.verifiedToolResult("create_request",
+                new JSONObject().put("success", true).put("data", new JSONObject()
+                        .put("requestId", UUID.randomUUID().toString())
+                        .put("operationId", "broken")
+                        .put("status", "OPEN")).toString()));
     }
 }
