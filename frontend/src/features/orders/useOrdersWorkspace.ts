@@ -82,7 +82,11 @@ export function useOrdersWorkspace() {
     queryKey: ["commercial", "orders"],
     queryFn: getOrders,
     enabled: me.isSuccess && canReadOrders,
-    ...queryDefaults
+    ...queryDefaults,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true
   });
 
   const deliveries = useQuery({
