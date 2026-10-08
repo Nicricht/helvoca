@@ -88,6 +88,19 @@ const READY_OPERATIONS = {
   ]
 };
 
+const DEFAULT_ATTENTION = [
+  {
+    kind: 'REQUEST', id: 'req-1', operationId: 'operation-1',
+    title: 'Cliente pidió devolución de llamada', priority: 'HIGH',
+    status: 'OPEN', createdAt: '2026-10-02T15:10:00Z'
+  },
+  {
+    kind: 'HANDOFF', id: 'handoff-1', operationId: 'operation-2',
+    title: 'Reclamo de cliente pendiente', priority: 'URGENT',
+    status: 'OPEN', createdAt: '2026-10-02T15:05:00Z'
+  }
+];
+
 const EMPTY_OPERATIONS = {
   businessName: 'Clínica Norte',
   timezone: 'America/Santiago',
@@ -171,6 +184,9 @@ async function bootHome(page, options = {}) {
   const permissions = options.permissions;
   const requests = [];
   let onboardingRequests = 0;
+  let attentionReads = 0;
+  let attentionMutations = 0;
+  let attentionItems = [...(options.attention || (options.operations === EMPTY_OPERATIONS ? [] : DEFAULT_ATTENTION))];
 
   await page.addInitScript(
     token => {
@@ -207,6 +223,38 @@ async function bootHome(page, options = {}) {
     return route.fulfill(json(options.onboarding || READY_ONBOARDING));
   });
 
+  await page.route('**/api/v1/operations/attention', async route => {
+    attentionReads += 1;
+    if (options.attentionError) {
+      return route.fulfill(json({ message: 'attention unavailable' }, options.attentionError));
+    }
+    return route.fulfill(json(attentionItems));
+  });
+
+  await page.route('**/api/v1/requests/req-1/status', route => {
+    attentionMutations += 1;
+    const status = route.request().postDataJSON()?.status;
+    attentionItems = attentionItems
+      .map(item => item.id === 'req-1' ? { ...item, status } : item)
+      .filter(item => item.status !== 'RESOLVED' && item.status !== 'CANCELLED');
+    return route.fulfill(json({ id: 'req-1', status }));
+  });
+  await page.route('**/api/v1/handoffs/handoff-1/acknowledge', route => {
+    attentionMutations += 1;
+    attentionItems = attentionItems.map(item => item.id === 'handoff-1'
+      ? { ...item, status: 'ACKNOWLEDGED' } : item);
+    return route.fulfill(json({ id: 'handoff-1', status: 'ACKNOWLEDGED' }));
+  });
+  await page.route('**/api/v1/handoffs/handoff-1/resolve', route => {
+    attentionMutations += 1;
+    attentionItems = attentionItems.filter(item => item.id !== 'handoff-1');
+    return route.fulfill(json({ id: 'handoff-1', status: 'RESOLVED' }));
+  });
+  await page.route('**/api/v1/requests', route => route.fulfill(json([
+    { id: 'req-1', requestType: 'CALLBACK', title: 'Cliente pidió devolución de llamada',
+      status: 'OPEN', priority: 'HIGH', createdAt: '2026-10-02T15:10:00Z' }
+  ])));
+
   await page.route('**/api/v1/operations/dashboard', async route => {
     if (options.operationsGate) await options.operationsGate;
     if (options.operationsError) {
@@ -235,7 +283,9 @@ async function bootHome(page, options = {}) {
 
   return {
     requests,
-    onboardingRequests: () => onboardingRequests
+    onboardingRequests: () => onboardingRequests,
+    attentionReads: () => attentionReads,
+    attentionMutations: () => attentionMutations
   };
 }
 
@@ -280,7 +330,7 @@ test.describe('React Home migration', () => {
 
     const attention = page.getByRole('region', { name: 'Necesita tu atención' });
     await expect(attention).toBeVisible();
-    await expect(attention).toContainText('4');
+    await expect(attention).toContainText('2');
     await expect(attention).toContainText(/solicitudes|pendientes/i);
     await expect(attention).toContainText(/pregunta|sin respuesta/i);
     await expect(attention).toContainText(/fallo/i);
@@ -302,6 +352,77 @@ test.describe('React Home migration', () => {
     expect(requests.some(request => request.url.includes('/operations/pilot-readiness'))).toBe(false);
     expect(requests.some(request => request.url.includes('/operations/pilot-metrics'))).toBe(false);
     expect(requests.some(request => request.url.includes('/operations/readiness'))).toBe(false);
+  });
+
+  test('loads a deduplicated actionable attention inbox and keeps the human history secondary', async ({ page }) => {
+    const api = await bootHome(page);
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('Cliente pidió devolución de llamada');
+    await expect(panel).toContainText('Reclamo de cliente pendiente');
+    await expect(panel).toContainText('Señales adicionales para revisar');
+    await expect(panel).not.toContainText('4 solicitudes');
+    expect(api.attentionReads()).toBe(1);
+    await expect(page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Historial y auditoría' })).toHaveCount(0);
+    await page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/i }).click();
+    await expect(page.getByRole('heading', { name: 'Historial y auditoría' })).toBeVisible();
+  });
+
+  test('updates requests and takes handoffs only after explicit user actions', async ({ page }) => {
+    const api = await bootHome(page);
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('Cliente pidió devolución de llamada');
+    expect(api.attentionMutations()).toBe(0);
+    await panel.getByRole('button', { name: 'Empezar gestión' }).click();
+    await expect(panel).toContainText('En progreso');
+    await expect.poll(api.attentionMutations).toBe(1);
+    await panel.getByRole('button', { name: 'Marcar resuelta' }).click();
+    await expect(panel.getByRole('button', { name: 'Confirmar cierre' })).toBeVisible();
+    expect(api.attentionMutations()).toBe(1);
+    await panel.getByRole('button', { name: 'Confirmar cierre' }).click();
+    await expect(panel).not.toContainText('Cliente pidió devolución de llamada');
+    await panel.getByRole('button', { name: 'Tomar caso' }).click();
+    await expect(panel).toContainText('Recibido');
+    await panel.getByRole('button', { name: 'Cerrar escalamiento' }).click();
+    await expect(panel.getByRole('button', { name: 'Confirmar cierre' })).toBeVisible();
+    await panel.getByRole('button', { name: 'Confirmar cierre' }).click();
+    await expect(panel).toContainText('Sin intervenciones pendientes');
+    expect(api.attentionMutations()).toBe(4);
+  });
+
+  test('does not fabricate a clear queue when the attention API fails', async ({ page }) => {
+    await bootHome(page, { attentionError: 503 });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel.getByRole('alert')).toContainText('No pudimos verificar los pendientes');
+    await expect(panel).not.toContainText('Sin intervenciones pendientes');
+    await expect(page.getByRole('region', { name: 'Estado de tu negocio' }))
+      .not.toContainText('Todo bajo control');
+  });
+
+  test('never fetches the protected human inbox for a role without operational access', async ({ page }) => {
+    const api = await bootHome(page, {
+      roles: ['STAFF'],
+      permissions: ['BOOKINGS_READ']
+    });
+    await page.goto('/app');
+    await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Necesita tu atención' })).toContainText('Tu rol no tiene acceso');
+    expect(api.attentionReads()).toBe(0);
+  });
+
+  test('read-only request permission does not expose status-changing controls', async ({ page }) => {
+    const api = await bootHome(page, {
+      roles: ['OPERATOR'],
+      permissions: ['REQUESTS_READ', 'OPERATIONS_READ']
+    });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('Cliente pidió devolución de llamada');
+    await expect(panel.getByRole('button', { name: 'Empezar gestión' })).toHaveCount(0);
+    expect(api.attentionMutations()).toBe(0);
   });
 
   test('renders the approved sans typography and layered petroleum atmosphere', async ({ page }) => {
