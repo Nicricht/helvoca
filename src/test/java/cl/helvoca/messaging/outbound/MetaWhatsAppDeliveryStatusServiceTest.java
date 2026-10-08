@@ -7,6 +7,8 @@ import cl.helvoca.messaging.MessagingMessage;
 import cl.helvoca.messaging.MessagingMessageRepository;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.request.RequestReplyDeliveryEvidenceService;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -18,6 +20,49 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 class MetaWhatsAppDeliveryStatusServiceTest {
+
+    @Test
+    void onlyMatchedMetaDeliveryAndReadAreCorrelatedWithTheRequestReply() {
+        OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
+        MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
+        MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
+        RequestReplyDeliveryEvidenceService evidence = mock(RequestReplyDeliveryEvidenceService.class);
+        UUID businessId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
+        UUID inboundId = UUID.randomUUID();
+        Instant now = Instant.ofEpochSecond(1760000000L);
+
+        MessagingMessage inbound = new MessagingMessage();
+        ReflectionTestUtils.setField(inbound, "id", inboundId);
+        inbound.setConversationId(conversationId);
+        inbound.setProvider(MetaWhatsAppMessagingProvider.ID);
+        inbound.setProviderMessageId("wamid.REQUEST-LINK");
+        inbound.setProviderDeliveryStatus("SENT");
+
+        MessagingConversation conversation = new MessagingConversation();
+        conversation.setBusinessId(businessId);
+        when(outbound.findTopByProviderAndProviderMessageIdOrderByUpdatedAtDesc(
+                MetaWhatsAppMessagingProvider.ID, "wamid.REQUEST-LINK")).thenReturn(Optional.empty());
+        when(messages.findByProviderAndProviderMessageId(
+                MetaWhatsAppMessagingProvider.ID, "wamid.REQUEST-LINK")).thenReturn(Optional.of(inbound));
+        when(conversations.findByIdAndBusinessId(conversationId, businessId))
+                .thenReturn(Optional.of(conversation));
+        MetaWhatsAppDeliveryStatusService service =
+                new MetaWhatsAppDeliveryStatusService(outbound, messages, conversations);
+        ReflectionTestUtils.setField(service, "requestReceiptEvidence", evidence);
+
+        assertEquals(MetaWhatsAppDeliveryStatusService.Result.UPDATED,
+                service.apply(businessId, "wamid.REQUEST-LINK", "delivered", now, null));
+        verify(evidence).recordMetaReceipt(businessId, inboundId, "wamid.REQUEST-LINK", "DELIVERED");
+        assertEquals(MetaWhatsAppDeliveryStatusService.Result.IGNORED,
+                service.apply(businessId, "wamid.REQUEST-LINK", "delivered", now, null));
+        assertEquals(MetaWhatsAppDeliveryStatusService.Result.UPDATED,
+                service.apply(businessId, "wamid.REQUEST-LINK", "read", now.plusSeconds(5), null));
+        verify(evidence).recordMetaReceipt(businessId, inboundId, "wamid.REQUEST-LINK", "READ");
+        assertEquals(MetaWhatsAppDeliveryStatusService.Result.IGNORED,
+                service.apply(businessId, "wamid.REQUEST-LINK", "failed", now.plusSeconds(10), null));
+        verifyNoMoreInteractions(evidence);
+    }
 
     @Test
     void deliveredUpdatesPersistedAiReplyTracking() {
