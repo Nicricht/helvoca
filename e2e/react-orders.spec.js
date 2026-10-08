@@ -396,4 +396,46 @@ test.describe('React Orders / Operations migration', () => {
       document.documentElement.scrollWidth <= document.documentElement.clientWidth
     )).toBe(true);
   });
+
+  test('prioritizes the order workspace over a giant hero and refreshes only on request', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    const api = await bootOrders(page);
+    await page.goto('/app/orders');
+
+    await expect(page.getByRole('region', { name: 'Centro de operaciones RecepVoz' })).toHaveCount(0);
+    const summary = page.getByRole('region', { name: 'Resumen de pedidos' });
+    const workspace = page.getByRole('heading', { name: 'Flujo operativo' });
+    await expect(summary).toBeVisible();
+    await expect(workspace).toBeVisible();
+    const summaryBounds = await summary.boundingBox();
+    const workspaceBounds = await workspace.boundingBox();
+    expect(summaryBounds).not.toBeNull();
+    expect(workspaceBounds).not.toBeNull();
+    expect(summaryBounds.y).toBeLessThan(workspaceBounds.y);
+    expect(workspaceBounds.y).toBeLessThan(620);
+
+    await expect(page.getByText('FLUJO EN TIEMPO REAL')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Actualizar pedidos' }).click();
+    await expect.poll(api.listCalls).toBe(2);
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+  });
+
+  test('renders a compact visual reference while retaining the full authoritative UUID', async ({ page }) => {
+    const id = '4fe28d31-98f4-4c81-8579-bad049c062ea';
+    await bootOrders(page, {
+      orders: [{ ...defaultOrders[0], id, operationId: null, sourceReferenceId: null }]
+    });
+    await page.goto('/app/orders');
+
+    const row = page.getByTestId(`orders-row-${id}`);
+    await expect(row).toContainText('Ref. 4fe28d31…c062ea');
+    await expect(row).not.toContainText(id);
+    await expect(row.getByText('Ref. 4fe28d31…c062ea')).toHaveAttribute('title', id);
+
+    await row.click();
+    const detail = page.getByRole('dialog', { name: new RegExp(id) });
+    await expect(detail).toBeVisible();
+    await expect(detail).toContainText('Ref. 4fe28d31…c062ea');
+    await expect(detail).toContainText('18.990');
+  });
 });
