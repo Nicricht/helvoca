@@ -596,7 +596,7 @@ test.describe('React Orders / Operations migration', () => {
     await expect(page.getByText(/Sincronización periódica cada 60 s/)).toBeVisible();
     expect(api.listCalls()).toBe(1);
 
-    await page.clock.fastForward('60s');
+    await page.clock.fastForward(60_000);
     await expect.poll(api.listCalls).toBeGreaterThanOrEqual(2);
     await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
   });
@@ -612,8 +612,22 @@ test.describe('React Orders / Operations migration', () => {
     await expect(page.getByTestId('operations-quotes')).toContainText('Cotización de herramientas');
     expect(api.quoteCalls()).toBe(1);
 
-    await page.clock.fastForward('60s');
+    await page.clock.fastForward(60_000);
     await expect.poll(api.quoteCalls).toBeGreaterThanOrEqual(2);
+  });
+
+  test('reports offline status without fabricating an active connection', async ({ page }) => {
+    await bootOrders(page);
+    await page.goto('/app/orders');
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+      window.dispatchEvent(new Event('offline'));
+    });
+    await expect(page.getByText('Sin conexión', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Se conservan los últimos datos consultados/)).toBeVisible();
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
   });
 
   test('identifies AI history only from actual AI-attributed operation events', async ({ page }) => {
