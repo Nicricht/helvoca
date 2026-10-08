@@ -78,6 +78,9 @@ async function bootOrders(page, options = {}) {
   let statusCalls = 0;
   let preparationCalls = 0;
   let statusPayload = null;
+  let quoteCalls = 0;
+  let quoteStatusCalls = 0;
+  let quoteStatus = 'REQUESTED';
   let releaseMutation;
   const mutationGate = new Promise(resolve => { releaseMutation = resolve; });
 
@@ -101,13 +104,42 @@ async function bootOrders(page, options = {}) {
     expect(url.searchParams.has('businessId')).toBe(false);
     listCalls += 1;
     if (options.ordersGate) await options.ordersGate;
-    if (options.ordersError) {
+    if (options.ordersError || (options.refetchError && listCalls > 1)) {
       return route.fulfill(json({ message: 'orders unavailable' }, 503));
     }
     const orders = (options.orders || defaultOrders).map(order =>
       order.id === 'order-1' ? { ...order, status: currentStatus } : order
     );
     return route.fulfill(json(orders));
+  });
+
+  await page.route('**/api/v1/commercial/quotes', async route => {
+    expect(route.request().method()).toBe('GET');
+    expect(new URL(route.request().url()).searchParams.has('businessId')).toBe(false);
+    quoteCalls += 1;
+    if (options.quotesError) return route.fulfill(json({ message: 'quotes unavailable' }, 503));
+    return route.fulfill(json([{
+      id: 'quote-1',
+      title: 'Cotización de herramientas',
+      description: 'Pedido de herramientas profesionales',
+      amount: 55000,
+      currency: 'CLP',
+      status: quoteStatus,
+      contactName: 'Camila Ferretería',
+      contactPhone: '+56911111111',
+      source: 'WHATSAPP',
+      createdAt: '2026-10-07T12:00:00Z'
+    }]));
+  });
+
+  await page.route('**/api/v1/commercial/quotes/quote-1/status', async route => {
+    quoteStatusCalls += 1;
+    expect(route.request().method()).toBe('PATCH');
+    const body = route.request().postDataJSON();
+    expect(body).toEqual({ status: 'READY' });
+    if (options.quoteMutationError) return route.fulfill(json({ message: 'conflict' }, options.quoteMutationError));
+    quoteStatus = body.status;
+    return route.fulfill(json({ id: 'quote-1', status: quoteStatus }));
   });
 
   await page.route('**/api/v1/commercial/deliveries', async route => {
@@ -136,7 +168,7 @@ async function bootOrders(page, options = {}) {
     if (options.contextError) {
       return route.fulfill(json({ message: 'history unavailable' }, 503));
     }
-    return route.fulfill(json([
+    return route.fulfill(json(options.events ?? [
       {
         id: 'evt-2',
         eventType: 'ORDER_CONFIRMED',
@@ -215,7 +247,9 @@ async function bootOrders(page, options = {}) {
     statusPayload: () => statusPayload,
     listCalls: () => listCalls,
     statusCalls: () => statusCalls,
-    preparationCalls: () => preparationCalls
+    preparationCalls: () => preparationCalls,
+    quoteCalls: () => quoteCalls,
+    quoteStatusCalls: () => quoteStatusCalls
   };
 }
 
@@ -353,7 +387,7 @@ test.describe('React Orders / Operations migration', () => {
     await page.goto('/app/orders');
     await page.getByTestId('orders-row-order-1').click();
 
-    await expect(page.getByRole('button', { name: /prepar|cancelar|despachar|completar/i })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: /Pedido .*Juan Pedido/i }).getByRole('button', { name: /prepar|cancelar|despachar|completar/i })).toHaveCount(0);
     expect(staff.statusCalls()).toBe(0);
     expect(staff.preparationCalls()).toBe(0);
   });
@@ -395,5 +429,263 @@ test.describe('React Orders / Operations migration', () => {
     expect(await page.evaluate(() =>
       document.documentElement.scrollWidth <= document.documentElement.clientWidth
     )).toBe(true);
+  });
+
+  test('prioritizes the order workspace over a giant hero and refreshes only on request', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    const api = await bootOrders(page);
+    await page.goto('/app/orders');
+
+    await expect(page.getByRole('region', { name: 'Centro de operaciones RecepVoz' })).toHaveCount(0);
+    const summary = page.getByRole('region', { name: 'Resumen de pedidos' });
+    const workspace = page.getByRole('heading', { name: 'Flujo operativo' });
+    await expect(summary).toBeVisible();
+    await expect(workspace).toBeVisible();
+    const summaryBounds = await summary.boundingBox();
+    const workspaceBounds = await workspace.boundingBox();
+    expect(summaryBounds).not.toBeNull();
+    expect(workspaceBounds).not.toBeNull();
+    expect(summaryBounds.y).toBeLessThan(workspaceBounds.y);
+    expect(workspaceBounds.y).toBeLessThan(620);
+
+    await expect(page.getByText('FLUJO EN TIEMPO REAL')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Actualizar pedidos' }).click();
+    await expect.poll(api.listCalls).toBe(2);
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+  });
+
+  test('makes the three summary metrics actionable without introducing false order states', async ({ page }) => {
+    await bootOrders(page);
+    await page.goto('/app/orders');
+
+    await page.getByRole('button', { name: 'Mostrar pedidos activos' }).click();
+    await expect(page.getByRole('button', { name: 'Mostrar pedidos activos' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+    await expect(page.getByTestId('orders-row-order-2')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Mostrar pedidos preparando' }).click();
+    await expect(page.getByTestId('orders-row-order-1')).toHaveCount(0);
+    await page.getByLabel('Estado').selectOption('ALL');
+    await expect(page.getByTestId('orders-row-order-2')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Clientes', exact: true }).click();
+    await expect(page.getByTestId('orders-customer-view')).toBeVisible();
+    await page.getByRole('button', { name: 'Mostrar pedidos listos' }).click();
+    await expect(page.getByRole('button', { name: 'Mostrar pedidos listos' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('orders-customer-view')).toHaveCount(0);
+  });
+
+  test('keeps previously loaded orders visible when manual refresh fails', async ({ page }) => {
+    const api = await bootOrders(page, { refetchError: true });
+    await page.goto('/app/orders');
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Actualizar pedidos' }).click();
+    await expect.poll(api.listCalls).toBe(2);
+    await expect(page.getByRole('alert')).toContainText('No pudimos actualizar los pedidos');
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Actualizar pedidos' })).toBeEnabled();
+  });
+
+  test('renders a compact visual reference while retaining the full authoritative UUID', async ({ page }) => {
+    const id = '4fe28d31-98f4-4c81-8579-bad049c062ea';
+    await bootOrders(page, {
+      orders: [{ ...defaultOrders[0], id, operationId: null, sourceReferenceId: null }]
+    });
+    await page.goto('/app/orders');
+
+    const row = page.getByTestId(`orders-row-${id}`);
+    await expect(row).toContainText('Ref. 4fe28d31…c062ea');
+    await expect(row).not.toContainText(id);
+    await expect(row.getByText('Ref. 4fe28d31…c062ea')).toHaveAttribute('title', id);
+
+    await row.click();
+    const detail = page.getByRole('dialog', { name: new RegExp(id) });
+    await expect(detail).toBeVisible();
+    await expect(detail).toContainText('Ref. 4fe28d31…c062ea');
+    await expect(detail).toContainText('18.990');
+  });
+
+  test('offers authorized commerce-specific quotes without mixing them with orders', async ({ page }) => {
+    const api = await bootOrders(page, {
+      permissions: ['ORDERS_READ', 'ORDERS_MANAGE', 'QUOTES_READ', 'QUOTES_MANAGE']
+    });
+    await page.goto('/app/orders');
+    await expect(page.getByRole('button', { name: 'Cotizaciones', exact: true })).toBeVisible();
+    expect(api.quoteCalls()).toBe(0);
+
+    await page.getByRole('button', { name: 'Cotizaciones', exact: true }).click();
+    const quotes = page.getByTestId('operations-quotes');
+    await expect(quotes).toContainText('Cotización de herramientas');
+    await expect(quotes).toContainText('Camila Ferretería');
+    await expect(quotes).toContainText('55.000');
+    await expect(quotes).toContainText('Solicitada');
+    await expect.poll(api.quoteCalls).toBe(1);
+
+    await quotes.getByRole('button', { name: 'Marcar lista' }).click();
+    await expect.poll(api.quoteStatusCalls).toBe(1);
+    await expect(quotes).toContainText('Lista');
+    await page.getByRole('button', { name: 'Pedidos', exact: true }).click();
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+  });
+
+  test('quotes are read-only for a receptionist lacking QUOTES_MANAGE', async ({ page }) => {
+    const api = await bootOrders(page, {
+      roles: ['RECEPTION'],
+      permissions: ['ORDERS_READ', 'QUOTES_READ']
+    });
+    await page.goto('/app/orders');
+    await page.getByRole('button', { name: 'Cotizaciones', exact: true }).click();
+    await expect(page.getByTestId('operations-quotes')).toContainText('Cotización de herramientas');
+    await expect(page.getByRole('button', { name: 'Marcar lista' })).toHaveCount(0);
+    expect(api.quoteStatusCalls()).toBe(0);
+  });
+
+  test('hides and never fetches quotes without QUOTES_READ, and does not fetch orders without ORDERS_READ', async ({ page }) => {
+    const api = await bootOrders(page, {
+      roles: ['STAFF'],
+      permissions: ['ORDERS_READ']
+    });
+    await page.goto('/app/orders');
+    await expect(page.getByRole('button', { name: 'Cotizaciones', exact: true })).toHaveCount(0);
+    expect(api.quoteCalls()).toBe(0);
+
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+    const unauthorized = await bootOrders(page, {
+      roles: ['PROFESSIONAL'],
+      permissions: ['BOOKINGS_READ']
+    });
+    await page.goto('/app/orders');
+    await expect(page.getByRole('alert')).toContainText('No tienes permiso para consultar pedidos');
+    expect(unauthorized.listCalls()).toBe(0);
+    expect(unauthorized.quoteCalls()).toBe(0);
+  });
+
+  test('supports a quote-only business user without querying unauthorized orders', async ({ page }) => {
+    const api = await bootOrders(page, {
+      roles: ['SALES'],
+      permissions: ['QUOTES_READ', 'QUOTES_MANAGE']
+    });
+    await page.goto('/app/orders');
+    await expect(page.getByRole('heading', { level: 1, name: 'Cotizaciones' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pedidos', exact: true })).toHaveCount(0);
+    await expect(page.getByTestId('operations-quotes')).toContainText('Cotización de herramientas');
+    expect(api.listCalls()).toBe(0);
+  });
+
+  test('keeps quote data visible and reports a failed status transition', async ({ page }) => {
+    const api = await bootOrders(page, {
+      roles: ['SALES'],
+      permissions: ['ORDERS_READ', 'QUOTES_READ', 'QUOTES_MANAGE'],
+      quoteMutationError: 409
+    });
+    await page.goto('/app/orders');
+    await page.getByRole('button', { name: 'Cotizaciones', exact: true }).click();
+    const quotes = page.getByTestId('operations-quotes');
+    await quotes.getByRole('button', { name: 'Marcar lista' }).click();
+    await expect(quotes.getByRole('alert')).toContainText('No pudimos actualizar la cotización');
+    await expect(quotes).toContainText('Solicitada');
+    expect(api.quoteStatusCalls()).toBe(1);
+  });
+
+  test('periodically synchronizes visible orders from the authoritative API without manual interaction', async ({ page }) => {
+    await page.clock.install();
+    const api = await bootOrders(page);
+    await page.goto('/app/orders');
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+    await expect(page.getByText(/Sincronización periódica cada 60 s/)).toBeVisible();
+    expect(api.listCalls()).toBe(1);
+
+    await page.clock.fastForward(60_000);
+    await expect.poll(api.listCalls).toBeGreaterThanOrEqual(2);
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+  });
+
+  test('periodically synchronizes authorized quotes while their workspace is visible', async ({ page }) => {
+    await page.clock.install();
+    const api = await bootOrders(page, {
+      roles: ['SALES'],
+      permissions: ['ORDERS_READ', 'QUOTES_READ']
+    });
+    await page.goto('/app/orders');
+    await page.getByRole('button', { name: 'Cotizaciones', exact: true }).click();
+    await expect(page.getByTestId('operations-quotes')).toContainText('Cotización de herramientas');
+    expect(api.quoteCalls()).toBe(1);
+
+    await page.clock.fastForward(60_000);
+    await expect.poll(api.quoteCalls).toBeGreaterThanOrEqual(2);
+  });
+
+  test('reports offline status without fabricating an active connection', async ({ page }) => {
+    await bootOrders(page);
+    await page.goto('/app/orders');
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+      window.dispatchEvent(new Event('offline'));
+    });
+    await expect(page.getByText('Sin conexión', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Se conservan los últimos datos consultados/)).toBeVisible();
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+  });
+
+  test('identifies AI history only from actual AI-attributed operation events', async ({ page }) => {
+    await bootOrders(page);
+    await page.goto('/app/orders');
+    await page.getByTestId('orders-row-order-1').click();
+    const dialog = page.getByRole('dialog', { name: /Pedido .*Juan Pedido/i });
+    const ai = dialog.getByRole('region', { name: 'Actividad de IA registrada' });
+    await expect(ai).toContainText('ORDER_CONFIRMED');
+    await expect(ai).toContainText('WhatsApp');
+    await expect(ai).toContainText('Historial registrado');
+    await expect(ai).not.toContainText('Trabajando ahora');
+  });
+
+  test('never invents AI activity when only a human event exists or the history fails', async ({ page }) => {
+    await bootOrders(page, {
+      events: [{ id: 'human-1', eventType: 'ORDER_PREPARING', actorType: 'HUMAN',
+        channel: 'MANUAL', createdAt: '2026-10-07T13:00:00Z' }]
+    });
+    await page.goto('/app/orders');
+    await page.getByTestId('orders-row-order-1').click();
+    const dialog = page.getByRole('dialog', { name: /Pedido .*Juan Pedido/i });
+    await expect(dialog).toContainText('ORDER_PREPARING');
+    await expect(dialog.getByRole('region', { name: 'Actividad de IA registrada' })).toHaveCount(0);
+
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+    await bootOrders(page, { contextError: true });
+    await page.goto('/app/orders');
+    await page.getByTestId('orders-row-order-1').click();
+    const failed = page.getByRole('dialog', { name: /Pedido .*Juan Pedido/i });
+    await expect(failed.getByRole('status')).toContainText(/contexto|historial/i);
+    await expect(failed.getByRole('region', { name: 'Actividad de IA registrada' })).toHaveCount(0);
+  });
+
+
+  test('keeps the actual Operations workspace inside the protected frame at six canonical viewports', async ({ page }) => {
+    await bootOrders(page);
+    for (const viewport of [
+      { width: 1536, height: 950 },
+      { width: 1440, height: 900 },
+      { width: 1366, height: 768 },
+      { width: 1280, height: 720 },
+      { width: 768, height: 1024 },
+      { width: 390, height: 844 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/app/orders');
+      await expect(page.getByRole('heading', { level: 1, name: 'Pedidos' })).toBeVisible();
+      await expect(page.getByTestId('orders-row-order-1')).toBeAttached();
+      await expect(page.getByRole('heading', { name: 'Flujo operativo' })).toBeAttached();
+      expect(await page.evaluate(() =>
+        document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
+      ), `horizontal document overflow at ${viewport.width}x${viewport.height}`).toBe(true);
+      if (viewport.width <= 680) {
+        await expect(page.getByTestId('orders-mobile-list')).toBeVisible();
+      } else {
+        await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+      }
+    }
   });
 });

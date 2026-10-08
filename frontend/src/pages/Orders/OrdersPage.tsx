@@ -8,12 +8,15 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
+  Bot,
   CalendarClock,
   ChevronRight,
   Clock3,
   MessageSquareText,
+  FileText,
   PackageCheck,
   Search,
+  RefreshCw,
   ShoppingBag,
   Truck,
   UserRound,
@@ -23,6 +26,7 @@ import {
 import { ApiError } from "../../api/client";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { OperationsSupportPanel } from "../../features/operations/OperationsSupportPanel";
+import { OperationsQuotesPanel } from "../../features/operations/OperationsQuotesPanel";
 import {
   getCallContext,
   getConversation,
@@ -38,10 +42,10 @@ import {
 import { useOrdersWorkspace } from "../../features/orders/useOrdersWorkspace";
 import styles from "./OrdersPage.module.css";
 
-type StatusFilter = "ALL" | OrderStatus;
+type StatusFilter = "ALL" | "ACTIVE" | OrderStatus;
 type SourceFilter = "ALL" | OrderSource;
 type SortMode = "NEWEST" | "OLDEST" | "STATUS";
-type EmbeddedView = "ORDERS" | "CUSTOMERS" | "CONVERSATIONS";
+type EmbeddedView = "ORDERS" | "CUSTOMERS" | "CONVERSATIONS" | "QUOTES";
 
 interface ContextState {
   loading: boolean;
@@ -95,6 +99,11 @@ function dateTime(value?: string | null) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(date);
+}
+
+// This is a display reference, not a business folio. Full UUID remains authoritative.
+function orderReference(id: string) {
+  return id.length > 20 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
 }
 
 function fulfillmentLabel(order: BusinessOrder) {
@@ -197,8 +206,23 @@ export function OrdersPage() {
   const [mutationPending, setMutationPending] = useState(false);
   const [mutationError, setMutationError] = useState("");
   const mutationLock = useRef(false);
+  const [online, setOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine
+  );
+
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
 
   const orders = model.orders.data ?? [];
+  const quoteOnly = !model.canReadOrders && model.canReadQuotes;
+  const activeView: EmbeddedView = quoteOnly ? "QUOTES" : view;
   const selected = selectedId
     ? orders.find(order => order.id === selectedId) ?? null
     : null;
@@ -207,10 +231,11 @@ export function OrdersPage() {
     const query = search.trim().toLocaleLowerCase("es");
     const filtered = orders.filter(order => {
       if (query && !orderSearchText(order).includes(query)) return false;
-      if (status !== "ALL" && order.status !== status) return false;
+      if (status === "ACTIVE" && ["COMPLETED", "CANCELLED"].includes(order.status)) return false;
+      if (status !== "ALL" && status !== "ACTIVE" && order.status !== status) return false;
       if (source !== "ALL" && order.source !== source) return false;
       if (
-        view === "CONVERSATIONS"
+        activeView === "CONVERSATIONS"
         && (!order.sourceReferenceId || (order.source !== "WHATSAPP" && order.source !== "VOICE"))
       ) {
         return false;
@@ -231,7 +256,7 @@ export function OrdersPage() {
     return [...filtered].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-  }, [orders, search, status, source, sort, view]);
+  }, [orders, search, status, source, sort, activeView]);
 
   const customerGroups = useMemo(() => {
     const groups = new Map<string, BusinessOrder[]>();
@@ -258,6 +283,10 @@ export function OrdersPage() {
   ).length;
   const preparingCount = orders.filter(order => order.status === "PREPARING").length;
   const readyCount = orders.filter(order => order.status === "READY").length;
+  const aiEvents = context.events
+    .filter(event => event.actorType?.trim().toUpperCase() === "AI")
+    .sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime())
+    .slice(0, 3);
 
   useEffect(() => {
     if (!selected) {
@@ -346,6 +375,7 @@ export function OrdersPage() {
   }, [
     selectedId,
     selected?.operationId,
+    selected?.updatedAt,
     selected?.source,
     selected?.sourceReferenceId,
     model.canReadConversations
@@ -382,8 +412,8 @@ export function OrdersPage() {
   }
 
   const hasFilters = Boolean(search.trim()) || status !== "ALL" || source !== "ALL";
-  const loading = model.orders.isPending;
-  const failed = model.orders.isError;
+  const loading = model.me.isPending || (model.canReadOrders && model.orders.isPending);
+  const failed = model.me.isError || (model.canReadOrders && model.orders.isError && !model.orders.data);
 
   if (loading) {
     return (
@@ -419,9 +449,28 @@ export function OrdersPage() {
           <section className={styles.errorCard} role="alert">
             <strong>No pudimos cargar los pedidos.</strong>
             <p>La operación no se mostrará como vacía si el servidor no respondió.</p>
-            <button className="button primary" type="button" onClick={() => model.orders.refetch()}>
+            <button className="button primary" type="button" onClick={() => { void (model.me.isError ? model.me.refetch() : model.orders.refetch()); }}>
               Reintentar
             </button>
+          </section>
+        </main>
+      </AppShell>
+    );
+  }
+
+  if (!model.canReadOrders && !model.canReadQuotes) {
+    return (
+      <AppShell>
+        <main className="rv-page-frame" data-visual-page="operations">
+          <header className="rv-page-header">
+            <div>
+              <p className="eyebrow">OPERACIONES</p>
+              <h1>Pedidos</h1>
+            </div>
+          </header>
+          <section className={styles.errorCard} role="alert">
+            <strong>No tienes permiso para consultar pedidos ni cotizaciones.</strong>
+            <p>Solicita acceso a una persona administradora de tu negocio.</p>
           </section>
         </main>
       </AppShell>
@@ -434,88 +483,106 @@ export function OrdersPage() {
         <header className="rv-page-header">
           <div>
             <p className="eyebrow">OPERACIONES</p>
-            <h1>Pedidos</h1>
+            <h1>{quoteOnly ? "Cotizaciones" : "Pedidos"}</h1>
             <p>
-              Controla pedidos, preparación y entrega. Clientes y conversaciones viven aquí como contexto,
-              no como módulos aislados.
+              {quoteOnly ? "Gestiona las cotizaciones del negocio según los permisos de tu rol." : "Gestiona pedidos, preparación, entregas y cotizaciones autorizadas sin salir del flujo."}
             </p>
           </div>
           <span className={styles.permissionPill}>
-            {model.canManage || model.canPrepare ? "Gestión habilitada" : "Solo lectura"}
+            {model.canManage || model.canPrepare || model.canManageQuotes ? "Gestión habilitada" : "Solo lectura"}
           </span>
         </header>
 
-        <section className={styles.visualHero} aria-label="Centro de operaciones RecepVoz">
-          <div className={styles.visualHeroCopy}>
-            <span className={styles.visualHeroKicker}>FLUJO EN TIEMPO REAL</span>
-            <h2>De pedido recibido a <span>entrega completada</span></h2>
+        {model.canReadOrders && <section className={styles.operationalBar} aria-label="Actualización de pedidos">
+          <div className={styles.operationalBarCopy}>
+            <span className={styles.syncLabel}>
+              <span className={styles.syncDot} data-offline={!online} aria-hidden="true" />
+              {online ? "Sincronización automática" : "Sin conexión"}
+            </span>
             <p>
-              RecepVoz mantiene pedidos, clientes y conversaciones enlazados para que tu equipo actúe sin perder contexto.
+              Mostrando los últimos pedidos disponibles (máximo 100).
+              {online ? " Sincronización periódica cada 60 s con pestaña visible." : " Se conservan los últimos datos consultados."}
+              {model.orders.dataUpdatedAt > 0 && (
+                <> Última consulta correcta: {new Intl.DateTimeFormat("es-CL", { timeStyle: "short" }).format(model.orders.dataUpdatedAt)}.</>
+              )}
             </p>
-            <div className={styles.visualHeroFlow} aria-label="Flujo operativo en tiempo real">
-              <span><i data-tone="cyan" />{activeCount} activos</span>
-              <b aria-hidden="true">→</b>
-              <span><i data-tone="violet" />{preparingCount} preparando</span>
-              <b aria-hidden="true">→</b>
-              <span><i data-tone="green" />{readyCount} listos</span>
-            </div>
+            {model.orders.isRefetchError && (
+              <p className={styles.syncError} role="alert">
+                No pudimos actualizar los pedidos. Se mantienen los últimos datos disponibles.
+              </p>
+            )}
           </div>
-          <div className={styles.visualHeroArt} aria-hidden="true">
-            <span className={styles.visualHeroOrbit} />
-            <span className={styles.visualRoute} />
-            <img className={styles.visualHeroRobot} src="/app/assets/recepvoz/v2/operations/hero-order-robot.webp" alt="" />
-            <img className={styles.visualPackage} src="/app/assets/recepvoz/v2/operations/order-package.webp" alt="" />
-            <img className={styles.visualTruck} src="/app/assets/recepvoz/v2/operations/delivery-truck.webp" alt="" />
-          </div>
-        </section>
+          <button
+            className={styles.refreshButton}
+            type="button"
+            disabled={model.orders.isFetching}
+            onClick={() => { void model.orders.refetch(); }}
+          >
+            <RefreshCw size={15} aria-hidden="true" />
+            {model.orders.isFetching ? "Actualizando…" : "Actualizar pedidos"}
+          </button>
+          <img
+            className={styles.operationalRobot}
+            src="/app/assets/recepvoz/v2/operations/hero-order-robot.webp"
+            alt=""
+            aria-hidden="true"
+          />
+        </section>}
 
-        <section className={styles.summaryGrid} aria-label="Resumen de pedidos">
-          <article className={styles.summaryCard}>
+        {model.canReadOrders && <section className={styles.summaryGrid} aria-label="Resumen de pedidos">
+          <button type="button" className={styles.summaryCard} aria-label="Mostrar pedidos activos" aria-pressed={status === "ACTIVE" && view === "ORDERS"} onClick={() => { setStatus("ACTIVE"); setView("ORDERS"); }}>
             <span className={styles.summaryIcon}><ShoppingBag size={18} aria-hidden="true" /></span>
-            <div><span>Activos</span><strong>{activeCount}</strong><small>requieren seguimiento</small></div>
-          </article>
-          <article className={styles.summaryCard}>
+            <div><span>Activos</span><strong>{activeCount}</strong><small>de los más recientes</small></div>
+          </button>
+          <button type="button" className={styles.summaryCard} aria-label="Mostrar pedidos preparando" aria-pressed={status === "PREPARING" && view === "ORDERS"} onClick={() => { setStatus("PREPARING"); setView("ORDERS"); }}>
             <span className={styles.summaryIcon}><Clock3 size={18} aria-hidden="true" /></span>
-            <div><span>Preparando</span><strong>{preparingCount}</strong><small>en proceso ahora</small></div>
-          </article>
-          <article className={styles.summaryCard}>
+            <div><span>Preparando</span><strong>{preparingCount}</strong><small>de los más recientes</small></div>
+          </button>
+          <button type="button" className={styles.summaryCard} aria-label="Mostrar pedidos listos" aria-pressed={status === "READY" && view === "ORDERS"} onClick={() => { setStatus("READY"); setView("ORDERS"); }}>
             <span className={styles.summaryIcon}><PackageCheck size={18} aria-hidden="true" /></span>
-            <div><span>Listos</span><strong>{readyCount}</strong><small>esperando retiro o despacho</small></div>
-          </article>
-        </section>
+            <div><span>Listos</span><strong>{readyCount}</strong><small>por retirar o despachar</small></div>
+          </button>
+        </section>}
 
         <section className={styles.workspace} aria-labelledby="ordersWorkspaceTitle">
           <div className={styles.workspaceHeader}>
             <div>
-              <h2 id="ordersWorkspaceTitle">Flujo operativo</h2>
-              <p>Una sola superficie para pedido, cliente y contexto de conversación.</p>
+              <h2 id="ordersWorkspaceTitle">{quoteOnly ? "Cotizaciones" : "Flujo operativo"}</h2>
+              <p>Pedidos como actividad principal, con clientes, conversaciones y cotizaciones en contexto.</p>
             </div>
             <div className={styles.viewSwitch} aria-label="Vista de operaciones">
-              <button
+              {model.canReadOrders && <button
                 type="button"
-                data-active={view === "ORDERS"}
+                data-active={activeView === "ORDERS"}
                 onClick={() => setView("ORDERS")}
               >
                 <ShoppingBag size={15} aria-hidden="true" />Pedidos
-              </button>
-              <button
+              </button>}
+              {model.canReadOrders && <button
                 type="button"
-                data-active={view === "CUSTOMERS"}
+                data-active={activeView === "CUSTOMERS"}
                 onClick={() => setView("CUSTOMERS")}
               >
                 <UsersRound size={15} aria-hidden="true" />Clientes
-              </button>
-              <button
+              </button>}
+              {model.canReadOrders && <button
                 type="button"
-                data-active={view === "CONVERSATIONS"}
+                data-active={activeView === "CONVERSATIONS"}
                 onClick={() => setView("CONVERSATIONS")}
               >
                 <MessageSquareText size={15} aria-hidden="true" />Conversaciones
-              </button>
+              </button>}
+              {model.canReadQuotes && <button
+                type="button"
+                data-active={activeView === "QUOTES"}
+                onClick={() => setView("QUOTES")}
+              >
+                <FileText size={15} aria-hidden="true" />Cotizaciones
+              </button>}
             </div>
           </div>
 
-          <div className={styles.toolbar}>
+          {activeView !== "QUOTES" && <div className={styles.toolbar}>
             <label className={styles.searchField}>
               <Search size={17} aria-hidden="true" />
               <span className={styles.visuallyHidden}>Buscar pedidos</span>
@@ -536,6 +603,7 @@ export function OrdersPage() {
                 onChange={event => setStatus(event.target.value as StatusFilter)}
               >
                 <option value="ALL">Todos</option>
+                <option value="ACTIVE">Activos</option>
                 <option value="CONFIRMED">Confirmados</option>
                 <option value="PREPARING">Preparando</option>
                 <option value="READY">Listos</option>
@@ -572,9 +640,11 @@ export function OrdersPage() {
                 <option value="STATUS">Por estado</option>
               </select>
             </label>
-          </div>
+          </div>}
 
-          {view === "CUSTOMERS" ? (
+          {activeView === "QUOTES" ? (
+            <OperationsQuotesPanel canManage={model.canManageQuotes} />
+          ) : activeView === "CUSTOMERS" ? (
             <div className={styles.customerGrid} data-testid="orders-customer-view">
               {customerGroups.length === 0 ? (
                 <div className={styles.emptyState}>
@@ -647,7 +717,7 @@ export function OrdersPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: reduceMotion ? 0 : .2, delay: reduceMotion ? 0 : Math.min(index * .025, .16) }}
                           >
-                            <td><strong className={styles.orderId}>#{order.id}</strong></td>
+                            <td><strong className={styles.orderId} title={order.id}>Ref. {orderReference(order.id)}</strong></td>
                             <td>
                               <span className={styles.customerCell}>
                                 <strong>{order.contactName || "Cliente"}</strong>
@@ -682,7 +752,7 @@ export function OrdersPage() {
                           <span className={statusClass(order.status)}>{statusLabels[order.status]}</span>
                         </span>
                         <span className={styles.mobileOrderMeta}>
-                          <span>#{order.id}</span>
+                          <span title={order.id}>Ref. {orderReference(order.id)}</span>
                           <span>{fulfillmentLabel(order)}</span>
                           <span>{sourceLabels[order.source]}</span>
                         </span>
@@ -701,7 +771,7 @@ export function OrdersPage() {
 
         <OperationsSupportPanel
           user={model.me.data}
-          showCustomerTools={view === "CUSTOMERS"}
+          showCustomerTools={activeView === "CUSTOMERS"}
         />
 
         <AnimatePresence>
@@ -729,7 +799,7 @@ export function OrdersPage() {
               >
                 <header className={styles.drawerHeader}>
                   <div>
-                    <span className={styles.drawerEyebrow}>Pedido #{selected.id}</span>
+                    <span className={styles.drawerEyebrow} title={selected.id}>Ref. {orderReference(selected.id)}</span>
                     <h2>{selected.contactName || "Cliente"}</h2>
                     <div className={styles.drawerBadges}>
                       <span className={statusClass(selected.status)}>{statusLabels[selected.status]}</span>
@@ -847,6 +917,26 @@ export function OrdersPage() {
                         <p className={styles.contextMuted}>No hay conversación visible asociada a este pedido.</p>
                       )}
                   </section>
+
+                  {aiEvents.length > 0 && (
+                    <section className={styles.aiEvidence} role="region" aria-label="Actividad de IA registrada">
+                      <div className={styles.aiEvidenceHeading}>
+                        <Bot size={17} aria-hidden="true" />
+                        <div>
+                          <h3>Actividad de IA registrada</h3>
+                          <span>Historial registrado en la operación. No indica una acción en curso.</span>
+                        </div>
+                      </div>
+                      <ol className={styles.aiEvidenceList}>
+                        {aiEvents.map(event => (
+                          <li key={event.id}>
+                            <strong>{event.eventType}</strong>
+                            <small>{[event.channel ? (sourceLabels[event.channel as OrderSource] ?? event.channel) : null, dateTime(event.createdAt)].filter(Boolean).join(" · ")}</small>
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+                  )}
 
                   <section className={styles.detailSection} aria-labelledby="historyTitle">
                     <div className={styles.sectionTitle}>
