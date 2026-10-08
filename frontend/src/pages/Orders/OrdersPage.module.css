@@ -101,7 +101,7 @@
 
 .workspace {
   min-width: 0;
-  margin-top: clamp(24px, 4vw, 38px);
+  margin-top: 13px;
   overflow: hidden;
   border: 1px solid var(--rv-border-subtle);
   border-radius: var(--rv-radius-xl);
@@ -1154,203 +1154,108 @@
 }
 
 
-/* === Visual System v2: Operations ====================================== */
+/* === Premium Operations: compact, work-first composition ================== */
 .page {
   isolation: isolate;
 }
 
-.visualHero {
+.operationalBar {
   position: relative;
-  min-height: 310px;
-  display: grid;
-  grid-template-columns: minmax(0, 1.06fr) minmax(390px, .94fr);
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 14px;
-  padding: clamp(26px, 3vw, 42px);
-  overflow: hidden;
-  border: 1px solid rgba(66, 154, 213, .29);
-  border-radius: 24px;
-  background:
-    radial-gradient(circle at 80% 34%, rgba(25, 211, 255, .15), transparent 28%),
-    radial-gradient(circle at 92% 83%, rgba(141, 76, 255, .15), transparent 31%),
-    linear-gradient(116deg, rgba(5, 31, 51, .98), rgba(7, 29, 52, .97) 49%, rgba(13, 21, 63, .95));
-  box-shadow:
-    0 24px 64px rgba(0,5,20,.19),
-    inset 0 1px 0 rgba(255,255,255,.025);
-}
-
-.visualHero::before {
-  position: absolute;
-  width: 74%;
-  height: 1px;
-  right: -6%;
-  top: 54%;
-  content: "";
-  background: linear-gradient(90deg, transparent, rgba(35, 224, 255, .36), rgba(119, 76, 255, .29), transparent);
-  box-shadow: 0 0 24px rgba(35, 224, 255, .13);
-  transform: rotate(-6deg);
-  animation: operationsWave 8.4s ease-in-out infinite alternate;
-}
-
-.visualHeroCopy {
-  position: relative;
-  z-index: 4;
-  max-width: 690px;
-}
-
-.visualHeroKicker {
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 11px;
-  border: 1px solid rgba(54, 224, 247, .27);
-  border-radius: 99px;
-  color: #70efff;
-  background: rgba(6, 65, 86, .31);
-  font-size: 9px;
-  font-weight: 850;
-  letter-spacing: .13em;
-}
-
-.visualHeroCopy h2 {
-  margin: 13px 0 0;
-  max-width: 720px;
-  color: #f5fbff;
-  font-size: clamp(35px, 3.6vw, 55px);
-  line-height: .98;
-  letter-spacing: -.052em;
-}
-
-.visualHeroCopy h2 span {
-  background: linear-gradient(90deg, #40e7ff, #72baff 46%, #ba7aff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: #48e4ff;
-  -webkit-text-fill-color: transparent;
-}
-
-.visualHeroCopy p {
-  max-width: 630px;
-  margin: 13px 0 0;
-  color: #9eb5c7;
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.visualHeroFlow {
+  min-width: 0;
+  min-height: 86px;
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  padding: 15px 124px 15px 19px;
+  margin: 13px 0 11px;
+  overflow: hidden;
+  border: 1px solid rgba(64, 157, 204, .25);
+  border-radius: 17px;
+  background:
+    radial-gradient(circle at 95% 50%, rgba(37, 215, 249, .1), transparent 30%),
+    linear-gradient(116deg, rgba(5, 31, 51, .98), rgba(8, 23, 49, .98));
+  box-shadow: 0 14px 30px rgba(0, 7, 24, .1);
+}
+
+.operationalBarCopy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.syncLabel {
+  display: inline-flex;
   align-items: center;
   gap: 9px;
-  margin-top: 21px;
+  color: var(--rv-text-primary);
+  font-size: 12px;
+  font-weight: 830;
+  letter-spacing: -.005em;
 }
 
-.visualHeroFlow span {
-  min-height: 35px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 11px;
-  border: 1px solid rgba(73, 144, 191, .2);
-  border-radius: 10px;
-  color: #c5d7e3;
-  background: rgba(4, 27, 45, .66);
-  font-size: 10px;
-  font-weight: 740;
-}
-
-.visualHeroFlow b {
-  color: #5c7e96;
-  font-size: 13px;
-  font-weight: 700;
-  animation: operationsArrow 2.4s ease-in-out infinite;
-}
-
-.visualHeroFlow i {
-  width: 6px;
-  height: 6px;
+.syncDot {
+  width: 8px;
+  height: 8px;
+  border: 2px solid rgba(80, 200, 226, .3);
   border-radius: 50%;
-  background: #39def8;
-  box-shadow: 0 0 10px rgba(57,222,248,.62);
-  animation: operationsSignal 2.1s ease-out infinite;
+  background: #7fc5d9;
+  box-shadow: 0 0 0 3px rgba(80, 200, 226, .07);
 }
 
-.visualHeroFlow i[data-tone="violet"] {
-  background: #9c79ff;
-  box-shadow: 0 0 10px rgba(156,121,255,.58);
+.operationalBarCopy p {
+  margin: 6px 0 0;
+  color: var(--rv-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
-.visualHeroFlow i[data-tone="green"] {
-  background: #42e3a4;
-  box-shadow: 0 0 10px rgba(66,227,164,.58);
-}
-
-.visualHeroArt {
+.refreshButton {
   position: relative;
   z-index: 2;
-  min-height: 245px;
-  display: grid;
-  place-items: center;
+  flex: 0 0 auto;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 14px;
+  border: 1px solid var(--rv-accent-border);
+  border-radius: 10px;
+  color: var(--rv-accent);
+  background: var(--rv-accent-soft);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease, transform .18s ease;
 }
 
-.visualHeroOrbit {
+.refreshButton:hover:not(:disabled),
+.refreshButton:focus-visible {
+  border-color: var(--rv-accent);
+  background: rgba(45, 197, 245, .13);
+}
+
+.refreshButton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.refreshButton:disabled {
+  opacity: .65;
+  cursor: progress;
+}
+
+.operationalRobot {
   position: absolute;
-  width: 290px;
-  height: 290px;
-  border: 1px solid rgba(66, 220, 255, .11);
-  border-radius: 50%;
-  box-shadow:
-    0 0 38px rgba(42, 203, 255, .07),
-    inset 0 0 32px rgba(126, 78, 255, .04);
-  animation: operationsOrbit 19s linear infinite;
-}
-
-.visualRoute {
-  position: absolute;
-  width: 84%;
-  height: 74px;
-  bottom: 6%;
-  left: 8%;
-  border-bottom: 2px dashed rgba(58, 210, 239, .20);
-  border-radius: 0 0 50% 50%;
-  transform: rotate(-5deg);
-}
-
-.visualHeroRobot {
-  position: relative;
-  z-index: 3;
-  width: min(410px, 100%);
-  max-height: 290px;
+  z-index: 1;
+  width: 100px;
+  height: 92px;
+  top: -4px;
+  right: 9px;
   object-fit: contain;
-  filter:
-    drop-shadow(0 24px 40px rgba(0,0,0,.36))
-    drop-shadow(0 0 18px rgba(42,211,255,.11));
-  animation: operationsFloat 5.7s ease-in-out infinite;
-}
-
-.visualPackage,
-.visualTruck {
-  position: absolute;
-  z-index: 4;
-  object-fit: contain;
-  filter:
-    drop-shadow(0 14px 22px rgba(0,0,0,.35))
-    drop-shadow(0 0 12px rgba(50,202,255,.08));
-}
-
-.visualPackage {
-  width: 92px;
-  left: 0;
-  bottom: 9%;
-  animation: operationsPackage 5.9s ease-in-out infinite .3s;
-}
-
-.visualTruck {
-  width: 118px;
-  right: -8px;
-  bottom: 3%;
-  animation: operationsTruck 7.4s ease-in-out infinite;
+  opacity: .83;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .28));
+  pointer-events: none;
+  animation: operationsFloat 6.5s ease-in-out infinite;
 }
 
 .summaryGrid {
@@ -1359,7 +1264,13 @@
 
 .summaryCard {
   position: relative;
-  min-height: 116px;
+  width: 100%;
+  min-height: 88px;
+  align-items: center;
+  padding: 13px 15px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
   overflow: hidden;
   border-color: rgba(64, 139, 193, .22);
   border-radius: 17px;
@@ -1371,6 +1282,16 @@
     transform var(--rv-motion-fast) var(--rv-ease-out),
     border-color var(--rv-motion-fast) ease,
     box-shadow var(--rv-motion-fast) ease;
+}
+
+.summaryCard[aria-pressed="true"] {
+  border-color: var(--rv-accent-border);
+  box-shadow: inset 0 0 0 1px var(--rv-accent-border), 0 14px 32px rgba(0, 7, 24, .15);
+}
+
+.summaryCard:focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 2px;
 }
 
 .summaryCard:hover {
@@ -1460,38 +1381,8 @@
 }
 
 @keyframes operationsFloat {
-  0%, 100% { transform: translate3d(0,0,0) rotate(-.35deg); }
-  50% { transform: translate3d(0,-11px,0) rotate(.55deg); }
-}
-
-@keyframes operationsPackage {
-  0%, 100% { transform: translate3d(0,0,0) rotate(-3deg); }
-  50% { transform: translate3d(8px,-9px,0) rotate(2deg); }
-}
-
-@keyframes operationsTruck {
-  0%, 100% { transform: translate3d(-5px,0,0); }
-  50% { transform: translate3d(9px,-4px,0); }
-}
-
-@keyframes operationsOrbit {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes operationsWave {
-  0% { transform: translate3d(-6%, 9px, 0) rotate(-8deg) scaleX(.95); opacity: .46; }
-  100% { transform: translate3d(7%, -11px, 0) rotate(-4deg) scaleX(1.05); opacity: 1; }
-}
-
-@keyframes operationsSignal {
-  0% { transform: scale(.82); opacity: .56; }
-  45% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.34); opacity: .22; }
-}
-
-@keyframes operationsArrow {
-  0%, 100% { transform: translateX(-2px); opacity: .45; }
-  50% { transform: translateX(3px); opacity: 1; }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
 
 @keyframes operationsTrace {
@@ -1499,62 +1390,38 @@
   50% { transform: scaleX(1); opacity: .85; }
 }
 
-@media (max-width: 980px) {
-  .visualHero {
-    grid-template-columns: minmax(0, 1fr) minmax(290px, .82fr);
-  }
-
-  .visualHeroCopy h2 {
-    font-size: clamp(32px, 5vw, 46px);
-  }
-}
-
 @media (max-width: 760px) {
-  .visualHero {
-    grid-template-columns: 1fr;
+  .operationalBar {
+    padding-right: 18px;
   }
 
-  .visualHeroArt {
-    min-height: 230px;
-  }
-
-  .visualPackage { left: 8%; }
-  .visualTruck { right: 5%; }
-}
-
-@media (max-width: 620px) {
-  .visualHero {
-    padding: 20px 17px;
-    border-radius: 19px;
-  }
-
-  .visualHeroCopy h2 {
-    font-size: clamp(31px, 10vw, 42px);
-  }
-
-  .visualHeroFlow {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .visualHeroFlow b {
+  .operationalRobot {
     display: none;
   }
 }
 
+@media (max-width: 620px) {
+  .operationalBar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 14px;
+  }
+
+  .refreshButton {
+    align-self: flex-start;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .visualHero::before,
-  .visualHeroFlow i,
-  .visualHeroFlow b,
-  .visualHeroOrbit,
-  .visualHeroRobot,
-  .visualPackage,
-  .visualTruck,
+  .operationalRobot,
   .summaryCard::after {
     animation: none !important;
   }
 
   .summaryCard,
+  .refreshButton,
   .viewSwitch button,
   .table tbody tr,
   .mobileOrder,
