@@ -18,6 +18,48 @@ export interface BusinessRequest {
   updatedAt?: string | null;
 }
 
+export type AttentionKind = "REQUEST" | "HANDOFF";
+export interface HumanAttentionItem {
+  kind: AttentionKind;
+  id: string;
+  operationId: string | null;
+  title: string;
+  priority: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface RequestTransition {
+  id: string;
+  previousStatus: RequestStatus;
+  status: RequestStatus;
+  actorType: "BUSINESS_USER" | "AUTOMATION";
+  reasonCode: string;
+  evidenceEventId: string | null;
+}
+
+export function getHumanAttention() {
+  return apiRequest<HumanAttentionItem[]>("/api/v1/operations/attention");
+}
+
+export function acknowledgeHumanHandoff(id: string) {
+  return apiRequest("/api/v1/handoffs/" + encodeURIComponent(id) + "/acknowledge", {
+    method: "POST"
+  });
+}
+
+export function resolveHumanHandoff(id: string) {
+  return apiRequest("/api/v1/handoffs/" + encodeURIComponent(id) + "/resolve", {
+    method: "POST"
+  });
+}
+
+export function getRequestHistory(id: string) {
+  return apiRequest<RequestTransition[]>(
+    "/api/v1/requests/" + encodeURIComponent(id) + "/history"
+  );
+}
+
 export interface AuditEntry {
   id: string;
   action?: string | null;
