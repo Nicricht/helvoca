@@ -168,7 +168,7 @@ async function bootOrders(page, options = {}) {
     if (options.contextError) {
       return route.fulfill(json({ message: 'history unavailable' }, 503));
     }
-    return route.fulfill(json([
+    return route.fulfill(json(options.events ?? [
       {
         id: 'evt-2',
         eventType: 'ORDER_CONFIRMED',
@@ -587,4 +587,65 @@ test.describe('React Orders / Operations migration', () => {
     await expect(quotes).toContainText('Solicitada');
     expect(api.quoteStatusCalls()).toBe(1);
   });
+
+  test('periodically synchronizes visible orders from the authoritative API without manual interaction', async ({ page }) => {
+    await page.clock.install();
+    const api = await bootOrders(page);
+    await page.goto('/app/orders');
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+    await expect(page.getByText(/Sincronización periódica cada 60 s/)).toBeVisible();
+    expect(api.listCalls()).toBe(1);
+
+    await page.clock.fastForward('60s');
+    await expect.poll(api.listCalls).toBeGreaterThanOrEqual(2);
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+  });
+
+  test('periodically synchronizes authorized quotes while their workspace is visible', async ({ page }) => {
+    await page.clock.install();
+    const api = await bootOrders(page, {
+      roles: ['SALES'],
+      permissions: ['ORDERS_READ', 'QUOTES_READ']
+    });
+    await page.goto('/app/orders');
+    await page.getByRole('button', { name: 'Cotizaciones', exact: true }).click();
+    await expect(page.getByTestId('operations-quotes')).toContainText('Cotización de herramientas');
+    expect(api.quoteCalls()).toBe(1);
+
+    await page.clock.fastForward('60s');
+    await expect.poll(api.quoteCalls).toBeGreaterThanOrEqual(2);
+  });
+
+  test('identifies AI history only from actual AI-attributed operation events', async ({ page }) => {
+    await bootOrders(page);
+    await page.goto('/app/orders');
+    await page.getByTestId('orders-row-order-1').click();
+    const dialog = page.getByRole('dialog', { name: /Pedido .*Juan Pedido/i });
+    const ai = dialog.getByRole('region', { name: 'Actividad de IA registrada' });
+    await expect(ai).toContainText('ORDER_CONFIRMED');
+    await expect(ai).toContainText('WhatsApp');
+    await expect(ai).toContainText('Historial registrado');
+    await expect(ai).not.toContainText('Trabajando ahora');
+  });
+
+  test('never invents AI activity when only a human event exists or the history fails', async ({ page }) => {
+    await bootOrders(page, {
+      events: [{ id: 'human-1', eventType: 'ORDER_PREPARING', actorType: 'HUMAN',
+        channel: 'MANUAL', createdAt: '2026-10-07T13:00:00Z' }]
+    });
+    await page.goto('/app/orders');
+    await page.getByTestId('orders-row-order-1').click();
+    const dialog = page.getByRole('dialog', { name: /Pedido .*Juan Pedido/i });
+    await expect(dialog).toContainText('ORDER_PREPARING');
+    await expect(dialog.getByRole('region', { name: 'Actividad de IA registrada' })).toHaveCount(0);
+
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+    await bootOrders(page, { contextError: true });
+    await page.goto('/app/orders');
+    await page.getByTestId('orders-row-order-1').click();
+    const failed = page.getByRole('dialog', { name: /Pedido .*Juan Pedido/i });
+    await expect(failed.getByRole('status')).toContainText(/contexto|historial/i);
+    await expect(failed.getByRole('region', { name: 'Actividad de IA registrada' })).toHaveCount(0);
+  });
+
 });
