@@ -4,8 +4,8 @@
 **Repositorio:** `Nicricht/helvoca`  
 **Baseline auditado:** `main@e3eed5dd9a268c9467d559e0eb077d77f4daa03b`  
 **Pantalla:** `/app/orders`  
-**Parte completada:** 1/5 (auditoría y contrato de aceptación).  
-**Estado de código funcional:** SIN MODIFICACIONES, las partes 2–5 están pendientes.  
+**Avance:** Parte 1/5 cerrada; Parte 2/5 implementada en rama, pendiente de certificación exact-HEAD.  
+**Estado de código funcional:** UX/UI de Operaciones modificada exclusivamente en esta rama durante Parte 2; sin cambios de backend, BD, proveedores ni producción.  
 **Riesgo previsto:** MEDIUM para UX/UI y cambios de frontend, HIGH si afectan transición de estados, tenants, inventario, persistencia, migraciones o proveedores.  
 **FRAME CHANGE:** NO. Preservar shell, navegación, paleta y geometría protegida.
 
@@ -58,13 +58,24 @@
 - Registrar hallazgos, riesgos, límites y definición de listo.
 - Crear rama y PR Draft separado para continuidad. Ningún código en producción cambia.
 
-### Parte 2 | Rediseño UX de pedidos (PENDIENTE)
+### Parte 2 | Rediseño UX de pedidos (IMPLEMENTADA EN RAMA, QA EN CURSO)
 - Compactar/reubicar el hero para que el usuario vea estado + bandeja sin desplazamiento excesivo.
 - Encabezado operativo claro, tarjetas con métricas honestas, búsqueda y filtros eficaces.
 - Dar protagonismo a pedidos y mover Clientes/Conversaciones a perspectivas contextuales compactas.
 - Mejorar folios, densidad, accesibilidad y responsive, sin modificar frame.
 - Mantener detalle lateral, totales, permisos, historial, cargas, errores y motion reducido.
 - Añadir E2E/regresiones visuales al comportamiento realmente alterado; evidenciar seis viewports canónicos.
+
+
+**Cambios de Parte 2 presentes en la rama:**
+- Hero de robot gigante retirado del área operativa, reemplazado por franja compacta ilustrada de actualización manual.
+- Tarjetas Activos/Preparando/Listos ahora filtran pedidos; `ACTIVE` es solo filtro local, no un nuevo estado de backend.
+- La UI explicita que lista como máximo 100 pedidos recientes y la hora de la última consulta; no afirma sincronización en tiempo real.
+- Identificadores de pedidos abreviados solo visualmente con `title` completo; todo `id` usado en eventos, API, testids, permisos y acciones sigue siendo el original.
+- Se conservaron conversación contextual, detalle lateral, precios backend-autoritativos, solicitudes/auditoría, manejo de 409 y protección de doble envío.
+- Regresión: `e2e/react-orders.spec.js` amplía de 8 a 11 pruebas para jerarquía, refresco bajo demanda, referencias completas y filtros de estado.
+- Efecto en el frame: **FRAME CHANGE: NO**, solo `OrdersPage.tsx` y CSS local; el arte aprobado `hero-order-robot.webp` sigue presente en formato pequeño.
+- E2E/CI del HEAD final y seis viewports: pendientes de verificación. No declarar la fase certificada mientras estén pendientes.
 
 ### Parte 3 | Flujo de gestión robusto y adaptación empresarial (PENDIENTE)
 - Validar con la matriz de capacidades existentes las vistas relevantes por rubro (pedido, cotización, solicitudes, delivery), sin duplicar Agenda.
@@ -98,4 +109,4 @@
 
 ## Checkpoint para continuar
 
-**A la espera de «continua». Próximo paso:** Parte 2, comenzar por test de regresión RED para jerarquía y accesibilidad, luego rediseño local de `OrdersPage`/CSS sin tocar backend ni frame. Antes de modificar, refrescar el estado de `main`, PR #761 y este PR.
+**Parte 2 implementada, QA en curso.** Antes de pasar a Parte 3, comprobar CI exact-HEAD y arreglar errores de la implementación. A la espera de «continua» para iniciar Parte 3 después de certificar Parte 2. Antes de modificar, refrescar el estado de `main`, PR #761 y este PR.
