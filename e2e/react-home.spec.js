@@ -553,7 +553,7 @@ test.describe('React Home migration', () => {
 
     await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toContainText(/sin actividad|todavía no/i);
-    await expect(page.getByRole('region', { name: 'Necesita tu atención' })).toContainText(/todo bajo control|sin pendientes/i);
+    await expect(page.getByRole('region', { name: 'Necesita tu atención' })).toContainText(/sin intervenciones pendientes/i);
     await expect(page.getByRole('region', { name: 'Última actividad' })).toContainText(/todavía no|sin actividad/i);
     await expect(page.getByRole('navigation', { name: 'Accesos rápidos' })).toHaveCount(0);
   });
