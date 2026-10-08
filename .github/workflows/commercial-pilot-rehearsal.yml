@@ -22,7 +22,7 @@ jobs:
       COMMERCIAL_PILOT_REHEARSAL_FULL: "true"
       DIFF_LINE_COVERAGE: "100"
       DIFF_BRANCH_COVERAGE: "100"
-          DIFF_METHOD_COVERAGE: "100"
+      DIFF_METHOD_COVERAGE: "100"
 
     steps:
       - name: Checkout
