@@ -72,8 +72,8 @@
 - Tarjetas Activos/Preparando/Listos ahora filtran pedidos; `ACTIVE` es solo filtro local, no un nuevo estado de backend.
 - La UI explicita que lista como máximo 100 pedidos recientes y la hora de la última consulta; no afirma sincronización en tiempo real.
 - Identificadores de pedidos abreviados solo visualmente con `title` completo; todo `id` usado en eventos, API, testids, permisos y acciones sigue siendo el original.
-- Se conservaron conversación contextual, detalle lateral, precios backend-autoritativos, solicitudes/auditoría, manejo de 409 y protección de doble envío.
-- Regresión: `e2e/react-orders.spec.js` amplía de 8 a 11 pruebas para jerarquía, refresco bajo demanda, referencias completas y filtros de estado.
+- Se conservaron conversación contextual, detalle lateral, precios backend-autoritativos, solicitudes/auditoría, manejo de 409 y protección de doble envío. Un fallo de actualización manual conserva los pedidos previamente obtenidos y muestra aviso.
+- Regresión: `e2e/react-orders.spec.js` amplía de 8 a 12 pruebas para jerarquía, refresco bajo demanda, referencias completas, filtros de estado y preservación de pedidos ante fallo de actualización.
 - Efecto en el frame: **FRAME CHANGE: NO**, solo `OrdersPage.tsx` y CSS local; el arte aprobado `hero-order-robot.webp` sigue presente en formato pequeño.
 - E2E/CI del HEAD final y seis viewports: pendientes de verificación. No declarar la fase certificada mientras estén pendientes.
 
@@ -109,4 +109,4 @@
 
 ## Checkpoint para continuar
 
-**Parte 2 implementada, QA en curso.** Antes de pasar a Parte 3, comprobar CI exact-HEAD y arreglar errores de la implementación. A la espera de «continua» para iniciar Parte 3 después de certificar Parte 2. Antes de modificar, refrescar el estado de `main`, PR #761 y este PR.
+**Parte 2 implementada, QA en curso.** Antes de pasar a Parte 3, comprobar CI exact-HEAD y arreglar errores de la implementación. A la espera de «continua» para iniciar Parte 3 después de revisar/certificar el exact-HEAD actual. Último HEAD de implementación de Parte 2: `3191fc23ebd777319fbcb038b75af70d99734d26`. Antes de modificar, refrescar el estado de `main`, PR #761 y este PR.
