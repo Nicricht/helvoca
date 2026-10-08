@@ -50,16 +50,44 @@ directly from a browser or from untrusted LLM output.
 No Flyway migration, outbound message, payment, provider write, modified
 existing endpoint or frontend release occurs in Part 1.
 
-## Part 2/5: trusted voice and WhatsApp event integration (not started)
+## Part 2/5: trusted voice and WhatsApp creation evidence (implemented in branch)
 
-- Examine `RealtimeToolService`, `UniversalWhatsAppToolService`, existing
-  `SafeOperationRetryEngine`, `BusinessOperationEvent`, call and message
-  delivery evidence.
-- Build trusted, tenant-scoped evidence adapters from persisted tool outcomes.
-- Call the decision engine only after the underlying operation and delivery
-  events have been durably committed.
-- Reuse the existing AI interaction. Do not add an LLM classification round-trip.
-- Treat the absence of verified customer delivery evidence conservatively.
+- `CallTraceService.recordTool` now sends **successful** `create_request`
+  results to `RequestCreationObservationDispatcher`, using backend-produced
+  `requestId` and `operationId` and the trusted call/tenant identities.
+  All other tool results, including failures, preserve original behavior.
+- `UniversalWhatsAppToolService.createRequestWithConversationContext` sends
+  the actual created `BusinessRequest` IDs to that same dispatcher.
+  This does not change the tool response and does not send another message.
+- The dispatcher observes **only after the enclosing transaction commits**.
+  Rollback, no transaction, incomplete IDs and non-AI sources do not record
+  a trusted creation. A post-commit read error cannot roll back an operation
+  already committed.
+- `RequestToolOutcomeObservationService` opens a fresh read-only transaction
+  in the originating tenant and verifies `business_request`,
+  `business_operation` and the immutable `REQUEST_CREATED` operation event.
+  It verifies matching business, operation, source conversation, channel and
+  original AI actor classification.
+- Micrometer counter `helvoca.request_creation_observed` has only
+  `channel` and `trusted` labels (no tenant IDs or customer data).
+- **Important fail-closed boundary:** a `REQUEST_CREATED` event proves
+  creation, not resolution. `Execution.UNKNOWN` and
+  `CustomerReceipt.UNCONFIRMED` always cause `KEEP_OPEN`.
+  No auto-resolution or human handoff is triggered in Part 2.
+- JUnit tests cover voice and WhatsApp wiring, tenant/channel/event integrity,
+  forged references, missing events, rollback/no-transaction, error isolation,
+  and no changes to AI tool output.
+
+**Still required in Part 3:** resolve the request's actual underlying outcome
+and the confirmed recipient delivery/playback signal using trusted provider
+evidence; introduce a safe, transactional lifecycle with evidence correlation,
+not inferred from the model narrative. A WhatsApp `SENT` receipt is not
+necessarily customer `DELIVERED`, and phone playback completion must not be
+assumed from text generation or tool success.
+
+**Costs/scope:** No new model invocation, provider message, call, payment,
+or background poll is introduced by this stage. Each created request adds a
+small, post-commit, read-only database observation.
 
 ## Part 3/5: PostgreSQL lifecycle and unified human attention (not started)
 
@@ -106,6 +134,6 @@ existing endpoint or frontend release occurs in Part 1.
 
 ## Release state
 
-Part 1 is complete *as code* once its PR checks succeed. It is **not** a
-customer-visible end-to-end automation until Parts 2-5 are implemented and
+Parts 1 and 2 are implemented *as code*; certify the latest PR commit before advancing. They are **not** a
+customer-visible end-to-end automation until Parts 3-5 are implemented and
 certified. Keep the PR draft until the complete release is ready.
