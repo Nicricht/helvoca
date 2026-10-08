@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { AppShell } from "../../components/AppShell/AppShell";
-import { OperationsSupportPanel } from "../../features/operations/OperationsSupportPanel";
+import { CustomerExportTools } from "../../features/operations/CustomerExportTools";
 import { OperationsQuotesPanel } from "../../features/operations/OperationsQuotesPanel";
 import {
   getCallContext,
@@ -769,10 +769,7 @@ export function OrdersPage() {
           )}
         </section>
 
-        <OperationsSupportPanel
-          user={model.me.data}
-          showCustomerTools={activeView === "CUSTOMERS"}
-        />
+        {activeView === "CUSTOMERS" && <CustomerExportTools user={model.me.data} />}
 
         <AnimatePresence>
           {selected && (
