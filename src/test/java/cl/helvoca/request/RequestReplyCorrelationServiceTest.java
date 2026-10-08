@@ -85,15 +85,14 @@ class RequestReplyCorrelationServiceTest {
 
     @Test
     void parserRejectsAllMissingOrInvalidToolReceipts() {
-        var parser = RequestReplyCorrelationService.class;
         assertNull(RequestReplyCorrelationService.verifiedToolResult(null, "{}"));
         assertNull(RequestReplyCorrelationService.verifiedToolResult("create_request", null));
         assertNull(RequestReplyCorrelationService.verifiedToolResult("create_request", " "));
         assertNull(RequestReplyCorrelationService.verifiedToolResult("create_request", "{}"));
         assertNull(RequestReplyCorrelationService.verifiedToolResult("create_request",
-                "{\\"success\\":true}"));
+                new JSONObject().put("success", true).toString()));
         assertNull(RequestReplyCorrelationService.verifiedToolResult("create_request",
-                "{\\"success\\":true,\\"data\\":{\\"status\\":\\"OPEN\\"}}"));
+                new JSONObject().put("success", true).put("data", new JSONObject().put("status", "OPEN")).toString()));
         assertNull(RequestReplyCorrelationService.verifiedToolResult("create_request",
                 new JSONObject().put("success", true).put("data", new JSONObject()
                         .put("requestId", UUID.randomUUID().toString())
