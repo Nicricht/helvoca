@@ -47,7 +47,11 @@ Important N/A decisions:
 <!-- Explain why a normally expected level does not apply. Do not leave risk-relevant omissions implicit. -->
 
 Coverage target/evidence:
-<!-- State measured line/branch/method evidence when applicable. HIGH-risk new or materially modified business logic targets 100% meaningful line/branch/method coverage. -->
+<!-- 100% is mandatory for the changed/affected scope. Record:
+- Backend: differential Lines / Branches / Methods = 100% when applicable.
+- Frontend: Statements/Lines / Branches / Functions/Methods = 100% when instrumented, plus 100% affected interaction/state-transition inventory with automated evidence.
+- Database: 100% affected persistence/constraint/migration/transaction/tenant/concurrency invariants mapped to real PostgreSQL evidence.
+An inapplicable metric requires a technical N/A plus equivalent behavior-level proof. -->
 
 ## Frontend frame contract
 
@@ -68,9 +72,11 @@ Coverage target/evidence:
 - [ ] Every reproducible bug fixed has a regression test.
 - [ ] RED was observed before the fix/new behavior when TDD applies.
 - [ ] Fast Gate passed.
-- [ ] Changed executable Java lines meet differential JaCoCo coverage.
+- [ ] Changed executable Java reaches 100% differential Lines / Branches / Methods when applicable.
+- [ ] Changed/affected frontend reaches 100% mapped executable + interaction/state-transition coverage.
+- [ ] Changed/affected data scope reaches 100% mapped real-PostgreSQL invariant coverage.
 - [ ] Full backend suite passed.
-- [ ] Browser E2E passed when applicable.
+- [ ] Browser E2E passed for 100% of affected meaningful browser interactions/journeys.
 - [ ] Security/adversarial/concurrency/idempotency checks passed when risk requires them.
 
 ## Test evidence
