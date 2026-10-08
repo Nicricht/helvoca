@@ -55,6 +55,7 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
     @Autowired MessagingConversationRepository messagingConversations;
     @Autowired MessagingMessageRepository messagingMessages;
     @Autowired RequestReplyCorrelationService replyCorrelations;
+    @Autowired RequestReplyDeliveryEvidenceService replyReceipts;
 
     @AfterEach
     void clearAuthentication() {
@@ -222,9 +223,52 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
         assertEquals(1, jdbc.queryForObject(
                 "SELECT count(*) FROM public.business_request_reply_correlation WHERE request_id = ?",
                 Integer.class, request.getId()));
+        // A queued or sent reply is not a confirmed customer receipt.
+        inbound.setProvider("META_WHATSAPP_CLOUD");
+        inbound.setProviderMessageId("wamid." + UUID.randomUUID());
+        inbound.setProviderDeliveryStatus("SENT");
+        messagingMessages.saveAndFlush(inbound);
+        replyReceipts.recordMetaReceipt(business.getId(), inbound.getId(),
+                inbound.getProviderMessageId(), "DELIVERED");
+        assertEquals(0, receiptCount(business.getId(), request.getId()));
+
+        // The authenticated Meta path persists the provider status first,
+        // then appends the correlated immutable receipt in the same transaction.
+        inbound.setProviderDeliveryStatus("DELIVERED");
+        inbound.setDeliveredAt(java.time.Instant.now());
+        messagingMessages.saveAndFlush(inbound);
+        replyReceipts.recordMetaReceipt(business.getId(), inbound.getId(),
+                inbound.getProviderMessageId(), "DELIVERED");
+        replyReceipts.recordMetaReceipt(business.getId(), inbound.getId(),
+                inbound.getProviderMessageId(), "DELIVERED");
+        replyReceipts.recordMetaReceipt(business.getId(), inbound.getId(),
+                "wamid.WRONG", "DELIVERED");
+        replyReceipts.recordMetaReceipt(UUID.randomUUID(), inbound.getId(),
+                inbound.getProviderMessageId(), "DELIVERED");
+        assertEquals(1, receiptCount(business.getId(), request.getId()));
+
+        // A new READ update is a new receipt kind, not resolution.
+        inbound.setProviderDeliveryStatus("READ");
+        inbound.setReadAt(java.time.Instant.now());
+        messagingMessages.saveAndFlush(inbound);
+        replyReceipts.recordMetaReceipt(business.getId(), inbound.getId(),
+                inbound.getProviderMessageId(), "READ");
+        replyReceipts.recordMetaReceipt(business.getId(), inbound.getId(),
+                inbound.getProviderMessageId(), "READ");
+        assertEquals(2, receiptCount(business.getId(), request.getId()));
         assertEquals("OPEN", jdbc.queryForObject(
                 "SELECT status FROM public.business_request WHERE id = ?",
                 String.class, request.getId()));
+    }
+
+    private int receiptCount(UUID businessId, UUID requestId) {
+        return jdbc.queryForObject("""
+                SELECT count(*)
+                FROM public.business_request_reply_delivery_event receipt
+                JOIN public.business_request_reply_correlation corr
+                  ON corr.id = receipt.correlation_id AND corr.business_id = receipt.business_id
+                WHERE receipt.business_id = ? AND corr.request_id = ?
+                """, Integer.class, businessId, requestId);
     }
 
     private Business business(String name) {
