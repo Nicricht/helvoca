@@ -561,6 +561,18 @@ test.describe('React Orders / Operations migration', () => {
     expect(unauthorized.quoteCalls()).toBe(0);
   });
 
+  test('supports a quote-only business user without querying unauthorized orders', async ({ page }) => {
+    const api = await bootOrders(page, {
+      roles: ['SALES'],
+      permissions: ['QUOTES_READ', 'QUOTES_MANAGE']
+    });
+    await page.goto('/app/orders');
+    await expect(page.getByRole('heading', { level: 1, name: 'Cotizaciones' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pedidos', exact: true })).toHaveCount(0);
+    await expect(page.getByTestId('operations-quotes')).toContainText('Cotización de herramientas');
+    expect(api.listCalls()).toBe(0);
+  });
+
   test('keeps quote data visible and reports a failed status transition', async ({ page }) => {
     const api = await bootOrders(page, {
       roles: ['SALES'],
