@@ -404,7 +404,7 @@ function AttentionPanel({ dashboard, attention }: {
           <h2 id="homeAttentionTitle">Necesita tu atención</h2>
         </div>
         {attention.authorized && !attention.loading && !attention.failed && total > 0 && (
-          <span className={styles.countPill} aria-label="Casos visibles">{total === 100 ? "100 recientes" : total}</span>
+          <span className={styles.countPill} aria-label="Casos visibles">{total === 100 ? "100 casos recientes" : total + " pendientes"}</span>
         )}
       </div>
 
