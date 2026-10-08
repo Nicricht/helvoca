@@ -89,16 +89,48 @@ assumed from text generation or tool success.
 or background poll is introduced by this stage. Each created request adds a
 small, post-commit, read-only database observation.
 
-## Part 3/5: PostgreSQL lifecycle and unified human attention (not started)
+## Part 3/5: request lifecycle and human attention (implemented in branch)
 
-- Use `business_request`, `business_operation`, `business_operation_event`
-  and `human_handoff` as the sources of truth. Avoid duplicate tickets.
-- Require evidence for automatic `RESOLVED`; validate transitions, actor
-  identity and tenant/operation/event linkage. Add a minimal versioned Flyway
-  migration only if existing schema cannot express these guarantees.
-- Keep human handoff audit and history durable. Deduplicate repeated events
-  idempotently, and do not escalate on retryable failures.
-- Provide one tenant-filtered read contract for unresolved human attention.
+- Flyway `V95__request_lifecycle_evidence.sql` adds a tenant-scoped,
+  runtime append-only `business_request_transition_event` ledger.
+  It records true `BUSINESS_USER` transitions separately from the
+  pre-existing operation-event trigger's channel-inferred actor.
+- The ledger has tenant-composite foreign keys for request/operation,
+  PostgreSQL RLS FORCE with runtime SELECT/INSERT grants, an automatic
+  evidence-id deduplication constraint and actor/evidence validation.
+- A database trigger rejects illegal state transitions even from a direct
+  SQL update. Requests in `RESOLVED` or `CANCELLED` are terminal.
+- `BusinessRequestService.setStatus` now pessimistically locks the
+  tenant-owned request row, allows idempotent same-state requests without
+  writes, checks transitions, updates the universal operation and appends
+  a human-actor lifecycle record in the *same transaction*.
+- `GET /api/v1/requests/{id}/history` exposes the tenant-scoped
+  transition history. The caller must hold an existing business role.
+- `HumanAttentionService` and
+  `GET /api/v1/operations/attention` provide one authorized, read-only
+  list of active handoffs and open/in-progress requests. An active handoff
+  supersedes the matching request by operation ID. The response is capped
+  at 100 items; it is **not** an all-time historical count.
+- Resolving a handoff does not falsely imply resolving the customer's
+  request. The open request then remains visible for follow-up.
+- JUnit and PostgreSQL/Testcontainers tests cover locking, valid/invalid
+  transitions, no-op idempotence, human-actor audit, deduplication and
+  cross-tenant access, pending CI certification.
+
+**Fail-closed boundary:** This part does not activate automated closure.
+The current `REQUEST_CREATED` event is not evidence of successful
+customer communication. Provider message delivery and actual voice
+playback/acknowledgement must be correlated to the *specific* request
+before wiring `RESOLVE`. Similarly, no extra model or outbound call
+should be created only to confirm a request.
+
+The existing human handoff retry/escalation remains in place. Explicit
+customer-requested handoff still requires a verified handoff record.
+
+**Database note:** Request lifecycle audit follows the owning request's
+retention lifecycle: deleting that request under the existing data
+retention process cascades the associated transition records. Runtime
+cannot update or directly delete ledger events.
 
 ## Part 4/5: React surfaces (not started)
 
@@ -134,6 +166,6 @@ small, post-commit, read-only database observation.
 
 ## Release state
 
-Parts 1 and 2 are implemented *as code*; certify the latest PR commit before advancing. They are **not** a
-customer-visible end-to-end automation until Parts 3-5 are implemented and
+Parts 1, 2 and 3 are implemented *as code*; certify the latest PR commit before advancing. They are **not** a
+customer-visible end-to-end automation until Parts 4-5 and verified delivery-driven resolution are implemented and
 certified. Keep the PR draft until the complete release is ready.
