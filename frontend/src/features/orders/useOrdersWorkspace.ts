@@ -43,6 +43,25 @@ export function useOrdersWorkspace() {
   const permissions = me.data?.permissions;
   const hasPermissionClaims = Array.isArray(permissions);
 
+  const canReadOrders = hasPermissionClaims
+    ? permissions.includes("ORDERS_READ") || permissions.includes("PERM_ORDERS_READ")
+    : roles.some(role => [
+        "BUSINESS_OWNER", "BUSINESS_ADMIN", "MANAGER", "RECEPTION", "STAFF",
+        "KITCHEN", "DISPATCH", "SALES", "OPERATOR"
+      ].includes(role));
+
+  const canReadQuotes = hasPermissionClaims
+    ? permissions.includes("QUOTES_READ") || permissions.includes("PERM_QUOTES_READ")
+    : roles.some(role => [
+        "BUSINESS_OWNER", "BUSINESS_ADMIN", "MANAGER", "RECEPTION", "SALES", "OPERATOR"
+      ].includes(role));
+
+  const canManageQuotes = hasPermissionClaims
+    ? permissions.includes("QUOTES_MANAGE") || permissions.includes("PERM_QUOTES_MANAGE")
+    : roles.some(role => [
+        "BUSINESS_OWNER", "BUSINESS_ADMIN", "MANAGER", "SALES"
+      ].includes(role));
+
   const canManage = hasPermissionClaims
     ? permissions.includes("ORDERS_MANAGE")
     : roles.some(role => MANAGE_ROLES.has(role));
@@ -62,6 +81,7 @@ export function useOrdersWorkspace() {
   const orders = useQuery({
     queryKey: ["commercial", "orders"],
     queryFn: getOrders,
+    enabled: me.isSuccess && canReadOrders,
     ...queryDefaults
   });
 
@@ -80,6 +100,9 @@ export function useOrdersWorkspace() {
     me,
     orders,
     deliveries,
+    canReadOrders,
+    canReadQuotes,
+    canManageQuotes,
     canManage,
     canPrepare,
     canReadConversations,
