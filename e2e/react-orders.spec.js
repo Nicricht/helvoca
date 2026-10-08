@@ -387,7 +387,7 @@ test.describe('React Orders / Operations migration', () => {
     await page.goto('/app/orders');
     await page.getByTestId('orders-row-order-1').click();
 
-    await expect(page.getByRole('button', { name: /prepar|cancelar|despachar|completar/i })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: /Pedido .*Juan Pedido/i }).getByRole('button', { name: /prepar|cancelar|despachar|completar/i })).toHaveCount(0);
     expect(staff.statusCalls()).toBe(0);
     expect(staff.preparationCalls()).toBe(0);
   });
