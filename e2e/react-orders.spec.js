@@ -78,6 +78,9 @@ async function bootOrders(page, options = {}) {
   let statusCalls = 0;
   let preparationCalls = 0;
   let statusPayload = null;
+  let quoteCalls = 0;
+  let quoteStatusCalls = 0;
+  let quoteStatus = 'REQUESTED';
   let releaseMutation;
   const mutationGate = new Promise(resolve => { releaseMutation = resolve; });
 
@@ -108,6 +111,35 @@ async function bootOrders(page, options = {}) {
       order.id === 'order-1' ? { ...order, status: currentStatus } : order
     );
     return route.fulfill(json(orders));
+  });
+
+  await page.route('**/api/v1/commercial/quotes', async route => {
+    expect(route.request().method()).toBe('GET');
+    expect(new URL(route.request().url()).searchParams.has('businessId')).toBe(false);
+    quoteCalls += 1;
+    if (options.quotesError) return route.fulfill(json({ message: 'quotes unavailable' }, 503));
+    return route.fulfill(json([{
+      id: 'quote-1',
+      title: 'Cotización de herramientas',
+      description: 'Pedido de herramientas profesionales',
+      amount: 55000,
+      currency: 'CLP',
+      status: quoteStatus,
+      contactName: 'Camila Ferretería',
+      contactPhone: '+56911111111',
+      source: 'WHATSAPP',
+      createdAt: '2026-10-07T12:00:00Z'
+    }]));
+  });
+
+  await page.route('**/api/v1/commercial/quotes/quote-1/status', async route => {
+    quoteStatusCalls += 1;
+    expect(route.request().method()).toBe('PATCH');
+    const body = route.request().postDataJSON();
+    expect(body).toEqual({ status: 'READY' });
+    if (options.quoteMutationError) return route.fulfill(json({ message: 'conflict' }, options.quoteMutationError));
+    quoteStatus = body.status;
+    return route.fulfill(json({ id: 'quote-1', status: quoteStatus }));
   });
 
   await page.route('**/api/v1/commercial/deliveries', async route => {
@@ -215,7 +247,9 @@ async function bootOrders(page, options = {}) {
     statusPayload: () => statusPayload,
     listCalls: () => listCalls,
     statusCalls: () => statusCalls,
-    preparationCalls: () => preparationCalls
+    preparationCalls: () => preparationCalls,
+    quoteCalls: () => quoteCalls,
+    quoteStatusCalls: () => quoteStatusCalls
   };
 }
 
@@ -470,5 +504,75 @@ test.describe('React Orders / Operations migration', () => {
     await expect(detail).toBeVisible();
     await expect(detail).toContainText('Ref. 4fe28d31…c062ea');
     await expect(detail).toContainText('18.990');
+  });
+
+  test('offers authorized commerce-specific quotes without mixing them with orders', async ({ page }) => {
+    const api = await bootOrders(page, {
+      permissions: ['ORDERS_READ', 'ORDERS_MANAGE', 'QUOTES_READ', 'QUOTES_MANAGE']
+    });
+    await page.goto('/app/orders');
+    await expect(page.getByRole('button', { name: 'Cotizaciones', exact: true })).toBeVisible();
+    expect(api.quoteCalls()).toBe(0);
+
+    await page.getByRole('button', { name: 'Cotizaciones', exact: true }).click();
+    const quotes = page.getByTestId('operations-quotes');
+    await expect(quotes).toContainText('Cotización de herramientas');
+    await expect(quotes).toContainText('Camila Ferretería');
+    await expect(quotes).toContainText('55.000');
+    await expect(quotes).toContainText('Solicitada');
+    await expect.poll(api.quoteCalls).toBe(1);
+
+    await quotes.getByRole('button', { name: 'Marcar lista' }).click();
+    await expect.poll(api.quoteStatusCalls).toBe(1);
+    await expect(quotes).toContainText('Lista');
+    await page.getByRole('button', { name: 'Pedidos', exact: true }).click();
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+  });
+
+  test('quotes are read-only for a receptionist lacking QUOTES_MANAGE', async ({ page }) => {
+    const api = await bootOrders(page, {
+      roles: ['RECEPTION'],
+      permissions: ['ORDERS_READ', 'QUOTES_READ']
+    });
+    await page.goto('/app/orders');
+    await page.getByRole('button', { name: 'Cotizaciones', exact: true }).click();
+    await expect(page.getByTestId('operations-quotes')).toContainText('Cotización de herramientas');
+    await expect(page.getByRole('button', { name: 'Marcar lista' })).toHaveCount(0);
+    expect(api.quoteStatusCalls()).toBe(0);
+  });
+
+  test('hides and never fetches quotes without QUOTES_READ, and does not fetch orders without ORDERS_READ', async ({ page }) => {
+    const api = await bootOrders(page, {
+      roles: ['STAFF'],
+      permissions: ['ORDERS_READ']
+    });
+    await page.goto('/app/orders');
+    await expect(page.getByRole('button', { name: 'Cotizaciones', exact: true })).toHaveCount(0);
+    expect(api.quoteCalls()).toBe(0);
+
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+    const unauthorized = await bootOrders(page, {
+      roles: ['PROFESSIONAL'],
+      permissions: ['BOOKINGS_READ']
+    });
+    await page.goto('/app/orders');
+    await expect(page.getByRole('alert')).toContainText('No tienes permiso para consultar pedidos');
+    expect(unauthorized.listCalls()).toBe(0);
+    expect(unauthorized.quoteCalls()).toBe(0);
+  });
+
+  test('keeps quote data visible and reports a failed status transition', async ({ page }) => {
+    const api = await bootOrders(page, {
+      roles: ['SALES'],
+      permissions: ['ORDERS_READ', 'QUOTES_READ', 'QUOTES_MANAGE'],
+      quoteMutationError: 409
+    });
+    await page.goto('/app/orders');
+    await page.getByRole('button', { name: 'Cotizaciones', exact: true }).click();
+    const quotes = page.getByTestId('operations-quotes');
+    await quotes.getByRole('button', { name: 'Marcar lista' }).click();
+    await expect(quotes.getByRole('alert')).toContainText('No pudimos actualizar la cotización');
+    await expect(quotes).toContainText('Solicitada');
+    expect(api.quoteStatusCalls()).toBe(1);
   });
 });
