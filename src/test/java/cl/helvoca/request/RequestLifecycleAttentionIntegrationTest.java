@@ -131,6 +131,46 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
                 .noneMatch(item -> item.id().equals(request.id())));
     }
 
+
+    @Test
+    void databaseRejectsDirectSqlReopeningEvenOutsideTheJavaLifecycleService() {
+        Business business = business("DB terminal lifecycle");
+        authenticate(business.getId());
+        var request = requests.create(new BusinessRequestDtos.Create(
+                "GENERAL", "Solicitud terminal", null, null, null, RequestPriority.NORMAL, null));
+        requests.setStatus(request.id(), RequestStatus.RESOLVED);
+
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update(
+                "UPDATE public.business_request SET status = 'OPEN' WHERE business_id = ? AND id = ?",
+                business.getId(), request.id()));
+        assertEquals("RESOLVED", jdbc.queryForObject(
+                "SELECT status FROM public.business_request WHERE business_id = ? AND id = ?",
+                String.class, business.getId(), request.id()));
+    }
+
+    @Test
+    void databaseRejectsAutomationAuditWithoutSpecificEvidenceEvent() {
+        Business business = business("DB automatic evidence gate");
+        authenticate(business.getId());
+        var request = requests.create(new BusinessRequestDtos.Create(
+                "GENERAL", "No synthetic closure", null, null, null, RequestPriority.NORMAL, null));
+        UUID operationId = jdbc.queryForObject(
+                "SELECT operation_id FROM public.business_request WHERE business_id = ? AND id = ?",
+                UUID.class, business.getId(), request.id());
+
+        assertThrows(org.springframework.dao.DataAccessException.class, () -> jdbc.update("""
+                INSERT INTO public.business_request_transition_event(
+                    business_id, request_id, operation_id, previous_status, status,
+                    actor_type, actor_reference, reason_code, evidence_event_id)
+                VALUES (?, ?, ?, 'OPEN', 'RESOLVED',
+                    'AUTOMATION', NULL, 'UNVERIFIED_TOOL_SUCCESS', NULL)
+                """, business.getId(), request.id(), operationId));
+        assertEquals(0, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM public.business_request_transition_event
+                WHERE business_id = ? AND request_id = ?
+                """, Integer.class, business.getId(), request.id()));
+    }
+
     private Business business(String name) {
         Business business = new Business();
         business.setName(name);
