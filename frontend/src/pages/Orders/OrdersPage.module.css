@@ -1208,6 +1208,11 @@
   line-height: 1.45;
 }
 
+.syncError {
+  color: var(--rv-danger) !important;
+  font-weight: 700;
+}
+
 .refreshButton {
   position: relative;
   z-index: 2;
