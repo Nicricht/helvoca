@@ -116,7 +116,18 @@ When a feature crosses layers, **100% of its acceptance criteria and material fa
 
 No assertion-free, duplicate, unreachable-only or behavior-free test may be added merely to reach 100%. No threshold below 100% may be introduced as a convenience exception. If a metric is technically inapplicable, the PR must state why and provide the behavior-level evidence that replaces it; "too hard to test" is not sufficient.
 
-Historical code does not authorize new uncovered behavior. Any touched production scope must satisfy this 100% contract before completion. Global/module 100% may be claimed only when the measured reports actually prove it.
+Historical code does not authorize new uncovered behavior. Any touched production scope must satisfy this 100% contract before completion.
+
+### Repository-wide 100% certification
+
+Helvoca may be described as having **100% QA coverage** only when repository-wide evidence proves all of the following for the production scope:
+- backend global Lines / Branches / Methods: **100%**;
+- frontend global Statements/Lines / Branches / Functions/Methods: **100%** for executable source included by the coverage instrument;
+- frontend meaningful interaction/state-transition inventory: **100% automated**;
+- database invariant catalog for the production schema and persistence paths: **100% mapped to real PostgreSQL tests**;
+- release-critical acceptance criteria and journeys: **100% mapped to automated evidence**.
+
+A green test suite means 100% of existing tests passed; it does not by itself mean 100% of the product is covered. Until the repository-wide measurements above are green, do not claim global 100% coverage.
 
 Mutation testing should be introduced for critical business logic as an additional strength signal. Surviving meaningful mutations must be investigated; mutation score is not a substitute for integration, security, frontend interaction, PostgreSQL or E2E evidence.
 
@@ -150,7 +161,7 @@ A change is done only when all applicable statements are true:
 - reproducible bugs have regression protection;
 - RED -> GREEN evidence exists when required;
 - unit/integration/security/concurrency/contract/component/E2E evidence is green where applicable;
-- coverage evidence meets the applicable floor/target or a justified exception is recorded;
+- every applicable changed/affected coverage dimension is proven at 100%; technically inapplicable metrics have an explicit N/A plus equivalent behavior evidence;
 - adversarial review found no unresolved invariant violation;
 - required Fast Gate and Full Gate are green;
 - certification belongs to the exact final HEAD;
