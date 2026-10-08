@@ -420,6 +420,27 @@ test.describe('React Orders / Operations migration', () => {
     await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
   });
 
+  test('makes the three summary metrics actionable without introducing false order states', async ({ page }) => {
+    await bootOrders(page);
+    await page.goto('/app/orders');
+
+    await page.getByRole('button', { name: 'Mostrar pedidos activos' }).click();
+    await expect(page.getByRole('button', { name: 'Mostrar pedidos activos' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('orders-row-order-1')).toBeVisible();
+    await expect(page.getByTestId('orders-row-order-2')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Mostrar pedidos preparando' }).click();
+    await expect(page.getByTestId('orders-row-order-1')).toHaveCount(0);
+    await page.getByLabel('Estado').selectOption('ALL');
+    await expect(page.getByTestId('orders-row-order-2')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Clientes', exact: true }).click();
+    await expect(page.getByTestId('orders-customer-view')).toBeVisible();
+    await page.getByRole('button', { name: 'Mostrar pedidos listos' }).click();
+    await expect(page.getByRole('button', { name: 'Mostrar pedidos listos' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('orders-customer-view')).toHaveCount(0);
+  });
+
   test('renders a compact visual reference while retaining the full authoritative UUID', async ({ page }) => {
     const id = '4fe28d31-98f4-4c81-8579-bad049c062ea';
     await bootOrders(page, {
