@@ -4,7 +4,7 @@
 **Repositorio:** `Nicricht/helvoca`  
 **Baseline auditado:** `main@e3eed5dd9a268c9467d559e0eb077d77f4daa03b`  
 **Pantalla:** `/app/orders`  
-**Avance:** Parte 1/5 cerrada; Partes 2/5 y 3/5 implementadas en rama; certificación Full Gate del HEAD final pendiente.  
+**Avance:** Partes 1/5, 2/5, 3/5 y 4/5 implementadas en rama; Full Gate/CI del HEAD final aún pendiente. Parte 5 reservada para certificación, merge, Railway exact-SHA y cleanup.  
 **Estado de código funcional:** UX/UI de Operaciones modificada exclusivamente en esta rama durante Parte 2; sin cambios de backend, BD, proveedores ni producción.  
 **Riesgo previsto:** MEDIUM para UX/UI y cambios de frontend, HIGH si afectan transición de estados, tenants, inventario, persistencia, migraciones o proveedores.  
 **FRAME CHANGE:** NO. Preservar shell, navegación, paleta y geometría protegida.
@@ -97,11 +97,25 @@
 - La pestaña de cotizaciones se controla por **permisos de usuario**, no por un switch automático de industria; la disponibilidad comercial por rubro deberá reflejar también los presets/capacidades de negocio sin suposiciones, si esto se amplía en el futuro.
 - La cotización NO se convierte automáticamente en pedido, y marcarla aceptada no implica cobro, entrega ni orden creada.
 
-### Parte 4 | Actualización verificable e IA explicable (PENDIENTE)
+### Parte 4 | Actualización verificable e IA explicable (IMPLEMENTADA EN RAMA, QA EN CURSO)
 - Implementar actualización de cambios mediante mecanismo fiable (polling acotado/invalidación o push real según soporte comprobado), evitando consumo excesivo.
 - Mostrar origen, tiempo de última sincronización y estados de conexión basados en hechos.
 - Mostrar actividad de IA **solo cuando** existen eventos reales y verificables de operación. Nunca simular acciones, mensajes, pagos o llamadas.
 - Resolver fallos parciales de contexto sin bloquear pedidos y sin efectos externos no autorizados.
+
+**Cambios de Parte 4 presentes en la rama:**
+- React Query `["commercial", "orders"]` habilita `refetchInterval: 60_000` con `refetchIntervalInBackground: false`, refresco al recuperar foco/conexión. La consulta sigue condicionada a `auth/me` y `ORDERS_READ`.
+- La lista contextual de cotizaciones tiene el mismo intervalo, únicamente mientras la vista `OperationsQuotesPanel` está montada y el rol tiene `QUOTES_READ`; las otras pestañas no solicitan cotizaciones.
+- El encabezado Operaciones explica explícitamente **sincronización periódica**, nunca promete WebSockets, push inmediato ni IA en ejecución. Se muestra la hora **correcta** de la última consulta y «Sin conexión» con datos previamente cargados.
+- Ante error de refetch la pantalla conserva el resultado previamente obtenido, comunica que los datos pueden estar desactualizados y permite reintento manual.
+- El nuevo panel «Actividad de IA registrada» aparece **solo** si `/api/v1/operation-events?operationId=...` retorna `actorType: "AI"`; muestra `eventType`, canal y fecha sin inventar efectos terminales, cobros, mensajes ni llamadas. Hasta tres eventos ordenados cronológicamente, sin mostrar payloads sensibles.
+- El endpoint de historial mantiene su autorización backend existente `hasAnyRole('BUSINESS_ADMIN','OPERATOR')`. Para otros roles, una respuesta 403 se trata como falla de contexto opcional; no se relaja autorización ni se oculta el pedido.
+- La carga de historial se vuelve a intentar cuando cambia el `updatedAt` autoritativo del pedido, por ejemplo tras una mutación exitosa y refresco de lista.
+- 5 nuevos casos E2E: sondeo de pedidos y cotizaciones con reloj controlado, evento IA real, ausencia de IA cuando hay solo actividad humana o error, y aviso sin conexión. Total de casos en `e2e/react-orders.spec.js`: **22**.
+- Sin nuevos endpoints, migraciones, pagos, proveedores activos ni cambios de permisos en backend. `FRAME CHANGE: NO`.
+- **Restricción consciente:** un sondeo cada 60 s ofrece *sincronización periódica*, no eventos instantáneos. Eventual push (WebSocket/SSE) requiere diseño y certificación de infraestructura futuros. No llamar «tiempo real estricto» a esta implementación.
+
+**Riesgos a certificar:** intervalos suspendidos en segundo plano; ausencia de consulta sin permiso; contexto 403 con fallo parcial; revalidación de estados concurrentes; sin filtración cross-tenant; quote-only sin consultas de pedidos; degradación segura con servidor caído.
 
 ### Parte 5 | Certificación, integración y entrega (PENDIENTE)
 - Fast Gate, suite dirigida, suite completa requerida, E2E, Golden Journey y evidencia exact-HEAD.
@@ -123,4 +137,13 @@
 
 ## Checkpoint para continuar
 
-**Parte 3 implementada, QA en curso.** Continuar con Parte 4 solo cuando el usuario escriba «continua». Antes de avanzar, comprobar CI exact-HEAD de este PR, corregir lo que falle (también potenciales regresiones de Parte 2) y refrescar `main` y el PR concurrente #761. Ninguna garantía de producción hasta los gates y Railway exact-SHA de Parte 5.
+**Parte 4 implementada, QA en curso.** Próximo paso condicionado al «continua» del usuario: Parte 5, certificación final exact-HEAD en GitHub Actions, corrección de cualquier prueba roja, verificación de responsive, merge solo con CI green y sin conflictos, exact-main CI, despliegue Railway exact-SHA y cleanup.
+
+- Rama: `feat/operations-premium-workspace-20261008`
+- PR: #762 (Draft; **no** mergeado)
+- Último commit de implementación funcional de Parte 4: `415ced2b23af577c3a0378478c36af1b0ea45d61` (22 pruebas Playwright definidas; su ejecución no se presume aprobada).
+- Base revisada: `main@e3eed5dd9a268c9467d559e0eb077d77f4daa03b`
+- PR #761 continúa siendo trabajo QA independiente y deberá comprobarse antes del merge.
+- Todas las credenciales, integraciones de Twilio/WhatsApp, pagos, telefonía y datos reales permanecen intactos.
+- Cualquier comprobación de CI de un SHA anterior queda invalidada por nuevos commits.
+
