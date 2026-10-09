@@ -186,6 +186,46 @@ test.describe('React Inventory mutations', () => {
     await expect(stockDialog).toHaveCount(0);
   });
 
+  test('stock setup failure keeps the already-created catalog record and allows a stock-only retry', async ({ page }) => {
+    const { createdProductId, requests } = await bootAdminInventory(page);
+    let attempts = 0;
+    await page.route(`**/api/v1/inventory/${createdProductId}`, route => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      attempts++;
+      if (attempts === 1) {
+        return route.fulfill({ status: 409, contentType: 'application/json',
+          body: JSON.stringify({ message: 'stale inventory version' }) });
+      }
+      const body = route.request().postDataJSON();
+      return route.fulfill(json({
+        id: 'stock-created', catalogItemId: createdProductId,
+        sku: body.sku, trackingEnabled: body.trackingEnabled,
+        onHand: body.onHand, reserved: 0, available: body.onHand,
+        reorderThreshold: body.reorderThreshold, lowStock: false
+      }));
+    });
+
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const productDialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await productDialog.getByLabel('Nombre').fill('Producto con reintento seguro');
+    await productDialog.getByLabel('Precio').fill('2000');
+    await productDialog.getByRole('button', { name: 'Crear y configurar stock' }).click();
+
+    const stockDialog = page.getByRole('dialog', { name: 'Configurar stock · Producto con reintento seguro' });
+    await expect(stockDialog).toBeVisible();
+    await stockDialog.getByLabel('SKU').fill('RETRY-STOCK');
+    await stockDialog.getByLabel('Stock físico inicial').fill('3');
+    await stockDialog.getByLabel('Umbral de reposición').fill('1');
+    await stockDialog.getByRole('button', { name: 'Guardar configuración' }).click();
+    await expect(stockDialog.getByRole('alert')).toContainText('conflicto');
+    expect(requests.createProduct).toHaveLength(1);
+    await stockDialog.getByRole('button', { name: 'Guardar configuración' }).click();
+    await expect(stockDialog).toHaveCount(0);
+    expect(attempts).toBe(2);
+    expect(requests.createProduct).toHaveLength(1);
+  });
+
   test('failed catalog creation never opens the stock step or silently retries', async ({ page }) => {
     const { requests } = await bootAdminInventory(page);
     let failedPosts = 0;
