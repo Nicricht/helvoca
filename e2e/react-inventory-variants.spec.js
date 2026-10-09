@@ -699,4 +699,122 @@ test.describe('React Inventory variants', () => {
   });
 
 
+
+  test('empty legacy options are editable, and an absent hidden baseline serializes to an empty object', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    const emptyLegacy = {
+      id: initialVariantId, catalogItemId: productId,
+      name: 'Azul / M', optionValuesJson: '', sku: 'CER-AZ-M',
+      trackingEnabled: true, onHand: 4, reserved: 1,
+      available: 3, reorderThreshold: 1, lowStock: false, active: true
+    };
+    await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+      if (route.request().method() === 'GET') return route.fulfill(json([emptyLegacy]));
+      return route.fallback();
+    });
+    const updates = [];
+    await page.route('**/api/v1/inventory/' + productId + '/variants/' + initialVariantId, route => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      updates.push(route.request().postDataJSON());
+      return route.fulfill(json({ ...emptyLegacy, ...updates[updates.length - 1] }));
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByTestId('inventory-variant-' + initialVariantId)
+      .getByRole('button', { name: 'Editar' }).click();
+    await expect(dialog.getByRole('alert')).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Agregar característica' })).toBeEnabled();
+    await dialog.locator('input[name="variantOptionsBaseline"]').evaluate(input => input.remove());
+    await dialog.getByLabel('Nombre de variante').fill('Sin opciones antiguas');
+    await dialog.getByRole('button', { name: 'Guardar variante' }).click();
+    await expect.poll(() => updates.length).toBe(1);
+    expect(JSON.parse(updates[0].optionValuesJson)).toEqual({});
+    expect(requests.update).toHaveLength(0);
+  });
+
+  test('non-object tampering in a variant baseline is refused before any write', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('Nombre de variante').fill('Control de integridad');
+    await dialog.getByLabel('SKU de variante').fill('INTEGRITY-1');
+    const baseline = dialog.locator('input[name="variantOptionsBaseline"]');
+    for (const tampering of ['null', '[]', '42']) {
+      await baseline.evaluate((el, value) => { el.value = value; }, tampering);
+      await dialog.getByRole('button', { name: 'Crear variante' }).click();
+      await expect(dialog.getByRole('alert')).toContainText('No pudimos interpretar');
+      expect(requests.create).toHaveLength(0);
+    }
+  });
+
+  test('SKU-specific variant conflict reports duplicate SKU and preserves the draft without replay', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page);
+    const attempts = [];
+    await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      attempts.push(route.request().postDataJSON());
+      return route.fulfill({
+        status: 409, contentType: 'application/json',
+        body: JSON.stringify({ message: 'SKU DUPLICATE' })
+      });
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('Nombre de variante').fill('SKU existente');
+    await dialog.getByLabel('SKU de variante').fill('CER-AZ-M');
+    await dialog.getByRole('button', { name: 'Crear variante' }).click();
+    await expect.poll(() => attempts.length).toBe(1);
+    await expect(dialog.getByRole('alert')).toContainText('Ese SKU ya está en uso');
+    await expect(dialog.getByLabel('SKU de variante')).toHaveValue('CER-AZ-M');
+    await expect(dialog).toBeVisible();
+    expect(requests.create).toHaveLength(0);
+  });
+
+  test('deactivation failure preserves active variant and needs an explicit successful retry', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    let active = true;
+    let errorNext = true;
+    const attempts = [];
+    const variant = () => ({
+      id: initialVariantId, catalogItemId: productId, name: 'Azul / M',
+      optionValuesJson: '{"color":"Azul","talla":"M"}',
+      sku: 'CER-AZ-M', trackingEnabled: true,
+      onHand: 4, reserved: 1, available: 3,
+      reorderThreshold: 1, lowStock: false, active
+    });
+    await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+      if (route.request().method() === 'GET') return route.fulfill(json([variant()]));
+      return route.fallback();
+    });
+    await page.route('**/api/v1/inventory/' + productId + '/variants/' + initialVariantId + '/deactivate', route => {
+      attempts.push(route.request().method());
+      if (errorNext) return route.fulfill({
+        status: 503, contentType: 'application/json',
+        body: JSON.stringify({ message: 'deactivation unavailable' })
+      });
+      active = false;
+      return route.fulfill(json(variant()));
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    const item = dialog.getByTestId('inventory-variant-' + initialVariantId);
+    await item.getByRole('button', { name: 'Desactivar' }).click();
+    await expect.poll(() => attempts.length).toBe(1);
+    await expect(dialog.getByRole('alert')).toContainText('El servidor no pudo guardar');
+    await expect(item).toContainText('Activa');
+    errorNext = false;
+    await item.getByRole('button', { name: 'Desactivar' }).click();
+    await expect.poll(() => attempts.length).toBe(2);
+    await expect(item).toContainText('Inactiva');
+    await expect(item.getByRole('button', { name: 'Desactivar' })).toHaveCount(0);
+    expect(requests.deactivate).toBe(0);
+  });
+
+
 });

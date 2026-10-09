@@ -831,4 +831,68 @@ test.describe('React Inventory migration', () => {
   });
 
 
+
+  test('Intl currency formatter failure never produces a fabricated catalog price', async ({ page }) => {
+    await page.addInitScript(() => {
+      const RealFormat = Intl.NumberFormat;
+      Intl.NumberFormat = function(locale, options) {
+        if (options?.style === 'currency' && options.currency === 'XYZ') {
+          throw new RangeError('Currency presentation unavailable');
+        }
+        return new RealFormat(locale, options);
+      };
+    });
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.route('**/api/v1/catalog', route => route.fulfill(json([
+      { id: 'prod-1', kind: 'PRODUCT', name: 'Taladro percutor',
+        price: 1200.5, currency: 'XYZ', active: true },
+      { id: 'prod-2', kind: 'PRODUCT', name: 'Broca metal 8 mm',
+        price: 4990, currency: '', active: true }
+    ])));
+    await page.goto('/app/inventory');
+    await expect(page.getByTestId('inventory-row-prod-1')).toContainText('Precio no disponible');
+    await expect(page.getByTestId('inventory-row-prod-2')).toContainText('4.990');
+    await page.getByTestId('inventory-row-prod-1')
+      .getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+    await expect(inspector).toContainText('Precio no disponible');
+    await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
+  });
+
+  test('unknown movement type and invalid timestamp remain readable without stock mutation', async ({ page }) => {
+    await bootInventory(page, { roles: ['OPERATOR'] });
+    const calls = { writes: 0 };
+    await page.route('**/api/v1/inventory/prod-1/movements', route => route.fulfill(json([
+      {
+        id: 'legacy-event-1', type: 'LEGACY_CONSUMPTION',
+        quantityDelta: -2, reservedDelta: -1,
+        onHandAfter: 5, reservedAfter: 1,
+        note: '', createdAt: 'unparseable-time'
+      },
+      {
+        id: 'legacy-event-2', type: 'RELEASE',
+        quantityDelta: 0, reservedDelta: -3,
+        onHandAfter: 5, reservedAfter: 1,
+        note: 'Liberación controlada', createdAt: '2026-10-09T10:00:00Z'
+      }
+    ])));
+    await page.route('**/api/v1/inventory/prod-1/adjustments', route => {
+      calls.writes += 1;
+      return route.fulfill(json({}));
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-prod-1')
+      .getByRole('button', { name: 'Ver historial' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Historial · Taladro percutor' });
+    const unknown = dialog.getByTestId('inventory-movement-legacy-event-1');
+    await expect(unknown).toContainText('Consumo');
+    await expect(unknown).toContainText('Físico -2');
+    await expect(unknown).toContainText('Reservado -1');
+    await expect(unknown).toContainText('unparseable-time');
+    await expect(dialog.getByTestId('inventory-movement-legacy-event-2')).toContainText('Liberación');
+    await expect(dialog.getByTestId('inventory-movement-legacy-event-2')).toContainText('Liberación controlada');
+    expect(calls.writes).toBe(0);
+  });
+
+
 });
