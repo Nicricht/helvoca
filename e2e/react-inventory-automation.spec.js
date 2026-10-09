@@ -245,4 +245,35 @@ test.describe('Inventory automation interaction contracts', () => {
   });
 
 
+
+  test('restock on unconfigured stock explains why it cannot adjust without sending mutations', async ({ page }) => {
+    const { requests } = await bootAutomation(page);
+    await page.route('**/api/v1/inventory', route => route.fulfill(json([])));
+    await page.goto('/app/inventory');
+    await expect(page.getByTestId('inventory-row-automation-item-1')).toContainText('Sin configurar');
+    const alert = page.getByTestId('inventory-alert-alert-1');
+    await alert.getByRole('button', { name: 'Reponer stock' }).click();
+    await expect(page.getByRole('alert')).toContainText('Configura el stock');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+    expect(requests.acknowledge).toBe(0);
+    expect(requests.cancel).toBe(0);
+  });
+
+  test('a synchronous double activation of alert acknowledgement submits no duplicate', async ({ page }) => {
+    const { requests } = await bootAutomation(page);
+    await page.goto('/app/inventory');
+    const alert = page.getByTestId('inventory-alert-alert-1');
+    await alert.getByRole('button', { name: 'Marcar atendida' }).evaluate(button => {
+      button.click();
+      button.click();
+    });
+    await expect(alert).toContainText('Atendida');
+    await expect.poll(() => requests.acknowledge).toBe(1);
+    expect(requests.cancel).toBe(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+  });
+
 });
