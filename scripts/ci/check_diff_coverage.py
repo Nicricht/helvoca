@@ -96,6 +96,7 @@ branch_total = branch_covered = 0
 method_total = method_covered = 0
 uncovered: list[str] = []
 uncovered_methods: list[str] = []
+uncovered_branch_lines: list[str] = []
 
 for path, lines in sorted(changed.items()):
     report_lines = jacoco.get(path, {})
@@ -113,6 +114,8 @@ for path, lines in sorted(changed.items()):
         if mb + cb > 0:
             branch_total += mb + cb
             branch_covered += cb
+            if mb:
+                uncovered_branch_lines.append(f"{path}:{nr} ({mb} missed branches)")
 
 affected_methods: set[tuple[str, int, str, str, bool]] = set()
 for path, lines in changed.items():
@@ -158,6 +161,13 @@ if uncovered:
         print(f" - {entry}")
     if len(uncovered) > 50:
         print(f" ... and {len(uncovered) - 50} more")
+
+if uncovered_branch_lines:
+    print("Uncovered changed branch outcomes:")
+    for entry in uncovered_branch_lines[:50]:
+        print(f" - {entry}")
+    if len(uncovered_branch_lines) > 50:
+        print(f" ... and {len(uncovered_branch_lines) - 50} more")
 
 if uncovered_methods:
     print("Uncovered changed methods:")
