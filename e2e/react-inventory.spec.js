@@ -238,6 +238,45 @@ test.describe('React Inventory migration', () => {
     await expect(inspector).toHaveCount(0);
   });
 
+  test('inspector contains keyboard tab focus and restores focus on close', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.goto('/app/inventory');
+    const trigger = page.getByTestId('inventory-row-prod-1')
+      .getByRole('button', { name: 'Ver detalles de Taladro percutor' });
+    await trigger.click();
+
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor' });
+    const close = inspector.getByRole('button', { name: 'Cerrar detalles' });
+    await expect(close).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(inspector.getByRole('button', { name: 'Ajustar stock' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(close).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(inspector).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+
+  test('absent catalog price and unauthorized media read cannot fabricate product data', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_OWNER'] });
+    await page.route('**/api/v1/catalog', route => route.fulfill(json([
+      { id: 'prod-1', kind: 'PRODUCT', name: 'Taladro percutor', price: null, currency: 'CLP', active: true }
+    ])));
+    let mediaRequests = 0;
+    await page.route('**/api/v1/catalog/*/media', route => {
+      mediaRequests++;
+      return route.fulfill(json([]));
+    });
+    await page.goto('/app/inventory');
+    const row = page.getByTestId('inventory-row-prod-1');
+    await expect(row).toContainText('Sin precio');
+    await expect(row.locator('img')).toHaveCount(0);
+    await row.getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+    await expect(page.getByRole('dialog', { name: 'Taladro percutor' }))
+      .toContainText('Sin precio');
+    expect(mediaRequests).toBe(0);
+  });
+
   test('read-only operator can inspect and review history without inventory mutation controls', async ({ page }) => {
     await bootInventory(page, { roles: ['OPERATOR'] });
     await page.goto('/app/inventory');
