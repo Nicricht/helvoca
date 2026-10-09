@@ -38,6 +38,16 @@ async function captureInventoryVisual(page, state) {
   }));
   expect(layout.scrollWidth, state + ' at ' + width + 'px must not widen the page')
     .toBeLessThanOrEqual(layout.clientWidth + 1);
+  // A routeStage with will-change: transform can offset fixed descendants.
+  // Check viewport bounds in addition to the document overflow assertion.
+  for (const dialog of await page.getByRole('dialog').all()) {
+    const rect = await dialog.boundingBox();
+    expect(rect, state + ' should have a measurable dialog').not.toBeNull();
+    expect(rect.y, state + ' dialog must not clip above the viewport')
+      .toBeGreaterThanOrEqual(-1);
+    expect(rect.y + rect.height, state + ' dialog must not clip below the viewport')
+      .toBeLessThanOrEqual(height + 1);
+  }
 }
 
 module.exports = { INVENTORY_VIEWPORTS, captureInventoryVisual };

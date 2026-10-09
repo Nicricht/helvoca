@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Boxes, PackageCheck, PackageOpen, Search } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { AppShell } from "../../components/AppShell/AppShell";
@@ -1237,6 +1238,9 @@ export function InventoryPage() {
           </section>
         )}
 
+        {/* Inventory dialogs must escape AppShell routeStage transform containment. */}
+        {createPortal(
+          <>
         {variantsTarget && (
           <div className={styles.dialogBackdrop}>
             <section
@@ -1914,6 +1918,9 @@ export function InventoryPage() {
               </form>
             </section>
           </div>
+        )}
+          </>,
+          document.querySelector('[data-react-app="recepvoz"]') ?? document.body
         )}
       </main>
     </AppShell>
