@@ -548,6 +548,8 @@ export function InventoryPage() {
     const description = String(data.get("description") ?? "").trim();
     const price = Number(data.get("price"));
     const currency = String(data.get("currency") ?? "").trim().toUpperCase();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const continueToStock = !productEditing && model.canManageStock && submitter?.value === "configure";
 
     if (!name) {
       setMutationError("Escribe un nombre para el producto.");
@@ -575,14 +577,37 @@ export function InventoryPage() {
         metadataJson: productEditing?.metadataJson ?? null,
         active: productEditing?.active !== false
       };
-      if (productEditing) {
-        await updateCatalogProduct(productEditing.id, input);
-      } else {
-        await createCatalogProduct(input);
-      }
-      await model.refetchPrimary();
+      const saved = productEditing
+        ? await updateCatalogProduct(productEditing.id, input)
+        : await createCatalogProduct(input);
+      // A successful catalogue write must not be replayed if a later read fails.
+      // Stock configuration is deliberately a second, independent operation.
       setProductCreateOpen(false);
       setProductEditing(null);
+      if (continueToStock && saved?.id) {
+        setConfigureTarget({
+          id: String(saved.id),
+          name: String(saved.name || name),
+          description: String(saved.description || description),
+          price: numberOrNull(saved.price),
+          currency: String(saved.currency || currency),
+          sku: "",
+          configured: false,
+          trackingEnabled: false,
+          onHand: null,
+          reserved: null,
+          available: null,
+          reorderThreshold: null,
+          lowStock: false,
+          outOfStock: false,
+          restocked: false
+        });
+      }
+      try {
+        await model.refetchPrimary();
+      } catch {
+        setMutationError("El producto se guardó, pero no se pudo actualizar la lista. Pulsa Actualizar antes de repetir cualquier operación.");
+      }
     } catch (error) {
       setMutationError(mutationMessage(error));
     } finally {
@@ -1689,19 +1714,27 @@ export function InventoryPage() {
                 </div>
 
                 <p className={styles.dialogHint}>
-                  El producto se crea primero en catálogo. Luego puedes configurar su SKU y stock físico.
+                  Paso 1: guarda los datos del catálogo. Si también gestionas stock, puedes continuar
+                  al paso 2 sin buscar el producto otra vez. Son dos operaciones independientes.
                 </p>
 
                 {mutationError && <p className={styles.dialogError} role="alert">{mutationError}</p>}
 
                 <div className={styles.dialogActions}>
-                  <button className="button primary" type="submit" disabled={mutationPending}>
+                  <button className={productEditing ? "button primary" : "button secondary"}
+                    type="submit" name="nextStep" value="catalog" disabled={mutationPending}>
                     {mutationPending
                       ? "Guardando…"
                       : productEditing
                         ? "Guardar producto"
                         : "Crear producto"}
                   </button>
+                  {!productEditing && model.canManageStock && (
+                    <button className="button primary" type="submit" name="nextStep"
+                      value="configure" disabled={mutationPending}>
+                      {mutationPending ? "Guardando…" : "Crear y configurar stock"}
+                    </button>
+                  )}
                 </div>
               </form>
             </section>
@@ -1734,6 +1767,12 @@ export function InventoryPage() {
               </div>
 
               <form className={styles.dialogForm} onSubmit={handleConfigure}>
+                {!configureTarget.configured && (
+                  <p className={styles.dialogHint}>
+                    Paso 2: define SKU, cantidad física y mínimo de reposición.
+                    Hasta guardar aquí, el producto sigue sin stock configurado.
+                  </p>
+                )}
                 <label className={styles.field}>
                   <span>SKU</span>
                   <input name="sku" defaultValue={configureTarget.sku} autoFocus />
