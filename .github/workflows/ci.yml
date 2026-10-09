@@ -195,8 +195,9 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          DIFF_LINE_COVERAGE: "80"
-          DIFF_BRANCH_COVERAGE: "70"
+          DIFF_LINE_COVERAGE: "100"
+          DIFF_BRANCH_COVERAGE: "100"
+          DIFF_METHOD_COVERAGE: "100"
         run: python3 scripts/ci/check_diff_coverage.py "$BASE_SHA"
 
       - name: Upload backend test diagnostics
