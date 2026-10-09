@@ -954,4 +954,59 @@ test.describe('React Inventory migration', () => {
   });
 
 
+
+  test('inspector stock actions open the correct forms without silently mutating inventory', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    const writes = [];
+    page.on('request', request => {
+      if (/\\/api\\/v1\\/(inventory|catalog)(\\/|$)/.test(new URL(request.url()).pathname)
+        && request.method() !== 'GET') {
+        writes.push({ method: request.method(), url: request.url() });
+      }
+    });
+    await page.goto('/app/inventory');
+    const trigger = page.getByTestId('inventory-row-prod-1')
+      .getByRole('button', { name: 'Ver detalles de Taladro percutor' });
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+
+    await trigger.click();
+    await inspector.getByRole('button', { name: 'Editar stock' }).click();
+    await expect(inspector).toHaveCount(0);
+    const config = page.getByRole('dialog', { name: 'Editar stock · Taladro percutor' });
+    await expect(config).toBeVisible();
+    await expect(config.getByLabel('SKU')).toHaveValue('TAL-18V');
+    await expect(config.getByLabel('Stock físico inicial')).toHaveValue('8');
+    await expect(config.getByLabel('Umbral de reposición')).toHaveValue('4');
+    await config.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(config).toHaveCount(0);
+
+    await trigger.click();
+    await inspector.getByRole('button', { name: 'Ajustar stock' }).click();
+    await expect(inspector).toHaveCount(0);
+    const adjustment = page.getByRole('dialog', { name: 'Ajustar stock · Taladro percutor' });
+    await expect(adjustment).toBeVisible();
+    await expect(adjustment).toContainText('Disponible ahora: 5');
+    await expect(adjustment.getByLabel('Ajuste')).toBeEmpty();
+    await adjustment.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(adjustment).toHaveCount(0);
+    await expect(page.getByTestId('inventory-row-prod-1')).toContainText('5');
+    expect(writes).toHaveLength(0);
+  });
+
+  test('legacy whitespace-only catalog currency keeps the explicit CLP default consistently in list and inspector', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.route('**/api/v1/catalog', route => route.fulfill(json([{
+      id: 'prod-1', kind: 'PRODUCT', name: 'Taladro percutor',
+      description: 'Legacy item', price: 54990, currency: '   ', active: true
+    }])));
+    await page.goto('/app/inventory');
+    const row = page.getByTestId('inventory-row-prod-1');
+    await expect(row).toContainText('54.990');
+    await row.getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+    await expect(inspector).toContainText('54.990');
+    await expect(inspector).not.toContainText('Precio no disponible');
+    await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
+  });
+
 });
