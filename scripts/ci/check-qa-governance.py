@@ -12,6 +12,10 @@ checks = {
         "user is not responsible for selecting",
         "test level",
         "production verification",
+        "100% quality contract",
+        "100% differential line, branch and method coverage",
+        "100% mapped interaction/state-transition coverage",
+        "100% mapped real-postgresql invariant coverage",
     ],
     "docs/engineering/QA_POLICY.md": [
         "QA ownership",
@@ -19,6 +23,12 @@ checks = {
         "Coverage policy",
         "Adversarial verification",
         "Definition of done",
+        "100% quality contract",
+        "differential Lines: **100%**",
+        "Branches: **100%**",
+        "differential Methods: **100%**",
+        "100% behavior coverage",
+        "100% of applicable database invariants",
     ],
     ".github/pull_request_template.md": [
         "QA classification",
@@ -29,6 +39,9 @@ checks = {
         "E2E",
         "Golden Journey",
         "Production verification",
+        "Backend: differential Lines / Branches / Methods = 100%",
+        "Frontend: Statements/Lines / Branches / Functions/Methods = 100%",
+        "Database: 100% affected persistence/constraint/migration/transaction/tenant/concurrency invariants",
     ],
     "software-factory/skill/first-pass-engineering/SKILL.md": [
         "user is not responsible for selecting",

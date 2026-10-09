@@ -313,8 +313,9 @@ git commit -m "feat(factory): add reusable quality gate"
 
 The Java test should assert the repository contract contains:
 - First-Pass Engineering reference;
-- exact 80% differential line threshold;
-- exact 70% differential branch threshold;
+- exact 100% differential line threshold;
+- exact 100% differential branch threshold;
+- exact 100% differential method threshold;
 - final-commit re-verification rule;
 - no direct `main` development;
 - regression-test requirement for bugs;

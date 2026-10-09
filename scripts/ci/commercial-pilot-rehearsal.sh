@@ -47,8 +47,9 @@ if [[ "${COMMERCIAL_PILOT_REHEARSAL_FULL:-false}" == "true" ]]; then
   fi
 
   echo "Enforcing differential Java coverage against $BASE_SHA..."
-  DIFF_LINE_COVERAGE="${DIFF_LINE_COVERAGE:-80}" \
-  DIFF_BRANCH_COVERAGE="${DIFF_BRANCH_COVERAGE:-70}" \
+  DIFF_LINE_COVERAGE="${DIFF_LINE_COVERAGE:-100}" \
+  DIFF_BRANCH_COVERAGE="${DIFF_BRANCH_COVERAGE:-100}" \
+  DIFF_METHOD_COVERAGE="${DIFF_METHOD_COVERAGE:-100}" \
     python3 scripts/ci/check_diff_coverage.py "$BASE_SHA"
 
   echo "Validating all console/e2e JavaScript syntax..."

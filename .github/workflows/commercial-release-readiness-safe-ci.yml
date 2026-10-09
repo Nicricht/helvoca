@@ -43,8 +43,9 @@ jobs:
 
       - name: Enforce differential Java coverage
         env:
-          DIFF_LINE_COVERAGE: "80"
-          DIFF_BRANCH_COVERAGE: "70"
+          DIFF_LINE_COVERAGE: "100"
+          DIFF_BRANCH_COVERAGE: "100"
+          DIFF_METHOD_COVERAGE: "100"
         run: |
           git fetch --no-tags origin main:refs/remotes/origin/main
           BASE_SHA="$(git rev-parse refs/remotes/origin/main)"
