@@ -1172,6 +1172,41 @@ test.describe('React Inventory migration', () => {
 
 
   
+  test('a queued Tab callback after inspector unmount cannot dereference its released dialog ref', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-prod-1')
+      .getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+    await expect(inspector).toBeVisible();
+    // Capture, but still remove, the registered listener during React effect cleanup.
+    // Exercise a queued callback after the component's ref has become null.
+    await page.evaluate(() => {
+      const originalRemove = window.removeEventListener;
+      window.__restoreInventoryRemove = () => { window.removeEventListener = originalRemove; };
+      window.removeEventListener = function(type, listener, options) {
+        if (type === 'keydown' && !window.__releasedInspectorKeydown) {
+          window.__releasedInspectorKeydown = listener;
+        }
+        return originalRemove.call(this, type, listener, options);
+      };
+    });
+    await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
+    await expect(inspector).toHaveCount(0);
+    const safe = await page.evaluate(() => {
+      const listener = window.__releasedInspectorKeydown;
+      window.__restoreInventoryRemove();
+      if (typeof listener !== 'function') throw new Error('Inspector cleanup listener not captured');
+      const event = new KeyboardEvent('keydown', { key: 'Tab', cancelable: true });
+      listener(event);
+      return !event.defaultPrevented;
+    });
+    expect(safe).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
   test('inspector remains accessible when the host app lacks the preferred portal marker', async ({ page }) => {
     await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
     await page.goto('/app/inventory');
