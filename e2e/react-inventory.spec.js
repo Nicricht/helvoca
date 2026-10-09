@@ -1127,4 +1127,44 @@ test.describe('React Inventory migration', () => {
     expect(errors).toEqual([]);
   });
 
+
+  test('backend configuration and consumption events remain intelligible in product history', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.route('**/api/v1/inventory/prod-1/movements', route => route.fulfill(json([
+      { id: 'configured', type: 'CONFIGURE', quantityDelta: 4, reservedDelta: 0,
+        onHandAfter: 4, reservedAfter: 0, note: 'Inventario inicial',
+        createdAt: '2026-10-02T09:00:00Z' },
+      { id: 'consumed', type: 'CONSUMPTION', quantityDelta: -1, reservedDelta: 0,
+        onHandAfter: 3, reservedAfter: 0, note: 'Venta registrada',
+        createdAt: '2026-10-02T11:00:00Z' }
+    ])));
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-prod-1').getByRole('button', { name: 'Ver historial' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Historial · Taladro percutor' });
+    await expect(dialog.getByTestId('inventory-movement-configured')).toContainText('Configuración');
+    await expect(dialog.getByTestId('inventory-movement-configured')).toContainText('Inventario inicial');
+    await expect(dialog.getByTestId('inventory-movement-consumed')).toContainText('Consumo');
+    await expect(dialog.getByTestId('inventory-movement-consumed')).toContainText('Físico -1');
+    await dialog.getByRole('button', { name: 'Cerrar' }).click();
+  });
+
+  test('empty product history and nameless legacy catalog item never imply nonexistent inventory activity', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.route('**/api/v1/catalog', route => route.fulfill(json([
+      { id: 'prod-1', kind: 'PRODUCT', name: '', description: null,
+        price: null, currency: null, active: true }
+    ])));
+    await page.route('**/api/v1/inventory/prod-1/movements', route => route.fulfill(json([])));
+    await page.goto('/app/inventory');
+    const product = page.getByTestId('inventory-row-prod-1');
+    await expect(product).toContainText('Producto');
+    await expect(product).toContainText('Sin precio');
+    await expect(product).toContainText('TAL-18V');
+    await product.getByRole('button', { name: 'Ver historial' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Historial · Producto' });
+    await expect(dialog).toContainText('todavía no tiene movimientos registrados');
+    await expect(dialog.locator('article')).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Cerrar' }).click();
+  });
+
 });
