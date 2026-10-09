@@ -26,6 +26,7 @@ import {
 } from "../../features/inventory/api";
 import styles from "./InventoryPage.module.css";
 import { InventoryIntro } from "./InventoryIntro";
+import { VariantOptionsEditor, serializeVariantOptions } from "./VariantOptionsEditor";
 import { ProductInspector, ProductThumbnail, formatCatalogPrice } from "./InventoryProductPresentation";
 
 type StatusFilter = "ALL" | "TRACKED" | "LOW" | "OUT" | "RESTOCKED" | "UNCONFIGURED";
@@ -422,13 +423,10 @@ export function InventoryPage() {
     return undefined;
   }
 
-  function variantInputFromForm(
-    form: HTMLFormElement,
-    current: InventoryVariant | null
-  ) {
+  function variantInputFromForm(form: HTMLFormElement) {
     const data = new FormData(form);
     const name = String(data.get("variantName") ?? "").trim();
-    const optionValuesJson = String(data.get("optionValuesJson") ?? "").trim() || "{}";
+    const optionValuesJson = serializeVariantOptions(form);
     const sku = String(data.get("variantSku") ?? "").trim().toUpperCase();
     const onHand = Number(data.get("variantOnHand"));
     const reorderThreshold = Number(data.get("variantReorderThreshold"));
@@ -440,15 +438,6 @@ export function InventoryPage() {
         || !Number.isInteger(reorderThreshold) || reorderThreshold < 0) {
       throw new Error("El stock físico y el umbral deben ser enteros iguales o mayores que cero.");
     }
-    try {
-      const parsed = JSON.parse(optionValuesJson);
-      if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-        throw new Error("not-object");
-      }
-    } catch {
-      throw new Error("Opciones JSON debe ser un objeto JSON válido.");
-    }
-
     return {
       name,
       optionValuesJson,
@@ -468,7 +457,7 @@ export function InventoryPage() {
     setMutationError("");
     let input;
     try {
-      input = variantInputFromForm(event.currentTarget, variantEditing);
+      input = variantInputFromForm(event.currentTarget);
     } catch (error) {
       setMutationError(mutationMessage(error));
       return;
@@ -1257,14 +1246,10 @@ export function InventoryPage() {
                           />
                         </label>
 
-                        <label className={styles.field}>
-                          <span>Opciones JSON</span>
-                          <input
-                            name="optionValuesJson"
-                            defaultValue={variantEditing?.optionValuesJson ?? "{}"}
-                            required
-                          />
-                        </label>
+                        <VariantOptionsEditor
+                          key={variantEditorMode === "CREATE" ? "create" : variantEditing?.id ?? "edit"}
+                          initialJson={variantEditing?.optionValuesJson ?? "{}"}
+                        />
 
                         <div className={styles.formGrid}>
                           <label className={styles.field}>
