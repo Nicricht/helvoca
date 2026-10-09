@@ -486,4 +486,35 @@ test.describe('React Inventory mutations', () => {
     expect(requests.configure).toHaveLength(0);
   });
 
+
+  test('missing required price input must never be treated as a zero-cost product', async ({ page }) => {
+    const { requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await dialog.getByLabel('Nombre').fill('Unpriced product');
+    await dialog.getByLabel('Moneda').fill('CLP');
+    await dialog.locator('[name="price"]').evaluate(element => element.remove());
+    await dialog.getByRole('button', { name: 'Crear producto', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toContainText('El precio debe ser un número');
+    await expect(dialog).toBeVisible();
+    expect(requests.createProduct).toHaveLength(0);
+  });
+
+  test('missing required physical stock input must not turn unknown stock into zero', async ({ page }) => {
+    const { productId, requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+    const row = page.getByTestId('inventory-row-' + productId);
+    await row.getByRole('button', { name: 'Configurar stock' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Configurar stock · Cera mate' });
+    await dialog.getByLabel('SKU').fill('CERA-1');
+    await dialog.getByLabel('Umbral de reposición').fill('2');
+    await dialog.locator('[name="onHand"]').evaluate(element => element.remove());
+    await dialog.getByRole('button', { name: 'Guardar configuración' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('enteros iguales o mayores que cero');
+    await expect(dialog).toBeVisible();
+    await expect(row).toContainText('Sin configurar');
+    expect(requests.configure).toHaveLength(0);
+  });
+
 });
