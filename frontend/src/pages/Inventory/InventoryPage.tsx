@@ -372,7 +372,10 @@ export function InventoryPage() {
       return;
     }
 
-    if (!row.configured || !row.trackingEnabled) return;
+    if (!row.configured || !row.trackingEnabled) {
+      setMutationError("Configura el stock y activa su seguimiento antes de reponer.");
+      return;
+    }
     setAdjustTarget(row);
   }
 
