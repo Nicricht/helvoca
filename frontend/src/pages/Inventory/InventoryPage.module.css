@@ -1570,3 +1570,64 @@
     align-items: flex-start;
   }
 }
+
+/* Part 3: customer-facing variant characteristics (no raw JSON input). */
+.variantOptions {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 15px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 13px;
+  background: var(--rv-surface-1);
+}
+
+.variantOptions legend {
+  padding: 0 5px;
+  color: var(--rv-text-primary);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.variantOptions > .dialogHint {
+  margin: 0 0 4px;
+}
+
+.variantOptionRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.variantOptionRow > :global(.button) {
+  min-height: 40px;
+}
+
+.variantOptionProtected {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--rv-border-default);
+  border-radius: 10px;
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+}
+
+.variantOptionProtected strong {
+  color: var(--rv-text-primary);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 620px) {
+  .variantOptionRow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .variantOptionRow > :global(.button) {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
