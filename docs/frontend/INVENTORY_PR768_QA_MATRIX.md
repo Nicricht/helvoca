@@ -44,3 +44,12 @@
 4. **Real PostgreSQL and providers:** not changed by this PR; no new real-data mutations or paid calls should be introduced to achieve a coverage number. Cross-layer invariants must be linked to existing Testcontainers/contract tests, not inferred from mocked E2E.
 
 **Release state:** HOLD / DRAFT until missing applicable coverage obligations are either implemented and certified on exact HEAD or shown inapplicable with documented, testable rationale. Do not lower 100% thresholds.
+
+## Checkpoint 9: real source coverage + permission boundary
+
+- The dedicated `inventory-frontend-coverage` CI job builds Vite with Istanbul only when `VITE_COVERAGE=true`; production builds are not instrumented.
+- All four Inventory browser suites capture real `window.__coverage__` counters and the gate merges per-test reports.
+- The report must locate **six affected source files** and reject statements, lines, branches or functions below **100% per file**. Missing sources are an explicit failure. Artifacts include the measured report and raw snapshots.
+- An administrator must hold both the appropriate admin role **and the effective inventory-manage grant** to see mutating Variantes/Alertas controls. The pre-fix negative-role tests are recorded on `b939f70`; read-only inspection remains available.
+- Additional UI tests: variant 503 recovery, malformed non-object legacy options and variant HTTP 409 without duplicate writes.
+- Do not mark this work complete solely because functional Playwright passes. Use the CI evidence to close all applicable uncovered branches and interactions. Keep the PR in Draft while any of those metrics is below 100%.

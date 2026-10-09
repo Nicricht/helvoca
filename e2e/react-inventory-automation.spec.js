@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./inventory-coverage-fixture');
 
 // Read/write fixtures are entirely local to Playwright request interception.
 // No real messaging provider, customer record or database is contacted.

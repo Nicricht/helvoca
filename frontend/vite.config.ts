@@ -2,6 +2,7 @@ import { copyFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import istanbul from "vite-plugin-istanbul";
 
 function directReactRoutes() {
   return {
@@ -51,12 +52,29 @@ function directReactRoutes() {
   };
 }
 
+const inventoryCoverage = process.env.VITE_COVERAGE === "true";
+
 export default defineConfig({
   base: "/app/",
-  plugins: [react(), directReactRoutes()],
+  plugins: [
+    react(),
+    ...(inventoryCoverage ? [istanbul({
+      include: [
+        "src/pages/Inventory/*",
+        "src/features/inventory/api.ts",
+        "src/features/inventory/useInventoryWorkspace.ts"
+      ],
+      exclude: ["node_modules"],
+      extension: [".ts", ".tsx"],
+      requireEnv: true,
+      checkProd: false,
+      forceBuildInstrument: true
+    })] : []),
+    directReactRoutes()
+  ],
   build: {
     outDir: "../src/main/resources/static/app",
     emptyOutDir: true,
-    sourcemap: false
+    sourcemap: inventoryCoverage ? "hidden" : false
   }
 });

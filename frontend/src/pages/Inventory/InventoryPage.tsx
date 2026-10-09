@@ -325,10 +325,10 @@ export function InventoryPage() {
   const roleLabel = model.canManage ? "Gestión habilitada" : "Solo lectura";
   const roles = model.me.data?.roles ?? [];
   const canReadVariants = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
-  const canManageVariants = roles.includes("BUSINESS_ADMIN");
+  const canManageVariants = roles.includes("BUSINESS_ADMIN") && model.canManageStock;
   const canReadAutomation = canReadVariants;
   const canReadMedia = canReadVariants;
-  const canManageAutomation = roles.includes("BUSINESS_ADMIN");
+  const canManageAutomation = roles.includes("BUSINESS_ADMIN") && model.canManageStock;
 
   async function refreshWorkspace() {
     if (refreshPending) return;

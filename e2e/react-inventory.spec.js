@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./inventory-coverage-fixture');
 const { INVENTORY_VIEWPORTS, captureInventoryVisual } = require('./inventory-visual-evidence-helper');
 
 const json = body => ({

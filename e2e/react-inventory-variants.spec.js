@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./inventory-coverage-fixture');
 const { captureInventoryVisual } = require('./inventory-visual-evidence-helper');
 
 const json = body => ({
@@ -464,6 +464,66 @@ test.describe('React Inventory variants', () => {
     await expect(dialog.getByRole('alert')).toHaveCount(0);
     expect(requests.create).toHaveLength(0);
     expect(requests.update).toHaveLength(0);
+  });
+
+
+
+  for (const malformed of ['[]', 'null', '"just a string"']) {
+    test('legacy non-object characteristic data ' + malformed + ' cannot cause variant writes', async ({ page }) => {
+      const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+      const badVariant = {
+        id: initialVariantId, catalogItemId: productId, name: 'Azul / M',
+        optionValuesJson: malformed, sku: 'CER-AZ-M',
+        trackingEnabled: true, onHand: 4, reserved: 1,
+        available: 3, reorderThreshold: 1, lowStock: false, active: true
+      };
+      await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+        if (route.request().method() === 'GET') return route.fulfill(json([badVariant]));
+        return route.fallback();
+      });
+      const writes = [];
+      await page.route('**/api/v1/inventory/' + productId + '/variants/' + initialVariantId, route => {
+        if (route.request().method() !== 'PUT') return route.fallback();
+        writes.push(route.request().postDataJSON());
+        return route.fulfill(json(badVariant));
+      });
+      await page.goto('/app/inventory');
+      await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+      await dialog.getByTestId('inventory-variant-' + initialVariantId).getByRole('button', { name: 'Editar' }).click();
+      await expect(dialog.getByRole('alert').filter({ hasText: 'formato no compatible' })).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Agregar característica' })).toBeDisabled();
+      await dialog.getByRole('button', { name: 'Guardar variante' }).click();
+      await expect(dialog.getByRole('alert').filter({ hasText: 'No se guardaron cambios' })).toBeVisible();
+      expect(writes).toHaveLength(0);
+      expect(requests.update).toHaveLength(0);
+    });
+  }
+
+  test('variant create conflict keeps draft available and does not send duplicate writes', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page);
+    const rejected = [];
+    await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      rejected.push(route.request().postDataJSON());
+      return route.fulfill({
+        status: 409, contentType: 'application/json',
+        body: JSON.stringify({ message: 'variant version conflict' })
+      });
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('Nombre de variante').fill('Conflicto QA');
+    await dialog.getByLabel('SKU de variante').fill('CONFLICT-ONE');
+    await dialog.getByRole('button', { name: 'Crear variante' }).click();
+    await expect.poll(() => rejected.length).toBe(1);
+    await expect(dialog.getByRole('alert')).toContainText('conflicto');
+    await expect(dialog.getByLabel('SKU de variante')).toHaveValue('CONFLICT-ONE');
+    expect(requests.create).toHaveLength(0);
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    expect(rejected).toHaveLength(1);
   });
 
 
