@@ -1080,4 +1080,51 @@ test.describe('React Inventory migration', () => {
     await expect(page.getByRole('alert')).toHaveCount(0);
   });
 
+
+  test('available stock ordering is deterministic when products have missing quantities and equal counts', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.route('**/api/v1/catalog', route => route.fulfill(json([
+      { id: 'prod-1', kind: 'PRODUCT', name: 'Zulu con stock', price: 100, currency: 'CLP', active: true },
+      { id: 'prod-2', kind: 'PRODUCT', name: 'Alfa con stock', price: 100, currency: 'CLP', active: true },
+      { id: 'prod-3', kind: 'PRODUCT', name: 'Sin configurar', price: 100, currency: 'CLP', active: true },
+      { id: 'prod-4', kind: 'PRODUCT', name: 'Beta con stock', price: 100, currency: 'CLP', active: true }
+    ])));
+    await page.route('**/api/v1/inventory', route => route.fulfill(json([
+      { id: 's1', catalogItemId: 'prod-1', trackingEnabled: true, onHand: 5, reserved: 0,
+        available: 5, reorderThreshold: 1, lowStock: false },
+      { id: 's2', catalogItemId: 'prod-2', trackingEnabled: true, onHand: 5, reserved: 0,
+        available: 5, reorderThreshold: 1, lowStock: false },
+      { id: 's4', catalogItemId: 'prod-4', trackingEnabled: true, onHand: 1, reserved: 0,
+        available: 1, reorderThreshold: 0, lowStock: false }
+    ])));
+    await page.goto('/app/inventory');
+    const rowIds = () => page.locator('tbody tr[data-testid^="inventory-row-"]')
+      .evaluateAll(rows => rows.map(row => row.getAttribute('data-testid')));
+    await expect(page.getByTestId('inventory-row-prod-3')).toContainText('Sin configurar');
+    await page.getByLabel('Orden').selectOption('AVAILABLE_ASC');
+    await expect.poll(rowIds).toEqual([
+      'inventory-row-prod-4', 'inventory-row-prod-2', 'inventory-row-prod-1', 'inventory-row-prod-3'
+    ]);
+    await page.getByLabel('Orden').selectOption('AVAILABLE_DESC');
+    await expect.poll(rowIds).toEqual([
+      'inventory-row-prod-2', 'inventory-row-prod-1', 'inventory-row-prod-4', 'inventory-row-prod-3'
+    ]);
+  });
+
+  test('closing inspector after its original trigger is detached does not focus a disconnected element', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/app/inventory');
+    const trigger = page.getByTestId('inventory-row-prod-1')
+      .getByRole('button', { name: 'Ver detalles de Taladro percutor' });
+    await trigger.click();
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+    await expect(inspector).toBeVisible();
+    await trigger.evaluate(button => button.remove());
+    await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
+    await expect(inspector).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
 });
