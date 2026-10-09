@@ -444,11 +444,76 @@ test.describe('React Inventory migration', () => {
     await expect(page).toHaveURL(/\/app\/auth\/?$/);
   });
 
+  test('secondary source outage never represents unavailable alert and waiting counts as zero', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    let calls = 0;
+    await page.route('**/api/v1/inventory/alerts', route => {
+      calls++;
+      if (calls === 1) return route.fulfill({
+        status: 503, contentType: 'application/json',
+        body: JSON.stringify({ message: 'alerts unavailable' })
+      });
+      return route.fulfill(json([]));
+    });
+    await page.goto('/app/inventory');
+
+    const degraded = page.getByTestId('inventory-partial-error');
+    await expect(degraded).toBeVisible();
+    await expect(page.getByTestId('inventory-products')).toContainText('2');
+    await expect(page.getByTestId('inventory-available')).toContainText('6');
+    await expect(page.getByLabel('Resumen de reposición')).toContainText('— alertas (sin datos)');
+    await expect(page.getByText('Alertas no disponibles. Reintenta la consulta.')).toBeVisible();
+    await expect(page.getByText('No hay alertas abiertas.')).toHaveCount(0);
+    await degraded.getByRole('button', { name: 'Reintentar consultas' }).click();
+    await expect.poll(() => calls).toBeGreaterThan(1);
+    await expect(degraded).toHaveCount(0);
+    await expect(page.getByLabel('Resumen de reposición')).toContainText('0 alertas');
+    await expect(page.getByText('No hay alertas abiertas.')).toBeVisible();
+    await expect(page.getByTestId('inventory-last-sync')).toContainText('Última consulta');
+  });
+
+  test('all secondary data errors keep stock usable but do not invent empty waiting or delivery queues', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    const unavailable = route => route.fulfill({
+      status: 503, contentType: 'application/json',
+      body: JSON.stringify({ message: 'temporarily unavailable' })
+    });
+    await page.route('**/api/v1/inventory/restock-subscriptions', unavailable);
+    await page.route('**/api/v1/inventory/restock-subscriptions/notifications', unavailable);
+    await page.goto('/app/inventory');
+
+    await expect(page.getByTestId('inventory-partial-error')).toBeVisible();
+    await expect(page.getByTestId('inventory-reserved')).toContainText('4');
+    await expect(page.getByLabel('Resumen de reposición')).toContainText('— esperando (sin datos)');
+    await expect(page.getByText('Lista de espera no disponible. Reintenta la consulta.')).toBeVisible();
+    await expect(page.getByText('Avisos no disponibles. Reintenta la consulta.')).toBeVisible();
+    await expect(page.getByText('Nadie está esperando reposición.')).toHaveCount(0);
+    await expect(page.getByText('No hay avisos pendientes.')).toHaveCount(0);
+  });
+
+  test('reduced-motion preference stops inspector entrance animation without hiding its actions', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.goto('/app/inventory');
+
+    await page.getByTestId('inventory-row-prod-1')
+      .getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+    const inspector = page.getByTestId('inventory-inspector');
+    await expect(inspector).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'Ajustar stock' })).toBeVisible();
+    expect(await inspector.evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+    await page.keyboard.press('Escape');
+    await expect(inspector).toHaveCount(0);
+  });
+
   test('stays contained at desktop tablet and mobile widths', async ({ page }) => {
     await bootInventory(page);
 
     for (const viewport of [
+      { width: 1536, height: 950 },
       { width: 1440, height: 900 },
+      { width: 1366, height: 768 },
+      { width: 1280, height: 720 },
       { width: 768, height: 1024 },
       { width: 390, height: 844 }
     ]) {
