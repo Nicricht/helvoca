@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -168,7 +167,8 @@ class WhatsAppRequestReplyCorrelationTest {
                     return "Operación no habilitada";
                 });
         assertEquals("Operación no habilitada", disabled.reply());
-        verifyNoInteractions(disabled.tools);
+        verify(disabled.tools).buildInstructions(disabled.conversation);
+        verify(disabled.tools, never()).execute(any(), anyString(), anyString());
         verifyNoInteractions(disabled.correlations);
     }
 
