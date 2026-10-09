@@ -26,14 +26,18 @@ import {
 } from "../../features/inventory/api";
 import styles from "./InventoryPage.module.css";
 import { InventoryIntro } from "./InventoryIntro";
+import { ProductInspector, ProductThumbnail, formatCatalogPrice } from "./InventoryProductPresentation";
 
 type StatusFilter = "ALL" | "TRACKED" | "LOW" | "OUT" | "RESTOCKED" | "UNCONFIGURED";
 type SortMode = "ATTENTION" | "NAME_ASC" | "AVAILABLE_ASC" | "AVAILABLE_DESC";
+const PAGE_SIZE = 8;
 
-interface ProductRow {
+export interface ProductRow {
   id: string;
   name: string;
   description: string;
+  price: number | null;
+  currency: string;
   sku: string;
   configured: boolean;
   trackingEnabled: boolean;
@@ -76,6 +80,8 @@ function buildRows(catalog: CatalogItem[], inventory: InventoryStock[], alerts: 
         id: String(item.id),
         name: String(item.name || "Producto"),
         description: String(item.description || ""),
+        price: numberOrNull(item.price),
+        currency: String(item.currency || "CLP"),
         sku: String(stock?.sku || ""),
         configured: Boolean(stock),
         trackingEnabled,
@@ -201,6 +207,8 @@ export function InventoryPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [sort, setSort] = useState<SortMode>("ATTENTION");
+  const [page, setPage] = useState(1);
+  const [inspectorTarget, setInspectorTarget] = useState<ProductRow | null>(null);
   const [productCreateOpen, setProductCreateOpen] = useState(false);
   const [productEditing, setProductEditing] = useState<CatalogItem | null>(null);
   const [refreshPending, setRefreshPending] = useState(false);
@@ -287,6 +295,10 @@ export function InventoryPage() {
     return [...next].sort((a, b) => attentionRank(a) - attentionRank(b) || a.name.localeCompare(b.name, "es"));
   }, [rows, search, status, sort]);
 
+  const totalPages = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = visibleRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   const tracked = rows.filter(row => row.configured && row.trackingEnabled);
   const availableTotal = tracked.reduce((total, row) => total + (row.available ?? 0), 0);
   const reservedTotal = tracked.reduce((total, row) => total + (row.reserved ?? 0), 0);
@@ -303,6 +315,7 @@ export function InventoryPage() {
   const canReadVariants = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
   const canManageVariants = roles.includes("BUSINESS_ADMIN");
   const canReadAutomation = canReadVariants;
+  const canReadMedia = canReadVariants;
   const canManageAutomation = roles.includes("BUSINESS_ADMIN");
 
   async function refreshWorkspace() {
@@ -836,14 +849,14 @@ export function InventoryPage() {
                 type="search"
                 aria-label="Buscar productos"
                 value={search}
-                onChange={event => setSearch(event.target.value)}
+                onChange={event => { setSearch(event.target.value); setPage(1); }}
                 placeholder="Buscar por producto o SKU"
               />
             </label>
 
             <label className={styles.selectField}>
               <span>Estado</span>
-              <select aria-label="Estado" value={status} onChange={event => setStatus(event.target.value as StatusFilter)}>
+              <select aria-label="Estado" value={status} onChange={event => { setStatus(event.target.value as StatusFilter); setPage(1); }}>
                 <option value="ALL">Todos</option>
                 <option value="TRACKED">Stock configurado</option>
                 <option value="LOW">Stock bajo</option>
@@ -855,7 +868,7 @@ export function InventoryPage() {
 
             <label className={styles.selectField}>
               <span>Orden</span>
-              <select aria-label="Orden" value={sort} onChange={event => setSort(event.target.value as SortMode)}>
+              <select aria-label="Orden" value={sort} onChange={event => { setSort(event.target.value as SortMode); setPage(1); }}>
                 <option value="ATTENTION">Atención primero</option>
                 <option value="NAME_ASC">Nombre A–Z</option>
                 <option value="AVAILABLE_ASC">Disponible: menor a mayor</option>
@@ -869,6 +882,7 @@ export function InventoryPage() {
               <thead>
                 <tr>
                   <th scope="col">Producto</th>
+                  <th scope="col">Precio</th>
                   <th scope="col">Estado</th>
                   <th scope="col">Disponible</th>
                   <th scope="col">Reservado</th>
@@ -878,14 +892,23 @@ export function InventoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleRows.map(row => (
+                {pagedRows.map(row => (
                   <tr key={row.id} data-testid={`inventory-row-${row.id}`}>
                     <td>
-                      <div className={styles.productCell}>
-                        <strong>{row.name}</strong>
-                        <span>{row.sku || "Sin SKU"}{row.description ? ` · ${row.description}` : ""}</span>
+                      <div className={styles.productIdentity}>
+                        <ProductThumbnail productId={row.id} canReadMedia={canReadMedia} />
+                        <div className={styles.productCell}>
+                          <strong>{row.name}</strong>
+                          <span>{row.sku || "Sin SKU"}{row.description ? ` · ${row.description}` : ""}</span>
+                          <button className={styles.productInspectLink} type="button"
+                            onClick={() => setInspectorTarget(row)}
+                            aria-label={`Ver detalles de ${row.name}`}>
+                            Ver detalles
+                          </button>
+                        </div>
                       </div>
                     </td>
+                    <td className={styles.productPrice}>{formatCatalogPrice(row.price, row.currency)}</td>
                     <td><ProductStatus row={row} /></td>
                     <td>
                       <strong className={styles.availableValue}>{stockValue(row.available)}</strong>
@@ -958,6 +981,25 @@ export function InventoryPage() {
               </tbody>
             </table>
           </div>
+
+          {visibleRows.length > PAGE_SIZE && (
+            <nav className={styles.productPagination} aria-label="Paginación de productos">
+              <span>
+                Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, visibleRows.length)} de {visibleRows.length}
+              </span>
+              <div>
+                <button className="button secondary" type="button" disabled={currentPage === 1}
+                  aria-label="Página anterior" onClick={() => setPage(currentPage - 1)}>
+                  Anterior
+                </button>
+                <span aria-live="polite">Página {currentPage} de {totalPages}</span>
+                <button className="button secondary" type="button" disabled={currentPage === totalPages}
+                  aria-label="Página siguiente" onClick={() => setPage(currentPage + 1)}>
+                  Siguiente
+                </button>
+              </div>
+            </nav>
+          )}
 
           {visibleRows.length === 0 && (
             <div className={styles.emptyState}>
@@ -1491,6 +1533,38 @@ export function InventoryPage() {
               </div>
             </section>
           </div>
+        )}
+
+        {inspectorTarget && (
+          <ProductInspector
+            row={rows.find(row => row.id === inspectorTarget.id) ?? inspectorTarget}
+            canReadMedia={canReadMedia}
+            canReadVariants={canReadVariants}
+            canManageStock={model.canManageStock}
+            onClose={() => setInspectorTarget(null)}
+            onVariants={() => {
+              const row = rows.find(value => value.id === inspectorTarget.id) ?? inspectorTarget;
+              setInspectorTarget(null);
+              void openVariants(row);
+            }}
+            onHistory={() => {
+              const row = rows.find(value => value.id === inspectorTarget.id) ?? inspectorTarget;
+              setInspectorTarget(null);
+              void openHistory(row);
+            }}
+            onConfigure={() => {
+              const row = rows.find(value => value.id === inspectorTarget.id) ?? inspectorTarget;
+              setInspectorTarget(null);
+              setMutationError("");
+              setConfigureTarget(row);
+            }}
+            onAdjust={() => {
+              const row = rows.find(value => value.id === inspectorTarget.id) ?? inspectorTarget;
+              setInspectorTarget(null);
+              setMutationError("");
+              setAdjustTarget(row);
+            }}
+          />
         )}
 
         {historyTarget && (
