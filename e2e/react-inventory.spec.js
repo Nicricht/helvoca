@@ -444,6 +444,31 @@ test.describe('React Inventory migration', () => {
     await expect(page).toHaveURL(/\/app\/auth\/?$/);
   });
 
+  test('shows no invented values in responsive loading skeleton and respects reduced-motion', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await bootInventory(page);
+    await page.route('**/api/v1/catalog', async route => {
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      return route.fallback();
+    });
+
+    await page.goto('/app/inventory');
+    const loading = page.getByTestId('inventory-loading');
+    const skeleton = page.getByTestId('inventory-loading-skeleton');
+    await expect(loading).toBeVisible();
+    await expect(skeleton.locator(':scope > span')).toHaveCount(5);
+    await expect(page.getByTestId('inventory-products')).toHaveCount(0);
+    const animation = await skeleton.locator(':scope > span').first()
+      .evaluate(element => getComputedStyle(element).animationName);
+    expect(animation).toBe('none');
+    expect(await page.evaluate(() =>
+      document.documentElement.scrollWidth <= document.documentElement.clientWidth
+    )).toBe(true);
+    await expect(loading).toHaveCount(0);
+    await expect(page.getByTestId('inventory-products')).toContainText('2');
+  });
+
   test('secondary source outage never represents unavailable alert and waiting counts as zero', async ({ page }) => {
     await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
     let calls = 0;
