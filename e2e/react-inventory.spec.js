@@ -1168,6 +1168,38 @@ test.describe('React Inventory migration', () => {
   });
 
 
+  
+  test('availability ordering puts unknown stock last without coercing it into zero', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.route('**/api/v1/inventory', route => route.fulfill(json([
+      { id: 'stock-1', catalogItemId: 'prod-1', sku: 'TAL-18V',
+        trackingEnabled: true, onHand: 8, reserved: 3, available: 5,
+        reorderThreshold: 4, lowStock: false }
+    ])));
+    await page.goto('/app/inventory');
+    const rows = page.locator('tbody tr[data-testid^="inventory-row-"]');
+    await expect(rows).toHaveCount(2);
+    await expect(page.getByTestId('inventory-row-prod-2')).toContainText('Sin configurar');
+    await page.getByLabel('Orden').selectOption('AVAILABLE_ASC');
+    await expect(rows.first()).toHaveAttribute('data-testid', 'inventory-row-prod-1');
+    await page.getByLabel('Orden').selectOption('AVAILABLE_DESC');
+    await expect(rows.first()).toHaveAttribute('data-testid', 'inventory-row-prod-1');
+    await expect(page.getByTestId('inventory-available')).toContainText('5');
+  });
+
+  test('legacy blank business name does not introduce an invented title or separator', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.route('**/api/v1/business', route => route.fulfill(json({
+      id: '11111111-1111-1111-1111-111111111111', name: '   '
+    })));
+    await page.goto('/app/inventory');
+    const heading = page.locator('.rv-page-header').first();
+    await expect(heading).toContainText('Stock físico, reservado y disponible');
+    await expect(heading).not.toContainText(' · Stock físico');
+    await expect(page.getByTestId('inventory-row-prod-1')).toBeVisible();
+  });
+
+
   test('malformed catalog success response fails closed rather than rendering invented or crashed stock totals', async ({ page }) => {
     await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
     await page.route('**/api/v1/catalog', route => route.fulfill(json({ unexpected: 'object' })));
