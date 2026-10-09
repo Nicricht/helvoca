@@ -611,4 +611,87 @@ test.describe('React Inventory mutations', () => {
     expect(requests.configure).toHaveLength(0);
   });
 
+  
+  test('missing product identity and currency controls fail closed even when native validation is bypassed', async ({ page }) => {
+    const { requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+    for (const [field, expected] of [
+      ['name', 'Escribe un nombre'],
+      ['currency', 'La moneda debe tener tres letras']
+    ]) {
+      await page.getByRole('button', { name: 'Nuevo producto' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+      await dialog.getByLabel('Nombre').fill('Producto íntegro');
+      await dialog.getByLabel('Precio').fill('4400');
+      await dialog.getByLabel('Moneda').fill('CLP');
+      await dialog.locator('[name="' + field + '"]').evaluate(element => element.remove());
+      await dialog.getByRole('button', { name: 'Crear producto', exact: true }).click();
+      await expect(dialog.getByRole('alert')).toContainText(expected);
+      expect(requests.createProduct).toHaveLength(0);
+      await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    }
+  });
+
+  test('absent optional catalog description stays null, never inferred from another field', async ({ page }) => {
+    const { requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await dialog.getByLabel('Nombre').fill('Producto sin descripción');
+    await dialog.getByLabel('Precio').fill('2600');
+    await dialog.getByLabel('Moneda').fill('CLP');
+    await dialog.locator('[name="description"]').evaluate(element => element.remove());
+    await dialog.getByRole('button', { name: 'Crear producto', exact: true }).click();
+    await expect.poll(() => requests.createProduct.length).toBe(1);
+    expect(requests.createProduct[0].description).toBeNull();
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test('missing optional SKU and stock note never generate fabricated values in a write', async ({ page }) => {
+    const { productId, requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId)
+      .getByRole('button', { name: 'Configurar stock' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Configurar stock · Cera mate' });
+    await dialog.getByLabel('Stock físico inicial').fill('8');
+    await dialog.getByLabel('Umbral de reposición').fill('2');
+    await dialog.locator('[name="sku"]').evaluate(element => element.remove());
+    await dialog.locator('[name="note"]').evaluate(element => element.remove());
+    await dialog.getByRole('button', { name: 'Guardar configuración' }).click();
+    await expect.poll(() => requests.configure.length).toBe(1);
+    expect(requests.configure[0]).toEqual({
+      sku: null, trackingEnabled: true, onHand: 8, reorderThreshold: 2, note: null
+    });
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test('sparse successful catalog response carries entered name and currency into the independent stock step', async ({ page }) => {
+    const { createdProductId, productId, requests } = await bootAdminInventory(page);
+    let catalog = [{
+      id: productId, kind: 'PRODUCT', name: 'Cera mate',
+      description: 'Cera profesional', price: 5990, currency: 'CLP', active: true
+    }];
+    await page.route('**/api/v1/catalog', route => {
+      if (route.request().method() === 'GET') return route.fulfill(json(catalog));
+      if (route.request().method() !== 'POST') return route.fallback();
+      const input = route.request().postDataJSON();
+      requests.createProduct.push(input);
+      catalog = [...catalog, { ...input, id: createdProductId }];
+      return route.fulfill({ ...json({ id: createdProductId }), status: 201 });
+    });
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await dialog.getByLabel('Nombre').fill('Bodega sin detalles');
+    await dialog.getByLabel('Precio').fill('4200');
+    await dialog.getByLabel('Moneda').fill('CLP');
+    await dialog.getByRole('button', { name: 'Crear y configurar stock' }).click();
+    const stockDialog = page.getByRole('dialog', { name: 'Configurar stock · Bodega sin detalles' });
+    await expect(stockDialog).toBeVisible();
+    await expect(page.getByTestId('inventory-row-' + createdProductId)).toContainText('Bodega sin detalles');
+    await stockDialog.getByRole('button', { name: 'Cancelar' }).click();
+    expect(requests.createProduct).toHaveLength(1);
+    expect(requests.configure).toHaveLength(0);
+  });
+
 });
