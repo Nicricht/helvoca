@@ -202,6 +202,86 @@ test.describe('React Inventory migration', () => {
     await expect(page.getByTestId('inventory-low-stock')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
+  test('uses real catalog price and media in the table and inspector', async ({ page }) => {
+    await bootInventory(page, {
+      roles: ['BUSINESS_ADMIN'],
+      mediaByProduct: {
+        'prod-1': [{
+          id: 'media-1', catalogItemId: 'prod-1', mediaType: 'IMAGE',
+          mediaUrl: 'https://assets.example.test/product-one.png', sortOrder: 0, active: true
+        }],
+        'prod-2': []
+      }
+    });
+    await page.route('https://assets.example.test/**', route => route.fulfill({
+      status: 200, contentType: 'image/png',
+      body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO9FI1EAAAAASUVORK5CYII=', 'base64')
+    }));
+    await page.goto('/app/inventory');
+
+    const first = page.getByTestId('inventory-row-prod-1');
+    await expect(first).toContainText('54.990');
+    await expect(first.locator('img[src="https://assets.example.test/product-one.png"]')).toBeVisible();
+    const second = page.getByTestId('inventory-row-prod-2');
+    await expect(second).toContainText('4.990');
+    await expect(second.locator('img')).toHaveCount(0);
+
+    await first.getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor' });
+    await expect(inspector).toContainText('54.990');
+    await expect(inspector).toContainText('SKU: TAL-18V');
+    await expect(inspector).toContainText('Disponible');
+    await expect(inspector).toContainText('Reservado');
+    await expect(inspector).toContainText('Físico');
+    await expect(inspector.locator('img[src="https://assets.example.test/product-one.png"]')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(inspector).toHaveCount(0);
+  });
+
+  test('read-only operator can inspect and review history without inventory mutation controls', async ({ page }) => {
+    await bootInventory(page, { roles: ['OPERATOR'] });
+    await page.goto('/app/inventory');
+
+    await page.getByTestId('inventory-row-prod-1')
+      .getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor' });
+    await expect(inspector.getByRole('button', { name: 'Ver historial' })).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'Editar stock' })).toHaveCount(0);
+    await expect(inspector.getByRole('button', { name: 'Configurar stock' })).toHaveCount(0);
+    await expect(inspector.getByRole('button', { name: 'Ajustar stock' })).toHaveCount(0);
+    await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
+    await expect(inspector).toHaveCount(0);
+  });
+
+  test('local pagination bounds media reads and resets after a filtered search', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    const extra = Array.from({ length: 18 }, (_, index) => ({
+      id: `extra-${index}`, kind: 'PRODUCT',
+      name: `Producto extra ${String(index).padStart(2, '0')}`,
+      description: '', price: index, currency: 'CLP', active: true
+    }));
+    await page.route('**/api/v1/catalog', route => route.fulfill(json(extra)));
+    let mediaRequests = 0;
+    await page.route('**/api/v1/catalog/*/media', route => {
+      mediaRequests++;
+      return route.fulfill(json([]));
+    });
+    await page.goto('/app/inventory');
+
+    const pagination = page.getByRole('navigation', { name: 'Paginación de productos' });
+    await expect(pagination).toContainText('Página 1 de 3');
+    await expect(page.locator('[data-testid^="inventory-row-extra-"]')).toHaveCount(8);
+    await expect.poll(() => mediaRequests).toBe(8);
+    await page.getByRole('button', { name: 'Página siguiente' }).click();
+    await expect(pagination).toContainText('Página 2 de 3');
+    await expect(page.locator('[data-testid^="inventory-row-extra-"]')).toHaveCount(8);
+    await expect.poll(() => mediaRequests).toBe(16);
+    await page.getByRole('searchbox', { name: 'Buscar productos' }).fill('Producto extra 17');
+    await expect(page.getByTestId('inventory-row-extra-17')).toBeVisible();
+    await expect(pagination).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+
   test('renders authoritative stock without confusing physical, reserved and available', async ({ page }) => {
     await bootInventory(page);
     await page.goto('/app/inventory');
