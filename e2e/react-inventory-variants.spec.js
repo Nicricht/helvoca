@@ -817,4 +817,39 @@ test.describe('React Inventory variants', () => {
   });
 
 
+
+  test('tampered variant stock fields reject negative quantities without posting variant data', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('Nombre de variante').fill('Manipulada');
+    await dialog.getByLabel('SKU de variante').fill('MAL-01');
+    await dialog.locator('form').evaluate(form => {
+      form.noValidate = true;
+      form.querySelector('[name="variantOnHand"]').type = 'text';
+    });
+    await dialog.getByLabel('Stock físico inicial').fill('-3');
+    await dialog.getByLabel('Umbral de reposición').fill('1');
+    await dialog.getByRole('button', { name: 'Crear variante' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('enteros iguales o mayores que cero');
+    expect(requests.create).toHaveLength(0);
+  });
+
+  test('missing required variant quantity cannot silently become zero via Number(null)', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('Nombre de variante').fill('Sin cantidad');
+    await dialog.getByLabel('SKU de variante').fill('MAL-02');
+    await dialog.locator('[name="variantOnHand"]').evaluate(element => element.remove());
+    await dialog.getByRole('button', { name: 'Crear variante' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('enteros iguales o mayores que cero');
+    await expect(dialog).toBeVisible();
+    expect(requests.create).toHaveLength(0);
+  });
+
 });
