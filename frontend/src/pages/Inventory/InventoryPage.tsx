@@ -25,6 +25,7 @@ import {
   type InventoryVariantMovement
 } from "../../features/inventory/api";
 import styles from "./InventoryPage.module.css";
+import { InventoryIntro } from "./InventoryIntro";
 
 type StatusFilter = "ALL" | "TRACKED" | "LOW" | "OUT" | "RESTOCKED" | "UNCONFIGURED";
 type SortMode = "ATTENTION" | "NAME_ASC" | "AVAILABLE_ASC" | "AVAILABLE_DESC";
@@ -706,38 +707,26 @@ export function InventoryPage() {
   return (
     <AppShell>
       <main className={`rv-page-frame ${styles.page}`} data-visual-page="inventory">
-        <header className="rv-page-header">
-          <div>
-            <p className="eyebrow">OPERACIÓN</p>
-            <h1>Inventario</h1>
-            <p>
-              {businessName ? `${businessName} · ` : ""}
-              Stock físico, reservado y disponible sin mezclar conceptos.
-            </p>
-          </div>
-          <span className={styles.rolePill}>{roleLabel}</span>
-        </header>
-
-        <section className={styles.visualHero} aria-label="Inventario inteligente RecepVoz">
-          <div className={styles.visualHeroCopy}>
-            <span className={styles.visualHeroKicker}>STOCK INTELIGENTE</span>
-            <h2>Tu inventario visible <span>antes de prometer una venta</span></h2>
-            <p>
-              RecepVoz cruza stock físico, reservado y disponible para que la operación responda con datos reales.
-            </p>
-            <div className={styles.visualHeroSignals}>
-              <span><i data-tone="cyan" />{rows.length} productos</span>
-              <span><i data-tone="green" />{tracked.length} controlados</span>
-              <span><i data-tone="warning" />{lowStockTotal} requieren atención</span>
+        <div className={styles.inventoryLead}>
+          <header className="rv-page-header">
+            <div>
+              <p className="eyebrow">OPERACIÓN</p>
+              <h1>Inventario</h1>
+              <p>
+                {businessName ? `${businessName} · ` : ""}
+                Stock físico, reservado y disponible sin mezclar conceptos.
+              </p>
             </div>
-          </div>
-          <div className={styles.visualHeroArt} aria-hidden="true">
-            <span className={styles.visualHeroOrbit} />
-            <img className={styles.visualHeroRobot} src="/app/assets/recepvoz/v2/inventory/hero-stock-robot.webp" alt="" />
-            <img className={styles.visualHealthy} src="/app/assets/recepvoz/v2/inventory/stock-confirmed.webp" alt="" />
-            <img className={styles.visualWarning} src="/app/assets/recepvoz/v2/inventory/stock-warning.webp" alt="" />
-          </div>
-        </section>
+            <span className={styles.rolePill}>{roleLabel}</span>
+          </header>
+          <InventoryIntro
+            productCount={rows.length}
+            trackedCount={tracked.length}
+            robotSrc="/app/assets/recepvoz/v2/inventory/hero-stock-robot.webp"
+            healthySrc="/app/assets/recepvoz/v2/inventory/stock-confirmed.webp"
+            warningSrc="/app/assets/recepvoz/v2/inventory/stock-warning.webp"
+          />
+        </div>
 
         <section className={styles.summaryGrid} aria-label="Resumen de inventario">
           <SummaryCard
@@ -804,32 +793,34 @@ export function InventoryPage() {
               <p>El stock disponible siempre viene del backend. La búsqueda y los filtros solo cambian esta vista.</p>
             </div>
             <div className={styles.workspaceActions}>
-              {model.canManageCatalog && (
-                <>
-                  <a className="button secondary" href="/app/settings/import">
-                    Importar archivos
-                  </a>
-                  <button
-                    className="button primary"
-                    type="button"
-                    onClick={() => {
-                      setMutationError("");
-                      setProductEditing(null);
-                      setProductCreateOpen(true);
-                    }}
-                  >
-                    Nuevo producto
-                  </button>
-                </>
-              )}
-              <button
-                className="button ghost"
-                type="button"
-                disabled={refreshPending}
-                onClick={() => void refreshWorkspace()}
-              >
-                {refreshPending ? "Actualizando…" : "Actualizar"}
-              </button>
+              <div className={styles.workspaceButtonRow}>
+                {model.canManageCatalog && (
+                  <>
+                    <a className="button secondary" href="/app/settings/import">
+                      Importar archivos
+                    </a>
+                    <button
+                      className="button primary"
+                      type="button"
+                      onClick={() => {
+                        setMutationError("");
+                        setProductEditing(null);
+                        setProductCreateOpen(true);
+                      }}
+                    >
+                      Nuevo producto
+                    </button>
+                  </>
+                )}
+                <button
+                  className="button ghost"
+                  type="button"
+                  disabled={refreshPending}
+                  onClick={() => void refreshWorkspace()}
+                >
+                  {refreshPending ? "Actualizando…" : "Actualizar"}
+                </button>
+              </div>
               <div className={styles.queueSummary} aria-label="Resumen de reposición">
                 <span>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length} alertas</span>
                 <span>{(model.restockSubscriptions.data ?? []).length} esperando reposición</span>
