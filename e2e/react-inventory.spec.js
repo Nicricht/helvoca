@@ -1010,4 +1010,74 @@ test.describe('React Inventory migration', () => {
     await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
   });
 
+
+  test('HTTP 400 during manual stock adjustment preserves authoritative stock and a useful correction message', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    let writes = 0;
+    await page.route('**/api/v1/inventory/prod-1/adjustments', route => {
+      writes += 1;
+      return route.fulfill({ status: 400, contentType: 'application/json',
+        body: JSON.stringify({ message: 'invalid warehouse adjustment' }) });
+    });
+    await page.goto('/app/inventory');
+    const row = page.getByTestId('inventory-row-prod-1');
+    await row.getByRole('button', { name: 'Ajustar stock' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Ajustar stock · Taladro percutor' });
+    await dialog.getByLabel('Ajuste').fill('2');
+    await dialog.getByRole('button', { name: 'Aplicar ajuste' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('Revisa los datos ingresados');
+    await expect(dialog).toBeVisible();
+    await expect(row).toContainText('TAL-18V');
+    await expect(row).toContainText('5');
+    expect(writes).toBe(1);
+  });
+
+  test('unknown inventory alert types and legacy contact channels render read-only without any actions', async ({ page }) => {
+    await bootInventory(page, { roles: ['OPERATOR'] });
+    await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([{
+      id: 'unknown-alert', catalogItemId: 'prod-1', type: 'UNKNOWN_EVENT',
+      acknowledged: false, subjectName: null, available: null, reorderThreshold: null
+    }])));
+    await page.route('**/api/v1/inventory/restock-subscriptions', route => route.fulfill(json([
+      { id: 'sms-contact', contact: 'Customer A', preferredChannel: 'SMS' },
+      { id: 'fallback-contact', contact: null, preferredChannel: null },
+      { id: 'custom-channel', contact: 'Customer B', preferredChannel: 'MESSENGER' }
+    ])));
+    await page.route('**/api/v1/inventory/restock-subscriptions/notifications',
+      route => route.fulfill(json([{ id: 'sms-notice', subjectName: null,
+        contact: null, preferredChannel: 'SMS', available: null }])));
+    await page.goto('/app/inventory');
+
+    const alert = page.getByTestId('inventory-alert-unknown-alert');
+    await expect(alert).toContainText('Alerta de inventario');
+    await expect(alert).toContainText('Producto');
+    await expect(alert).toContainText('Disponible: —');
+    await expect(alert.getByRole('button', { name: 'Reponer stock' })).toHaveCount(0);
+    await expect(page.getByTestId('restock-subscription-sms-contact')).toContainText('SMS');
+    await expect(page.getByTestId('restock-subscription-fallback-contact')).toContainText('Canal');
+    await expect(page.getByTestId('restock-subscription-custom-channel')).toContainText('MESSENGER');
+    await expect(page.getByTestId('restock-notification-sms-notice')).toContainText('SMS');
+    await expect(page.getByRole('button', { name: 'Marcar atendida' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Cancelar espera' })).toHaveCount(0);
+  });
+
+  test('primary catalog outage recovers through the visible retry instead of inventing inventory totals', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    let unavailable = true;
+    await page.route('**/api/v1/catalog', route => unavailable
+      ? route.fulfill({ status: 503, contentType: 'application/json',
+        body: JSON.stringify({ message: 'temporarily unavailable' }) })
+      : route.fulfill(json([{ id: 'prod-1', kind: 'PRODUCT', name: 'Taladro percutor',
+        price: 54990, currency: 'CLP', active: true }]))
+    );
+    await page.goto('/app/inventory');
+    await expect(page.getByRole('alert')).toContainText('No pudimos cargar el inventario completo');
+    await expect(page.getByTestId('inventory-available')).toContainText('—');
+    unavailable = false;
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+    await expect(page.getByTestId('inventory-row-prod-1')).toBeVisible();
+    await expect(page.getByTestId('inventory-available')).toContainText('5');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
+
 });
