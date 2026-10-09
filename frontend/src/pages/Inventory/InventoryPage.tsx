@@ -52,6 +52,10 @@ export interface ProductRow {
   restocked: boolean;
 }
 
+function asList<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
 function numberOrNull(value: unknown) {
   if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) return null;
   const parsed = Number(value);
@@ -249,9 +253,9 @@ export function InventoryPage() {
 
   const rows = useMemo(
     () => buildRows(
-      model.catalog.data ?? [],
-      model.inventory.data ?? [],
-      model.alerts.data ?? []
+      asList(model.catalog.data),
+      asList(model.inventory.data),
+      asList(model.alerts.data)
     ),
     [model.catalog.data, model.inventory.data, model.alerts.data]
   );
@@ -307,16 +311,22 @@ export function InventoryPage() {
   const lowStockTotal = tracked.filter(row => row.lowStock || row.outOfStock).length;
 
   const loading = model.me.isPending || model.catalog.isPending || model.inventory.isPending;
-  const primaryFailed = model.catalog.isError || model.inventory.isError;
-  const secondaryFailed = model.alerts.isError
-    || model.restockSubscriptions.isError
-    || model.restockNotifications.isError;
-  const alertCount = model.alerts.isError || model.alerts.isPending
-    ? null : (model.alerts.data ?? []).filter(alert => !alert.acknowledged).length;
-  const waitingCount = model.restockSubscriptions.isError || model.restockSubscriptions.isPending
-    ? null : (model.restockSubscriptions.data ?? []).length;
-  const notificationCount = model.restockNotifications.isError || model.restockNotifications.isPending
-    ? null : (model.restockNotifications.data ?? []).length;
+  const primaryFailed = model.catalog.isError || model.inventory.isError
+    || (model.catalog.isSuccess && !Array.isArray(model.catalog.data))
+    || (model.inventory.isSuccess && !Array.isArray(model.inventory.data));
+  const alertsUnavailable = model.alerts.isError
+    || (model.alerts.isSuccess && !Array.isArray(model.alerts.data));
+  const waitingUnavailable = model.restockSubscriptions.isError
+    || (model.restockSubscriptions.isSuccess && !Array.isArray(model.restockSubscriptions.data));
+  const notificationsUnavailable = model.restockNotifications.isError
+    || (model.restockNotifications.isSuccess && !Array.isArray(model.restockNotifications.data));
+  const secondaryFailed = alertsUnavailable || waitingUnavailable || notificationsUnavailable;
+  const alertCount = alertsUnavailable || model.alerts.isPending
+    ? null : (asList(model.alerts.data)).filter(alert => !alert.acknowledged).length;
+  const waitingCount = waitingUnavailable || model.restockSubscriptions.isPending
+    ? null : (asList(model.restockSubscriptions.data)).length;
+  const notificationCount = notificationsUnavailable || model.restockNotifications.isPending
+    ? null : (asList(model.restockNotifications.data)).length;
   const lastPrimarySync = Math.min(model.catalog.dataUpdatedAt || 0, model.inventory.dataUpdatedAt || 0);
   const lastPrimarySyncText = lastPrimarySync > 0
     ? new Date(lastPrimarySync).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })
@@ -1008,7 +1018,7 @@ export function InventoryPage() {
                           type="button"
                           aria-label={`Editar producto ${row.name}`}
                           onClick={() => {
-                            const item = (model.catalog.data ?? []).find(candidate => String(candidate.id) === row.id);
+                            const item = (asList(model.catalog.data)).find(candidate => String(candidate.id) === row.id);
                             if (!item) return;
                             setMutationError("");
                             setProductEditing(item);
@@ -1087,14 +1097,14 @@ export function InventoryPage() {
                 </div>
 
                 <div className={styles.automationList}>
-                  {model.alerts.isError ? (
+                  {alertsUnavailable ? (
                     <p className={styles.automationEmpty} role="status">Alertas no disponibles. Reintenta la consulta.</p>
                   ) : model.alerts.isPending ? (
                     <p className={styles.automationEmpty} role="status">Consultando alertas…</p>
-                  ) : (model.alerts.data ?? []).length === 0 ? (
+                  ) : (asList(model.alerts.data)).length === 0 ? (
                     <p className={styles.automationEmpty}>No hay alertas abiertas.</p>
                   ) : (
-                    (model.alerts.data ?? []).map(alert => (
+                    (asList(model.alerts.data)).map(alert => (
                       <article
                         key={alert.id}
                         className={styles.automationCard}
@@ -1158,14 +1168,14 @@ export function InventoryPage() {
                 </div>
 
                 <div className={styles.automationList}>
-                  {model.restockSubscriptions.isError ? (
+                  {waitingUnavailable ? (
                     <p className={styles.automationEmpty} role="status">Lista de espera no disponible. Reintenta la consulta.</p>
                   ) : model.restockSubscriptions.isPending ? (
                     <p className={styles.automationEmpty} role="status">Consultando lista de espera…</p>
-                  ) : (model.restockSubscriptions.data ?? []).length === 0 ? (
+                  ) : (asList(model.restockSubscriptions.data)).length === 0 ? (
                     <p className={styles.automationEmpty}>Nadie está esperando reposición.</p>
                   ) : (
-                    (model.restockSubscriptions.data ?? []).map(subscription => (
+                    (asList(model.restockSubscriptions.data)).map(subscription => (
                       <article
                         key={subscription.id}
                         className={styles.automationCard}
@@ -1207,14 +1217,14 @@ export function InventoryPage() {
                 </div>
 
                 <div className={styles.automationList}>
-                  {model.restockNotifications.isError ? (
+                  {notificationsUnavailable ? (
                     <p className={styles.automationEmpty} role="status">Avisos no disponibles. Reintenta la consulta.</p>
                   ) : model.restockNotifications.isPending ? (
                     <p className={styles.automationEmpty} role="status">Consultando avisos…</p>
-                  ) : (model.restockNotifications.data ?? []).length === 0 ? (
+                  ) : (asList(model.restockNotifications.data)).length === 0 ? (
                     <p className={styles.automationEmpty}>No hay avisos pendientes.</p>
                   ) : (
-                    (model.restockNotifications.data ?? []).map(notification => (
+                    (asList(model.restockNotifications.data)).map(notification => (
                       <article
                         key={notification.id}
                         className={styles.automationCard}
