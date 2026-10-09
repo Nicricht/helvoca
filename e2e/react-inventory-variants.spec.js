@@ -175,7 +175,13 @@ test.describe('React Inventory variants', () => {
 
     await variantsDialog.getByRole('button', { name: 'Nueva variante' }).click();
     await variantsDialog.getByLabel('Nombre de variante').fill('Rojo / L');
-    await variantsDialog.getByLabel('Opciones JSON').fill('{"color":"Rojo","talla":"L"}');
+    await variantsDialog.getByRole('button', { name: 'Agregar característica' }).click();
+    await variantsDialog.getByRole('button', { name: 'Agregar característica' }).click();
+    await variantsDialog.getByLabel('Característica 1').fill('color');
+    await variantsDialog.getByLabel('Característica 2').fill('talla');
+    await variantsDialog.getByLabel('Valor').nth(0).fill('Rojo');
+    await variantsDialog.getByLabel('Valor').nth(1).fill('L');
+    await expect(variantsDialog.getByLabel('Opciones JSON')).toHaveCount(0);
     await variantsDialog.getByLabel('SKU de variante').fill('CER-ROJ-L');
     await variantsDialog.getByLabel('Stock físico inicial').fill('5');
     await variantsDialog.getByLabel('Umbral de reposición').fill('2');
