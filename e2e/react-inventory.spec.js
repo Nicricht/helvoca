@@ -318,7 +318,7 @@ test.describe('React Inventory migration', () => {
     await expect.poll(() => mediaRequests).toBe(16);
     await page.getByRole('button', { name: 'Página anterior' }).click();
     await expect(pagination).toContainText('Página 1 de 3');
-    await expect(page.getByTestId('inventory-row-extra-00')).toBeVisible();
+    await expect(page.getByTestId('inventory-row-extra-0')).toContainText('Producto extra 00');
     await page.getByRole('button', { name: 'Página siguiente' }).click();
     await expect(pagination).toContainText('Página 2 de 3');
     await page.getByRole('searchbox', { name: 'Buscar productos' }).fill('Producto extra 17');
@@ -693,7 +693,7 @@ test.describe('React Inventory migration', () => {
     await page.goto('/app/inventory');
     const row = page.getByTestId('inventory-row-prod-1');
     await row.getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
-    let inspector = page.getByRole('dialog', { name: 'Taladro percutor' });
+    let inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
     await inspector.getByRole('button', { name: 'Variantes' }).click();
     await expect(inspector).toHaveCount(0);
     const variantDialog = page.getByRole('dialog', { name: 'Variantes · Taladro percutor' });
