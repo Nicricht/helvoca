@@ -25,7 +25,7 @@ Use verification proportional to the real risk. Before implementation, review th
 
 The implementing agent owns QA for every change. The user is not responsible for selecting or reminding the agent which tests to create or run. Before coding, read `docs/engineering/QA_POLICY.md`, classify the change, identify the properties that can fail, and select the lowest test level that can prove each property correctly.
 
-Do not mechanically run every test category for every edit. Unit tests prove isolated logic; integration/PostgreSQL tests prove persistence, SQL, Flyway, repository and transactional behavior; security/tenant tests prove authorization and isolation boundaries; concurrency/idempotency tests prove race and replay safety; contract/failure tests prove provider boundaries; component tests prove local UI behavior; browser E2E proves user journeys; Golden Journey proves release-critical commercial flows; production verification proves the exact deployed artifact.
+Do not mechanically run every test category for every edit. Unit tests prove isolated logic; integration/PostgreSQL tests prove persistence, SQL, Flyway, repository and transactional behavior; security/tenant tests prove authorization and isolation boundaries; concurrency/idempotency tests prove race and replay safety; contract/failure tests prove provider boundaries; component tests prove local UI behavior; browser E2E proves user journeys; Golden Journey proves release-critical commercial flows; production verification proves the exact deployed artifact. The selected evidence must collectively cover 100% of the changed or affected behavior and applicable invariants.
 
 Mandatory rules:
 - A reproducible bug requires a regression test that is observed RED for the intended reason before the fix when technically feasible.
@@ -40,7 +40,9 @@ Mandatory rules:
 - Do not add assertion-free or behavior-free tests merely to increase a coverage number.
 - Any implementation or engineering-contract edit after certification invalidates stale evidence and requires fresh verification.
 
-Coverage is a guardrail, not proof of correctness. The current automated differential floor remains at least 80% changed executable line coverage and 70% changed branch coverage. For HIGH-risk new or materially modified business logic, the engineering target is 100% meaningful line, branch and method coverage, with any infeasible or meaningless exception documented in the PR. Do not claim 100% coverage unless the measured report actually proves it.
+Coverage is a guardrail, not proof of correctness. Helvoca now uses a **100% quality contract** for every changed or affected production scope. Backend executable Java must reach 100% differential line, branch and method coverage when those counters apply. Frontend executable logic must reach 100% statement/line, branch and function/method coverage when instrumented, and 100% of affected meaningful interactive controls and state transitions must have automated behavioral evidence. Database work must map 100% of affected persistence, constraint, migration, transaction, tenant-isolation and concurrency/idempotency invariants to real PostgreSQL evidence. One layer's 100% never compensates for missing evidence in another layer. Do not claim 100% unless the measured reports and behavior matrix actually prove it.
+
+A repository-wide "100% QA coverage" claim is stronger than a green suite or differential gate. It requires measured 100% backend line/branch/method coverage, measured 100% frontend statement/line/branch/function coverage for executable source, 100% automated meaningful frontend interactions/state transitions, 100% mapped real-PostgreSQL database invariants, and 100% mapped release-critical journeys. Until those reports exist and are green, never describe the whole product as 100% covered.
 
 ## Required workflow
 
@@ -52,7 +54,7 @@ Coverage is a guardrail, not proof of correctness. The current automated differe
    `bash scripts/ci/fast-gate.sh <base-sha>`
 6. Review the change adversarially before Full Gate: nulls, retries, duplicate calls, stale state, partial success, cross-tenant data, concurrency, provider failures and repeated user input.
 7. Pull requests must pass the Full Gate. The Full Gate runs all backend tests, JaCoCo differential coverage, JavaScript validation and browser E2E.
-8. New or modified executable Java lines must maintain at least 80% differential line coverage and 70% differential branch coverage when branches are present.
+8. New or modified executable Java must maintain 100% differential line, branch and method coverage when those counters apply. Changed or affected frontend behavior must have 100% mapped interaction/state-transition coverage, and changed or affected database behavior must have 100% mapped real-PostgreSQL invariant coverage.
 9. Never merge a red or incomplete PR. Re-check that the branch is not behind current `main` immediately before merge.
 10. Completion evidence must belong to the exact final commit. Any implementation or engineering-contract change after certification invalidates the earlier certification and requires fresh verification.
 11. For MEDIUM/HIGH or multi-step work likely to outlive one interaction, maintain a **resume checkpoint** in the Draft PR. It must identify branch, PR, exact HEAD, completed blocks, CI/evidence valid for that HEAD, blockers/rulings, and next step.
