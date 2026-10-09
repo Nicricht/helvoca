@@ -969,11 +969,6 @@
   margin-bottom: 14px;
 }
 
-.inventoryLead :global(.rv-page-header) {
-  min-width: 0;
-  margin-bottom: 0;
-  align-self: center;
-}
 
 .visualHero {
   position: relative;
