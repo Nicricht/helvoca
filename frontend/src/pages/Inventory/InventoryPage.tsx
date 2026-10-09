@@ -1294,6 +1294,10 @@ export function InventoryPage() {
                   <p className={styles.dialogError} role="alert">{variantsError}</p>
                 )}
 
+                {mutationError && !variantEditorMode && !variantAdjusting && (
+                  <p className={styles.dialogError} role="alert">{mutationError}</p>
+                )}
+
                 {!variantsPending && !variantsError && (
                   <>
                     {variantEditorMode && (
