@@ -310,11 +310,11 @@ export function InventoryPage() {
   const secondaryFailed = model.alerts.isError
     || model.restockSubscriptions.isError
     || model.restockNotifications.isError;
-  const alertCount = model.alerts.isError
+  const alertCount = model.alerts.isError || model.alerts.isPending
     ? null : (model.alerts.data ?? []).filter(alert => !alert.acknowledged).length;
-  const waitingCount = model.restockSubscriptions.isError
+  const waitingCount = model.restockSubscriptions.isError || model.restockSubscriptions.isPending
     ? null : (model.restockSubscriptions.data ?? []).length;
-  const notificationCount = model.restockNotifications.isError
+  const notificationCount = model.restockNotifications.isError || model.restockNotifications.isPending
     ? null : (model.restockNotifications.data ?? []).length;
   const lastPrimarySync = Math.min(model.catalog.dataUpdatedAt || 0, model.inventory.dataUpdatedAt || 0);
   const lastPrimarySyncText = lastPrimarySync > 0
@@ -1081,6 +1081,8 @@ export function InventoryPage() {
                 <div className={styles.automationList}>
                   {model.alerts.isError ? (
                     <p className={styles.automationEmpty} role="status">Alertas no disponibles. Reintenta la consulta.</p>
+                  ) : model.alerts.isPending ? (
+                    <p className={styles.automationEmpty} role="status">Consultando alertas…</p>
                   ) : (model.alerts.data ?? []).length === 0 ? (
                     <p className={styles.automationEmpty}>No hay alertas abiertas.</p>
                   ) : (
@@ -1150,6 +1152,8 @@ export function InventoryPage() {
                 <div className={styles.automationList}>
                   {model.restockSubscriptions.isError ? (
                     <p className={styles.automationEmpty} role="status">Lista de espera no disponible. Reintenta la consulta.</p>
+                  ) : model.restockSubscriptions.isPending ? (
+                    <p className={styles.automationEmpty} role="status">Consultando lista de espera…</p>
                   ) : (model.restockSubscriptions.data ?? []).length === 0 ? (
                     <p className={styles.automationEmpty}>Nadie está esperando reposición.</p>
                   ) : (
@@ -1197,6 +1201,8 @@ export function InventoryPage() {
                 <div className={styles.automationList}>
                   {model.restockNotifications.isError ? (
                     <p className={styles.automationEmpty} role="status">Avisos no disponibles. Reintenta la consulta.</p>
+                  ) : model.restockNotifications.isPending ? (
+                    <p className={styles.automationEmpty} role="status">Consultando avisos…</p>
                   ) : (model.restockNotifications.data ?? []).length === 0 ? (
                     <p className={styles.automationEmpty}>No hay avisos pendientes.</p>
                   ) : (
