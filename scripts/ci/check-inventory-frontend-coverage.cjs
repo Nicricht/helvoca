@@ -94,9 +94,17 @@ for (const wanted of expected) {
     .map(([id]) => ({ name: data.fnMap[id]?.name ?? id,
       line: data.fnMap[id]?.loc?.start?.line ?? null })).slice(0, 60);
   const uncoveredBranches = Object.entries(data.b).flatMap(([id, hits]) =>
-    hits.flatMap((count, index) => count === 0
-      ? [{ line: data.branchMap[id]?.line ?? null, index, type: data.branchMap[id]?.type ?? 'unknown' }]
-      : [])).slice(0, 100);
+    hits.flatMap((count, index) => {
+      if (count !== 0) return [];
+      const branch = data.branchMap[id];
+      const location = branch?.locations?.[index] ?? branch?.loc;
+      return [{
+        line: location?.start?.line ?? branch?.line ?? null,
+        column: location?.start?.column ?? null,
+        index,
+        type: branch?.type ?? 'unknown'
+      }];
+    })).slice(0, 100);
   if (dimensions.some(key => coverage[key] < 100)) failed = true;
   details.push({ path: wanted, ...coverage, uncoveredLines, uncoveredFunctions, uncoveredBranches });
 }
