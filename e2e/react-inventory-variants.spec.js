@@ -629,8 +629,31 @@ test.describe('React Inventory variants', () => {
     await expect(page.getByText('Solo lectura')).toBeVisible();
     await variants.getByRole('button', { name: 'Crear variante' }).click();
     await expect(variants).toBeVisible();
+    await expect(variants.getByRole('alert')).toContainText('Tus permisos cambiaron');
     expect(requests.create).toHaveLength(0);
     expect(requests.update).toHaveLength(0);
+    expect(requests.adjust).toHaveLength(0);
+  });
+
+  test('variant adjustment draft cannot write when permissions are revoked while open', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    let canWrite = true;
+    await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+      email: 'admin@demo.cl', roles: canWrite ? ['BUSINESS_ADMIN'] : ['OPERATOR']
+    })));
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId)
+      .getByRole('button', { name: 'Variantes' }).click();
+    const variants = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await variants.getByTestId('inventory-variant-' + initialVariantId)
+      .getByRole('button', { name: 'Ajustar' }).click();
+    await variants.getByLabel('Ajuste de variante').fill('2');
+    canWrite = false;
+    await page.getByRole('button', { name: 'Actualizar', exact: true })
+      .evaluate(button => button.click());
+    await expect(page.getByText('Solo lectura')).toBeVisible();
+    await variants.getByRole('button', { name: 'Aplicar ajuste de variante' }).click();
+    await expect(variants.getByRole('alert')).toContainText('Tus permisos cambiaron');
     expect(requests.adjust).toHaveLength(0);
   });
 

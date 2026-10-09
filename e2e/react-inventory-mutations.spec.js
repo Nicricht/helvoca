@@ -712,6 +712,7 @@ test.describe('React Inventory mutations', () => {
     await expect(page.getByText('Solo lectura')).toBeVisible();
     await dialog.getByRole('button', { name: 'Crear producto', exact: true }).click();
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('alert')).toContainText('Tus permisos cambiaron');
     expect(requests.createProduct).toHaveLength(0);
   });
 
@@ -733,6 +734,7 @@ test.describe('React Inventory mutations', () => {
     await expect(page.getByText('Solo lectura')).toBeVisible();
     await dialog.getByRole('button', { name: 'Guardar configuración' }).click();
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('alert')).toContainText('Tus permisos cambiaron');
     expect(requests.configure).toHaveLength(0);
     await expect(row).toContainText('Sin configurar');
   });

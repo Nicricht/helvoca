@@ -33,6 +33,7 @@ import { ProductInspector, ProductThumbnail, formatCatalogPrice } from "./Invent
 type StatusFilter = "ALL" | "TRACKED" | "LOW" | "OUT" | "RESTOCKED" | "UNCONFIGURED";
 type SortMode = "ATTENTION" | "NAME_ASC" | "AVAILABLE_ASC" | "AVAILABLE_DESC";
 const PAGE_SIZE = 8;
+const PERMISSION_CHANGE_ERROR = "Tus permisos cambiaron. Actualiza para continuar.";
 
 export interface ProductRow {
   id: string;
@@ -476,7 +477,11 @@ export function InventoryPage() {
 
   async function handleVariantEditor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!variantsTarget || !canManageVariants || !variantEditorMode || mutationLock.current) return;
+    if (!variantsTarget || !variantEditorMode || mutationLock.current) return;
+    if (!canManageVariants) {
+      setMutationError(PERMISSION_CHANGE_ERROR);
+      return;
+    }
 
     setMutationError("");
     let input;
@@ -506,7 +511,11 @@ export function InventoryPage() {
 
   async function handleVariantAdjustment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!variantsTarget || !variantAdjusting || !canManageVariants || mutationLock.current) return;
+    if (!variantsTarget || !variantAdjusting || mutationLock.current) return;
+    if (!canManageVariants) {
+      setMutationError(PERMISSION_CHANGE_ERROR);
+      return;
+    }
 
     const data = new FormData(event.currentTarget);
     const delta = Number(data.get("variantDelta"));
@@ -565,7 +574,11 @@ export function InventoryPage() {
 
   async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!model.canManageCatalog || mutationLock.current) return;
+    if (mutationLock.current) return;
+    if (!model.canManageCatalog) {
+      setMutationError(PERMISSION_CHANGE_ERROR);
+      return;
+    }
 
     const data = new FormData(event.currentTarget);
     const name = String(data.get("name") ?? "").trim();
@@ -640,7 +653,11 @@ export function InventoryPage() {
 
   async function handleConfigure(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!configureTarget || !model.canManageStock || mutationLock.current) return;
+    if (!configureTarget || mutationLock.current) return;
+    if (!model.canManageStock) {
+      setMutationError(PERMISSION_CHANGE_ERROR);
+      return;
+    }
 
     const data = new FormData(event.currentTarget);
     const onHand = numberOrNull(data.get("onHand"));
@@ -675,7 +692,11 @@ export function InventoryPage() {
 
   async function handleAdjustment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!adjustTarget || !model.canManageStock || mutationLock.current) return;
+    if (!adjustTarget || mutationLock.current) return;
+    if (!model.canManageStock) {
+      setMutationError(PERMISSION_CHANGE_ERROR);
+      return;
+    }
 
     const data = new FormData(event.currentTarget);
     const delta = Number(data.get("delta"));

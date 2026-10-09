@@ -1202,6 +1202,32 @@ test.describe('React Inventory migration', () => {
     await expect(page.getByTestId('inventory-available')).toContainText('5');
   });
 
+  test('base-stock adjustment draft cannot write when permissions are revoked after opening', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    let canWrite = true;
+    await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+      email: 'owner@negocio.cl', roles: canWrite ? ['BUSINESS_ADMIN'] : ['OPERATOR']
+    })));
+    let writes = 0;
+    await page.route('**/api/v1/inventory/prod-1/adjustments', route => {
+      writes++;
+      return route.fulfill(json({}));
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-prod-1')
+      .getByRole('button', { name: 'Ajustar stock' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Ajustar stock · Taladro percutor' });
+    await dialog.getByLabel('Ajuste').fill('2');
+    canWrite = false;
+    await page.getByRole('button', { name: 'Actualizar', exact: true })
+      .evaluate(button => button.click());
+    await expect(page.getByText('Solo lectura')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Aplicar ajuste' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('Tus permisos cambiaron');
+    expect(writes).toBe(0);
+    await expect(page.getByTestId('inventory-available')).toContainText('6');
+  });
+
   test('message-less network failures keep history and adjustments safe with plain-language fallback', async ({ page }) => {
     await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
     await page.goto('/app/inventory');
