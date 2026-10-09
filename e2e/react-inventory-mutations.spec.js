@@ -694,4 +694,48 @@ test.describe('React Inventory mutations', () => {
     expect(requests.configure).toHaveLength(0);
   });
 
+  test('catalog save cannot write after server revokes access while its editor stays open', async ({ page }) => {
+    const { requests } = await bootAdminInventory(page);
+    let canWrite = true;
+    await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+      email: 'admin@demo.cl', roles: canWrite ? ['BUSINESS_ADMIN'] : ['OPERATOR']
+    })));
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await dialog.getByLabel('Nombre').fill('No guardar sin permiso');
+    await dialog.getByLabel('Precio').fill('2700');
+    await dialog.getByLabel('Moneda').fill('CLP');
+    canWrite = false;
+    await page.getByRole('button', { name: 'Actualizar', exact: true })
+      .evaluate(button => button.click());
+    await expect(page.getByText('Solo lectura')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Crear producto', exact: true }).click();
+    await expect(dialog).toBeVisible();
+    expect(requests.createProduct).toHaveLength(0);
+  });
+
+  test('stock configuration cannot write after server revokes inventory permission mid-edit', async ({ page }) => {
+    const { productId, requests } = await bootAdminInventory(page);
+    let canWrite = true;
+    await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+      email: 'admin@demo.cl', roles: canWrite ? ['BUSINESS_ADMIN'] : ['OPERATOR']
+    })));
+    await page.goto('/app/inventory');
+    const row = page.getByTestId('inventory-row-' + productId);
+    await row.getByRole('button', { name: 'Configurar stock' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Configurar stock · Cera mate' });
+    await dialog.getByLabel('Stock físico inicial').fill('12');
+    await dialog.getByLabel('Umbral de reposición').fill('3');
+    canWrite = false;
+    await page.getByRole('button', { name: 'Actualizar', exact: true })
+      .evaluate(button => button.click());
+    await expect(page.getByText('Solo lectura')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Guardar configuración' }).click();
+    await expect(dialog).toBeVisible();
+    expect(requests.configure).toHaveLength(0);
+    await expect(row).toContainText('Sin configurar');
+  });
+
+
 });
