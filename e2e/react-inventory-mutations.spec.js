@@ -144,6 +144,69 @@ test.describe('React Inventory mutations', () => {
     await expect(page.getByTestId('inventory-products')).toContainText('2');
   });
 
+  test('guided creation saves catalog once, then independently configures stock without duplicates', async ({ page }) => {
+    const { createdProductId, requests } = await bootAdminInventory(page);
+    let createdStock = null;
+    await page.route(`**/api/v1/inventory/${createdProductId}`, async route => {
+      if (route.request().method() !== 'PUT') return route.continue();
+      const body = route.request().postDataJSON();
+      requests.configure.push(body);
+      createdStock = {
+        id: 'stock-created', catalogItemId: createdProductId, sku: body.sku,
+        trackingEnabled: body.trackingEnabled, onHand: body.onHand,
+        reserved: 0, available: body.onHand, reorderThreshold: body.reorderThreshold,
+        lowStock: body.onHand <= body.reorderThreshold
+      };
+      await route.fulfill(json(createdStock));
+    });
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const productDialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await productDialog.getByLabel('Nombre').fill('Pomada con inventario');
+    await productDialog.getByLabel('Precio').fill('9500');
+    await productDialog.getByLabel('Moneda').fill('CLP');
+    await productDialog.getByRole('button', { name: 'Crear y configurar stock' }).click();
+
+    await expect.poll(() => requests.createProduct.length).toBe(1);
+    const stockDialog = page.getByRole('dialog', { name: 'Configurar stock · Pomada con inventario' });
+    await expect(stockDialog).toBeVisible();
+    await expect(stockDialog).toContainText('Paso 2');
+    await expect(page.getByTestId(`inventory-row-${createdProductId}`)).toContainText('Sin configurar');
+    await stockDialog.getByLabel('SKU').fill('POM-9500');
+    await stockDialog.getByLabel('Stock físico inicial').fill('7');
+    await stockDialog.getByLabel('Umbral de reposición').fill('2');
+    await stockDialog.getByRole('button', { name: 'Guardar configuración' }).click();
+
+    await expect.poll(() => requests.configure.length).toBe(1);
+    expect(requests.configure[0]).toEqual({
+      sku: 'POM-9500', trackingEnabled: true,
+      onHand: 7, reorderThreshold: 2, note: null
+    });
+    expect(requests.createProduct).toHaveLength(1);
+    await expect(stockDialog).toHaveCount(0);
+  });
+
+  test('failed catalog creation never opens the stock step or silently retries', async ({ page }) => {
+    const { requests } = await bootAdminInventory(page);
+    let failedPosts = 0;
+    await page.route('**/api/v1/catalog', async route => {
+      if (route.request().method() !== 'POST') return route.continue();
+      failedPosts++;
+      return route.fulfill({ status: 500, contentType: 'application/json',
+        body: JSON.stringify({ message: 'catalog unavailable' }) });
+    });
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await dialog.getByLabel('Nombre').fill('Producto con error');
+    await dialog.getByLabel('Precio').fill('1000');
+    await dialog.getByRole('button', { name: 'Crear y configurar stock' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('El servidor no pudo guardar');
+    await expect(page.getByRole('dialog', { name: /Configurar stock/ })).toHaveCount(0);
+    expect(failedPosts).toBe(1);
+    expect(requests.createProduct).toHaveLength(0);
+  });
+
   test('admin configures an existing product and then adjusts authoritative base stock', async ({ page }) => {
     const { productId, requests } = await bootAdminInventory(page);
     await page.goto('/app/inventory');
