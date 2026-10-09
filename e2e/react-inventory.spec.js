@@ -1272,6 +1272,51 @@ test.describe('React Inventory migration', () => {
   });
 
 
+  test('array-shaped stock with null elements cannot crash or present partial stock as authoritative', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    let malformed = true;
+    await page.route('**/api/v1/inventory', route => route.fulfill(json(malformed
+      ? [null, { id: 'stock-1', catalogItemId: 'prod-1', sku: 'TAL-18V',
+        trackingEnabled: true, onHand: 8, reserved: 3, available: 5, reorderThreshold: 4 }]
+      : [{ id: 'stock-1', catalogItemId: 'prod-1', sku: 'TAL-18V',
+        trackingEnabled: true, onHand: 8, reserved: 3, available: 5, reorderThreshold: 4 }])));
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/app/inventory');
+    await expect(page.getByRole('alert')).toContainText('No pudimos cargar el inventario completo');
+    await expect(page.getByTestId('inventory-available')).toContainText('—');
+    malformed = false;
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+    await expect(page.getByTestId('inventory-row-prod-1')).toContainText('TAL-18V');
+    await expect(page.getByTestId('inventory-available')).toContainText('5');
+    expect(errors).toEqual([]);
+  });
+
+  test('array-shaped secondary queues with null entries stay unavailable until explicitly refreshed', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    let malformed = true;
+    await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json(malformed ? [null] : [])));
+    await page.route('**/api/v1/inventory/restock-subscriptions',
+      route => route.fulfill(json(malformed ? [null] : [])));
+    await page.route('**/api/v1/inventory/restock-subscriptions/notifications',
+      route => route.fulfill(json(malformed ? [null] : [])));
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/app/inventory');
+    await expect(page.getByTestId('inventory-row-prod-1')).toBeVisible();
+    const degraded = page.getByTestId('inventory-partial-error');
+    await expect(degraded).toBeVisible();
+    await expect(page.getByLabel('Resumen de reposición')).toContainText('— alertas (sin datos)');
+    await expect(page.getByText('Avisos no disponibles. Reintenta la consulta.')).toBeVisible();
+    await expect(page.getByText('Nadie está esperando reposición.')).toHaveCount(0);
+    malformed = false;
+    await degraded.getByRole('button', { name: 'Reintentar consultas' }).click();
+    await expect(degraded).toHaveCount(0);
+    await expect(page.getByLabel('Resumen de reposición')).toContainText('0 alertas');
+    await expect(page.getByText('No hay avisos pendientes.')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test('malformed catalog success response fails closed rather than rendering invented or crashed stock totals', async ({ page }) => {
     await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
     await page.route('**/api/v1/catalog', route => route.fulfill(json({ unexpected: 'object' })));

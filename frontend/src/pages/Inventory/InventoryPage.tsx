@@ -53,8 +53,16 @@ export interface ProductRow {
   restocked: boolean;
 }
 
+function isRecordList(value: unknown): boolean {
+  return Array.isArray(value) && value.every(
+    item => item !== null && typeof item === "object" && !Array.isArray(item)
+  );
+}
+
 function asList<T>(value: T[] | null | undefined): T[] {
-  return Array.isArray(value) ? value : [];
+  return Array.isArray(value)
+    ? value.filter(item => item !== null && typeof item === "object" && !Array.isArray(item))
+    : [];
 }
 
 function numberOrNull(value: unknown) {
@@ -313,14 +321,14 @@ export function InventoryPage() {
 
   const loading = model.me.isPending || model.catalog.isPending || model.inventory.isPending;
   const primaryFailed = model.catalog.isError || model.inventory.isError
-    || (model.catalog.isSuccess && !Array.isArray(model.catalog.data))
-    || (model.inventory.isSuccess && !Array.isArray(model.inventory.data));
+    || (model.catalog.isSuccess && !isRecordList(model.catalog.data))
+    || (model.inventory.isSuccess && !isRecordList(model.inventory.data));
   const alertsUnavailable = model.alerts.isError
-    || (model.alerts.isSuccess && !Array.isArray(model.alerts.data));
+    || (model.alerts.isSuccess && !isRecordList(model.alerts.data));
   const waitingUnavailable = model.restockSubscriptions.isError
-    || (model.restockSubscriptions.isSuccess && !Array.isArray(model.restockSubscriptions.data));
+    || (model.restockSubscriptions.isSuccess && !isRecordList(model.restockSubscriptions.data));
   const notificationsUnavailable = model.restockNotifications.isError
-    || (model.restockNotifications.isSuccess && !Array.isArray(model.restockNotifications.data));
+    || (model.restockNotifications.isSuccess && !isRecordList(model.restockNotifications.data));
   const secondaryFailed = alertsUnavailable || waitingUnavailable || notificationsUnavailable;
   const alertCount = alertsUnavailable || model.alerts.isPending
     ? null : (asList(model.alerts.data)).filter(alert => !alert.acknowledged).length;
