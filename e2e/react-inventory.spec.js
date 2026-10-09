@@ -1169,6 +1169,21 @@ test.describe('React Inventory migration', () => {
 
 
   
+  test('inspector remains accessible when the host app lacks the preferred portal marker', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.goto('/app/inventory');
+    await page.locator('[data-react-app="recepvoz"]')
+      .evaluate(element => element.removeAttribute('data-react-app'));
+    const trigger = page.getByTestId('inventory-row-prod-1')
+      .getByRole('button', { name: 'Ver detalles de Taladro percutor' });
+    await trigger.click();
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+    await expect(inspector).toBeVisible();
+    await expect(inspector).toContainText('Disponible');
+    await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
+    await expect(inspector).toHaveCount(0);
+  });
+
   test('availability ordering puts unknown stock last without coercing it into zero', async ({ page }) => {
     await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
     await page.route('**/api/v1/inventory', route => route.fulfill(json([
