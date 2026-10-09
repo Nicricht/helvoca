@@ -2,6 +2,10 @@ package cl.helvoca.request;
 
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
+import cl.helvoca.messaging.MessagingConversation;
+import cl.helvoca.messaging.MessagingConversationRepository;
+import cl.helvoca.messaging.MessagingMessage;
+import cl.helvoca.messaging.MessagingMessageRepository;
 import cl.helvoca.operations.BusinessOperation;
 import cl.helvoca.operations.HumanAttentionService;
 import cl.helvoca.operations.HumanHandoffService;
@@ -48,6 +52,10 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
     @Autowired HumanAttentionService attention;
     @Autowired HumanHandoffService handoffs;
     @Autowired JdbcTemplate jdbc;
+    @Autowired MessagingConversationRepository messagingConversations;
+    @Autowired MessagingMessageRepository messagingMessages;
+    @Autowired RequestReplyCorrelationService replyCorrelations;
+    @Autowired RequestReplyDeliveryEvidenceService replyReceipts;
 
     @AfterEach
     void clearAuthentication() {
@@ -169,6 +177,98 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
                 SELECT COUNT(*) FROM public.business_request_transition_event
                 WHERE business_id = ? AND request_id = ?
                 """, Integer.class, business.getId(), request.id()));
+    }
+
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional
+    void aiCreatedWhatsAppRequestHasIdempotentExactlyScopedReplyCorrelation() {
+        Business business = business("Reply correlation tenant");
+        authenticate(business.getId());
+
+        MessagingConversation conversation = new MessagingConversation();
+        conversation.setBusinessId(business.getId());
+        conversation.setChannel("whatsapp");
+        conversation.setSender("+56912345678");
+        conversation.setRecipient("+56987654321");
+        conversation = messagingConversations.saveAndFlush(conversation);
+
+        MessagingMessage inbound = new MessagingMessage();
+        inbound.setConversationId(conversation.getId());
+        inbound.setExternalMessageId("test-correlation-" + UUID.randomUUID());
+        inbound.setDirection("INBOUND");
+        inbound.setRole("USER");
+        inbound.setContent("Necesito hablar con alguien");
+        inbound.setReplyText("Tu solicitud fue registrada para seguimiento.");
+        inbound = messagingMessages.saveAndFlush(inbound);
+
+        BusinessRequest request = requests.createFromAi(
+                business.getId(), null, conversation.getId(), "GENERAL",
+                "Seguimiento requerido", "El cliente requiere atencion", null,
+                conversation.getSender(), RequestPriority.NORMAL, null, RequestSource.AI_WHATSAPP);
+        var ids = new RequestReplyCorrelationService.CreatedRequest(request.getId(), request.getOperationId());
+
+        replyCorrelations.capture(business.getId(), conversation.getId(), inbound.getId(), List.of(ids, ids));
+        replyCorrelations.capture(business.getId(), conversation.getId(), inbound.getId(), List.of(ids));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT count(*) FROM public.business_request_reply_correlation
+                 WHERE business_id = ? AND request_id = ? AND operation_id = ?
+                       AND conversation_id = ? AND inbound_message_id = ?
+                """, Integer.class, business.getId(), request.getId(), request.getOperationId(),
+                conversation.getId(), inbound.getId()));
+
+        // Even an ID from another tenant or another conversation is never accepted.
+        replyCorrelations.capture(UUID.randomUUID(), conversation.getId(), inbound.getId(), List.of(ids));
+        replyCorrelations.capture(business.getId(), UUID.randomUUID(), inbound.getId(), List.of(ids));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT count(*) FROM public.business_request_reply_correlation WHERE request_id = ?",
+                Integer.class, request.getId()));
+        // A queued or sent reply is not a confirmed customer receipt.
+        inbound.setProvider("META_WHATSAPP_CLOUD");
+        inbound.setProviderMessageId("wamid." + UUID.randomUUID());
+        inbound.setProviderDeliveryStatus("SENT");
+        messagingMessages.saveAndFlush(inbound);
+        replyReceipts.recordMetaReceipt(business.getId(), inbound.getId(),
+                inbound.getProviderMessageId(), "DELIVERED");
+        assertEquals(0, receiptCount(business.getId(), request.getId()));
+
+        // The authenticated Meta path persists the provider status first,
+        // then appends the correlated immutable receipt in the same transaction.
+        inbound.setProviderDeliveryStatus("DELIVERED");
+        inbound.setDeliveredAt(java.time.Instant.now());
+        messagingMessages.saveAndFlush(inbound);
+        replyReceipts.recordMetaReceipt(business.getId(), inbound.getId(),
+                inbound.getProviderMessageId(), "DELIVERED");
+        replyReceipts.recordMetaReceipt(business.getId(), inbound.getId(),
+                inbound.getProviderMessageId(), "DELIVERED");
+        replyReceipts.recordMetaReceipt(business.getId(), inbound.getId(),
+                "wamid.WRONG", "DELIVERED");
+        replyReceipts.recordMetaReceipt(UUID.randomUUID(), inbound.getId(),
+                inbound.getProviderMessageId(), "DELIVERED");
+        assertEquals(1, receiptCount(business.getId(), request.getId()));
+
+        // A new READ update is a new receipt kind, not resolution.
+        inbound.setProviderDeliveryStatus("READ");
+        inbound.setReadAt(java.time.Instant.now());
+        messagingMessages.saveAndFlush(inbound);
+        replyReceipts.recordMetaReceipt(business.getId(), inbound.getId(),
+                inbound.getProviderMessageId(), "READ");
+        replyReceipts.recordMetaReceipt(business.getId(), inbound.getId(),
+                inbound.getProviderMessageId(), "READ");
+        assertEquals(2, receiptCount(business.getId(), request.getId()));
+        assertEquals("OPEN", jdbc.queryForObject(
+                "SELECT status FROM public.business_request WHERE id = ?",
+                String.class, request.getId()));
+    }
+
+    private int receiptCount(UUID businessId, UUID requestId) {
+        return jdbc.queryForObject("""
+                SELECT count(*)
+                FROM public.business_request_reply_delivery_event receipt
+                JOIN public.business_request_reply_correlation corr
+                  ON corr.id = receipt.correlation_id AND corr.business_id = receipt.business_id
+                WHERE receipt.business_id = ? AND corr.request_id = ?
+                """, Integer.class, businessId, requestId);
     }
 
     private Business business(String name) {

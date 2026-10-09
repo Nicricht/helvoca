@@ -6,6 +6,7 @@ import cl.helvoca.messaging.MessagingMessage;
 import cl.helvoca.messaging.MessagingMessageRepository;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.request.RequestReplyDeliveryEvidenceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,9 @@ public class MetaWhatsAppDeliveryStatusService {
     private final MessagingConversationRepository conversations;
     private final PhoneNumberRepository phones;
     private final AuditService auditService;
+
+    @Autowired(required = false)
+    private RequestReplyDeliveryEvidenceService requestReceiptEvidence;
 
     @Autowired
     public MetaWhatsAppDeliveryStatusService(
@@ -78,6 +82,13 @@ public class MetaWhatsAppDeliveryStatusService {
             return Result.NOT_FOUND;
         }
         Result result = apply(conversationMessage, next, occurredAt, rawErrorCode);
+        if (result == Result.UPDATED && requestReceiptEvidence != null
+                && ("DELIVERED".equals(next) || "READ".equals(next))) {
+            // Only the authenticated, tenant-resolved Meta callback reaches this
+            // path. Persist the exact provider receipt in the same transaction.
+            requestReceiptEvidence.recordMetaReceipt(businessId, conversationMessage.getId(),
+                    messageId, next);
+        }
         certifyMetaSenderIfNeeded(businessId, next, occurredAt, result);
         return result;
     }
