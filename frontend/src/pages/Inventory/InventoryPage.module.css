@@ -1714,3 +1714,55 @@
     transition: none !important;
   }
 }
+
+
+/* Part 4: non-deceptive loading composition: shapes only, no pretend values. */
+.loadingCard {
+  flex-wrap: wrap;
+}
+
+.loadingSkeleton {
+  flex: 1 0 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.loadingSkeleton > span {
+  min-width: 0;
+  min-height: 78px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 13px;
+  background: linear-gradient(110deg, var(--rv-surface-2) 20%,
+    var(--rv-accent-soft) 48%, var(--rv-surface-2) 76%);
+  background-size: 220% 100%;
+  animation: inventorySkeletonSweep 2.5s ease-in-out infinite;
+}
+
+.loadingSkeleton > .loadingSkeletonTable {
+  grid-column: 1 / -1;
+  min-height: 170px;
+}
+
+@keyframes inventorySkeletonSweep {
+  0%, 100% { background-position: 100% 0; }
+  50% { background-position: 0 0; }
+}
+
+@media (max-width: 760px) {
+  .loadingSkeleton {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .loadingSkeleton > span {
+    min-height: 68px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loadingSkeleton > span {
+    animation: none !important;
+    background-position: 50% 0;
+  }
+}
