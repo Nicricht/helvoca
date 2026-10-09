@@ -5,7 +5,7 @@ const { readdirSync, readFileSync, mkdirSync, writeFileSync, existsSync } = requ
 const path = require('node:path');
 const { createCoverageMap, createCoverageSummary } = require('istanbul-lib-coverage');
 
-const rawDir = path.join(process.cwd(), 'test-results', 'inventory-coverage-raw');
+const rawDir = path.join(process.cwd(), '.inventory-coverage-raw');
 const outDir = path.join(process.cwd(), 'test-results', 'inventory-coverage');
 const expected = [
   'src/pages/Inventory/InventoryPage.tsx',
@@ -23,6 +23,9 @@ const samples = existsSync(rawDir)
 for (const filename of samples) {
   map.merge(JSON.parse(readFileSync(path.join(rawDir, filename), 'utf8')));
 }
+const unavailableSamples = existsSync(rawDir)
+  ? readdirSync(rawDir).filter(name => name.endsWith('.unavailable.json')).sort()
+  : [];
 const sources = map.files();
 const normalize = value => value.replaceAll('\\', '/').split('?')[0];
 const details = [];
@@ -57,6 +60,8 @@ for (const wanted of expected) {
 const report = {
   source: 'Istanbul-instrumented React source exercised by Playwright Chromium',
   capturedBrowserTests: samples.length,
+  unavailableBrowserTests: unavailableSamples.length,
+  totalRecordedTests: samples.length + unavailableSamples.length,
   requiredCoveragePercent: 100,
   expectedSourceFiles: expected.length,
   observedSourceFiles: details.length,
@@ -71,7 +76,9 @@ writeFileSync(path.join(outDir, 'summary.json'), JSON.stringify(report, null, 2)
 const markdown = [
   '# Inventory source coverage from browser execution',
   '',
-  'Captured browser test snapshots: ' + samples.length,
+  'Instrumented snapshots: ' + samples.length,
+  'Unavailable at teardown: ' + unavailableSamples.length,
+  'Total browser tests recorded: ' + (samples.length + unavailableSamples.length),
   '',
   '| Source | Statements | Lines | Branches | Functions |',
   '| --- | ---: | ---: | ---: | ---: |',
