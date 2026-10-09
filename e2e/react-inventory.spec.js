@@ -702,7 +702,7 @@ test.describe('React Inventory migration', () => {
     await expect(variantDialog).toHaveCount(0);
 
     await row.getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
-    inspector = page.getByRole('dialog', { name: 'Taladro percutor' });
+    inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
     await inspector.getByRole('button', { name: 'Ver historial' }).click();
     await expect(inspector).toHaveCount(0);
     const history = page.getByRole('dialog', { name: 'Historial · Taladro percutor' });
