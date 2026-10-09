@@ -611,7 +611,7 @@ test.describe('React Inventory variants', () => {
   test('message-less variant read outages remain visible and recover without inventory writes', async ({ page }) => {
     const { productId, initialVariantId, requests } = await bootVariantInventory(page);
     await page.goto('/app/inventory');
-    await page.evaluate(() => {
+    await page.evaluate(variantId => {
       const originalFetch = window.fetch.bind(window);
       let firstVariantFetch = true;
       window.fetch = (input, init) => {
@@ -620,12 +620,12 @@ test.describe('React Inventory variants', () => {
           firstVariantFetch = false;
           return Promise.reject(new Error(''));
         }
-        if (url.endsWith('/variants/' + '44444444-4444-4444-4444-444444444444' + '/movements')) {
+        if (url.endsWith('/variants/' + variantId + '/movements')) {
           return Promise.reject(new Error(''));
         }
         return originalFetch(input, init);
       };
-    });
+    }, initialVariantId);
     const row = page.getByTestId('inventory-row-' + productId);
     await row.getByRole('button', { name: 'Variantes' }).click();
     let variants = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
