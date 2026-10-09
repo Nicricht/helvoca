@@ -67,3 +67,13 @@
 - The strict CI check must remap actual Playwright Istanbul counters with `istanbul-lib-source-maps` embedded Vite `inputSourceMap` **before** per-file line/branch/function coverage is assessed. Original-source remapping is mandatory; the job fails if embedded source maps are missing or any source/metric falls below 100%.
 - The 86 Inventory tests and six required source files remain in scope, unchanged. No suppression, threshold reduction, fake mocks of counters, or production instrumentation.
 - Original-source mapped baseline must be obtained from exact final HEAD CI. Do not substitute prior generated-code percentages for the final QA claim.
+
+
+## Owner-approved one-time exception for PR #768 (2026-10-09)
+
+- **Decision:** The project owner explicitly accepts **95% coverage for this Inventory PR on this occasion**, to complete phase 2 and move into phase 3. This overrides the local Inventory gate threshold ONLY for this named PR; it does **not** revise `docs/engineering/QA_POLICY.md`, backend/database quality gates, other PRs or the repository-wide 100% target.
+- **Scope:** the same six explicitly listed Inventory original TSX/TS files, with each of statements, lines, branches and functions measured **independently per file at >=95%** after Istanbul/Vite sourcemap remapping. Aggregating high-coverage files to hide a low-coverage file is forbidden. Missing source files, absent suites, incomplete collection, archival failures, or mismatched discovered/recorded tests still fail closed.
+- **Technical restriction:** the exception activates only when the exact GitHub PR event is #768 under `Nicricht/helvoca`, on branch `feat/inventory-premium-layout-part1-20261009`, and the dedicated CI step passes its explicit opt-in marker. Anywhere else, the checker demands 100%.
+- **Test quality unchanged:** 100% of the discovered Inventory E2E tests must pass, as must Fast Gate, full backend/Playwright gate and real-stack system integration; no known application regression, permission bypass, invented data, or unmocked HTTP 501 can be accepted. In particular, the existing-variant adjustment fixture is now routed properly and asserts `note: null` with an actual intercepted POST.
+- **Disclosure:** This PR must **not** claim 100% coverage, full compliance with the repository-wide baseline, or globally completed Helvoca quality. Document the measured per-file coverage and uncovered branches in the final certification comment.
+- **Phase 3 entry:** permitted only after successful exact-HEAD CI under this explicitly approved one-time 95% exception. Production merge/deployment still requires independent final release inspection and explicit recording of any remaining risk.

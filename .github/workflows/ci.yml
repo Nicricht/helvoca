@@ -297,7 +297,9 @@ jobs:
         env:
           VITE_COVERAGE: "true"
         run: npx playwright test e2e/react-inventory*.spec.js
-      - name: Require 100 percent per affected Inventory source file
+      - name: Require affected Inventory original-source coverage (100% default; explicit PR 768 exception)
+        env:
+          INVENTORY_PR768_COVERAGE_EXCEPTION: "approved-95pct"
         run: node scripts/ci/check-inventory-frontend-coverage.cjs
       - name: Upload measured frontend coverage and diagnostics
         if: always()

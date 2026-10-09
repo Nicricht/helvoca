@@ -102,16 +102,20 @@ async function bootVariantInventory(page, roles = ['BUSINESS_ADMIN'], permission
     return route.fulfill(json(variants.find(variant => variant.id === createdVariantId)));
   });
 
-  await page.route(`**/api/v1/inventory/${productId}/variants/${createdVariantId}/adjustments`, async route => {
-    const body = route.request().postDataJSON();
-    requests.adjust.push(body);
-    variants = variants.map(variant =>
-      variant.id === createdVariantId
-        ? { ...variant, onHand: variant.onHand + body.delta, available: variant.available + body.delta }
-        : variant
-    );
-    return route.fulfill(json(variants.find(variant => variant.id === createdVariantId)));
-  });
+  // Exercise the same authoritative adjustment contract for pre-existing AND newly created variants.
+  // An unmocked POST to the static fixture server would return HTTP 501 and conceal what the browser actually sent.
+  for (const variantId of [initialVariantId, createdVariantId]) {
+    await page.route(`**/api/v1/inventory/${productId}/variants/${variantId}/adjustments`, async route => {
+      const body = route.request().postDataJSON();
+      requests.adjust.push(body);
+      variants = variants.map(variant =>
+        variant.id === variantId
+          ? { ...variant, onHand: variant.onHand + body.delta, available: variant.available + body.delta }
+          : variant
+      );
+      return route.fulfill(json(variants.find(variant => variant.id === variantId)));
+    });
+  }
 
   await page.route(`**/api/v1/inventory/${productId}/variants/${createdVariantId}`, async route => {
     if (route.request().method() !== 'PUT') return route.continue();

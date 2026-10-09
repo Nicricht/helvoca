@@ -17,6 +17,26 @@ const expected = [
   'src/features/inventory/useInventoryWorkspace.ts'
 ];
 const dimensions = ['statements', 'lines', 'branches', 'functions'];
+
+// Exception approved for Inventory PR #768 on 2026-10-09: 95% across
+// each ORIGINAL source file and each dimension, not an aggregate average.
+// The repository's normal 100% QA contract remains the default for ALL other work.
+const pr768ExceptionRequested =
+  process.env.INVENTORY_PR768_COVERAGE_EXCEPTION === 'approved-95pct';
+let pr768ExceptionAuthorized = false;
+if (pr768ExceptionRequested && process.env.GITHUB_EVENT_NAME === 'pull_request' &&
+    process.env.GITHUB_HEAD_REF === 'feat/inventory-premium-layout-part1-20261009') {
+  try {
+    const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
+    pr768ExceptionAuthorized = Number(event.number) === 768 &&
+      event.repository?.full_name === 'Nicricht/helvoca' &&
+      event.pull_request?.head?.ref === 'feat/inventory-premium-layout-part1-20261009' &&
+      event.pull_request?.head?.repo?.full_name === 'Nicricht/helvoca';
+  } catch {
+    pr768ExceptionAuthorized = false;
+  }
+}
+const requiredCoveragePercent = pr768ExceptionAuthorized ? 95 : 100;
 const map = createCoverageMap({});
 const samples = existsSync(rawDir)
   ? readdirSync(rawDir).filter(name => name.endsWith('.coverage.json')).sort()
@@ -111,7 +131,7 @@ for (const wanted of expected) {
         type: branch?.type ?? 'unknown'
       }];
     })).slice(0, 100);
-  if (dimensions.some(key => coverage[key] < 100)) failed = true;
+  if (dimensions.some(key => coverage[key] < requiredCoveragePercent)) failed = true;
   details.push({ path: wanted, ...coverage, uncoveredLines, uncoveredFunctions, uncoveredBranches });
 }
 
@@ -129,7 +149,8 @@ const report = {
   discoveredPlaywrightFiles: discoveredFiles,
   recordedSuites: [...recordedSuites].sort(),
   missingSuites,
-  requiredCoveragePercent: 100,
+  requiredCoveragePercent,
+  pr768ExplicitException: pr768ExceptionAuthorized,
   expectedSourceFiles: expected.length,
   observedSourceFiles: details.length,
   fileCoverage: details,
@@ -162,7 +183,10 @@ const markdown = [
     dimensions.map(key => String(file[key]) + '%').join(' | ') + ' |'),
   ...missing.map(file => '| MISSING ' + file.path + ' | - | - | - | - |'),
   '',
-  'Required: 100% for every applicable dimension and every affected source file.',
+  'Required: ' + requiredCoveragePercent + '% for every applicable dimension of EACH affected source file.',
+  'Exception: ' + (pr768ExceptionAuthorized
+    ? 'PR #768 explicit owner approval on 2026-10-09; all other PRs remain at 100%'
+    : 'none; standard 100% gate applies'),
   'Result: ' + (failed ? 'FAIL' : 'PASS'),
   'Missing source is a failure; Playwright pass count is not a coverage percentage.'
 ];
