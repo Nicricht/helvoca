@@ -161,6 +161,30 @@ test.describe('React Inventory migration', () => {
     await expect(page.getByTestId('inventory-row-prod-2')).toContainText('Stock bajo');
   });
 
+  test('distinguishes an unconfigured product from exhausted stock in the compact header', async ({ page }) => {
+    await bootInventory(page);
+    await page.route('**/api/v1/inventory', route => route.fulfill(json([{
+      id: 'stock-1',
+      catalogItemId: 'prod-1',
+      sku: 'TAL-18V',
+      trackingEnabled: true,
+      onHand: 8,
+      reserved: 3,
+      available: 5,
+      reorderThreshold: 4,
+      lowStock: false
+    }])));
+    await page.goto('/app/inventory');
+    const intro = page.getByTestId('inventory-intro');
+    await expect(intro).toContainText('1 de 2 productos con stock controlado');
+    await expect(intro.locator('[data-tone="warning"]')).toHaveCount(1);
+    await expect(page.getByTestId('inventory-available')).toContainText('5');
+    await expect(page.getByRole('button', { name: 'Ver sin configurar' })).toBeVisible();
+    await page.getByRole('button', { name: 'Ver sin configurar' }).click();
+    await expect(page.getByTestId('inventory-row-prod-2')).toContainText('Sin configurar');
+    await expect(page.getByTestId('inventory-row-prod-1')).toHaveCount(0);
+  });
+
   test('preserves the compact lead, all four metrics and no page overflow on a mobile viewport', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await bootInventory(page);
