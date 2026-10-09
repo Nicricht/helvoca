@@ -1307,6 +1307,49 @@ test.describe('React Inventory migration', () => {
   });
 
 
+  test('ascending availability ordering keeps an unknown first record last without treating it as zero', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.route('**/api/v1/catalog', route => route.fulfill(json([
+      { id: 'prod-2', kind: 'PRODUCT', name: 'Broca metal 8 mm',
+        price: 4990, currency: 'CLP', active: true },
+      { id: 'prod-1', kind: 'PRODUCT', name: 'Taladro percutor',
+        price: 54990, currency: 'CLP', active: true }
+    ])));
+    await page.route('**/api/v1/inventory', route => route.fulfill(json([
+      { id: 'stock-1', catalogItemId: 'prod-1', sku: 'TAL-18V',
+        trackingEnabled: true, onHand: 8, reserved: 3, available: 5,
+        reorderThreshold: 4, lowStock: false }
+    ])));
+    await page.goto('/app/inventory');
+    const rows = page.locator('tbody tr[data-testid^="inventory-row-"]');
+    await expect(rows).toHaveCount(2);
+    await page.getByLabel('Orden').selectOption('AVAILABLE_ASC');
+    await expect(rows.first()).toHaveAttribute('data-testid', 'inventory-row-prod-1');
+    await expect(rows.last()).toHaveAttribute('data-testid', 'inventory-row-prod-2');
+    await expect(page.getByTestId('inventory-row-prod-2')).toContainText('Sin configurar');
+  });
+
+  test('legacy product with blank name has a safe edit heading without persisting a phantom name', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.route('**/api/v1/catalog', route => route.fulfill(json([
+      { id: 'prod-1', kind: 'PRODUCT', name: '', description: null,
+        price: 54990, currency: 'CLP', active: true }
+    ])));
+    const writes = [];
+    page.on('request', request => {
+      if (request.method() === 'PUT' && request.url().includes('/api/v1/catalog/')) {
+        writes.push(request.url());
+      }
+    });
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Editar producto Producto' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Editar producto · Producto' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel('Nombre')).toBeEmpty();
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    expect(writes).toEqual([]);
+  });
+
   test('array-shaped stock with null elements cannot crash or present partial stock as authoritative', async ({ page }) => {
     await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
     let malformed = true;

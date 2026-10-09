@@ -657,6 +657,30 @@ test.describe('React Inventory variants', () => {
     expect(requests.adjust).toHaveLength(0);
   });
 
+  test('missing optional variant notes remain null on create and manual adjustment', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId)
+      .getByRole('button', { name: 'Variantes' }).click();
+    const variants = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await variants.getByRole('button', { name: 'Nueva variante' }).click();
+    await variants.getByLabel('Nombre de variante').fill('Azul sin nota');
+    await variants.getByLabel('SKU de variante').fill('NO-NOTE');
+    await variants.getByLabel('Stock físico inicial').fill('4');
+    await variants.getByLabel('Umbral de reposición').fill('2');
+    await variants.locator('[name="variantNote"]').evaluate(element => element.remove());
+    await variants.getByRole('button', { name: 'Crear variante' }).click();
+    await expect.poll(() => requests.create.length).toBe(1);
+    expect(requests.create[0].note).toBeNull();
+    const initial = variants.getByTestId('inventory-variant-' + initialVariantId);
+    await initial.getByRole('button', { name: 'Ajustar' }).click();
+    await variants.getByLabel('Ajuste de variante').fill('1');
+    await variants.locator('[name="variantAdjustmentNote"]').evaluate(element => element.remove());
+    await variants.getByRole('button', { name: 'Aplicar ajuste de variante' }).click();
+    await expect.poll(() => requests.adjust.length).toBe(1);
+    expect(requests.adjust[0]).toEqual({ delta: 1, note: null });
+  });
+
   test('message-less variant read outages remain visible and recover without inventory writes', async ({ page }) => {
     const { productId, initialVariantId, requests } = await bootVariantInventory(page);
     await page.goto('/app/inventory');
