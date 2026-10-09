@@ -436,4 +436,54 @@ test.describe('React Inventory mutations', () => {
   });
 
 
+
+  test('tampered catalog form rejects blank names and nonnumeric prices without sending a create request', async ({ page }) => {
+    const { requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await dialog.locator('form').evaluate(form => { form.noValidate = true; });
+    await dialog.getByLabel('Nombre').fill('   ');
+    await dialog.getByLabel('Precio').fill('1200');
+    await dialog.getByLabel('Moneda').fill('CLP');
+    await dialog.getByRole('button', { name: 'Crear producto', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toContainText('Escribe un nombre');
+    expect(requests.createProduct).toHaveLength(0);
+
+    await dialog.getByLabel('Nombre').fill('Artículo verificado');
+    await dialog.locator('[name="price"]').evaluate(input => { input.type = 'text'; });
+    await dialog.getByLabel('Precio').fill('not-a-price');
+    await dialog.getByRole('button', { name: 'Crear producto', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toContainText('El precio debe ser un número');
+    await expect(dialog).toBeVisible();
+    expect(requests.createProduct).toHaveLength(0);
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+  });
+
+  test('tampered physical stock form rejects negative and fractional quantities before any PUT', async ({ page }) => {
+    const { productId, requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+    const row = page.getByTestId('inventory-row-' + productId);
+    await row.getByRole('button', { name: 'Configurar stock' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Configurar stock · Cera mate' });
+    await dialog.locator('form').evaluate(form => {
+      form.noValidate = true;
+      form.querySelector('[name="onHand"]').type = 'text';
+      form.querySelector('[name="reorderThreshold"]').type = 'text';
+    });
+    await dialog.getByLabel('Stock físico inicial').fill('-5');
+    await dialog.getByLabel('Umbral de reposición').fill('2');
+    await dialog.getByRole('button', { name: 'Guardar configuración' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('enteros iguales o mayores que cero');
+    expect(requests.configure).toHaveLength(0);
+
+    await dialog.getByLabel('Stock físico inicial').fill('5');
+    await dialog.getByLabel('Umbral de reposición').fill('1.25');
+    await dialog.getByRole('button', { name: 'Guardar configuración' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('enteros iguales o mayores que cero');
+    await expect(dialog).toBeVisible();
+    await expect(row).toContainText('Sin configurar');
+    expect(requests.configure).toHaveLength(0);
+  });
+
 });
