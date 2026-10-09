@@ -64,6 +64,11 @@ async function bootInventory(page, options = {}) {
     ]));
   });
 
+  await page.route('**/api/v1/catalog/*/media', route => {
+    const id = route.request().url().split('/').at(-2);
+    return route.fulfill(json(options.mediaByProduct?.[id] ?? []));
+  });
+
   await page.route('**/api/v1/inventory', route => route.fulfill(json([
     {
       id: 'stock-1',
