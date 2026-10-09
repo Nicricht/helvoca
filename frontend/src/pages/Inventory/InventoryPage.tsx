@@ -310,6 +310,16 @@ export function InventoryPage() {
   const secondaryFailed = model.alerts.isError
     || model.restockSubscriptions.isError
     || model.restockNotifications.isError;
+  const alertCount = model.alerts.isError
+    ? null : (model.alerts.data ?? []).filter(alert => !alert.acknowledged).length;
+  const waitingCount = model.restockSubscriptions.isError
+    ? null : (model.restockSubscriptions.data ?? []).length;
+  const notificationCount = model.restockNotifications.isError
+    ? null : (model.restockNotifications.data ?? []).length;
+  const lastPrimarySync = Math.min(model.catalog.dataUpdatedAt || 0, model.inventory.dataUpdatedAt || 0);
+  const lastPrimarySyncText = lastPrimarySync > 0
+    ? new Date(lastPrimarySync).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })
+    : "No disponible";
   const businessName = model.business.data?.name?.trim();
   const roleLabel = model.canManage ? "Gestión habilitada" : "Solo lectura";
   const roles = model.me.data?.roles ?? [];
@@ -787,9 +797,16 @@ export function InventoryPage() {
         </section>
 
         {secondaryFailed && (
-          <p className={styles.partialNotice} role="status">
-            El stock está disponible, pero una fuente secundaria de alertas o reposición no respondió.
-          </p>
+          <div className={styles.partialNotice} role="status" data-testid="inventory-partial-error">
+            <span>
+              El stock principal está disponible, pero no se pudieron consultar algunos datos de alertas o reposición.
+              Los valores no disponibles se muestran como «—», nunca como cero.
+            </span>
+            <button className="button secondary" type="button" disabled={refreshPending}
+              onClick={() => void refreshWorkspace()}>
+              {refreshPending ? "Reintentando…" : "Reintentar consultas"}
+            </button>
+          </div>
         )}
 
         {rows.some(row => !row.configured) && (
@@ -820,6 +837,9 @@ export function InventoryPage() {
               <p>El stock disponible siempre viene del backend. La búsqueda y los filtros solo cambian esta vista.</p>
             </div>
             <div className={styles.workspaceActions}>
+              <span className={styles.lastSync} data-testid="inventory-last-sync">
+                Última consulta de catálogo y stock: {lastPrimarySyncText}
+              </span>
               <div className={styles.workspaceButtonRow}>
                 {model.canManageCatalog && (
                   <>
@@ -843,14 +863,15 @@ export function InventoryPage() {
                   className="button ghost"
                   type="button"
                   disabled={refreshPending}
+                  aria-busy={refreshPending}
                   onClick={() => void refreshWorkspace()}
                 >
                   {refreshPending ? "Actualizando…" : "Actualizar"}
                 </button>
               </div>
               <div className={styles.queueSummary} aria-label="Resumen de reposición">
-                <span>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length} alertas</span>
-                <span>{(model.restockSubscriptions.data ?? []).length} esperando reposición</span>
+                <span>{alertCount === null ? "— alertas (sin datos)" : `${alertCount} alertas`}</span>
+                <span>{waitingCount === null ? "— esperando (sin datos)" : `${waitingCount} esperando reposición`}</span>
               </div>
             </div>
           </div>
@@ -1036,11 +1057,9 @@ export function InventoryPage() {
                 </p>
               </div>
               <div className={styles.automationSummary}>
-                <span>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length} alertas pendientes</span>
-                <span>{(model.restockSubscriptions.data ?? []).length} esperando reposición</span>
-                <span>
-                  {(model.restockNotifications.data ?? []).length} {(model.restockNotifications.data ?? []).length === 1 ? "aviso listo" : "avisos listos"}
-                </span>
+                <span>{alertCount === null ? "— alertas (sin datos)" : `${alertCount} alertas pendientes`}</span>
+                <span>{waitingCount === null ? "— esperando (sin datos)" : `${waitingCount} esperando reposición`}</span>
+                <span>{notificationCount === null ? "— avisos (sin datos)" : `${notificationCount} ${notificationCount === 1 ? "aviso listo" : "avisos listos"}`}</span>
               </div>
             </div>
 
@@ -1056,11 +1075,13 @@ export function InventoryPage() {
                     <span className={styles.dialogEyebrow}>Stock</span>
                     <h3 id="inventoryAlertsTitle">Alertas</h3>
                   </div>
-                  <strong>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length}</strong>
+                  <strong>{alertCount ?? "—"}</strong>
                 </div>
 
                 <div className={styles.automationList}>
-                  {(model.alerts.data ?? []).length === 0 ? (
+                  {model.alerts.isError ? (
+                    <p className={styles.automationEmpty} role="status">Alertas no disponibles. Reintenta la consulta.</p>
+                  ) : (model.alerts.data ?? []).length === 0 ? (
                     <p className={styles.automationEmpty}>No hay alertas abiertas.</p>
                   ) : (
                     (model.alerts.data ?? []).map(alert => (
@@ -1123,11 +1144,13 @@ export function InventoryPage() {
                     <span className={styles.dialogEyebrow}>Clientes</span>
                     <h3 id="restockWaitingTitle">Esperando reposición</h3>
                   </div>
-                  <strong>{(model.restockSubscriptions.data ?? []).length}</strong>
+                  <strong>{waitingCount ?? "—"}</strong>
                 </div>
 
                 <div className={styles.automationList}>
-                  {(model.restockSubscriptions.data ?? []).length === 0 ? (
+                  {model.restockSubscriptions.isError ? (
+                    <p className={styles.automationEmpty} role="status">Lista de espera no disponible. Reintenta la consulta.</p>
+                  ) : (model.restockSubscriptions.data ?? []).length === 0 ? (
                     <p className={styles.automationEmpty}>Nadie está esperando reposición.</p>
                   ) : (
                     (model.restockSubscriptions.data ?? []).map(subscription => (
@@ -1168,11 +1191,13 @@ export function InventoryPage() {
                     <span className={styles.dialogEyebrow}>Avisos</span>
                     <h3 id="restockNotificationsTitle">Listos para enviar</h3>
                   </div>
-                  <strong>{(model.restockNotifications.data ?? []).length}</strong>
+                  <strong>{notificationCount ?? "—"}</strong>
                 </div>
 
                 <div className={styles.automationList}>
-                  {(model.restockNotifications.data ?? []).length === 0 ? (
+                  {model.restockNotifications.isError ? (
+                    <p className={styles.automationEmpty} role="status">Avisos no disponibles. Reintenta la consulta.</p>
+                  ) : (model.restockNotifications.data ?? []).length === 0 ? (
                     <p className={styles.automationEmpty}>No hay avisos pendientes.</p>
                   ) : (
                     (model.restockNotifications.data ?? []).map(notification => (
