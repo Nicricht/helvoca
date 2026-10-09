@@ -163,6 +163,14 @@
   gap: 10px;
 }
 
+.workspaceButtonRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
 .queueSummary {
   flex: 0 0 auto;
   display: flex;
@@ -951,18 +959,29 @@
   isolation: isolate;
 }
 
+/* Only the Inventory editable slots change. Shell/frame tokens stay untouched. */
+.inventoryLead {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, .85fr) minmax(440px, 1fr);
+  align-items: stretch;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+
 .visualHero {
   position: relative;
-  min-height: 315px;
+  min-height: 158px;
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(390px, .95fr);
+  grid-template-columns: minmax(0, 1fr) minmax(120px, .45fr);
   align-items: center;
-  gap: 20px;
-  margin-bottom: 14px;
-  padding: clamp(26px, 3vw, 42px);
+  gap: 8px;
+  margin: 0;
+  padding: 14px 18px;
   overflow: hidden;
   border: 1px solid rgba(66,154,213,.29);
-  border-radius: 24px;
+  border-radius: 18px;
   background:
     radial-gradient(circle at 80% 35%, rgba(24,210,255,.14), transparent 28%),
     radial-gradient(circle at 91% 80%, rgba(78,222,164,.08), transparent 30%),
@@ -993,7 +1012,7 @@
 }
 
 .visualHeroKicker {
-  min-height: 28px;
+  min-height: 22px;
   display: inline-flex;
   align-items: center;
   padding: 0 11px;
@@ -1006,16 +1025,17 @@
   letter-spacing: .13em;
 }
 
-.visualHeroCopy h2 {
-  max-width: 730px;
-  margin: 13px 0 0;
-  color: #f5fbff;
-  font-size: clamp(35px,3.6vw,55px);
-  line-height: .98;
-  letter-spacing: -.052em;
+.visualHeroCopy .visualHeroHeadline {
+  max-width: 500px;
+  margin: 7px 0 0;
+  color: var(--rv-text-primary);
+  font-size: clamp(19px, 1.7vw, 24px);
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -.035em;
 }
 
-.visualHeroCopy h2 span {
+.visualHeroHeadline span {
   background: linear-gradient(90deg,#40e7ff,#62d7c1 52%,#9d82ff);
   -webkit-background-clip: text;
   background-clip: text;
@@ -1023,23 +1043,23 @@
   -webkit-text-fill-color: transparent;
 }
 
-.visualHeroCopy p {
-  max-width: 630px;
-  margin: 13px 0 0;
-  color: #9eb5c7;
-  font-size: 13px;
-  line-height: 1.55;
+.visualHeroCopy > p:not(.visualHeroHeadline) {
+  max-width: 500px;
+  margin: 7px 0 0;
+  color: var(--rv-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .visualHeroSignals {
   display: flex;
   flex-wrap: wrap;
-  gap: 9px;
-  margin-top: 21px;
+  gap: 8px;
+  margin-top: 9px;
 }
 
 .visualHeroSignals span {
-  min-height: 35px;
+  min-height: 25px;
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -1074,15 +1094,15 @@
 .visualHeroArt {
   position: relative;
   z-index: 2;
-  min-height: 245px;
+  min-height: 126px;
   display: grid;
   place-items: center;
 }
 
 .visualHeroOrbit {
   position: absolute;
-  width: 292px;
-  height: 292px;
+  width: 136px;
+  height: 136px;
   border: 1px solid rgba(66,220,255,.11);
   border-radius: 50%;
   box-shadow:
@@ -1094,8 +1114,8 @@
 .visualHeroRobot {
   position: relative;
   z-index: 3;
-  width: min(420px,100%);
-  max-height: 294px;
+  width: min(164px,100%);
+  max-height: 147px;
   object-fit: contain;
   filter:
     drop-shadow(0 24px 40px rgba(0,0,0,.36))
@@ -1107,7 +1127,7 @@
 .visualWarning {
   position: absolute;
   z-index: 4;
-  width: 96px;
+  width: 48px;
   object-fit: contain;
   filter:
     drop-shadow(0 14px 22px rgba(0,0,0,.35))
@@ -1277,40 +1297,69 @@
 }
 
 @media (max-width: 980px) {
-  .visualHero {
-    grid-template-columns: minmax(0,1fr) minmax(290px,.82fr);
+  .inventoryLead {
+    grid-template-columns: 1fr;
   }
 
-  .visualHeroCopy h2 {
-    font-size: clamp(32px,5vw,46px);
+  .visualHero {
+    grid-template-columns: minmax(0, 1fr) minmax(120px, .25fr);
   }
 }
 
 @media (max-width: 760px) {
-  .visualHero {
-    grid-template-columns: 1fr;
+  .workspaceButtonRow {
+    justify-content: flex-start;
   }
 
   .visualHeroArt {
-    min-height: 230px;
+    min-height: 112px;
   }
-
-  .visualHealthy { left: 7%; }
-  .visualWarning { right: 6%; }
 }
 
 @media (max-width: 620px) {
   .visualHero {
-    padding: 20px 17px;
-    border-radius: 19px;
+    padding: 13px 14px;
+    border-radius: 16px;
+    grid-template-columns: minmax(0, 1fr) 94px;
   }
 
-  .visualHeroCopy h2 {
-    font-size: clamp(31px,10vw,42px);
+  .visualHeroCopy .visualHeroHeadline {
+    font-size: 18px;
+  }
+
+  .visualHeroArt {
+    min-height: 100px;
+  }
+
+  .visualHeroRobot {
+    max-height: 104px;
+  }
+
+  .visualHeroOrbit {
+    width: 94px;
+    height: 94px;
+  }
+
+  .visualHealthy,
+  .visualWarning {
+    width: 34px;
   }
 
   .visualHeroSignals {
-    display: grid;
+    display: flex;
+  }
+
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summaryCard {
+    min-height: 108px;
+    padding: 12px;
+  }
+
+  .workspaceButtonRow {
+    width: 100%;
   }
 }
 
@@ -1331,5 +1380,389 @@
   .table tbody tr,
   .automationCard {
     transition-duration: .01ms !important;
+  }
+}
+
+
+/* Inventory Part 2: table-first hierarchy, scoped to editable product slots. */
+.productIdentity {
+  display: flex;
+  align-items: center;
+  min-width: 220px;
+  gap: 11px;
+}
+
+.productThumbnail,
+.productThumbnailLarge {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--rv-border-default);
+  color: var(--rv-accent);
+  background: var(--rv-surface-2);
+  border-radius: 11px;
+}
+
+.productThumbnail {
+  width: 44px;
+  height: 44px;
+}
+
+.productThumbnailLarge {
+  width: 92px;
+  height: 92px;
+  border-radius: 18px;
+}
+
+.productThumbnail img,
+.productThumbnailLarge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.productPrice {
+  color: var(--rv-text-primary) !important;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.productInspectLink {
+  display: inline-flex;
+  align-self: flex-start;
+  width: fit-content;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--rv-accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.productInspectLink:hover {
+  text-decoration: underline;
+}
+
+.productInspectLink:focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 3px;
+}
+
+.productPagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 18px;
+  border-top: 1px solid var(--rv-border-subtle);
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+}
+
+.productPagination > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.productPagination :global(.button) {
+  min-height: 34px;
+  padding: 5px 11px;
+  font-size: 12px;
+}
+
+.productInspector {
+  width: min(560px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+  border: 1px solid var(--rv-border-default);
+  border-radius: var(--rv-radius-xl);
+  background: var(--rv-bg-canvas);
+  box-shadow: var(--rv-shadow-lg);
+}
+
+.inspectorBody {
+  padding: 20px;
+  display: grid;
+  gap: 17px;
+}
+
+.inspectorOverview {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  min-width: 0;
+}
+
+.inspectorOverviewText {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+}
+
+.inspectorOverviewText strong {
+  color: var(--rv-text-primary);
+  font-size: 21px;
+}
+
+.inspectorOverviewText p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.inspectorMetrics {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 9px;
+}
+
+.inspectorMetrics div {
+  padding: 13px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 11px;
+  background: var(--rv-surface-1);
+}
+
+.inspectorMetrics dt {
+  font-size: 12px;
+  color: var(--rv-text-secondary);
+}
+
+.inspectorMetrics dd {
+  margin: 5px 0 0;
+  color: var(--rv-text-primary);
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.inspectorActions {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 620px) {
+  .productPagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .productPagination > div {
+    justify-content: flex-start;
+  }
+  .productInspector {
+    max-height: calc(100vh - 24px);
+  }
+  .inspectorBody {
+    padding: 14px;
+  }
+  .inspectorOverview {
+    align-items: flex-start;
+  }
+}
+
+/* Part 3: customer-facing variant characteristics (no raw JSON input). */
+.variantOptions {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 15px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 13px;
+  background: var(--rv-surface-1);
+}
+
+.variantOptions legend {
+  padding: 0 5px;
+  color: var(--rv-text-primary);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.variantOptions > .dialogHint {
+  margin: 0 0 4px;
+}
+
+.variantOptionRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.variantOptionRow > :global(.button) {
+  min-height: 40px;
+}
+
+.variantOptionProtected {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--rv-border-default);
+  border-radius: 10px;
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+}
+
+.variantOptionProtected strong {
+  color: var(--rv-text-primary);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 620px) {
+  .variantOptionRow {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .variantOptionRow > :global(.button) {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+
+/* Part 4: deliberate micro-interactions and resilient data-state presentation.
+ * These styles belong only to Inventory editable slots (FRAME CHANGE: NO). */
+.lastSync {
+  color: var(--rv-text-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.partialNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.partialNotice > span {
+  flex: 1 1 320px;
+  line-height: 1.5;
+}
+
+.partialNotice :global(.button) {
+  flex: 0 0 auto;
+}
+
+.productThumbnail,
+.productThumbnailLarge {
+  transition: border-color var(--rv-motion-fast) ease,
+    box-shadow var(--rv-motion-fast) ease;
+}
+
+.productIdentity:hover .productThumbnail,
+.productIdentity:focus-within .productThumbnail {
+  border-color: var(--rv-accent-border);
+  box-shadow: 0 0 0 2px var(--rv-accent-soft);
+}
+
+.productInspectLink,
+.inspectorActions :global(.button) {
+  transition: color var(--rv-motion-fast) ease,
+    opacity var(--rv-motion-fast) ease;
+}
+
+.productInspector {
+  animation: inventoryDialogIn var(--rv-motion-medium) var(--rv-ease-out) both;
+}
+
+.productInspector :global(.button:focus-visible),
+.productPagination :global(.button:focus-visible),
+.variantOptions :global(.button:focus-visible) {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 760px) {
+  .lastSync {
+    text-align: left;
+  }
+}
+
+@media (hover: none) {
+  .summaryCard:hover,
+  .automationCard:hover,
+  .table tbody tr:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .productInspector {
+    animation: none !important;
+  }
+
+  .productThumbnail,
+  .productThumbnailLarge,
+  .productInspectLink,
+  .inspectorActions :global(.button) {
+    transition: none !important;
+  }
+}
+
+
+/* Part 4: non-deceptive loading composition: shapes only, no pretend values. */
+.loadingCard {
+  flex-wrap: wrap;
+}
+
+.loadingSkeleton {
+  flex: 1 0 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.loadingSkeleton > span {
+  min-width: 0;
+  min-height: 78px;
+  border: 1px solid var(--rv-border-subtle);
+  border-radius: 13px;
+  background: linear-gradient(110deg, var(--rv-surface-2) 20%,
+    var(--rv-accent-soft) 48%, var(--rv-surface-2) 76%);
+  background-size: 220% 100%;
+  animation: inventorySkeletonSweep 2.5s ease-in-out infinite;
+}
+
+.loadingSkeleton > .loadingSkeletonTable {
+  grid-column: 1 / -1;
+  min-height: 170px;
+}
+
+@keyframes inventorySkeletonSweep {
+  0%, 100% { background-position: 100% 0; }
+  50% { background-position: 0 0; }
+}
+
+@media (max-width: 760px) {
+  .loadingSkeleton {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .loadingSkeleton > span {
+    min-height: 68px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loadingSkeleton > span {
+    animation: none !important;
+    background-position: 50% 0;
   }
 }

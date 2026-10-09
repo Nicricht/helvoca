@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Boxes, PackageCheck, PackageOpen, Search } from "lucide-react";
 import { ApiError } from "../../api/client";
 import { AppShell } from "../../components/AppShell/AppShell";
@@ -25,14 +26,21 @@ import {
   type InventoryVariantMovement
 } from "../../features/inventory/api";
 import styles from "./InventoryPage.module.css";
+import { InventoryIntro } from "./InventoryIntro";
+import { VariantOptionsEditor, serializeVariantOptions } from "./VariantOptionsEditor";
+import { ProductInspector, ProductThumbnail, formatCatalogPrice } from "./InventoryProductPresentation";
 
 type StatusFilter = "ALL" | "TRACKED" | "LOW" | "OUT" | "RESTOCKED" | "UNCONFIGURED";
 type SortMode = "ATTENTION" | "NAME_ASC" | "AVAILABLE_ASC" | "AVAILABLE_DESC";
+const PAGE_SIZE = 8;
+const PERMISSION_CHANGE_ERROR = "Tus permisos cambiaron. Actualiza para continuar.";
 
-interface ProductRow {
+export interface ProductRow {
   id: string;
   name: string;
   description: string;
+  price: number | null;
+  currency: string;
   sku: string;
   configured: boolean;
   trackingEnabled: boolean;
@@ -45,8 +53,20 @@ interface ProductRow {
   restocked: boolean;
 }
 
+function isRecordList(value: unknown): boolean {
+  return Array.isArray(value) && value.every(
+    item => item !== null && typeof item === "object" && !Array.isArray(item)
+  );
+}
+
+function asList<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value)
+    ? value.filter(item => item !== null && typeof item === "object" && !Array.isArray(item))
+    : [];
+}
+
 function numberOrNull(value: unknown) {
-  if (value === null || value === undefined || value === "") return null;
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -75,6 +95,8 @@ function buildRows(catalog: CatalogItem[], inventory: InventoryStock[], alerts: 
         id: String(item.id),
         name: String(item.name || "Producto"),
         description: String(item.description || ""),
+        price: numberOrNull(item.price),
+        currency: String(item.currency || "CLP"),
         sku: String(stock?.sku || ""),
         configured: Boolean(stock),
         trackingEnabled,
@@ -200,6 +222,8 @@ export function InventoryPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("ALL");
   const [sort, setSort] = useState<SortMode>("ATTENTION");
+  const [page, setPage] = useState(1);
+  const [inspectorTarget, setInspectorTarget] = useState<ProductRow | null>(null);
   const [productCreateOpen, setProductCreateOpen] = useState(false);
   const [productEditing, setProductEditing] = useState<CatalogItem | null>(null);
   const [refreshPending, setRefreshPending] = useState(false);
@@ -238,9 +262,9 @@ export function InventoryPage() {
 
   const rows = useMemo(
     () => buildRows(
-      model.catalog.data ?? [],
-      model.inventory.data ?? [],
-      model.alerts.data ?? []
+      asList(model.catalog.data),
+      asList(model.inventory.data),
+      asList(model.alerts.data)
     ),
     [model.catalog.data, model.inventory.data, model.alerts.data]
   );
@@ -286,23 +310,44 @@ export function InventoryPage() {
     return [...next].sort((a, b) => attentionRank(a) - attentionRank(b) || a.name.localeCompare(b.name, "es"));
   }, [rows, search, status, sort]);
 
+  const totalPages = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = visibleRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   const tracked = rows.filter(row => row.configured && row.trackingEnabled);
   const availableTotal = tracked.reduce((total, row) => total + (row.available ?? 0), 0);
   const reservedTotal = tracked.reduce((total, row) => total + (row.reserved ?? 0), 0);
   const lowStockTotal = tracked.filter(row => row.lowStock || row.outOfStock).length;
 
   const loading = model.me.isPending || model.catalog.isPending || model.inventory.isPending;
-  const primaryFailed = model.catalog.isError || model.inventory.isError;
-  const secondaryFailed = model.alerts.isError
-    || model.restockSubscriptions.isError
-    || model.restockNotifications.isError;
+  const primaryFailed = model.catalog.isError || model.inventory.isError
+    || (model.catalog.isSuccess && !isRecordList(model.catalog.data))
+    || (model.inventory.isSuccess && !isRecordList(model.inventory.data));
+  const alertsUnavailable = model.alerts.isError
+    || (model.alerts.isSuccess && !isRecordList(model.alerts.data));
+  const waitingUnavailable = model.restockSubscriptions.isError
+    || (model.restockSubscriptions.isSuccess && !isRecordList(model.restockSubscriptions.data));
+  const notificationsUnavailable = model.restockNotifications.isError
+    || (model.restockNotifications.isSuccess && !isRecordList(model.restockNotifications.data));
+  const secondaryFailed = alertsUnavailable || waitingUnavailable || notificationsUnavailable;
+  const alertCount = alertsUnavailable || model.alerts.isPending
+    ? null : (asList(model.alerts.data)).filter(alert => !alert.acknowledged).length;
+  const waitingCount = waitingUnavailable || model.restockSubscriptions.isPending
+    ? null : (asList(model.restockSubscriptions.data)).length;
+  const notificationCount = notificationsUnavailable || model.restockNotifications.isPending
+    ? null : (asList(model.restockNotifications.data)).length;
+  const lastPrimarySync = Math.min(model.catalog.dataUpdatedAt || 0, model.inventory.dataUpdatedAt || 0);
+  const lastPrimarySyncText = lastPrimarySync > 0
+    ? new Date(lastPrimarySync).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })
+    : "No disponible";
   const businessName = model.business.data?.name?.trim();
   const roleLabel = model.canManage ? "Gestión habilitada" : "Solo lectura";
   const roles = model.me.data?.roles ?? [];
   const canReadVariants = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
-  const canManageVariants = roles.includes("BUSINESS_ADMIN");
+  const canManageVariants = roles.includes("BUSINESS_ADMIN") && model.canManageStock;
   const canReadAutomation = canReadVariants;
-  const canManageAutomation = roles.includes("BUSINESS_ADMIN");
+  const canReadMedia = canReadVariants;
+  const canManageAutomation = roles.includes("BUSINESS_ADMIN") && model.canManageStock;
 
   async function refreshWorkspace() {
     if (refreshPending) return;
@@ -346,7 +391,10 @@ export function InventoryPage() {
       return;
     }
 
-    if (!row.configured || !row.trackingEnabled) return;
+    if (!row.configured || !row.trackingEnabled) {
+      setMutationError("Configura el stock y activa su seguimiento antes de reponer.");
+      return;
+    }
     setAdjustTarget(row);
   }
 
@@ -408,33 +456,21 @@ export function InventoryPage() {
     return undefined;
   }
 
-  function variantInputFromForm(
-    form: HTMLFormElement,
-    current: InventoryVariant | null
-  ) {
+  function variantInputFromForm(form: HTMLFormElement) {
     const data = new FormData(form);
     const name = String(data.get("variantName") ?? "").trim();
-    const optionValuesJson = String(data.get("optionValuesJson") ?? "").trim() || "{}";
+    const optionValuesJson = serializeVariantOptions(form);
     const sku = String(data.get("variantSku") ?? "").trim().toUpperCase();
-    const onHand = Number(data.get("variantOnHand"));
-    const reorderThreshold = Number(data.get("variantReorderThreshold"));
+    const onHand = numberOrNull(data.get("variantOnHand"));
+    const reorderThreshold = numberOrNull(data.get("variantReorderThreshold"));
     const note = String(data.get("variantNote") ?? "").trim();
 
     if (!name) throw new Error("Escribe un nombre para la variante.");
     if (!sku) throw new Error("Escribe un SKU para la variante.");
-    if (!Number.isInteger(onHand) || onHand < 0
-        || !Number.isInteger(reorderThreshold) || reorderThreshold < 0) {
+    if (onHand === null || !Number.isInteger(onHand) || onHand < 0
+        || reorderThreshold === null || !Number.isInteger(reorderThreshold) || reorderThreshold < 0) {
       throw new Error("El stock físico y el umbral deben ser enteros iguales o mayores que cero.");
     }
-    try {
-      const parsed = JSON.parse(optionValuesJson);
-      if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-        throw new Error("not-object");
-      }
-    } catch {
-      throw new Error("Opciones JSON debe ser un objeto JSON válido.");
-    }
-
     return {
       name,
       optionValuesJson,
@@ -449,12 +485,16 @@ export function InventoryPage() {
 
   async function handleVariantEditor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!variantsTarget || !canManageVariants || !variantEditorMode || mutationLock.current) return;
+    if (!variantsTarget || !variantEditorMode || mutationLock.current) return;
+    if (!canManageVariants) {
+      setMutationError(PERMISSION_CHANGE_ERROR);
+      return;
+    }
 
     setMutationError("");
     let input;
     try {
-      input = variantInputFromForm(event.currentTarget, variantEditing);
+      input = variantInputFromForm(event.currentTarget);
     } catch (error) {
       setMutationError(mutationMessage(error));
       return;
@@ -479,7 +519,11 @@ export function InventoryPage() {
 
   async function handleVariantAdjustment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!variantsTarget || !variantAdjusting || !canManageVariants || mutationLock.current) return;
+    if (!variantsTarget || !variantAdjusting || mutationLock.current) return;
+    if (!canManageVariants) {
+      setMutationError(PERMISSION_CHANGE_ERROR);
+      return;
+    }
 
     const data = new FormData(event.currentTarget);
     const delta = Number(data.get("variantDelta"));
@@ -538,19 +582,25 @@ export function InventoryPage() {
 
   async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!model.canManageCatalog || mutationLock.current) return;
+    if (mutationLock.current) return;
+    if (!model.canManageCatalog) {
+      setMutationError(PERMISSION_CHANGE_ERROR);
+      return;
+    }
 
     const data = new FormData(event.currentTarget);
     const name = String(data.get("name") ?? "").trim();
     const description = String(data.get("description") ?? "").trim();
-    const price = Number(data.get("price"));
+    const price = numberOrNull(data.get("price"));
     const currency = String(data.get("currency") ?? "").trim().toUpperCase();
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const continueToStock = !productEditing && model.canManageStock && submitter?.value === "configure";
 
     if (!name) {
       setMutationError("Escribe un nombre para el producto.");
       return;
     }
-    if (!Number.isFinite(price) || price < 0) {
+    if (price === null || price < 0) {
       setMutationError("El precio debe ser un número igual o mayor que cero.");
       return;
     }
@@ -572,14 +622,36 @@ export function InventoryPage() {
         metadataJson: productEditing?.metadataJson ?? null,
         active: productEditing?.active !== false
       };
-      if (productEditing) {
-        await updateCatalogProduct(productEditing.id, input);
-      } else {
-        await createCatalogProduct(input);
-      }
-      await model.refetchPrimary();
+      const saved = productEditing
+        ? await updateCatalogProduct(productEditing.id, input)
+        : await createCatalogProduct(input);
+      // A successful catalogue write must not be replayed if a later read fails.
+      // Stock configuration is deliberately a second, independent operation.
       setProductCreateOpen(false);
       setProductEditing(null);
+      if (continueToStock && saved?.id) {
+        setConfigureTarget({
+          id: String(saved.id),
+          name: String(saved.name || name),
+          description: String(saved.description || description),
+          price: numberOrNull(saved.price),
+          currency: String(saved.currency || currency),
+          sku: "",
+          configured: false,
+          trackingEnabled: false,
+          onHand: null,
+          reserved: null,
+          available: null,
+          reorderThreshold: null,
+          lowStock: false,
+          outOfStock: false,
+          restocked: false
+        });
+      }
+      const primaryRefreshed = await model.refetchPrimary();
+      if (!primaryRefreshed) {
+        setMutationError("El producto se guardó, pero no se pudo actualizar la lista. Pulsa Actualizar antes de repetir cualquier operación.");
+      }
     } catch (error) {
       setMutationError(mutationMessage(error));
     } finally {
@@ -589,14 +661,18 @@ export function InventoryPage() {
 
   async function handleConfigure(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!configureTarget || !model.canManageStock || mutationLock.current) return;
+    if (!configureTarget || mutationLock.current) return;
+    if (!model.canManageStock) {
+      setMutationError(PERMISSION_CHANGE_ERROR);
+      return;
+    }
 
     const data = new FormData(event.currentTarget);
-    const onHand = Number(data.get("onHand"));
-    const reorderThreshold = Number(data.get("reorderThreshold"));
+    const onHand = numberOrNull(data.get("onHand"));
+    const reorderThreshold = numberOrNull(data.get("reorderThreshold"));
 
-    if (!Number.isInteger(onHand) || onHand < 0
-        || !Number.isInteger(reorderThreshold) || reorderThreshold < 0) {
+    if (onHand === null || !Number.isInteger(onHand) || onHand < 0
+        || reorderThreshold === null || !Number.isInteger(reorderThreshold) || reorderThreshold < 0) {
       setMutationError("El stock físico y el umbral deben ser números enteros iguales o mayores que cero.");
       return;
     }
@@ -624,7 +700,11 @@ export function InventoryPage() {
 
   async function handleAdjustment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!adjustTarget || !model.canManageStock || mutationLock.current) return;
+    if (!adjustTarget || mutationLock.current) return;
+    if (!model.canManageStock) {
+      setMutationError(PERMISSION_CHANGE_ERROR);
+      return;
+    }
 
     const data = new FormData(event.currentTarget);
     const delta = Number(data.get("delta"));
@@ -663,9 +743,13 @@ export function InventoryPage() {
               <p>Stock físico, reservado y disponible en un solo lugar.</p>
             </div>
           </header>
-          <div className={styles.loadingCard} role="status" aria-live="polite">
+          <div className={styles.loadingCard} role="status" aria-live="polite" data-testid="inventory-loading">
             <span className={styles.spinner} aria-hidden="true" />
             <span>Cargando inventario autoritativo…</span>
+            <div className={styles.loadingSkeleton} aria-hidden="true" data-testid="inventory-loading-skeleton">
+              <span /><span /><span /><span />
+              <span className={styles.loadingSkeletonTable} />
+            </div>
           </div>
         </main>
       </AppShell>
@@ -694,6 +778,7 @@ export function InventoryPage() {
           <section className={styles.errorCard} role="alert">
             <strong>No pudimos cargar el inventario completo.</strong>
             <p>No mostramos cifras parciales como si fueran stock real. Puedes reintentar sin salir de esta pantalla.</p>
+            {mutationError && <p className={styles.dialogError}>{mutationError}</p>}
             <button className="button secondary" type="button" onClick={() => void model.refetchPrimary()}>
               Reintentar
             </button>
@@ -706,38 +791,26 @@ export function InventoryPage() {
   return (
     <AppShell>
       <main className={`rv-page-frame ${styles.page}`} data-visual-page="inventory">
-        <header className="rv-page-header">
-          <div>
-            <p className="eyebrow">OPERACIÓN</p>
-            <h1>Inventario</h1>
-            <p>
-              {businessName ? `${businessName} · ` : ""}
-              Stock físico, reservado y disponible sin mezclar conceptos.
-            </p>
-          </div>
-          <span className={styles.rolePill}>{roleLabel}</span>
-        </header>
-
-        <section className={styles.visualHero} aria-label="Inventario inteligente RecepVoz">
-          <div className={styles.visualHeroCopy}>
-            <span className={styles.visualHeroKicker}>STOCK INTELIGENTE</span>
-            <h2>Tu inventario visible <span>antes de prometer una venta</span></h2>
-            <p>
-              RecepVoz cruza stock físico, reservado y disponible para que la operación responda con datos reales.
-            </p>
-            <div className={styles.visualHeroSignals}>
-              <span><i data-tone="cyan" />{rows.length} productos</span>
-              <span><i data-tone="green" />{tracked.length} controlados</span>
-              <span><i data-tone="warning" />{lowStockTotal} requieren atención</span>
+        <div className={styles.inventoryLead}>
+          <header className="rv-page-header">
+            <div>
+              <p className="eyebrow">OPERACIÓN</p>
+              <h1>Inventario</h1>
+              <p>
+                {businessName ? `${businessName} · ` : ""}
+                Stock físico, reservado y disponible sin mezclar conceptos.
+              </p>
             </div>
-          </div>
-          <div className={styles.visualHeroArt} aria-hidden="true">
-            <span className={styles.visualHeroOrbit} />
-            <img className={styles.visualHeroRobot} src="/app/assets/recepvoz/v2/inventory/hero-stock-robot.webp" alt="" />
-            <img className={styles.visualHealthy} src="/app/assets/recepvoz/v2/inventory/stock-confirmed.webp" alt="" />
-            <img className={styles.visualWarning} src="/app/assets/recepvoz/v2/inventory/stock-warning.webp" alt="" />
-          </div>
-        </section>
+            <span className={styles.rolePill}>{roleLabel}</span>
+          </header>
+          <InventoryIntro
+            productCount={rows.length}
+            trackedCount={tracked.length}
+            robotSrc="/app/assets/recepvoz/v2/inventory/hero-stock-robot.webp"
+            healthySrc="/app/assets/recepvoz/v2/inventory/stock-confirmed.webp"
+            warningSrc="/app/assets/recepvoz/v2/inventory/stock-warning.webp"
+          />
+        </div>
 
         <section className={styles.summaryGrid} aria-label="Resumen de inventario">
           <SummaryCard
@@ -771,9 +844,16 @@ export function InventoryPage() {
         </section>
 
         {secondaryFailed && (
-          <p className={styles.partialNotice} role="status">
-            El stock está disponible, pero una fuente secundaria de alertas o reposición no respondió.
-          </p>
+          <div className={styles.partialNotice} role="status" data-testid="inventory-partial-error">
+            <span>
+              El stock principal está disponible, pero no se pudieron consultar algunos datos de alertas o reposición.
+              Los valores no disponibles se muestran como «—», nunca como cero.
+            </span>
+            <button className="button secondary" type="button" disabled={refreshPending}
+              onClick={() => void refreshWorkspace()}>
+              {refreshPending ? "Reintentando…" : "Reintentar consultas"}
+            </button>
+          </div>
         )}
 
         {rows.some(row => !row.configured) && (
@@ -804,35 +884,41 @@ export function InventoryPage() {
               <p>El stock disponible siempre viene del backend. La búsqueda y los filtros solo cambian esta vista.</p>
             </div>
             <div className={styles.workspaceActions}>
-              {model.canManageCatalog && (
-                <>
-                  <a className="button secondary" href="/app/settings/import">
-                    Importar archivos
-                  </a>
-                  <button
-                    className="button primary"
-                    type="button"
-                    onClick={() => {
-                      setMutationError("");
-                      setProductEditing(null);
-                      setProductCreateOpen(true);
-                    }}
-                  >
-                    Nuevo producto
-                  </button>
-                </>
-              )}
-              <button
-                className="button ghost"
-                type="button"
-                disabled={refreshPending}
-                onClick={() => void refreshWorkspace()}
-              >
-                {refreshPending ? "Actualizando…" : "Actualizar"}
-              </button>
+              <span className={styles.lastSync} data-testid="inventory-last-sync">
+                Última consulta de catálogo y stock: {lastPrimarySyncText}
+              </span>
+              <div className={styles.workspaceButtonRow}>
+                {model.canManageCatalog && (
+                  <>
+                    <a className="button secondary" href="/app/settings/import">
+                      Importar archivos
+                    </a>
+                    <button
+                      className="button primary"
+                      type="button"
+                      onClick={() => {
+                        setMutationError("");
+                        setProductEditing(null);
+                        setProductCreateOpen(true);
+                      }}
+                    >
+                      Nuevo producto
+                    </button>
+                  </>
+                )}
+                <button
+                  className="button ghost"
+                  type="button"
+                  disabled={refreshPending}
+                  aria-busy={refreshPending}
+                  onClick={() => void refreshWorkspace()}
+                >
+                  {refreshPending ? "Actualizando…" : "Actualizar"}
+                </button>
+              </div>
               <div className={styles.queueSummary} aria-label="Resumen de reposición">
-                <span>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length} alertas</span>
-                <span>{(model.restockSubscriptions.data ?? []).length} esperando reposición</span>
+                <span>{alertCount === null ? "— alertas (sin datos)" : `${alertCount} alertas`}</span>
+                <span>{waitingCount === null ? "— esperando (sin datos)" : `${waitingCount} esperando reposición`}</span>
               </div>
             </div>
           </div>
@@ -845,14 +931,14 @@ export function InventoryPage() {
                 type="search"
                 aria-label="Buscar productos"
                 value={search}
-                onChange={event => setSearch(event.target.value)}
+                onChange={event => { setSearch(event.target.value); setPage(1); }}
                 placeholder="Buscar por producto o SKU"
               />
             </label>
 
             <label className={styles.selectField}>
               <span>Estado</span>
-              <select aria-label="Estado" value={status} onChange={event => setStatus(event.target.value as StatusFilter)}>
+              <select aria-label="Estado" value={status} onChange={event => { setStatus(event.target.value as StatusFilter); setPage(1); }}>
                 <option value="ALL">Todos</option>
                 <option value="TRACKED">Stock configurado</option>
                 <option value="LOW">Stock bajo</option>
@@ -864,7 +950,7 @@ export function InventoryPage() {
 
             <label className={styles.selectField}>
               <span>Orden</span>
-              <select aria-label="Orden" value={sort} onChange={event => setSort(event.target.value as SortMode)}>
+              <select aria-label="Orden" value={sort} onChange={event => { setSort(event.target.value as SortMode); setPage(1); }}>
                 <option value="ATTENTION">Atención primero</option>
                 <option value="NAME_ASC">Nombre A–Z</option>
                 <option value="AVAILABLE_ASC">Disponible: menor a mayor</option>
@@ -878,6 +964,7 @@ export function InventoryPage() {
               <thead>
                 <tr>
                   <th scope="col">Producto</th>
+                  <th scope="col">Precio</th>
                   <th scope="col">Estado</th>
                   <th scope="col">Disponible</th>
                   <th scope="col">Reservado</th>
@@ -887,14 +974,23 @@ export function InventoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleRows.map(row => (
+                {pagedRows.map(row => (
                   <tr key={row.id} data-testid={`inventory-row-${row.id}`}>
                     <td>
-                      <div className={styles.productCell}>
-                        <strong>{row.name}</strong>
-                        <span>{row.sku || "Sin SKU"}{row.description ? ` · ${row.description}` : ""}</span>
+                      <div className={styles.productIdentity}>
+                        <ProductThumbnail productId={row.id} canReadMedia={canReadMedia} />
+                        <div className={styles.productCell}>
+                          <strong>{row.name}</strong>
+                          <span>{row.sku || "Sin SKU"}{row.description ? ` · ${row.description}` : ""}</span>
+                          <button className={styles.productInspectLink} type="button"
+                            onClick={() => setInspectorTarget(row)}
+                            aria-label={`Ver detalles de ${row.name}`}>
+                            Ver detalles
+                          </button>
+                        </div>
                       </div>
                     </td>
+                    <td className={styles.productPrice}>{formatCatalogPrice(row.price, row.currency)}</td>
                     <td><ProductStatus row={row} /></td>
                     <td>
                       <strong className={styles.availableValue}>{stockValue(row.available)}</strong>
@@ -951,7 +1047,7 @@ export function InventoryPage() {
                           type="button"
                           aria-label={`Editar producto ${row.name}`}
                           onClick={() => {
-                            const item = (model.catalog.data ?? []).find(candidate => String(candidate.id) === row.id);
+                            const item = (asList(model.catalog.data)).find(candidate => String(candidate.id) === row.id);
                             if (!item) return;
                             setMutationError("");
                             setProductEditing(item);
@@ -967,6 +1063,25 @@ export function InventoryPage() {
               </tbody>
             </table>
           </div>
+
+          {visibleRows.length > PAGE_SIZE && (
+            <nav className={styles.productPagination} aria-label="Paginación de productos">
+              <span>
+                Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, visibleRows.length)} de {visibleRows.length}
+              </span>
+              <div>
+                <button className="button secondary" type="button" disabled={currentPage === 1}
+                  aria-label="Página anterior" onClick={() => setPage(currentPage - 1)}>
+                  Anterior
+                </button>
+                <span aria-live="polite">Página {currentPage} de {totalPages}</span>
+                <button className="button secondary" type="button" disabled={currentPage === totalPages}
+                  aria-label="Página siguiente" onClick={() => setPage(currentPage + 1)}>
+                  Siguiente
+                </button>
+              </div>
+            </nav>
+          )}
 
           {visibleRows.length === 0 && (
             <div className={styles.emptyState}>
@@ -989,11 +1104,9 @@ export function InventoryPage() {
                 </p>
               </div>
               <div className={styles.automationSummary}>
-                <span>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length} alertas pendientes</span>
-                <span>{(model.restockSubscriptions.data ?? []).length} esperando reposición</span>
-                <span>
-                  {(model.restockNotifications.data ?? []).length} {(model.restockNotifications.data ?? []).length === 1 ? "aviso listo" : "avisos listos"}
-                </span>
+                <span>{alertCount === null ? "— alertas (sin datos)" : `${alertCount} alertas pendientes`}</span>
+                <span>{waitingCount === null ? "— esperando (sin datos)" : `${waitingCount} esperando reposición`}</span>
+                <span>{notificationCount === null ? "— avisos (sin datos)" : `${notificationCount} ${notificationCount === 1 ? "aviso listo" : "avisos listos"}`}</span>
               </div>
             </div>
 
@@ -1009,14 +1122,18 @@ export function InventoryPage() {
                     <span className={styles.dialogEyebrow}>Stock</span>
                     <h3 id="inventoryAlertsTitle">Alertas</h3>
                   </div>
-                  <strong>{(model.alerts.data ?? []).filter(alert => !alert.acknowledged).length}</strong>
+                  <strong>{alertCount ?? "—"}</strong>
                 </div>
 
                 <div className={styles.automationList}>
-                  {(model.alerts.data ?? []).length === 0 ? (
+                  {alertsUnavailable ? (
+                    <p className={styles.automationEmpty} role="status">Alertas no disponibles. Reintenta la consulta.</p>
+                  ) : model.alerts.isPending ? (
+                    <p className={styles.automationEmpty} role="status">Consultando alertas…</p>
+                  ) : (asList(model.alerts.data)).length === 0 ? (
                     <p className={styles.automationEmpty}>No hay alertas abiertas.</p>
                   ) : (
-                    (model.alerts.data ?? []).map(alert => (
+                    (asList(model.alerts.data)).map(alert => (
                       <article
                         key={alert.id}
                         className={styles.automationCard}
@@ -1076,14 +1193,18 @@ export function InventoryPage() {
                     <span className={styles.dialogEyebrow}>Clientes</span>
                     <h3 id="restockWaitingTitle">Esperando reposición</h3>
                   </div>
-                  <strong>{(model.restockSubscriptions.data ?? []).length}</strong>
+                  <strong>{waitingCount ?? "—"}</strong>
                 </div>
 
                 <div className={styles.automationList}>
-                  {(model.restockSubscriptions.data ?? []).length === 0 ? (
+                  {waitingUnavailable ? (
+                    <p className={styles.automationEmpty} role="status">Lista de espera no disponible. Reintenta la consulta.</p>
+                  ) : model.restockSubscriptions.isPending ? (
+                    <p className={styles.automationEmpty} role="status">Consultando lista de espera…</p>
+                  ) : (asList(model.restockSubscriptions.data)).length === 0 ? (
                     <p className={styles.automationEmpty}>Nadie está esperando reposición.</p>
                   ) : (
-                    (model.restockSubscriptions.data ?? []).map(subscription => (
+                    (asList(model.restockSubscriptions.data)).map(subscription => (
                       <article
                         key={subscription.id}
                         className={styles.automationCard}
@@ -1121,14 +1242,18 @@ export function InventoryPage() {
                     <span className={styles.dialogEyebrow}>Avisos</span>
                     <h3 id="restockNotificationsTitle">Listos para enviar</h3>
                   </div>
-                  <strong>{(model.restockNotifications.data ?? []).length}</strong>
+                  <strong>{notificationCount ?? "—"}</strong>
                 </div>
 
                 <div className={styles.automationList}>
-                  {(model.restockNotifications.data ?? []).length === 0 ? (
+                  {notificationsUnavailable ? (
+                    <p className={styles.automationEmpty} role="status">Avisos no disponibles. Reintenta la consulta.</p>
+                  ) : model.restockNotifications.isPending ? (
+                    <p className={styles.automationEmpty} role="status">Consultando avisos…</p>
+                  ) : (asList(model.restockNotifications.data)).length === 0 ? (
                     <p className={styles.automationEmpty}>No hay avisos pendientes.</p>
                   ) : (
-                    (model.restockNotifications.data ?? []).map(notification => (
+                    (asList(model.restockNotifications.data)).map(notification => (
                       <article
                         key={notification.id}
                         className={styles.automationCard}
@@ -1155,6 +1280,9 @@ export function InventoryPage() {
           </section>
         )}
 
+        {/* Inventory dialogs must escape AppShell routeStage transform containment. */}
+        {createPortal(
+          <>
         {variantsTarget && (
           <div className={styles.dialogBackdrop}>
             <section
@@ -1208,6 +1336,10 @@ export function InventoryPage() {
                   <p className={styles.dialogError} role="alert">{variantsError}</p>
                 )}
 
+                {mutationError && !variantEditorMode && !variantAdjusting && (
+                  <p className={styles.dialogError} role="alert">{mutationError}</p>
+                )}
+
                 {!variantsPending && !variantsError && (
                   <>
                     {variantEditorMode && (
@@ -1224,14 +1356,10 @@ export function InventoryPage() {
                           />
                         </label>
 
-                        <label className={styles.field}>
-                          <span>Opciones JSON</span>
-                          <input
-                            name="optionValuesJson"
-                            defaultValue={variantEditing?.optionValuesJson ?? "{}"}
-                            required
-                          />
-                        </label>
+                        <VariantOptionsEditor
+                          key={variantEditorMode === "CREATE" ? "create" : variantEditing?.id ?? "edit"}
+                          initialJson={variantEditing?.optionValuesJson ?? "{}"}
+                        />
 
                         <div className={styles.formGrid}>
                           <label className={styles.field}>
@@ -1502,6 +1630,38 @@ export function InventoryPage() {
           </div>
         )}
 
+        {inspectorTarget && (
+          <ProductInspector
+            row={rows.find(row => row.id === inspectorTarget.id) ?? inspectorTarget}
+            canReadMedia={canReadMedia}
+            canReadVariants={canReadVariants}
+            canManageStock={model.canManageStock}
+            onClose={() => setInspectorTarget(null)}
+            onVariants={() => {
+              const row = rows.find(value => value.id === inspectorTarget.id) ?? inspectorTarget;
+              setInspectorTarget(null);
+              void openVariants(row);
+            }}
+            onHistory={() => {
+              const row = rows.find(value => value.id === inspectorTarget.id) ?? inspectorTarget;
+              setInspectorTarget(null);
+              void openHistory(row);
+            }}
+            onConfigure={() => {
+              const row = rows.find(value => value.id === inspectorTarget.id) ?? inspectorTarget;
+              setInspectorTarget(null);
+              setMutationError("");
+              setConfigureTarget(row);
+            }}
+            onAdjust={() => {
+              const row = rows.find(value => value.id === inspectorTarget.id) ?? inspectorTarget;
+              setInspectorTarget(null);
+              setMutationError("");
+              setAdjustTarget(row);
+            }}
+          />
+        )}
+
         {historyTarget && (
           <div className={styles.dialogBackdrop}>
             <section
@@ -1639,19 +1799,27 @@ export function InventoryPage() {
                 </div>
 
                 <p className={styles.dialogHint}>
-                  El producto se crea primero en catálogo. Luego puedes configurar su SKU y stock físico.
+                  Paso 1: guarda los datos del catálogo. Si también gestionas stock, puedes continuar
+                  al paso 2 sin buscar el producto otra vez. Son dos operaciones independientes.
                 </p>
 
                 {mutationError && <p className={styles.dialogError} role="alert">{mutationError}</p>}
 
                 <div className={styles.dialogActions}>
-                  <button className="button primary" type="submit" disabled={mutationPending}>
+                  <button className={productEditing ? "button primary" : "button secondary"}
+                    type="submit" name="nextStep" value="catalog" disabled={mutationPending}>
                     {mutationPending
                       ? "Guardando…"
                       : productEditing
                         ? "Guardar producto"
                         : "Crear producto"}
                   </button>
+                  {!productEditing && model.canManageStock && (
+                    <button className="button primary" type="submit" name="nextStep"
+                      value="configure" disabled={mutationPending}>
+                      {mutationPending ? "Guardando…" : "Crear y configurar stock"}
+                    </button>
+                  )}
                 </div>
               </form>
             </section>
@@ -1684,6 +1852,12 @@ export function InventoryPage() {
               </div>
 
               <form className={styles.dialogForm} onSubmit={handleConfigure}>
+                {!configureTarget.configured && (
+                  <p className={styles.dialogHint}>
+                    Paso 2: define SKU, cantidad física y mínimo de reposición.
+                    Hasta guardar aquí, el producto sigue sin stock configurado.
+                  </p>
+                )}
                 <label className={styles.field}>
                   <span>SKU</span>
                   <input name="sku" defaultValue={configureTarget.sku} autoFocus />
@@ -1790,6 +1964,9 @@ export function InventoryPage() {
               </form>
             </section>
           </div>
+        )}
+          </>,
+          document.querySelector('[data-react-app="recepvoz"]') ?? document.body
         )}
       </main>
     </AppShell>

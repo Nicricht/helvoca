@@ -270,6 +270,51 @@ jobs:
           curl --fail-with-body -sS -L -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" -d "$PAYLOAD" "https://api.github.com/repos/$REPOSITORY/statuses/$COMMIT_SHA"
 
 
+  inventory-frontend-coverage:
+    needs: [fast-gate]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install browser testing dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Build explicitly instrumented Inventory source
+        env:
+          VITE_COVERAGE: "true"
+        run: npm run frontend:build
+      - name: Inventory coverage test discovery manifest
+        run: npx playwright test e2e/react-inventory*.spec.js --list | tee .inventory-coverage-tests.txt
+      - name: Exercise Inventory behavior in Chromium
+        env:
+          VITE_COVERAGE: "true"
+        run: npx playwright test e2e/react-inventory*.spec.js
+      - name: Require affected Inventory original-source coverage (100% default; explicit PR 768 exception)
+        env:
+          INVENTORY_PR768_COVERAGE_EXCEPTION: "approved-95pct"
+        run: node scripts/ci/check-inventory-frontend-coverage.cjs
+      - name: Upload measured frontend coverage and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inventory-frontend-source-coverage
+          path: |
+            test-results/inventory-coverage/**
+            .inventory-coverage-raw/**
+            .inventory-coverage-tests.txt
+            test-results/**/error-context.md
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: true
+
   system-integration-e2e:
     needs: [fast-gate, golden-journey-release-contract]
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'

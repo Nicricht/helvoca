@@ -72,7 +72,7 @@ export function useInventoryWorkspace() {
   const canManage = canManageStock || canManageCatalog;
 
   async function refetchPrimary() {
-    await Promise.all([
+    const results = await Promise.all([
       me.refetch(),
       business.refetch(),
       catalog.refetch(),
@@ -81,6 +81,9 @@ export function useInventoryWorkspace() {
       restockSubscriptions.refetch(),
       restockNotifications.refetch()
     ]);
+    // React Query refetch resolves with an error result by default; it does
+    // not throw just because the authoritative read failed after a write.
+    return !results[2].isError && !results[3].isError;
   }
 
   return {

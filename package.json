@@ -11,6 +11,7 @@
     "test:e2e:system": "playwright test --config=playwright.system.config.js"
   },
   "devDependencies": {
-    "@playwright/test": "1.55.0"
+    "@playwright/test": "1.55.0",
+    "istanbul-lib-source-maps": "5.0.6"
   }
 }

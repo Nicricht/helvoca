@@ -1,0 +1,79 @@
+# PR #768 · Inventory premium: affected frontend QA traceability
+
+**Scope:** only `frontend/src/pages/Inventory/*`, `frontend/src/features/inventory/api.ts` and inventory Playwright E2E.
+**Risk:** HIGH where inventory stock/variants, authorization and retries cross server boundaries; MEDIUM for UI geometry and filtering.
+**Frame change:** NO. All fixtures are intercepted browser requests, not real DB/provider requests.
+**Release gate:** **100% applicable affected executable statements/lines, branches and functions when instrumented, plus 100% meaningful affected interactions/state transitions.** A passing CI test count alone is not a measured percentage.
+
+## Evidence inventory (coverage obligations, not percentages)
+
+| Affected user action, state or invariant | Automated behavioral evidence | Proof / current limit |
+| --- | --- | --- |
+| Inventory initial load, official art, dense operational lead, accurate product counts and stock | `e2e/react-inventory.spec.js` (ready, skeleton, primary failure, authoritative stock), `e2e/frontend-release-candidate.spec.js` | Assertions and exact-head PNGs |
+| Search, LOW/TRACKED/OUT/RESTOCKED/UNCONFIGURED filters, sorting (attention/name/available), empty state | `e2e/react-inventory.spec.js` ("keeps search", "all stock status filters and sort choices") | Filter transitions and row order asserted |
+| Pagination, table media read budget, page reset after search | `e2e/react-inventory.spec.js` ("local pagination bounds media reads") | Next page and search reset asserted; **previous page now explicitly asserted in latest test revision; new exact-HEAD CI required** |
+| Inspector open/close, focus trap, Escape, restored trigger focus, client viewport bounds | `e2e/react-inventory.spec.js` ("inspector contains keyboard tab focus", "captures exact-head inspector") | Real navigation and geometry; 6 canonical viewports |
+| Catalog price/media permission, missing price, missing catalog | `e2e/react-inventory.spec.js` ("uses real catalog price", "absent catalog price", "stays useful when catalog data fails") | Assertions prevent fabricated data |
+| Create catalog product, guided stock setup, partial success retry, failing create | `e2e/react-inventory-mutations.spec.js` | Network request payload and duplicate prevention |
+| Edit catalog product, invalid currency, no duplicate POST | `e2e/react-inventory-mutations.spec.js` ("editing an existing catalog product") | Added in coverage-audit increment, requires exact-head CI |
+| Configure base stock and apply explicit delta | `e2e/react-inventory-mutations.spec.js`, `e2e/react-inventory.spec.js` | Payload asserted and UI refreshed |
+| Alert acknowledge (success/error) and queues refetch | `e2e/react-inventory-automation.spec.js` | New deterministic fixture, requires exact-head CI |
+| Restock waiting cancellation (success/error) without external notification | `e2e/react-inventory-automation.spec.js` | New deterministic fixture, requires exact-head CI |
+| Base restock via LOW_STOCK alert, explicit delta, no automatic mutation on open | `e2e/react-inventory-automation.spec.js` | New deterministic fixture, requires exact-head CI |
+| Variant-specific restock via linked alert, base stock not changed | `e2e/react-inventory-automation.spec.js` | New deterministic fixture, requires exact-head CI |
+| Operator can read automation data but cannot acknowledge/cancel/restock | `e2e/react-inventory-automation.spec.js` | New negative-role fixture, requires exact-head CI |
+| Backend unavailable in one or all secondary data sources; no invented zeros | `e2e/react-inventory.spec.js` | 503 states asserted; six-viewport exact-head PNGs |
+| Variant create, edit, delta, history, deactivate, role boundary | `e2e/react-inventory-variants.spec.js` | Request payload + UI outcomes asserted |
+| Variant empty/duplicate options and legacy nested fields preserved | `e2e/react-inventory-variants.spec.js` | No unauthorized writes + serialized options asserted |
+| Modal create/stock/variant/error responsive geometry | `e2e/inventory-visual-evidence-helper.js`, three Inventory E2E specs | 36 exact-head screenshots; top and bottom bounds asserted |
+| Inventory Java / SQL authoritative domain invariants | Existing backend/Testcontainers quality suites and `docs/engineering/invariants.md` | No inventory server/schema change in this PR; frontend mocks **do not** certify DB semantics |
+| Global commercial release journeys | GitHub Golden Journey and system integration workflows | Exact final SHA required |
+
+## Additional adverse-path assertions (new commit, verify exact HEAD)
+
+- `e2e/react-inventory.spec.js`: previous-page navigation; failed history followed by successful reopen; zero base-stock adjustment rejected before HTTP; inspector-to-variants and inspector-to-history navigation without writes.
+- `e2e/react-inventory-mutations.spec.js`: catalog/stock cancellation without writes; catalog edit conflict HTTP 409 leaves the draft visible and prevents duplicate writes.
+- `e2e/react-inventory-variants.spec.js`: malformed legacy variant options cannot be submitted as modified data; zero variant delta cannot send an adjustment; deleting a characteristic and canceling the variant editor do not mutate server state.
+- No real API, database, provider or production state is changed by these mocked tests. Tests must pass at the exact new commit before their cells can be certified.
+
+## Missing certification evidence: explicit HOLD items
+
+1. **Measured frontend executable coverage:** there is currently no JavaScript/TSX source instrumentation or report in the frontend `package.json` and relevant CI evidence for this PR; therefore cannot claim 100% statements/lines/branches/functions. Implement and enforce scoped source coverage or justify inapplicability with a behavior inventory according to `docs/engineering/QA_POLICY.md`.
+2. **Complete affected-control inventory:** the new tests address pagination backward navigation, product edit HTTP 409, zero stock delta, malformed legacy option JSON, failed history and several cancellations. Remaining edges include variants API server failures, alternate malformed/non-object legacy option values, authorization claim combinations, and remaining interactive state transitions.
+3. **Permission matrix depth:** roles BUSINESS_OWNER/BUSINESS_ADMIN/OPERATOR have partial browser proof; server authorization and mixed granular claims need scope-specific verification before a 100% coverage claim.
+4. **Real PostgreSQL and providers:** not changed by this PR; no new real-data mutations or paid calls should be introduced to achieve a coverage number. Cross-layer invariants must be linked to existing Testcontainers/contract tests, not inferred from mocked E2E.
+
+**Release state:** HOLD / DRAFT until missing applicable coverage obligations are either implemented and certified on exact HEAD or shown inapplicable with documented, testable rationale. Do not lower 100% thresholds.
+
+## Checkpoint 9: real source coverage + permission boundary
+
+- The dedicated `inventory-frontend-coverage` CI job builds Vite with Istanbul only when `VITE_COVERAGE=true`; production builds are not instrumented.
+- All four Inventory browser suites capture real `window.__coverage__` counters and the gate merges per-test reports.
+- The report must locate **six affected source files** and reject statements, lines, branches or functions below **100% per file**. Missing sources are an explicit failure. Artifacts include the measured report and raw snapshots.
+- An administrator must hold both the appropriate admin role **and the effective inventory-manage grant** to see mutating Variantes/Alertas controls. The pre-fix negative-role tests are recorded on `b939f70`; read-only inspection remains available.
+- Additional UI tests: variant 503 recovery, malformed non-object legacy options and variant HTTP 409 without duplicate writes.
+- Do not mark this work complete solely because functional Playwright passes. Use the CI evidence to close all applicable uncovered branches and interactions. Keep the PR in Draft while any of those metrics is below 100%.
+
+## Phase 1 of 3: coverage-collector completeness (2026-10-09)
+
+- RED evidence at `a32db775`: 67 Playwright Inventory tests passed, but the Istanbul collector recorded only 57 because three existing specs were not using the collection fixture. Four of seven spec suites were represented. This was a collection blind spot, not a passing coverage result.
+- Phase-1 repair: route `react-inventory-alerts-restock.spec.js`, `react-inventory-hardening.spec.js` and `react-inventory-parity.spec.js` through the same source-coverage fixture, preserving their assertions.
+- CI now obtains an independent `playwright --list` test-discovery manifest and refuses to certify a mismatch between discovered and recorded browser tests, or missing required suites. Seven Inventory suites are mandatory; zero silent omissions are permitted.
+- The strict per-file **100% statements, lines, branches and functions** checks are unchanged and expected to remain RED wherever actual coverage falls short. Phase 2 addresses those uncovered code paths. Phase 3 performs exact-head final certification and production release checks only if all gates pass.
+
+## Phase 2: original TSX source map fidelity
+
+- Found a real instrumentation reporting bug: generated Istanbul branch locations point into transpiled JSX (for example a 721-character condensed conditional at `InventoryProductPresentation.tsx:147`), whereas line 147 of the original TSX is ordinary markup. Pre-remapping numeric percentages were computed against generated JS positions and **are provisional, not proof of original TSX source-line accuracy**.
+- The strict CI check must remap actual Playwright Istanbul counters with `istanbul-lib-source-maps` embedded Vite `inputSourceMap` **before** per-file line/branch/function coverage is assessed. Original-source remapping is mandatory; the job fails if embedded source maps are missing or any source/metric falls below 100%.
+- The 86 Inventory tests and six required source files remain in scope, unchanged. No suppression, threshold reduction, fake mocks of counters, or production instrumentation.
+- Original-source mapped baseline must be obtained from exact final HEAD CI. Do not substitute prior generated-code percentages for the final QA claim.
+
+
+## Owner-approved one-time exception for PR #768 (2026-10-09)
+
+- **Decision:** The project owner explicitly accepts **95% coverage for this Inventory PR on this occasion**, to complete phase 2 and move into phase 3. This overrides the local Inventory gate threshold ONLY for this named PR; it does **not** revise `docs/engineering/QA_POLICY.md`, backend/database quality gates, other PRs or the repository-wide 100% target.
+- **Scope:** the same six explicitly listed Inventory original TSX/TS files, with each of statements, lines, branches and functions measured **independently per file at >=95%** after Istanbul/Vite sourcemap remapping. Aggregating high-coverage files to hide a low-coverage file is forbidden. Missing source files, absent suites, incomplete collection, archival failures, or mismatched discovered/recorded tests still fail closed.
+- **Technical restriction:** the exception activates only when the exact GitHub PR event is #768 under `Nicricht/helvoca`, on branch `feat/inventory-premium-layout-part1-20261009`, and the dedicated CI step passes its explicit opt-in marker. Anywhere else, the checker demands 100%.
+- **Test quality unchanged:** 100% of the discovered Inventory E2E tests must pass, as must Fast Gate, full backend/Playwright gate and real-stack system integration; no known application regression, permission bypass, invented data, or unmocked HTTP 501 can be accepted. In particular, the existing-variant adjustment fixture is now routed properly and asserts `note: null` with an actual intercepted POST.
+- **Disclosure:** This PR must **not** claim 100% coverage, full compliance with the repository-wide baseline, or globally completed Helvoca quality. Document the measured per-file coverage and uncovered branches in the final certification comment.
+- **Phase 3 entry:** permitted only after successful exact-HEAD CI under this explicitly approved one-time 95% exception. Production merge/deployment still requires independent final release inspection and explicit recording of any remaining risk.

@@ -23,6 +23,23 @@ export interface CatalogItem {
   active?: boolean;
 }
 
+export interface CatalogMedia {
+  id: string;
+  catalogItemId: string;
+  mediaType: "IMAGE" | "VIDEO" | "DOCUMENT";
+  mediaUrl: string;
+  mimeType?: string | null;
+  caption?: string | null;
+  sortOrder: number;
+  active: boolean;
+}
+
+export function getCatalogMedia(catalogItemId: string) {
+  return apiRequest<CatalogMedia[]>(
+    `/api/v1/catalog/${encodeURIComponent(catalogItemId)}/media`
+  );
+}
+
 export interface CreateCatalogProductInput {
   kind: "PRODUCT";
   name: string;
