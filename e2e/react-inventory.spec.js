@@ -1202,4 +1202,25 @@ test.describe('React Inventory migration', () => {
     expect(errors).toEqual([]);
   });
 
+
+  test('malformed inventory success response is rejected and normal stock returns after explicit retry', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    let malformed = true;
+    await page.route('**/api/v1/inventory', route => route.fulfill(json(malformed
+      ? { invalid: 'stock must be a list' }
+      : [{ id: 'stock-recovered', catalogItemId: 'prod-1', sku: 'TAL-RECOVERED',
+        trackingEnabled: true, onHand: 7, reserved: 2, available: 5,
+        reorderThreshold: 2, lowStock: false }])));
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/app/inventory');
+    await expect(page.getByRole('alert')).toContainText('No pudimos cargar el inventario completo');
+    await expect(page.getByTestId('inventory-available')).toContainText('—');
+    malformed = false;
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+    await expect(page.getByTestId('inventory-row-prod-1')).toContainText('TAL-RECOVERED');
+    await expect(page.getByTestId('inventory-available')).toContainText('5');
+    expect(errors).toEqual([]);
+  });
+
 });
