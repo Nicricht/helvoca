@@ -60,3 +60,10 @@
 - Phase-1 repair: route `react-inventory-alerts-restock.spec.js`, `react-inventory-hardening.spec.js` and `react-inventory-parity.spec.js` through the same source-coverage fixture, preserving their assertions.
 - CI now obtains an independent `playwright --list` test-discovery manifest and refuses to certify a mismatch between discovered and recorded browser tests, or missing required suites. Seven Inventory suites are mandatory; zero silent omissions are permitted.
 - The strict per-file **100% statements, lines, branches and functions** checks are unchanged and expected to remain RED wherever actual coverage falls short. Phase 2 addresses those uncovered code paths. Phase 3 performs exact-head final certification and production release checks only if all gates pass.
+
+## Phase 2: original TSX source map fidelity
+
+- Found a real instrumentation reporting bug: generated Istanbul branch locations point into transpiled JSX (for example a 721-character condensed conditional at `InventoryProductPresentation.tsx:147`), whereas line 147 of the original TSX is ordinary markup. Pre-remapping numeric percentages were computed against generated JS positions and **are provisional, not proof of original TSX source-line accuracy**.
+- The strict CI check must remap actual Playwright Istanbul counters with `istanbul-lib-source-maps` embedded Vite `inputSourceMap` **before** per-file line/branch/function coverage is assessed. Original-source remapping is mandatory; the job fails if embedded source maps are missing or any source/metric falls below 100%.
+- The 86 Inventory tests and six required source files remain in scope, unchanged. No suppression, threshold reduction, fake mocks of counters, or production instrumentation.
+- Original-source mapped baseline must be obtained from exact final HEAD CI. Do not substitute prior generated-code percentages for the final QA claim.

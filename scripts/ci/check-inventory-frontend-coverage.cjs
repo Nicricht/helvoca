@@ -4,6 +4,7 @@
 const { readdirSync, readFileSync, mkdirSync, writeFileSync, existsSync } = require('node:fs');
 const path = require('node:path');
 const { createCoverageMap, createCoverageSummary } = require('istanbul-lib-coverage');
+const { createSourceMapStore } = require('istanbul-lib-source-maps');
 
 const rawDir = path.join(process.cwd(), '.inventory-coverage-raw');
 const outDir = path.join(process.cwd(), 'test-results', 'inventory-coverage');
@@ -48,12 +49,28 @@ const discoveredManifest = existsSync(discoveredManifestPath)
 const discoveredTotals = discoveredManifest.match(/Total:\s*(\d+)\s+tests?\s+in\s+(\d+)\s+files?/);
 const discoveredTests = discoveredTotals ? Number(discoveredTotals[1]) : null;
 const discoveredFiles = discoveredTotals ? Number(discoveredTotals[2]) : null;
-const sources = map.files();
+async function certifyCoverage() {
+  // vite-plugin-istanbul measures transpiled React code and attaches
+  // inputSourceMap to each file. Always remap to the actual TS/TSX original
+  // before reporting line/branch/function coverage or enforcing 100%.
+  const instrumentedSources = map.files();
+  const inputSourceMaps = instrumentedSources.filter(file =>
+    Boolean(map.fileCoverageFor(file).data.inputSourceMap)
+  );
+  const sourceMapStore = createSourceMapStore({ baseDir: process.cwd() });
+  let remapped;
+  try {
+    remapped = await sourceMapStore.transformCoverage(map);
+  } finally {
+    sourceMapStore.dispose();
+  }
+  const sources = remapped.files();
 const normalize = value => value.replaceAll('\\', '/').split('?')[0];
 const details = [];
 const missing = [];
 const aggregate = createCoverageSummary();
-let failed = samples.length === 0 ||
+let failed = inputSourceMaps.length !== expected.length ||
+  samples.length === 0 ||
   missingSuites.length > 0 ||
   manifest.length !== samples.length + unavailableSamples.length ||
   discoveredTests === null ||
@@ -67,7 +84,7 @@ for (const wanted of expected) {
     failed = true;
     continue;
   }
-  const data = map.fileCoverageFor(candidates[0]);
+  const data = remapped.fileCoverageFor(candidates[0]);
   const summary = data.toSummary();
   aggregate.merge(summary);
   const coverage = Object.fromEntries(dimensions.map(key => [key, summary.data[key].pct]));
@@ -85,7 +102,10 @@ for (const wanted of expected) {
 }
 
 const report = {
-  source: 'Istanbul-instrumented React source exercised by Playwright Chromium',
+  source: 'Istanbul browser counters remapped through embedded Vite source maps to original TS/TSX',
+  originalSourceRemapping: true,
+  instrumentedSourceFilesWithInputSourceMaps: inputSourceMaps.length,
+  mappedOriginalSourceFiles: sources.length,
   capturedBrowserTests: samples.length,
   unavailableBrowserTests: unavailableSamples.length,
   totalRecordedTests: manifest.length,
@@ -108,6 +128,9 @@ const markdown = [
   '# Inventory source coverage from browser execution',
   '',
   'Instrumented snapshots: ' + samples.length,
+  'Original source remapping: ENABLED (embedded Vite inputSourceMap)',
+  'Instrumented files with source maps: ' + inputSourceMaps.length,
+  'Mapped original files: ' + sources.length,
   'Unavailable at teardown: ' + unavailableSamples.length,
   'Total browser tests recorded: ' + manifest.length,
   'Playwright-discovered tests: ' + (discoveredTests ?? 'MISSING'),
@@ -128,3 +151,9 @@ const markdown = [
 writeFileSync(path.join(outDir, 'summary.md'), markdown.join('\n') + '\n');
 console.log(markdown.join('\n'));
 if (failed) process.exitCode = 1;
+
+}
+certifyCoverage().catch(error => {
+  console.error('Inventory original-source coverage remapping failed:', error);
+  process.exitCode = 1;
+});
