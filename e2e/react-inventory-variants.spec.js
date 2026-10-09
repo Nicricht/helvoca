@@ -7,7 +7,7 @@ const json = body => ({
   body: JSON.stringify(body)
 });
 
-async function bootVariantInventory(page, roles = ['BUSINESS_ADMIN']) {
+async function bootVariantInventory(page, roles = ['BUSINESS_ADMIN'], permissions = undefined) {
   await page.addInitScript(
     token => sessionStorage.setItem('helvoca_access_token', token),
     'inventory-react-variants'
@@ -42,7 +42,8 @@ async function bootVariantInventory(page, roles = ['BUSINESS_ADMIN']) {
 
   await page.route('**/api/v1/auth/me', route => route.fulfill(json({
     email: roles.includes('BUSINESS_ADMIN') ? 'admin@demo.cl' : 'operator@demo.cl',
-    roles
+    roles,
+    ...(Array.isArray(permissions) ? { permissions } : {})
   })));
 
   await page.route('**/api/v1/business', route => route.fulfill(json({
@@ -412,6 +413,57 @@ test.describe('React Inventory variants', () => {
     expect(requests.create).toHaveLength(0);
     expect(requests.update).toHaveLength(0);
     expect(requests.adjust).toHaveLength(0);
+  });
+
+
+
+  test('admin without explicit inventory grant can read variants but cannot mutate them', async ({ page }) => {
+    const { productId, initialVariantId, requests } =
+      await bootVariantInventory(page, ['BUSINESS_ADMIN'], []);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId)
+      .getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await expect(dialog.getByTestId('inventory-variant-' + initialVariantId)).toContainText('Azul / M');
+    await expect(dialog.getByRole('button', { name: 'Nueva variante' })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Editar' })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Ajustar' })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Desactivar' })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Historial' })).toBeVisible();
+    expect(requests.create).toHaveLength(0);
+    expect(requests.update).toHaveLength(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.deactivate).toBe(0);
+  });
+
+  test('variant GET failure is reported and reopening after recovery shows authoritative variants', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    let fail = true;
+    await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      if (fail) return route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'variants temporarily unavailable' })
+      });
+      return route.fallback();
+    });
+    await page.goto('/app/inventory');
+    const row = page.getByTestId('inventory-row-' + productId);
+    await row.getByRole('button', { name: 'Variantes' }).click();
+    let dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await expect(dialog.getByRole('alert')).toBeVisible();
+    await expect(dialog.getByTestId('inventory-variant-' + initialVariantId)).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Cerrar', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+
+    fail = false;
+    await row.getByRole('button', { name: 'Variantes' }).click();
+    dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await expect(dialog.getByTestId('inventory-variant-' + initialVariantId)).toContainText('Azul / M');
+    await expect(dialog.getByRole('alert')).toHaveCount(0);
+    expect(requests.create).toHaveLength(0);
+    expect(requests.update).toHaveLength(0);
   });
 
 

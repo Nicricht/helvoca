@@ -40,7 +40,8 @@ async function bootAutomation(page, options = {}) {
 
   await page.route('**/api/v1/auth/me', route => route.fulfill(json({
     email: 'automation@demo.cl',
-    roles: options.operator ? ['OPERATOR'] : ['BUSINESS_ADMIN']
+    roles: options.operator ? ['OPERATOR'] : ['BUSINESS_ADMIN'],
+    ...(Array.isArray(options.permissions) ? { permissions: options.permissions } : {})
   })));
   await page.route('**/api/v1/business', route => route.fulfill(json({
     id: 'business-automation-demo', name: 'Ferretería QA'
@@ -193,4 +194,35 @@ test.describe('Inventory automation interaction contracts', () => {
     expect(requests.acknowledge).toBe(0);
     expect(requests.cancel).toBe(0);
   });
+
+  test('explicit empty permission claims prevent admin automation mutations despite legacy role', async ({ page }) => {
+    const { requests } = await bootAutomation(page, { permissions: [] });
+    await page.goto('/app/inventory');
+    await expect(page.getByTestId('inventory-alert-alert-1')).toContainText('Pendiente');
+    await expect(page.getByTestId('restock-subscription-wait-1')).toContainText('WhatsApp');
+    await expect(page.getByRole('button', { name: 'Marcar atendida' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Reponer stock' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Cancelar espera' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Ajustar stock' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Nuevo producto' })).toHaveCount(0);
+    expect(requests.acknowledge).toBe(0);
+    expect(requests.cancel).toBe(0);
+    expect(requests.adjust).toHaveLength(0);
+  });
+
+  test('explicit inventory-only claim permits stock management without catalog creation', async ({ page }) => {
+    const { requests } = await bootAutomation(page, { permissions: ['INVENTORY_MANAGE'] });
+    await page.goto('/app/inventory');
+    await expect(page.getByRole('button', { name: 'Nuevo producto' })).toHaveCount(0);
+    await expect(page.getByTestId('inventory-alert-alert-1')
+      .getByRole('button', { name: 'Marcar atendida' })).toBeVisible();
+    await expect(page.getByTestId('inventory-alert-alert-1')
+      .getByRole('button', { name: 'Reponer stock' })).toBeVisible();
+    await expect(page.getByTestId('restock-subscription-wait-1')
+      .getByRole('button', { name: 'Cancelar espera' })).toBeVisible();
+    expect(requests.acknowledge).toBe(0);
+    expect(requests.cancel).toBe(0);
+  });
+
+
 });
