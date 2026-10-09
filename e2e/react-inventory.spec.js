@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { INVENTORY_VIEWPORTS, captureInventoryVisual } = require('./inventory-visual-evidence-helper');
 
 const json = body => ({
   status: 200,
@@ -550,4 +551,50 @@ test.describe('React Inventory migration', () => {
       )).toBe(true);
     }
   });
+
+  test('captures exact-head inspector and degraded states at six canonical viewports', async ({ page }) => {
+    test.setTimeout(180000);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+
+    for (const viewport of INVENTORY_VIEWPORTS) {
+      await page.setViewportSize(viewport);
+      await page.goto('/app/inventory');
+      const row = page.getByTestId('inventory-row-prod-1');
+      await expect(row).toBeVisible();
+      await row.getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+      const inspector = page.getByRole('dialog', { name: 'Taladro percutor' });
+      await expect(inspector).toBeVisible();
+      await expect(inspector).toContainText('Reservado');
+      await captureInventoryVisual(page, 'inspector');
+      await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
+      await expect(inspector).toHaveCount(0);
+
+      const alertsUnavailable = route => route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'alerts unavailable' })
+      });
+      await page.route('**/api/v1/inventory/alerts', alertsUnavailable);
+      await page.goto('/app/inventory');
+      await expect(page.getByTestId('inventory-partial-error')).toBeVisible();
+      await expect(page.getByTestId('inventory-available')).toContainText('6');
+      await expect(page.getByLabel('Resumen de reposición')).toContainText('— alertas (sin datos)');
+      await captureInventoryVisual(page, 'alerts-unavailable');
+      await page.unroute('**/api/v1/inventory/alerts', alertsUnavailable);
+
+      const catalogUnavailable = route => route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'catalog unavailable' })
+      });
+      await page.route('**/api/v1/catalog', catalogUnavailable);
+      await page.goto('/app/inventory');
+      await expect(page.getByRole('alert')).toContainText('No pudimos cargar');
+      await expect(page.getByTestId('inventory-available')).not.toContainText('6');
+      await captureInventoryVisual(page, 'catalog-unavailable');
+      await page.unroute('**/api/v1/catalog', catalogUnavailable);
+    }
+  });
+
 });

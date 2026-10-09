@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { captureInventoryVisual } = require('./inventory-visual-evidence-helper');
 
 const json = body => ({
   status: 200,
@@ -321,4 +322,39 @@ test.describe('React Inventory variants', () => {
     await expect(variantsDialog.getByRole('button', { name: 'Desactivar' })).toHaveCount(0);
     await expect(variantsDialog.getByRole('button', { name: 'Historial' })).toBeVisible();
   });
+
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 }
+  ]) {
+    test('captures exact-head variant list, editor and duplicate validation at ' + viewport.width + 'px', async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      const { productId, requests } = await bootVariantInventory(page);
+      await page.goto('/app/inventory');
+      await page.getByTestId('inventory-row-' + productId)
+        .getByRole('button', { name: 'Variantes' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+      await expect(dialog.getByText('Azul / M')).toBeVisible();
+      await captureInventoryVisual(page, 'variant-list');
+
+      await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+      await dialog.getByRole('button', { name: 'Agregar característica' }).click();
+      await dialog.getByRole('button', { name: 'Agregar característica' }).click();
+      await expect(dialog.getByRole('textbox', { name: 'Característica 1', exact: true })).toBeVisible();
+      await captureInventoryVisual(page, 'variant-editor');
+
+      await dialog.getByLabel('Nombre de variante').fill('Nueva presentación');
+      await dialog.getByLabel('SKU de variante').fill('PRES-DUP');
+      await dialog.getByRole('textbox', { name: 'Característica 1', exact: true }).fill('color');
+      await dialog.getByRole('textbox', { name: 'Característica 2', exact: true }).fill('color');
+      await dialog.getByRole('textbox', { name: 'Valor', exact: true }).nth(0).fill('Azul');
+      await dialog.getByRole('textbox', { name: 'Valor', exact: true }).nth(1).fill('Rojo');
+      await dialog.getByRole('button', { name: 'Crear variante' }).click();
+      await expect(dialog.getByRole('alert')).toContainText('repetida');
+      expect(requests.create).toHaveLength(0);
+      await captureInventoryVisual(page, 'variant-duplicate-error');
+    });
+  }
+
 });

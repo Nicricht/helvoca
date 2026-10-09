@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { captureInventoryVisual } = require('./inventory-visual-evidence-helper');
 
 const json = body => ({
   status: 200,
@@ -296,4 +297,46 @@ test.describe('React Inventory mutations', () => {
     await expect(row).toContainText('7');
     await expect(page.getByTestId('inventory-available')).toContainText('7');
   });
+
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 }
+  ]) {
+    test('captures exact-head product creation, stock setup and 409 error at ' + viewport.width + 'px', async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      const { createdProductId, requests } = await bootAdminInventory(page);
+      const rejectStock = route => {
+        if (route.request().method() !== 'PUT') return route.fallback();
+        return route.fulfill({
+          status: 409, contentType: 'application/json',
+          body: JSON.stringify({ message: 'stale inventory version' })
+        });
+      };
+      await page.route('**/api/v1/inventory/' + createdProductId, rejectStock);
+      await page.goto('/app/inventory');
+      await page.getByRole('button', { name: 'Nuevo producto' }).click();
+      const productDialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+      await expect(productDialog).toBeVisible();
+      await captureInventoryVisual(page, 'create-product');
+
+      await productDialog.getByLabel('Nombre').fill('Pomada con evidencia visual');
+      await productDialog.getByLabel('Precio').fill('9500');
+      await productDialog.getByLabel('Moneda').fill('CLP');
+      await productDialog.getByRole('button', { name: 'Crear y configurar stock' }).click();
+      await expect.poll(() => requests.createProduct.length).toBe(1);
+      const stockDialog = page.getByRole('dialog', { name: 'Configurar stock · Pomada con evidencia visual' });
+      await expect(stockDialog).toContainText('Paso 2');
+      await captureInventoryVisual(page, 'configure-stock');
+
+      await stockDialog.getByLabel('SKU').fill('POM-VIS-1');
+      await stockDialog.getByLabel('Stock físico inicial').fill('4');
+      await stockDialog.getByLabel('Umbral de reposición').fill('2');
+      await stockDialog.getByRole('button', { name: 'Guardar configuración' }).click();
+      await expect(stockDialog.getByRole('alert')).toContainText('conflicto');
+      expect(requests.createProduct).toHaveLength(1);
+      await captureInventoryVisual(page, 'stock-conflict-409');
+    });
+  }
+
 });
