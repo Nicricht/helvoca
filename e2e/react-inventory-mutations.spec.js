@@ -517,4 +517,35 @@ test.describe('React Inventory mutations', () => {
     expect(requests.configure).toHaveLength(0);
   });
 
+
+  test('catalog is saved only once and warns when authoritative list reload fails after creation', async ({ page }) => {
+    const { createdProductId, requests } = await bootAdminInventory(page);
+    let catalogWriteObserved = false;
+    let injectedReadFailure = false;
+    await page.route('**/api/v1/catalog', route => {
+      if (route.request().method() === 'POST') catalogWriteObserved = true;
+      if (route.request().method() === 'GET' && catalogWriteObserved && !injectedReadFailure) {
+        injectedReadFailure = true;
+        return route.fulfill({ status: 503, contentType: 'application/json',
+          body: JSON.stringify({ message: 'list refresh temporarily unavailable' }) });
+      }
+      return route.fallback();
+    });
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await dialog.getByLabel('Nombre').fill('Artículo ya guardado');
+    await dialog.getByLabel('Precio').fill('7500');
+    await dialog.getByLabel('Moneda').fill('CLP');
+    await dialog.getByRole('button', { name: 'Crear producto', exact: true }).click();
+    await expect.poll(() => requests.createProduct.length).toBe(1);
+    await expect(page.getByRole('alert')).toContainText(
+      'El producto se guardó, pero no se pudo actualizar la lista');
+    await expect(dialog).toHaveCount(0);
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+    await expect(page.getByTestId('inventory-row-' + createdProductId)).toContainText('Artículo ya guardado');
+    expect(requests.createProduct).toHaveLength(1);
+    expect(injectedReadFailure).toBe(true);
+  });
+
 });
