@@ -386,4 +386,54 @@ test.describe('React Inventory mutations', () => {
   });
 
 
+
+  test('cancelled catalog and stock dialogs never write or create implicit inventory', async ({ page }) => {
+    const { productId, requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const createDialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await createDialog.getByLabel('Nombre').fill('Unsubmitted product');
+    await createDialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(createDialog).toHaveCount(0);
+
+    await page.getByTestId('inventory-row-' + productId)
+      .getByRole('button', { name: 'Configurar stock' }).click();
+    const stockDialog = page.getByRole('dialog', { name: 'Configurar stock · Cera mate' });
+    await stockDialog.getByLabel('SKU').fill('NEVER-SAVED');
+    await stockDialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(stockDialog).toHaveCount(0);
+    await expect(page.getByTestId('inventory-row-' + productId)).toContainText('Sin configurar');
+    expect(requests.createProduct).toHaveLength(0);
+    expect(requests.configure).toHaveLength(0);
+    expect(requests.adjust).toHaveLength(0);
+  });
+
+  test('catalog edit 409 stays in edit dialog, preserves draft and never duplicates write', async ({ page }) => {
+    const { productId, requests } = await bootAdminInventory(page);
+    const writes = [];
+    await page.route('**/api/v1/catalog/' + productId, route => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      writes.push(route.request().postDataJSON());
+      return route.fulfill({
+        status: 409, contentType: 'application/json',
+        body: JSON.stringify({ message: 'catalog version conflict' })
+      });
+    });
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Editar producto Cera mate' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Editar producto · Cera mate' });
+    await dialog.getByLabel('Precio').fill('8500');
+    await dialog.getByRole('button', { name: 'Guardar producto' }).click();
+    await expect.poll(() => writes.length).toBe(1);
+    await expect(dialog.getByRole('alert')).toContainText('conflicto');
+    await expect(dialog.getByLabel('Precio')).toHaveValue('8500');
+    await expect(dialog).toBeVisible();
+    expect(requests.createProduct).toHaveLength(0);
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(writes).toHaveLength(1);
+    await expect(page.getByTestId('inventory-row-' + productId)).toContainText('Cera profesional');
+  });
+
+
 });

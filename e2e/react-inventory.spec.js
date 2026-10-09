@@ -316,6 +316,11 @@ test.describe('React Inventory migration', () => {
     await expect(pagination).toContainText('Página 2 de 3');
     await expect(page.locator('[data-testid^="inventory-row-extra-"]')).toHaveCount(8);
     await expect.poll(() => mediaRequests).toBe(16);
+    await page.getByRole('button', { name: 'Página anterior' }).click();
+    await expect(pagination).toContainText('Página 1 de 3');
+    await expect(page.getByTestId('inventory-row-extra-00')).toBeVisible();
+    await page.getByRole('button', { name: 'Página siguiente' }).click();
+    await expect(pagination).toContainText('Página 2 de 3');
     await page.getByRole('searchbox', { name: 'Buscar productos' }).fill('Producto extra 17');
     await expect(page.getByTestId('inventory-row-extra-17')).toBeVisible();
     await expect(pagination).toHaveCount(0);
@@ -630,6 +635,80 @@ test.describe('React Inventory migration', () => {
     await order.selectOption('ATTENTION');
     await expect(rows.first()).toHaveAttribute('data-testid', 'inventory-row-prod-2');
     await expect(page.getByRole('heading', { name: 'Alertas y reposición' })).toHaveCount(0);
+  });
+
+
+
+  test('failed history fetch presents an error and a later successful reopen recovers', async ({ page }) => {
+    await bootInventory(page, { roles: ['OPERATOR'] });
+    let fail = true;
+    await page.route('**/api/v1/inventory/prod-1/movements', route => {
+      if (fail) return route.fulfill({
+        status: 503, contentType: 'application/json',
+        body: JSON.stringify({ message: 'history temporarily unavailable' })
+      });
+      return route.fallback();
+    });
+    await page.goto('/app/inventory');
+    const row = page.getByTestId('inventory-row-prod-1');
+    await row.getByRole('button', { name: 'Ver historial' }).click();
+    const history = page.getByRole('dialog', { name: 'Historial · Taladro percutor' });
+    await expect(history.getByRole('alert')).toBeVisible();
+    await expect(history.getByTestId('inventory-movement-move-2')).toHaveCount(0);
+    await history.getByRole('button', { name: 'Cerrar' }).click();
+    await expect(history).toHaveCount(0);
+
+    fail = false;
+    await row.getByRole('button', { name: 'Ver historial' }).click();
+    await expect(history.getByTestId('inventory-movement-move-2')).toContainText('Reposición bodega');
+    await expect(history.getByRole('alert')).toHaveCount(0);
+  });
+
+  test('zero base-stock delta is rejected client-side without any network mutation', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    const requests = [];
+    await page.route('**/api/v1/inventory/prod-1/adjustments', route => {
+      requests.push(route.request().postDataJSON());
+      return route.fulfill(json({}));
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-prod-1').getByRole('button', { name: 'Ajustar stock' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Ajustar stock · Taladro percutor' });
+    await dialog.getByLabel('Ajuste').fill('0');
+    await dialog.getByRole('button', { name: 'Aplicar ajuste' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('entero distinto de cero');
+    expect(requests).toHaveLength(0);
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(requests).toHaveLength(0);
+  });
+
+  test('inspector actions navigate to variants and history without mutating stock', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    const writes = [];
+    await page.route('**/api/v1/inventory/prod-1/variants', route => {
+      if (route.request().method() !== 'GET') writes.push(route.request().method());
+      return route.fulfill(json([]));
+    });
+    await page.goto('/app/inventory');
+    const row = page.getByTestId('inventory-row-prod-1');
+    await row.getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+    let inspector = page.getByRole('dialog', { name: 'Taladro percutor' });
+    await inspector.getByRole('button', { name: 'Variantes' }).click();
+    await expect(inspector).toHaveCount(0);
+    const variantDialog = page.getByRole('dialog', { name: 'Variantes · Taladro percutor' });
+    await expect(variantDialog).toContainText('todavía no tiene variantes');
+    await variantDialog.getByRole('button', { name: 'Cerrar', exact: true }).click();
+    await expect(variantDialog).toHaveCount(0);
+
+    await row.getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+    inspector = page.getByRole('dialog', { name: 'Taladro percutor' });
+    await inspector.getByRole('button', { name: 'Ver historial' }).click();
+    await expect(inspector).toHaveCount(0);
+    const history = page.getByRole('dialog', { name: 'Historial · Taladro percutor' });
+    await expect(history.getByTestId('inventory-movement-move-2')).toContainText('Ajuste manual');
+    await history.getByRole('button', { name: 'Cerrar' }).click();
+    expect(writes).toHaveLength(0);
   });
 
 

@@ -357,4 +357,62 @@ test.describe('React Inventory variants', () => {
     });
   }
 
+
+  test('malformed legacy variant characteristics prevent unsafe writes without exposing raw JSON', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    const damaged = {
+      id: initialVariantId, catalogItemId: productId, name: 'Azul / M',
+      optionValuesJson: '{"incomplete":', sku: 'CER-AZ-M',
+      trackingEnabled: true, onHand: 4, reserved: 1,
+      available: 3, reorderThreshold: 1, lowStock: false, active: true
+    };
+    await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+      if (route.request().method() === 'GET') return route.fulfill(json([damaged]));
+      return route.fallback();
+    });
+    const writes = [];
+    await page.route('**/api/v1/inventory/' + productId + '/variants/' + initialVariantId, route => {
+      if (route.request().method() === 'PUT') writes.push(route.request().postDataJSON());
+      return route.fulfill(json(damaged));
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByTestId('inventory-variant-' + initialVariantId).getByRole('button', { name: 'Editar' }).click();
+    await expect(dialog.getByRole('alert').filter({ hasText: 'formato no compatible' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Agregar característica' })).toBeDisabled();
+    await expect(dialog.getByLabel('Opciones JSON')).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Guardar variante' }).click();
+    await expect(dialog.getByRole('alert').filter({ hasText: 'No se guardaron cambios' })).toBeVisible();
+    expect(writes).toHaveLength(0);
+    expect(requests.update).toHaveLength(0);
+  });
+
+  test('zero variant adjustment is rejected and cancellation does not call variant write endpoints', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByTestId('inventory-variant-' + initialVariantId).getByRole('button', { name: 'Ajustar' }).click();
+    await dialog.getByLabel('Ajuste de variante').fill('0');
+    await dialog.getByRole('button', { name: 'Aplicar ajuste de variante' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('entero distinto de cero');
+    expect(requests.adjust).toHaveLength(0);
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog.getByRole('heading', { name: 'Ajustar · Azul / M' })).toHaveCount(0);
+    expect(requests.adjust).toHaveLength(0);
+
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByRole('button', { name: 'Agregar característica' }).click();
+    await dialog.getByRole('textbox', { name: 'Característica 1', exact: true }).fill('color');
+    await dialog.getByRole('textbox', { name: 'Valor', exact: true }).fill('Azul');
+    await dialog.getByRole('button', { name: 'Quitar característica color' }).click();
+    await expect(dialog.getByRole('textbox', { name: 'Característica 1', exact: true })).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    expect(requests.create).toHaveLength(0);
+    expect(requests.update).toHaveLength(0);
+    expect(requests.adjust).toHaveLength(0);
+  });
+
+
 });

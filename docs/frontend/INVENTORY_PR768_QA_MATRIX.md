@@ -11,7 +11,7 @@
 | --- | --- | --- |
 | Inventory initial load, official art, dense operational lead, accurate product counts and stock | `e2e/react-inventory.spec.js` (ready, skeleton, primary failure, authoritative stock), `e2e/frontend-release-candidate.spec.js` | Assertions and exact-head PNGs |
 | Search, LOW/TRACKED/OUT/RESTOCKED/UNCONFIGURED filters, sorting (attention/name/available), empty state | `e2e/react-inventory.spec.js` ("keeps search", "all stock status filters and sort choices") | Filter transitions and row order asserted |
-| Pagination, table media read budget, page reset after search | `e2e/react-inventory.spec.js` ("local pagination bounds media reads") | Next page and search reset asserted; **previous page not explicitly asserted** |
+| Pagination, table media read budget, page reset after search | `e2e/react-inventory.spec.js` ("local pagination bounds media reads") | Next page and search reset asserted; **previous page now explicitly asserted in latest test revision; new exact-HEAD CI required** |
 | Inspector open/close, focus trap, Escape, restored trigger focus, client viewport bounds | `e2e/react-inventory.spec.js` ("inspector contains keyboard tab focus", "captures exact-head inspector") | Real navigation and geometry; 6 canonical viewports |
 | Catalog price/media permission, missing price, missing catalog | `e2e/react-inventory.spec.js` ("uses real catalog price", "absent catalog price", "stays useful when catalog data fails") | Assertions prevent fabricated data |
 | Create catalog product, guided stock setup, partial success retry, failing create | `e2e/react-inventory-mutations.spec.js` | Network request payload and duplicate prevention |
@@ -29,10 +29,17 @@
 | Inventory Java / SQL authoritative domain invariants | Existing backend/Testcontainers quality suites and `docs/engineering/invariants.md` | No inventory server/schema change in this PR; frontend mocks **do not** certify DB semantics |
 | Global commercial release journeys | GitHub Golden Journey and system integration workflows | Exact final SHA required |
 
+## Additional adverse-path assertions (new commit, verify exact HEAD)
+
+- `e2e/react-inventory.spec.js`: previous-page navigation; failed history followed by successful reopen; zero base-stock adjustment rejected before HTTP; inspector-to-variants and inspector-to-history navigation without writes.
+- `e2e/react-inventory-mutations.spec.js`: catalog/stock cancellation without writes; catalog edit conflict HTTP 409 leaves the draft visible and prevents duplicate writes.
+- `e2e/react-inventory-variants.spec.js`: malformed legacy variant options cannot be submitted as modified data; zero variant delta cannot send an adjustment; deleting a characteristic and canceling the variant editor do not mutate server state.
+- No real API, database, provider or production state is changed by these mocked tests. Tests must pass at the exact new commit before their cells can be certified.
+
 ## Missing certification evidence: explicit HOLD items
 
 1. **Measured frontend executable coverage:** there is currently no JavaScript/TSX source instrumentation or report in the frontend `package.json` and relevant CI evidence for this PR; therefore cannot claim 100% statements/lines/branches/functions. Implement and enforce scoped source coverage or justify inapplicability with a behavior inventory according to `docs/engineering/QA_POLICY.md`.
-2. **Complete affected-control inventory:** some actions still need dedicated assertions for their **failure/edge** outcomes, especially pagination backward navigation, product edit server 409, stock input boundary cases, variants server failures, variant JSON invalid/non-object legacy input, history failure and some close/cancel combinations.
+2. **Complete affected-control inventory:** the new tests address pagination backward navigation, product edit HTTP 409, zero stock delta, malformed legacy option JSON, failed history and several cancellations. Remaining edges include variants API server failures, alternate malformed/non-object legacy option values, authorization claim combinations, and remaining interactive state transitions.
 3. **Permission matrix depth:** roles BUSINESS_OWNER/BUSINESS_ADMIN/OPERATOR have partial browser proof; server authorization and mixed granular claims need scope-specific verification before a 100% coverage claim.
 4. **Real PostgreSQL and providers:** not changed by this PR; no new real-data mutations or paid calls should be introduced to achieve a coverage number. Cross-layer invariants must be linked to existing Testcontainers/contract tests, not inferred from mocked E2E.
 
