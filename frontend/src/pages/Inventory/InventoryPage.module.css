@@ -1631,3 +1631,86 @@
     justify-self: start;
   }
 }
+
+
+/* Part 4: deliberate micro-interactions and resilient data-state presentation.
+ * These styles belong only to Inventory editable slots (FRAME CHANGE: NO). */
+.lastSync {
+  color: var(--rv-text-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.partialNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.partialNotice > span {
+  flex: 1 1 320px;
+  line-height: 1.5;
+}
+
+.partialNotice :global(.button) {
+  flex: 0 0 auto;
+}
+
+.productThumbnail,
+.productThumbnailLarge {
+  transition: border-color var(--rv-motion-fast) ease,
+    box-shadow var(--rv-motion-fast) ease;
+}
+
+.productIdentity:hover .productThumbnail,
+.productIdentity:focus-within .productThumbnail {
+  border-color: var(--rv-accent-border);
+  box-shadow: 0 0 0 2px var(--rv-accent-soft);
+}
+
+.productInspectLink,
+.inspectorActions :global(.button) {
+  transition: color var(--rv-motion-fast) ease,
+    opacity var(--rv-motion-fast) ease;
+}
+
+.productInspector {
+  animation: inventoryDialogIn var(--rv-motion-medium) var(--rv-ease-out) both;
+}
+
+.productInspector :global(.button:focus-visible),
+.productPagination :global(.button:focus-visible),
+.variantOptions :global(.button:focus-visible) {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 760px) {
+  .lastSync {
+    text-align: left;
+  }
+}
+
+@media (hover: none) {
+  .summaryCard:hover,
+  .automationCard:hover,
+  .table tbody tr:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .productInspector {
+    animation: none !important;
+  }
+
+  .productThumbnail,
+  .productThumbnailLarge,
+  .productInspectLink,
+  .inspectorActions :global(.button) {
+    transition: none !important;
+  }
+}
