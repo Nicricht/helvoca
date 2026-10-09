@@ -1195,7 +1195,7 @@ test.describe('React Inventory migration', () => {
     const summary = page.getByLabel('Resumen de reposición');
     await expect(summary).toContainText('— alertas (sin datos)');
     await expect(summary).toContainText('— esperando (sin datos)');
-    await expect(summary).toContainText('— avisos (sin datos)');
+    await expect(page.getByRole('heading', { name: 'Listos para enviar' }).locator('xpath=../..')).toContainText('—');
     await expect(page.getByText('Alertas no disponibles. Reintenta la consulta.')).toBeVisible();
     await expect(page.getByText('Lista de espera no disponible. Reintenta la consulta.')).toBeVisible();
     await expect(page.getByText('Avisos no disponibles. Reintenta la consulta.')).toBeVisible();
