@@ -737,14 +737,17 @@ test.describe('React Inventory migration', () => {
     const first = page.getByTestId('inventory-row-prod-1');
     const second = page.getByTestId('inventory-row-prod-2');
     await expect(first).toContainText('54.990');
+    // Wait for the one permitted remote image request before asserting fallback.
+    // Without this poll, an unloaded image looks identical to a failed image.
+    await expect.poll(() => [...requestedImages]).toEqual(['https://cdn.example.test/broken.png']);
     await expect(first.locator('img')).toHaveCount(0);
     await expect(second.locator('img')).toHaveCount(0);
-    expect(requestedImages).toEqual(['https://cdn.example.test/broken.png']);
     await first.getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
     const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
     await expect(inspector.locator('img')).toHaveCount(0);
     await expect(inspector).toContainText('SKU: TAL-18V');
     await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
+    expect(requestedImages).toEqual(['https://cdn.example.test/broken.png']);
   });
 
   test('product detail distinguishes unconfigured, untracked and exhausted stock without fabricating availability', async ({ page }) => {
