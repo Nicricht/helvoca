@@ -130,6 +130,49 @@ async function bootInventory(page, options = {}) {
 }
 
 test.describe('React Inventory migration', () => {
+  test('keeps the official robot in a compact operational lead with the product table above the desktop fold', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await bootInventory(page);
+    await page.goto('/app/inventory');
+
+    const intro = page.getByTestId('inventory-intro');
+    await expect(intro).toBeVisible();
+    await expect(intro).toContainText('2 de 2 productos con stock controlado');
+    await expect(intro.locator('img[src="/app/assets/recepvoz/v2/inventory/hero-stock-robot.webp"]')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Inventario' })).toHaveCount(1);
+
+    const height = await intro.evaluate(element => element.getBoundingClientRect().height);
+    expect(height).toBeLessThanOrEqual(210);
+
+    const tableTop = await page.locator('table').first().evaluate(element => element.getBoundingClientRect().top);
+    expect(tableTop).toBeLessThan(900);
+
+    const importTop = await page.getByRole('link', { name: 'Importar archivos' })
+      .evaluate(element => element.getBoundingClientRect().top);
+    const createTop = await page.getByRole('button', { name: 'Nuevo producto' })
+      .evaluate(element => element.getBoundingClientRect().top);
+    const refreshTop = await page.getByRole('button', { name: 'Actualizar', exact: true })
+      .evaluate(element => element.getBoundingClientRect().top);
+    expect(Math.abs(importTop - createTop)).toBeLessThan(8);
+    expect(Math.abs(createTop - refreshTop)).toBeLessThan(8);
+
+    await expect(page.getByTestId('inventory-available')).toContainText('6');
+    await expect(page.getByTestId('inventory-reserved')).toContainText('4');
+    await expect(page.getByTestId('inventory-row-prod-2')).toContainText('Stock bajo');
+  });
+
+  test('preserves the compact lead, all four metrics and no page overflow on a mobile viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await bootInventory(page);
+    await page.goto('/app/inventory');
+
+    await expect(page.getByTestId('inventory-intro')).toBeVisible();
+    await expect(page.getByTestId('inventory-products')).toBeVisible();
+    await expect(page.getByTestId('inventory-available')).toBeVisible();
+    await expect(page.getByTestId('inventory-reserved')).toBeVisible();
+    await expect(page.getByTestId('inventory-low-stock')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
   test('renders authoritative stock without confusing physical, reserved and available', async ({ page }) => {
     await bootInventory(page);
     await page.goto('/app/inventory');
