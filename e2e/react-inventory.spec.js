@@ -895,4 +895,63 @@ test.describe('React Inventory migration', () => {
   });
 
 
+
+  test('inspector distinguishes low, healthy and partial stock without fictional values', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    let stock = [];
+    await page.route('**/api/v1/inventory', route => route.fulfill(json(stock)));
+    const scenarios = [
+      {
+        record: { sku: 'LOW-01', trackingEnabled: true, onHand: 5,
+          reserved: 1, available: 4, reorderThreshold: 5, lowStock: true },
+        hint: 'Stock bajo: revisa el mínimo', sku: 'SKU: LOW-01',
+        amount: '4', expectedAdjust: 1
+      },
+      {
+        record: { sku: 'OK-01', trackingEnabled: true, onHand: 10,
+          reserved: 0, available: 10, reorderThreshold: 2, lowStock: false },
+        hint: 'Disponibilidad calculada desde el backend.',
+        sku: 'SKU: OK-01', amount: '10', expectedAdjust: 1
+      },
+      {
+        record: { sku: '', trackingEnabled: true, onHand: null,
+          reserved: null, available: null, reorderThreshold: null, lowStock: false },
+        hint: 'Disponibilidad calculada desde el backend.',
+        sku: 'SKU: Sin SKU', amount: '—', expectedAdjust: 1
+      }
+    ];
+    for (const state of scenarios) {
+      stock = [{ id: 'stock-1', catalogItemId: 'prod-1', ...state.record }];
+      await page.goto('/app/inventory');
+      await page.getByTestId('inventory-row-prod-1')
+        .getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+      const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+      await expect(inspector).toContainText(state.hint);
+      await expect(inspector).toContainText(state.sku);
+      await expect(inspector.locator('dl')).toContainText(state.amount);
+      await expect(inspector.getByRole('button', { name: 'Ajustar stock' })).toHaveCount(state.expectedAdjust);
+      await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
+      await expect(inspector).toHaveCount(0);
+    }
+  });
+
+  test('inspector Escape works even after its focusable controls are removed dynamically', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.goto('/app/inventory');
+    const trigger = page.getByTestId('inventory-row-prod-1')
+      .getByRole('button', { name: 'Ver detalles de Taladro percutor' });
+    await trigger.click();
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+    await expect(inspector).toBeVisible();
+    await inspector.evaluate(element => {
+      for (const button of element.querySelectorAll('button')) button.remove();
+    });
+    await page.keyboard.press('Tab');
+    await expect(inspector).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(inspector).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+
+
 });
