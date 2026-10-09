@@ -190,7 +190,7 @@ test.describe('React Inventory mutations', () => {
     const { requests } = await bootAdminInventory(page);
     let failedPosts = 0;
     await page.route('**/api/v1/catalog', async route => {
-      if (route.request().method() !== 'POST') return route.continue();
+      if (route.request().method() !== 'POST') return route.fallback();
       failedPosts++;
       return route.fulfill({ status: 500, contentType: 'application/json',
         body: JSON.stringify({ message: 'catalog unavailable' }) });
