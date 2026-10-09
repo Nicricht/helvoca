@@ -30,8 +30,13 @@ const unavailableSamples = existsSync(rawDir)
 const manifest = existsSync(rawDir)
   ? readdirSync(rawDir).filter(name => name.endsWith('.record.json')).sort()
   : [];
-const recordedSuites = new Set(manifest.map(filename =>
-  JSON.parse(readFileSync(path.join(rawDir, filename), 'utf8')).suite));
+const records = manifest.map(filename =>
+  JSON.parse(readFileSync(path.join(rawDir, filename), 'utf8')));
+const recordedSuites = new Set(records.map(record => record.suite));
+const archivedDocuments = records.reduce((sum, record) =>
+  sum + (record.archivedDocuments || 0), 0);
+const archivedFailures = records.filter(record => record.archiveFailed)
+  .map(record => ({ suite: record.suite, test: record.test }));
 const requiredSuites = [
   'react-inventory.spec.js',
   'react-inventory-mutations.spec.js',
@@ -70,6 +75,7 @@ const details = [];
 const missing = [];
 const aggregate = createCoverageSummary();
 let failed = inputSourceMaps.length !== expected.length ||
+  archivedDocuments === 0 || archivedFailures.length > 0 ||
   samples.length === 0 ||
   missingSuites.length > 0 ||
   manifest.length !== samples.length + unavailableSamples.length ||
@@ -112,6 +118,8 @@ for (const wanted of expected) {
 const report = {
   source: 'Istanbul browser counters remapped through embedded Vite source maps to original TS/TSX',
   originalSourceRemapping: true,
+  archivedPriorNavigations: archivedDocuments,
+  archivedFailures,
   instrumentedSourceFilesWithInputSourceMaps: inputSourceMaps.length,
   mappedOriginalSourceFiles: sources.length,
   capturedBrowserTests: samples.length,
@@ -136,6 +144,8 @@ const markdown = [
   '# Inventory source coverage from browser execution',
   '',
   'Instrumented snapshots: ' + samples.length,
+  'Previously navigated document snapshots merged: ' + archivedDocuments,
+  'Source archive failures: ' + archivedFailures.length,
   'Original source remapping: ENABLED (embedded Vite inputSourceMap)',
   'Instrumented files with source maps: ' + inputSourceMaps.length,
   'Mapped original files: ' + sources.length,
