@@ -65,6 +65,44 @@ class MetaWhatsAppDeliveryStatusServiceTest {
     }
 
     @Test
+    void authenticatedSentAndFailedCallbacksNeverMasqueradeAsDeliveryReceipts() {
+        for (String status : List.of("sent", "failed")) {
+            OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
+            MessagingMessageRepository messages = mock(MessagingMessageRepository.class);
+            MessagingConversationRepository conversations = mock(MessagingConversationRepository.class);
+            RequestReplyDeliveryEvidenceService evidence = mock(RequestReplyDeliveryEvidenceService.class);
+            UUID businessId = UUID.randomUUID();
+            UUID conversationId = UUID.randomUUID();
+            UUID inboundId = UUID.randomUUID();
+            String providerId = "wamid." + status;
+
+            MessagingMessage inbound = new MessagingMessage();
+            ReflectionTestUtils.setField(inbound, "id", inboundId);
+            inbound.setConversationId(conversationId);
+            inbound.setProvider(MetaWhatsAppMessagingProvider.ID);
+            inbound.setProviderMessageId(providerId);
+
+            MessagingConversation conversation = new MessagingConversation();
+            conversation.setBusinessId(businessId);
+            when(outbound.findTopByProviderAndProviderMessageIdOrderByUpdatedAtDesc(
+                    MetaWhatsAppMessagingProvider.ID, providerId)).thenReturn(Optional.empty());
+            when(messages.findByProviderAndProviderMessageId(
+                    MetaWhatsAppMessagingProvider.ID, providerId)).thenReturn(Optional.of(inbound));
+            when(conversations.findByIdAndBusinessId(conversationId, businessId))
+                    .thenReturn(Optional.of(conversation));
+            var service = new MetaWhatsAppDeliveryStatusService(outbound, messages, conversations);
+            ReflectionTestUtils.setField(service, "requestReceiptEvidence", evidence);
+
+            assertEquals(MetaWhatsAppDeliveryStatusService.Result.UPDATED,
+                    service.apply(businessId, providerId, status,
+                            Instant.ofEpochSecond(1760000000L), "temporary"));
+            assertEquals(status.toUpperCase(java.util.Locale.ROOT), inbound.getProviderDeliveryStatus());
+            verify(messages).saveAndFlush(inbound);
+            verifyNoInteractions(evidence);
+        }
+    }
+
+    @Test
     void deliveredUpdatesPersistedAiReplyTracking() {
         OutboundMessageRepository outbound = mock(OutboundMessageRepository.class);
         MessagingMessageRepository messages = mock(MessagingMessageRepository.class);

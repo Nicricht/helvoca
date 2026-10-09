@@ -200,6 +200,14 @@ jobs:
           DIFF_METHOD_COVERAGE: "100"
         run: python3 scripts/ci/check_diff_coverage.py "$BASE_SHA"
 
+      - name: Certify historical PR 764 request-reply code at 100 percent
+        if: github.event_name == 'pull_request' && github.head_ref == 'test/request-reply-100-percent-20261008'
+        env:
+          DIFF_LINE_COVERAGE: "100"
+          DIFF_BRANCH_COVERAGE: "100"
+          DIFF_METHOD_COVERAGE: "100"
+        run: python3 scripts/ci/check_diff_coverage.py "51e77b1991892e6ec5b1ead78dda5f776ae7e00d"
+
       - name: Upload backend test diagnostics
         if: failure()
         uses: actions/upload-artifact@v4

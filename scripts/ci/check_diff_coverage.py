@@ -96,6 +96,7 @@ branch_total = branch_covered = 0
 method_total = method_covered = 0
 uncovered: list[str] = []
 uncovered_methods: list[str] = []
+uncovered_branch_lines: list[str] = []
 
 for path, lines in sorted(changed.items()):
     report_lines = jacoco.get(path, {})
@@ -113,12 +114,17 @@ for path, lines in sorted(changed.items()):
         if mb + cb > 0:
             branch_total += mb + cb
             branch_covered += cb
+            if mb:
+                uncovered_branch_lines.append(f"{path}:{nr} ({mb} missed branches)")
 
 affected_methods: set[tuple[str, int, str, str, bool]] = set()
 for path, lines in changed.items():
     methods = sorted(methods_by_path.get(path, []), key=lambda item: item[0])
-    for index, (start, name, desc, covered) in enumerate(methods):
-        next_start = methods[index + 1][0] if index + 1 < len(methods) else 10**9
+    distinct_starts = sorted({start for start, _, _, _ in methods})
+    for start, name, desc, covered in methods:
+        # JaCoCo can report several synthetic/record/nested methods at the same
+        # source line. Do not silently exclude all but the last such method.
+        next_start = next((other for other in distinct_starts if other > start), 10**9)
         if any(start <= line_no < next_start for line_no in lines):
             affected_methods.add((path, start, name, desc, covered))
 
@@ -158,6 +164,13 @@ if uncovered:
         print(f" - {entry}")
     if len(uncovered) > 50:
         print(f" ... and {len(uncovered) - 50} more")
+
+if uncovered_branch_lines:
+    print("Uncovered changed branch outcomes:")
+    for entry in uncovered_branch_lines[:50]:
+        print(f" - {entry}")
+    if len(uncovered_branch_lines) > 50:
+        print(f" ... and {len(uncovered_branch_lines) - 50} more")
 
 if uncovered_methods:
     print("Uncovered changed methods:")

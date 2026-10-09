@@ -261,6 +261,86 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
                 String.class, request.getId()));
     }
 
+    @Test
+    void realPostgresRejectsForgedCorrelationAndUnsignedProviderReceiptsAtTheDatabaseBoundary() {
+        Business business = business("Reply receipt SQL guards");
+        authenticate(business.getId());
+
+        MessagingConversation conversation = new MessagingConversation();
+        conversation.setBusinessId(business.getId());
+        conversation.setChannel("whatsapp");
+        conversation.setSender("+56912345678");
+        conversation.setRecipient("+56987654321");
+        conversation = messagingConversations.saveAndFlush(conversation);
+
+        MessagingMessage inbound = new MessagingMessage();
+        inbound.setConversationId(conversation.getId());
+        inbound.setExternalMessageId("sql-guard-" + UUID.randomUUID());
+        inbound.setDirection("INBOUND");
+        inbound.setRole("USER");
+        inbound.setContent("Necesito información sobre mi solicitud");
+        inbound = messagingMessages.saveAndFlush(inbound);
+
+        BusinessRequest request = requests.createFromAi(
+                business.getId(), null, conversation.getId(), "GENERAL",
+                "Solicitud verificable", "Requiere respuesta", null,
+                conversation.getSender(), RequestPriority.NORMAL, null, RequestSource.AI_WHATSAPP);
+
+        UUID finalConversation = conversation.getId();
+        UUID finalMessage = inbound.getId();
+        // Missing persisted assistant reply must be rejected by the V96 trigger.
+        assertThrows(org.springframework.dao.DataAccessException.class,
+                () -> jdbc.update("""
+                        INSERT INTO public.business_request_reply_correlation
+                            (business_id, request_id, operation_id, conversation_id, inbound_message_id)
+                        VALUES (?, ?, ?, ?, ?)
+                        """, business.getId(), request.getId(), request.getOperationId(),
+                        finalConversation, finalMessage));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM public.business_request_reply_correlation WHERE request_id = ?",
+                Integer.class, request.getId()));
+
+        inbound.setReplyText("Registré tu solicitud para seguimiento.");
+        inbound = messagingMessages.saveAndFlush(inbound);
+
+        // Valid trusted evidence may be inserted; foreign tenant references may not.
+        assertThrows(org.springframework.dao.DataAccessException.class,
+                () -> jdbc.update("""
+                        INSERT INTO public.business_request_reply_correlation
+                            (business_id, request_id, operation_id, conversation_id, inbound_message_id)
+                        VALUES (?, ?, ?, ?, ?)
+                        """, UUID.randomUUID(), request.getId(), request.getOperationId(),
+                        finalConversation, finalMessage));
+        jdbc.update("""
+                INSERT INTO public.business_request_reply_correlation
+                    (business_id, request_id, operation_id, conversation_id, inbound_message_id)
+                VALUES (?, ?, ?, ?, ?)
+                """, business.getId(), request.getId(), request.getOperationId(),
+                finalConversation, finalMessage);
+        UUID correlationId = jdbc.queryForObject("""
+                SELECT id FROM public.business_request_reply_correlation
+                WHERE business_id = ? AND request_id = ?
+                """, UUID.class, business.getId(), request.getId());
+        assertNotNull(correlationId);
+
+        // No signed delivery callback has persisted DELIVERED, so V97 must reject
+        // a fabricated provider receipt, even if the IDs match real rows.
+        UUID finalCorrelation = correlationId;
+        assertThrows(org.springframework.dao.DataAccessException.class,
+                () -> jdbc.update("""
+                        INSERT INTO public.business_request_reply_delivery_event
+                            (business_id, correlation_id, inbound_message_id, provider,
+                             provider_message_id, receipt_status, provider_recorded_at)
+                        VALUES (?, ?, ?, 'META_WHATSAPP_CLOUD',
+                                'wamid.forged', 'DELIVERED', CURRENT_TIMESTAMP)
+                        """, business.getId(), finalCorrelation, finalMessage));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM public.business_request_reply_delivery_event WHERE correlation_id = ?",
+                Integer.class, finalCorrelation));
+        assertEquals("OPEN", jdbc.queryForObject(
+                "SELECT status FROM public.business_request WHERE id = ?", String.class, request.getId()));
+    }
+
     private int receiptCount(UUID businessId, UUID requestId) {
         return jdbc.queryForObject("""
                 SELECT count(*)
