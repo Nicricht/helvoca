@@ -291,6 +291,8 @@ jobs:
         env:
           VITE_COVERAGE: "true"
         run: npm run frontend:build
+      - name: Inventory coverage test discovery manifest
+        run: npx playwright test e2e/react-inventory*.spec.js --list | tee .inventory-coverage-tests.txt
       - name: Exercise Inventory behavior in Chromium
         env:
           VITE_COVERAGE: "true"
@@ -305,6 +307,7 @@ jobs:
           path: |
             test-results/inventory-coverage/**
             .inventory-coverage-raw/**
+            .inventory-coverage-tests.txt
             test-results/**/error-context.md
           if-no-files-found: warn
           retention-days: 14

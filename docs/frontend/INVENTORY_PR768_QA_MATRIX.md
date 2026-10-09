@@ -53,3 +53,10 @@
 - An administrator must hold both the appropriate admin role **and the effective inventory-manage grant** to see mutating Variantes/Alertas controls. The pre-fix negative-role tests are recorded on `b939f70`; read-only inspection remains available.
 - Additional UI tests: variant 503 recovery, malformed non-object legacy options and variant HTTP 409 without duplicate writes.
 - Do not mark this work complete solely because functional Playwright passes. Use the CI evidence to close all applicable uncovered branches and interactions. Keep the PR in Draft while any of those metrics is below 100%.
+
+## Phase 1 of 3: coverage-collector completeness (2026-10-09)
+
+- RED evidence at `a32db775`: 67 Playwright Inventory tests passed, but the Istanbul collector recorded only 57 because three existing specs were not using the collection fixture. Four of seven spec suites were represented. This was a collection blind spot, not a passing coverage result.
+- Phase-1 repair: route `react-inventory-alerts-restock.spec.js`, `react-inventory-hardening.spec.js` and `react-inventory-parity.spec.js` through the same source-coverage fixture, preserving their assertions.
+- CI now obtains an independent `playwright --list` test-discovery manifest and refuses to certify a mismatch between discovered and recorded browser tests, or missing required suites. Seven Inventory suites are mandatory; zero silent omissions are permitted.
+- The strict per-file **100% statements, lines, branches and functions** checks are unchanged and expected to remain RED wherever actual coverage falls short. Phase 2 addresses those uncovered code paths. Phase 3 performs exact-head final certification and production release checks only if all gates pass.

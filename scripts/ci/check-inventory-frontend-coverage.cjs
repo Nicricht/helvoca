@@ -35,15 +35,30 @@ const requiredSuites = [
   'react-inventory.spec.js',
   'react-inventory-mutations.spec.js',
   'react-inventory-variants.spec.js',
-  'react-inventory-automation.spec.js'
+  'react-inventory-automation.spec.js',
+  'react-inventory-alerts-restock.spec.js',
+  'react-inventory-hardening.spec.js',
+  'react-inventory-parity.spec.js'
 ];
 const missingSuites = requiredSuites.filter(name => !recordedSuites.has(name));
+const discoveredManifestPath = path.join(process.cwd(), '.inventory-coverage-tests.txt');
+const discoveredManifest = existsSync(discoveredManifestPath)
+  ? readFileSync(discoveredManifestPath, 'utf8')
+  : '';
+const discoveredTotals = discoveredManifest.match(/Total:\s*(\d+)\s+tests?\s+in\s+(\d+)\s+files?/);
+const discoveredTests = discoveredTotals ? Number(discoveredTotals[1]) : null;
+const discoveredFiles = discoveredTotals ? Number(discoveredTotals[2]) : null;
 const sources = map.files();
 const normalize = value => value.replaceAll('\\', '/').split('?')[0];
 const details = [];
 const missing = [];
 const aggregate = createCoverageSummary();
-let failed = samples.length === 0 || missingSuites.length > 0 || manifest.length !== samples.length + unavailableSamples.length;
+let failed = samples.length === 0 ||
+  missingSuites.length > 0 ||
+  manifest.length !== samples.length + unavailableSamples.length ||
+  discoveredTests === null ||
+  discoveredTests !== manifest.length ||
+  discoveredFiles !== requiredSuites.length;
 
 for (const wanted of expected) {
   const candidates = sources.filter(name => normalize(name).endsWith('/' + wanted));
@@ -74,6 +89,8 @@ const report = {
   capturedBrowserTests: samples.length,
   unavailableBrowserTests: unavailableSamples.length,
   totalRecordedTests: manifest.length,
+  discoveredPlaywrightTests: discoveredTests,
+  discoveredPlaywrightFiles: discoveredFiles,
   recordedSuites: [...recordedSuites].sort(),
   missingSuites,
   requiredCoveragePercent: 100,
@@ -93,6 +110,8 @@ const markdown = [
   'Instrumented snapshots: ' + samples.length,
   'Unavailable at teardown: ' + unavailableSamples.length,
   'Total browser tests recorded: ' + manifest.length,
+  'Playwright-discovered tests: ' + (discoveredTests ?? 'MISSING'),
+  'Playwright-discovered spec files: ' + (discoveredFiles ?? 'MISSING'),
   'Suites captured: ' + [...recordedSuites].sort().join(', '),
   'Missing suites: ' + (missingSuites.length ? missingSuites.join(', ') : 'none'),
   '',
