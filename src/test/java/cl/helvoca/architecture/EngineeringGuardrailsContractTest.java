@@ -18,8 +18,9 @@ class EngineeringGuardrailsContractTest {
         String agents = read("AGENTS.md");
         assertTrue(agents.contains("First-Pass Engineering"));
         assertTrue(agents.contains("software-factory/skill/first-pass-engineering/SKILL.md"));
-        assertTrue(agents.contains("80% differential line coverage"));
-        assertTrue(agents.contains("70% differential branch coverage"));
+        assertTrue(agents.contains("100% differential line, branch and method coverage"));
+        assertTrue(agents.contains("100% mapped interaction/state-transition coverage"));
+        assertTrue(agents.contains("100% mapped real-PostgreSQL invariant coverage"));
         assertTrue(agents.toLowerCase().contains("final commit"));
         assertTrue(agents.contains("Never develop directly on `main`"));
         assertTrue(agents.toLowerCase().contains("regression tests for every bug fixed"));
