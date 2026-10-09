@@ -1167,4 +1167,39 @@ test.describe('React Inventory migration', () => {
     await dialog.getByRole('button', { name: 'Cerrar' }).click();
   });
 
+
+  test('malformed catalog success response fails closed rather than rendering invented or crashed stock totals', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.route('**/api/v1/catalog', route => route.fulfill(json({ unexpected: 'object' })));
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/app/inventory');
+    await expect(page.getByRole('alert')).toContainText('No pudimos cargar el inventario completo');
+    await expect(page.getByTestId('inventory-products')).toContainText('—');
+    await expect(page.getByTestId('inventory-available')).toContainText('—');
+    await expect(page.getByTestId('inventory-row-prod-1')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('malformed secondary success payloads show unavailable queues instead of zeros or runtime errors', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json(null)));
+    await page.route('**/api/v1/inventory/restock-subscriptions', route => route.fulfill(json({ waiting: null })));
+    await page.route('**/api/v1/inventory/restock-subscriptions/notifications',
+      route => route.fulfill(json({ notifications: null })));
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/app/inventory');
+    await expect(page.getByTestId('inventory-row-prod-1')).toBeVisible();
+    await expect(page.getByTestId('inventory-partial-error')).toBeVisible();
+    const summary = page.getByLabel('Resumen de reposición');
+    await expect(summary).toContainText('— alertas (sin datos)');
+    await expect(summary).toContainText('— esperando (sin datos)');
+    await expect(summary).toContainText('— avisos (sin datos)');
+    await expect(page.getByText('Alertas no disponibles. Reintenta la consulta.')).toBeVisible();
+    await expect(page.getByText('Lista de espera no disponible. Reintenta la consulta.')).toBeVisible();
+    await expect(page.getByText('Avisos no disponibles. Reintenta la consulta.')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
 });
