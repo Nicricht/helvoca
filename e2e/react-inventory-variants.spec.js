@@ -852,4 +852,21 @@ test.describe('React Inventory variants', () => {
     expect(requests.create).toHaveLength(0);
   });
 
+
+  test('missing variant threshold is rejected before creating any variant', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('Nombre de variante').fill('Sin umbral');
+    await dialog.getByLabel('SKU de variante').fill('NO-THRESHOLD');
+    await dialog.getByLabel('Stock físico inicial').fill('4');
+    await dialog.locator('[name="variantReorderThreshold"]').evaluate(element => element.remove());
+    await dialog.getByRole('button', { name: 'Crear variante' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('enteros iguales o mayores que cero');
+    await expect(dialog).toBeVisible();
+    expect(requests.create).toHaveLength(0);
+  });
+
 });

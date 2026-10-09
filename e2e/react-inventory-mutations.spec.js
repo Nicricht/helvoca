@@ -548,4 +548,67 @@ test.describe('React Inventory mutations', () => {
     expect(injectedReadFailure).toBe(true);
   });
 
+
+  test('stock reload outage after successful catalog write preserves one write and explains the partial success', async ({ page }) => {
+    const { createdProductId, requests } = await bootAdminInventory(page);
+    let catalogWriteObserved = false;
+    let failedInventoryRead = false;
+    await page.route('**/api/v1/catalog', route => {
+      if (route.request().method() === 'POST') catalogWriteObserved = true;
+      return route.fallback();
+    });
+    await page.route('**/api/v1/inventory', route => {
+      if (route.request().method() === 'GET' && catalogWriteObserved && !failedInventoryRead) {
+        failedInventoryRead = true;
+        return route.fulfill({ status: 503, contentType: 'application/json',
+          body: JSON.stringify({ message: 'inventory read unavailable' }) });
+      }
+      return route.fallback();
+    });
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await dialog.getByLabel('Nombre').fill('Catálogo guardado');
+    await dialog.getByLabel('Precio').fill('2600');
+    await dialog.getByLabel('Moneda').fill('CLP');
+    await dialog.getByRole('button', { name: 'Crear producto', exact: true }).click();
+    await expect.poll(() => requests.createProduct.length).toBe(1);
+    await expect(page.getByRole('alert')).toContainText('El producto se guardó, pero no se pudo actualizar la lista');
+    await expect(dialog).toHaveCount(0);
+    await page.getByRole('button', { name: 'Reintentar' }).click();
+    await expect(page.getByTestId('inventory-row-' + createdProductId)).toContainText('Catálogo guardado');
+    expect(failedInventoryRead).toBe(true);
+    expect(requests.createProduct).toHaveLength(1);
+  });
+
+  test('a blank but present price is unknown, never silently zero through numeric coercion', async ({ page }) => {
+    const { requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await dialog.getByLabel('Nombre').fill('Precio sin definir');
+    await dialog.getByLabel('Moneda').fill('CLP');
+    await dialog.locator('form').evaluate(form => {
+      form.noValidate = true;
+      form.querySelector('[name="price"]').type = 'text';
+    });
+    await dialog.getByLabel('Precio').fill('   ');
+    await dialog.getByRole('button', { name: 'Crear producto', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toContainText('El precio debe ser un número');
+    await expect(dialog).toBeVisible();
+    expect(requests.createProduct).toHaveLength(0);
+  });
+
+  test('missing required stock threshold is rejected rather than normalized to zero', async ({ page }) => {
+    const { productId, requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Configurar stock' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Configurar stock · Cera mate' });
+    await dialog.getByLabel('Stock físico inicial').fill('7');
+    await dialog.locator('[name="reorderThreshold"]').evaluate(element => element.remove());
+    await dialog.getByRole('button', { name: 'Guardar configuración' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('enteros iguales o mayores que cero');
+    expect(requests.configure).toHaveLength(0);
+  });
+
 });
