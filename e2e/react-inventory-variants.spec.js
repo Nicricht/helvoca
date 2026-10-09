@@ -869,4 +869,35 @@ test.describe('React Inventory variants', () => {
     expect(requests.create).toHaveLength(0);
   });
 
+
+  test('removing required variant identity fields is rejected without submitting phantom variants', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId)
+      .getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('SKU de variante').fill('NO-IDENTITY');
+    const form = dialog.locator('form');
+    await form.evaluate(element => {
+      element.noValidate = true;
+      element.querySelector('[name="variantName"]').remove();
+    });
+    await dialog.getByRole('button', { name: 'Crear variante' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('Escribe un nombre para la variante');
+    expect(requests.create).toHaveLength(0);
+
+    await form.evaluate(element => {
+      const name = document.createElement('input');
+      name.name = 'variantName';
+      name.value = 'Variante recuperada';
+      element.append(name);
+      element.querySelector('[name="variantSku"]').remove();
+    });
+    await dialog.getByRole('button', { name: 'Crear variante' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('Escribe un SKU para la variante');
+    await expect(dialog).toBeVisible();
+    expect(requests.create).toHaveLength(0);
+  });
+
 });
