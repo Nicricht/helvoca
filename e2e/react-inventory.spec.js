@@ -712,4 +712,123 @@ test.describe('React Inventory migration', () => {
   });
 
 
+
+  test('broken and unsafe catalog images fall back to local icons without retrying media providers', async ({ page }) => {
+    const requestedImages = [];
+    await bootInventory(page, {
+      roles: ['BUSINESS_ADMIN'],
+      mediaByProduct: {
+        'prod-1': [
+          { id: 'inactive', mediaType: 'IMAGE', mediaUrl: 'https://cdn.example.test/inactive.png', active: false },
+          { id: 'bad-type', mediaType: 'VIDEO', mediaUrl: 'https://cdn.example.test/clip.mp4', active: true },
+          { id: 'valid', mediaType: 'IMAGE', mediaUrl: 'https://cdn.example.test/broken.png', active: true }
+        ],
+        'prod-2': [
+          { id: 'unsafe', mediaType: 'IMAGE', mediaUrl: 'javascript:alert(1)', active: true },
+          { id: 'insecure', mediaType: 'IMAGE', mediaUrl: 'http://cdn.example.test/insecure.png', active: true }
+        ]
+      }
+    });
+    await page.route('https://cdn.example.test/**', route => {
+      requestedImages.push(route.request().url());
+      return route.fulfill({ status: 404, body: 'not found' });
+    });
+    await page.goto('/app/inventory');
+    const first = page.getByTestId('inventory-row-prod-1');
+    const second = page.getByTestId('inventory-row-prod-2');
+    await expect(first).toContainText('54.990');
+    await expect(first.locator('img')).toHaveCount(0);
+    await expect(second.locator('img')).toHaveCount(0);
+    expect(requestedImages).toEqual(['https://cdn.example.test/broken.png']);
+    await first.getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+    await expect(inspector.locator('img')).toHaveCount(0);
+    await expect(inspector).toContainText('SKU: TAL-18V');
+    await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
+  });
+
+  test('product detail distinguishes unconfigured, untracked and exhausted stock without fabricating availability', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    let currentStock = [];
+    await page.route('**/api/v1/inventory', route => route.fulfill(json(currentStock)));
+    const states = [
+      {
+        stock: [], message: 'Stock sin configurar.',
+        available: '—', manage: 'Configurar stock', adjust: false
+      },
+      {
+        stock: [{
+          id: 'stock-1', catalogItemId: 'prod-1', trackingEnabled: false,
+          onHand: 8, reserved: 3, available: 5, reorderThreshold: 4, lowStock: false
+        }], message: 'control de stock está desactivado',
+        available: '5', manage: 'Editar stock', adjust: false
+      },
+      {
+        stock: [{
+          id: 'stock-1', catalogItemId: 'prod-1', trackingEnabled: true,
+          onHand: 5, reserved: 5, available: 0, reorderThreshold: 2, lowStock: false
+        }], message: 'Sin unidades disponibles.',
+        available: '0', manage: 'Editar stock', adjust: true
+      }
+    ];
+    for (const state of states) {
+      currentStock = state.stock;
+      await page.goto('/app/inventory');
+      await page.getByTestId('inventory-row-prod-1')
+        .getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+      const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+      await expect(inspector).toContainText(state.message);
+      await expect(inspector.locator('dl')).toContainText(state.available);
+      await expect(inspector.getByRole('button', { name: state.manage })).toBeVisible();
+      await expect(inspector.getByRole('button', { name: 'Ajustar stock' }))
+        .toHaveCount(state.adjust ? 1 : 0);
+      await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
+      await expect(inspector).toHaveCount(0);
+    }
+  });
+
+  test('inspector keyboard focus wraps backward and forward and non-escape typing keeps dialog open', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.goto('/app/inventory');
+    const trigger = page.getByTestId('inventory-row-prod-1')
+      .getByRole('button', { name: 'Ver detalles de Taladro percutor' });
+    await trigger.click();
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+    const close = inspector.getByRole('button', { name: 'Cerrar detalles' });
+    await expect(close).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(inspector.getByRole('button', { name: 'Variantes' })).toBeFocused();
+    await page.keyboard.press('a');
+    await expect(inspector).toBeVisible();
+    await page.keyboard.press('Shift+Tab');
+    await expect(close).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(inspector.getByRole('button', { name: 'Ajustar stock' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(close).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(inspector).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+
+  test('invalid currency format and non-finite catalog price are never presented as a real price', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.route('**/api/v1/catalog', route => route.fulfill(json([
+      { id: 'prod-1', kind: 'PRODUCT', name: 'Taladro percutor',
+        price: 'Infinity', currency: 'CLP', active: true },
+      { id: 'prod-2', kind: 'PRODUCT', name: 'Broca metal 8 mm',
+        price: 4990, currency: 'US', active: true }
+    ])));
+    await page.goto('/app/inventory');
+    const first = page.getByTestId('inventory-row-prod-1');
+    const second = page.getByTestId('inventory-row-prod-2');
+    await expect(first).toContainText('Sin precio');
+    await expect(second).toContainText('Precio no disponible');
+    await first.getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+    const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+    await expect(inspector).toContainText('Sin precio');
+    await inspector.getByRole('button', { name: 'Cerrar detalles' }).click();
+  });
+
+
 });

@@ -527,4 +527,84 @@ test.describe('React Inventory variants', () => {
   });
 
 
+
+  test('protected null and nested legacy characteristics remain unchanged when editable fields are changed', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    const legacy = {
+      id: initialVariantId, catalogItemId: productId, name: 'Azul / M',
+      optionValuesJson: '{"color":"Azul","lote":null,"medidas":["M","L"],"cantidad":2}',
+      sku: 'CER-AZ-M', trackingEnabled: true, onHand: 4, reserved: 1,
+      available: 3, reorderThreshold: 1, lowStock: false, active: true
+    };
+    await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+      if (route.request().method() === 'GET') return route.fulfill(json([legacy]));
+      return route.fallback();
+    });
+    const updates = [];
+    await page.route('**/api/v1/inventory/' + productId + '/variants/' + initialVariantId, route => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      const body = route.request().postDataJSON();
+      updates.push(body);
+      return route.fulfill(json({ ...legacy, ...body }));
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByTestId('inventory-variant-' + initialVariantId).getByRole('button', { name: 'Editar' }).click();
+    await expect(dialog.getByText('Valor avanzado guardado: se conservará sin cambios.')).toHaveCount(2);
+    await dialog.getByRole('textbox', { name: 'Característica 1', exact: true }).fill('color');
+    await dialog.getByRole('textbox', { name: 'Valor', exact: true }).nth(0).fill('Turquesa');
+    await dialog.getByRole('button', { name: 'Agregar característica' }).click();
+    await dialog.getByRole('textbox', { name: 'Característica 5', exact: true }).fill('material');
+    await dialog.getByRole('textbox', { name: 'Valor', exact: true }).last().fill('Acero');
+    await dialog.getByRole('button', { name: 'Guardar variante' }).click();
+    await expect.poll(() => updates.length).toBe(1);
+    expect(JSON.parse(updates[0].optionValuesJson)).toEqual({
+      color: 'Turquesa', lote: null, medidas: ['M', 'L'],
+      cantidad: 2, material: 'Acero'
+    });
+    expect(requests.create).toHaveLength(0);
+  });
+
+  test('empty attribute row is omitted from serialized options without failing a valid variant creation', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('Nombre de variante').fill('Edición sin características');
+    await dialog.getByLabel('SKU de variante').fill('EMPTY-KEYS');
+    await dialog.getByRole('button', { name: 'Agregar característica' }).click();
+    await dialog.getByRole('button', { name: 'Crear variante' }).click();
+    await expect.poll(() => requests.create.length).toBe(1);
+    expect(JSON.parse(requests.create[0].optionValuesJson)).toEqual({});
+    expect(requests.create[0].sku).toBe('EMPTY-KEYS');
+  });
+
+  test('duplicate protected characteristic name cannot overwrite legacy data', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    const protectedRecord = {
+      id: initialVariantId, catalogItemId: productId, name: 'Azul / M',
+      optionValuesJson: '{"paquete":{"niveles":[1,2]}}',
+      sku: 'CER-AZ-M', trackingEnabled: true, onHand: 4, reserved: 1,
+      available: 3, reorderThreshold: 1, lowStock: false, active: true
+    };
+    await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+      if (route.request().method() === 'GET') return route.fulfill(json([protectedRecord]));
+      return route.fallback();
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByTestId('inventory-variant-' + initialVariantId)
+      .getByRole('button', { name: 'Editar' }).click();
+    await dialog.getByRole('button', { name: 'Agregar característica' }).click();
+    await dialog.getByRole('textbox', { name: 'Característica 2', exact: true }).fill('paquete');
+    await dialog.getByRole('textbox', { name: 'Valor', exact: true }).fill('sobrescribir');
+    await dialog.getByRole('button', { name: 'Guardar variante' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('repetida o reservada');
+    expect(requests.update).toHaveLength(0);
+  });
+
+
 });
