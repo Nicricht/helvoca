@@ -26,12 +26,24 @@ for (const filename of samples) {
 const unavailableSamples = existsSync(rawDir)
   ? readdirSync(rawDir).filter(name => name.endsWith('.unavailable.json')).sort()
   : [];
+const manifest = existsSync(rawDir)
+  ? readdirSync(rawDir).filter(name => name.endsWith('.record.json')).sort()
+  : [];
+const recordedSuites = new Set(manifest.map(filename =>
+  JSON.parse(readFileSync(path.join(rawDir, filename), 'utf8')).suite));
+const requiredSuites = [
+  'react-inventory.spec.js',
+  'react-inventory-mutations.spec.js',
+  'react-inventory-variants.spec.js',
+  'react-inventory-automation.spec.js'
+];
+const missingSuites = requiredSuites.filter(name => !recordedSuites.has(name));
 const sources = map.files();
 const normalize = value => value.replaceAll('\\', '/').split('?')[0];
 const details = [];
 const missing = [];
 const aggregate = createCoverageSummary();
-let failed = samples.length === 0;
+let failed = samples.length === 0 || missingSuites.length > 0 || manifest.length !== samples.length + unavailableSamples.length;
 
 for (const wanted of expected) {
   const candidates = sources.filter(name => normalize(name).endsWith('/' + wanted));
@@ -61,7 +73,9 @@ const report = {
   source: 'Istanbul-instrumented React source exercised by Playwright Chromium',
   capturedBrowserTests: samples.length,
   unavailableBrowserTests: unavailableSamples.length,
-  totalRecordedTests: samples.length + unavailableSamples.length,
+  totalRecordedTests: manifest.length,
+  recordedSuites: [...recordedSuites].sort(),
+  missingSuites,
   requiredCoveragePercent: 100,
   expectedSourceFiles: expected.length,
   observedSourceFiles: details.length,
@@ -78,7 +92,9 @@ const markdown = [
   '',
   'Instrumented snapshots: ' + samples.length,
   'Unavailable at teardown: ' + unavailableSamples.length,
-  'Total browser tests recorded: ' + (samples.length + unavailableSamples.length),
+  'Total browser tests recorded: ' + manifest.length,
+  'Suites captured: ' + [...recordedSuites].sort().join(', '),
+  'Missing suites: ' + (missingSuites.length ? missingSuites.join(', ') : 'none'),
   '',
   '| Source | Statements | Lines | Branches | Functions |',
   '| --- | ---: | ---: | ---: | ---: |',
