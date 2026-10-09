@@ -607,4 +607,96 @@ test.describe('React Inventory variants', () => {
   });
 
 
+
+  test('variant history 503 error and later empty-state recovery never mutate stock', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    let fail = true;
+    let reads = 0;
+    await page.route('**/api/v1/inventory/' + productId + '/variants/' + initialVariantId + '/movements', route => {
+      reads += 1;
+      return fail
+        ? route.fulfill({ status: 503, contentType: 'application/json',
+            body: JSON.stringify({ message: 'history unavailable' }) })
+        : route.fulfill(json([]));
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    const item = dialog.getByTestId('inventory-variant-' + initialVariantId);
+    await item.getByRole('button', { name: 'Historial' }).click();
+    let history = page.getByRole('dialog', { name: 'Historial variante · Azul / M' });
+    await expect(history.getByRole('alert')).toBeVisible();
+    await history.getByRole('button', { name: 'Cerrar historial' }).click();
+    await expect(history).toHaveCount(0);
+
+    fail = false;
+    await item.getByRole('button', { name: 'Historial' }).click();
+    history = page.getByRole('dialog', { name: 'Historial variante · Azul / M' });
+    await expect(history).toContainText('todavía no tiene movimientos');
+    await expect(history.getByRole('alert')).toHaveCount(0);
+    expect(reads).toBe(2);
+    expect(requests.create).toHaveLength(0);
+    expect(requests.update).toHaveLength(0);
+    expect(requests.adjust).toHaveLength(0);
+  });
+
+  test('variant adjustment 503 preserves entered delta and allows one explicit controlled retry', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    const submissions = [];
+    let fail = true;
+    await page.route('**/api/v1/inventory/' + productId + '/variants/' + initialVariantId + '/adjustments', route => {
+      submissions.push(route.request().postDataJSON());
+      return fail
+        ? route.fulfill({ status: 503, contentType: 'application/json',
+            body: JSON.stringify({ message: 'temporary failure' }) })
+        : route.fulfill(json({ id: initialVariantId }));
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByTestId('inventory-variant-' + initialVariantId).getByRole('button', { name: 'Ajustar' }).click();
+    await dialog.getByLabel('Ajuste de variante').fill('3');
+    await dialog.getByLabel('Nota de ajuste').fill('Reintento explícito');
+    await dialog.getByRole('button', { name: 'Aplicar ajuste de variante' }).click();
+    await expect.poll(() => submissions.length).toBe(1);
+    await expect(dialog.getByRole('alert')).toContainText('El servidor no pudo guardar');
+    await expect(dialog.getByLabel('Ajuste de variante')).toHaveValue('3');
+    expect(requests.adjust).toHaveLength(0);
+
+    fail = false;
+    await dialog.getByRole('button', { name: 'Aplicar ajuste de variante' }).click();
+    await expect.poll(() => submissions.length).toBe(2);
+    expect(submissions).toEqual([
+      { delta: 3, note: 'Reintento explícito' },
+      { delta: 3, note: 'Reintento explícito' }
+    ]);
+    await expect(dialog.getByRole('heading', { name: 'Ajustar · Azul / M' })).toHaveCount(0);
+    expect(requests.adjust).toHaveLength(0);
+  });
+
+  test('tampered hidden legacy JSON or missing attribute value prevents variant writes', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('Nombre de variante').fill('QA validación adversarial');
+    await dialog.getByLabel('SKU de variante').fill('QA-ADV');
+    const baseline = dialog.locator('input[name="variantOptionsBaseline"]');
+    await baseline.evaluate(element => { element.value = '['; });
+    await dialog.getByRole('button', { name: 'Crear variante' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('No pudimos interpretar');
+    expect(requests.create).toHaveLength(0);
+
+    await baseline.evaluate(element => { element.value = '{}'; });
+    await dialog.getByRole('button', { name: 'Agregar característica' }).click();
+    await dialog.getByRole('textbox', { name: 'Característica 1', exact: true }).fill('color');
+    await dialog.getByRole('textbox', { name: 'Valor', exact: true }).fill('Azul');
+    await dialog.locator('input[name="variantOptionValue"]').evaluate(element => element.remove());
+    await dialog.getByRole('button', { name: 'Crear variante' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('Revisa las características');
+    expect(requests.create).toHaveLength(0);
+  });
+
+
 });

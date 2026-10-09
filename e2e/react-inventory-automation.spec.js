@@ -225,4 +225,24 @@ test.describe('Inventory automation interaction contracts', () => {
   });
 
 
+
+  test('stale variant restock alert does not open adjustment or issue inventory mutations', async ({ page }) => {
+    const { requests } = await bootAutomation(page, { variantAlert: true });
+    await page.route('**/api/v1/inventory/automation-item-1/variants', route => route.fulfill(json([{
+      id: 'automation-variant-1', catalogItemId: 'automation-item-1',
+      name: 'Taladro azul', optionValuesJson: '{"color":"Azul"}', sku: 'TAL-AZ',
+      trackingEnabled: true, active: false, onHand: 3,
+      reserved: 0, available: 3, reorderThreshold: 4, lowStock: true
+    }])));
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-alert-alert-1').getByRole('button', { name: 'Reponer stock' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Taladro demo' });
+    await expect(dialog.getByTestId('inventory-variant-automation-variant-1')).toContainText('Inactiva');
+    await expect(dialog.getByRole('heading', { name: 'Ajustar · Taladro azul' })).toHaveCount(0);
+    await expect(page.getByRole('alert')).toContainText('ya no está disponible');
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+  });
+
+
 });
