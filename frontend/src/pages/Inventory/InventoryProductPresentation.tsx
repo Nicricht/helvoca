@@ -5,6 +5,10 @@ import { getCatalogMedia, type CatalogMedia } from "../../features/inventory/api
 import type { ProductRow } from "./InventoryPage";
 import styles from "./InventoryPage.module.css";
 
+// Do not request a URL known to be broken twice across table and inspector.
+// A new browser session or a changed image URL can attempt loading again.
+const rejectedImageUrls = new Set<string>();
+
 function firstSafeImage(items: CatalogMedia[] | undefined): string | null {
   const image = items?.find(item =>
     item.active !== false
@@ -37,9 +41,12 @@ export function ProductThumbnail({
   const imageUrl = firstSafeImage(result.data);
   return (
     <span className={large ? styles.productThumbnailLarge : styles.productThumbnail} aria-hidden="true">
-      {imageUrl && imageUrl !== failedUrl
+      {imageUrl && imageUrl !== failedUrl && !rejectedImageUrls.has(imageUrl)
         ? <img src={imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer"
-            onError={() => setFailedUrl(imageUrl)} />
+            onError={() => {
+              rejectedImageUrls.add(imageUrl);
+              setFailedUrl(imageUrl);
+            }} />
         : <Package size={large ? 36 : 20} strokeWidth={1.6} />}
     </span>
   );
