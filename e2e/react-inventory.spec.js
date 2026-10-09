@@ -959,7 +959,8 @@ test.describe('React Inventory migration', () => {
     await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
     const writes = [];
     page.on('request', request => {
-      if (/\\/api\\/v1\\/(inventory|catalog)(\\/|$)/.test(new URL(request.url()).pathname)
+      if ((new URL(request.url()).pathname.includes('/api/v1/inventory')
+        || new URL(request.url()).pathname.includes('/api/v1/catalog'))
         && request.method() !== 'GET') {
         writes.push({ method: request.method(), url: request.url() });
       }
