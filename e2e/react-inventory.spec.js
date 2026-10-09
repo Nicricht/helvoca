@@ -1202,6 +1202,34 @@ test.describe('React Inventory migration', () => {
     await expect(page.getByTestId('inventory-available')).toContainText('5');
   });
 
+  test('message-less network failures keep history and adjustments safe with plain-language fallback', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    await page.goto('/app/inventory');
+    await page.evaluate(() => {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = (input, init) => {
+        const url = typeof input === 'string' ? input : input.url;
+        if (url.endsWith('/api/v1/inventory/prod-1/movements')
+          || (url.endsWith('/api/v1/inventory/prod-1/adjustments') && init?.method === 'POST')) {
+          return Promise.reject(new Error(''));
+        }
+        return originalFetch(input, init);
+      };
+    });
+    const row = page.getByTestId('inventory-row-prod-1');
+    await row.getByRole('button', { name: 'Ver historial' }).click();
+    const history = page.getByRole('dialog', { name: 'Historial · Taladro percutor' });
+    await expect(history.getByRole('alert')).toContainText('No pudimos cargar el historial.');
+    await history.getByRole('button', { name: 'Cerrar' }).click();
+    await row.getByRole('button', { name: 'Ajustar stock' }).click();
+    const adjustment = page.getByRole('dialog', { name: 'Ajustar stock · Taladro percutor' });
+    await adjustment.getByLabel('Ajuste').fill('4');
+    await adjustment.getByRole('button', { name: 'Aplicar ajuste' }).click();
+    await expect(adjustment.getByRole('alert')).toContainText('No pudimos guardar el cambio.');
+    await expect(row).toContainText('TAL-18V');
+    await expect(page.getByTestId('inventory-available')).toContainText('6');
+  });
+
   test('legacy blank business name does not introduce an invented title or separator', async ({ page }) => {
     await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
     await page.route('**/api/v1/business', route => route.fulfill(json({
