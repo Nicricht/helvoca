@@ -53,7 +53,7 @@ export interface ProductRow {
 }
 
 function numberOrNull(value: unknown) {
-  if (value === null || value === undefined || value === "") return null;
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
@@ -439,14 +439,14 @@ export function InventoryPage() {
     const name = String(data.get("variantName") ?? "").trim();
     const optionValuesJson = serializeVariantOptions(form);
     const sku = String(data.get("variantSku") ?? "").trim().toUpperCase();
-    const onHand = Number(data.get("variantOnHand"));
-    const reorderThreshold = Number(data.get("variantReorderThreshold"));
+    const onHand = numberOrNull(data.get("variantOnHand"));
+    const reorderThreshold = numberOrNull(data.get("variantReorderThreshold"));
     const note = String(data.get("variantNote") ?? "").trim();
 
     if (!name) throw new Error("Escribe un nombre para la variante.");
     if (!sku) throw new Error("Escribe un SKU para la variante.");
-    if (!Number.isInteger(onHand) || onHand < 0
-        || !Number.isInteger(reorderThreshold) || reorderThreshold < 0) {
+    if (onHand === null || !Number.isInteger(onHand) || onHand < 0
+        || reorderThreshold === null || !Number.isInteger(reorderThreshold) || reorderThreshold < 0) {
       throw new Error("El stock físico y el umbral deben ser enteros iguales o mayores que cero.");
     }
     return {
@@ -557,7 +557,7 @@ export function InventoryPage() {
     const data = new FormData(event.currentTarget);
     const name = String(data.get("name") ?? "").trim();
     const description = String(data.get("description") ?? "").trim();
-    const price = Number(data.get("price"));
+    const price = numberOrNull(data.get("price"));
     const currency = String(data.get("currency") ?? "").trim().toUpperCase();
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const continueToStock = !productEditing && model.canManageStock && submitter?.value === "configure";
@@ -566,7 +566,7 @@ export function InventoryPage() {
       setMutationError("Escribe un nombre para el producto.");
       return;
     }
-    if (!Number.isFinite(price) || price < 0) {
+    if (price === null || price < 0) {
       setMutationError("El precio debe ser un número igual o mayor que cero.");
       return;
     }
@@ -631,11 +631,11 @@ export function InventoryPage() {
     if (!configureTarget || !model.canManageStock || mutationLock.current) return;
 
     const data = new FormData(event.currentTarget);
-    const onHand = Number(data.get("onHand"));
-    const reorderThreshold = Number(data.get("reorderThreshold"));
+    const onHand = numberOrNull(data.get("onHand"));
+    const reorderThreshold = numberOrNull(data.get("reorderThreshold"));
 
-    if (!Number.isInteger(onHand) || onHand < 0
-        || !Number.isInteger(reorderThreshold) || reorderThreshold < 0) {
+    if (onHand === null || !Number.isInteger(onHand) || onHand < 0
+        || reorderThreshold === null || !Number.isInteger(reorderThreshold) || reorderThreshold < 0) {
       setMutationError("El stock físico y el umbral deben ser números enteros iguales o mayores que cero.");
       return;
     }
