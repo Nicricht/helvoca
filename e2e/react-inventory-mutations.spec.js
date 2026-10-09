@@ -339,4 +339,51 @@ test.describe('React Inventory mutations', () => {
     });
   }
 
+
+  test('editing an existing catalog product validates currency before one authoritative PUT', async ({ page }) => {
+    const { productId, requests } = await bootAdminInventory(page);
+    let catalog = [{
+      id: productId, kind: 'PRODUCT', name: 'Cera mate',
+      description: 'Cera profesional', price: 5990, currency: 'CLP',
+      durationMinutes: null, metadataJson: null, active: true
+    }];
+    const updates = [];
+    await page.route('**/api/v1/catalog', route => {
+      if (route.request().method() === 'GET') return route.fulfill(json(catalog));
+      return route.fallback();
+    });
+    await page.route('**/api/v1/catalog/' + productId, route => {
+      if (route.request().method() !== 'PUT') return route.fallback();
+      const update = route.request().postDataJSON();
+      updates.push(update);
+      catalog = [{ ...catalog[0], ...update }];
+      return route.fulfill(json(catalog[0]));
+    });
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Editar producto Cera mate' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Editar producto · Cera mate' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Crear y configurar stock' })).toHaveCount(0);
+    await dialog.getByLabel('Precio').fill('7290');
+    await dialog.getByLabel('Descripción').fill('Producto editado por QA');
+    await dialog.getByLabel('Moneda').fill('US');
+    await dialog.getByRole('button', { name: 'Guardar producto' }).click();
+    await expect(dialog.getByRole('alert')).toContainText('tres letras');
+    expect(updates).toHaveLength(0);
+    expect(requests.createProduct).toHaveLength(0);
+
+    await dialog.getByLabel('Moneda').fill('USD');
+    await dialog.getByRole('button', { name: 'Guardar producto' }).click();
+    await expect.poll(() => updates.length).toBe(1);
+    expect(updates[0]).toEqual({
+      kind: 'PRODUCT', name: 'Cera mate',
+      description: 'Producto editado por QA', price: 7290, currency: 'USD',
+      durationMinutes: null, metadataJson: null, active: true
+    });
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByTestId('inventory-row-' + productId)).toContainText('Producto editado por QA');
+    expect(requests.createProduct).toHaveLength(0);
+  });
+
+
 });

@@ -597,4 +597,40 @@ test.describe('React Inventory migration', () => {
     }
   });
 
+
+  test('all stock status filters and sort choices apply to the current table only', async ({ page }) => {
+    await bootInventory(page);
+    await page.goto('/app/inventory');
+    const rows = page.locator('tbody tr[data-testid^="inventory-row-"]');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toHaveAttribute('data-testid', 'inventory-row-prod-2');
+
+    const status = page.getByLabel('Estado');
+    await status.selectOption('LOW');
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toHaveAttribute('data-testid', 'inventory-row-prod-2');
+    await status.selectOption('OUT');
+    await expect(rows).toHaveCount(0);
+    await expect(page.getByText('No hay productos que coincidan.')).toBeVisible();
+    await status.selectOption('TRACKED');
+    await expect(rows).toHaveCount(2);
+    await status.selectOption('RESTOCKED');
+    await expect(rows).toHaveCount(0);
+    await status.selectOption('UNCONFIGURED');
+    await expect(rows).toHaveCount(0);
+    await status.selectOption('ALL');
+
+    const order = page.getByLabel('Orden');
+    await order.selectOption('NAME_ASC');
+    await expect(rows.first()).toHaveAttribute('data-testid', 'inventory-row-prod-2');
+    await order.selectOption('AVAILABLE_DESC');
+    await expect(rows.first()).toHaveAttribute('data-testid', 'inventory-row-prod-1');
+    await order.selectOption('AVAILABLE_ASC');
+    await expect(rows.first()).toHaveAttribute('data-testid', 'inventory-row-prod-2');
+    await order.selectOption('ATTENTION');
+    await expect(rows.first()).toHaveAttribute('data-testid', 'inventory-row-prod-2');
+    await expect(page.getByRole('heading', { name: 'Alertas y reposición' })).toHaveCount(0);
+  });
+
+
 });
