@@ -608,6 +608,32 @@ test.describe('React Inventory variants', () => {
 
 
 
+  test('variant draft opened as admin cannot be submitted after live permission revocation', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page);
+    let canWrite = true;
+    await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+      email: 'admin@demo.cl', roles: canWrite ? ['BUSINESS_ADMIN'] : ['OPERATOR']
+    })));
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId)
+      .getByRole('button', { name: 'Variantes' }).click();
+    const variants = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await variants.getByRole('button', { name: 'Nueva variante' }).click();
+    await variants.getByLabel('Nombre de variante').fill('Rojo sin permiso');
+    await variants.getByLabel('SKU de variante').fill('NO-WRITE');
+    await variants.getByLabel('Stock físico inicial').fill('4');
+    await variants.getByLabel('Umbral de reposición').fill('1');
+    canWrite = false;
+    await page.getByRole('button', { name: 'Actualizar', exact: true })
+      .evaluate(button => button.click());
+    await expect(page.getByText('Solo lectura')).toBeVisible();
+    await variants.getByRole('button', { name: 'Crear variante' }).click();
+    await expect(variants).toBeVisible();
+    expect(requests.create).toHaveLength(0);
+    expect(requests.update).toHaveLength(0);
+    expect(requests.adjust).toHaveLength(0);
+  });
+
   test('message-less variant read outages remain visible and recover without inventory writes', async ({ page }) => {
     const { productId, initialVariantId, requests } = await bootVariantInventory(page);
     await page.goto('/app/inventory');
