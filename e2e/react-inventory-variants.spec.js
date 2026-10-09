@@ -608,6 +608,42 @@ test.describe('React Inventory variants', () => {
 
 
 
+  test('message-less variant read outages remain visible and recover without inventory writes', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.evaluate(() => {
+      const originalFetch = window.fetch.bind(window);
+      let firstVariantFetch = true;
+      window.fetch = (input, init) => {
+        const url = typeof input === 'string' ? input : input.url;
+        if (url.endsWith('/variants') && firstVariantFetch) {
+          firstVariantFetch = false;
+          return Promise.reject(new Error(''));
+        }
+        if (url.endsWith('/variants/' + '44444444-4444-4444-4444-444444444444' + '/movements')) {
+          return Promise.reject(new Error(''));
+        }
+        return originalFetch(input, init);
+      };
+    });
+    const row = page.getByTestId('inventory-row-' + productId);
+    await row.getByRole('button', { name: 'Variantes' }).click();
+    let variants = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await expect(variants.getByRole('alert')).toContainText('No pudimos cargar las variantes.');
+    await variants.getByRole('button', { name: 'Cerrar', exact: true }).click();
+    await row.getByRole('button', { name: 'Variantes' }).click();
+    variants = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    const item = variants.getByTestId('inventory-variant-' + initialVariantId);
+    await expect(item).toBeVisible();
+    await item.getByRole('button', { name: 'Historial' }).click();
+    const history = page.getByRole('dialog', { name: 'Historial variante · Azul / M' });
+    await expect(history.getByRole('alert')).toContainText('No pudimos cargar el historial de la variante.');
+    await history.getByRole('button', { name: 'Cerrar historial' }).click();
+    expect(requests.create).toHaveLength(0);
+    expect(requests.update).toHaveLength(0);
+    expect(requests.adjust).toHaveLength(0);
+  });
+
   test('variant history 503 error and later empty-state recovery never mutate stock', async ({ page }) => {
     const { productId, initialVariantId, requests } = await bootVariantInventory(page);
     let fail = true;
