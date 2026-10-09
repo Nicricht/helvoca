@@ -120,8 +120,11 @@ for path, lines in sorted(changed.items()):
 affected_methods: set[tuple[str, int, str, str, bool]] = set()
 for path, lines in changed.items():
     methods = sorted(methods_by_path.get(path, []), key=lambda item: item[0])
-    for index, (start, name, desc, covered) in enumerate(methods):
-        next_start = methods[index + 1][0] if index + 1 < len(methods) else 10**9
+    distinct_starts = sorted({start for start, _, _, _ in methods})
+    for start, name, desc, covered in methods:
+        # JaCoCo can report several synthetic/record/nested methods at the same
+        # source line. Do not silently exclude all but the last such method.
+        next_start = next((other for other in distinct_starts if other > start), 10**9)
         if any(start <= line_no < next_start for line_no in lines):
             affected_methods.add((path, start, name, desc, covered))
 
