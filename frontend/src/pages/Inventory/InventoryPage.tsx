@@ -614,9 +614,8 @@ export function InventoryPage() {
           restocked: false
         });
       }
-      try {
-        await model.refetchPrimary();
-      } catch {
+      const primaryRefreshed = await model.refetchPrimary();
+      if (!primaryRefreshed) {
         setMutationError("El producto se guardó, pero no se pudo actualizar la lista. Pulsa Actualizar antes de repetir cualquier operación.");
       }
     } catch (error) {
@@ -737,6 +736,7 @@ export function InventoryPage() {
           <section className={styles.errorCard} role="alert">
             <strong>No pudimos cargar el inventario completo.</strong>
             <p>No mostramos cifras parciales como si fueran stock real. Puedes reintentar sin salir de esta pantalla.</p>
+            {mutationError && <p className={styles.dialogError}>{mutationError}</p>}
             <button className="button secondary" type="button" onClick={() => void model.refetchPrimary()}>
               Reintentar
             </button>
