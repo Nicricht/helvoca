@@ -1203,6 +1203,78 @@ test.describe('React Inventory migration', () => {
   });
 
 
+  
+  test('malformed secondary success responses recover only after an explicit authoritative refresh', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    let malformed = true;
+    await page.route('**/api/v1/inventory/alerts', route =>
+      route.fulfill(json(malformed ? null : [])));
+    await page.route('**/api/v1/inventory/restock-subscriptions', route =>
+      route.fulfill(json(malformed ? { wrong: 'shape' } : [])));
+    await page.route('**/api/v1/inventory/restock-subscriptions/notifications', route =>
+      route.fulfill(json(malformed ? { wrong: 'shape' } : [])));
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/app/inventory');
+    const degraded = page.getByTestId('inventory-partial-error');
+    await expect(degraded).toBeVisible();
+    await expect(page.getByTestId('inventory-available')).toContainText('6');
+    await expect(page.getByText('No hay alertas abiertas.')).toHaveCount(0);
+    await expect(page.getByText('Nadie está esperando reposición.')).toHaveCount(0);
+    await expect(page.getByText('No hay avisos pendientes.')).toHaveCount(0);
+    malformed = false;
+    await degraded.getByRole('button', { name: 'Reintentar consultas' }).click();
+    await expect(degraded).toHaveCount(0);
+    await expect(page.getByLabel('Resumen de reposición')).toContainText('0 alertas');
+    await expect(page.getByLabel('Resumen de reposición')).toContainText('0 esperando');
+    await expect(page.getByText('No hay alertas abiertas.')).toBeVisible();
+    await expect(page.getByText('Nadie está esperando reposición.')).toBeVisible();
+    await expect(page.getByText('No hay avisos pendientes.')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('catalog disappearance during an open inspector preserves readable snapshot actions without writes', async ({ page }) => {
+    await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
+    let catalogVisible = true;
+    await page.route('**/api/v1/catalog', route => route.fulfill(json(catalogVisible
+      ? [{ id: 'prod-1', kind: 'PRODUCT', name: 'Taladro percutor',
+        description: 'Taladro 18V', price: 54990, currency: 'CLP', active: true }]
+      : [])));
+    const writes = [];
+    await page.route('**/api/v1/inventory/prod-1/variants', route => {
+      if (route.request().method() !== 'GET') writes.push(route.request().method());
+      return route.fulfill(json([]));
+    });
+    const targets = [
+      ['Variantes', 'Variantes · Taladro percutor'],
+      ['Ver historial', 'Historial · Taladro percutor'],
+      ['Editar stock', 'Editar stock · Taladro percutor'],
+      ['Ajustar stock', 'Ajustar stock · Taladro percutor']
+    ];
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    for (const [action, destination] of targets) {
+      catalogVisible = true;
+      await page.goto('/app/inventory');
+      const row = page.getByTestId('inventory-row-prod-1');
+      await expect(row).toBeVisible();
+      await row.getByRole('button', { name: 'Ver detalles de Taladro percutor' }).click();
+      const inspector = page.getByRole('dialog', { name: 'Taladro percutor', exact: true });
+      await expect(inspector).toBeVisible();
+      catalogVisible = false;
+      // A background refresh can complete while a product inspector remains mounted.
+      await page.getByRole('button', { name: 'Actualizar', exact: true })
+        .evaluate(button => button.click());
+      await expect(row).toHaveCount(0);
+      await expect(inspector).toContainText('Taladro percutor');
+      await inspector.getByRole('button', { name: action, exact: true }).click();
+      await expect(page.getByRole('dialog', { name: destination })).toBeVisible();
+    }
+    expect(writes).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+
   test('malformed inventory success response is rejected and normal stock returns after explicit retry', async ({ page }) => {
     await bootInventory(page, { roles: ['BUSINESS_ADMIN'] });
     let malformed = true;
