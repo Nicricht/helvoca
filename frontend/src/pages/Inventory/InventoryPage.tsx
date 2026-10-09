@@ -701,9 +701,13 @@ export function InventoryPage() {
               <p>Stock físico, reservado y disponible en un solo lugar.</p>
             </div>
           </header>
-          <div className={styles.loadingCard} role="status" aria-live="polite">
+          <div className={styles.loadingCard} role="status" aria-live="polite" data-testid="inventory-loading">
             <span className={styles.spinner} aria-hidden="true" />
             <span>Cargando inventario autoritativo…</span>
+            <div className={styles.loadingSkeleton} aria-hidden="true" data-testid="inventory-loading-skeleton">
+              <span /><span /><span /><span />
+              <span className={styles.loadingSkeletonTable} />
+            </div>
           </div>
         </main>
       </AppShell>
