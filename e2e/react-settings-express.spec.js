@@ -129,7 +129,9 @@ test.describe('Settings Express user journey', () => {
     const start = express.getByRole('link', { name: /Empezar/ });
     await expect(start).toBeVisible();
     const transitionDuration = await start.evaluate(node => getComputedStyle(node).transitionDuration);
-    expect(transitionDuration).toBe('0s');
+    // Chromium reports 0.00001s for reduced-motion transitions when the global
+    // accessibility reset takes precedence. Prove the duration is effectively zero.
+    expect(transitionDuration.split(',').every(value => Number.parseFloat(value) <= 0.00001)).toBe(true);
     await start.focus();
     await expect(start).toBeFocused();
     await page.keyboard.press('Enter');
