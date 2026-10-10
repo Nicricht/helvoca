@@ -41,10 +41,10 @@ class BusinessImportAiPlanQuotaTest {
         when(rs.getBigDecimal("limit_value")).thenReturn(limit);
         when(rs.getString("unit")).thenReturn(unit);
         when(rs.getObject("hard_limit")).thenReturn(hard);
-        when(jdbc.query(anyString(), any(RowMapper.class), eq(BUSINESS))).thenAnswer(invocation -> {
+        doAnswer(invocation -> {
             RowMapper mapper = invocation.getArgument(1);
             return List.of(mapper.mapRow(rs, 0));
-        });
+        }).when(jdbc).query(anyString(), any(RowMapper.class), eq(BUSINESS));
         when(jdbc.queryForObject(anyString(), eq(BigDecimal.class), eq(BUSINESS),
                 any(Timestamp.class), any(Timestamp.class))).thenReturn(used);
     }
