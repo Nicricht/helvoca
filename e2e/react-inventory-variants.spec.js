@@ -1140,7 +1140,10 @@ test.describe('React Inventory variants', () => {
     await expect(item.getByRole('button', { name: 'Historial' })).toBeVisible();
 
     allowVariantRead = false;
-    await page.getByRole('button', { name: 'Actualizar', exact: true }).click();
+    // The variants modal overlays the page; activate background refresh
+    // programmatically, like the existing live-permission revocation contracts.
+    await page.getByRole('button', { name: 'Actualizar', exact: true })
+      .evaluate(button => button.click());
     await expect(page.getByText('Solo lectura')).toBeVisible();
     await expect(dialog).toBeVisible();
 
