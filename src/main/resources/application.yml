@@ -48,8 +48,13 @@ springdoc:
 app:
   onboarding:
     import-ai:
-      # Paid image/PDF analysis requires explicit server-side opt-in.
+      # The API key alone cannot enable paid imports.
       enabled: ${HELVOCA_BUSINESS_IMPORT_AI_ENABLED:false}
+      # Zero means no paid requests even if the flag is enabled.
+      max-attempts-per-30-days: ${HELVOCA_BUSINESS_IMPORT_AI_MAX_ATTEMPTS_PER_30_DAYS:0}
+      max-paid-files: ${HELVOCA_BUSINESS_IMPORT_AI_MAX_FILES:3}
+      max-paid-bytes: ${HELVOCA_BUSINESS_IMPORT_AI_MAX_BYTES:4194304}
+      model: ${HELVOCA_BUSINESS_IMPORT_AI_MODEL:gpt-4.1-mini}
   demo:
     runtime-business-id: ${HELVOCA_DEMO_RUNTIME_BUSINESS_ID:}
   jwt:
