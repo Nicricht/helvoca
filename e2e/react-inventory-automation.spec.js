@@ -146,6 +146,38 @@ test.describe('Inventory automation interaction contracts', () => {
     await expect(page.getByTestId('inventory-available')).toContainText('7');
   });
 
+
+  test('an orphaned restock alert cannot initiate a stock mutation for a missing catalog item', async ({ page }) => {
+    const { requests } = await bootAutomation(page);
+    await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([{
+      id: 'alert-1', catalogItemId: 'deleted-product',
+      variantId: null, type: 'LOW_STOCK', subjectName: 'Producto eliminado',
+      sku: 'STALE-1', available: 0, reorderThreshold: 2, acknowledged: false
+    }])));
+    await page.goto('/app/inventory');
+    const alert = page.getByTestId('inventory-alert-alert-1');
+    await expect(alert).toContainText('Producto eliminado');
+    await alert.getByRole('button', { name: 'Reponer stock' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+  });
+
+  test('an adjustment without optional note sends null rather than an invented explanation', async ({ page }) => {
+    const { requests } = await bootAutomation(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-alert-alert-1').getByRole('button', { name: 'Reponer stock' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Ajustar stock · Taladro demo' });
+    await dialog.getByLabel('Ajuste').fill('1');
+    await dialog.getByLabel('Nota').fill('');
+    await dialog.getByRole('button', { name: 'Aplicar ajuste' }).click();
+    await expect.poll(() => requests.adjust.length).toBe(1);
+    expect(requests.adjust[0]).toEqual({
+      delta: 1, referenceType: 'MANUAL', referenceId: null, note: null
+    });
+    await expect(dialog).toHaveCount(0);
+  });
+
   test('variant-linked restock opens the correct variant adjustment without changing base stock', async ({ page }) => {
     const { requests } = await bootAutomation(page, { variantAlert: true });
     await page.goto('/app/inventory');
