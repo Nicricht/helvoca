@@ -459,4 +459,142 @@ class BusinessImportPreviewServiceTest {
         verifyNoInteractions(budget, http);
     }
 
+
+    private static BusinessImportPreviewService meteredPreview(HttpClient http,
+                                                               BusinessImportAiUsageLedger ledger) {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties props = new OpenAiRealtimeProperties();
+        props.setApiKey("test-key");
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenReturn(true);
+        var service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), props, tenant, budget, ledger, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
+        return service;
+    }
+
+    private static MockMultipartFile meteredImage() {
+        return new MockMultipartFile("files", "photo.jpg", "image/jpeg", new byte[] {1, 2, 3});
+    }
+
+    @Test
+    void recordedStartMustCommitBeforeSendingToProviderAndReceiptBeforeParsing() throws Exception {
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiUsageLedger ledger = mock(BusinessImportAiUsageLedger.class);
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn(new JSONObject()
+                .put("id", "resp_1")
+                .put("model", "gpt-4.1-mini")
+                .put("usage", new JSONObject().put("input_tokens", 25).put("output_tokens", 10))
+                .put("output_text", "{\"products\":[],\"warnings\":[]}")
+                .toString());
+        when(http.send(any(HttpRequest.class), any())).thenReturn(response);
+
+        var preview = meteredPreview(http, ledger).preview("Negocio", List.of(meteredImage()));
+        assertTrue(preview.aiUsed());
+        var order = inOrder(ledger, http);
+        order.verify(ledger).started(any(UUID.class), eq("gpt-4.1-mini"));
+        order.verify(http).send(any(HttpRequest.class), any());
+        order.verify(ledger).received(any(UUID.class), eq("gpt-4.1-mini"), same(response));
+        verify(ledger, never()).uncertain(any(), anyString());
+    }
+
+    @Test
+    void missingLedgerFailsClosedBeforeProviderEvenWithSuccessfulQuota() {
+        HttpClient http = mock(HttpClient.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties props = new OpenAiRealtimeProperties();
+        props.setApiKey("test-key");
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenReturn(true);
+        var previewService = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), props, tenant, budget, http);
+        ReflectionTestUtils.setField(previewService, "paidAiImportEnabled", true);
+
+        var preview = previewService.preview("Negocio", List.of(meteredImage()));
+        assertFalse(preview.aiUsed());
+        assertEquals("AI_ERROR", preview.sources().getFirst().method());
+        verifyNoInteractions(http);
+    }
+
+    @Test
+    void startPersistenceFailurePreventsBillableRequest() {
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiUsageLedger ledger = mock(BusinessImportAiUsageLedger.class);
+        doThrow(new IllegalStateException("audit unavailable"))
+                .when(ledger).started(any(UUID.class), anyString());
+        var preview = meteredPreview(http, ledger).preview("Negocio", List.of(meteredImage()));
+        assertFalse(preview.aiUsed());
+        assertEquals("AI_ERROR", preview.sources().getFirst().method());
+        verifyNoInteractions(http);
+    }
+
+    @Test
+    void failedResponsePersistenceDoesNotTreatUnmeteredResponseAsSuccess() throws Exception {
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiUsageLedger ledger = mock(BusinessImportAiUsageLedger.class);
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(http.send(any(HttpRequest.class), any())).thenReturn(response);
+        doThrow(new IllegalStateException("audit response unavailable"))
+                .when(ledger).received(any(UUID.class), anyString(), same(response));
+
+        var preview = meteredPreview(http, ledger).preview("Negocio", List.of(meteredImage()));
+        assertFalse(preview.aiUsed());
+        assertEquals("AI_ERROR", preview.sources().getFirst().method());
+        verify(ledger).started(any(UUID.class), anyString());
+        verify(http).send(any(HttpRequest.class), any());
+    }
+
+    @Test
+    void networkFailureAfterStartedReceiptLeavesUncertainEvidence() throws Exception {
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiUsageLedger ledger = mock(BusinessImportAiUsageLedger.class);
+        when(http.send(any(HttpRequest.class), any())).thenThrow(new IOException("connection reset"));
+        var preview = meteredPreview(http, ledger).preview("Negocio", List.of(meteredImage()));
+        assertFalse(preview.aiUsed());
+        assertEquals("AI_ERROR", preview.sources().getFirst().method());
+        var order = inOrder(ledger, http);
+        order.verify(ledger).started(any(UUID.class), anyString());
+        order.verify(http).send(any(HttpRequest.class), any());
+        order.verify(ledger).uncertain(any(UUID.class), eq("gpt-4.1-mini"));
+    }
+
+    @Test
+    void interruptedProviderCallPreservesInterruptAndUncertainReceipt() throws Exception {
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiUsageLedger ledger = mock(BusinessImportAiUsageLedger.class);
+        when(http.send(any(HttpRequest.class), any()))
+                .thenThrow(new InterruptedException("provider interrupted"));
+        try {
+            var preview = meteredPreview(http, ledger).preview("Negocio", List.of(meteredImage()));
+            assertFalse(preview.aiUsed());
+            assertEquals("AI_ERROR", preview.sources().getFirst().method());
+            assertTrue(Thread.currentThread().isInterrupted());
+            verify(ledger).uncertain(any(UUID.class), eq("gpt-4.1-mini"));
+        } finally {
+            // Do not poison later JUnit tests with an interrupted thread.
+            Thread.interrupted();
+        }
+    }
+
+    @Test
+    void errorHttpResponseIsRecordedBeforeClientSeesProviderFailure() throws Exception {
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiUsageLedger ledger = mock(BusinessImportAiUsageLedger.class);
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(429);
+        when(response.body()).thenReturn("{\"error\":\"rate_limited\"}");
+        when(http.send(any(HttpRequest.class), any())).thenReturn(response);
+        var preview = meteredPreview(http, ledger).preview("Negocio", List.of(meteredImage()));
+        assertFalse(preview.aiUsed());
+        assertEquals("AI_ERROR", preview.sources().getFirst().method());
+        verify(ledger).received(any(UUID.class), eq("gpt-4.1-mini"), same(response));
+    }
+
 }
