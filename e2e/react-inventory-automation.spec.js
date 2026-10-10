@@ -310,4 +310,21 @@ test.describe('Inventory automation interaction contracts', () => {
     expect(requests.adjustVariant).toHaveLength(0);
   });
 
+
+  test('two synchronous waiting-list cancellations consume one mutation only', async ({ page }) => {
+    const { requests } = await bootAutomation(page);
+    await page.goto('/app/inventory');
+    const item = page.getByTestId('restock-subscription-wait-1');
+    await expect(item).toContainText('Esperando');
+    await item.getByRole('button', { name: 'Cancelar espera' }).evaluate(button => {
+      button.click();
+      button.click();
+    });
+    await expect.poll(() => requests.cancel).toBe(1);
+    await expect(item).toHaveCount(0);
+    expect(requests.cancel).toBe(1);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+  });
+
 });
