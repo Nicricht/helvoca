@@ -91,6 +91,7 @@ class DistributedRateLimiterIntegrationTest {
     void paidImportQuotaDoesNotCrossTenantAndHandlesConcurrentRequests() throws Exception {
         // Reuse the real RLS/Flyway-backed PostgreSQL limiter; no external AI calls.
         jdbc.update("DELETE FROM api_rate_limit_bucket WHERE bucket_key LIKE 'business-import-ai:%'");
+        jdbc.update("DELETE FROM api_rate_limit_bucket WHERE bucket_key LIKE 'business-import-ai-reserved-cost:%'");
         DistributedRateLimiter shared = new DistributedRateLimiter(jdbc);
 
         UUID one = UUID.randomUUID();
@@ -103,6 +104,11 @@ class DistributedRateLimiterIntegrationTest {
         BusinessImportAiBudget b = new BusinessImportAiBudget(shared, tenantTwo);
         ReflectionTestUtils.setField(a, "maxAttempts", 2);
         ReflectionTestUtils.setField(b, "maxAttempts", 2);
+        for (BusinessImportAiBudget budget : List.of(a, b)) {
+            ReflectionTestUtils.setField(budget, "reservedCentsPerAttempt", 25);
+            ReflectionTestUtils.setField(budget, "maxTenantReservedCents", 100);
+            ReflectionTestUtils.setField(budget, "maxGlobalReservedCents", 500);
+        }
 
         CountDownLatch ready = new CountDownLatch(12);
         CountDownLatch fire = new CountDownLatch(1);
@@ -134,6 +140,63 @@ class DistributedRateLimiterIntegrationTest {
             assertEquals(3, jdbc.queryForObject(
                     "SELECT request_count FROM api_rate_limit_bucket WHERE bucket_key = ?",
                     Integer.class, "business-import-ai:" + two));
+            assertEquals(4, jdbc.queryForObject(
+                    "SELECT request_count FROM api_rate_limit_bucket WHERE bucket_key = ?",
+                    Integer.class, "business-import-ai-reserved-cost:global"));
+            assertEquals(2, jdbc.queryForObject(
+                    "SELECT request_count FROM api_rate_limit_bucket WHERE bucket_key = ?",
+                    Integer.class, "business-import-ai-reserved-cost:tenant:" + one));
+            assertEquals(2, jdbc.queryForObject(
+                    "SELECT request_count FROM api_rate_limit_bucket WHERE bucket_key = ?",
+                    Integer.class, "business-import-ai-reserved-cost:tenant:" + two));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+
+    @Test
+    void globalMonetaryReservationCircuitBreakerWorksAcrossTwoTenantsAndReplicas() throws Exception {
+        jdbc.update("DELETE FROM api_rate_limit_bucket WHERE bucket_key LIKE 'business-import-ai:%'");
+        jdbc.update("DELETE FROM api_rate_limit_bucket WHERE bucket_key LIKE 'business-import-ai-reserved-cost:%'");
+        DistributedRateLimiter shared = new DistributedRateLimiter(jdbc);
+
+        TenantProvider providerOne = mock(TenantProvider.class);
+        TenantProvider providerTwo = mock(TenantProvider.class);
+        when(providerOne.requireBusinessId()).thenReturn(UUID.randomUUID());
+        when(providerTwo.requireBusinessId()).thenReturn(UUID.randomUUID());
+        BusinessImportAiBudget one = new BusinessImportAiBudget(shared, providerOne);
+        BusinessImportAiBudget two = new BusinessImportAiBudget(shared, providerTwo);
+        for (BusinessImportAiBudget budget : List.of(one, two)) {
+            ReflectionTestUtils.setField(budget, "maxAttempts", 10);
+            ReflectionTestUtils.setField(budget, "reservedCentsPerAttempt", 25);
+            ReflectionTestUtils.setField(budget, "maxTenantReservedCents", 250);
+            ReflectionTestUtils.setField(budget, "maxGlobalReservedCents", 75);
+        }
+
+        CountDownLatch ready = new CountDownLatch(12);
+        CountDownLatch fire = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(12);
+        try {
+            List<Future<Boolean>> outcomes = new ArrayList<>();
+            for (int i = 0; i < 12; i++) {
+                final BusinessImportAiBudget selected = i % 2 == 0 ? one : two;
+                outcomes.add(executor.submit(() -> {
+                    ready.countDown();
+                    assertTrue(fire.await(5, TimeUnit.SECONDS));
+                    return selected.reserve();
+                }));
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            fire.countDown();
+            int permitted = 0;
+            for (Future<Boolean> outcome : outcomes) {
+                if (outcome.get(15, TimeUnit.SECONDS)) permitted++;
+            }
+            assertEquals(3, permitted);
+            assertEquals(12, jdbc.queryForObject(
+                    "SELECT request_count FROM api_rate_limit_bucket WHERE bucket_key = ?",
+                    Integer.class, "business-import-ai-reserved-cost:global"));
         } finally {
             executor.shutdownNow();
         }
