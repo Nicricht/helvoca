@@ -71,6 +71,10 @@ separado de OpenAI, realizar conciliación de invoice según
 y Railway Wait for CI. Solo Parte 5, previa orden explícita, evaluará
 la transición a producción y piloto.
 
+## Rebaselining after PR #774 was merged (2026-10-10)
+
+PR #774 token evidence was merged into main as commit `56959f17b600bc10b1993a449a7293b5188f1c72` after exact-head CI #3929 had six successful mandatory jobs. This documentation-only follow-up commit re-triggers PR #775 certification against the newer main. The prior #3935 differential gate missed two branch outcomes at `BusinessImportAiBudget:86` and `BusinessImportAiPlanQuota:106`; focused tests now cover both. Do not merge PR #775 until its **new exact-head** run completes all six mandatory checks and confirms **100/100/100** Java differential line/branch/method coverage. Railway deployment of PR #774 awaits the independent main-push full-verification gate. Paid AI import remains OFF with zero commercial allowances and reserved budgets.
+
 ## Nota de certificación CI (2026-10-10)
 El workflow `.github/workflows/ci.yml` solo escucha `pull_request`
 contra `main`. Por ello el PR #775 se dirige a `main` **como DRAFT**,
