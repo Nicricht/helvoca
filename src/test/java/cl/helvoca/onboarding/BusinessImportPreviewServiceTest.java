@@ -293,7 +293,7 @@ class BusinessImportPreviewServiceTest {
         BusinessImportPreviewService service = new BusinessImportPreviewService(
                 new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
-        var fourPictures = List.of(
+        List<org.springframework.web.multipart.MultipartFile> fourPictures = List.of(
                 new MockMultipartFile("files", "1.jpg", "image/jpeg", new byte[]{1}),
                 new MockMultipartFile("files", "2.jpg", "image/jpeg", new byte[]{2}),
                 new MockMultipartFile("files", "3.jpg", "image/jpeg", new byte[]{3}),
