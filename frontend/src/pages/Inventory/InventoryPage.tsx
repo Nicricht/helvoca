@@ -491,9 +491,8 @@ export function InventoryPage() {
     };
   }
 
-  async function handleVariantEditor(event: FormEvent<HTMLFormElement>) {
+  async function handleVariantEditor(event: FormEvent<HTMLFormElement>, target: ProductRow, mode: "CREATE" | "EDIT") {
     event.preventDefault();
-    if (!variantsTarget || !variantEditorMode) return;
     if (!canManageVariants) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -510,12 +509,12 @@ export function InventoryPage() {
 
     if (!beginMutation()) return;
     try {
-      if (variantEditorMode === "CREATE") {
-        await createInventoryVariant(variantsTarget.id, input);
+      if (mode === "CREATE") {
+        await createInventoryVariant(target.id, input);
       } else if (variantEditing) {
-        await updateInventoryVariant(variantsTarget.id, variantEditing.id, input);
+        await updateInventoryVariant(target.id, variantEditing.id, input);
       }
-      await refreshVariants(variantsTarget.id);
+      await refreshVariants(target.id);
       setVariantEditorMode(null);
       setVariantEditing(null);
     } catch (error) {
@@ -525,9 +524,8 @@ export function InventoryPage() {
     }
   }
 
-  async function handleVariantAdjustment(event: FormEvent<HTMLFormElement>) {
+  async function handleVariantAdjustment(event: FormEvent<HTMLFormElement>, target: ProductRow, adjusting: InventoryVariant) {
     event.preventDefault();
-    if (!variantsTarget || !variantAdjusting) return;
     if (!canManageVariants) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -544,11 +542,11 @@ export function InventoryPage() {
     if (!beginMutation()) return;
     setMutationError("");
     try {
-      await adjustInventoryVariant(variantsTarget.id, variantAdjusting.id, {
+      await adjustInventoryVariant(target.id, adjusting.id, {
         delta,
         note: note || null
       });
-      await refreshVariants(variantsTarget.id);
+      await refreshVariants(target.id);
       setVariantAdjusting(null);
     } catch (error) {
       setMutationError(mutationMessage(error));
@@ -666,9 +664,8 @@ export function InventoryPage() {
     }
   }
 
-  async function handleConfigure(event: FormEvent<HTMLFormElement>) {
+  async function handleConfigure(event: FormEvent<HTMLFormElement>, target: ProductRow) {
     event.preventDefault();
-    if (!configureTarget) return;
     if (!model.canManageStock) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -689,7 +686,7 @@ export function InventoryPage() {
     try {
       const sku = String(data.get("sku") ?? "").trim();
       const note = String(data.get("note") ?? "").trim();
-      await configureInventoryStock(configureTarget.id, {
+      await configureInventoryStock(target.id, {
         sku: sku || null,
         trackingEnabled: data.get("trackingEnabled") === "on",
         onHand,
@@ -705,9 +702,8 @@ export function InventoryPage() {
     }
   }
 
-  async function handleAdjustment(event: FormEvent<HTMLFormElement>) {
+  async function handleAdjustment(event: FormEvent<HTMLFormElement>, target: ProductRow) {
     event.preventDefault();
-    if (!adjustTarget) return;
     if (!model.canManageStock) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -724,7 +720,7 @@ export function InventoryPage() {
     setMutationError("");
     try {
       const note = String(data.get("note") ?? "").trim();
-      await adjustInventoryStock(adjustTarget.id, {
+      await adjustInventoryStock(target.id, {
         delta,
         referenceType: "MANUAL",
         referenceId: null,
@@ -1349,8 +1345,8 @@ export function InventoryPage() {
 
                 {!variantsPending && !variantsError && (
                   <>
-                    {variantEditorMode && (
-                      <form className={styles.variantForm} onSubmit={handleVariantEditor}>
+                    {variantEditorMode && (variantEditorMode === "CREATE" || variantEditing) && (
+                      <form className={styles.variantForm} onSubmit={event => handleVariantEditor(event, variantsTarget!, variantEditorMode!)}>
                         <h3>{variantEditorMode === "CREATE" ? "Nueva variante" : "Editar variante"}</h3>
 
                         <label className={styles.field}>
@@ -1364,7 +1360,7 @@ export function InventoryPage() {
                         </label>
 
                         <VariantOptionsEditor
-                          key={variantEditorMode === "CREATE" ? "create" : variantEditing?.id ?? "edit"}
+                          key={variantEditorMode === "CREATE" ? "create" : variantEditing?.id}
                           initialJson={variantEditing?.optionValuesJson ?? "{}"}
                         />
 
@@ -1455,7 +1451,7 @@ export function InventoryPage() {
                     )}
 
                     {variantAdjusting && (
-                      <form className={styles.variantForm} onSubmit={handleVariantAdjustment}>
+                      <form className={styles.variantForm} onSubmit={event => handleVariantAdjustment(event, variantsTarget!, variantAdjusting!)}>
                         <h3>Ajustar · {variantAdjusting.name}</h3>
                         <p className={styles.dialogHint}>
                           Disponible ahora: <strong>{variantAdjusting.available}</strong>
@@ -1858,7 +1854,7 @@ export function InventoryPage() {
                 </button>
               </div>
 
-              <form className={styles.dialogForm} onSubmit={handleConfigure}>
+              <form className={styles.dialogForm} onSubmit={event => handleConfigure(event, configureTarget!)}>
                 {!configureTarget.configured && (
                   <p className={styles.dialogHint}>
                     Paso 2: define SKU, cantidad física y mínimo de reposición.
@@ -1945,7 +1941,7 @@ export function InventoryPage() {
                 </button>
               </div>
 
-              <form className={styles.dialogForm} onSubmit={handleAdjustment}>
+              <form className={styles.dialogForm} onSubmit={event => handleAdjustment(event, adjustTarget!)}>
                 <p className={styles.dialogHint}>
                   Disponible ahora: <strong>{stockValue(adjustTarget.available)}</strong>.
                   Usa un valor positivo para reponer y negativo para corregir una baja.
