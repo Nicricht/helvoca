@@ -436,4 +436,27 @@ class BusinessImportPreviewServiceTest {
         verifyNoInteractions(budget, http);
     }
 
+    @Test
+    void unsupportedGifAndSvgCannotTriggerPaidImageAnalysis() {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("test-key");
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
+
+        var gif = new MockMultipartFile("files", "animation.gif", "image/gif", new byte[]{1, 2});
+        var svg = new MockMultipartFile("files", "vector.svg", "image/svg+xml", new byte[]{3, 4});
+        var preview = service.preview("Negocio", List.of(gif, svg));
+
+        assertFalse(preview.aiUsed());
+        assertTrue(preview.products().isEmpty());
+        assertEquals(2, preview.sources().size());
+        assertTrue(preview.sources().stream().allMatch(src -> "UNSUPPORTED".equals(src.method())));
+        verifyNoInteractions(budget, http);
+    }
+
 }

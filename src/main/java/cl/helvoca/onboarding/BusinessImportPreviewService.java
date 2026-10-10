@@ -536,17 +536,21 @@ public class BusinessImportPreviewService {
         String type = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
         return name.endsWith(".pdf") || name.endsWith(".jpg") || name.endsWith(".jpeg")
                 || name.endsWith(".png") || name.endsWith(".webp")
-                || type.equals("application/pdf") || type.startsWith("image/");
+                || type.equals("application/pdf") || type.equals("image/jpeg")
+                || type.equals("image/png") || type.equals("image/webp");
     }
 
     private static String normalizedMime(MultipartFile file) {
-        String type = file.getContentType();
-        if (type != null && !type.isBlank() && !"application/octet-stream".equalsIgnoreCase(type)) return type;
+        // Prefer file extension over an untrusted, user-supplied MIME header.
         String name = displayName(file).toLowerCase(Locale.ROOT);
         if (name.endsWith(".pdf")) return "application/pdf";
         if (name.endsWith(".png")) return "image/png";
         if (name.endsWith(".webp")) return "image/webp";
-        return "image/jpeg";
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+        String type = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        if (type.equals("application/pdf") || type.equals("image/png")
+                || type.equals("image/webp") || type.equals("image/jpeg")) return type;
+        throw new IllegalArgumentException("Formato de IA no soportado");
     }
 
     private static String displayName(MultipartFile file) {
