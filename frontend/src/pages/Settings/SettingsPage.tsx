@@ -16,12 +16,10 @@ import {
   Wrench
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../api/client";
 import { AppShell } from "../../components/AppShell/AppShell";
 import {
-  saveAiAgent,
-  saveBusinessProfile,
-  saveSetup,
   type AiAgentInput,
   type BusinessHour,
   type BusinessProfileInput,
@@ -29,6 +27,7 @@ import {
   type ServiceItem
 } from "../../features/settings/api";
 import { useSettingsWorkspace } from "../../features/settings/useSettingsWorkspace";
+import { editedSections, persistSettingsSection, sectionChanged, validateSection } from "../../features/settings/sectionSave";
 import type {
   SavePhase,
   SectionKey,
@@ -59,11 +58,6 @@ function sectionFromLocation(): SectionKey {
     return requested as SectionKey;
   }
   return "business";
-}
-
-function nullable(value: string) {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
 }
 
 function defaultProfile(): BusinessProfileInput {
@@ -114,12 +108,14 @@ function saveErrorMessage(error: unknown) {
 }
 
 export function SettingsPage() {
+  const queryClient = useQueryClient();
   const model = useSettingsWorkspace();
   const [activeSection, setActiveSection] = useState<SectionKey>(sectionFromLocation);
   const [draft, setDraft] = useState<SettingsDraft | null>(null);
   const [savePhase, setSavePhase] = useState<SavePhase>("clean");
   const [saveError, setSaveError] = useState("");
   const hydrated = useRef(false);
+  const baselineRef = useRef<SettingsDraft | null>(null);
   const submitLock = useRef(false);
 
   const coreSettled = !model.profile.isPending
@@ -135,7 +131,7 @@ export function SettingsPage() {
     const profile = model.profile.data;
     const agent = model.agent.data;
 
-    setDraft({
+    const initial: SettingsDraft = {
       businessName: String(business.name || ""),
       timezone: String(business.timezone || "America/Santiago"),
       language: String(business.language || "es"),
@@ -157,9 +153,9 @@ export function SettingsPage() {
         sellsServices: profile?.sellsServices ?? null,
         usesReservations: profile?.usesReservations ?? null
       },
-      services: (model.services.data ?? []).map(service => ({ ...service })),
+      services: (model.services.data ?? []).filter(service => service.active !== false).map(service => ({ ...service })),
       hours: (model.hours.data ?? []).map(hour => ({ ...hour })),
-      knowledge: (model.knowledge.data ?? []).map(item => ({ ...item })),
+      knowledge: (model.knowledge.data ?? []).filter(item => item.active !== false).map(item => ({ ...item })),
       agent: {
         name: String(agent?.name || "Helvoca"),
         language: String(agent?.language || business.language || "es"),
@@ -169,7 +165,9 @@ export function SettingsPage() {
         active: agent?.active !== false,
         capabilities: [...(agent?.capabilities ?? [])]
       }
-    });
+    };
+    setDraft(initial);
+    baselineRef.current = structuredClone(initial);
 
     hydrated.current = true;
     setSavePhase("clean");
@@ -182,6 +180,16 @@ export function SettingsPage() {
     model.profile.data,
     model.services.data
   ]);
+
+  const activeIsEditable = editedSections.includes(activeSection);
+  const activeDirty = Boolean(draft && baselineRef.current
+    && sectionChanged(activeSection, draft, baselineRef.current));
+  const pendingOther = draft && baselineRef.current
+    ? editedSections.filter(section => section !== activeSection
+      && sectionChanged(section, draft, baselineRef.current!)).length
+    : 0;
+  const visibleSavePhase: SavePhase = savePhase === "saving" ? "saving"
+    : activeDirty ? "dirty" : savePhase === "saved" ? "saved" : "clean";
 
   const readiness = useMemo(() => {
     const status = model.onboarding.data;
@@ -319,102 +327,59 @@ export function SettingsPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!draft || !model.canManage || submitLock.current) return;
+    if (!draft || !baselineRef.current || !model.canManage || submitLock.current
+      || !editedSections.includes(activeSection)) return;
 
     setSaveError("");
-
-    if (!draft.businessName.trim()) {
-      setSaveError("El nombre del negocio es obligatorio.");
-      openSection("business");
+    if (!sectionChanged(activeSection, draft, baselineRef.current)) {
+      setSavePhase("saved");
       return;
     }
 
-    const validServices = draft.services.filter(service => service.name.trim());
-    if (!validServices.length) {
-      setSaveError("Añade al menos un servicio antes de guardar.");
-      openSection("services");
+    const failedSource = activeSection === "business" ? model.profile.isError
+      : activeSection === "receptionist" ? model.agent.isError
+      : activeSection === "services" ? model.services.isError
+      : activeSection === "hours" ? model.hours.isError
+      : model.knowledge.isError;
+    if (failedSource) {
+      setSaveError("No pudimos cargar esta sección. Recarga antes de guardar para proteger tus datos.");
+      return;
+    }
+    const error = validateSection(activeSection, draft);
+    if (error) {
+      setSaveError(error);
       return;
     }
 
-    if (!draft.hours.length) {
-      setSaveError("Configura al menos un horario de atención.");
-      openSection("hours");
-      return;
-    }
-
-    if (!draft.agent.greeting.trim()) {
-      setSaveError("Define el saludo inicial de la recepcionista IA.");
-      openSection("receptionist");
-      return;
-    }
-
-    const submitButton = event.currentTarget.querySelector<HTMLButtonElement>('button[type="submit"]');
+    const button = event.currentTarget.querySelector<HTMLButtonElement>('button[type="submit"]');
     submitLock.current = true;
-    if (submitButton) submitButton.disabled = true;
+    if (button) button.disabled = true;
     setSavePhase("saving");
 
     try {
-      await saveSetup({
-        businessName: draft.businessName.trim(),
-        timezone: draft.timezone.trim(),
-        language: draft.language.trim(),
-        humanTransferPhone: nullable(draft.humanTransferPhone),
-        services: validServices.map(service => ({
-          id: service.id ?? null,
-          name: service.name.trim(),
-          description: nullable(String(service.description ?? "")),
-          durationMinutes: Number(service.durationMinutes) || 30,
-          price: service.price === null || service.price === undefined
-            ? null
-            : Number(service.price)
-        })),
-        hours: draft.hours.map(hour => ({
-          dayOfWeek: Number(hour.dayOfWeek),
-          openTime: String(hour.openTime).slice(0, 5),
-          closeTime: String(hour.closeTime).slice(0, 5)
-        })),
-        knowledge: draft.knowledge
-          .filter(item => item.title.trim() && item.content.trim())
-          .map(item => ({
-            id: item.id ?? null,
-            title: item.title.trim(),
-            category: nullable(String(item.category ?? "")),
-            content: item.content.trim()
-          }))
+      await persistSettingsSection(activeSection, draft, () => baselineRef.current!, result => {
+        if (baselineRef.current) baselineRef.current = { ...baselineRef.current, ...result.patch };
+        if (result.created) {
+          const { section, index, item } = result.created;
+          if (section === "services") {
+            setDraft(current => current
+              ? { ...current, services: current.services.map((value, i) => i === index
+                ? { ...value, ...item as ServiceItem } : value) } : current);
+          } else {
+            setDraft(current => current
+              ? { ...current, knowledge: current.knowledge.map((value, i) => i === index
+                ? { ...value, ...item as KnowledgeItem } : value) } : current);
+          }
+        }
       });
-
-      await saveBusinessProfile({
-        ...draft.profile,
-        presetKey: nullable(String(draft.profile.presetKey ?? "")),
-        publicDescription: nullable(String(draft.profile.publicDescription ?? "")),
-        publicPhone: nullable(String(draft.profile.publicPhone ?? "")),
-        publicEmail: nullable(String(draft.profile.publicEmail ?? "")),
-        websiteUrl: nullable(String(draft.profile.websiteUrl ?? "")),
-        addressLine: nullable(String(draft.profile.addressLine ?? "")),
-        commune: nullable(String(draft.profile.commune ?? "")),
-        city: nullable(String(draft.profile.city ?? "")),
-        region: nullable(String(draft.profile.region ?? "")),
-        countryCode: nullable(String(draft.profile.countryCode ?? "").toUpperCase()),
-        defaultCurrency: String(draft.profile.defaultCurrency || "CLP").trim().toUpperCase()
-      });
-
-      await saveAiAgent({
-        ...draft.agent,
-        name: draft.agent.name.trim(),
-        language: draft.agent.language.trim(),
-        voice: draft.agent.voice.trim(),
-        greeting: draft.agent.greeting.trim(),
-        instructions: draft.agent.instructions.trim(),
-        capabilities: [...draft.agent.capabilities]
-      });
-
       setSavePhase("saved");
-    } catch (error) {
-      setSaveError(saveErrorMessage(error));
+    } catch (failure) {
+      setSaveError(saveErrorMessage(failure));
       setSavePhase("dirty");
     } finally {
       submitLock.current = false;
-      if (submitButton) submitButton.disabled = false;
+      if (button) button.disabled = false;
+      void queryClient.invalidateQueries({ queryKey: ["settings"] });
     }
   }
 
@@ -543,6 +508,7 @@ export function SettingsPage() {
                 role="tab"
                 aria-selected={activeSection === key}
                 aria-controls={`settings-panel-${key}`}
+                disabled={savePhase === "saving"}
                 onClick={() => openSection(key)}
               >
                 <Icon size={16} aria-hidden="true" />
@@ -555,7 +521,7 @@ export function SettingsPage() {
             <SettingsPanelView
               activeSection={activeSection}
               draft={draft}
-              canManage={model.canManage}
+              canManage={model.canManage && savePhase !== "saving"}
               canManageTeam={model.canManageTeam}
               canReadScheduleExceptions={model.canReadScheduleExceptions}
               canManageScheduleExceptions={model.canManageScheduleExceptions}
@@ -580,35 +546,36 @@ export function SettingsPage() {
             />
           </div>
 
-          {model.canManage && (
+          {model.canManage && activeIsEditable && (
             <footer className={styles.saveBar}>
               <div
                 className={
-                  savePhase === "dirty"
+                  visibleSavePhase === "dirty"
                     ? styles.saveStatusDirty
-                    : savePhase === "saving"
+                    : visibleSavePhase === "saving"
                       ? styles.saveStatusSaving
                       : styles.saveStatus
                 }
                 role="status"
                 aria-live="polite"
               >
-                {savePhase === "dirty" && <CircleAlert size={15} aria-hidden="true" />}
-                {savePhase === "saving" && <span className={styles.miniSpinner} aria-hidden="true" />}
-                {(savePhase === "clean" || savePhase === "saved") && <Check size={15} aria-hidden="true" />}
-                {savePhase === "dirty" && "Cambios sin guardar"}
-                {savePhase === "saving" && "Guardando…"}
-                {savePhase === "saved" && "Guardado"}
-                {savePhase === "clean" && "Guardado"}
+                {visibleSavePhase === "dirty" && <CircleAlert size={15} aria-hidden="true" />}
+                {visibleSavePhase === "saving" && <span className={styles.miniSpinner} aria-hidden="true" />}
+                {(visibleSavePhase === "clean" || visibleSavePhase === "saved") && <Check size={15} aria-hidden="true" />}
+                {visibleSavePhase === "dirty" && "Cambios sin guardar"}
+                {visibleSavePhase === "saving" && "Guardando…"}
+                {visibleSavePhase === "saved" && "Guardado"}
+                {visibleSavePhase === "clean" && "Guardado"}
+                {pendingOther > 0 && visibleSavePhase !== "saving" && ` · ${pendingOther} otra(s) sección(es) pendiente(s)`}
               </div>
 
               <button
                 className="button primary"
                 type="submit"
-                disabled={savePhase === "saving"}
+                disabled={visibleSavePhase === "saving" || !activeDirty}
               >
                 <Save size={16} aria-hidden="true" />
-                {savePhase === "saving" ? "Guardando…" : "Guardar cambios"}
+                {visibleSavePhase === "saving" ? "Guardando…" : "Guardar cambios"}
               </button>
             </footer>
           )}
