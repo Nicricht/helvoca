@@ -147,7 +147,8 @@ class BusinessImportAiBudgetTest {
         BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant, quota);
         configure(budget, 2, 25, 50, 100);
         assertFalse(budget.reserve());
-        verify(quota).reserve(any(UUID.class));
+        verify(quota).current();
+        verify(quota, never()).reserve(any(UUID.class));
         verifyNoInteractions(limiter, tenant);
     }
 
