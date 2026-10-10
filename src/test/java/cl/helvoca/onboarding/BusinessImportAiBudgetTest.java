@@ -135,4 +135,32 @@ class BusinessImportAiBudgetTest {
 
         assertThrows(IllegalStateException.class, budget::reserve);
     }
+
+    @Test
+    void productionConstructorDeniesPaidImportWhenPlanHasNoRight() {
+        DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        BusinessImportAiPlanQuota quota = mock(BusinessImportAiPlanQuota.class);
+        BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant, quota);
+        configure(budget, 2, 25, 50, 100);
+        assertFalse(budget.reserve());
+        verify(quota).reserve(any(UUID.class));
+        verifyNoInteractions(limiter, tenant);
+    }
+
+    @Test
+    void approvedPlanStillRequiresAllExistingFinancialCircuitBreakers() {
+        DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        BusinessImportAiPlanQuota quota = mock(BusinessImportAiPlanQuota.class);
+        UUID business = UUID.randomUUID();
+        when(tenant.requireBusinessId()).thenReturn(business);
+        when(quota.reserve(any(UUID.class))).thenReturn(true);
+        when(limiter.consume(anyString(), anyInt(), eq(WINDOW), any(Instant.class))).thenReturn(ALLOW);
+        BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant, quota);
+        configure(budget, 2, 25, 50, 100);
+        assertTrue(budget.reserve());
+        verify(quota).reserve(any(UUID.class));
+        verify(limiter, times(3)).consume(anyString(), anyInt(), eq(WINDOW), any(Instant.class));
+    }
 }
