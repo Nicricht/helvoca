@@ -213,7 +213,7 @@ class BusinessImportPreviewServiceTest {
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service = new BusinessImportPreviewService(
-                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
 
         MockMultipartFile image = new MockMultipartFile(
@@ -244,7 +244,7 @@ class BusinessImportPreviewServiceTest {
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service = new BusinessImportPreviewService(
-                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
 
         MockMultipartFile image = new MockMultipartFile(
@@ -268,7 +268,7 @@ class BusinessImportPreviewServiceTest {
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         when(budget.reserve()).thenReturn(false);
         BusinessImportPreviewService service = new BusinessImportPreviewService(
-                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
         MockMultipartFile picture = new MockMultipartFile(
                 "files", "carta.jpg", "image/jpeg", new byte[]{2, 3, 4});
@@ -291,7 +291,7 @@ class BusinessImportPreviewServiceTest {
         HttpClient http = mock(HttpClient.class);
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         BusinessImportPreviewService service = new BusinessImportPreviewService(
-                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
         List<org.springframework.web.multipart.MultipartFile> fourPictures = List.of(
                 new MockMultipartFile("files", "1.jpg", "image/jpeg", new byte[]{1}),
@@ -315,7 +315,7 @@ class BusinessImportPreviewServiceTest {
         HttpClient http = mock(HttpClient.class);
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         BusinessImportPreviewService service = new BusinessImportPreviewService(
-                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
         MockMultipartFile big = new MockMultipartFile("files", "large.png", "image/png",
                 new byte[4 * 1024 * 1024 + 1]);
@@ -336,7 +336,7 @@ class BusinessImportPreviewServiceTest {
         HttpClient http = mock(HttpClient.class);
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         BusinessImportPreviewService service = new BusinessImportPreviewService(
-                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
         ReflectionTestUtils.setField(service, "maxPaidFiles", 0);
 
@@ -361,7 +361,7 @@ class BusinessImportPreviewServiceTest {
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         when(budget.reserve()).thenThrow(new IllegalStateException("db unavailable"));
         BusinessImportPreviewService service = new BusinessImportPreviewService(
-                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
         var csv = new MockMultipartFile("files", "products.csv", "text/csv",
                 "SKU,Producto,Precio\nA,Manzana,100\n".getBytes(StandardCharsets.UTF_8));
@@ -393,7 +393,7 @@ class BusinessImportPreviewServiceTest {
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service = new BusinessImportPreviewService(
-                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
 
         var original = new MockMultipartFile("files", "original.jpg", "image/jpeg", new byte[]{1, 2});
@@ -419,7 +419,7 @@ class BusinessImportPreviewServiceTest {
         HttpClient http = mock(HttpClient.class);
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         BusinessImportPreviewService service = new BusinessImportPreviewService(
-                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
         org.springframework.web.multipart.MultipartFile photo = mock(org.springframework.web.multipart.MultipartFile.class);
         when(photo.getOriginalFilename()).thenReturn("no-readable.jpg");
@@ -445,7 +445,7 @@ class BusinessImportPreviewServiceTest {
         HttpClient http = mock(HttpClient.class);
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         BusinessImportPreviewService service = new BusinessImportPreviewService(
-                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
 
         var gif = new MockMultipartFile("files", "animation.gif", "image/gif", new byte[]{1, 2});
