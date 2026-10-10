@@ -157,7 +157,9 @@ test.describe('Inventory automation interaction contracts', () => {
     await page.goto('/app/inventory');
     const alert = page.getByTestId('inventory-alert-alert-1');
     await expect(alert).toContainText('Producto eliminado');
-    await alert.getByRole('button', { name: 'Reponer stock' }).click();
+    // The orphaned alert has no valid catalog row, so the UI must not offer
+    // the mutation action at all. An absent action is stronger than a no-op click.
+    await expect(alert.getByRole('button', { name: 'Reponer stock' })).toHaveCount(0);
     await expect(page.getByRole('dialog')).toHaveCount(0);
     expect(requests.adjust).toHaveLength(0);
     expect(requests.adjustVariant).toHaveLength(0);
