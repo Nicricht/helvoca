@@ -70,3 +70,10 @@ separado de OpenAI, realizar conciliación de invoice según
 `BUSINESS_IMPORT_AI_USAGE_RECONCILIATION.md`, verificar límite de proveedor
 y Railway Wait for CI. Solo Parte 5, previa orden explícita, evaluará
 la transición a producción y piloto.
+
+## Nota de certificación CI (2026-10-10)
+El workflow `.github/workflows/ci.yml` solo escucha `pull_request`
+contra `main`. Por ello el PR #775 se dirige a `main` **como DRAFT**,
+manteniendo su HEAD descendiente directo del PR #774 hasta que este último
+sea fusionado. La certificación no autoriza fusionar ni desplegar #775; el
+diff contra `main` temporalmente incluye la dependencia V98 de #774.
