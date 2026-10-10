@@ -100,4 +100,40 @@ test.describe('Settings Express user journey', () => {
     await expect(page.getByText(/Aún quedan requisitos de atención/)).toBeVisible();
     await expect(page.getByRole('link', { name: /Preparar recepcionista/ })).toHaveAttribute('href', '/app/settings?section=receptionist');
   });
+
+  for (const [width, height] of [
+    [1536, 950], [1440, 900], [1366, 768],
+    [1280, 720], [768, 1024], [390, 844]
+  ]) {
+    test(`Express remains usable without horizontal page overflow at ${width}x${height}`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height });
+      const writes = await mockSetup(page);
+      await page.goto('/app/settings');
+      const express = page.getByTestId('settings-express');
+      await expect(express.getByRole('heading', { name: 'Tu negocio, preparado con menos trabajo.' })).toBeVisible();
+      await expect(express.getByRole('link', { name: /Empezar/ })).toBeVisible();
+      await expect(page.getByRole('tablist', { name: 'Secciones de configuración' }).getByRole('tab')).toHaveCount(8);
+      const overflow = await page.evaluate(() =>
+        document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow, `horizontal page overflow at ${width}x${height}`).toBeLessThanOrEqual(1);
+      await page.screenshot({ path: testInfo.outputPath(`settings-express-${width}x${height}.png`), fullPage: true });
+      expect(writes).toEqual([]);
+    });
+  }
+
+  test('Express disables motion on reduced-motion preference without blocking keyboard navigation', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const writes = await mockSetup(page);
+    await page.goto('/app/settings');
+    const express = page.getByTestId('settings-express');
+    const start = express.getByRole('link', { name: /Empezar/ });
+    await expect(start).toBeVisible();
+    const transitionDuration = await start.evaluate(node => getComputedStyle(node).transitionDuration);
+    expect(transitionDuration).toBe('0s');
+    await start.focus();
+    await expect(start).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/app\/settings\/import/);
+    expect(writes).toEqual([]);
+  });
 });
