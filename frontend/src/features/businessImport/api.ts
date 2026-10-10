@@ -76,3 +76,19 @@ export function applyBusinessImport(products: BusinessImportApplyItem[]) {
     body: JSON.stringify({ products })
   });
 }
+
+export interface BusinessImportAiQuota {
+  status: "AVAILABLE" | "DISABLED" | "BUSINESS_INACTIVE" | "SUBSCRIPTION_INACTIVE"
+    | "PERIOD_EXPIRED" | "NOT_INCLUDED" | "LIMIT_REACHED" | "UNAVAILABLE";
+  planCode: string | null;
+  limit: number;
+  used: number;
+  remaining: number;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  masterEnabled: boolean;
+}
+
+export function getBusinessImportAiQuota() {
+  return apiRequest<BusinessImportAiQuota>("/api/v1/onboarding/import/ai-quota");
+}
