@@ -36,6 +36,16 @@ public class BusinessImportPreviewService {
     private final OpenAiRealtimeProperties openAi;
     private final TenantProvider tenantProvider;
     private final HttpClient http;
+    private final BusinessImportAiBudget aiBudget;
+
+    @Value("${app.onboarding.import-ai.max-paid-files:3}")
+    private int maxPaidFiles = 3;
+
+    @Value("${app.onboarding.import-ai.max-paid-bytes:4194304}")
+    private long maxPaidBytes = 4L * 1024L * 1024L;
+
+    @Value("${app.onboarding.import-ai.model:gpt-4.1-mini}")
+    private String importModel = "gpt-4.1-mini";
 
     // A configured API key is not authorization to incur paid import costs.
     @Value("${app.onboarding.import-ai.enabled:false}")
@@ -44,8 +54,17 @@ public class BusinessImportPreviewService {
     @Autowired
     public BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
                                         OpenAiRealtimeProperties openAi,
-                                        TenantProvider tenantProvider) {
-        this(spreadsheets, openAi, tenantProvider,
+                                        TenantProvider tenantProvider,
+                                        BusinessImportAiBudget aiBudget) {
+        this(spreadsheets, openAi, tenantProvider, aiBudget,
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
+    }
+
+    // Compatibility constructors for focused tests. No quota means fail closed.
+    BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
+                                 OpenAiRealtimeProperties openAi,
+                                 TenantProvider tenantProvider) {
+        this(spreadsheets, openAi, tenantProvider, null,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
     }
 
@@ -53,9 +72,18 @@ public class BusinessImportPreviewService {
                                  OpenAiRealtimeProperties openAi,
                                  TenantProvider tenantProvider,
                                  HttpClient http) {
+        this(spreadsheets, openAi, tenantProvider, null, http);
+    }
+
+    BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
+                                 OpenAiRealtimeProperties openAi,
+                                 TenantProvider tenantProvider,
+                                 BusinessImportAiBudget aiBudget,
+                                 HttpClient http) {
         this.spreadsheets = spreadsheets;
         this.openAi = openAi;
         this.tenantProvider = tenantProvider;
+        this.aiBudget = aiBudget;
         this.http = http;
     }
 
@@ -142,6 +170,13 @@ public class BusinessImportPreviewService {
                             false,
                             List.of("IA no configurada")));
                 }
+            } else if (aiBudget == null || !aiBudget.reserve()) {
+                warnings.add("Este negocio no tiene cupo disponible de importaciones pagadas con IA. Puedes importar CSV/Excel sin gasto.");
+                for (MultipartFile file : semantic) {
+                    sources.add(new SourcePreview(displayName(file),
+                            BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN,
+                            0, "AI_BUDGET_EXCEEDED", false, List.of("Cupo de IA agotado")));
+                }
             } else {
                 try {
                     SemanticResult result = analyzeSemantic(safeBusinessName, semantic);
@@ -187,7 +222,15 @@ public class BusinessImportPreviewService {
                 .put("type", "input_text")
                 .put("text", semanticInstructions(businessName)));
 
+        if (files.size() > maxPaidFiles) {
+            throw new IllegalArgumentException("Se excedió la cantidad máxima de archivos en un análisis de IA.");
+        }
+        long paidBytes = 0L;
         for (MultipartFile file : files) {
+            paidBytes += file.getSize();
+            if (paidBytes > maxPaidBytes) {
+                throw new IllegalArgumentException("Los archivos superan el límite de datos para un análisis de IA.");
+            }
             byte[] bytes = file.getBytes();
             String mime = normalizedMime(file);
             String dataUrl = "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(bytes);
@@ -206,11 +249,11 @@ public class BusinessImportPreviewService {
         }
 
         JSONObject body = new JSONObject()
-                .put("model", openAi.getSummaryModel())
+                .put("model", importModel)
                 .put("input", new JSONArray().put(new JSONObject()
                         .put("role", "user")
                         .put("content", content)))
-                .put("max_output_tokens", 6000);
+                .put("max_output_tokens", 2000);
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(openAi.getResponsesUrl()))
                 .timeout(Duration.ofSeconds(45))
