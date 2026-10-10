@@ -60,8 +60,8 @@ public class BusinessImportAiUsageLedger {
         // The business id is resolved from the authenticated JWT on every write.
         UUID businessId = tenant.requireBusinessId();
         JSONObject root = responseJson(body);
-        String responseId = root == null ? null : optionalString(root, "id");
-        String responseModel = root == null ? null : optionalString(root, "model");
+        String responseId = root == null ? null : optionalString(root, "id", 180);
+        String responseModel = root == null ? null : optionalString(root, "model", 100);
         Tokens tokens = root == null ? null : parseTokens(root.optJSONObject("usage"));
         BigDecimal estimate = tokens == null ? null : estimatedUsd(model, responseModel, tokens);
 
@@ -90,10 +90,10 @@ public class BusinessImportAiUsageLedger {
         }
     }
 
-    private static String optionalString(JSONObject root, String key) {
+    private static String optionalString(JSONObject root, String key, int maxLength) {
         String value = root.optString(key, "").trim();
         if (value.isEmpty()) return null;
-        return value.length() <= 180 ? value : value.substring(0, 180);
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
     static Tokens parseTokens(JSONObject usage) {
