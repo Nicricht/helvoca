@@ -9,18 +9,35 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Reserves a provider attempt against the tenant's shared PostgreSQL limiter.
- * This is a REQUEST quota, not a dollar-denominated invoice or cost estimate.
- * Each attempt consumes capacity even if the provider times out or rejects it.
+ * Conservative preauthorization for paid document analysis.
+ *
+ * These limits reserve OPERATOR-ESTIMATED cents for each provider attempt.
+ * They are not a provider invoice or a claim that actual tokens have a
+ * fixed price. Until pricing/usage reconciliation and a provider hard cap
+ * are validated, this circuit breaker must remain disabled in production.
+ *
+ * A denied later check can consume earlier reservations (fail closed).
+ * Buckets are fixed 30-day windows shared by all application instances.
  */
 @Service
 public class BusinessImportAiBudget {
     private static final int WINDOW_SECONDS = 30 * 24 * 60 * 60;
+    private static final String GLOBAL_COST_BUCKET = "business-import-ai-reserved-cost:global";
+
     private final DistributedRateLimiter limiter;
     private final TenantProvider tenant;
 
     @Value("${app.onboarding.import-ai.max-attempts-per-30-days:0}")
     private int maxAttempts;
+
+    @Value("${app.onboarding.import-ai.reserved-cents-per-attempt:0}")
+    private int reservedCentsPerAttempt;
+
+    @Value("${app.onboarding.import-ai.max-tenant-reserved-cents-per-30-days:0}")
+    private int maxTenantReservedCents;
+
+    @Value("${app.onboarding.import-ai.max-global-reserved-cents-per-30-days:0}")
+    private int maxGlobalReservedCents;
 
     public BusinessImportAiBudget(DistributedRateLimiter limiter, TenantProvider tenant) {
         this.limiter = limiter;
@@ -28,9 +45,26 @@ public class BusinessImportAiBudget {
     }
 
     public boolean reserve() {
-        if (maxAttempts <= 0) return false;
-        UUID tenantId = tenant.requireBusinessId();
-        return limiter.consume("business-import-ai:" + tenantId,
-                maxAttempts, WINDOW_SECONDS, Instant.now()).allowed();
+        // All knobs must be intentionally configured. Zero is an emergency stop.
+        if (maxAttempts <= 0 || reservedCentsPerAttempt <= 0
+                || maxTenantReservedCents < reservedCentsPerAttempt
+                || maxGlobalReservedCents < reservedCentsPerAttempt) return false;
+
+        UUID businessId = tenant.requireBusinessId();
+        Instant now = Instant.now();
+        if (!limiter.consume("business-import-ai:" + businessId,
+                maxAttempts, WINDOW_SECONDS, now).allowed()) return false;
+
+        // Do not use two uncoordinated in-memory counters. Each PostgreSQL
+        // bucket is atomic across instances and business identities.
+        if (!limiter.consume("business-import-ai-reserved-cost:tenant:" + businessId,
+                maxTenantReservedCents / reservedCentsPerAttempt,
+                WINDOW_SECONDS, now).allowed()) return false;
+
+        // The global reservation is the final authority across all tenants.
+        // A failed or unknown provider response never refunds a reservation.
+        return limiter.consume(GLOBAL_COST_BUCKET,
+                maxGlobalReservedCents / reservedCentsPerAttempt,
+                WINDOW_SECONDS, now).allowed();
     }
 }
