@@ -6,6 +6,7 @@ import cl.helvoca.security.TenantProvider;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -35,6 +36,10 @@ public class BusinessImportPreviewService {
     private final OpenAiRealtimeProperties openAi;
     private final TenantProvider tenantProvider;
     private final HttpClient http;
+
+    // A configured API key is not authorization to incur paid import costs.
+    @Value("${app.onboarding.import-ai.enabled:false}")
+    private boolean paidAiImportEnabled;
 
     @Autowired
     public BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
@@ -117,7 +122,17 @@ public class BusinessImportPreviewService {
 
         boolean aiUsed = false;
         if (!semantic.isEmpty()) {
-            if (!openAi.hasApiKey()) {
+            if (!paidAiImportEnabled) {
+                warnings.add("El análisis pagado de fotos/PDF está desactivado para proteger los costos. Puedes importar planillas sin IA.");
+                for (MultipartFile file : semantic) {
+                    sources.add(new SourcePreview(displayName(file),
+                            BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN,
+                            0,
+                            "AI_DISABLED",
+                            false,
+                            List.of("Análisis pagado desactivado")));
+                }
+            } else if (!openAi.hasApiKey()) {
                 warnings.add("Hay fotos o PDF pendientes, pero el análisis con IA no está configurado. Las planillas reconocidas sí fueron procesadas.");
                 for (MultipartFile file : semantic) {
                     sources.add(new SourcePreview(displayName(file),

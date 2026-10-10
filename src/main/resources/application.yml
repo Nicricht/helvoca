@@ -46,6 +46,10 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  onboarding:
+    import-ai:
+      # Paid image/PDF analysis requires explicit server-side opt-in.
+      enabled: ${HELVOCA_BUSINESS_IMPORT_AI_ENABLED:false}
   demo:
     runtime-business-id: ${HELVOCA_DEMO_RUNTIME_BUSINESS_ID:}
   jwt:

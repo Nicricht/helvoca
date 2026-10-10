@@ -3,8 +3,13 @@ package cl.helvoca.onboarding;
 import cl.helvoca.ai.realtime.OpenAiRealtimeProperties;
 import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
+import org.json.JSONObject;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
@@ -173,6 +178,79 @@ class BusinessImportPreviewServiceTest {
         assertNull(result.products().getFirst().durationMinutes());
         assertTrue(result.warnings().stream().anyMatch(w ->
                 w.toLowerCase().contains("duración") && w.contains("Cirugía veterinaria")));
+    }
+
+    @Test
+    void configuredApiKeyDoesNotAuthorizePaidImageAnalysisByDefault() {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("test-key");
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), openAi, tenant, http);
+
+        MockMultipartFile image = new MockMultipartFile(
+                "files", "carta.png", "image/png", new byte[]{1, 2, 3, 4});
+        BusinessImportPreviewService.Preview preview =
+                service.preview("Restaurante", List.of(image));
+
+        assertFalse(preview.aiUsed());
+        assertTrue(preview.products().isEmpty());
+        assertEquals("AI_DISABLED", preview.sources().getFirst().method());
+        assertTrue(preview.warnings().stream().anyMatch(w -> w.contains("desactivado")));
+        verifyNoInteractions(http);
+    }
+
+    @Test
+    void optedInPaidAnalysisWithoutConfiguredKeyStillFailsClosed() {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("");
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), openAi, tenant, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
+
+        MockMultipartFile image = new MockMultipartFile(
+                "files", "carta.png", "image/png", new byte[]{1, 2, 3, 4});
+        BusinessImportPreviewService.Preview preview =
+                service.preview("Restaurante", List.of(image));
+
+        assertFalse(preview.aiUsed());
+        assertEquals("AI_UNAVAILABLE", preview.sources().getFirst().method());
+        verifyNoInteractions(http);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void explicitServerSideOptInAllowsOneMockedImageAnalysis() throws Exception {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("test-key");
+        HttpClient http = mock(HttpClient.class);
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn(new JSONObject()
+                .put("output_text", """
+                        {"products":[{"name":"Hamburguesa","price":8490,"kind":"PRODUCT","confidence":0.9}],"warnings":[]}
+                        """).toString());
+        when(http.send(any(HttpRequest.class), any())).thenReturn(response);
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), openAi, tenant, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
+
+        MockMultipartFile image = new MockMultipartFile(
+                "files", "carta.png", "image/png", new byte[]{1, 2, 3, 4});
+        BusinessImportPreviewService.Preview preview =
+                service.preview("Restaurante", List.of(image));
+
+        assertTrue(preview.aiUsed());
+        assertEquals("AI", preview.sources().getFirst().method());
+        assertEquals("Hamburguesa", preview.products().getFirst().name());
+        verify(http, times(1)).send(any(HttpRequest.class), any());
     }
 
 }
