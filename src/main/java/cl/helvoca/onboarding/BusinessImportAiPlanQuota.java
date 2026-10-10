@@ -32,7 +32,7 @@ public class BusinessImportAiPlanQuota {
 
     @Transactional(readOnly = true)
     public Snapshot current() {
-        return evaluate(tenant.requireBusinessId(), false);
+        return evaluate(tenant.requireBusinessId(), false, Instant.now());
     }
 
     /**
@@ -44,7 +44,8 @@ public class BusinessImportAiPlanQuota {
     public boolean reserve(UUID attemptId) {
         if (attemptId == null) throw new IllegalArgumentException("Attempt ID required");
         UUID businessId = tenant.requireBusinessId();
-        Snapshot snapshot = evaluate(businessId, true);
+        Instant attemptStartedAt = Instant.now();
+        Snapshot snapshot = evaluate(businessId, true, attemptStartedAt);
         if (!"AVAILABLE".equals(snapshot.status())) return false;
 
         int written = jdbc.update("""
@@ -55,11 +56,11 @@ public class BusinessImportAiPlanQuota {
                           ?, 'OPENAI', ?, ?)
                 ON CONFLICT (business_id, idempotency_key) DO NOTHING
                 """, businessId, attemptId.toString(),
-                "BUSINESS_IMPORT_AI:" + attemptId, Timestamp.from(Instant.now()));
+                "BUSINESS_IMPORT_AI:" + attemptId, Timestamp.from(attemptStartedAt));
         return written == 1;
     }
 
-    private Snapshot evaluate(UUID businessId, boolean lock) {
+    private Snapshot evaluate(UUID businessId, boolean lock, Instant now) {
         String sql = """
                 SELECT b.status AS business_status, s.status AS subscription_status,
                        s.plan_code, s.current_period_start, s.current_period_end,
@@ -87,7 +88,6 @@ public class BusinessImportAiPlanQuota {
         }
 
         PlanState p = rows.getFirst();
-        Instant now = Instant.now();
         String status;
         if (!enabled) status = "DISABLED";
         else if (!"ACTIVE".equals(p.businessStatus())) status = "BUSINESS_INACTIVE";
