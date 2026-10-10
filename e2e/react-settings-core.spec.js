@@ -218,7 +218,7 @@ test.describe('React settings core RED contract', () => {
     const save = page.locator('form button[type="submit"]');
 
     await name.fill('Barbería Norte Centro');
-    await expect(page.getByRole('status')).toContainText('Cambios sin guardar');
+    await expect(page.locator('footer [role="status"]')).toContainText('Cambios sin guardar');
 
     await save.evaluate(button => {
       button.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -226,7 +226,7 @@ test.describe('React settings core RED contract', () => {
     });
 
     await expect(save).toBeDisabled();
-    await expect(page.getByRole('status')).toContainText('Guardando');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardando');
 
     await expect.poll(() => state.businessPayloads.length).toBe(1);
     expect(state.businessPayloads[0]).toMatchObject({
@@ -242,7 +242,7 @@ test.describe('React settings core RED contract', () => {
     expect(state.agentPayloads.every(payload => !Object.hasOwn(payload, 'businessId'))).toBe(true);
     expect(state.forbiddenWrites).toEqual([]);
 
-    await expect(page.getByRole('status')).toContainText('Guardado');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
   });
 
   test('blocks invalid edits before any mutation request', async ({ page }) => {
@@ -269,7 +269,7 @@ test.describe('React settings core RED contract', () => {
 
     await expect(page.getByRole('alert')).toContainText(/no pudimos guardar|configuration unavailable|intenta nuevamente/i);
     await expect(page.getByLabel('Nombre del negocio')).toHaveValue('Barbería Norte Error');
-    await expect(page.getByRole('status')).toContainText('Cambios sin guardar');
+    await expect(page.locator('footer [role="status"]')).toContainText('Cambios sin guardar');
     expect(state.businessPayloads).toHaveLength(1);
     expect(state.setupPayloads).toHaveLength(0);
     expect(state.forbiddenWrites).toEqual([]);
