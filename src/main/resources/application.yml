@@ -52,6 +52,12 @@ app:
       enabled: ${HELVOCA_BUSINESS_IMPORT_AI_ENABLED:false}
       # Zero means no paid requests even if the flag is enabled.
       max-attempts-per-30-days: ${HELVOCA_BUSINESS_IMPORT_AI_MAX_ATTEMPTS_PER_30_DAYS:0}
+      # Emergency-off unless every budget is configured by an operator.
+      # Cents are conservative reserved estimates, NOT actual provider billing.
+      # Keep OFF until real token costs, monthly invoices and provider hard caps are verified.
+      reserved-cents-per-attempt: ${HELVOCA_BUSINESS_IMPORT_AI_RESERVED_CENTS_PER_ATTEMPT:0}
+      max-tenant-reserved-cents-per-30-days: ${HELVOCA_BUSINESS_IMPORT_AI_MAX_TENANT_RESERVED_CENTS_PER_30_DAYS:0}
+      max-global-reserved-cents-per-30-days: ${HELVOCA_BUSINESS_IMPORT_AI_MAX_GLOBAL_RESERVED_CENTS_PER_30_DAYS:0}
       max-paid-files: ${HELVOCA_BUSINESS_IMPORT_AI_MAX_FILES:3}
       max-paid-bytes: ${HELVOCA_BUSINESS_IMPORT_AI_MAX_BYTES:4194304}
       model: ${HELVOCA_BUSINESS_IMPORT_AI_MODEL:gpt-4.1-mini}
