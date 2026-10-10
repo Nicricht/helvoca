@@ -227,6 +227,7 @@ export function InventoryPage() {
   const [productCreateOpen, setProductCreateOpen] = useState(false);
   const [productEditing, setProductEditing] = useState<CatalogItem | null>(null);
   const [refreshPending, setRefreshPending] = useState(false);
+  const refreshLock = useRef(false);
   const [configureTarget, setConfigureTarget] = useState<ProductRow | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<ProductRow | null>(null);
   const [historyTarget, setHistoryTarget] = useState<ProductRow | null>(null);
@@ -350,11 +351,15 @@ export function InventoryPage() {
   const canManageAutomation = roles.includes("BUSINESS_ADMIN") && model.canManageStock;
 
   async function refreshWorkspace() {
-    if (refreshPending) return;
+    // React state updates may batch two clicks in the same browser task.
+    // A synchronous lock prevents duplicate refetch traffic before rendering.
+    if (refreshLock.current) return;
+    refreshLock.current = true;
     setRefreshPending(true);
     try {
       await model.refetchPrimary();
     } finally {
+      refreshLock.current = false;
       setRefreshPending(false);
     }
   }
