@@ -170,6 +170,15 @@ public class BusinessImportPreviewService {
                             false,
                             List.of("IA no configurada")));
                 }
+            } else if (maxPaidFiles <= 0 || maxPaidBytes <= 0
+                    || semantic.size() > maxPaidFiles
+                    || semantic.stream().mapToLong(MultipartFile::getSize).sum() > maxPaidBytes) {
+                warnings.add("La importación con IA supera el límite permitido de cantidad o tamaño de archivos. Divide los archivos en lotes pequeños.");
+                for (MultipartFile file : semantic) {
+                    sources.add(new SourcePreview(displayName(file),
+                            BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN,
+                            0, "AI_INPUT_LIMIT", false, List.of("Reduce cantidad o tamaño")));
+                }
             } else if (aiBudget == null || !aiBudget.reserve()) {
                 warnings.add("Este negocio no tiene cupo disponible de importaciones pagadas con IA. Puedes importar CSV/Excel sin gasto.");
                 for (MultipartFile file : semantic) {
