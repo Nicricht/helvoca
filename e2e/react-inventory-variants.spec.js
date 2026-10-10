@@ -1013,4 +1013,72 @@ test.describe('React Inventory variants', () => {
     expect(requests.create).toHaveLength(0);
   });
 
+
+  test('synchronous duplicate variant creation emits one authoritative POST', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('Nombre de variante').fill('Verde único');
+    await dialog.getByLabel('SKU de variante').fill('CER-VERDE-UNICO');
+    await dialog.locator('form').evaluate(form => {
+      // Two activations before React can paint another frame must still create once.
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    await expect.poll(() => requests.create.length).toBe(1);
+    await expect(dialog.getByTestId('inventory-variant-66666666-6666-6666-6666-666666666666')).toBeVisible();
+    expect(requests.create).toHaveLength(1);
+  });
+
+  test('synchronous duplicate variant adjustments cannot spend the same stock delta twice', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByTestId('inventory-variant-' + initialVariantId)
+      .getByRole('button', { name: 'Ajustar' }).click();
+    await dialog.getByLabel('Ajuste de variante').fill('2');
+    await dialog.locator('form').evaluate(form => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    await expect.poll(() => requests.adjust.length).toBe(1);
+    await expect(dialog.getByTestId('inventory-variant-' + initialVariantId)).toContainText('Disponible: 5');
+    expect(requests.adjust).toHaveLength(1);
+  });
+
+  test('synchronous duplicate variant deactivation never posts a second irreversible request', async ({ page }) => {
+    const { productId, initialVariantId } = await bootVariantInventory(page);
+    let deactivations = 0;
+    const current = () => ({
+      id: initialVariantId, catalogItemId: productId, name: 'Azul / M',
+      optionValuesJson: '{"color":"Azul","talla":"M"}', sku: 'CER-AZ-M',
+      trackingEnabled: true, onHand: 4, reserved: 1, available: 3,
+      reorderThreshold: 1, lowStock: false, active: deactivations === 0
+    });
+    await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+      if (route.request().method() === 'GET') return route.fulfill(json([current()]));
+      return route.fallback();
+    });
+    await page.route('**/api/v1/inventory/' + productId + '/variants/' + initialVariantId + '/deactivate', async route => {
+      deactivations += 1;
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return route.fulfill(json(current()));
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    const item = dialog.getByTestId('inventory-variant-' + initialVariantId);
+    await item.getByRole('button', { name: 'Desactivar' }).evaluate(button => {
+      button.click();
+      button.click();
+    });
+    await expect.poll(() => deactivations).toBe(1);
+    await expect(item).toContainText('Inactiva');
+    await expect(item.getByRole('button', { name: 'Desactivar' })).toHaveCount(0);
+    expect(deactivations).toBe(1);
+  });
+
 });
