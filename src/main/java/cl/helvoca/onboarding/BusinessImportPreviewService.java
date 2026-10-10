@@ -6,6 +6,7 @@ import cl.helvoca.security.TenantProvider;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -14,6 +15,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -35,12 +38,35 @@ public class BusinessImportPreviewService {
     private final OpenAiRealtimeProperties openAi;
     private final TenantProvider tenantProvider;
     private final HttpClient http;
+    private final BusinessImportAiBudget aiBudget;
+
+    @Value("${app.onboarding.import-ai.max-paid-files:3}")
+    private int maxPaidFiles = 3;
+
+    @Value("${app.onboarding.import-ai.max-paid-bytes:4194304}")
+    private long maxPaidBytes = 4L * 1024L * 1024L;
+
+    @Value("${app.onboarding.import-ai.model:gpt-4.1-mini}")
+    private String importModel = "gpt-4.1-mini";
+
+    // A configured API key is not authorization to incur paid import costs.
+    @Value("${app.onboarding.import-ai.enabled:false}")
+    private boolean paidAiImportEnabled;
 
     @Autowired
     public BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
                                         OpenAiRealtimeProperties openAi,
-                                        TenantProvider tenantProvider) {
-        this(spreadsheets, openAi, tenantProvider,
+                                        TenantProvider tenantProvider,
+                                        BusinessImportAiBudget aiBudget) {
+        this(spreadsheets, openAi, tenantProvider, aiBudget,
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
+    }
+
+    // Compatibility constructors for focused tests. No quota means fail closed.
+    BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
+                                 OpenAiRealtimeProperties openAi,
+                                 TenantProvider tenantProvider) {
+        this(spreadsheets, openAi, tenantProvider, null,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
     }
 
@@ -48,9 +74,18 @@ public class BusinessImportPreviewService {
                                  OpenAiRealtimeProperties openAi,
                                  TenantProvider tenantProvider,
                                  HttpClient http) {
+        this(spreadsheets, openAi, tenantProvider, null, http);
+    }
+
+    BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
+                                 OpenAiRealtimeProperties openAi,
+                                 TenantProvider tenantProvider,
+                                 BusinessImportAiBudget aiBudget,
+                                 HttpClient http) {
         this.spreadsheets = spreadsheets;
         this.openAi = openAi;
         this.tenantProvider = tenantProvider;
+        this.aiBudget = aiBudget;
         this.http = http;
     }
 
@@ -115,9 +150,25 @@ public class BusinessImportPreviewService {
                     List.of("Formato no soportado")));
         }
 
+        // Deduplicate the same image/PDF content before it enters a paid payload.
+        // An unreadable file stays local and cannot initiate a provider request.
+        if (!semantic.isEmpty() && paidAiImportEnabled && openAi.hasApiKey()) {
+            semantic = distinctSemanticFiles(semantic, sources, warnings);
+        }
+
         boolean aiUsed = false;
         if (!semantic.isEmpty()) {
-            if (!openAi.hasApiKey()) {
+            if (!paidAiImportEnabled) {
+                warnings.add("El análisis pagado de fotos/PDF está desactivado para proteger los costos. Puedes importar planillas sin IA.");
+                for (MultipartFile file : semantic) {
+                    sources.add(new SourcePreview(displayName(file),
+                            BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN,
+                            0,
+                            "AI_DISABLED",
+                            false,
+                            List.of("Análisis pagado desactivado")));
+                }
+            } else if (!openAi.hasApiKey()) {
                 warnings.add("Hay fotos o PDF pendientes, pero el análisis con IA no está configurado. Las planillas reconocidas sí fueron procesadas.");
                 for (MultipartFile file : semantic) {
                     sources.add(new SourcePreview(displayName(file),
@@ -126,6 +177,22 @@ public class BusinessImportPreviewService {
                             "AI_UNAVAILABLE",
                             false,
                             List.of("IA no configurada")));
+                }
+            } else if (maxPaidFiles <= 0 || maxPaidBytes <= 0
+                    || semantic.size() > maxPaidFiles
+                    || semantic.stream().mapToLong(MultipartFile::getSize).sum() > maxPaidBytes) {
+                warnings.add("La importación con IA supera el límite permitido de cantidad o tamaño de archivos. Divide los archivos en lotes pequeños.");
+                for (MultipartFile file : semantic) {
+                    sources.add(new SourcePreview(displayName(file),
+                            BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN,
+                            0, "AI_INPUT_LIMIT", false, List.of("Reduce cantidad o tamaño")));
+                }
+            } else if (!reservePaidBudget(warnings)) {
+                warnings.add("Este negocio no tiene cupo disponible de importaciones pagadas con IA. Puedes importar CSV/Excel sin gasto.");
+                for (MultipartFile file : semantic) {
+                    sources.add(new SourcePreview(displayName(file),
+                            BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN,
+                            0, "AI_BUDGET_EXCEEDED", false, List.of("Cupo de IA agotado")));
                 }
             } else {
                 try {
@@ -166,13 +233,59 @@ public class BusinessImportPreviewService {
                 List.copyOf(dedupeWarnings(warnings)), aiUsed);
     }
 
+    private static List<MultipartFile> distinctSemanticFiles(List<MultipartFile> files,
+                                                                  List<SourcePreview> sources,
+                                                                  List<String> warnings) {
+        Set<String> fingerprints = new LinkedHashSet<>();
+        List<MultipartFile> distinct = new ArrayList<>();
+        for (MultipartFile file : files) {
+            try {
+                String fingerprint = HexFormat.of().formatHex(
+                        MessageDigest.getInstance("SHA-256").digest(file.getBytes()));
+                if (fingerprints.add(fingerprint)) {
+                    distinct.add(file);
+                } else {
+                    warnings.add(displayName(file) + " es un archivo duplicado; se analizará solo una vez.");
+                    sources.add(new SourcePreview(displayName(file),
+                            BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN,
+                            0, "DUPLICATE", false, List.of("Contenido repetido")));
+                }
+            } catch (Exception e) {
+                warnings.add("No fue posible leer " + displayName(file) + "; no se enviará a IA.");
+                sources.add(new SourcePreview(displayName(file),
+                        BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN,
+                        0, "READ_ERROR", false, List.of("Archivo ilegible")));
+            }
+        }
+        return distinct;
+    }
+
+    private boolean reservePaidBudget(List<String> warnings) {
+        if (aiBudget == null) return false;
+        try {
+            return aiBudget.reserve();
+        } catch (RuntimeException e) {
+            // Database or tenant lookup failure must never silently authorize a paid request.
+            warnings.add("No se pudo comprobar el cupo de IA. El análisis pagado no se realizó.");
+            return false;
+        }
+    }
+
     private SemanticResult analyzeSemantic(String businessName, List<MultipartFile> files) throws Exception {
         JSONArray content = new JSONArray();
         content.put(new JSONObject()
                 .put("type", "input_text")
                 .put("text", semanticInstructions(businessName)));
 
+        if (files.size() > maxPaidFiles) {
+            throw new IllegalArgumentException("Se excedió la cantidad máxima de archivos en un análisis de IA.");
+        }
+        long paidBytes = 0L;
         for (MultipartFile file : files) {
+            paidBytes += file.getSize();
+            if (paidBytes > maxPaidBytes) {
+                throw new IllegalArgumentException("Los archivos superan el límite de datos para un análisis de IA.");
+            }
             byte[] bytes = file.getBytes();
             String mime = normalizedMime(file);
             String dataUrl = "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(bytes);
@@ -191,11 +304,11 @@ public class BusinessImportPreviewService {
         }
 
         JSONObject body = new JSONObject()
-                .put("model", openAi.getSummaryModel())
+                .put("model", importModel)
                 .put("input", new JSONArray().put(new JSONObject()
                         .put("role", "user")
                         .put("content", content)))
-                .put("max_output_tokens", 6000);
+                .put("max_output_tokens", 2000);
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(openAi.getResponsesUrl()))
                 .timeout(Duration.ofSeconds(45))
@@ -423,17 +536,21 @@ public class BusinessImportPreviewService {
         String type = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
         return name.endsWith(".pdf") || name.endsWith(".jpg") || name.endsWith(".jpeg")
                 || name.endsWith(".png") || name.endsWith(".webp")
-                || type.equals("application/pdf") || type.startsWith("image/");
+                || type.equals("application/pdf") || type.equals("image/jpeg")
+                || type.equals("image/png") || type.equals("image/webp");
     }
 
     private static String normalizedMime(MultipartFile file) {
-        String type = file.getContentType();
-        if (type != null && !type.isBlank() && !"application/octet-stream".equalsIgnoreCase(type)) return type;
+        // Prefer file extension over an untrusted, user-supplied MIME header.
         String name = displayName(file).toLowerCase(Locale.ROOT);
         if (name.endsWith(".pdf")) return "application/pdf";
         if (name.endsWith(".png")) return "image/png";
         if (name.endsWith(".webp")) return "image/webp";
-        return "image/jpeg";
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+        String type = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        if (type.equals("application/pdf") || type.equals("image/png")
+                || type.equals("image/webp") || type.equals("image/jpeg")) return type;
+        throw new IllegalArgumentException("Formato de IA no soportado");
     }
 
     private static String displayName(MultipartFile file) {

@@ -37,6 +37,8 @@ const PERMISSION_CHANGE_ERROR = "Tus permisos cambiaron. Actualiza para continua
 
 export interface ProductRow {
   id: string;
+  // Keep the authoritative catalogue record attached to its derived row.
+  catalogItem: CatalogItem;
   name: string;
   description: string;
   price: number | null;
@@ -93,6 +95,7 @@ function buildRows(catalog: CatalogItem[], inventory: InventoryStock[], alerts: 
 
       return {
         id: String(item.id),
+        catalogItem: item,
         name: String(item.name || "Producto"),
         description: String(item.description || ""),
         price: numberOrNull(item.price),
@@ -227,6 +230,7 @@ export function InventoryPage() {
   const [productCreateOpen, setProductCreateOpen] = useState(false);
   const [productEditing, setProductEditing] = useState<CatalogItem | null>(null);
   const [refreshPending, setRefreshPending] = useState(false);
+  const refreshLock = useRef(false);
   const [configureTarget, setConfigureTarget] = useState<ProductRow | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<ProductRow | null>(null);
   const [historyTarget, setHistoryTarget] = useState<ProductRow | null>(null);
@@ -248,6 +252,9 @@ export function InventoryPage() {
   const mutationLock = useRef(false);
   const [mutationError, setMutationError] = useState("");
 
+  // One synchronous lock is the source of truth for every stock mutation.
+  // Validating form fields before this lock is safe; a competing submit can
+  // never send a second request once beginMutation reserves it.
   function beginMutation() {
     if (mutationLock.current) return false;
     mutationLock.current = true;
@@ -350,11 +357,15 @@ export function InventoryPage() {
   const canManageAutomation = roles.includes("BUSINESS_ADMIN") && model.canManageStock;
 
   async function refreshWorkspace() {
-    if (refreshPending) return;
+    // React state updates may batch two clicks in the same browser task.
+    // A synchronous lock prevents duplicate refetch traffic before rendering.
+    if (refreshLock.current) return;
+    refreshLock.current = true;
     setRefreshPending(true);
     try {
       await model.refetchPrimary();
     } finally {
+      refreshLock.current = false;
       setRefreshPending(false);
     }
   }
@@ -372,10 +383,14 @@ export function InventoryPage() {
     }
   }
 
-  async function restockFromAlert(catalogItemId?: string, variantId?: string | null) {
-    if (!canManageAutomation || !catalogItemId) return;
-    const row = rows.find(candidate => candidate.id === String(catalogItemId));
-    if (!row) return;
+  // Resolve permission and the live catalog row before exposing a mutation
+  // control. Invalid or orphaned alerts never acquire a restock callback.
+  function authorizedRestockRow(catalogItemId?: string): ProductRow | null {
+    if (!canManageAutomation || !catalogItemId) return null;
+    return rows.find(candidate => candidate.id === String(catalogItemId)) ?? null;
+  }
+
+  async function restockFromAlert(row: ProductRow, variantId?: string | null) {
     setMutationError("");
 
     if (variantId) {
@@ -434,8 +449,10 @@ export function InventoryPage() {
     return data;
   }
 
+  // Both entry points enforce the current read capability: the variants
+  // button is permission-gated and restock requires an authorized alert row.
+  // The backend also authorizes every variants GET for the active tenant.
   async function openVariants(row: ProductRow) {
-    if (!canReadVariants) return;
     setVariantsTarget(row);
     setVariants([]);
     setVariantsError("");
@@ -483,9 +500,8 @@ export function InventoryPage() {
     };
   }
 
-  async function handleVariantEditor(event: FormEvent<HTMLFormElement>) {
+  async function handleVariantEditor(event: FormEvent<HTMLFormElement>, target: ProductRow, mode: "CREATE" | "EDIT", editing: InventoryVariant | null) {
     event.preventDefault();
-    if (!variantsTarget || !variantEditorMode || mutationLock.current) return;
     if (!canManageVariants) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -502,12 +518,13 @@ export function InventoryPage() {
 
     if (!beginMutation()) return;
     try {
-      if (variantEditorMode === "CREATE") {
-        await createInventoryVariant(variantsTarget.id, input);
-      } else if (variantEditing) {
-        await updateInventoryVariant(variantsTarget.id, variantEditing.id, input);
+      if (mode === "CREATE") {
+        await createInventoryVariant(target.id, input);
+      } else {
+        // EDIT is mounted only for a selected existing variant.
+        await updateInventoryVariant(target.id, editing!.id, input);
       }
-      await refreshVariants(variantsTarget.id);
+      await refreshVariants(target.id);
       setVariantEditorMode(null);
       setVariantEditing(null);
     } catch (error) {
@@ -517,9 +534,8 @@ export function InventoryPage() {
     }
   }
 
-  async function handleVariantAdjustment(event: FormEvent<HTMLFormElement>) {
+  async function handleVariantAdjustment(event: FormEvent<HTMLFormElement>, target: ProductRow, adjusting: InventoryVariant) {
     event.preventDefault();
-    if (!variantsTarget || !variantAdjusting || mutationLock.current) return;
     if (!canManageVariants) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -536,11 +552,11 @@ export function InventoryPage() {
     if (!beginMutation()) return;
     setMutationError("");
     try {
-      await adjustInventoryVariant(variantsTarget.id, variantAdjusting.id, {
+      await adjustInventoryVariant(target.id, adjusting.id, {
         delta,
         note: note || null
       });
-      await refreshVariants(variantsTarget.id);
+      await refreshVariants(target.id);
       setVariantAdjusting(null);
     } catch (error) {
       setMutationError(mutationMessage(error));
@@ -582,7 +598,6 @@ export function InventoryPage() {
 
   async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (mutationLock.current) return;
     if (!model.canManageCatalog) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -632,6 +647,7 @@ export function InventoryPage() {
       if (continueToStock && saved?.id) {
         setConfigureTarget({
           id: String(saved.id),
+          catalogItem: saved,
           name: String(saved.name || name),
           description: String(saved.description || description),
           price: numberOrNull(saved.price),
@@ -659,9 +675,8 @@ export function InventoryPage() {
     }
   }
 
-  async function handleConfigure(event: FormEvent<HTMLFormElement>) {
+  async function handleConfigure(event: FormEvent<HTMLFormElement>, target: ProductRow) {
     event.preventDefault();
-    if (!configureTarget || mutationLock.current) return;
     if (!model.canManageStock) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -682,7 +697,7 @@ export function InventoryPage() {
     try {
       const sku = String(data.get("sku") ?? "").trim();
       const note = String(data.get("note") ?? "").trim();
-      await configureInventoryStock(configureTarget.id, {
+      await configureInventoryStock(target.id, {
         sku: sku || null,
         trackingEnabled: data.get("trackingEnabled") === "on",
         onHand,
@@ -698,9 +713,8 @@ export function InventoryPage() {
     }
   }
 
-  async function handleAdjustment(event: FormEvent<HTMLFormElement>) {
+  async function handleAdjustment(event: FormEvent<HTMLFormElement>, target: ProductRow) {
     event.preventDefault();
-    if (!adjustTarget || mutationLock.current) return;
     if (!model.canManageStock) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -717,7 +731,7 @@ export function InventoryPage() {
     setMutationError("");
     try {
       const note = String(data.get("note") ?? "").trim();
-      await adjustInventoryStock(adjustTarget.id, {
+      await adjustInventoryStock(target.id, {
         delta,
         referenceType: "MANUAL",
         referenceId: null,
@@ -1047,10 +1061,10 @@ export function InventoryPage() {
                           type="button"
                           aria-label={`Editar producto ${row.name}`}
                           onClick={() => {
-                            const item = (asList(model.catalog.data)).find(candidate => String(candidate.id) === row.id);
-                            if (!item) return;
+                            // The row was derived from this exact catalogue record.
+                            // A subsequent PUT is still server-authorized and rejects stale IDs.
                             setMutationError("");
-                            setProductEditing(item);
+                            setProductEditing(row.catalogItem);
                             setProductCreateOpen(true);
                           }}
                         >
@@ -1133,7 +1147,9 @@ export function InventoryPage() {
                   ) : (asList(model.alerts.data)).length === 0 ? (
                     <p className={styles.automationEmpty}>No hay alertas abiertas.</p>
                   ) : (
-                    (asList(model.alerts.data)).map(alert => (
+                    (asList(model.alerts.data)).map(alert => {
+                      const target = authorizedRestockRow(alert.catalogItemId);
+                      return (
                       <article
                         key={alert.id}
                         className={styles.automationCard}
@@ -1168,13 +1184,13 @@ export function InventoryPage() {
                               </button>
                             )}
                             {(alert.type === "LOW_STOCK" || alert.type === "OUT_OF_STOCK")
-                              && rows.some(row => row.id === String(alert.catalogItemId))
+                              && target !== null
                               && (
                                 <button
                                   className="button secondary"
                                   type="button"
                                   disabled={mutationPending}
-                                  onClick={() => void restockFromAlert(alert.catalogItemId, alert.variantId)}
+                                  onClick={() => void restockFromAlert(target, alert.variantId)}
                                 >
                                   Reponer stock
                                 </button>
@@ -1182,7 +1198,8 @@ export function InventoryPage() {
                           </div>
                         )}
                       </article>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </section>
@@ -1342,8 +1359,8 @@ export function InventoryPage() {
 
                 {!variantsPending && !variantsError && (
                   <>
-                    {variantEditorMode && (
-                      <form className={styles.variantForm} onSubmit={handleVariantEditor}>
+                    {variantEditorMode && (variantEditorMode === "CREATE" || variantEditing) && (
+                      <form className={styles.variantForm} onSubmit={event => handleVariantEditor(event, variantsTarget!, variantEditorMode!, variantEditing)}>
                         <h3>{variantEditorMode === "CREATE" ? "Nueva variante" : "Editar variante"}</h3>
 
                         <label className={styles.field}>
@@ -1357,7 +1374,7 @@ export function InventoryPage() {
                         </label>
 
                         <VariantOptionsEditor
-                          key={variantEditorMode === "CREATE" ? "create" : variantEditing?.id ?? "edit"}
+                          key={variantEditorMode === "CREATE" ? "create" : variantEditing?.id}
                           initialJson={variantEditing?.optionValuesJson ?? "{}"}
                         />
 
@@ -1448,7 +1465,7 @@ export function InventoryPage() {
                     )}
 
                     {variantAdjusting && (
-                      <form className={styles.variantForm} onSubmit={handleVariantAdjustment}>
+                      <form className={styles.variantForm} onSubmit={event => handleVariantAdjustment(event, variantsTarget!, variantAdjusting!)}>
                         <h3>Ajustar · {variantAdjusting.name}</h3>
                         <p className={styles.dialogHint}>
                           Disponible ahora: <strong>{variantAdjusting.available}</strong>
@@ -1851,7 +1868,7 @@ export function InventoryPage() {
                 </button>
               </div>
 
-              <form className={styles.dialogForm} onSubmit={handleConfigure}>
+              <form className={styles.dialogForm} onSubmit={event => handleConfigure(event, configureTarget!)}>
                 {!configureTarget.configured && (
                   <p className={styles.dialogHint}>
                     Paso 2: define SKU, cantidad física y mínimo de reposición.
@@ -1938,7 +1955,7 @@ export function InventoryPage() {
                 </button>
               </div>
 
-              <form className={styles.dialogForm} onSubmit={handleAdjustment}>
+              <form className={styles.dialogForm} onSubmit={event => handleAdjustment(event, adjustTarget!)}>
                 <p className={styles.dialogHint}>
                   Disponible ahora: <strong>{stockValue(adjustTarget.available)}</strong>.
                   Usa un valor positivo para reponer y negativo para corregir una baja.

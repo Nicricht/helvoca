@@ -1013,4 +1013,166 @@ test.describe('React Inventory variants', () => {
     expect(requests.create).toHaveLength(0);
   });
 
+
+  test('synchronous duplicate variant creation emits one authoritative POST', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('Nombre de variante').fill('Verde único');
+    await dialog.getByLabel('SKU de variante').fill('CER-VERDE-UNICO');
+    await dialog.locator('form').evaluate(form => {
+      // Two activations before React can paint another frame must still create once.
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    await expect.poll(() => requests.create.length).toBe(1);
+    await expect(dialog.getByTestId('inventory-variant-66666666-6666-6666-6666-666666666666')).toBeVisible();
+    expect(requests.create).toHaveLength(1);
+  });
+
+  test('synchronous duplicate variant adjustments cannot spend the same stock delta twice', async ({ page }) => {
+    const { productId, initialVariantId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    await dialog.getByTestId('inventory-variant-' + initialVariantId)
+      .getByRole('button', { name: 'Ajustar' }).click();
+    await dialog.getByLabel('Ajuste de variante').fill('2');
+    await dialog.locator('form').evaluate(form => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    await expect.poll(() => requests.adjust.length).toBe(1);
+    await expect(dialog.getByTestId('inventory-variant-' + initialVariantId)).toContainText('Disponible: 5');
+    expect(requests.adjust).toHaveLength(1);
+  });
+
+  test('synchronous duplicate variant deactivation never posts a second irreversible request', async ({ page }) => {
+    const { productId, initialVariantId } = await bootVariantInventory(page);
+    let deactivations = 0;
+    const current = () => ({
+      id: initialVariantId, catalogItemId: productId, name: 'Azul / M',
+      optionValuesJson: '{"color":"Azul","talla":"M"}', sku: 'CER-AZ-M',
+      trackingEnabled: true, onHand: 4, reserved: 1, available: 3,
+      reorderThreshold: 1, lowStock: false, active: deactivations === 0
+    });
+    await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+      if (route.request().method() === 'GET') return route.fulfill(json([current()]));
+      return route.fallback();
+    });
+    await page.route('**/api/v1/inventory/' + productId + '/variants/' + initialVariantId + '/deactivate', async route => {
+      deactivations += 1;
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return route.fulfill(json(current()));
+    });
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    const item = dialog.getByTestId('inventory-variant-' + initialVariantId);
+    await item.getByRole('button', { name: 'Desactivar' }).evaluate(button => {
+      button.click();
+      button.click();
+    });
+    await expect.poll(() => deactivations).toBe(1);
+    await expect(item).toContainText('Inactiva');
+    await expect(item.getByRole('button', { name: 'Desactivar' })).toHaveCount(0);
+    expect(deactivations).toBe(1);
+  });
+
+
+  test('reentrant FormData submissions preserve a single variant create and adjustment', async ({ page }) => {
+    const { productId, initialVariantId, createdVariantId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    const submitDuringSerialization = async form => form.evaluate(element => {
+      let reentered = false;
+      element.addEventListener('formdata', () => {
+        if (reentered) return;
+        reentered = true;
+        element.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
+      element.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('Nombre de variante').fill('Azul sin duplicados');
+    await dialog.getByLabel('SKU de variante').fill('CER-AZUL-LOCK');
+    await submitDuringSerialization(dialog.locator('form'));
+    await expect.poll(() => requests.create.length).toBe(1);
+    await expect(dialog.getByTestId('inventory-variant-' + createdVariantId)).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Nueva variante' })).toHaveCount(0);
+    expect(requests.create).toHaveLength(1);
+
+    await dialog.getByTestId('inventory-variant-' + initialVariantId)
+      .getByRole('button', { name: 'Ajustar' }).click();
+    await dialog.getByLabel('Ajuste de variante').fill('4');
+    await submitDuringSerialization(dialog.locator('form'));
+    await expect.poll(() => requests.adjust.length).toBe(1);
+    await expect(dialog.getByTestId('inventory-variant-' + initialVariantId)).toContainText('Disponible: 7');
+    expect(requests.adjust).toHaveLength(1);
+    expect(requests.adjust[0].delta).toBe(4);
+  });
+
+
+  test('revoked variant-read role blocks history fetch even while its dialog remains open', async ({ page }) => {
+    const { productId, initialVariantId } = await bootVariantInventory(page);
+    let allowVariantRead = true;
+    let historyRequests = 0;
+    await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+      email: 'staff@demo.cl',
+      roles: allowVariantRead ? ['BUSINESS_ADMIN'] : ['WAREHOUSE']
+    })));
+    await page.route(
+      '**/api/v1/inventory/' + productId + '/variants/' + initialVariantId + '/movements',
+      route => {
+        historyRequests += 1;
+        return route.fulfill(json([]));
+      }
+    );
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId)
+      .getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    const item = dialog.getByTestId('inventory-variant-' + initialVariantId);
+    await expect(item.getByRole('button', { name: 'Historial' })).toBeVisible();
+
+    allowVariantRead = false;
+    // The variants modal overlays the page; activate background refresh
+    // programmatically, like the existing live-permission revocation contracts.
+    await page.getByRole('button', { name: 'Actualizar', exact: true })
+      .evaluate(button => button.click());
+    await expect(page.getByText('Solo lectura')).toBeVisible();
+    await expect(dialog).toBeVisible();
+
+    // A still-mounted dialog must not bypass permission revalidation.
+    await item.getByRole('button', { name: 'Historial' }).click();
+    expect(historyRequests).toBe(0);
+    await expect(dialog.getByRole('heading', { name: /Historial/ })).toHaveCount(0);
+  });
+
+
+  test('warehouse-only identities cannot open variant history or bypass variant-read entry points', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page, ['WAREHOUSE']);
+    let variantReads = 0;
+    await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      variantReads += 1;
+      return route.fallback();
+    });
+    await page.goto('/app/inventory');
+    const row = page.getByTestId('inventory-row-' + productId);
+    await expect(row).toBeVisible();
+    await expect(row.getByRole('button', { name: 'Variantes' })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: /Variantes/ })).toHaveCount(0);
+    expect(variantReads).toBe(0);
+    expect(requests.history).toBe(0);
+    expect(requests.deactivate).toBe(0);
+    expect(requests.create).toHaveLength(0);
+    expect(requests.update).toHaveLength(0);
+    expect(requests.adjust).toHaveLength(0);
+  });
+
 });

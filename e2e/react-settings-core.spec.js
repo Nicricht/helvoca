@@ -14,6 +14,7 @@ async function bootSettingsCore(page, options = {}) {
 
   const state = {
     setupPayloads: [],
+    businessPayloads: [],
     profilePayloads: [],
     agentPayloads: [],
     forbiddenWrites: [],
@@ -71,7 +72,16 @@ async function bootSettingsCore(page, options = {}) {
     }));
   });
 
-  await page.route(/\/api\/v1\/business$/, route => route.fulfill(json(state.business)));
+  await page.route(/\/api\/v1\/business$/, async route => {
+    if (route.request().method() === 'PATCH') {
+      const payload = route.request().postDataJSON();
+      state.businessPayloads.push(payload);
+      if (options.setupError) return route.fulfill(json({ message: options.setupError }, 500));
+      if (options.setupDelayMs) await new Promise(resolve => setTimeout(resolve, options.setupDelayMs));
+      state.business = { ...state.business, ...payload, name: payload.name };
+    }
+    return route.fulfill(json(state.business));
+  });
 
   await page.route('**/api/v1/business/profile', async route => {
     if (route.request().method() === 'PUT') {
@@ -208,7 +218,7 @@ test.describe('React settings core RED contract', () => {
     const save = page.locator('form button[type="submit"]');
 
     await name.fill('Barbería Norte Centro');
-    await expect(page.getByRole('status')).toContainText('Cambios sin guardar');
+    await expect(page.locator('footer [role="status"]')).toContainText('Cambios sin guardar');
 
     await save.evaluate(button => {
       button.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -216,20 +226,23 @@ test.describe('React settings core RED contract', () => {
     });
 
     await expect(save).toBeDisabled();
-    await expect(page.getByRole('status')).toContainText('Guardando');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardando');
 
-    await expect.poll(() => state.setupPayloads.length).toBe(1);
-    expect(state.setupPayloads[0]).toMatchObject({
-      businessName: 'Barbería Norte Centro',
+    await expect.poll(() => state.businessPayloads.length).toBe(1);
+    expect(state.businessPayloads[0]).toMatchObject({
+      name: 'Barbería Norte Centro',
       timezone: 'America/Santiago',
       language: 'es'
     });
-    expect(state.setupPayloads[0]).not.toHaveProperty('businessId');
+    expect(state.businessPayloads[0]).not.toHaveProperty('businessId');
+    expect(state.setupPayloads).toHaveLength(0);
+    expect(state.profilePayloads).toHaveLength(0);
+    expect(state.agentPayloads).toHaveLength(0);
     expect(state.profilePayloads.every(payload => !Object.hasOwn(payload, 'businessId'))).toBe(true);
     expect(state.agentPayloads.every(payload => !Object.hasOwn(payload, 'businessId'))).toBe(true);
     expect(state.forbiddenWrites).toEqual([]);
 
-    await expect(page.getByRole('status')).toContainText('Guardado');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
   });
 
   test('blocks invalid edits before any mutation request', async ({ page }) => {
@@ -241,6 +254,7 @@ test.describe('React settings core RED contract', () => {
 
     await expect(page.getByRole('alert')).toContainText(/nombre.*obligatorio|revisa.*obligatorio/i);
     expect(state.setupPayloads).toHaveLength(0);
+    expect(state.businessPayloads).toHaveLength(0);
     expect(state.profilePayloads).toHaveLength(0);
     expect(state.agentPayloads).toHaveLength(0);
     expect(state.forbiddenWrites).toEqual([]);
@@ -255,8 +269,9 @@ test.describe('React settings core RED contract', () => {
 
     await expect(page.getByRole('alert')).toContainText(/no pudimos guardar|configuration unavailable|intenta nuevamente/i);
     await expect(page.getByLabel('Nombre del negocio')).toHaveValue('Barbería Norte Error');
-    await expect(page.getByRole('status')).toContainText('Cambios sin guardar');
-    expect(state.setupPayloads).toHaveLength(1);
+    await expect(page.locator('footer [role="status"]')).toContainText('Cambios sin guardar');
+    expect(state.businessPayloads).toHaveLength(1);
+    expect(state.setupPayloads).toHaveLength(0);
     expect(state.forbiddenWrites).toEqual([]);
   });
 

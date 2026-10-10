@@ -6,6 +6,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.net.http.HttpClient;
@@ -104,8 +105,11 @@ class BusinessImportPreviewServiceCoverageTest {
                 .toString());
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
 
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service =
-                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), http);
+                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), budget, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
 
         var image = new MockMultipartFile(
                 "files", "menu.png", "application/octet-stream", new byte[]{1, 2, 3});
@@ -137,8 +141,11 @@ class BusinessImportPreviewServiceCoverageTest {
                 .toString());
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
 
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service =
-                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), http);
+                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), budget, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
         var jpg = new MockMultipartFile("files", "menu.jpg", "image/jpeg", new byte[]{1});
 
         var preview = service.preview("Negocio", List.of(jpg));
@@ -158,8 +165,11 @@ class BusinessImportPreviewServiceCoverageTest {
         when(response.body()).thenReturn("unavailable");
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
 
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service =
-                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), http);
+                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), budget, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
         var webp = new MockMultipartFile("files", "menu.webp", null, new byte[]{1});
 
         var preview = service.preview("Negocio", List.of(webp));
@@ -223,8 +233,11 @@ class BusinessImportPreviewServiceCoverageTest {
     }
 
     private static BusinessImportPreviewService serviceWithoutAi(TenantProvider tenant) {
-        return new BusinessImportPreviewService(
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
                 new BusinessImportSpreadsheetParser(), new OpenAiRealtimeProperties(), tenant);
+        // Explicitly allow the provider branch so the missing-key fallback remains tested.
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
+        return service;
     }
 
     private static OpenAiRealtimeProperties aiProps() {

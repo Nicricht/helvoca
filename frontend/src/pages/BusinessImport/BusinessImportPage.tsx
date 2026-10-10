@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate } from "react-router-dom";
 import {
   AlertTriangle,
@@ -12,11 +12,12 @@ import {
   RotateCcw,
   ShieldCheck,
   Sparkles,
-  UploadCloud
+  UploadCloud,
+  ArrowRight
 } from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { getCurrentUser } from "../../features/dashboard/api";
-import { getBusiness } from "../../features/settings/api";
+import { getBusiness, getOnboardingStatus } from "../../features/settings/api";
 import {
   applyBusinessImport,
   previewBusinessImport,
@@ -61,6 +62,22 @@ function formatBytes(bytes: number) {
   if (bytes < 1024) return bytes + " B";
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+function methodLabel(method?: string | null) {
+  switch (method) {
+    case "SPREADSHEET": return "Sin IA pagada";
+    case "AI": return "Interpretado con IA";
+    case "AI_DISABLED": return "IA no habilitada";
+    case "AI_UNAVAILABLE": return "IA no configurada";
+    case "AI_BUDGET_EXCEEDED": return "Cupo de IA agotado";
+    case "AI_INPUT_LIMIT": return "Lote demasiado grande";
+    case "DUPLICATE": return "Duplicado";
+    case "READ_ERROR": return "Archivo ilegible";
+    case "AI_ERROR": return "Error de análisis";
+    case "UNSUPPORTED": return "Formato no admitido";
+    default: return "Revisar";
+  }
 }
 
 function sourceLabel(kind?: string | null) {
@@ -136,6 +153,7 @@ function buildApplyPayload(rows: EditableRow[]): BusinessImportApplyItem[] {
 }
 
 export function BusinessImportPage() {
+  const queryClient = useQueryClient();
   const prefilledBusiness = useRef(false);
   const mutationLock = useRef(false);
   const [businessName, setBusinessName] = useState("");
@@ -172,6 +190,14 @@ export function BusinessImportPage() {
   }, [business.data?.name]);
 
   const selectedCount = useMemo(() => rows.filter(row => row.selected).length, [rows]);
+  const currentStep = result ? 3 : preview ? 2 : 1;
+  const activation = useQuery({
+    queryKey: ["settings", "onboarding-status"],
+    queryFn: getOnboardingStatus,
+    enabled: admin && Boolean(result),
+    retry: false,
+    refetchOnWindowFocus: false
+  });
 
   if (!me.isPending && me.data && !admin) {
     return <Navigate to="/settings" replace />;
@@ -180,13 +206,21 @@ export function BusinessImportPage() {
   if (me.isPending || !admin) return null;
 
   function setSelectedFiles(next: File[]) {
-    const accepted = next.filter(file => file.size > 0).slice(0, 12);
+    const supported = /\.(csv|tsv|xls|xlsx|pdf|jpe?g|png|webp)$/i;
+    const issues: string[] = [];
+    if (next.length > 12) issues.push("Puedes analizar un máximo de 12 archivos por lote.");
+    const accepted = next.slice(0, 12).filter(file => {
+      if (file.size <= 0) { issues.push(file.name + ": el archivo está vacío."); return false; }
+      if (file.size > 10 * 1024 * 1024) { issues.push(file.name + ": supera 10 MB."); return false; }
+      if (!supported.test(file.name)) { issues.push(file.name + ": formato no admitido."); return false; }
+      return true;
+    });
     setFiles(accepted);
     setPreview(null);
     setRows([]);
     setResult(null);
     setMessage("");
-    setError("");
+    setError(issues.join(" "));
   }
 
   function removeFile(index: number) {
@@ -259,7 +293,8 @@ export function BusinessImportPage() {
     try {
       const next = await applyBusinessImport(payload);
       setResult(next);
-      setMessage("Datos del negocio guardados correctamente.");
+      void queryClient.invalidateQueries({ queryKey: ["settings"] });
+      setMessage("Datos aprobados guardados. Ahora comprueba qué falta para preparar tu recepcionista.");
     } catch (value) {
       setError(value instanceof Error ? value.message : "No pudimos aplicar la importación.");
     } finally {
@@ -297,10 +332,22 @@ export function BusinessImportPage() {
           </div>
         </header>
 
+        <ol className={styles.expressSteps} aria-label="Progreso de Configuración Express">
+          {["Importar", "Revisar", "Preparar"].map((label, index) => {
+            const step = index + 1;
+            return (
+              <li key={label} data-state={step < currentStep ? "done" : step === currentStep ? "current" : "upcoming"}
+                  aria-current={step === currentStep ? "step" : undefined}>
+                <span>{step}</span><strong>{label}</strong>
+                {step < currentStep && <CheckCircle2 size={14} aria-hidden="true" />}
+              </li>
+            );
+          })}
+        </ol>
         <section className={styles.safetyStrip} aria-label="Flujo seguro de importación">
           <Sparkles size={18} aria-hidden="true" />
           <strong>Vista previa → revisión → aplicar</strong>
-          <span>Las planillas claras evitan IA. PDF e imágenes pueden usar análisis semántico, siempre antes del guardado.</span>
+          <span>Excel y CSV se leen sin IA de pago. Fotos y PDF requieren una cuota de IA habilitada. Nada se guarda sin tu aprobación.</span>
         </section>
 
         {(error || message) && (
@@ -314,7 +361,7 @@ export function BusinessImportPage() {
           <article className={styles.card}>
             <div className={styles.stepHead}>
               <span>1</span>
-              <div><strong>Material del negocio</strong><small>Hasta 12 archivos, 10 MB por archivo</small></div>
+              <div><strong>Material del negocio</strong><small>Hasta 12 archivos, 10 MB por archivo. La IA usa lotes más pequeños</small></div>
             </div>
 
             <label className={styles.field}>
@@ -365,7 +412,7 @@ export function BusinessImportPage() {
 
             <div className={styles.costNote}>
               <Sparkles size={16} aria-hidden="true" />
-              <span><strong>Modo ahorro automático</strong> Las planillas reconocibles se procesan sin IA.</span>
+              <span><strong>Gasto protegido</strong> Las planillas se procesan sin IA pagada. Fotos y PDF requieren cupo autorizado (hasta 3 archivos y 4 MB por análisis con IA).</span>
             </div>
 
             <button
@@ -421,7 +468,7 @@ export function BusinessImportPage() {
               {(preview.sources ?? []).map((source, index) => (
                 <article key={source.name + "-" + index} className={styles.sourceCard} data-recognized={source.recognized ? "true" : "false"}>
                   <div><strong>{source.name}</strong><span>{sourceLabel(source.kind)} · {source.rowCount || 0} filas</span></div>
-                  <b>{source.method === "SPREADSHEET" ? "Automático" : source.method === "AI" ? "IA" : "Revisar"}</b>
+                  <b>{methodLabel(source.method)}</b>
                 </article>
               ))}
             </div>
@@ -573,6 +620,21 @@ export function BusinessImportPage() {
               <article><span>Nuevos</span><strong data-testid="business-import-created">{result.created ?? 0}</strong></article>
               <article><span>Actualizados</span><strong data-testid="business-import-updated">{result.updated ?? 0}</strong></article>
               <article><span>Inventario</span><strong data-testid="business-import-inventory">{result.inventoryConfigured ?? 0}</strong></article>
+            </div>
+            <div className={styles.nextStep} role="status">
+              <div>
+                <strong><CheckCircle2 size={16} aria-hidden="true" /> Paso 3. Preparar la atención</strong>
+                <p>{activation.isPending
+                  ? "Comprobando la configuración del negocio…"
+                  : activation.isError || !activation.data
+                    ? "No pudimos verificar los canales. Revisa la configuración antes de activar."
+                    : activation.data.readyForCalls
+                      ? "La configuración básica figura lista. Comprueba con una prueba real que tu teléfono atienda correctamente."
+                      : "Catálogo aprobado. Aún quedan requisitos de atención por verificar antes de activar canales."}</p>
+              </div>
+              <Link className="button secondary" to="/settings?section=receptionist">
+                Preparar recepcionista <ArrowRight size={15} aria-hidden="true" />
+              </Link>
             </div>
             <div className={styles.resultActions}>
               <Link className="button primary" to="/inventory">Ver inventario</Link>

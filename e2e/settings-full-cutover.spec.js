@@ -560,6 +560,8 @@ test('business profile and AI capabilities remain editable after the legacy cuto
   await expect(page.getByText('Prioriza catálogo, stock, cotizaciones, pedidos y despacho.')).toBeVisible();
 
   await businessPanel.getByLabel('Ofrece servicios').selectOption('true');
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect.poll(() => profilePayload?.sellsServices).toBe(true);
   await page.getByRole('tab', { name: 'Recepcionista IA' }).click();
 
   const receptionistPanel = page.locator('#settings-panel-receptionist');
@@ -571,7 +573,6 @@ test('business profile and AI capabilities remain editable after the legacy cuto
 
   await page.getByRole('button', { name: 'Guardar cambios' }).click();
 
-  await expect.poll(() => profilePayload?.sellsServices).toBe(true);
   await expect.poll(() => agentPayload?.capabilities).toContain('CREATE_BOOKING');
   expect(agentPayload.active).toBe(true);
 });

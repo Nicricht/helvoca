@@ -1,6 +1,9 @@
 package cl.helvoca.security;
 
+import cl.helvoca.onboarding.BusinessImportAiBudget;
+
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,9 +21,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
 
 @Testcontainers
 @SpringBootTest
@@ -82,4 +87,56 @@ class DistributedRateLimiterIntegrationTest {
             executor.shutdownNow();
         }
     }
+    @Test
+    void paidImportQuotaDoesNotCrossTenantAndHandlesConcurrentRequests() throws Exception {
+        // Reuse the real RLS/Flyway-backed PostgreSQL limiter; no external AI calls.
+        jdbc.update("DELETE FROM api_rate_limit_bucket WHERE bucket_key LIKE 'business-import-ai:%'");
+        DistributedRateLimiter shared = new DistributedRateLimiter(jdbc);
+
+        UUID one = UUID.randomUUID();
+        UUID two = UUID.randomUUID();
+        TenantProvider tenantOne = mock(TenantProvider.class);
+        TenantProvider tenantTwo = mock(TenantProvider.class);
+        when(tenantOne.requireBusinessId()).thenReturn(one);
+        when(tenantTwo.requireBusinessId()).thenReturn(two);
+        BusinessImportAiBudget a = new BusinessImportAiBudget(shared, tenantOne);
+        BusinessImportAiBudget b = new BusinessImportAiBudget(shared, tenantTwo);
+        ReflectionTestUtils.setField(a, "maxAttempts", 2);
+        ReflectionTestUtils.setField(b, "maxAttempts", 2);
+
+        CountDownLatch ready = new CountDownLatch(12);
+        CountDownLatch fire = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(12);
+        try {
+            List<Future<Boolean>> results = new ArrayList<>();
+            for (int i = 0; i < 12; i++) {
+                final BusinessImportAiBudget selected = i < 9 ? a : b;
+                results.add(executor.submit(() -> {
+                    ready.countDown();
+                    assertTrue(fire.await(5, TimeUnit.SECONDS));
+                    return selected.reserve();
+                }));
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            fire.countDown();
+            int allowedFirst = 0;
+            int allowedSecond = 0;
+            for (int i = 0; i < results.size(); i++) {
+                boolean allowed = results.get(i).get(15, TimeUnit.SECONDS);
+                if (allowed && i < 9) allowedFirst++;
+                if (allowed && i >= 9) allowedSecond++;
+            }
+            assertEquals(2, allowedFirst);
+            assertEquals(2, allowedSecond);
+            assertEquals(9, jdbc.queryForObject(
+                    "SELECT request_count FROM api_rate_limit_bucket WHERE bucket_key = ?",
+                    Integer.class, "business-import-ai:" + one));
+            assertEquals(3, jdbc.queryForObject(
+                    "SELECT request_count FROM api_rate_limit_bucket WHERE bucket_key = ?",
+                    Integer.class, "business-import-ai:" + two));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
 }

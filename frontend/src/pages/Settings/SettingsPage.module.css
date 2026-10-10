@@ -1774,3 +1774,63 @@
 @media (prefers-reduced-motion: reduce) {
   .heroSources { animation: none !important; }
 }
+
+
+/* Phase 4: compact supporting illustration; Express is the primary first action.
+   Only page-local settings slots, never the shared frame contract. */
+.advancedHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 23px 2px 12px;
+  scroll-margin-top: 86px;
+}
+.advancedHeading h2 {
+  margin: 4px 0 0;
+  color: var(--rv-text-primary);
+  font-size: 17px;
+  letter-spacing: -.025em;
+}
+.advancedHeading p:not(:global(.eyebrow)) {
+  margin: 5px 0 0;
+  color: var(--rv-text-secondary);
+  font-size: 11px;
+}
+.advancedHeading > span {
+  flex: 0 0 auto;
+  color: var(--rv-text-tertiary);
+  font-size: 11px;
+  font-weight: 750;
+}
+.hero {
+  min-height: 138px;
+  padding: 16px 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, .36fr);
+  gap: 13px;
+}
+.heroCopy > div > strong {max-width: 490px; font-size: clamp(20px, 2vw, 28px); line-height: 1.1;}
+.heroCopy p {max-width: 490px; margin-top: 6px; font-size: 11px;}
+.heroKicker {min-height: 22px; font-size: 8px;}
+.heroSignals {gap: 6px; margin-top: 8px;}
+.heroSignals span {min-height: 25px; font-size: 9px; padding: 0 8px;}
+.heroAction {min-height: 32px; margin-top: 9px; font-size: 10px;}
+.heroArt {min-height: 125px; max-height: 146px;}
+.heroOrbit {width: 138px; height: 138px;}
+.heroRobot {max-width: 220px; max-height: 135px;}
+.heroDocument,.heroBusiness {width: 55px;}
+.heroSources {width: 44px;}
+.heroGlow {width: 210px; height: 210px;}
+@media (max-width: 760px) {
+  .hero {grid-template-columns: minmax(0, 1fr) minmax(100px, .32fr); min-height: 135px;}
+  .heroArt {min-height: 120px; max-height: 140px;}
+  .heroRobot {max-height: 120px; max-width: 165px;}
+}
+@media (max-width: 620px) {
+  .hero {grid-template-columns: 1fr; padding: 14px 16px; min-height: 0;}
+  .heroArt {display: none;}
+  .heroCopy > div > strong {font-size: 22px;}
+  .heroSignals {display: flex; gap: 5px;}
+  .heroAction {min-height: 36px;}
+  .advancedHeading {align-items: flex-start; flex-direction: column;}
+}

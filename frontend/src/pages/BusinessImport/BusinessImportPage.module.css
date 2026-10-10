@@ -737,3 +737,82 @@
     transform: none;
   }
 }
+
+
+/* Express workflow is local to import, not a second product frame. */
+.expressSteps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+}
+.expressSteps li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
+  padding: 13px 15px;
+  border: 1px solid rgba(74, 123, 160, .19);
+  border-radius: 13px;
+  background: rgba(7, 25, 40, .70);
+  color: #7f95a6;
+  font-size: 12px;
+}
+.expressSteps li[data-state="current"] {
+  border-color: rgba(22, 217, 245, .44);
+  background: rgba(22, 217, 245, .075);
+  color: #e4fbff;
+}
+.expressSteps li[data-state="done"] {color: #b8e3cf; border-color: rgba(74,222,128,.22);}
+.expressSteps li > span {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  place-items: center;
+  border-radius: 9px;
+  color: #c3cfff;
+  background: rgba(139,92,246,.11);
+  font-size: 11px;
+  font-weight: 800;
+}
+.expressSteps li strong {font-weight: 800;}
+.expressSteps svg {margin-left: auto; color: #63dca1;}
+.nextStep {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgba(22,217,245,.22);
+  border-radius: 14px;
+  background: rgba(22,217,245,.04);
+}
+.nextStep > div {min-width: 0;}
+.nextStep strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #edf9ff;
+  font-size: 13px;
+}
+.nextStep strong svg {color: #58dcba;}
+.nextStep p {max-width: 600px; margin: 5px 0 0; color: #9ab1c2; font-size: 11px; line-height: 1.6;}
+.nextStep :global(.button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  text-decoration: none;
+}
+@media (max-width: 620px) {
+  .expressSteps {gap: 5px;}
+  .expressSteps li {padding: 8px 5px; justify-content: center; flex-wrap: wrap; gap: 5px; font-size: 10px;}
+  .expressSteps li > span {width: 21px; height: 21px; flex-basis: 21px; font-size: 9px;}
+  .nextStep {align-items: stretch; flex-direction: column;}
+  .nextStep :global(.button) {width: 100%;}
+}

@@ -146,6 +146,104 @@ test.describe('Inventory automation interaction contracts', () => {
     await expect(page.getByTestId('inventory-available')).toContainText('7');
   });
 
+
+  test('an orphaned restock alert cannot initiate a stock mutation for a missing catalog item', async ({ page }) => {
+    const { requests } = await bootAutomation(page);
+    await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([{
+      id: 'alert-1', catalogItemId: 'deleted-product',
+      variantId: null, type: 'LOW_STOCK', subjectName: 'Producto eliminado',
+      sku: 'STALE-1', available: 0, reorderThreshold: 2, acknowledged: false
+    }])));
+    await page.goto('/app/inventory');
+    const alert = page.getByTestId('inventory-alert-alert-1');
+    await expect(alert).toContainText('Producto eliminado');
+    // The orphaned alert has no valid catalog row, so the UI must not offer
+    // the mutation action at all. An absent action is stronger than a no-op click.
+    await expect(alert.getByRole('button', { name: 'Reponer stock' })).toHaveCount(0);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+  });
+
+  test('missing catalog identity and restricted roles never expose restock actions', async ({ page }) => {
+    const { requests } = await bootAutomation(page);
+    await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([{
+      id: 'alert-1', type: 'OUT_OF_STOCK', subjectName: 'Referencia ausente',
+      variantId: null, sku: 'UNKNOWN', available: 0,
+      reorderThreshold: 2, acknowledged: false
+    }])));
+    await page.goto('/app/inventory');
+    const alert = page.getByTestId('inventory-alert-alert-1');
+    await expect(alert).toContainText('Referencia ausente');
+    await expect(alert.getByRole('button', { name: 'Reponer stock' })).toHaveCount(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+
+    // A reader may inspect alerts, but the same authoritative resolver
+    // must never grant an adjustment button to a restricted role.
+    await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+      email: 'operator@demo.cl', roles: ['OPERATOR']
+    })));
+    await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([{
+      id: 'alert-1', catalogItemId: 'automation-item-1',
+      type: 'LOW_STOCK', subjectName: 'Taladro demo',
+      variantId: null, available: 4, reorderThreshold: 5,
+      acknowledged: false
+    }])));
+    await page.getByRole('button', { name: 'Actualizar', exact: true }).click();
+    await expect(page.getByText('Solo lectura')).toBeVisible();
+    await expect(alert).toContainText('Taladro demo');
+    await expect(alert.getByRole('button', { name: 'Reponer stock' })).toHaveCount(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+  });
+
+  test('missing alert type remains generic and never grants an inventory adjustment', async ({ page }) => {
+    const { itemId, requests } = await bootAutomation(page);
+    await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([{
+      id: 'alert-1', catalogItemId: itemId,
+      subjectName: 'Alerta incompleta', available: 7, reorderThreshold: 2,
+      acknowledged: false
+    }])));
+    await page.goto('/app/inventory');
+    const alert = page.getByTestId('inventory-alert-alert-1');
+    await expect(alert).toContainText('Alerta de inventario');
+    await expect(alert).toContainText('Alerta incompleta');
+    await expect(alert.getByRole('button', { name: 'Reponer stock' })).toHaveCount(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+  });
+
+  test('a server-side 403 denial remains visible and does not mark stock alerts handled', async ({ page }) => {
+    const { requests } = await bootAutomation(page);
+    await page.route('**/api/v1/inventory/alerts/alert-1/acknowledge', route => route.fulfill(
+      json({ message: 'Permiso revocado por el servidor' }, 403)
+    ));
+    await page.goto('/app/inventory');
+    const alert = page.getByTestId('inventory-alert-alert-1');
+    await alert.getByRole('button', { name: 'Marcar atendida' }).click();
+    await expect(page.getByRole('alert')).toContainText('Permiso revocado por el servidor');
+    await expect(alert).toContainText('Pendiente');
+    expect(requests.acknowledge).toBe(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+  });
+
+  test('an adjustment without optional note sends null rather than an invented explanation', async ({ page }) => {
+    const { requests } = await bootAutomation(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-alert-alert-1').getByRole('button', { name: 'Reponer stock' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Ajustar stock · Taladro demo' });
+    await dialog.getByLabel('Ajuste').fill('1');
+    await dialog.getByLabel('Nota').fill('');
+    await dialog.getByRole('button', { name: 'Aplicar ajuste' }).click();
+    await expect.poll(() => requests.adjust.length).toBe(1);
+    expect(requests.adjust[0]).toEqual({
+      delta: 1, referenceType: 'MANUAL', referenceId: null, note: null
+    });
+    await expect(dialog).toHaveCount(0);
+  });
+
   test('variant-linked restock opens the correct variant adjustment without changing base stock', async ({ page }) => {
     const { requests } = await bootAutomation(page, { variantAlert: true });
     await page.goto('/app/inventory');
@@ -272,6 +370,23 @@ test.describe('Inventory automation interaction contracts', () => {
     await expect(alert).toContainText('Atendida');
     await expect.poll(() => requests.acknowledge).toBe(1);
     expect(requests.cancel).toBe(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+  });
+
+
+  test('two synchronous waiting-list cancellations consume one mutation only', async ({ page }) => {
+    const { requests } = await bootAutomation(page);
+    await page.goto('/app/inventory');
+    const item = page.getByTestId('restock-subscription-wait-1');
+    await expect(item).toContainText('Esperando');
+    await item.getByRole('button', { name: 'Cancelar espera' }).evaluate(button => {
+      button.click();
+      button.click();
+    });
+    await expect.poll(() => requests.cancel).toBe(1);
+    await expect(item).toHaveCount(0);
+    expect(requests.cancel).toBe(1);
     expect(requests.adjust).toHaveLength(0);
     expect(requests.adjustVariant).toHaveLength(0);
   });

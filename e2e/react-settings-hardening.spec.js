@@ -29,12 +29,21 @@ async function boot(page, options = {}) {
     }));
   });
 
-  await page.route(/\/api\/v1\/business$/, route => route.fulfill(json({
-    name: 'Negocio Seguro',
-    timezone: 'America/Santiago',
-    language: 'es',
-    humanTransferPhone: '+56999999999'
-  })));
+  await page.route(/\/api\/v1\/business$/, route => {
+    const status = options.setupStatus || 200;
+    if (route.request().method() === 'PATCH' && status !== 200) {
+      const messages = { 400: 'invalid configuration', 403: 'forbidden', 409: 'configuration conflict' };
+      return route.fulfill(json({ message: messages[status] || 'save failed' }, status));
+    }
+    const edited = route.request().method() === 'PATCH' ? route.request().postDataJSON() : {};
+    return route.fulfill(json({
+      name: 'Negocio Seguro',
+      timezone: 'America/Santiago',
+      language: 'es',
+      humanTransferPhone: '+56999999999',
+      ...edited
+    }));
+  });
 
   await page.route('**/api/v1/business/profile', route => {
     if (options.profileError) return route.fulfill(json({ message: 'profile unavailable' }, 503));
@@ -134,7 +143,7 @@ test.describe('React settings hardening RED contract', () => {
 
       await expect(page.getByRole('alert')).toContainText(scenario.message);
       await expect(page.getByLabel('Nombre del negocio')).toHaveValue('Cambio pendiente');
-      await expect(page.getByRole('status')).toContainText('Cambios sin guardar');
+      await expect(page.locator('footer [role="status"]')).toContainText('Cambios sin guardar');
     });
   }
 
