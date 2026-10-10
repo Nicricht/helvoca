@@ -455,7 +455,7 @@ export function SettingsPage() {
           canImport={model.canManage}
           onAdvanced={() => {
             document.getElementById("settingsAdvanced")?.scrollIntoView({
-              behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+              behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
               block: "start"
             });
           }}
