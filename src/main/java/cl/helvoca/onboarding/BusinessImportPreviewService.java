@@ -15,6 +15,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -148,6 +150,12 @@ public class BusinessImportPreviewService {
                     List.of("Formato no soportado")));
         }
 
+        // Deduplicate the same image/PDF content before it enters a paid payload.
+        // An unreadable file stays local and cannot initiate a provider request.
+        if (!semantic.isEmpty() && paidAiImportEnabled && openAi.hasApiKey()) {
+            semantic = distinctSemanticFiles(semantic, sources, warnings);
+        }
+
         boolean aiUsed = false;
         if (!semantic.isEmpty()) {
             if (!paidAiImportEnabled) {
@@ -223,6 +231,33 @@ public class BusinessImportPreviewService {
 
         return new Preview(safeBusinessName, List.copyOf(normalized), List.copyOf(sources),
                 List.copyOf(dedupeWarnings(warnings)), aiUsed);
+    }
+
+    private static List<MultipartFile> distinctSemanticFiles(List<MultipartFile> files,
+                                                                  List<SourcePreview> sources,
+                                                                  List<String> warnings) {
+        Set<String> fingerprints = new LinkedHashSet<>();
+        List<MultipartFile> distinct = new ArrayList<>();
+        for (MultipartFile file : files) {
+            try {
+                String fingerprint = HexFormat.of().formatHex(
+                        MessageDigest.getInstance("SHA-256").digest(file.getBytes()));
+                if (fingerprints.add(fingerprint)) {
+                    distinct.add(file);
+                } else {
+                    warnings.add(displayName(file) + " es un archivo duplicado; se analizará solo una vez.");
+                    sources.add(new SourcePreview(displayName(file),
+                            BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN,
+                            0, "DUPLICATE", false, List.of("Contenido repetido")));
+                }
+            } catch (Exception e) {
+                warnings.add("No fue posible leer " + displayName(file) + "; no se enviará a IA.");
+                sources.add(new SourcePreview(displayName(file),
+                        BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN,
+                        0, "READ_ERROR", false, List.of("Archivo ilegible")));
+            }
+        }
+        return distinct;
     }
 
     private boolean reservePaidBudget(List<String> warnings) {
