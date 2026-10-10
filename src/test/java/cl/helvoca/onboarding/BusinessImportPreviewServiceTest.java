@@ -491,7 +491,7 @@ class BusinessImportPreviewServiceTest {
                 .put("usage", new JSONObject().put("input_tokens", 25).put("output_tokens", 10))
                 .put("output_text", "{\"products\":[],\"warnings\":[]}")
                 .toString());
-        when(http.send(any(HttpRequest.class), any())).thenReturn(response);
+        when(http.send(any(HttpRequest.class), org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(response);
 
         var preview = meteredPreview(http, ledger).preview("Negocio", List.of(meteredImage()));
         assertTrue(preview.aiUsed());
@@ -539,7 +539,7 @@ class BusinessImportPreviewServiceTest {
         BusinessImportAiUsageLedger ledger = mock(BusinessImportAiUsageLedger.class);
         @SuppressWarnings("unchecked")
         HttpResponse<String> response = mock(HttpResponse.class);
-        when(http.send(any(HttpRequest.class), any())).thenReturn(response);
+        when(http.send(any(HttpRequest.class), org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(response);
         doThrow(new IllegalStateException("audit response unavailable"))
                 .when(ledger).received(any(UUID.class), anyString(), same(response));
 
@@ -590,7 +590,7 @@ class BusinessImportPreviewServiceTest {
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(429);
         when(response.body()).thenReturn("{\"error\":\"rate_limited\"}");
-        when(http.send(any(HttpRequest.class), any())).thenReturn(response);
+        when(http.send(any(HttpRequest.class), org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(response);
         var preview = meteredPreview(http, ledger).preview("Negocio", List.of(meteredImage()));
         assertFalse(preview.aiUsed());
         assertEquals("AI_ERROR", preview.sources().getFirst().method());
