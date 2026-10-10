@@ -143,7 +143,7 @@ test.describe('React settings hardening RED contract', () => {
 
       await expect(page.getByRole('alert')).toContainText(scenario.message);
       await expect(page.getByLabel('Nombre del negocio')).toHaveValue('Cambio pendiente');
-      await expect(page.getByRole('status')).toContainText('Cambios sin guardar');
+      await expect(page.locator('footer [role="status"]')).toContainText('Cambios sin guardar');
     });
   }
 
