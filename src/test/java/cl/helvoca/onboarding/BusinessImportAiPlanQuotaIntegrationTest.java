@@ -110,9 +110,9 @@ class BusinessImportAiPlanQuotaIntegrationTest {
         var bStatus = as(b, quota::current);
         assertEquals("LIMIT_REACHED", aStatus.status());
         assertEquals("LIMIT_REACHED", bStatus.status());
-        assertEquals(BigDecimal.ONE, aStatus.used());
-        assertEquals(BigDecimal.ONE, bStatus.used());
-        assertEquals(BigDecimal.ZERO, aStatus.remaining());
+        assertEquals(0, BigDecimal.ONE.compareTo(aStatus.used()));
+        assertEquals(0, BigDecimal.ONE.compareTo(bStatus.used()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(aStatus.remaining()));
         long visibleA = databaseContext.callAsTenant(a, () -> jdbc.queryForObject(
                 "SELECT count(*) FROM public.usage_meter_event WHERE meter_key = 'AI_IMPORT_REQUESTS'",
                 Long.class));
@@ -143,7 +143,7 @@ class BusinessImportAiPlanQuotaIntegrationTest {
             assertEquals(1, (first.get(30, TimeUnit.SECONDS) ? 1 : 0)
                     + (second.get(30, TimeUnit.SECONDS) ? 1 : 0));
         }
-        assertEquals(BigDecimal.ONE, as(a, quota::current).used());
+        assertEquals(0, BigDecimal.ONE.compareTo(as(a, quota::current).used()));
     }
 
     @Test
@@ -156,6 +156,6 @@ class BusinessImportAiPlanQuotaIntegrationTest {
                 Timestamp.from(Instant.now().minusSeconds(1)), a);
         assertEquals("PERIOD_EXPIRED", as(a, quota::current).status());
         assertFalse(as(a, () -> quota.reserve(UUID.randomUUID())));
-        assertEquals(BigDecimal.ZERO, as(a, quota::current).used());
+        assertEquals(0, BigDecimal.ZERO.compareTo(as(a, quota::current).used()));
     }
 }
