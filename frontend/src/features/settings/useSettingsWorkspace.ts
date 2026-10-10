@@ -83,9 +83,8 @@ export function useSettingsWorkspace() {
   const roles = me.data?.roles ?? [];
   const permissions = me.data?.permissions;
   const hasPermissionClaims = Array.isArray(permissions);
-  const canManage = hasPermissionClaims
-    ? permissions.includes("BUSINESS_CONFIGURE")
-    : roles.some(role => LEGACY_MANAGE_ROLES.has(role));
+  // The save endpoints require BUSINESS_ADMIN, not only permission claims.
+  const canManage = roles.includes("BUSINESS_ADMIN");
 
   const canManageTeam = hasPermissionClaims
     ? permissions.includes("TEAM_MANAGE") || roles.some(role => LEGACY_MANAGE_ROLES.has(role))
