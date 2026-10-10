@@ -105,8 +105,10 @@ class BusinessImportPreviewServiceCoverageTest {
                 .toString());
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
 
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service =
-                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), http);
+                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), budget, http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
 
         var image = new MockMultipartFile(
@@ -139,8 +141,10 @@ class BusinessImportPreviewServiceCoverageTest {
                 .toString());
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
 
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service =
-                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), http);
+                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), budget, http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
         var jpg = new MockMultipartFile("files", "menu.jpg", "image/jpeg", new byte[]{1});
 
@@ -161,8 +165,10 @@ class BusinessImportPreviewServiceCoverageTest {
         when(response.body()).thenReturn("unavailable");
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
 
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service =
-                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), http);
+                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), budget, http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
         var webp = new MockMultipartFile("files", "menu.webp", null, new byte[]{1});
 
