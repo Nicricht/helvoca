@@ -50,7 +50,7 @@ public class BusinessImportAiBudget {
     }
 
     // Existing focused tests use this constructor without a database-backed quota.
-    BusinessImportAiBudget(DistributedRateLimiter limiter, TenantProvider tenant) {
+    public BusinessImportAiBudget(DistributedRateLimiter limiter, TenantProvider tenant) {
         this(limiter, tenant, null);
     }
 
