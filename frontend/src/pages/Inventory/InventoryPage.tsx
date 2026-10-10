@@ -249,6 +249,9 @@ export function InventoryPage() {
   const mutationLock = useRef(false);
   const [mutationError, setMutationError] = useState("");
 
+  // One synchronous lock is the source of truth for every stock mutation.
+  // Validating form fields before this lock is safe; a competing submit can
+  // never send a second request once beginMutation reserves it.
   function beginMutation() {
     if (mutationLock.current) return false;
     mutationLock.current = true;
@@ -490,7 +493,7 @@ export function InventoryPage() {
 
   async function handleVariantEditor(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!variantsTarget || !variantEditorMode || mutationLock.current) return;
+    if (!variantsTarget || !variantEditorMode) return;
     if (!canManageVariants) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -524,7 +527,7 @@ export function InventoryPage() {
 
   async function handleVariantAdjustment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!variantsTarget || !variantAdjusting || mutationLock.current) return;
+    if (!variantsTarget || !variantAdjusting) return;
     if (!canManageVariants) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -587,7 +590,6 @@ export function InventoryPage() {
 
   async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (mutationLock.current) return;
     if (!model.canManageCatalog) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -666,7 +668,7 @@ export function InventoryPage() {
 
   async function handleConfigure(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!configureTarget || mutationLock.current) return;
+    if (!configureTarget) return;
     if (!model.canManageStock) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
@@ -705,7 +707,7 @@ export function InventoryPage() {
 
   async function handleAdjustment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!adjustTarget || mutationLock.current) return;
+    if (!adjustTarget) return;
     if (!model.canManageStock) {
       setMutationError(PERMISSION_CHANGE_ERROR);
       return;
