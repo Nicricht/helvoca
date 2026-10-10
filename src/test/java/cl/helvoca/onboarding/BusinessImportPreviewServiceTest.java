@@ -10,6 +10,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
@@ -373,6 +374,66 @@ class BusinessImportPreviewServiceTest {
         assertTrue(preview.warnings().stream().anyMatch(w -> w.contains("comprobar el cupo")));
         assertEquals("AI_BUDGET_EXCEEDED", preview.sources().get(1).method());
         verifyNoInteractions(http);
+    }
+
+    @Test
+    void repeatedPhotoIsMarkedDuplicateAndNotResentToPaidProvider() throws Exception {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("test-key");
+        HttpClient http = mock(HttpClient.class);
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn(new JSONObject()
+                .put("output_text", "{\\"products\\":[],\\"warnings\\":[]}")
+                .toString());
+        when(http.send(any(HttpRequest.class),
+                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(response);
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenReturn(true);
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
+
+        var original = new MockMultipartFile("files", "original.jpg", "image/jpeg", new byte[]{1, 2});
+        var duplicate = new MockMultipartFile("files", "copy.jpg", "image/jpeg", new byte[]{1, 2});
+        var different = new MockMultipartFile("files", "different.jpg", "image/jpeg", new byte[]{1, 3});
+        var preview = service.preview("Negocio", List.of(original, duplicate, different));
+
+        assertTrue(preview.aiUsed(), preview.warnings().toString());
+        assertEquals(3, preview.sources().size());
+        assertEquals(1, preview.sources().stream().filter(src -> "DUPLICATE".equals(src.method())).count());
+        assertEquals(2, preview.sources().stream().filter(src -> "AI".equals(src.method())).count());
+        verify(budget, times(1)).reserve();
+        verify(http, times(1)).send(any(HttpRequest.class),
+                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
+    }
+
+    @Test
+    void unreadablePhotoFailsClosedWithoutConsumingQuotaOrSendingAi() throws Exception {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("test-key");
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
+        org.springframework.web.multipart.MultipartFile photo = mock(org.springframework.web.multipart.MultipartFile.class);
+        when(photo.getOriginalFilename()).thenReturn("no-readable.jpg");
+        when(photo.getContentType()).thenReturn("image/jpeg");
+        when(photo.getSize()).thenReturn(100L);
+        when(photo.isEmpty()).thenReturn(false);
+        when(photo.getBytes()).thenThrow(new IOException("read failed"));
+
+        var preview = service.preview("Negocio", List.of(photo));
+
+        assertFalse(preview.aiUsed());
+        assertEquals("READ_ERROR", preview.sources().getFirst().method());
+        assertTrue(preview.warnings().stream().anyMatch(w -> w.contains("no se enviará a IA")));
+        verifyNoInteractions(budget, http);
     }
 
 }
