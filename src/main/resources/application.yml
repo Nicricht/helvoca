@@ -61,6 +61,14 @@ app:
       max-paid-files: ${HELVOCA_BUSINESS_IMPORT_AI_MAX_FILES:3}
       max-paid-bytes: ${HELVOCA_BUSINESS_IMPORT_AI_MAX_BYTES:4194304}
       model: ${HELVOCA_BUSINESS_IMPORT_AI_MODEL:gpt-4.1-mini}
+      # These are *operator-entered* per-million-token tariffs, not an invoice.
+      # No estimate is produced unless the exact response model matches the
+      # explicitly priced model and ALL THREE rates are positive.
+      pricing:
+        model: ${HELVOCA_BUSINESS_IMPORT_AI_PRICED_MODEL:}
+        input-usd-per-million: ${HELVOCA_BUSINESS_IMPORT_AI_INPUT_USD_PER_MILLION:0}
+        cached-input-usd-per-million: ${HELVOCA_BUSINESS_IMPORT_AI_CACHED_USD_PER_MILLION:0}
+        output-usd-per-million: ${HELVOCA_BUSINESS_IMPORT_AI_OUTPUT_USD_PER_MILLION:0}
   demo:
     runtime-business-id: ${HELVOCA_DEMO_RUNTIME_BUSINESS_ID:}
   jwt:

@@ -108,7 +108,7 @@ class BusinessImportPreviewServiceCoverageTest {
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service =
-                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), budget, http);
+                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
 
         var image = new MockMultipartFile(
@@ -144,7 +144,7 @@ class BusinessImportPreviewServiceCoverageTest {
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service =
-                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), budget, http);
+                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
         var jpg = new MockMultipartFile("files", "menu.jpg", "image/jpeg", new byte[]{1});
 
@@ -168,7 +168,7 @@ class BusinessImportPreviewServiceCoverageTest {
         BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
         when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service =
-                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), budget, http);
+                new BusinessImportPreviewService(new BusinessImportSpreadsheetParser(), aiProps(), tenant(), budget, mock(BusinessImportAiUsageLedger.class), http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
         var webp = new MockMultipartFile("files", "menu.webp", null, new byte[]{1});
 

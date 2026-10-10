@@ -1,5 +1,6 @@
 package cl.helvoca.security;
 
+import cl.helvoca.onboarding.BusinessImportAiUsageLedger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -1359,4 +1360,57 @@ class PostgresRowLevelSecurityIntegrationTest {
         assertTrue(directChildrenWithoutRls.isEmpty(),
                 "Direct children of RLS tenant tables must also have RLS: " + directChildrenWithoutRls);
     }
+
+    @Test
+    void providerUsageReceiptsAreTenantIsolatedImmutableAndIdempotent() {
+        UUID attempt = UUID.randomUUID();
+        TenantProvider tenant = org.mockito.Mockito.mock(TenantProvider.class);
+        org.mockito.Mockito.when(tenant.requireBusinessId())
+                .thenReturn(businessA, businessA, businessA, businessB);
+        BusinessImportAiUsageLedger ledger = new BusinessImportAiUsageLedger(runtimeJdbc, tenant);
+        @SuppressWarnings("unchecked")
+        java.net.http.HttpResponse<String> response = org.mockito.Mockito.mock(java.net.http.HttpResponse.class);
+        org.mockito.Mockito.when(response.statusCode()).thenReturn(200);
+        org.mockito.Mockito.when(response.body()).thenReturn(
+                "{\"id\":\"resp_test\",\"model\":\"gpt-4.1-mini\","
+                + "\"usage\":{\"input_tokens\":20,\"output_tokens\":4}}");
+
+        databaseContext.runAsTenant(businessA, () -> {
+            ledger.started(attempt, "gpt-4.1-mini");
+            ledger.started(attempt, "gpt-4.1-mini");
+            ledger.received(attempt, "gpt-4.1-mini", response);
+        });
+        databaseContext.runAsTenant(businessB, () -> ledger.started(attempt, "gpt-4.1-mini"));
+
+        assertEquals(2L, databaseContext.callAsTenant(businessA, () ->
+                runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM public.business_import_ai_provider_usage_event WHERE attempt_id = ?",
+                        Long.class, attempt)));
+        assertEquals(1L, databaseContext.callAsTenant(businessB, () ->
+                runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM public.business_import_ai_provider_usage_event WHERE attempt_id = ?",
+                        Long.class, attempt)));
+        assertEquals(3L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM public.business_import_ai_provider_usage_event WHERE attempt_id = ?",
+                Long.class, attempt));
+        assertEquals(20L, databaseContext.callAsTenant(businessA, () ->
+                runtimeJdbc.queryForObject(
+                        "SELECT input_tokens FROM public.business_import_ai_provider_usage_event "
+                        + "WHERE attempt_id = ? AND phase = 'RESPONSE'",
+                        Long.class, attempt)));
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(businessA,
+                () -> runtimeJdbc.update(
+                        "UPDATE public.business_import_ai_provider_usage_event SET requested_model = ? WHERE attempt_id = ?",
+                        "forbidden", attempt)));
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(businessB,
+                () -> runtimeJdbc.update(
+                        "DELETE FROM public.business_import_ai_provider_usage_event WHERE attempt_id = ?",
+                        attempt)));
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(businessA,
+                () -> runtimeJdbc.update(
+                        "INSERT INTO public.business_import_ai_provider_usage_event "
+                        + "(business_id, attempt_id, phase, requested_model) VALUES (?, ?, ?, ?)",
+                        businessB, UUID.randomUUID(), "STARTED", "gpt-4.1-mini")));
+    }
+
 }
