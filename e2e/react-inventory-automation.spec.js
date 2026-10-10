@@ -198,6 +198,37 @@ test.describe('Inventory automation interaction contracts', () => {
     expect(requests.adjustVariant).toHaveLength(0);
   });
 
+  test('missing alert type remains generic and never grants an inventory adjustment', async ({ page }) => {
+    const { itemId, requests } = await bootAutomation(page);
+    await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([{
+      id: 'alert-1', catalogItemId: itemId,
+      subjectName: 'Alerta incompleta', available: 7, reorderThreshold: 2,
+      acknowledged: false
+    }])));
+    await page.goto('/app/inventory');
+    const alert = page.getByTestId('inventory-alert-alert-1');
+    await expect(alert).toContainText('Alerta de inventario');
+    await expect(alert).toContainText('Alerta incompleta');
+    await expect(alert.getByRole('button', { name: 'Reponer stock' })).toHaveCount(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+  });
+
+  test('a server-side 403 denial remains visible and does not mark stock alerts handled', async ({ page }) => {
+    const { requests } = await bootAutomation(page);
+    await page.route('**/api/v1/inventory/alerts/alert-1/acknowledge', route => route.fulfill(
+      json({ message: 'Permiso revocado por el servidor' }, 403)
+    ));
+    await page.goto('/app/inventory');
+    const alert = page.getByTestId('inventory-alert-alert-1');
+    await alert.getByRole('button', { name: 'Marcar atendida' }).click();
+    await expect(page.getByRole('alert')).toContainText('Permiso revocado por el servidor');
+    await expect(alert).toContainText('Pendiente');
+    expect(requests.acknowledge).toBe(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+  });
+
   test('an adjustment without optional note sends null rather than an invented explanation', async ({ page }) => {
     const { requests } = await bootAutomation(page);
     await page.goto('/app/inventory');
