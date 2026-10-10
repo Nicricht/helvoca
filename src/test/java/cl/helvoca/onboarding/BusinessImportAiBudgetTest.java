@@ -5,61 +5,133 @@ import cl.helvoca.security.TenantProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.UUID;
 import java.time.Instant;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class BusinessImportAiBudgetTest {
+    private static final int WINDOW = 2592000;
+    private static final DistributedRateLimiter.Result ALLOW =
+            new DistributedRateLimiter.Result(true, 1, 1, 10);
+    private static final DistributedRateLimiter.Result DENY =
+            new DistributedRateLimiter.Result(false, 4, 0, 10);
+
+    private static void configure(BusinessImportAiBudget guard, int attempts, int centsPerCall,
+                                  int tenantCents, int globalCents) {
+        ReflectionTestUtils.setField(guard, "maxAttempts", attempts);
+        ReflectionTestUtils.setField(guard, "reservedCentsPerAttempt", centsPerCall);
+        ReflectionTestUtils.setField(guard, "maxTenantReservedCents", tenantCents);
+        ReflectionTestUtils.setField(guard, "maxGlobalReservedCents", globalCents);
+    }
+
     @Test
-    void defaultsToZeroAndNeverTouchesPostgresOrTenantClaims() {
+    void defaultZeroProtectsProviderWithoutTouchingTenantOrPostgres() {
         DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
         TenantProvider tenant = mock(TenantProvider.class);
-        BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant);
-        assertFalse(budget.reserve());
+        assertFalse(new BusinessImportAiBudget(limiter, tenant).reserve());
         verifyNoInteractions(limiter, tenant);
     }
 
     @Test
-    void tenantBoundedQuotaIsAtomicAtExistingPostgresqlLimiterBoundary() {
+    void eachMissingOrInvalidCommercialBudgetFailsClosed() {
+        DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant);
+        for (int[] limits : new int[][] {
+                {-1, 20, 100, 100},
+                {2, 0, 100, 100},
+                {2, -10, 100, 100},
+                {2, 20, 19, 100},
+                {2, 20, -1, 100},
+                {2, 20, 100, 19},
+                {2, 20, 100, -1}
+        }) {
+            configure(budget, limits[0], limits[1], limits[2], limits[3]);
+            assertFalse(budget.reserve());
+        }
+        verifyNoInteractions(limiter, tenant);
+    }
+
+    @Test
+    void reservesOneAtomicTenantAttemptAndTwoPricedBucketsPerAllowedRequest() {
         DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
         TenantProvider tenant = mock(TenantProvider.class);
         UUID first = UUID.randomUUID();
-        UUID second = UUID.randomUUID();
-        when(tenant.requireBusinessId()).thenReturn(first, second);
-        when(limiter.consume(anyString(), eq(2), eq(2592000), any(Instant.class)))
-                .thenReturn(new DistributedRateLimiter.Result(true, 1, 1, 10),
-                        new DistributedRateLimiter.Result(false, 3, 0, 10));
+        when(tenant.requireBusinessId()).thenReturn(first);
+        when(limiter.consume(anyString(), anyInt(), eq(WINDOW), any(Instant.class))).thenReturn(ALLOW);
         BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant);
-        ReflectionTestUtils.setField(budget, "maxAttempts", 2);
+        configure(budget, 7, 25, 125, 250);
 
         assertTrue(budget.reserve());
-        assertFalse(budget.reserve());
-        verify(limiter).consume(eq("business-import-ai:" + first), eq(2), eq(2592000), any(Instant.class));
-        verify(limiter).consume(eq("business-import-ai:" + second), eq(2), eq(2592000), any(Instant.class));
+        verify(limiter).consume(eq("business-import-ai:" + first), eq(7), eq(WINDOW), any(Instant.class));
+        verify(limiter).consume(eq("business-import-ai-reserved-cost:tenant:" + first),
+                eq(5), eq(WINDOW), any(Instant.class));
+        verify(limiter).consume(eq("business-import-ai-reserved-cost:global"),
+                eq(10), eq(WINDOW), any(Instant.class));
+        verifyNoMoreInteractions(limiter);
     }
 
     @Test
-    void invalidNegativeLimitAlsoFailsClosed() {
+    void tenantAttemptQuotaRejectsBeforeAnyCostReservation() {
         DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
         TenantProvider tenant = mock(TenantProvider.class);
+        UUID business = UUID.randomUUID();
+        when(tenant.requireBusinessId()).thenReturn(business);
+        when(limiter.consume(eq("business-import-ai:" + business), eq(2), eq(WINDOW),
+                any(Instant.class))).thenReturn(DENY);
         BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant);
-        ReflectionTestUtils.setField(budget, "maxAttempts", -1);
+        configure(budget, 2, 25, 50, 100);
+
         assertFalse(budget.reserve());
-        verifyNoInteractions(limiter, tenant);
+        verify(limiter).consume(eq("business-import-ai:" + business), eq(2), eq(WINDOW), any(Instant.class));
+        verifyNoMoreInteractions(limiter);
     }
 
     @Test
-    void postgresFailureMustNotApprovePaidProviderCall() {
+    void exhaustedTenantReservedCentsNeverTouchGlobalCostBucket() {
+        DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        UUID business = UUID.randomUUID();
+        when(tenant.requireBusinessId()).thenReturn(business);
+        when(limiter.consume(eq("business-import-ai:" + business), anyInt(), eq(WINDOW),
+                any(Instant.class))).thenReturn(ALLOW);
+        when(limiter.consume(eq("business-import-ai-reserved-cost:tenant:" + business),
+                eq(2), eq(WINDOW), any(Instant.class))).thenReturn(DENY);
+        BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant);
+        configure(budget, 4, 25, 50, 100);
+
+        assertFalse(budget.reserve());
+        verify(limiter, never()).consume(eq("business-import-ai-reserved-cost:global"),
+                anyInt(), anyInt(), any(Instant.class));
+    }
+
+    @Test
+    void exhaustedGlobalBudgetRejectsEvenWhenTenantHasRoom() {
         DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
         TenantProvider tenant = mock(TenantProvider.class);
         when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
-        when(limiter.consume(anyString(), eq(1), eq(2592000), any(Instant.class)))
+        when(limiter.consume(anyString(), anyInt(), eq(WINDOW), any(Instant.class)))
+                .thenReturn(ALLOW);
+        when(limiter.consume(eq("business-import-ai-reserved-cost:global"), eq(3),
+                eq(WINDOW), any(Instant.class))).thenReturn(DENY);
+        BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant);
+        configure(budget, 20, 25, 50, 75);
+
+        assertFalse(budget.reserve());
+    }
+
+    @Test
+    void databaseFailureCannotAuthorizePaidProviderCall() {
+        DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        when(limiter.consume(anyString(), anyInt(), eq(WINDOW), any(Instant.class)))
                 .thenThrow(new IllegalStateException("quota database offline"));
         BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant);
-        ReflectionTestUtils.setField(budget, "maxAttempts", 1);
+        configure(budget, 1, 25, 50, 75);
 
         assertThrows(IllegalStateException.class, budget::reserve);
     }
