@@ -356,6 +356,42 @@ export function saveSetup(input: SetupInput) {
   });
 }
 
+export function updateBusiness(input: { name: string; timezone: string; language: string; humanTransferPhone: string | null }) {
+  return apiRequest<BusinessSummary>("/api/v1/business", { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function replaceBusinessHours(hours: BusinessHour[]) {
+  return apiRequest<BusinessHour[]>("/api/v1/business/hours", { method: "PUT", body: JSON.stringify({ hours }) });
+}
+
+export function createServiceItem(input: Omit<ServiceItem, "id">) {
+  return apiRequest<ServiceItem>("/api/v1/services", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function updateServiceItem(id: string, input: Omit<ServiceItem, "id">) {
+  return apiRequest<ServiceItem>(`/api/v1/services/${encodeURIComponent(id)}`, {
+    method: "PATCH", body: JSON.stringify(input)
+  });
+}
+
+export function deactivateServiceItem(id: string) {
+  return apiRequest<void>(`/api/v1/services/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export function createKnowledgeItem(input: Omit<KnowledgeItem, "id">) {
+  return apiRequest<KnowledgeItem>("/api/v1/knowledge", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function updateKnowledgeItem(id: string, input: Omit<KnowledgeItem, "id">) {
+  return apiRequest<KnowledgeItem>(`/api/v1/knowledge/${encodeURIComponent(id)}`, {
+    method: "PATCH", body: JSON.stringify(input)
+  });
+}
+
+export function deactivateKnowledgeItem(id: string) {
+  return apiRequest<void>(`/api/v1/knowledge/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 export function saveBusinessProfile(input: BusinessProfileInput) {
   return apiRequest<BusinessProfile>("/api/v1/business/profile", {
     method: "PUT",
