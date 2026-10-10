@@ -37,6 +37,8 @@ const PERMISSION_CHANGE_ERROR = "Tus permisos cambiaron. Actualiza para continua
 
 export interface ProductRow {
   id: string;
+  // Keep the authoritative catalogue record attached to its derived row.
+  catalogItem: CatalogItem;
   name: string;
   description: string;
   price: number | null;
@@ -93,6 +95,7 @@ function buildRows(catalog: CatalogItem[], inventory: InventoryStock[], alerts: 
 
       return {
         id: String(item.id),
+        catalogItem: item,
         name: String(item.name || "Producto"),
         description: String(item.description || ""),
         price: numberOrNull(item.price),
@@ -446,8 +449,10 @@ export function InventoryPage() {
     return data;
   }
 
+  // Both entry points enforce the current read capability: the variants
+  // button is permission-gated and restock requires an authorized alert row.
+  // The backend also authorizes every variants GET for the active tenant.
   async function openVariants(row: ProductRow) {
-    if (!canReadVariants) return;
     setVariantsTarget(row);
     setVariants([]);
     setVariantsError("");
@@ -495,7 +500,7 @@ export function InventoryPage() {
     };
   }
 
-  async function handleVariantEditor(event: FormEvent<HTMLFormElement>, target: ProductRow, mode: "CREATE" | "EDIT") {
+  async function handleVariantEditor(event: FormEvent<HTMLFormElement>, target: ProductRow, mode: "CREATE" | "EDIT", editing: InventoryVariant | null) {
     event.preventDefault();
     if (!canManageVariants) {
       setMutationError(PERMISSION_CHANGE_ERROR);
@@ -515,8 +520,9 @@ export function InventoryPage() {
     try {
       if (mode === "CREATE") {
         await createInventoryVariant(target.id, input);
-      } else if (variantEditing) {
-        await updateInventoryVariant(target.id, variantEditing.id, input);
+      } else {
+        // EDIT is mounted only for a selected existing variant.
+        await updateInventoryVariant(target.id, editing!.id, input);
       }
       await refreshVariants(target.id);
       setVariantEditorMode(null);
@@ -641,6 +647,7 @@ export function InventoryPage() {
       if (continueToStock && saved?.id) {
         setConfigureTarget({
           id: String(saved.id),
+          catalogItem: saved,
           name: String(saved.name || name),
           description: String(saved.description || description),
           price: numberOrNull(saved.price),
@@ -1054,10 +1061,10 @@ export function InventoryPage() {
                           type="button"
                           aria-label={`Editar producto ${row.name}`}
                           onClick={() => {
-                            const item = (asList(model.catalog.data)).find(candidate => String(candidate.id) === row.id);
-                            if (!item) return;
+                            // The row was derived from this exact catalogue record.
+                            // A subsequent PUT is still server-authorized and rejects stale IDs.
                             setMutationError("");
-                            setProductEditing(item);
+                            setProductEditing(row.catalogItem);
                             setProductCreateOpen(true);
                           }}
                         >
@@ -1353,7 +1360,7 @@ export function InventoryPage() {
                 {!variantsPending && !variantsError && (
                   <>
                     {variantEditorMode && (variantEditorMode === "CREATE" || variantEditing) && (
-                      <form className={styles.variantForm} onSubmit={event => handleVariantEditor(event, variantsTarget!, variantEditorMode!)}>
+                      <form className={styles.variantForm} onSubmit={event => handleVariantEditor(event, variantsTarget!, variantEditorMode!, variantEditing)}>
                         <h3>{variantEditorMode === "CREATE" ? "Nueva variante" : "Editar variante"}</h3>
 
                         <label className={styles.field}>
