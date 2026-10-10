@@ -12,6 +12,10 @@ async function mockSetup(page, roles = ['BUSINESS_ADMIN']) {
     if (path === '/api/v1/auth/me') return route.fulfill(json({ email: 'admin@demo.cl', roles, permissions: ['BUSINESS_READ', 'BUSINESS_CONFIGURE'] }));
     if (path === '/api/v1/business') return route.fulfill(json({ name: 'Restaurante La Plaza', language: 'es', timezone: 'America/Santiago' }));
     if (path === '/api/v1/business/profile') return route.fulfill(json({ presetKey: 'restaurant', countryCode: 'CL', defaultCurrency: 'CLP' }));
+    if (path === '/api/v1/onboarding/import/ai-quota') return route.fulfill(json({
+      status: 'DISABLED', planCode: 'BASIC', limit: 0, used: 0, remaining: 0,
+      masterEnabled: false, currentPeriodStart: null, currentPeriodEnd: null
+    }));
     if (path === '/api/v1/onboarding/status') return route.fulfill(json({
       businessProfileConfigured: true, servicesConfigured: true,
       knowledgeConfigured: false, scheduleConfigured: true,
@@ -92,7 +96,7 @@ test.describe('Settings Express user journey', () => {
       name: 'carta.csv', mimeType: 'text/csv', buffer: Buffer.from('producto,precio\nAlmuerzo,9000\n')
     });
     await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
-    await expect(page.getByText('Sin IA pagada')).toBeVisible();
+    await expect(page.getByText('Sin IA pagada', { exact: true })).toBeVisible();
     expect(applied).toBe(0);
     await page.getByRole('button', { name: 'Importar al negocio' }).click();
     await expect.poll(() => applied).toBe(1);
@@ -138,4 +142,24 @@ test.describe('Settings Express user journey', () => {
     await expect(page).toHaveURL(/\/app\/settings\/import/);
     expect(writes).toEqual([]);
   });
+});
+
+test('paid import quota is shown read-only without blocking free spreadsheets', async ({ page }) => {
+  const writes = await mockSetup(page);
+  await page.goto('/app/settings/import');
+  const quota = page.getByTestId('ai-import-quota');
+  await expect(quota).toContainText('Análisis pagado desactivado por seguridad.');
+  await expect(quota).toContainText('Excel y CSV siguen disponibles');
+  await expect(page.getByLabel('Archivos del negocio')).toHaveAttribute('type', 'file');
+  expect(writes).toEqual([]);
+});
+
+test('exhausted paid quota has specific accessible copy', async ({ page }) => {
+  await mockSetup(page);
+  await page.route('**/api/v1/onboarding/import/ai-quota', route => route.fulfill(json({
+    status: 'LIMIT_REACHED', planCode: 'PRO', limit: 2, used: 2, remaining: 0,
+    masterEnabled: true, currentPeriodStart: null, currentPeriodEnd: null
+  })));
+  await page.goto('/app/settings/import');
+  await expect(page.getByTestId('ai-import-quota')).toContainText('Agotaste el cupo de IA de este período.');
 });

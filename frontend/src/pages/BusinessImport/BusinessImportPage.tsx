@@ -20,6 +20,7 @@ import { getCurrentUser } from "../../features/dashboard/api";
 import { getBusiness, getOnboardingStatus } from "../../features/settings/api";
 import {
   applyBusinessImport,
+  getBusinessImportAiQuota,
   previewBusinessImport,
   type BusinessImportApplyItem,
   type BusinessImportApplyResult,
@@ -173,6 +174,13 @@ export function BusinessImportPage() {
   });
 
   const admin = Boolean(me.data?.roles?.includes("BUSINESS_ADMIN"));
+  const aiQuota = useQuery({
+    queryKey: ["business-import", "ai-quota"],
+    queryFn: getBusinessImportAiQuota,
+    enabled: admin,
+    retry: false,
+    refetchOnWindowFocus: false
+  });
 
   const business = useQuery({
     queryKey: ["settings", "business"],
@@ -262,6 +270,7 @@ export function BusinessImportPage() {
     try {
       const next = await previewBusinessImport(name, files);
       setPreview(next);
+      void queryClient.invalidateQueries({ queryKey: ["business-import", "ai-quota"] });
       setRows(rowsFromPreview(next));
       setMessage("Borrador creado. Revisa cada dato antes de aplicar.");
     } catch (value) {
@@ -348,6 +357,31 @@ export function BusinessImportPage() {
           <Sparkles size={18} aria-hidden="true" />
           <strong>Vista previa → revisión → aplicar</strong>
           <span>Excel y CSV se leen sin IA de pago. Fotos y PDF requieren una cuota de IA habilitada. Nada se guarda sin tu aprobación.</span>
+        </section>
+
+        <section className={styles.costNote} aria-label="Cupo de importación con IA" data-testid="ai-import-quota">
+          <ShieldCheck size={18} aria-hidden="true" />
+          <div>
+            <strong>Importaciones con IA: controladas por tu plan</strong>
+            {aiQuota.isPending ? (
+              <span>Consultando cupo disponible…</span>
+            ) : aiQuota.isError || !aiQuota.data ? (
+              <span>No se pudo verificar el cupo. No se autorizarán llamadas pagadas sin comprobación.</span>
+            ) : (
+              <span>
+                {aiQuota.data.status === "AVAILABLE"
+                  ? `${aiQuota.data.remaining} de ${aiQuota.data.limit} solicitudes disponibles en este período.`
+                  : aiQuota.data.status === "DISABLED" ? "Análisis pagado desactivado por seguridad."
+                  : aiQuota.data.status === "NOT_INCLUDED" ? "Tu plan aún no incluye solicitudes de IA pagada."
+                  : aiQuota.data.status === "LIMIT_REACHED" ? "Agotaste el cupo de IA de este período."
+                  : aiQuota.data.status === "BUSINESS_INACTIVE" ? "El negocio está suspendido."
+                  : aiQuota.data.status === "PERIOD_EXPIRED" ? "El período de suscripción venció."
+                  : aiQuota.data.status === "SUBSCRIPTION_INACTIVE" ? "La suscripción no permite consumo de IA."
+                  : "Cupo no disponible. No se autorizarán solicitudes pagadas."}
+                {" "}Excel y CSV siguen disponibles sin IA pagada.
+              </span>
+            )}
+          </div>
         </section>
 
         {(error || message) && (

@@ -135,4 +135,60 @@ class BusinessImportAiBudgetTest {
 
         assertThrows(IllegalStateException.class, budget::reserve);
     }
+
+    @Test
+    void productionConstructorDeniesPaidImportWhenPlanHasNoRight() {
+        DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        BusinessImportAiPlanQuota quota = mock(BusinessImportAiPlanQuota.class);
+        when(quota.current()).thenReturn(new BusinessImportAiPlanQuota.Snapshot("NOT_INCLUDED", "BASIC",
+                java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO,
+                java.math.BigDecimal.ZERO, null, null, true));
+        BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant, quota);
+        configure(budget, 2, 25, 50, 100);
+        assertFalse(budget.reserve());
+        verify(quota).current();
+        verify(quota, never()).reserve(any(UUID.class));
+        verifyNoInteractions(limiter, tenant);
+    }
+
+    @Test
+    void concurrentQuotaExhaustionAfterBudgetReservationStillPreventsProviderCall() {
+        DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        BusinessImportAiPlanQuota quota = mock(BusinessImportAiPlanQuota.class);
+        UUID business = UUID.randomUUID();
+        when(tenant.requireBusinessId()).thenReturn(business);
+        when(quota.current()).thenReturn(new BusinessImportAiPlanQuota.Snapshot("AVAILABLE", "BASIC",
+                java.math.BigDecimal.ONE, java.math.BigDecimal.ZERO,
+                java.math.BigDecimal.ONE, null, null, true));
+        when(quota.reserve(any(UUID.class))).thenReturn(false);
+        when(limiter.consume(anyString(), anyInt(), eq(WINDOW), any(Instant.class))).thenReturn(ALLOW);
+        BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant, quota);
+        configure(budget, 2, 25, 50, 100);
+
+        assertFalse(budget.reserve());
+        verify(quota).current();
+        verify(quota).reserve(any(UUID.class));
+        verify(limiter, times(3)).consume(anyString(), anyInt(), eq(WINDOW), any(Instant.class));
+    }
+
+    @Test
+    void approvedPlanStillRequiresAllExistingFinancialCircuitBreakers() {
+        DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        BusinessImportAiPlanQuota quota = mock(BusinessImportAiPlanQuota.class);
+        UUID business = UUID.randomUUID();
+        when(tenant.requireBusinessId()).thenReturn(business);
+        when(quota.current()).thenReturn(new BusinessImportAiPlanQuota.Snapshot("AVAILABLE", "BASIC",
+                java.math.BigDecimal.ONE, java.math.BigDecimal.ZERO,
+                java.math.BigDecimal.ONE, null, null, true));
+        when(quota.reserve(any(UUID.class))).thenReturn(true);
+        when(limiter.consume(anyString(), anyInt(), eq(WINDOW), any(Instant.class))).thenReturn(ALLOW);
+        BusinessImportAiBudget budget = new BusinessImportAiBudget(limiter, tenant, quota);
+        configure(budget, 2, 25, 50, 100);
+        assertTrue(budget.reserve());
+        verify(quota).reserve(any(UUID.class));
+        verify(limiter, times(3)).consume(anyString(), anyInt(), eq(WINDOW), any(Instant.class));
+    }
 }
