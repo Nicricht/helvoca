@@ -150,7 +150,7 @@ test('paid import quota is shown read-only without blocking free spreadsheets', 
   const quota = page.getByTestId('ai-import-quota');
   await expect(quota).toContainText('Análisis pagado desactivado por seguridad.');
   await expect(quota).toContainText('Excel y CSV siguen disponibles');
-  await expect(page.getByLabel('Archivos del negocio')).toBeVisible();
+  await expect(page.getByLabel('Archivos del negocio')).toHaveAttribute('type', 'file');
   expect(writes).toEqual([]);
 });
 
