@@ -60,10 +60,10 @@ public class BusinessImportAiBudget {
                 || maxTenantReservedCents < reservedCentsPerAttempt
                 || maxGlobalReservedCents < reservedCentsPerAttempt) return false;
 
-        // The live Spring bean always receives a plan quota. Reserve the
-        // subscription-cycle slot before any provider-cost circuit breaker.
-        // Denials are conservative: earlier reservations are not refunded.
-        if (planQuota != null && !planQuota.reserve(UUID.randomUUID())) return false;
+        // Preflight BEFORE consuming shared budgets; an ineligible tenant cannot
+        // drain the global pool. Atomic subscription reservation is performed
+        // AFTER the budget checks to avoid charging a plan for budget denials.
+        if (planQuota != null && !"AVAILABLE".equals(planQuota.current().status())) return false;
 
         UUID businessId = tenant.requireBusinessId();
         Instant now = Instant.now();
@@ -78,8 +78,11 @@ public class BusinessImportAiBudget {
 
         // The global reservation is the final authority across all tenants.
         // A failed or unknown provider response never refunds a reservation.
-        return limiter.consume(GLOBAL_COST_BUCKET,
+        if (!limiter.consume(GLOBAL_COST_BUCKET,
                 maxGlobalReservedCents / reservedCentsPerAttempt,
-                WINDOW_SECONDS, now).allowed();
+                WINDOW_SECONDS, now).allowed()) return false;
+        // A concurrent loser may consume an earlier conservative budget bucket,
+        // never a customer's subscription slot or a paid provider request.
+        return planQuota == null || planQuota.reserve(UUID.randomUUID());
     }
 }
