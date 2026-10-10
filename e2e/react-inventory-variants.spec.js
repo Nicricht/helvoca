@@ -1153,4 +1153,26 @@ test.describe('React Inventory variants', () => {
     await expect(dialog.getByRole('heading', { name: /Historial/ })).toHaveCount(0);
   });
 
+
+  test('warehouse-only identities cannot open variant history or bypass variant-read entry points', async ({ page }) => {
+    const { productId, requests } = await bootVariantInventory(page, ['WAREHOUSE']);
+    let variantReads = 0;
+    await page.route('**/api/v1/inventory/' + productId + '/variants', route => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      variantReads += 1;
+      return route.fallback();
+    });
+    await page.goto('/app/inventory');
+    const row = page.getByTestId('inventory-row-' + productId);
+    await expect(row).toBeVisible();
+    await expect(row.getByRole('button', { name: 'Variantes' })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: /Variantes/ })).toHaveCount(0);
+    expect(variantReads).toBe(0);
+    expect(requests.history).toBe(0);
+    expect(requests.deactivate).toBe(0);
+    expect(requests.create).toHaveLength(0);
+    expect(requests.update).toHaveLength(0);
+    expect(requests.adjust).toHaveLength(0);
+  });
+
 });
