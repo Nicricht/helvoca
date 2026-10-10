@@ -206,7 +206,8 @@ class DistributedRateLimiterIntegrationTest {
 
     @Test
     void providerUsageEvidenceIsAppendOnlyIdempotentAndTenantAttributedInPostgres() {
-        jdbc.update("DELETE FROM public.business_import_ai_provider_usage_event");
+        // V98 receipts are deliberately append-only. Use a fresh random attempt
+        // instead of deleting evidence, which the runtime role must not permit.
         UUID one = UUID.randomUUID();
         UUID two = UUID.randomUUID();
         TenantProvider tenant = mock(TenantProvider.class);
