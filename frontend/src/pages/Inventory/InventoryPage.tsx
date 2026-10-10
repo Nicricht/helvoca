@@ -380,10 +380,14 @@ export function InventoryPage() {
     }
   }
 
-  async function restockFromAlert(catalogItemId?: string, variantId?: string | null) {
-    if (!canManageAutomation || !catalogItemId) return;
-    const row = rows.find(candidate => candidate.id === String(catalogItemId));
-    if (!row) return;
+  // Resolve permission and the live catalog row before exposing a mutation
+  // control. Invalid or orphaned alerts never acquire a restock callback.
+  function authorizedRestockRow(catalogItemId?: string): ProductRow | null {
+    if (!canManageAutomation || !catalogItemId) return null;
+    return rows.find(candidate => candidate.id === String(catalogItemId)) ?? null;
+  }
+
+  async function restockFromAlert(row: ProductRow, variantId?: string | null) {
     setMutationError("");
 
     if (variantId) {
@@ -1136,7 +1140,9 @@ export function InventoryPage() {
                   ) : (asList(model.alerts.data)).length === 0 ? (
                     <p className={styles.automationEmpty}>No hay alertas abiertas.</p>
                   ) : (
-                    (asList(model.alerts.data)).map(alert => (
+                    (asList(model.alerts.data)).map(alert => {
+                      const target = authorizedRestockRow(alert.catalogItemId);
+                      return (
                       <article
                         key={alert.id}
                         className={styles.automationCard}
@@ -1171,13 +1177,13 @@ export function InventoryPage() {
                               </button>
                             )}
                             {(alert.type === "LOW_STOCK" || alert.type === "OUT_OF_STOCK")
-                              && rows.some(row => row.id === String(alert.catalogItemId))
+                              && target !== null
                               && (
                                 <button
                                   className="button secondary"
                                   type="button"
                                   disabled={mutationPending}
-                                  onClick={() => void restockFromAlert(alert.catalogItemId, alert.variantId)}
+                                  onClick={() => void restockFromAlert(target, alert.variantId)}
                                 >
                                   Reponer stock
                                 </button>
@@ -1185,7 +1191,8 @@ export function InventoryPage() {
                           </div>
                         )}
                       </article>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </section>
