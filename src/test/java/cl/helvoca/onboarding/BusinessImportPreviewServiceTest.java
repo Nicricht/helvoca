@@ -237,7 +237,7 @@ class BusinessImportPreviewServiceTest {
                 .put("output_text", """
                         {"products":[{"name":"Hamburguesa","price":8490,"kind":"PRODUCT","confidence":0.9}],"warnings":[]}
                         """).toString());
-        when(http.send(any(HttpRequest.class), any())).thenReturn(response);
+        when(http.send(any(HttpRequest.class), org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(response);
         BusinessImportPreviewService service = new BusinessImportPreviewService(
                 new BusinessImportSpreadsheetParser(), openAi, tenant, http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
