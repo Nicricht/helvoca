@@ -106,6 +106,21 @@ class BusinessImportAiUsageLedgerTest {
     }
 
     @Test
+    void blankProviderBodyIsUnpricedAndNeverInventsTokenUsage() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        var recorder = ledger(jdbc, mock(TenantProvider.class));
+        recorder.received(UUID.randomUUID(), MODEL, response(200, "   ", false));
+        Object[] values = lastWrite(jdbc);
+        assertEquals("RESPONSE", values[3]);
+        assertEquals(200, values[8]);
+        assertNull(values[6]);
+        assertNull(values[9]);
+        assertNull(values[10]);
+        assertNull(values[11]);
+        assertNull(values[12]);
+    }
+
+    @Test
     void uncalibratedOrChangedModelNeverClaimsInvoiceCost() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         var recorder = ledger(jdbc, mock(TenantProvider.class));
