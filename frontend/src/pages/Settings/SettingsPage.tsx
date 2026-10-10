@@ -34,6 +34,7 @@ import type {
   SettingsDraft
 } from "../../features/settings/viewModel";
 import { SettingsPanelView } from "./SettingsPanelView";
+import { SettingsExpressIntro } from "./SettingsExpressIntro";
 import styles from "./SettingsPage.module.css";
 
 const sections: Array<{
@@ -446,7 +447,21 @@ export function SettingsPage() {
           </div>
         </header>
 
-        <section className={styles.hero} aria-label="Configuración asistida">
+        <SettingsExpressIntro
+          businessName={draft.businessName}
+          status={model.onboarding.data}
+          serviceCount={draft.services.length}
+          knowledgeCount={draft.knowledge.length}
+          canImport={model.canManage}
+          onAdvanced={() => {
+            document.getElementById("settingsAdvanced")?.scrollIntoView({
+              behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+              block: "start"
+            });
+          }}
+        />
+
+        <section className={styles.hero} aria-label="Identidad de RecepVoz">
           <div className={styles.heroGlow} aria-hidden="true" />
           <div className={styles.heroCopy}>
             <span className={styles.heroKicker}>CENTRO DE CONTROL IA</span>
@@ -494,6 +509,14 @@ export function SettingsPage() {
           </div>
         )}
 
+        <div className={styles.advancedHeading} id="settingsAdvanced">
+          <div>
+            <p className="eyebrow">AJUSTES DETALLADOS</p>
+            <h2>Editar manualmente</h2>
+            <p>Solo si lo necesitas. Tus datos existentes y los cambios pendientes se conservan.</p>
+          </div>
+          <span>{pendingOther > 0 ? `${pendingOther} sección(es) con cambios pendientes` : "Configuración avanzada"}</span>
+        </div>
         <form className={styles.settingsSurface} onSubmit={handleSubmit} noValidate>
           <div
             className={styles.tabs}
