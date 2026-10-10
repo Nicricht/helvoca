@@ -740,4 +740,50 @@ test.describe('React Inventory mutations', () => {
   });
 
 
+
+  test('a synchronous double submit creates one catalog item only', async ({ page }) => {
+    const { createdProductId, requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByRole('button', { name: 'Nuevo producto' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nuevo producto' });
+    await dialog.getByLabel('Nombre').fill('Artículo sin duplicados');
+    await dialog.getByLabel('Precio').fill('5300');
+    await dialog.getByLabel('Moneda').fill('CLP');
+    await dialog.locator('form').evaluate(form => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    await expect.poll(() => requests.createProduct.length).toBe(1);
+    await expect(page.getByTestId('inventory-row-' + createdProductId))
+      .toContainText('Artículo sin duplicados');
+    expect(requests.createProduct).toHaveLength(1);
+  });
+
+  test('simultaneous base-stock adjustments remain single-write when the optional note field is absent', async ({ page }) => {
+    const { productId, requests } = await bootAdminInventory(page);
+    await page.goto('/app/inventory');
+    const row = page.getByTestId('inventory-row-' + productId);
+    await row.getByRole('button', { name: 'Configurar stock' }).click();
+    const configure = page.getByRole('dialog', { name: 'Configurar stock · Cera mate' });
+    await configure.getByLabel('Stock físico inicial').fill('9');
+    await configure.getByLabel('Umbral de reposición').fill('2');
+    await configure.getByRole('button', { name: 'Guardar configuración' }).click();
+    await expect(configure).toHaveCount(0);
+
+    await row.getByRole('button', { name: 'Ajustar stock' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Ajustar stock · Cera mate' });
+    await dialog.getByLabel('Ajuste').fill('3');
+    await dialog.locator('[name="note"]').evaluate(input => input.remove());
+    await dialog.locator('form').evaluate(form => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    await expect.poll(() => requests.adjust.length).toBe(1);
+    expect(requests.adjust[0]).toEqual({
+      delta: 3, referenceType: 'MANUAL', referenceId: null, note: null
+    });
+    await expect(dialog).toHaveCount(0);
+    expect(requests.adjust).toHaveLength(1);
+  });
+
 });
