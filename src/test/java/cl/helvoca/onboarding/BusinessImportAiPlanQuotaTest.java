@@ -174,6 +174,23 @@ class BusinessImportAiPlanQuotaTest {
     }
 
     @Test
+    void reversedSubscriptionPeriodCannotProduceOrReserveUsage() throws Exception {
+        enabled();
+        Instant now = Instant.now();
+        row("ACTIVE", "ACTIVE", now.plusSeconds(90), now.minusSeconds(90),
+                true, "USAGE", "AI_IMPORT_REQUESTS", BigDecimal.ONE,
+                "REQUESTS", true, BigDecimal.ZERO);
+
+        var snapshot = quota.current();
+        assertEquals("PERIOD_EXPIRED", snapshot.status());
+        assertEquals(BigDecimal.ZERO, snapshot.used());
+        assertFalse(quota.reserve(UUID.randomUUID()));
+        verify(jdbc, never()).queryForObject(anyString(), eq(BigDecimal.class),
+                any(UUID.class), any(Timestamp.class), any(Timestamp.class));
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
+
+    @Test
     void databaseUnknownUsageDefaultsToZeroWithoutInventingInvoiceCosts() throws Exception {
         enabled();
         valid(BigDecimal.ONE, null);
