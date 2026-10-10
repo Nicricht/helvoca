@@ -179,7 +179,7 @@ public class BusinessImportPreviewService {
                             BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN,
                             0, "AI_INPUT_LIMIT", false, List.of("Reduce cantidad o tamaño")));
                 }
-            } else if (aiBudget == null || !aiBudget.reserve()) {
+            } else if (!reservePaidBudget(warnings)) {
                 warnings.add("Este negocio no tiene cupo disponible de importaciones pagadas con IA. Puedes importar CSV/Excel sin gasto.");
                 for (MultipartFile file : semantic) {
                     sources.add(new SourcePreview(displayName(file),
@@ -223,6 +223,17 @@ public class BusinessImportPreviewService {
 
         return new Preview(safeBusinessName, List.copyOf(normalized), List.copyOf(sources),
                 List.copyOf(dedupeWarnings(warnings)), aiUsed);
+    }
+
+    private boolean reservePaidBudget(List<String> warnings) {
+        if (aiBudget == null) return false;
+        try {
+            return aiBudget.reserve();
+        } catch (RuntimeException e) {
+            // Database or tenant lookup failure must never silently authorize a paid request.
+            warnings.add("No se pudo comprobar el cupo de IA. El análisis pagado no se realizó.");
+            return false;
+        }
     }
 
     private SemanticResult analyzeSemantic(String businessName, List<MultipartFile> files) throws Exception {
