@@ -96,7 +96,7 @@ test.describe('Settings Express user journey', () => {
       name: 'carta.csv', mimeType: 'text/csv', buffer: Buffer.from('producto,precio\nAlmuerzo,9000\n')
     });
     await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
-    await expect(page.getByText('Sin IA pagada')).toBeVisible();
+    await expect(page.getByText('Sin IA pagada', { exact: true })).toBeVisible();
     expect(applied).toBe(0);
     await page.getByRole('button', { name: 'Importar al negocio' }).click();
     await expect.poll(() => applied).toBe(1);
