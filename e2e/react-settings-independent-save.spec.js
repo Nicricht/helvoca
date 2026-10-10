@@ -157,7 +157,8 @@ test.describe('Settings independent save contract', () => {
   test('knowledge update uses item PATCH instead of a full onboarding sync', async ({ page }) => {
     const state = await boot(page);
     await page.goto('/app/settings?section=knowledge');
-    await page.getByLabel('Respuesta', { exact: true }).fill('Nueva respuesta');
+    await page.getByRole('tabpanel', { name: 'Conocimiento' })
+      .getByRole('textbox', { name: 'Respuesta', exact: true }).fill('Nueva respuesta');
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
     await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
     expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual(['PATCH /api/v1/knowledge/k1']);
