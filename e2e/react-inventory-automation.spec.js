@@ -165,6 +165,39 @@ test.describe('Inventory automation interaction contracts', () => {
     expect(requests.adjustVariant).toHaveLength(0);
   });
 
+  test('missing catalog identity and restricted roles never expose restock actions', async ({ page }) => {
+    const { requests } = await bootAutomation(page);
+    await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([{
+      id: 'alert-1', type: 'OUT_OF_STOCK', subjectName: 'Referencia ausente',
+      variantId: null, sku: 'UNKNOWN', available: 0,
+      reorderThreshold: 2, acknowledged: false
+    }])));
+    await page.goto('/app/inventory');
+    const alert = page.getByTestId('inventory-alert-alert-1');
+    await expect(alert).toContainText('Referencia ausente');
+    await expect(alert.getByRole('button', { name: 'Reponer stock' })).toHaveCount(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+
+    // A reader may inspect alerts, but the same authoritative resolver
+    // must never grant an adjustment button to a restricted role.
+    await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+      email: 'operator@demo.cl', roles: ['OPERATOR']
+    })));
+    await page.route('**/api/v1/inventory/alerts', route => route.fulfill(json([{
+      id: 'alert-1', catalogItemId: 'automation-item-1',
+      type: 'LOW_STOCK', subjectName: 'Taladro demo',
+      variantId: null, available: 4, reorderThreshold: 5,
+      acknowledged: false
+    }])));
+    await page.getByRole('button', { name: 'Actualizar', exact: true }).click();
+    await expect(page.getByText('Solo lectura')).toBeVisible();
+    await expect(alert).toContainText('Taladro demo');
+    await expect(alert.getByRole('button', { name: 'Reponer stock' })).toHaveCount(0);
+    expect(requests.adjust).toHaveLength(0);
+    expect(requests.adjustVariant).toHaveLength(0);
+  });
+
   test('an adjustment without optional note sends null rather than an invented explanation', async ({ page }) => {
     const { requests } = await bootAutomation(page);
     await page.goto('/app/inventory');
