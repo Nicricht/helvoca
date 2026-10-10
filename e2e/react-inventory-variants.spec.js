@@ -1116,4 +1116,38 @@ test.describe('React Inventory variants', () => {
     expect(requests.adjust[0].delta).toBe(4);
   });
 
+
+  test('revoked variant-read role blocks history fetch even while its dialog remains open', async ({ page }) => {
+    const { productId, initialVariantId } = await bootVariantInventory(page);
+    let allowVariantRead = true;
+    let historyRequests = 0;
+    await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+      email: 'staff@demo.cl',
+      roles: allowVariantRead ? ['BUSINESS_ADMIN'] : ['WAREHOUSE']
+    })));
+    await page.route(
+      '**/api/v1/inventory/' + productId + '/variants/' + initialVariantId + '/movements',
+      route => {
+        historyRequests += 1;
+        return route.fulfill(json([]));
+      }
+    );
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId)
+      .getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    const item = dialog.getByTestId('inventory-variant-' + initialVariantId);
+    await expect(item.getByRole('button', { name: 'Historial' })).toBeVisible();
+
+    allowVariantRead = false;
+    await page.getByRole('button', { name: 'Actualizar', exact: true }).click();
+    await expect(page.getByText('Solo lectura')).toBeVisible();
+    await expect(dialog).toBeVisible();
+
+    // A still-mounted dialog must not bypass permission revalidation.
+    await item.getByRole('button', { name: 'Historial' }).click();
+    expect(historyRequests).toBe(0);
+    await expect(dialog.getByRole('heading', { name: /Historial/ })).toHaveCount(0);
+  });
+
 });
