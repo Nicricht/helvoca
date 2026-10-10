@@ -350,4 +350,29 @@ class BusinessImportPreviewServiceTest {
         verifyNoInteractions(budget, http);
     }
 
+    @Test
+    void quotaServiceOutageKeepsSpreadsheetPreviewAndNeverCallsAi() {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("test-key");
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenThrow(new IllegalStateException("db unavailable"));
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
+        var csv = new MockMultipartFile("files", "products.csv", "text/csv",
+                "SKU,Producto,Precio\nA,Manzana,100\n".getBytes(StandardCharsets.UTF_8));
+        var img = new MockMultipartFile("files", "menu.png", "image/png", new byte[]{2, 3});
+
+        var preview = service.preview("Tienda", List.of(csv, img));
+
+        assertFalse(preview.aiUsed());
+        assertEquals(1, preview.products().size());
+        assertTrue(preview.warnings().stream().anyMatch(w -> w.contains("comprobar el cupo")));
+        assertEquals("AI_BUDGET_EXCEEDED", preview.sources().get(1).method());
+        verifyNoInteractions(http);
+    }
+
 }
