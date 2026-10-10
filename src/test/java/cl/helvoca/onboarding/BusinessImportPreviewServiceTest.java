@@ -386,7 +386,7 @@ class BusinessImportPreviewServiceTest {
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(200);
         when(response.body()).thenReturn(new JSONObject()
-                .put("output_text", "{\\"products\\":[],\\"warnings\\":[]}")
+                .put("output_text", "{}")
                 .toString());
         when(http.send(any(HttpRequest.class),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(response);
