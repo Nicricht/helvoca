@@ -1081,4 +1081,39 @@ test.describe('React Inventory variants', () => {
     expect(deactivations).toBe(1);
   });
 
+
+  test('reentrant FormData submissions preserve a single variant create and adjustment', async ({ page }) => {
+    const { productId, initialVariantId, createdVariantId, requests } = await bootVariantInventory(page);
+    await page.goto('/app/inventory');
+    await page.getByTestId('inventory-row-' + productId).getByRole('button', { name: 'Variantes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Variantes · Cera premium' });
+    const submitDuringSerialization = async form => form.evaluate(element => {
+      let reentered = false;
+      element.addEventListener('formdata', () => {
+        if (reentered) return;
+        reentered = true;
+        element.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
+      element.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    await dialog.getByRole('button', { name: 'Nueva variante' }).click();
+    await dialog.getByLabel('Nombre de variante').fill('Azul sin duplicados');
+    await dialog.getByLabel('SKU de variante').fill('CER-AZUL-LOCK');
+    await submitDuringSerialization(dialog.locator('form'));
+    await expect.poll(() => requests.create.length).toBe(1);
+    await expect(dialog.getByTestId('inventory-variant-' + createdVariantId)).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Nueva variante' })).toHaveCount(0);
+    expect(requests.create).toHaveLength(1);
+
+    await dialog.getByTestId('inventory-variant-' + initialVariantId)
+      .getByRole('button', { name: 'Ajustar' }).click();
+    await dialog.getByLabel('Ajuste de variante').fill('4');
+    await submitDuringSerialization(dialog.locator('form'));
+    await expect.poll(() => requests.adjust.length).toBe(1);
+    await expect(dialog.getByTestId('inventory-variant-' + initialVariantId)).toContainText('Disponible: 7');
+    expect(requests.adjust).toHaveLength(1);
+    expect(requests.adjust[0].delta).toBe(4);
+  });
+
 });
