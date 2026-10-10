@@ -65,9 +65,11 @@ export function validateSection(section: SectionKey, draft: SettingsDraft) {
   return null;
 }
 
-export type PersistedChange =
-  | { patch: Partial<SettingsDraft> }
-  | { patch: Partial<SettingsDraft>; created: { section: "services" | "knowledge"; index: number; item: ServiceItem | KnowledgeItem } };
+export type PersistedChange = {
+  patch: Partial<SettingsDraft>;
+  created?: { section: "services"; index: number; item: ServiceItem }
+    | { section: "knowledge"; index: number; item: KnowledgeItem };
+};
 
 /**
  * Write only the selected section. Successful steps are committed to the caller's
