@@ -209,8 +209,10 @@ class BusinessImportPreviewServiceTest {
         OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
         openAi.setApiKey("");
         HttpClient http = mock(HttpClient.class);
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service = new BusinessImportPreviewService(
-                new BusinessImportSpreadsheetParser(), openAi, tenant, http);
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
 
         MockMultipartFile image = new MockMultipartFile(
@@ -238,8 +240,10 @@ class BusinessImportPreviewServiceTest {
                         {"products":[{"name":"Hamburguesa","price":8490,"kind":"PRODUCT","confidence":0.9}],"warnings":[]}
                         """).toString());
         when(http.send(any(HttpRequest.class), org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(response);
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenReturn(true);
         BusinessImportPreviewService service = new BusinessImportPreviewService(
-                new BusinessImportSpreadsheetParser(), openAi, tenant, http);
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
         ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
 
         MockMultipartFile image = new MockMultipartFile(
