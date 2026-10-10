@@ -257,4 +257,97 @@ class BusinessImportPreviewServiceTest {
         verify(http, times(1)).send(any(HttpRequest.class), any());
     }
 
+    @Test
+    void tenantQuotaExhaustionPreventsEveryPaidProviderCall() {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("test-key");
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        when(budget.reserve()).thenReturn(false);
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
+        MockMultipartFile picture = new MockMultipartFile(
+                "files", "carta.jpg", "image/jpeg", new byte[]{2, 3, 4});
+
+        var preview = service.preview("Restaurante", List.of(picture));
+
+        assertFalse(preview.aiUsed());
+        assertEquals("AI_BUDGET_EXCEEDED", preview.sources().getFirst().method());
+        assertTrue(preview.warnings().stream().anyMatch(w -> w.contains("cupo")));
+        verify(budget).reserve();
+        verifyNoInteractions(http);
+    }
+
+    @Test
+    void excessiveImageCountRejectsWithoutConsumingTenantQuota() {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("test-key");
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
+        var fourPictures = List.of(
+                new MockMultipartFile("files", "1.jpg", "image/jpeg", new byte[]{1}),
+                new MockMultipartFile("files", "2.jpg", "image/jpeg", new byte[]{2}),
+                new MockMultipartFile("files", "3.jpg", "image/jpeg", new byte[]{3}),
+                new MockMultipartFile("files", "4.jpg", "image/jpeg", new byte[]{4}));
+
+        var preview = service.preview("Negocio", fourPictures);
+
+        assertFalse(preview.aiUsed());
+        assertTrue(preview.sources().stream().allMatch(src -> "AI_INPUT_LIMIT".equals(src.method())));
+        verifyNoInteractions(budget, http);
+    }
+
+    @Test
+    void excessivePaidBytesRejectWithoutConsumingTenantQuota() {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("test-key");
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
+        MockMultipartFile big = new MockMultipartFile("files", "large.png", "image/png",
+                new byte[4 * 1024 * 1024 + 1]);
+
+        var preview = service.preview("Negocio", List.of(big));
+
+        assertFalse(preview.aiUsed());
+        assertEquals("AI_INPUT_LIMIT", preview.sources().getFirst().method());
+        verifyNoInteractions(budget, http);
+    }
+
+    @Test
+    void paidInputLimitsAlsoFailClosedForZeroOrInvalidConfiguration() {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        OpenAiRealtimeProperties openAi = new OpenAiRealtimeProperties();
+        openAi.setApiKey("test-key");
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiBudget budget = mock(BusinessImportAiBudget.class);
+        BusinessImportPreviewService service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), openAi, tenant, budget, http);
+        ReflectionTestUtils.setField(service, "paidAiImportEnabled", true);
+        ReflectionTestUtils.setField(service, "maxPaidFiles", 0);
+
+        var preview = service.preview("Negocio", List.of(
+                new MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1})));
+        assertEquals("AI_INPUT_LIMIT", preview.sources().getFirst().method());
+        ReflectionTestUtils.setField(service, "maxPaidFiles", 3);
+        ReflectionTestUtils.setField(service, "maxPaidBytes", 0L);
+        var second = service.preview("Negocio", List.of(
+                new MockMultipartFile("files", "a.jpg", "image/jpeg", new byte[]{1})));
+        assertEquals("AI_INPUT_LIMIT", second.sources().getFirst().method());
+        verifyNoInteractions(budget, http);
+    }
+
 }
