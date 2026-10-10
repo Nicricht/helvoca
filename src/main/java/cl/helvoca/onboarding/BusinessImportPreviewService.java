@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.io.IOException;
 
 @Service
 public class BusinessImportPreviewService {
@@ -39,6 +41,7 @@ public class BusinessImportPreviewService {
     private final TenantProvider tenantProvider;
     private final HttpClient http;
     private final BusinessImportAiBudget aiBudget;
+    private final BusinessImportAiUsageLedger usageLedger;
 
     @Value("${app.onboarding.import-ai.max-paid-files:3}")
     private int maxPaidFiles = 3;
@@ -57,8 +60,9 @@ public class BusinessImportPreviewService {
     public BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
                                         OpenAiRealtimeProperties openAi,
                                         TenantProvider tenantProvider,
-                                        BusinessImportAiBudget aiBudget) {
-        this(spreadsheets, openAi, tenantProvider, aiBudget,
+                                        BusinessImportAiBudget aiBudget,
+                                        BusinessImportAiUsageLedger usageLedger) {
+        this(spreadsheets, openAi, tenantProvider, aiBudget, usageLedger,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
     }
 
@@ -66,7 +70,7 @@ public class BusinessImportPreviewService {
     BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
                                  OpenAiRealtimeProperties openAi,
                                  TenantProvider tenantProvider) {
-        this(spreadsheets, openAi, tenantProvider, null,
+        this(spreadsheets, openAi, tenantProvider, null, null,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
     }
 
@@ -74,7 +78,7 @@ public class BusinessImportPreviewService {
                                  OpenAiRealtimeProperties openAi,
                                  TenantProvider tenantProvider,
                                  HttpClient http) {
-        this(spreadsheets, openAi, tenantProvider, null, http);
+        this(spreadsheets, openAi, tenantProvider, null, null, http);
     }
 
     BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
@@ -82,10 +86,20 @@ public class BusinessImportPreviewService {
                                  TenantProvider tenantProvider,
                                  BusinessImportAiBudget aiBudget,
                                  HttpClient http) {
+        this(spreadsheets, openAi, tenantProvider, aiBudget, null, http);
+    }
+
+    BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
+                                 OpenAiRealtimeProperties openAi,
+                                 TenantProvider tenantProvider,
+                                 BusinessImportAiBudget aiBudget,
+                                 BusinessImportAiUsageLedger usageLedger,
+                                 HttpClient http) {
         this.spreadsheets = spreadsheets;
         this.openAi = openAi;
         this.tenantProvider = tenantProvider;
         this.aiBudget = aiBudget;
+        this.usageLedger = usageLedger;
         this.http = http;
     }
 
@@ -317,7 +331,21 @@ public class BusinessImportPreviewService {
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
 
-        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        // A database failure must never allow a provider request without an
+        // auditable STARTED receipt. Missing usage is an unknown cost, not zero.
+        if (usageLedger == null) throw new IllegalStateException("Paid AI usage evidence is not configured");
+        UUID attemptId = UUID.randomUUID();
+        usageLedger.started(attemptId, importModel);
+
+        HttpResponse<String> response;
+        try {
+            response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (IOException | InterruptedException error) {
+            usageLedger.uncertain(attemptId, importModel);
+            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+            throw error;
+        }
+        usageLedger.received(attemptId, importModel, response);
         if (response.statusCode() / 100 != 2) {
             throw new IllegalStateException("OpenAI respondió HTTP " + response.statusCode());
         }
