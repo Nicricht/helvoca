@@ -194,4 +194,26 @@ test.describe('React Inventory hardening', () => {
     await expect.poll(() => requests.configure).toBe(1);
     await expect(row).toContainText('CER-LOCK');
   });
+
+  test('two refresh clicks in one event task start exactly one authoritative data reload', async ({ page }) => {
+    await boot(page, { configured: true });
+    await page.goto('/app/inventory');
+    await expect(page.getByTestId('inventory-available')).toContainText('3');
+    let refreshReads = 0;
+    await page.route('**/api/v1/inventory', async route => {
+      if (new URL(route.request().url()).pathname !== '/api/v1/inventory') return route.fallback();
+      refreshReads += 1;
+      await new Promise(resolve => setTimeout(resolve, 180));
+      return route.fallback();
+    });
+    const refresh = page.getByRole('button', { name: 'Actualizar', exact: true });
+    await refresh.evaluate(button => {
+      button.click();
+      button.click();
+    });
+    await expect.poll(() => refreshReads).toBe(1);
+    await expect(refresh).toBeEnabled();
+    expect(refreshReads).toBe(1);
+  });
+
 });
