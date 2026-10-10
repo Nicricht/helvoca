@@ -116,6 +116,9 @@ test.describe('real React + Spring Boot + PostgreSQL system integration', () => 
     const bookingId = testId.replace('agenda-row-', '');
 
     await page.reload();
+    // A full reload correctly resets Agenda to its default calendar view.
+    // Select the list again before verifying the authoritative persisted row.
+    await page.getByRole('tab', { name: 'Lista' }).click();
     const persisted = page.getByTestId(`agenda-row-${bookingId}`);
     await expect(persisted).toContainText(customerName);
     await expect(persisted).toContainText('Confirmada');
@@ -127,6 +130,7 @@ test.describe('real React + Spring Boot + PostgreSQL system integration', () => 
     await expect(page.getByTestId(`agenda-row-${bookingId}`)).toContainText('Cancelada');
 
     await page.reload();
+    await page.getByRole('tab', { name: 'Lista' }).click();
     await expect(page.getByTestId(`agenda-row-${bookingId}`)).toContainText('Cancelada');
 
     const backend = await authenticatedJson(page, `/api/v1/bookings/${bookingId}`);
