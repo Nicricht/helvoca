@@ -103,7 +103,7 @@ test.describe('Settings independent save contract', () => {
     await page.goto('/app/settings');
     await page.getByLabel('Nombre del negocio').fill('Mi negocio nuevo');
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
-    await expect(page.getByRole('status')).toContainText('Guardado');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
     expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual(['PATCH /api/v1/business']);
     expect(state.data.business.name).toBe('Mi negocio nuevo');
   });
@@ -113,7 +113,7 @@ test.describe('Settings independent save contract', () => {
     await page.goto('/app/settings');
     await page.getByLabel('Descripción pública').fill('Nueva descripción');
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
-    await expect(page.getByRole('status')).toContainText('Guardado');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
     expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual(['PUT /api/v1/business/profile']);
   });
 
@@ -122,7 +122,7 @@ test.describe('Settings independent save contract', () => {
     await page.goto('/app/settings?section=receptionist');
     await page.getByLabel('Saludo inicial').fill('Bienvenidos al negocio');
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
-    await expect(page.getByRole('status')).toContainText('Guardado');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
     expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual(['PUT /api/v1/ai-agent']);
   });
 
@@ -131,7 +131,7 @@ test.describe('Settings independent save contract', () => {
     await page.goto('/app/settings?section=services');
     await page.getByLabel('Precio').fill('19990');
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
-    await expect(page.getByRole('status')).toContainText('Guardado');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
     expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual(['PATCH /api/v1/services/s1']);
     expect(state.data.services[0].price).toBe(19990);
   });
@@ -141,7 +141,7 @@ test.describe('Settings independent save contract', () => {
     await page.goto('/app/settings?section=services');
     await page.getByRole('button', { name: 'Eliminar servicio Consulta' }).click();
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
-    await expect(page.getByRole('status')).toContainText('Guardado');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
     expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual(['DELETE /api/v1/services/s1']);
   });
 
@@ -150,7 +150,7 @@ test.describe('Settings independent save contract', () => {
     await page.goto('/app/settings?section=hours');
     await page.getByLabel('Cierre 1').fill('19:00');
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
-    await expect(page.getByRole('status')).toContainText('Guardado');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
     expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual(['PUT /api/v1/business/hours']);
   });
 
@@ -159,7 +159,7 @@ test.describe('Settings independent save contract', () => {
     await page.goto('/app/settings?section=knowledge');
     await page.getByLabel('Respuesta').fill('Nueva respuesta');
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
-    await expect(page.getByRole('status')).toContainText('Guardado');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
     expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual(['PATCH /api/v1/knowledge/k1']);
   });
 
@@ -170,11 +170,11 @@ test.describe('Settings independent save contract', () => {
     await page.getByRole('tab', { name: 'Recepcionista IA' }).click();
     await page.getByLabel('Saludo inicial').fill('Nuevo saludo');
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
-    await expect(page.getByRole('status')).toContainText('Guardado');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
     expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual(['PUT /api/v1/ai-agent']);
     await page.getByRole('tab', { name: 'Negocio' }).click();
     await expect(page.getByLabel('Descripción pública')).toHaveValue('Cambio pendiente');
-    await expect(page.getByRole('status')).toContainText('Cambios sin guardar');
+    await expect(page.locator('footer [role="status"]')).toContainText('Cambios sin guardar');
   });
 
   test('partial business save failure retries only the failed profile mutation', async ({ page }) => {
@@ -184,9 +184,9 @@ test.describe('Settings independent save contract', () => {
     await page.getByLabel('Descripción pública').fill('Perfil pendiente');
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
     await expect(page.getByRole('alert')).toContainText('Perfil temporalmente indisponible');
-    await expect(page.getByRole('status')).toContainText('Cambios sin guardar');
+    await expect(page.locator('footer [role="status"]')).toContainText('Cambios sin guardar');
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
-    await expect(page.getByRole('status')).toContainText('Guardado');
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
     expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual([
       'PATCH /api/v1/business', 'PUT /api/v1/business/profile', 'PUT /api/v1/business/profile'
     ]);
