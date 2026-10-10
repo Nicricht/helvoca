@@ -65,8 +65,8 @@ class BusinessImportAiPlanQuotaIntegrationTest {
             owner.update("INSERT INTO public.business(id, name) VALUES (?, ?)", id, "Quota integration tenant");
             owner.update("""
                     INSERT INTO public.business_subscription
-                        (id, business_id, plan_code, status, current_period_start, current_period_end)
-                    VALUES (?, ?, 'BASIC', 'ACTIVE', ?, ?)
+                        (id, business_id, plan_code, status, current_period_start, current_period_end, created_at, updated_at)
+                    VALUES (?, ?, 'BASIC', 'ACTIVE', ?, ?, now(), now())
                     """, UUID.randomUUID(), id, Timestamp.from(Instant.now().minusSeconds(600)),
                     Timestamp.from(Instant.now().plusSeconds(600)));
         }
