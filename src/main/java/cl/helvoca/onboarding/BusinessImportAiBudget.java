@@ -2,6 +2,7 @@ package cl.helvoca.onboarding;
 
 import cl.helvoca.security.DistributedRateLimiter;
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +27,7 @@ public class BusinessImportAiBudget {
 
     private final DistributedRateLimiter limiter;
     private final TenantProvider tenant;
+    private final BusinessImportAiPlanQuota planQuota;
 
     @Value("${app.onboarding.import-ai.max-attempts-per-30-days:0}")
     private int maxAttempts;
@@ -39,9 +41,17 @@ public class BusinessImportAiBudget {
     @Value("${app.onboarding.import-ai.max-global-reserved-cents-per-30-days:0}")
     private int maxGlobalReservedCents;
 
-    public BusinessImportAiBudget(DistributedRateLimiter limiter, TenantProvider tenant) {
+    @Autowired
+    public BusinessImportAiBudget(DistributedRateLimiter limiter, TenantProvider tenant,
+                                  BusinessImportAiPlanQuota planQuota) {
         this.limiter = limiter;
         this.tenant = tenant;
+        this.planQuota = planQuota;
+    }
+
+    // Existing focused tests use this constructor without a database-backed quota.
+    BusinessImportAiBudget(DistributedRateLimiter limiter, TenantProvider tenant) {
+        this(limiter, tenant, null);
     }
 
     public boolean reserve() {
@@ -49,6 +59,11 @@ public class BusinessImportAiBudget {
         if (maxAttempts <= 0 || reservedCentsPerAttempt <= 0
                 || maxTenantReservedCents < reservedCentsPerAttempt
                 || maxGlobalReservedCents < reservedCentsPerAttempt) return false;
+
+        // The live Spring bean always receives a plan quota. Reserve the
+        // subscription-cycle slot before any provider-cost circuit breaker.
+        // Denials are conservative: earlier reservations are not refunded.
+        if (planQuota != null && !planQuota.reserve(UUID.randomUUID())) return false;
 
         UUID businessId = tenant.requireBusinessId();
         Instant now = Instant.now();
