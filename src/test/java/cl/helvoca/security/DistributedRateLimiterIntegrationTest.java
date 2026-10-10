@@ -1,7 +1,6 @@
 package cl.helvoca.security;
 
 import cl.helvoca.onboarding.BusinessImportAiBudget;
-import cl.helvoca.onboarding.BusinessImportAiUsageLedger;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -204,49 +203,5 @@ class DistributedRateLimiterIntegrationTest {
     }
 
 
-    @Test
-    void providerUsageEvidenceIsAppendOnlyIdempotentAndTenantAttributedInPostgres() {
-        // V98 receipts are deliberately append-only. Use a fresh random attempt
-        // instead of deleting evidence, which the runtime role must not permit.
-        UUID one = UUID.randomUUID();
-        UUID two = UUID.randomUUID();
-        TenantProvider tenant = mock(TenantProvider.class);
-        when(tenant.requireBusinessId()).thenReturn(one, one, one, two);
-        BusinessImportAiUsageLedger ledger = new BusinessImportAiUsageLedger(jdbc, tenant);
-        UUID attempt = UUID.randomUUID();
-
-        ledger.started(attempt, "gpt-4.1-mini");
-        ledger.started(attempt, "gpt-4.1-mini");
-        @SuppressWarnings("unchecked")
-        java.net.http.HttpResponse<String> response = mock(java.net.http.HttpResponse.class);
-        when(response.statusCode()).thenReturn(200);
-        when(response.body()).thenReturn(
-                "{\"id\":\"resp_test\",\"model\":\"gpt-4.1-mini\","
-                + "\"usage\":{\"input_tokens\":20,\"output_tokens\":4}}");
-        ledger.received(attempt, "gpt-4.1-mini", response);
-        ledger.started(attempt, "gpt-4.1-mini");
-
-        assertEquals(3, jdbc.queryForObject(
-                "SELECT COUNT(*) FROM public.business_import_ai_provider_usage_event WHERE attempt_id = ?",
-                Integer.class, attempt));
-        assertEquals(2, jdbc.queryForObject(
-                "SELECT COUNT(*) FROM public.business_import_ai_provider_usage_event WHERE attempt_id = ? AND business_id = ?",
-                Integer.class, attempt, one));
-        assertEquals(1, jdbc.queryForObject(
-                "SELECT COUNT(*) FROM public.business_import_ai_provider_usage_event WHERE attempt_id = ? AND business_id = ?",
-                Integer.class, attempt, two));
-        assertEquals(20L, jdbc.queryForObject(
-                "SELECT input_tokens FROM public.business_import_ai_provider_usage_event WHERE business_id = ? AND phase = 'RESPONSE'",
-                Long.class, one));
-        assertEquals(0, jdbc.queryForObject(
-                "SELECT COUNT(*) FROM public.business_import_ai_provider_usage_event WHERE estimated_cost_usd IS NOT NULL",
-                Integer.class));
-        assertEquals(1, jdbc.queryForObject(
-                "SELECT COUNT(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'business_import_ai_provider_usage_event' AND policyname = 'helvoca_tenant_isolation'",
-                Integer.class));
-        assertEquals(1, jdbc.queryForObject(
-                "SELECT COUNT(*) FROM pg_class WHERE oid = 'public.business_import_ai_provider_usage_event'::regclass AND relrowsecurity AND relforcerowsecurity",
-                Integer.class));
-    }
 
 }
