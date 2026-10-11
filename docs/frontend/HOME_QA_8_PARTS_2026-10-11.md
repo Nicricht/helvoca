@@ -23,8 +23,8 @@ Per `AGENTS.md` and `docs/engineering/QA_POLICY.md`:
 | 1 | Inspect current main, map coverage, repair stale special-certification Playwright paths, add fail-closed path-existence regression assertions, create draft PR and checkpoint | **IMPLEMENTED; CI NOT YET CERTIFIED** |
 | 2 | Inicio session/onboarding and dashboard lifecycle: missing token, 401/403/503, network interruption, loading, fail-closed malformed payloads, retry and next-step mappings | **IMPLEMENTED; CI PENDING** |
 | 3 | Human attention: request/handoff actions, success/failure, confirmation cancellation, duplicate clicks, 401/403/409/503, stale/refetch, least privilege, malformed success payload | **IMPLEMENTED; CI PENDING** |
-| 4 | Backend / PostgreSQL: tenant-isolated dashboard metrics/calls/costs, Santiago/Auckland day boundaries, attention deduplication/order/LIMIT 100, RLS, concurrency and request lifecycle | **IMPLEMENTED; CI NOT YET CERTIFIED** |
-| 5 | Commercial analytics: currency aggregation and formatting, null/missing/invalid values, daily/7/30-day query switching, no fabricated ROI or zero, timezone boundaries | PENDING |
+| 4 | Backend / PostgreSQL: tenant-isolated dashboard metrics/calls/costs, Santiago/Auckland day boundaries, attention deduplication/order/LIMIT 100, RLS, concurrency and request lifecycle | **CERTIFIED exact SHA c6f2ebe8, CI 38114322289 GREEN** |
+| 5 | Commercial analytics: currency aggregation and formatting, null/missing/invalid values, daily/7/30-day query switching, no fabricated ROI or zero, timezone boundaries | **IMPLEMENTED; exact-HEAD CI PENDING** |
 | 6 | Responsive/accessibility and non-side-effect browser behavior: keyboard, focus, live states, reduced motion, multiple viewports, no provider/payment requests | PENDING |
 | 7 | Frontend original-source coverage measurement, per-file 100% statement/line/branch/function gate for affected scope; complete interaction-to-test traceability | PENDING |
 | 8 | Fast Gate, Full Gate, adverse review, exact-HEAD CI and coverage report, merge only if green, exact-main verification and evidence checkpoint | PENDING |
@@ -58,9 +58,9 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 
 ## Continuity checkpoint
 
-- Current tracked milestone: **Parts 1–4 implemented**, exact certification pending.
+- Current tracked milestone: **Part 4 certified on exact SHA; Part 5 implemented with final CI pending**.
 - New branch is deliberately kept separate from `main`. Do not merge until Part 8 evidence satisfies the repository quality contract.
-- Resume next with **Part 5** only after inspecting latest PR HEAD, CI, checkpoint and resolving any red runs. Do not redo Parts 1–4; unfinished certification remains a blocker.
+- Resume next with **Part 6** only after inspecting Part 5 exact-HEAD CI, resolving any RED and verifying its 100% applicable contract. Do not redo Parts 1–4.
 - After every phase update this document and draft PR with exact HEAD/evidence before responding to the user.
 
 ## Part 2 checkpoint: Inicio identity / onboarding / dashboard resilience
@@ -121,8 +121,20 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 - Fixed the foreign handoff to reference the real foreign request's persisted `operation_id`.
 - Fixed the 105+1 LIMIT fixtures by using unique `source_reference_id` values with nullable `operation_id`, respecting the composite FK and active-handoff uniqueness.
 - Read V4 call_session schema and added tenant-linked **synthetic phone_number fixtures**, because `phone_number_id` is NOT NULL and constrained to the same business. No real Twilio provision or message/call.
-- **GREEN NOT YET VERIFIED:** Later exact-HEAD CI must prove tests pass. Do not merge, lower coverage, mark a skipped/failed gate green or claim full 100%.
+- **GREEN VERIFIED for Part 4:** exact commit `c6f2ebe8ea02fce95c58efd5f1eb67e9f953db5e`, workflow `38114322289` concluded **success**. All 28 jobs completed; 6 success and 22 conditional skips; Fast Gate, Golden Journey, test (backend Java/JaCoCo, differential 100%, browser E2E), System Integration and Inventory coverage completed successfully. Later Part 5 HEAD requires new certification.
 - Part 2 and Part 3 Fast Gate/Golden Journey successfully completed. The long-running Full Gate browser jobs were not yet fully certified at the last check.
 - **Next:** inspect this document plus `PR #780`, exact HEAD and Fast/Full CI results; if red resolve root cause first, else ask the user for Part 5.
 
 **Safety:** test data only, Testcontainers ephemeral PostgreSQL, mock voice-provider *rows* without external requests. No production DB, live phone, WhatsApp, payment or deployment. The PR stays Draft until Part 8 exact HEAD/merged-main certification.
+
+## Part 5 checkpoint: sales attribution and timezone
+
+**Implementation:** Hardened frontend `attributedTotals` and `ValueGenerated` in `frontend/src/pages/Home/HomePage.tsx`: no invented `$0` when monetary attribution is null/unknown; reject malformed types, negative/non-finite amounts and invalid currency code shapes; disclose partial totals without implying that a known component proves a full sum. Verified zero still displays zero. No changes to backend production code.
+
+**New Playwright coverage:** Nine additional deterministic cases inside `e2e/react-home.spec.js`, using local API fixtures only: null versus verified zero, malformed negative/string/currency, partial evidence notice, same/mixed currency aggregation without cross-currency addition or unauthorised ROI, 1/7/30 period API source switching, and operational availability while commercial data is incomplete.
+
+**Backend coverage:** One focused Java unit test in `SalesAnalyticsServiceTest.java` looping 9 combinations of three windows (1/7/30 days) and three zones (America/Santiago, Pacific/Auckland, UTC). Captures Instant boundaries sent to tenant-scoped repositories and asserts current/previous half-open local-calendar windows, daily series size, empty/unknown revenue not synthesized, and no order/line reads with no payment candidates. Existing SalesAnalyticsService and BookingRevenue tests continue to cover same/mixed currencies, cancelled orders, verified bookings and dedupe.
+
+**Explicit certification limitations:** 100% measured React source statement/line/branch/function coverage remains the dedicated Part 7 gate, not inferred from nine passing E2E cases. Part 5 browser/backend test execution requires exact-HEAD CI; do not merge or call this certified until green. Previous Part 4 green is distinct from Part 5 HEAD.
+
+**No side effects:** E2E API routes are mock-only, no real phone call, Twilio, WhatsApp, payment, production DB mutation or deployment.
