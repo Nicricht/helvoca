@@ -377,4 +377,19 @@ class TwilioVoiceControllerTest {
         verifyNoInteractions(calls, router, summaries);
     }
 
+    @Test
+    void missingDestinationAfterCarrierAttestationStillHangsUpWithoutAi() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        doThrow(new cl.helvoca.common.NotFoundException("number removed"))
+                .when(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
+
+        var response = controller(calls, router, summaries, false)
+                .incoming(CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID);
+
+        assertEquals(SILENT_HANGUP, response.getBody());
+        verifyNoInteractions(router, summaries);
+    }
+
 }
