@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, CheckCircle2, CircleAlert, Clock3, RefreshCw, UserRoundCheck } from "lucide-react";
 import {
@@ -54,11 +54,14 @@ export function HomeAttentionRows({
 }: Props) {
   const client = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Synchronous lock: React state alone can batch two same-tick clicks.
+  const pendingMutation = useRef(false);
   const [error, setError] = useState("");
   const [confirmationId, setConfirmationId] = useState<string | null>(null);
 
   async function perform(item: HumanAttentionItem, action: string) {
-    if (busyId) return;
+    if (pendingMutation.current || refreshing) return;
+    pendingMutation.current = true;
     setBusyId(item.id);
     setError("");
     try {
@@ -87,6 +90,7 @@ export function HomeAttentionRows({
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No pudimos actualizar el caso.");
     } finally {
+      pendingMutation.current = false;
       setBusyId(null);
     }
   }
@@ -155,20 +159,20 @@ export function HomeAttentionRows({
               {next && (
                 <div className={styles.action}>
                   {destructive && !ask ? (
-                    <button type="button" disabled={Boolean(busyId)}
+                    <button type="button" disabled={Boolean(busyId) || refreshing}
                       onClick={() => setConfirmationId(item.id)}>{next.label} <ArrowUpRight size={13} /></button>
                   ) : destructive && ask ? (
                     <>
                       <span className={styles.question}>¿Confirmas que gestionaste este caso?</span>
-                      <button type="button" disabled={Boolean(busyId)}
+                      <button type="button" disabled={Boolean(busyId) || refreshing}
                         onClick={() => { void perform(item, next.action); }}>
                         {busyId === item.id ? "Guardando…" : "Confirmar cierre"}
                       </button>
-                      <button type="button" className={styles.cancel} disabled={Boolean(busyId)}
+                      <button type="button" className={styles.cancel} disabled={Boolean(busyId) || refreshing}
                         onClick={() => setConfirmationId(null)}>Cancelar</button>
                     </>
                   ) : (
-                    <button type="button" disabled={Boolean(busyId)}
+                    <button type="button" disabled={Boolean(busyId) || refreshing}
                       onClick={() => { void perform(item, next.action); }}>
                       {busyId === item.id ? "Guardando…" : next.label}
                       <ArrowUpRight size={13} aria-hidden="true" />
