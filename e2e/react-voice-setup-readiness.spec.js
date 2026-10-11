@@ -83,7 +83,7 @@ test('setup guides an admin without treating an active legacy number as certifie
   const state = await boot(page);
   const panel = page.getByLabel('Guía de activación de voz');
 
-  await expect(page.getByText('Base configurada · voz pendiente de certificación')).toBeVisible();
+  await expect(page.getByLabel('Identidad de RecepVoz').getByText('Base configurada · voz pendiente de certificación')).toBeVisible();
   await expect(page.getByText('Listo para atender', { exact: true })).toHaveCount(0);
   await expect(panel).toContainText('Configuración incompleta');
   await expect(panel).toContainText('Número Twilio certificado para este negocio');
