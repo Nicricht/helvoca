@@ -639,6 +639,7 @@ export function HomePage() {
     isAdmin &&
     Boolean(onboardingQuery.data) &&
     onboardingQuery.data?.readyForCalls === false;
+  const onboardingFailed = isAdmin && onboardingQuery.isError;
 
   const loading =
     meQuery.isPending ||
@@ -662,6 +663,22 @@ export function HomePage() {
 
         {onboardingIncomplete && onboardingQuery.data ? (
           <OnboardingCard status={onboardingQuery.data} />
+        ) : onboardingFailed ? (
+          <div className={styles.errorState} role="alert">
+            <TriangleAlert size={20} aria-hidden="true" />
+            <div>
+              <strong>No pudimos verificar la configuración de tu negocio.</strong>
+              <span>Sin esta información no podemos confirmar que el resumen esté listo.</span>
+            </div>
+            <button
+              className={styles.errorRetry}
+              type="button"
+              disabled={onboardingQuery.isFetching}
+              onClick={() => void onboardingQuery.refetch()}
+            >
+              {onboardingQuery.isFetching ? "Reintentando…" : "Reintentar"}
+            </button>
+          </div>
         ) : loading ? (
           <div className={styles.loadingState} role="status">
             <span className={styles.spinner} aria-hidden="true" />
@@ -677,6 +694,14 @@ export function HomePage() {
               <strong>No pudimos cargar el resumen operativo.</strong>
               <span>Intenta nuevamente en unos momentos.</span>
             </div>
+            <button
+              className={styles.errorRetry}
+              type="button"
+              disabled={operationsQuery.isFetching}
+              onClick={() => void operationsQuery.refetch()}
+            >
+              {operationsQuery.isFetching ? "Reintentando…" : "Reintentar"}
+            </button>
           </div>
         ) : operationsQuery.data ? (
           <motion.div
