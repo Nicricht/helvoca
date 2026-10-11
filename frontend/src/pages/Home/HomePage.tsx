@@ -217,6 +217,7 @@ function HeroOverview({ dashboard, attention }: { dashboard: OperationsDashboard
           <strong>{dashboard.bookingsToday}</strong>{" "}
           {dashboard.bookingsToday === 1 ? "reserva" : "reservas"}.
         </p>
+        {liveCall && <span className={styles.srOnly}>Hay una llamada en curso.</span>}
 
         {pending > 0 && (
           <a className={styles.heroAction} href="#home-attention">
@@ -284,7 +285,7 @@ function ValueGenerated({
           </div>
         </div>
 
-        <div className={styles.periodTabs} aria-label="Periodo del valor generado">
+        <div className={styles.periodTabs} role="group" aria-label="Periodo del valor generado">
           {periods.map(period => (
             <button
               key={period.days}

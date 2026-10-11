@@ -1534,6 +1534,144 @@ test.describe('React Home migration', () => {
     expect(unsafe).toEqual([]);
   });
 
+  test('commercial periods are a named keyboard-operable group with visible focus', async ({ page }) => {
+    await bootHome(page);
+    await page.goto('/app');
+
+    const group = page.getByRole('group', { name: 'Periodo del valor generado' });
+    await expect(group).toBeVisible();
+    const today = group.getByRole('button', { name: 'Hoy' });
+    const seven = group.getByRole('button', { name: '7 días' });
+    const thirty = group.getByRole('button', { name: '30 días' });
+
+    await today.focus();
+    await expect(today).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(today).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('Tab');
+    await expect(seven).toBeFocused();
+    await page.keyboard.press('Space');
+    await expect(seven).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('Tab');
+    await expect(thirty).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(thirty).toHaveAttribute('aria-pressed', 'true');
+    await expect(today).toHaveAttribute('aria-pressed', 'false');
+
+    const focusStyle = await thirty.evaluate(element => getComputedStyle(element).outlineStyle);
+    expect(focusStyle).not.toBe('none');
+  });
+
+  test('active call announcement is readable without relying on a decorative animation', async ({ page }) => {
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS,
+      recentCalls: [{
+        ...READY_OPERATIONS.recentCalls[0],
+        status: 'IN_PROGRESS',
+        resolution: null
+      }]
+    } });
+    await page.goto('/app');
+
+    const hero = page.getByRole('region', { name: 'Estado de tu negocio' });
+    await expect(hero).toContainText('Hay una llamada en curso.');
+    const announcement = hero.locator('span').filter({ hasText: /^Hay una llamada en curso\.$/ });
+    await expect(announcement).toHaveCount(1);
+    await expect(announcement).not.toBeVisible();
+  });
+
+  test('reduced-motion preference removes ambient and dashboard decorative animations', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await bootHome(page);
+    await page.goto('/app');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+    const animations = await page.evaluate(() => {
+      const selectors = [
+        '[data-home-ambient-layer="flow"]',
+        '[data-home-ambient-layer="grid"]',
+        '[data-home-ambient-layer="particles"]',
+        '[data-home-ambient-layer="halo"]'
+      ];
+      return selectors.map(selector => getComputedStyle(document.querySelector(selector)).animationName);
+    });
+    expect(animations).toEqual(['none', 'none', 'none', 'none']);
+    await expect(page.getByRole('group', { name: 'Periodo del valor generado' })).toBeVisible();
+  });
+
+  test('mobile action buttons and commercial period targets meet 44 CSS pixel minimum', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await bootHome(page);
+    await page.goto('/app');
+    const targets = [
+      page.getByRole('button', { name: 'Hoy' }),
+      page.getByRole('button', { name: '7 días' }),
+      page.getByRole('button', { name: '30 días' }),
+      page.getByRole('button', { name: 'Actualizar' }),
+      page.getByRole('button', { name: 'Empezar gestión' }),
+      page.getByRole('button', { name: 'Tomar caso' }),
+      page.getByRole('link', { name: 'Revisar pendientes' })
+    ];
+    for (const target of targets) {
+      await expect(target).toBeVisible();
+      const bounds = await target.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds.height).toBeGreaterThanOrEqual(43.5);
+    }
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test('onboarding at narrow width keeps progress and primary action accessible to keyboard', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 });
+    await bootHome(page, { onboarding: INCOMPLETE_ONBOARDING });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(panel.getByRole('progressbar', { name: 'Progreso de configuración' })).toHaveAttribute('aria-valuenow', '25');
+    const action = panel.getByRole('link', { name: 'Continuar configuración' });
+    await expect(action).toHaveAttribute('href', '/app/settings?section=services');
+    await action.focus();
+    await expect(action).toBeFocused();
+    expect((await action.boundingBox()).height).toBeGreaterThanOrEqual(43.5);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test('zoomed Home retains whole hero content instead of clipping behind value panel', async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 900 });
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS,
+      callsToday: 123456,
+      bookingsToday: 78910
+    } });
+    await page.goto('/app');
+    await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+    const hero = page.getByRole('region', { name: 'Estado de tu negocio' });
+    await expect(hero).toBeVisible();
+    await expect(hero).toContainText('123456');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    const bounds = await Promise.all([hero.boundingBox(), value.boundingBox()]);
+    expect(bounds[0]).not.toBeNull();
+    expect(bounds[1]).not.toBeNull();
+    expect(bounds[0].y + bounds[0].height).toBeLessThanOrEqual(bounds[1].y + 2);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  for (const viewport of [
+    { name: 'compact phone', width: 320, height: 740 },
+    { name: 'large phone', width: 430, height: 932 },
+    { name: 'small laptop', width: 1024, height: 768 }
+  ]) {
+    test(`Home preserves sections and has no horizontal overflow at ${viewport.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await bootHome(page);
+      await page.goto('/app');
+      await expect(page.getByRole('region', { name: 'Estado de tu negocio' })).toBeVisible();
+      await expect(page.getByRole('region', { name: 'Valor generado por RecepVoz' })).toBeVisible();
+      await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+      await expect(page.getByRole('region', { name: 'Necesita tu atención' })).toBeVisible();
+      await expect(page.getByRole('region', { name: 'Última actividad' })).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    });
+  }
+
   for (const viewport of [
     { name: 'desktop', width: 1440, height: 900 },
     { name: 'tablet', width: 768, height: 1024 },

@@ -82,6 +82,18 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 - [x] Add Playwright checks for cancellation, failure/retry, duplicate submissions, independent handoff/request lifecycle and readonly request permissions.
 - [ ] Verify latest exact SHA Full Gate and any failing browser cases before merge.
 
+## Phase 7 implementation
+
+- [x] Inspect responsive CSS cascade and original 1440/768/390 browser width coverage.
+- [x] Expand actual viewport checks to 320/430/1024px and verify every live Home section exists without horizontal overflow.
+- [x] Improve hero text reflow by removing fixed height and making long status strings wrap at phone widths and increased text size.
+- [x] Add a visible-to-assistive-technology, visually hidden in-progress call announcement outside decorative aria-hidden media.
+- [x] Give commercial periods an accessible named group, focus-visible outline and keyboard navigation tests.
+- [x] Enforce 44px minimum touch heights on period tabs, hero links, onboarding links, request/handoff buttons and refresh.
+- [x] Verify that reduced-motion CSS suppresses four ambient animation layers and retains interaction.
+- [x] Add browser checks for onboarding progress keyboard focus, zoomed hero/card separation and phone interactive targets.
+- [ ] Certify latest exact SHA Full Gate, Playwright UI, CI accessibility and reduced-motion tests with actual run evidence.
+
 ## Change safety
 
 - No existing database schema or production credentials touched.
