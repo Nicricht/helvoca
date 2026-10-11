@@ -664,7 +664,23 @@ export function HomePage() {
           <h1>Inicio</h1>
         </header>
 
-        {onboardingIncomplete && onboardingQuery.data ? (
+        {meQuery.isError ? (
+          <div className={styles.errorState} role="alert">
+            <TriangleAlert size={20} aria-hidden="true" />
+            <div>
+              <strong>No pudimos verificar tus permisos de acceso.</strong>
+              <span>El resumen no se mostrará hasta que se verifique tu identidad.</span>
+            </div>
+            <button
+              className={styles.errorRetry}
+              type="button"
+              disabled={meQuery.isFetching}
+              onClick={() => void meQuery.refetch()}
+            >
+              {meQuery.isFetching ? "Reintentando…" : "Reintentar"}
+            </button>
+          </div>
+        ) : onboardingIncomplete && onboardingQuery.data ? (
           <OnboardingCard status={onboardingQuery.data} />
         ) : onboardingFailed ? (
           <div className={styles.errorState} role="alert">

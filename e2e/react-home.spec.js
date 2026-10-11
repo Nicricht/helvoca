@@ -184,6 +184,7 @@ async function bootHome(page, options = {}) {
   const permissions = options.permissions;
   const requests = [];
   let onboardingRequests = 0;
+  let meFailuresRemaining = options.meFailures ?? 0;
   let onboardingFailuresRemaining = options.onboardingFailures ?? 0;
   let operationsFailuresRemaining = options.operationsFailures ?? 0;
   let attentionReads = 0;
@@ -212,6 +213,13 @@ async function bootHome(page, options = {}) {
   await page.route('**/api/v1/auth/me', route => {
     if (options.expired) {
       return route.fulfill(json({ message: 'expired' }, 401));
+    }
+    if (meFailuresRemaining > 0) {
+      meFailuresRemaining -= 1;
+      return route.fulfill(json({ message: 'identity unavailable' }, 503));
+    }
+    if (options.meError) {
+      return route.fulfill(json({ message: 'forbidden' }, options.meError));
     }
     return route.fulfill(json({
       email: roles.includes('OPERATOR') ? 'operator@negocio.cl' : 'owner@negocio.cl',
@@ -413,6 +421,33 @@ test.describe('React Home migration', () => {
     await expect(panel).not.toContainText('Sin intervenciones pendientes');
     await expect(page.getByRole('region', { name: 'Estado de tu negocio' }))
       .not.toContainText('Todo bajo control');
+  });
+
+  test('403 identity check fails closed before any protected operational API call', async ({ page }) => {
+    const api = await bootHome(page, { meError: 403 });
+    await page.goto('/app');
+
+    const error = page.locator('main[data-visual-page="home"] [role="alert"]');
+    await expect(error).toContainText('No pudimos verificar tus permisos de acceso.');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Estado de tu negocio' })).toHaveCount(0);
+    expect(api.requests.some(request => /\/api\/v1\/(operations\/|onboarding\/|commercial\/analytics)/.test(request.url))).toBe(false);
+    expect(api.attentionReads()).toBe(0);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('transient identity outage recovers only after revalidating the user', async ({ page }) => {
+    const api = await bootHome(page, { meFailures: 2 });
+    await page.goto('/app');
+
+    const error = page.locator('main[data-visual-page="home"] [role="alert"]');
+    await expect(error).toContainText('No pudimos verificar tus permisos de acceso.');
+    expect(api.requests.some(request => request.url.includes('/operations/dashboard'))).toBe(false);
+
+    await error.getByRole('button', { name: 'Reintentar' }).click();
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+    await expect(error).toHaveCount(0);
+    expect(api.attentionMutations()).toBe(0);
   });
 
   test('staff without operational role sees a restricted home without protected backend reads', async ({ page }) => {
