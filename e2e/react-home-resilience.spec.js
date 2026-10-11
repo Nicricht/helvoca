@@ -33,6 +33,7 @@ async function boot(page, opts = {}) {
     authStatus: opts.authStatus ?? 200,
     onboardingStatus: opts.onboardingStatus ?? 200,
     dashboardStatus: opts.dashboardStatus ?? 200,
+    dashboardNetworkError: opts.dashboardNetworkError ?? false,
     onboarding: Object.prototype.hasOwnProperty.call(opts, 'onboarding') ? opts.onboarding : ready,
     authPayload: Object.prototype.hasOwnProperty.call(opts, 'authPayload') ? opts.authPayload :
       { email: 'owner@example.test', roles: ['BUSINESS_ADMIN'], permissions: ['REQUESTS_READ'] },
@@ -78,6 +79,7 @@ async function boot(page, opts = {}) {
   await page.route('**/api/v1/operations/dashboard', async route => {
     state.counts.dashboard += 1;
     if (state.dashboardGate) await state.dashboardGate;
+    if (state.dashboardNetworkError) return route.abort('failed');
     return route.fulfill(json(state.dashboardStatus === 200
       ? dashboard : { message: 'unavailable' }, state.dashboardStatus));
   });
@@ -211,6 +213,17 @@ test.describe('Inicio Parte 2: identidad, onboarding, carga y recuperación', ()
     await expect(page.getByRole('status')).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
     state.dashboardStatus = 200;
+    await page.getByRole('button', { name: 'Reintentar resumen' }).click();
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toContainText('3');
+    assertReadOnly(state);
+  });
+
+  test('corte de red del dashboard muestra fallo explícito y se recupera', async ({ page }) => {
+    const state = await boot(page, { dashboardNetworkError: true });
+    await page.goto('/app');
+    await expect(page.getByRole('alert')).toContainText('No pudimos cargar el resumen operativo');
+    expect(state.counts.dashboard).toBeGreaterThan(0);
+    state.dashboardNetworkError = false;
     await page.getByRole('button', { name: 'Reintentar resumen' }).click();
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toContainText('3');
     assertReadOnly(state);
