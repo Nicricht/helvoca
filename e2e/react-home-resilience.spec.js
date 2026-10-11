@@ -52,6 +52,15 @@ async function boot(page, opts = {}) {
       state.methods.push({ method: request.method(), url: request.url() });
     }
   });
+  // Unexpected external/provider calls are failed locally, not forwarded.
+  await page.route('**/api/v1/**', route => {
+    const url = route.request().url();
+    if (/twilio|whatsapp|payment|outbound|dispatch/i.test(url)) {
+      return route.abort('blockedbyclient');
+    }
+    return route.fulfill(json({ message: 'Unexpected request in Home Part 2 mock' }, 418));
+  });
+
   await page.route('**/api/v1/auth/me', route => {
     state.counts.auth += 1;
     return route.fulfill(json(state.authStatus === 200
@@ -77,14 +86,6 @@ async function boot(page, opts = {}) {
   await page.route('**/api/v1/operations/attention', route => {
     state.counts.attention += 1;
     return route.fulfill(json([]));
-  });
-  // Unexpected external/provider calls are failed locally, not forwarded.
-  await page.route('**/api/v1/**', route => {
-    const url = route.request().url();
-    if (/twilio|whatsapp|payment|outbound|dispatch/i.test(url)) {
-      return route.abort('blockedbyclient');
-    }
-    return route.fulfill(json({ message: 'Unexpected request in Home Part 2 mock' }, 418));
   });
   return state;
 }
