@@ -315,6 +315,48 @@ jobs:
           retention-days: 14
           include-hidden-files: true
 
+  home-frontend-coverage:
+    needs: [fast-gate]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install Chromium browser dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Build instrumented original Home source
+        env:
+          VITE_HOME_COVERAGE: "true"
+        run: npm run frontend:build
+      - name: Discover all Home browser cases
+        run: npx playwright test e2e/react-home.spec.js --list | tee .home-coverage-tests.txt
+      - name: Capture Home source coverage in real Chromium
+        env:
+          VITE_HOME_COVERAGE: "true"
+        run: npx playwright test e2e/react-home.spec.js
+      - name: Require strict 100 percent remapped Home lines branches statements functions
+        run: node scripts/ci/check-home-frontend-coverage.cjs
+      - name: Archive Home coverage evidence even if gate fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-frontend-source-coverage
+          path: |
+            test-results/home-coverage/**
+            .home-coverage-raw/**
+            .home-coverage-tests.txt
+            test-results/**/error-context.md
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: true
+
   system-integration-e2e:
     needs: [fast-gate, golden-journey-release-contract]
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'

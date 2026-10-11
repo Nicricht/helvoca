@@ -53,13 +53,20 @@ function directReactRoutes() {
 }
 
 const inventoryCoverage = process.env.VITE_COVERAGE === "true";
+const homeCoverage = process.env.VITE_HOME_COVERAGE === "true";
+if (inventoryCoverage && homeCoverage) throw new Error("Home and Inventory coverage require separate builds.");
+const coverageEnabled = inventoryCoverage || homeCoverage;
 
 export default defineConfig({
   base: "/app/",
   plugins: [
     react(),
-    ...(inventoryCoverage ? [istanbul({
-      include: [
+    ...(coverageEnabled ? [istanbul({
+      include: homeCoverage ? [
+        "src/pages/Home/HomePage.tsx",
+        "src/pages/Home/HomeAttentionRows.tsx",
+        "src/features/operations/api.ts"
+      ] : [
         "src/pages/Inventory/*",
         "src/features/inventory/api.ts",
         "src/features/inventory/useInventoryWorkspace.ts"
@@ -75,6 +82,6 @@ export default defineConfig({
   build: {
     outDir: "../src/main/resources/static/app",
     emptyOutDir: true,
-    sourcemap: inventoryCoverage ? "hidden" : false
+    sourcemap: coverageEnabled ? "hidden" : false
   }
 });

@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./home-coverage-fixture');
 
 const json = (body, status = 200) => ({
   status,

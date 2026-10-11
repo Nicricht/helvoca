@@ -103,6 +103,15 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 - [ ] Confirm no remaining failures, verify Java differential coverage gate and publish objective release evidence; do not claim global 100% feature coverage.
 - [ ] Merge/deploy requires separate explicit approval.
 
+## Independent source-level Home coverage
+
+- [x] VITE_HOME_COVERAGE mode instruments HomePage.tsx, HomeAttentionRows.tsx and operations/api.ts only.
+- [x] Home Playwright fixture preserves counters across page navigations.
+- [x] Source-map remapping reconstructs original TS/TSX and enforces 100% statements, lines, branches and functions per file.
+- [x] Strict separate CI job with test inventory and missed branches/functions artifacts, no Inventory-specific exception.
+- [ ] Investigate actual measured uncovered paths; no claim of Home 100% until this gate is green.
+- [ ] Verify exact-HEAD Full Gate and security/integration once additions are accepted.
+
 ## Change safety
 
 - No existing database schema or production credentials touched.
