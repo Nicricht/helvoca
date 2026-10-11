@@ -19,9 +19,9 @@ ALTER TABLE phone_number
          AND twilio_account_sid ~ '^AC[0-9a-fA-F]{32}
     );
 
-CREATE INDEX IF NOT EXISTS idx_phone_twilio_account_sid
+CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_managed_twilio_account_sid
     ON phone_number (twilio_account_sid, external_id)
-    WHERE twilio_account_sid IS NOT NULL;
+    WHERE twilio_binding_source = 'MANAGED_PURCHASE';
 
          AND external_id IS NOT NULL
          AND external_id ~ '^PN[0-9a-fA-F]{32}
