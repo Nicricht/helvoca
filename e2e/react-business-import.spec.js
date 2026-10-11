@@ -26,6 +26,7 @@ async function boot(page, options = {}) {
   let previewCalls = 0;
   let applyCalls = 0;
   let applyPayload = null;
+  const setupWrites = { hours: [], knowledge: [] };
 
   await page.route('**/api/v1/**', async route => {
     const request = route.request();
@@ -100,6 +101,7 @@ async function boot(page, options = {}) {
           warnings: []
         }],
         warnings: [],
+        setupSuggestions: options.setupSuggestions || [],
         aiUsed: false
       }));
     }
@@ -128,13 +130,28 @@ async function boot(page, options = {}) {
       }));
     }
 
+    if (pathname === "/api/v1/business/hours") {
+      if (request.method() === "GET") return route.fulfill(json([{ dayOfWeek: 4, openTime: "10:00", closeTime: "15:00" }]));
+      if (request.method() === "PUT") {
+        setupWrites.hours.push(request.postDataJSON());
+        return route.fulfill(json(request.postDataJSON().hours));
+      }
+    }
+    if (pathname === "/api/v1/knowledge") {
+      if (request.method() === "GET") return route.fulfill(json([]));
+      if (request.method() === "POST") {
+        setupWrites.knowledge.push(request.postDataJSON());
+        return route.fulfill(json({ id: "11111111-2222-3333-4444-555555555555", ...request.postDataJSON() }, 201));
+      }
+    }
     return route.fulfill(json({}));
   });
 
   return {
     previewCalls: () => previewCalls,
     applyCalls: () => applyCalls,
-    applyPayload: () => applyPayload
+    applyPayload: () => applyPayload,
+    setupWrites: () => setupWrites
   };
 }
 
@@ -194,6 +211,52 @@ test.describe('React business import migration', () => {
     await expect(page.getByTestId('business-import-created')).toHaveText('2');
     await expect(page.getByTestId('business-import-updated')).toHaveText('0');
     await expect(page.getByTestId('business-import-inventory')).toHaveText('1');
+  });
+
+
+  test('free CSV setup suggestions require explicit approval, preserve unrelated hours and reject invalid times', async ({ page }) => {
+    const calls = await boot(page, {
+      setupSuggestions: [
+        { kind: 'FAQ', key: '¿Aceptan mascotas?', value: 'Sí, en terraza.',
+          sourceName: 'negocio.csv', sheetName: null, sourceRow: 2 },
+        { kind: 'BUSINESS_HOURS', key: 'MONDAY', value: '09:00-18:00',
+          sourceName: 'negocio.csv', sheetName: null, sourceRow: 4 }
+      ]
+    });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'negocio.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('Pregunta,Respuesta\n¿Aceptan mascotas?,Sí, en terraza.')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('business-import-setup-review')).toBeVisible();
+    expect(calls.setupWrites().knowledge).toHaveLength(0);
+    expect(calls.setupWrites().hours).toHaveLength(0);
+
+    const approve = page.getByRole('button', { name: 'Aprobar FAQ y horarios seleccionados' });
+    await page.getByLabel('Valor sugerido 1').fill('18:00-09:00');
+    await approve.click();
+    await expect(page.getByRole('alert')).toContainText('Horario inválido');
+    expect(calls.setupWrites().knowledge).toHaveLength(0);
+    expect(calls.setupWrites().hours).toHaveLength(0);
+
+    await page.getByLabel('Valor sugerido 1').fill('09:00-18:00');
+    await page.getByLabel('Aprobar sugerencia 0').uncheck();
+    await approve.click();
+    await expect.poll(() => calls.setupWrites().hours.length).toBe(1);
+    expect(calls.setupWrites().knowledge).toHaveLength(0);
+    expect(calls.setupWrites().hours[0].hours).toEqual([
+      { dayOfWeek: 1, openTime: '09:00', closeTime: '18:00' },
+      { dayOfWeek: 4, openTime: '10:00', closeTime: '15:00' }
+    ]);
+
+    await page.getByLabel('Aprobar sugerencia 0').check();
+    await approve.click();
+    await expect.poll(() => calls.setupWrites().knowledge.length).toBe(1);
+    expect(calls.setupWrites().knowledge[0]).toMatchObject({
+      title: '¿Aceptan mascotas?', content: 'Sí, en terraza.', category: 'FAQ', active: true
+    });
+    expect(calls.setupWrites().hours).toHaveLength(1);
   });
 
   test('non-admin cannot use the import surface', async ({ page }) => {
