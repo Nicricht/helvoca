@@ -228,7 +228,9 @@ export function ChannelsSettingsPanel({
   const togglePhoneActive = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) => setPhoneActive(id, active),
     onSuccess: async result => {
-      setPhoneMessage((result.phoneNumber || "El número") + (result.active ? " quedó activo." : " quedó inactivo."));
+      setPhoneMessage((result.phoneNumber || "El número") + (result.active
+        ? " quedó activo tras verificar la vinculación con el proveedor. Falta certificar una llamada real."
+        : " quedó inactivo."));
       await refreshChannels();
     },
     onError: error => setPhoneMessage(errorMessage(error, "No pudimos cambiar el estado del número."))
@@ -281,6 +283,17 @@ export function ChannelsSettingsPanel({
       "Vas a aprovisionar " + item.phoneNumber + " con el proveedor. Puede generar cargos. ¿Confirmas?"
     );
     if (accepted) provisionPhone.mutate(item.phoneNumber);
+  }
+
+  function doTogglePhoneActive(phone: PhoneNumber) {
+    if (!canManage || !phone.id || togglePhoneActive.isPending) return;
+    if (!phone.active && !window.confirm(
+      "¿Activar " + (phone.phoneNumber || "este número") + "? "
+      + "Esto consulta a Twilio para comprobar la pertenencia, el SID y los webhooks, "
+      + "y modifica su estado si la verificación es correcta. "
+      + "No realiza una llamada real ni certifica la recepcionista IA."
+    )) return;
+    togglePhoneActive.mutate({ id: phone.id, active: !phone.active });
   }
 
   function doConnectExisting() {
@@ -527,7 +540,7 @@ export function ChannelsSettingsPanel({
                       className="button ghost"
                       type="button"
                       disabled={togglePhoneActive.isPending}
-                      onClick={() => togglePhoneActive.mutate({ id: phone.id as string, active: !phone.active })}
+                      onClick={() => doTogglePhoneActive(phone)}
                     >
                       {phone.active ? "Desactivar" : "Activar"}
                     </button>
