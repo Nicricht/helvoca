@@ -130,6 +130,14 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 - [x] Add browser coverage for null value, short currency, missing call metadata, empty request status, null onboarding nextStep, stale attention statuses and plural signal counts.
 - [ ] Confirm exact commit CI and strict source coverage; no claim of 100% pending report.
 
+## Source coverage last six HomePage branches
+
+- [x] Explicit retry busy state for identity, onboarding and operational data, with gated network responses.
+- [x] Cached commercial amount displays an in-flight refresh instead of falsely appearing static.
+- [x] Unknown activity statuses display a safe readable fallback.
+- [x] HTTP 200 with null operational payload displays an actionable fail-closed error, not a blank dashboard.
+- [ ] Verify all four source coverage dimensions at the new exact HEAD; threshold remains 100% per file.
+
 ## Change safety
 
 - No existing database schema or production credentials touched.

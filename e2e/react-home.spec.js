@@ -185,6 +185,8 @@ async function bootHome(page, options = {}) {
   const requests = [];
   let onboardingRequests = 0;
   let meFailuresRemaining = options.meFailures ?? 0;
+  let meReads = 0;
+  let operationsReads = 0;
   let onboardingFailuresRemaining = options.onboardingFailures ?? 0;
   let operationsFailuresRemaining = options.operationsFailures ?? 0;
   let attentionReads = 0;
@@ -213,7 +215,9 @@ async function bootHome(page, options = {}) {
     });
   });
 
-  await page.route('**/api/v1/auth/me', route => {
+  await page.route('**/api/v1/auth/me', async route => {
+    meReads += 1;
+    if (options.meGates?.[meReads]) await options.meGates[meReads];
     if (options.expired) {
       return route.fulfill(json({ message: 'expired' }, 401));
     }
@@ -231,8 +235,9 @@ async function bootHome(page, options = {}) {
     }));
   });
 
-  await page.route('**/api/v1/onboarding/status', route => {
+  await page.route('**/api/v1/onboarding/status', async route => {
     onboardingRequests += 1;
+    if (options.onboardingGates?.[onboardingRequests]) await options.onboardingGates[onboardingRequests];
     if (onboardingFailuresRemaining > 0) {
       onboardingFailuresRemaining -= 1;
       return route.fulfill(json({ message: 'onboarding unavailable' }, 503));
@@ -303,6 +308,8 @@ async function bootHome(page, options = {}) {
   ])));
 
   await page.route('**/api/v1/operations/dashboard', async route => {
+    operationsReads += 1;
+    if (options.operationsGates?.[operationsReads]) await options.operationsGates[operationsReads];
     if (options.operationsGate) await options.operationsGate;
     if (operationsFailuresRemaining > 0) {
       operationsFailuresRemaining -= 1;
@@ -311,6 +318,7 @@ async function bootHome(page, options = {}) {
     if (options.operationsError) {
       return route.fulfill(json({ message: 'operations unavailable' }, options.operationsError));
     }
+    if (options.operationsPayloads?.length) return route.fulfill(json(options.operationsPayloads.shift()));
     return route.fulfill(json(options.operations || READY_OPERATIONS));
   });
 
@@ -1209,6 +1217,85 @@ test.describe('React Home migration', () => {
     await expect(panel).toContainText('2 preguntas sin respuesta');
     await expect(panel).toContainText('2 fallos de llamada');
   });
+
+  test('successful HTTP response without dashboard data fails closed and recovers on deliberate retry', async ({ page }) => {
+    const api = await bootHome(page, { operationsPayloads: [null] });
+    await page.goto('/app');
+    const error = page.locator('main[data-visual-page="home"] [role="alert"]');
+    await expect(error).toContainText('No recibimos datos verificables del resumen operativo.');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+    expect(api.attentionMutations()).toBe(0);
+    await error.getByRole('button', { name: 'Reintentar' }).click();
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+    await expect(error).toHaveCount(0);
+  });
+
+  test('unknown recent activity status is shown intelligibly without pretending it was completed', async ({ page }) => {
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS,
+      recentCalls: [],
+      recentRequests: [{
+        id: 'unknown-event',
+        title: 'Seguimiento pendiente de validar',
+        status: 'WAITING_ON_CUSTOMER',
+        priority: 'NORMAL',
+        createdAt: '2026-10-02T15:20:00Z'
+      }]
+    }, attention: [] });
+    await page.goto('/app');
+    const activity = page.getByRole('region', { name: 'Última actividad' });
+    await expect(activity).toContainText('Seguimiento pendiente de validar');
+    await expect(activity).toContainText('waiting on customer');
+    await expect(activity).not.toContainText('Resuelta');
+  });
+
+  test('cached value explicitly identifies an in-flight refresh without inventing a new total', async ({ page }) => {
+    const gates = {};
+    const api = await bootHome(page, { analyticsGates: gates });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(panel).toContainText('209.900');
+    await panel.getByRole('button', { name: '30 días' }).click();
+    await expect(panel.getByRole('button', { name: '30 días' })).toHaveAttribute('aria-pressed', 'true');
+
+    let release;
+    gates[7] = new Promise(resolve => { release = resolve; });
+    await page.evaluate(() => {
+      const actualNow = Date.now;
+      Date.now = () => actualNow() + 120000;
+    });
+    await panel.getByRole('button', { name: '7 días' }).click();
+    await expect(panel).toContainText('Actualizando…');
+    await expect(panel).toContainText('209.900');
+    release();
+    await expect(panel).not.toContainText('Actualizando…');
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  for (const state of [
+    { label: 'identity', options: gate => ({ meFailures: 1, meGates: { 2: gate } }),
+      error: 'No pudimos verificar tus permisos de acceso.' },
+    { label: 'onboarding', options: gate => ({ onboardingFailures: 2, onboardingGates: { 3: gate } }),
+      error: 'No pudimos verificar la configuración de tu negocio.' },
+    { label: 'operations', options: gate => ({ operationsFailures: 2, operationsGates: { 3: gate } }),
+      error: 'No pudimos cargar el resumen operativo.' }
+  ]) {
+    test(`${state.label} retry stays visibly busy and disabled until the server actually recovers`, async ({ page }) => {
+      let release;
+      const gate = new Promise(resolve => { release = resolve; });
+      const api = await bootHome(page, state.options(gate));
+      await page.goto('/app');
+      const error = page.locator('main[data-visual-page="home"] [role="alert"]');
+      await expect(error).toContainText(state.error);
+      await error.getByRole('button', { name: 'Reintentar' }).click();
+      const retrying = error.getByRole('button', { name: 'Reintentando…' });
+      await expect(retrying).toBeDisabled();
+      expect(api.attentionMutations()).toBe(0);
+      release();
+      await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+      await expect(error).toHaveCount(0);
+    });
+  }
 
   test('incomplete owner sees onboarding guidance instead of duplicated operational workspaces', async ({ page }) => {
     await bootHome(page, { onboarding: INCOMPLETE_ONBOARDING });

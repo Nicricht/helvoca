@@ -817,7 +817,23 @@ export function HomePage() {
                 )}
               </section>
           </motion.div>
-        ) : null}
+        ) : (
+          <div className={styles.errorState} role="alert">
+            <TriangleAlert size={20} aria-hidden="true" />
+            <div>
+              <strong>No recibimos datos verificables del resumen operativo.</strong>
+              <span>No podemos mostrar resultados hasta confirmar la respuesta del servidor.</span>
+            </div>
+            <button
+              className={styles.errorRetry}
+              type="button"
+              disabled={operationsQuery.isFetching}
+              onClick={() => void operationsQuery.refetch()}
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
       </main>
       </MotionConfig>
     </AppShell>
