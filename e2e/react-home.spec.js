@@ -689,7 +689,7 @@ test.describe('React Home migration', () => {
     const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
     await expect(value).toContainText('Valor no disponible');
     await expect(value).not.toContainText('$-');
-    await expect(value).not.toContainText(/rentabilidad garantizada|retorno de inversión/i);
+    await expect(value).not.toContainText(/ROI positivo|retorno de inversión confirmado/i);
   });
 
   test('different currencies remain separate instead of blending attributed revenue', async ({ page }) => {
