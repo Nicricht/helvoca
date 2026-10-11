@@ -200,4 +200,26 @@ class BusinessImportSpreadsheetParserTest {
         assertTrue(result.products().isEmpty());
         assertFalse(result.warnings().isEmpty());
     }
+
+    @Test
+    void incompleteSetupHeadersNeverBecomeFaqOrBusinessHours() {
+        // Each dataset intentionally lacks one required header.
+        // Covers FAQ question-only, hours day-without-open, and day/open-without-close.
+        // No guessed answers, missing hours, or commercial mutations.
+        var parser = new BusinessImportSpreadsheetParser();
+        String[] invalidHeaders = {
+                "Pregunta,Nombre\n¿Hay terraza?,Paseo Central\n",
+                "Día,Cierre\nLunes,18:00\n",
+                "Día,Apertura\nMartes,09:00\n"
+        };
+        for (int index = 0; index < invalidHeaders.length; index++) {
+            var file = new MockMultipartFile("files", "incomplete-" + index + ".csv",
+                    "text/csv", invalidHeaders[index].getBytes(StandardCharsets.UTF_8));
+            var parsed = parser.parse(file);
+            assertEquals(BusinessImportSpreadsheetParser.DatasetKind.UNKNOWN, parsed.kind(),
+                    "El parser no debe inventar un tipo válido a partir de cabeceras incompletas");
+            assertTrue(parsed.setupRows().isEmpty());
+            assertTrue(parsed.products().isEmpty());
+        }
+    }
 }
