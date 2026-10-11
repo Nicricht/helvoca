@@ -170,6 +170,42 @@ class CallLifecycleServiceTest {
     }
 
     @Test
+    void mediaStreamStartIsIdempotentOnlyForSameBoundStream() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        CallLifecycleService lifecycle = new CallLifecycleService(
+                mock(PhoneNumberRepository.class),
+                mock(CustomerRepository.class),
+                calls,
+                jdbc,
+                new CallCommercialProperties(),
+                new SimpleMeterRegistry());
+        UUID callId = UUID.randomUUID();
+        UUID businessId = UUID.randomUUID();
+        CallSession call = new CallSession();
+        call.setBusinessId(businessId);
+        call.setProviderCallId("CA-stream");
+        call.setCallerNumber("+56910000000");
+        call.setDestinationNumber("+14355550101");
+        call.setStatus(CallStatus.RINGING);
+        when(calls.findById(callId)).thenReturn(Optional.of(call));
+
+        var initial = lifecycle.markStreamStarted(callId, "CA-stream", "MZ-one", "gemini");
+        assertEquals(businessId, initial.businessId());
+        assertEquals("MZ-one", call.getStreamSid());
+        verify(calls).saveAndFlush(call);
+
+        var retry = lifecycle.markStreamStarted(callId, "CA-stream", "MZ-one", "gemini");
+        assertEquals(initial, retry);
+        verify(calls, times(1)).saveAndFlush(call);
+
+        assertThrows(IllegalStateException.class,
+                () -> lifecycle.markStreamStarted(callId, "CA-stream", "MZ-other", "gemini"));
+        assertEquals("MZ-one", call.getStreamSid());
+        verify(jdbc, times(3)).execute(contains("pg_advisory_xact_lock"));
+    }
+
+    @Test
     void subscriptionCapacityRejectsCallBeforePersistingAnotherSession() {
         PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
         CustomerRepository customers = mock(CustomerRepository.class);
