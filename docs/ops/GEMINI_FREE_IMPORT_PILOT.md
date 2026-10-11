@@ -57,3 +57,26 @@ Comparar ambos modelos con **las mismas imágenes sintéticas** y una tabla manu
 - https://ai.google.dev/gemini-api/docs/billing
 
 **Producción sigue apagada** para importación pagada de imágenes/PDF. No habilitar `HELVOCA_BUSINESS_IMPORT_AI_ENABLED` ni modificar sus cuotas para este experimento.
+
+## Benchmark sin evaluación manual repetitiva
+
+El ejecutor Gemini devuelve un esquema amplio de negocio, promociones, extras, horarios y FAQ. Solo analiza el archivo incluido en la solicitud, sin historial de menú anterior. Para evaluar automáticamente una imagen con ground truth revisado:
+
+```bash
+python3 scripts/pilot/benchmark_import.py \
+  scripts/pilot/fixtures/mercado_del_patio_angled_truth.json \
+  ~/private-recepvoz-pilot/actual.json \
+  --output ~/private-recepvoz-pilot/score.json
+```
+
+El argumento `--truth` permite que el propio piloto calcule la evaluación **después** de una llamada API autorizada:
+
+```bash
+python3 scripts/pilot/gemini_import_probe.py --send \
+  --audit ~/private-recepvoz-pilot/audit.jsonl \
+  --report ~/private-recepvoz-pilot/review.jsonl \
+  --truth scripts/pilot/fixtures/mercado_del_patio_angled_truth.json \
+  ~/pilot/mercado-del-patio.png
+```
+
+El puntaje compara todos los campos explícitos y se detiene después del primer resultado inseguro. No existe acción que publique productos o promociones. En CI se verifican regresiones usando respuestas simuladas: **nunca se dispara la API externa**. El ground truth se creó revisando la tercera imagen ficticia; los límites y credenciales humanas del piloto siguen vigentes.
