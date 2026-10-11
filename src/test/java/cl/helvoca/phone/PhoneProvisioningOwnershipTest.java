@@ -55,6 +55,29 @@ class PhoneProvisioningOwnershipTest {
     }
 
     @Test
+    void availabilitySearchRequiresTenantAndDelegatesReadOnlyToTwilio() {
+        var available = java.util.List.of(new AvailablePhoneNumberResponse(
+                PHONE, "Test Number", "Washington", "DC", "20001", "US", null, true));
+        when(twilio.searchAvailable("US", "202", 5)).thenReturn(available);
+
+        assertSame(available, service.available("US", "202", 5));
+
+        verify(tenant).requireBusinessId();
+        verify(twilio).searchAvailable("US", "202", 5);
+        verify(twilio, never()).provision(any());
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void availabilitySearchRejectsMissingTenantBeforeCarrierLookup() {
+        when(tenant.requireBusinessId()).thenThrow(new IllegalStateException("missing tenant"));
+
+        assertThrows(IllegalStateException.class, () -> service.available("US", null, 5));
+
+        verify(twilio, never()).searchAvailable(any(), any(), anyInt());
+    }
+
+    @Test
     void refusesClientSuppliedCarrierSidBeforeCarrierAccess() {
         assertThrows(ConflictException.class, () -> service.connectExisting(new PhoneNumberRequest(PHONE, SID, true)));
         verify(twilio, never()).verifyManagedPhone(any());
