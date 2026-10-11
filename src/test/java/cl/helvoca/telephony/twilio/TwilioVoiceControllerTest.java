@@ -326,4 +326,55 @@ class TwilioVoiceControllerTest {
         assertEquals(204, response.getStatusCode().value());
         verifyNoInteractions(summaries);
     }
+    @Test
+    void uncertifiedOrCrossTenantInboundCallNeverTouchesLifecycleOrAi() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        TwilioCallBindingGuard gate =
+                (TwilioCallBindingGuard) ReflectionTestUtils.getField(controller, "bindingGuard");
+        when(gate.allowsIncoming(CALL_SID, "+14355652512", "+56911111111", ACCOUNT_SID))
+                .thenReturn(false);
+
+        var response = controller.incoming(CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID);
+
+        assertEquals(SILENT_HANGUP, response.getBody());
+        verifyNoInteractions(calls, router, summaries);
+    }
+
+    @Test
+    void crossTenantStatusAndStreamCallbackCannotMutateAnotherCall() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        TwilioCallBindingGuard gate =
+                (TwilioCallBindingGuard) ReflectionTestUtils.getField(controller, "bindingGuard");
+        when(gate.allowsCallback(CALL_SID, ACCOUNT_SID)).thenReturn(false);
+        when(gate.allowsStreamCallback(CALL_SID, "MZ-foreign", ACCOUNT_SID)).thenReturn(false);
+
+        assertEquals(204, controller.status(CALL_SID, "completed", 30, ACCOUNT_SID).getStatusCode().value());
+        assertEquals(204, controller.streamStatus(
+                "MZ-foreign", "stream-stopped", CALL_SID, null, ACCOUNT_SID).getStatusCode().value());
+        verifyNoInteractions(calls, router, summaries);
+    }
+
+    @Test
+    void missingCarrierBindingGuardFailsClosed() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        TwilioVoiceController controller = new TwilioVoiceController(
+                calls, router, summaries, new TwilioProperties());
+
+        assertEquals(SILENT_HANGUP, controller.incoming(
+                CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID).getBody());
+        assertEquals(204, controller.status(
+                CALL_SID, "completed", 30, ACCOUNT_SID).getStatusCode().value());
+        assertEquals(204, controller.streamStatus(
+                "MZ-foreign", "stream-error", CALL_SID, "failed", ACCOUNT_SID).getStatusCode().value());
+        verifyNoInteractions(calls, router, summaries);
+    }
+
 }
