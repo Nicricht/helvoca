@@ -35,6 +35,12 @@ public class PhoneNumberController {
         return provisioning.status();
     }
 
+    @GetMapping("/provisioning/readiness")
+    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    public List<PhoneVoiceReadinessResponse> voiceReadiness() {
+        return provisioning.readiness();
+    }
+
     @GetMapping("/provisioning/available")
     @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public List<AvailablePhoneNumberResponse> available(@RequestParam(defaultValue = "CL") String country,
