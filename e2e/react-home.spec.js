@@ -415,15 +415,63 @@ test.describe('React Home migration', () => {
       .not.toContainText('Todo bajo control');
   });
 
-  test('never fetches the protected human inbox for a role without operational access', async ({ page }) => {
+  test('staff without operational role sees a restricted home without protected backend reads', async ({ page }) => {
     const api = await bootHome(page, {
       roles: ['STAFF'],
       permissions: ['BOOKINGS_READ']
     });
     await page.goto('/app');
     await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Necesita tu atención' })).toContainText('Tu rol no tiene acceso');
+    await expect(page.getByRole('status')).toContainText('Tu rol no tiene acceso al resumen operativo.');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Necesita tu atención' })).toHaveCount(0);
+
+    const endpoints = api.requests.map(request => new URL(request.url).pathname);
+    expect(endpoints).not.toContain('/api/v1/operations/dashboard');
+    expect(endpoints).not.toContain('/api/v1/operations/attention');
+    expect(endpoints).not.toContain('/api/v1/onboarding/status');
+    expect(endpoints).not.toContain('/api/v1/commercial/analytics');
     expect(api.attentionReads()).toBe(0);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('permissions listed by the client cannot override restricted operational roles', async ({ page }) => {
+    const api = await bootHome(page, {
+      roles: ['STAFF'],
+      permissions: ['OPERATIONS_READ', 'ANALYTICS_READ', 'REQUESTS_READ']
+    });
+    await page.goto('/app');
+    await expect(page.getByRole('status')).toContainText('Tu rol no tiene acceso al resumen operativo.');
+    expect(api.requests.filter(request => /\/api\/v1\/(operations\/|commercial\/analytics)/.test(request.url))).toEqual([]);
+    expect(api.attentionReads()).toBe(0);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('Home ignores businessId supplied in the URL and never forwards it to tenant APIs', async ({ page }) => {
+    const api = await bootHome(page);
+    await page.goto('/app?businessId=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+
+    const observed = api.requests.filter(request => request.url.includes('/api/v1/'));
+    expect(observed.length).toBeGreaterThan(0);
+    for (const request of observed) {
+      const url = new URL(request.url);
+      expect(url.searchParams.has('businessId')).toBe(false);
+      expect(request.postData || '').not.toMatch(/businessId/i);
+      expect(request.method).toBe('GET');
+    }
+  });
+
+  test('unauthenticated visitors are redirected before any protected Home API request', async ({ page }) => {
+    const protectedReads = [];
+    page.on('request', request => {
+      if (request.url().includes('/api/v1/')) protectedReads.push(request.url());
+    });
+
+    await page.goto('/app');
+    await expect(page).toHaveURL(/\/app\/auth\/?$/);
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+    expect(protectedReads).toEqual([]);
   });
 
   test('read-only request permission does not expose status-changing controls', async ({ page }) => {
