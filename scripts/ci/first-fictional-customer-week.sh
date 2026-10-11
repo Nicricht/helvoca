@@ -61,7 +61,8 @@ npx playwright install --with-deps chromium
 
 echo "Running first-user and owner-operation browser journeys..."
 npx playwright test \
-  e2e/first-user-ux-v2.spec.js \
-  e2e/home-operational.spec.js
+  e2e/frontend-ux.spec.js \
+  e2e/react-settings-core.spec.js \
+  e2e/react-home.spec.js
 
 echo "FIRST FICTIONAL CUSTOMER WEEK: PASS"

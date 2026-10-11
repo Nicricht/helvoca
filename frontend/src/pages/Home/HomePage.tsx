@@ -72,15 +72,13 @@ const nextStepCopy: Record<string, { text: string; href: string }> = {
 };
 
 function formatMoney(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: currency === "CLP" ? 0 : 2
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toLocaleString("es-CL")}`;
-  }
+  // Attributed totals accept only finite values and 3-letter currency codes.
+  // Keep the formatter deterministic rather than concealing invalid payloads.
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: currency === "CLP" ? 0 : 2
+  }).format(amount);
 }
 
 function formatActivityTime(value: string, timeZone: string): string {
@@ -248,7 +246,8 @@ function ValueGenerated({
   refreshing,
   failed,
   days,
-  onDaysChange
+  onDaysChange,
+  onRefresh
 }: {
   data?: SalesAnalytics;
   loading: boolean;
@@ -256,6 +255,7 @@ function ValueGenerated({
   failed: boolean;
   days: number;
   onDaysChange: (days: number) => void;
+  onRefresh: () => void;
 }) {
   const totals = attributedTotals(data);
   const unverifiedAmounts = hasUnverifiedAttributedAmounts(data);
@@ -296,6 +296,13 @@ function ValueGenerated({
               {period.label}
             </button>
           ))}
+          <button
+            type="button"
+            className={styles.periodButton}
+            disabled={loading || refreshing}
+            aria-label="Actualizar valor comercial"
+            onClick={onRefresh}
+          >Actualizar</button>
         </div>
       </div>
 
@@ -640,21 +647,24 @@ export function HomePage() {
     retry: false
   });
 
-  const isAdmin = meQuery.data?.roles?.includes("BUSINESS_ADMIN") ?? false;
+  // A successful HTTP status is not proof of a usable identity contract.
+  const validIdentity = Boolean(meQuery.data) &&
+    Array.isArray(meQuery.data?.roles) && meQuery.data.roles.length > 0;
+  const isAdmin = validIdentity && meQuery.data?.roles?.includes("BUSINESS_ADMIN") === true;
   const onboardingQuery = useQuery({
     queryKey: ["home", "onboarding"],
     queryFn: getOnboardingStatus,
     enabled: isAdmin
   });
 
-  const roles = meQuery.data?.roles ?? [];
+  const roles = validIdentity ? meQuery.data!.roles : [];
   // Match the server's hasAnyRole('BUSINESS_ADMIN', 'OPERATOR') operations contract.
   const canReadOperations = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
   const onboardingStatus = onboardingQuery.data;
   const onboardingValid = hasValidOnboardingStatus(onboardingStatus);
   const adminReady = !isAdmin || (onboardingValid && onboardingStatus.readyForCalls === true);
-  const readyToLoad = Boolean(meQuery.data) && canReadOperations && adminReady;
-  const restricted = Boolean(meQuery.data) && !canReadOperations;
+  const readyToLoad = validIdentity && canReadOperations && adminReady;
+  const restricted = validIdentity && !canReadOperations;
   const canReadAttention = canReadOperations;
   const permissions = meQuery.data?.permissions;
   const canManageRequests = canReadAttention && (!Array.isArray(permissions)
@@ -720,7 +730,7 @@ export function HomePage() {
           <h1>Inicio</h1>
         </header>
 
-        {meQuery.isError || retrying === "identity" ? (
+        {meQuery.isError || (meQuery.isSuccess && !validIdentity) || retrying === "identity" ? (
           <div className={styles.errorState} role="alert">
             <TriangleAlert size={20} aria-hidden="true" />
             <div>
@@ -803,6 +813,7 @@ export function HomePage() {
               failed={salesQuery.isError}
               days={salesDays}
               onDaysChange={setSalesDays}
+              onRefresh={() => { void salesQuery.refetch(); }}
             />
 
             <TodaySummary dashboard={operationsQuery.data} />
@@ -814,14 +825,17 @@ export function HomePage() {
             <section id="home-history" className={styles.historySection} aria-label="Historial de gestión">
                 <button type="button" className={styles.historyToggle}
                   aria-expanded={historyOpen}
+                  aria-controls="home-history-panel"
                   onClick={() => setHistoryOpen(previous => !previous)}>
                   <ClipboardList size={17} aria-hidden="true" />
                   {historyOpen ? "Ocultar historial y auditoría" : "Consultar historial de solicitudes y auditoría"}
                   <ArrowUpRight size={15} aria-hidden="true" />
                 </button>
-                {historyOpen && (
-                  <OperationsSupportPanel user={meQuery.data} showCustomerTools={false} />
-                )}
+                <div id="home-history-panel" hidden={!historyOpen}>
+                  {historyOpen && (
+                    <OperationsSupportPanel user={meQuery.data} showCustomerTools={false} />
+                  )}
+                </div>
               </section>
           </motion.div>
         ) : (

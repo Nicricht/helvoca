@@ -221,4 +221,86 @@ class OperationsDashboardServiceTest {
         verify(requests, never()).findAllByBusinessIdOrderByCreatedAtDesc(any());
         verify(questions, never()).findAllByBusinessIdAndStatusOrderByLastSeenAtDesc(any(), any());
     }
+
+    @Test
+    void dashboardUsesTenantLocalHalfOpenDayAndExcludesSimulatorAndCertification() {
+        UUID id = UUID.randomUUID();
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        BusinessRequestRepository requests = mock(BusinessRequestRepository.class);
+        UnansweredQuestionRepository questions = mock(UnansweredQuestionRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        Business business = mock(Business.class);
+        when(tenant.requireBusinessId()).thenReturn(id);
+        when(businesses.findById(id)).thenReturn(Optional.of(business));
+        when(business.getName()).thenReturn("A");
+        when(business.getTimezone()).thenReturn("America/Santiago");
+        when(calls.findAllByBusinessIdAndCertificationFalseAndTelephonyProviderNot(
+                eq(id), eq("simulator"), any())).thenReturn(Page.empty());
+
+        OperationsDashboardService.Dashboard actual = new OperationsDashboardService(
+                businesses, calls, bookings, customers, requests, questions, tenant).dashboard();
+
+        java.time.ZoneId zone = java.time.ZoneId.of("America/Santiago");
+        java.time.LocalDate localDay = java.time.OffsetDateTime.parse(actual.localNow()).toLocalDate();
+        Instant start = localDay.atStartOfDay(zone).toInstant();
+        Instant end = localDay.plusDays(1).atStartOfDay(zone).toInstant();
+        // The end is tomorrow's local midnight, NOT start + 24h. DST can change day length.
+        assertEquals("America/Santiago", actual.timezone());
+        assertEquals(0L, actual.callsToday());
+        assertEquals(0L, actual.callFailuresToday());
+        assertEquals(0L, actual.callDurationSecondsToday());
+        assertEquals(java.math.BigDecimal.ZERO, actual.estimatedCallCostTodayUsd());
+        assertEquals(0L, actual.bookingsToday());
+        assertEquals(0L, actual.openRequests());
+        assertEquals(0L, actual.unansweredQuestions());
+
+        verify(calls).countByBusinessIdAndCertificationFalseAndTelephonyProviderNotAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                id, "simulator", start, end);
+        verify(calls).countByBusinessIdAndCertificationFalseAndTelephonyProviderNotAndStatusInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                id, "simulator", List.of(cl.helvoca.call.CallStatus.FAILED,
+                        cl.helvoca.call.CallStatus.NO_ANSWER), start, end);
+        verify(calls).sumEstimatedCostByBusinessAndPeriod(id, start, end, "simulator");
+        verify(calls).sumDurationSecondsByBusinessAndPeriod(id, start, end, "simulator");
+        verify(bookings).countByBusinessIdAndStatusNotAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                id, BookingStatus.CANCELLED, start, end);
+        verify(customers).countByBusinessIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(id, start, end);
+        verify(requests).countByBusinessIdAndStatusIn(
+                id, List.of(RequestStatus.OPEN, RequestStatus.IN_PROGRESS));
+        verify(questions).countByBusinessIdAndStatus(id, QuestionStatus.OPEN);
+
+        org.mockito.ArgumentCaptor<org.springframework.data.domain.Pageable> page =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        verify(calls).findAllByBusinessIdAndCertificationFalseAndTelephonyProviderNot(
+                eq(id), eq("simulator"), page.capture());
+        assertEquals(10, page.getValue().getPageSize());
+        assertEquals(0, page.getValue().getPageNumber());
+        assertEquals(org.springframework.data.domain.Sort.Direction.DESC,
+                page.getValue().getSort().getOrderFor("startedAt").getDirection());
+        verify(requests).findTop10ByBusinessIdOrderByCreatedAtDesc(id);
+        verify(questions).findTop10ByBusinessIdAndStatusOrderByLastSeenAtDesc(id, QuestionStatus.OPEN);
+    }
+
+    @Test
+    void dashboardWithoutAuthenticatedTenantNeverReadsAnyBusinessData() {
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        BusinessRequestRepository requests = mock(BusinessRequestRepository.class);
+        UnansweredQuestionRepository questions = mock(UnansweredQuestionRepository.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenThrow(new org.springframework.security.access.AccessDeniedException(
+                "Authenticated tenant required"));
+
+        OperationsDashboardService service = new OperationsDashboardService(
+                businesses, calls, bookings, customers, requests, questions, tenant);
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                org.springframework.security.access.AccessDeniedException.class, service::dashboard);
+        verifyNoInteractions(businesses, calls, bookings, customers, requests, questions);
+    }
+
 }
