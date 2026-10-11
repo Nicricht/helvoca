@@ -527,17 +527,23 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
 
         UUID a = tenantA.getId();
         UUID b = tenantB.getId();
+        UUID phoneA = UUID.randomUUID();
+        UUID phoneB = UUID.randomUUID();
+        jdbc.update("INSERT INTO phone_number(id, business_id, phone_number) VALUES (?, ?, ?)",
+                phoneA, a, syntheticPhoneNumber());
+        jdbc.update("INSERT INTO phone_number(id, business_id, phone_number) VALUES (?, ?, ?)",
+                phoneB, b, syntheticPhoneNumber());
         java.time.ZoneId zone = java.time.ZoneId.of("Pacific/Auckland");
         java.time.LocalDate today = java.time.LocalDate.now(zone);
         java.time.Instant dayStart = today.atStartOfDay(zone).toInstant();
         java.time.Instant nextDayStart = today.plusDays(1).atStartOfDay(zone).toInstant();
-        insertHomeSyntheticCall(a, dayStart, "twilio", false, "COMPLETED", 60, "0.60");
-        insertHomeSyntheticCall(a, dayStart.plusSeconds(2), "twilio", false, "FAILED", 30, "0.20");
-        insertHomeSyntheticCall(a, dayStart.plusSeconds(3), "simulator", false, "COMPLETED", 999, "100.00");
-        insertHomeSyntheticCall(a, dayStart.plusSeconds(4), "twilio", true, "COMPLETED", 999, "100.00");
-        insertHomeSyntheticCall(a, nextDayStart, "twilio", false, "COMPLETED", 300, "5.00");
-        insertHomeSyntheticCall(a, dayStart.minusSeconds(1), "twilio", false, "COMPLETED", 300, "5.00");
-        insertHomeSyntheticCall(b, java.time.Instant.now(), "twilio", false, "COMPLETED", 999, "100.00");
+        insertHomeSyntheticCall(a, phoneA, dayStart, "twilio", false, "COMPLETED", 60, "0.60");
+        insertHomeSyntheticCall(a, phoneA, dayStart.plusSeconds(2), "twilio", false, "FAILED", 30, "0.20");
+        insertHomeSyntheticCall(a, phoneA, dayStart.plusSeconds(3), "simulator", false, "COMPLETED", 999, "100.00");
+        insertHomeSyntheticCall(a, phoneA, dayStart.plusSeconds(4), "twilio", true, "COMPLETED", 999, "100.00");
+        insertHomeSyntheticCall(a, phoneA, nextDayStart, "twilio", false, "COMPLETED", 300, "5.00");
+        insertHomeSyntheticCall(a, phoneA, dayStart.minusSeconds(1), "twilio", false, "COMPLETED", 300, "5.00");
+        insertHomeSyntheticCall(b, phoneB, java.time.Instant.now(), "twilio", false, "COMPLETED", 999, "100.00");
 
         authenticate(a);
         var requestA = requests.create(new BusinessRequestDtos.Create(
@@ -578,18 +584,24 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
                 .anyMatch(x -> x.id().equals(requestA.id())));
     }
 
-    private void insertHomeSyntheticCall(UUID businessId, java.time.Instant startedAt,
-                                         String provider, boolean certification, String status,
+    private static String syntheticPhoneNumber() {
+        int suffix = (int) Math.floorMod(UUID.randomUUID().getLeastSignificantBits(), 100_000_000L);
+        return String.format(java.util.Locale.ROOT, "+569%08d", suffix);
+    }
+
+    private void insertHomeSyntheticCall(UUID businessId, UUID phoneNumberId,
+                                         java.time.Instant startedAt, String provider,
+                                         boolean certification, String status,
                                          int durationSeconds, String totalCost) {
         jdbc.update("""
                 INSERT INTO call_session(
-                    id, business_id, telephony_provider, provider_call_id, destination_number,
-                    direction, status, started_at, duration_seconds, estimated_total_cost_usd,
-                    certification, created_at, updated_at)
-                VALUES (?, ?, ?, ?, '+56900000000', 'INBOUND', ?, ?, ?, ?, ?, NOW(), NOW())
-                """, UUID.randomUUID(), businessId, provider, "home-qa-" + UUID.randomUUID(),
-                status, java.sql.Timestamp.from(startedAt), durationSeconds,
-                new java.math.BigDecimal(totalCost), certification);
+                    id, business_id, phone_number_id, telephony_provider, provider_call_id,
+                    destination_number, direction, status, started_at, duration_seconds,
+                    estimated_total_cost_usd, certification, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, '+56900000000', 'INBOUND', ?, ?, ?, ?, ?, NOW(), NOW())
+                """, UUID.randomUUID(), businessId, phoneNumberId, provider,
+                "home-qa-" + UUID.randomUUID(), status, java.sql.Timestamp.from(startedAt),
+                durationSeconds, new java.math.BigDecimal(totalCost), certification);
     }
 
     private int receiptCount(UUID businessId, UUID requestId) {
