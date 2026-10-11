@@ -50,11 +50,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     // revalidate availability, so a repeated read within this window can be
     // reused safely without adding another provider/tool round trip.
     private static final long READ_TOOL_DEDUPE_WINDOW_MS = 30_000L;
-    private static final Set<String> DEDUPED_READ_TOOLS = Set.of(
-            "list_services",
-            "find_caller",
-            "list_available_slots",
-            "check_booking_availability");
+    // Caller identity and appointment availability can change between turns.
+    // Do not cache them locally: the backend remains the source of truth.
+    private static final Set<String> DEDUPED_READ_TOOLS = Set.of("list_services");
     private static final List<String> VOICE_BAKEOFF_MARKERS = List.of(
             "[RECEPVOZ_VOICE_BAKEOFF_LINE_1]",
             "[RECEPVOZ_VOICE_BAKEOFF_LINE_2]",
@@ -75,7 +73,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final LocalBargeInDetector localBargeInDetector;
     private final GeminiTwilioAudioFramer assistantAudioFramer = new GeminiTwilioAudioFramer();
     private final Queue<String> pendingAudio = new ConcurrentLinkedQueue<>();
-    private final Set<String> completedToolCalls = ConcurrentHashMap.newKeySet();
+    private final GeminiToolCallLedger toolCallLedger = new GeminiToolCallLedger();
     private final ConcurrentHashMap<String, CachedToolResult> recentReadToolResults = new ConcurrentHashMap<>();
     private final AtomicBoolean setupComplete = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -508,24 +506,31 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             String id = function.optString("id", null);
             String name = function.optString("name", null);
             JSONObject args = function.optJSONObject("args");
-            if (id == null || name == null || !completedToolCalls.add(id)) continue;
+            if (id == null || id.isBlank() || name == null || name.isBlank()) continue;
 
             JSONObject safeArgs = args == null ? new JSONObject() : args;
             long toolStartedAtNanos = System.nanoTime();
-            log.info("tool_call_started call_id={} tool_name={}", context.callId(), name);
-            JSONObject result = executeToolWithShortDedupe(name, safeArgs);
-            long toolDurationMs = elapsedMillis(toolStartedAtNanos);
-            executedCalls++;
-            boolean success = result.optBoolean("success", false);
-            JSONObject data = result.optJSONObject("data");
-            String entityId = data == null ? null : firstEntityId(data);
-            log.info("tool_call_completed call_id={} tool_name={} success={} entity_id={} duration_ms={}",
-                    context.callId(), name, success, entityId == null ? "none" : entityId, toolDurationMs);
-            if (toolDurationMs > properties.getToolLatencyBudgetMs()) {
-                log.warn("VOICE_LATENCY_BUDGET_EXCEEDED call={} stage=tool tool_name={} duration_ms={} budget_ms={}",
-                        context.callId(), name, toolDurationMs, properties.getToolLatencyBudgetMs());
+            GeminiToolCallLedger.Resolution resolution = toolCallLedger.resolve(
+                    id, name, canonicalJson(safeArgs),
+                    () -> executeToolWithShortDedupe(name, safeArgs));
+            JSONObject result = resolution.result();
+            if (resolution.executed()) {
+                long toolDurationMs = elapsedMillis(toolStartedAtNanos);
+                executedCalls++;
+                boolean success = result.optBoolean("success", false);
+                JSONObject data = result.optJSONObject("data");
+                String entityId = data == null ? null : firstEntityId(data);
+                log.info("tool_call_completed call_id={} tool_name={} success={} entity_id={} duration_ms={}",
+                        context.callId(), name, success, entityId == null ? "none" : entityId, toolDurationMs);
+                if (toolDurationMs > properties.getToolLatencyBudgetMs()) {
+                    log.warn("VOICE_LATENCY_BUDGET_EXCEEDED call={} stage=tool tool_name={} duration_ms={} budget_ms={}",
+                            context.callId(), name, toolDurationMs, properties.getToolLatencyBudgetMs());
+                }
+                recordCertificationToolOutcome(name, success, data);
+            } else {
+                log.info("tool_call_replayed_or_blocked call_id={} tool_name={} success={}",
+                        context.callId(), name, result.optBoolean("success", false));
             }
-            recordCertificationToolOutcome(name, success, data);
             responses.put(new JSONObject()
                     .put("id", id)
                     .put("name", name)
