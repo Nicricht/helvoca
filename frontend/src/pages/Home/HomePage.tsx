@@ -626,7 +626,9 @@ export function HomePage() {
 
   const meQuery = useQuery({
     queryKey: ["home", "me"],
-    queryFn: getCurrentUser
+    queryFn: getCurrentUser,
+    // Identity reads must not silently recover before the user can inspect a failure.
+    retry: false
   });
 
   const isAdmin = meQuery.data?.roles?.includes("BUSINESS_ADMIN") ?? false;

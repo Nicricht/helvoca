@@ -94,6 +94,14 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 - [x] Add browser checks for onboarding progress keyboard focus, zoomed hero/card separation and phone interactive targets.
 - [ ] Certify latest exact SHA Full Gate, Playwright UI, CI accessibility and reduced-motion tests with actual run evidence.
 
+## Phase 8 final release verification
+
+- [x] Inspected exact PR HEAD and historical GitHub Actions; failures on earlier phase 4 and 5 runs were isolated to the same Home transient identity retry assertion while backend 1,915 tests succeeded.
+- [x] Diagnosed implicit React Query default retry (1) conflicting with an explicit-retry test. Disable silent automatic retry only for Home identity, and use a single deterministic mock 503 before the user's retry.
+- [ ] Exact-HEAD Full Gate including Playwright, backend/JaCoCo, real-stack PostgreSQL, Golden Journey, webhook smoke and frontend inventory coverage.
+- [ ] Confirm no remaining failures, verify Java differential coverage gate and publish objective release evidence; do not claim global 100% feature coverage.
+- [ ] Merge/deploy requires separate explicit approval.
+
 ## Change safety
 
 - No existing database schema or production credentials touched.

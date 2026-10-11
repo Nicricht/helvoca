@@ -836,7 +836,7 @@ test.describe('React Home migration', () => {
   });
 
   test('transient identity outage recovers only after revalidating the user', async ({ page }) => {
-    const api = await bootHome(page, { meFailures: 2 });
+    const api = await bootHome(page, { meFailures: 1 });
     await page.goto('/app');
 
     const error = page.locator('main[data-visual-page="home"] [role="alert"]');
