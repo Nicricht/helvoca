@@ -132,7 +132,7 @@ class PhoneProvisioningOwnershipTest {
 
     @Test
     void carrierOutageDoesNotActivatePhone() {
-        PhoneNumber phone = alreadyAssigned(owner, null, "TWILIO");
+        PhoneNumber phone = alreadyAssigned(owner, SID, "TWILIO");
         when(twilio.verifyManagedPhone(PHONE)).thenThrow(new IllegalStateException("offline"));
         assertThrows(IllegalStateException.class, () -> service.connectExisting(new PhoneNumberRequest(PHONE, null, true)));
         assertFalse(phone.isActive());
