@@ -45,8 +45,9 @@ public class VoiceSetupReadinessService {
         UUID businessId = tenantProvider.requireBusinessId();
         OnboardingStatusResponse setup = onboarding.status();
         BusinessProfileResponse profile = profiles.current();
-        boolean reservations = profile == null || profile.usesReservations() == null || profile.usesReservations();
-        boolean services = reservations || profile == null || profile.sellsServices() == null || profile.sellsServices();
+        boolean reservations = profile == null || !Boolean.FALSE.equals(profile.usesReservations());
+        // When reservations are not required, the profile is necessarily non-null.
+        boolean services = reservations || !Boolean.FALSE.equals(profile.sellsServices());
         boolean providerConfigured = twilio.configured();
         String managedAccount = providerConfigured ? twilio.managedAccountSid() : "";
 
