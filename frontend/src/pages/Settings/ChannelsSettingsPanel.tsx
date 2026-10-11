@@ -158,6 +158,28 @@ export function ChannelsSettingsPanel({
     refetchOnWindowFocus: false
   });
 
+  const receivedVoiceGuide = voiceReadiness.data;
+  const voiceGuideValid = Boolean(
+    receivedVoiceGuide
+    && (receivedVoiceGuide.status === "CONFIGURATION_INCOMPLETE"
+      || receivedVoiceGuide.status === "AWAITING_LIVE_CERTIFICATION")
+    && typeof receivedVoiceGuide.configurationReady === "boolean"
+    && receivedVoiceGuide.liveCertified === false
+    && receivedVoiceGuide.readyForCommercialCalls === false
+    && (receivedVoiceGuide.activePhoneNumber == null
+      || typeof receivedVoiceGuide.activePhoneNumber === "string")
+    && Array.isArray(receivedVoiceGuide.steps)
+    && receivedVoiceGuide.steps.length > 0
+    && receivedVoiceGuide.steps.some(step => step?.code === "LIVE_CALL" && step.complete === false)
+    && receivedVoiceGuide.steps.every(step => step
+      && typeof step.code === "string"
+      && typeof step.label === "string"
+      && typeof step.complete === "boolean"
+      && typeof step.guidance === "string"
+      && (step.href === null || typeof step.href === "string"))
+  );
+  const voiceGuide = voiceGuideValid ? receivedVoiceGuide : null;
+
   const activationReady = metaStatus.data?.configured === true
     && metaStatus.data?.enabled === false
     && certification.data?.ready === true
@@ -449,22 +471,22 @@ export function ChannelsSettingsPanel({
 
           {!canRead && <p role="status">No tienes permiso para consultar la configuración de voz.</p>}
           {canRead && voiceReadiness.isPending && <p role="status">Revisando configuración de voz…</p>}
-          {canRead && voiceReadiness.isError && (
+          {canRead && (voiceReadiness.isError || (voiceReadiness.isSuccess && !voiceGuide)) && (
             <p role="alert">No pudimos comprobar la configuración. No se puede confirmar que la voz esté lista.</p>
           )}
-          {canRead && voiceReadiness.data && (
+          {canRead && voiceGuide && (
             <>
               <p className={styles.voiceSetupStatus} role="status">
-                {voiceReadiness.data.configurationReady
+                {voiceGuide.configurationReady
                   ? "Configuración completada. Falta certificar una llamada real autorizada."
                   : "Configuración incompleta. Corrige los pasos pendientes antes de probar una llamada."}
               </p>
-              {voiceReadiness.data.activePhoneNumber && (
-                <p>Número activo registrado: <strong>{voiceReadiness.data.activePhoneNumber}</strong>.
+              {voiceGuide.activePhoneNumber && (
+                <p>Número activo registrado: <strong>{voiceGuide.activePhoneNumber}</strong>.
                   Que figure activo no implica que Twilio y la IA funcionen en producción.</p>
               )}
               <ol className={styles.voiceSetupSteps}>
-                {voiceReadiness.data.steps.map(step => (
+                {voiceGuide.steps.map(step => (
                   <li key={step.code}>
                     <span className={step.complete ? styles.voiceSetupComplete : styles.voiceSetupPending}>
                       {step.complete ? "Completado" : "Pendiente"}
