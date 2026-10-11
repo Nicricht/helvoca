@@ -363,8 +363,11 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
         var foreign = requests.create(new BusinessRequestDtos.Create(
                 "GENERAL", "Tenant B private request", null, null, null,
                 RequestPriority.NORMAL, null));
+        UUID foreignOperation = jdbc.queryForObject(
+                "SELECT operation_id FROM business_request WHERE business_id = ? AND id = ?",
+                UUID.class, tenantB.getId(), foreign.id());
         var foreignActive = handoffs.createForUnresolvable(
-                tenantB.getId(), BusinessOperation.Type.REQUEST, null, UUID.randomUUID(),
+                tenantB.getId(), BusinessOperation.Type.REQUEST, null, foreignOperation,
                 "create_request", "HOME_TEST_FOREIGN", 0);
 
         authenticate(tenantA.getId());
@@ -424,7 +427,7 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
             inserted.add(id);
             jdbc.update("""
                     INSERT INTO human_handoff(
-                        id, business_id, operation_id, operation_type,
+                        id, business_id, source_reference_id, operation_type,
                         tool_name, reason_code, failure_class, priority, status,
                         safe_summary, created_at)
                     VALUES (?, ?, ?, 'REQUEST', 'home_qa', 'HOME_INBOX_LIMIT',
@@ -435,7 +438,7 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
         UUID foreignId = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO human_handoff(
-                    id, business_id, operation_id, operation_type,
+                    id, business_id, source_reference_id, operation_type,
                     tool_name, reason_code, failure_class, status, created_at)
                 VALUES (?, ?, ?, 'REQUEST', 'home_qa', 'HOME_FOREIGN_LIMIT',
                         'UNRESOLVABLE', 'OPEN', ?)
