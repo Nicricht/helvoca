@@ -779,6 +779,219 @@ test.describe('React Home migration', () => {
     expect(calls).toContain(30);
   });
 
+
+  test('keyboard Tab, Space and aria-pressed operate the sales period with a visible focus ring', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    const seven = value.getByRole('button', { name: '7 días' });
+    const thirty = value.getByRole('button', { name: '30 días' });
+    await expect(seven).toHaveAttribute('aria-pressed', 'true');
+    await seven.focus();
+    await page.keyboard.press('Tab');
+    await expect(thirty).toBeFocused();
+    const styles = await thirty.evaluate(el => ({
+      focusedByKeyboard: el.matches(':focus-visible'),
+      outline: getComputedStyle(el).outlineStyle,
+      width: parseFloat(getComputedStyle(el).outlineWidth)
+    }));
+    expect(styles.focusedByKeyboard).toBe(true);
+    expect(styles.outline).not.toBe('none');
+    expect(styles.width).toBeGreaterThanOrEqual(2);
+    await page.keyboard.press('Space');
+    await expect(thirty).toHaveAttribute('aria-pressed', 'true');
+    await expect(seven).toHaveAttribute('aria-pressed', 'false');
+    await expect.poll(() => state.requests.some(request =>
+      request.url.includes('/api/v1/commercial/analytics?days=30'))).toBe(true);
+    expect(state.attentionMutations()).toBe(0);
+  });
+
+  test('history expands with Enter and collapses with Space, reflecting aria-expanded', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.goto('/app');
+    const toggle = page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/ });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    const collapse = page.getByRole('button', { name: /Ocultar historial y auditoría/ });
+    await expect(collapse).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('heading', { name: 'Historial y auditoría' })).toBeVisible();
+    await collapse.focus();
+    await page.keyboard.press('Space');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('heading', { name: 'Historial y auditoría' })).toHaveCount(0);
+    expect(state.attentionMutations()).toBe(0);
+  });
+
+  test('keyboard cancellation of a destructive action never sends a close request', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await panel.getByRole('button', { name: 'Empezar gestión' }).click();
+    await expect(panel).toContainText('En progreso');
+    const resolve = panel.getByRole('button', { name: 'Marcar resuelta' });
+    await resolve.focus();
+    await page.keyboard.press('Enter');
+    const cancel = panel.getByRole('button', { name: 'Cancelar' });
+    await expect(cancel).toBeVisible();
+    await cancel.focus();
+    await page.keyboard.press('Space');
+    await expect(panel.getByRole('button', { name: 'Confirmar cierre' })).toHaveCount(0);
+    await expect(panel).toContainText('Cliente pidió devolución de llamada');
+    expect(state.attentionMutations()).toBe(1);
+  });
+
+  test('keyboard confirmation performs only the explicitly accepted request close', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await panel.getByRole('button', { name: 'Empezar gestión' }).click();
+    await expect(panel).toContainText('En progreso');
+    await panel.getByRole('button', { name: 'Marcar resuelta' }).click();
+    expect(state.attentionMutations()).toBe(1);
+    const confirm = panel.getByRole('button', { name: 'Confirmar cierre' });
+    await confirm.focus();
+    await page.keyboard.press('Enter');
+    await expect(panel).not.toContainText('Cliente pidió devolución de llamada');
+    expect(state.attentionMutations()).toBe(2);
+    const writes = state.requests.filter(req =>
+      !['GET', 'OPTIONS', 'HEAD'].includes(req.method) && req.url.includes('/api/v1/'));
+    expect(writes).toHaveLength(2);
+    expect(writes.every(req => req.url.includes('/api/v1/requests/req-1/status'))).toBe(true);
+  });
+
+  test('onboarding progress exposes an accurate numeric accessible value and keyboard link', async ({ page }) => {
+    const state = await bootHome(page, { onboarding: INCOMPLETE_ONBOARDING });
+    await page.goto('/app');
+    const section = page.getByRole('region', { name: 'Configura tu negocio' });
+    const progress = section.getByRole('progressbar', { name: 'Progreso de configuración' });
+    await expect(progress).toHaveAttribute('aria-valuemin', '0');
+    await expect(progress).toHaveAttribute('aria-valuemax', '100');
+    await expect(progress).toHaveAttribute('aria-valuenow', '25');
+    const link = section.getByRole('link', { name: /Continuar configuración/ });
+    await expect(link).toHaveAttribute('href', '/app/settings?section=services');
+    await link.focus();
+    await expect(link).toBeFocused();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    await expect(link).toBeFocused();
+    const visual = await link.evaluate(el => ({
+      focusVisible: el.matches(':focus-visible'),
+      style: getComputedStyle(el).outlineStyle,
+      size: parseFloat(getComputedStyle(el).outlineWidth)
+    }));
+    expect(visual.focusVisible).toBe(true);
+    expect(visual.style).not.toBe('none');
+    expect(visual.size).toBeGreaterThanOrEqual(2);
+    expect(state.attentionMutations()).toBe(0);
+    expect(state.requests.some(req => req.url.includes('/api/v1/operations/dashboard'))).toBe(false);
+  });
+
+  test('Home uses one page-level heading, labelled regions and decorative non-semantic layers', async ({ page }) => {
+    await bootHome(page);
+    await page.goto('/app');
+    await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toHaveCount(1);
+    for (const title of [
+      'Estado de tu negocio', 'Valor generado por RecepVoz',
+      'Resultados de hoy', 'Necesita tu atención', 'Última actividad'
+    ]) {
+      await expect(page.getByRole('region', { name: title })).toBeVisible();
+    }
+    await expect(page.locator('[data-home-ambient-layer][aria-hidden="true"]')).toHaveCount(0);
+    expect(await page.locator('[data-home-ambient-layer]').evaluateAll(items =>
+      items.every(item => item.closest('[aria-hidden="true"]') !== null))).toBe(true);
+  });
+
+  test('reduced motion removes animation and transition on the Home scene', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await bootHome(page);
+    await page.goto('/app');
+    await expect(page.getByRole('region', { name: 'Valor generado por RecepVoz' })).toBeVisible();
+    expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
+    const state = await page.evaluate(() => {
+      const atmosphere = document.querySelector('[data-home-ambient-layer="flow"]');
+      const section = document.querySelector('[aria-labelledby="homeValueTitle"]');
+      if (!atmosphere || !section) return null;
+      return {
+        ambience: getComputedStyle(atmosphere).animationName,
+        valueAnimationMs: getComputedStyle(section, '::before').animationDuration,
+        periodTransitionMs: getComputedStyle(
+          document.querySelector('[aria-label="Periodo del valor generado"] button')
+        ).transitionDuration
+      };
+    });
+    expect(state).not.toBeNull();
+    expect(state.ambience).toBe('none');
+    expect(state.valueAnimationMs).toMatch(/0\.0?1ms|0s|1e-05s|1e-5s/);
+    expect(state.periodTransitionMs).toMatch(/0\.0?1ms|0s|1e-05s|1e-5s/);
+  });
+
+  test('commercial pending state is announced and marked aria-busy without hiding operations', async ({ page }) => {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    await bootHome(page);
+    await page.route('**/api/v1/commercial/analytics**', async route => {
+      await gate;
+      return route.fulfill(json(READY_ANALYTICS));
+    });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toHaveAttribute('aria-busy', 'true');
+    await expect(value.getByRole('status')).toContainText('Calculando valor atribuido');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+    release();
+    await expect(value).toHaveAttribute('aria-busy', 'false');
+    await expect(value).toContainText('$209.900');
+  });
+
+  test('no provider/payment side effects arise from navigation-only tabs, refresh and history', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await value.getByRole('button', { name: 'Hoy' }).click();
+    await value.getByRole('button', { name: '30 días' }).click();
+    const attention = page.getByRole('region', { name: 'Necesita tu atención' });
+    await attention.getByRole('button', { name: 'Actualizar' }).click();
+    await page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/ }).click();
+    await expect(page.getByRole('heading', { name: 'Historial y auditoría' })).toBeVisible();
+    expect(state.attentionMutations()).toBe(0);
+    const writes = state.requests.filter(req =>
+      req.url.includes('/api/v1/') && !['GET', 'HEAD', 'OPTIONS'].includes(req.method));
+    expect(writes).toEqual([]);
+    expect(state.requests.filter(req => /twilio|outbound|whatsapp.*send|payments.*(?:charge|capture|create)/i.test(req.url))).toEqual([]);
+  });
+
+  for (const viewport of [
+    { name: 'small phone', width: 320, height: 640 },
+    { name: 'compact phone', width: 360, height: 740 },
+    { name: 'small laptop', width: 1024, height: 768 },
+    { name: 'wide desktop', width: 1920, height: 1080 }
+  ]) {
+    test('reflows important Home controls and avoids page overflow at ' + viewport.name, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await bootHome(page);
+      await page.goto('/app');
+      const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+      const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+      await expect(value).toBeVisible();
+      await expect(panel).toBeVisible();
+      for (const label of ['Hoy', '7 días', '30 días']) {
+        const button = value.getByRole('button', { name: label });
+        await expect(button).toBeVisible();
+        const bounds = await button.boundingBox();
+        expect(bounds).not.toBeNull();
+        expect(bounds.width).toBeGreaterThanOrEqual(24);
+        expect(bounds.height).toBeGreaterThanOrEqual(24);
+      }
+      const geometry = await page.evaluate(() => ({
+        document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        body: document.body.scrollWidth - document.body.clientWidth
+      }));
+      expect(geometry.document).toBeLessThanOrEqual(1);
+      expect(geometry.body).toBeLessThanOrEqual(1);
+    });
+  }
+
   for (const viewport of [
     { name: 'desktop', width: 1440, height: 900 },
     { name: 'tablet', width: 768, height: 1024 },
