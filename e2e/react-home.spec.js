@@ -674,6 +674,25 @@ test.describe('React Home migration', () => {
   test('audit tab filters and local CSV export are explicit, not background provider effects', async ({ page }) => {
     const state = await bootHome(page);
     const auditReads = [];
+    // The authenticated download uses native fetch() rather than apiRequest.
+    // Intercept it inside the isolated browser to avoid any local-network fallback
+    // or provider traffic, while keeping the real Blob/download behavior under test.
+    await page.addInitScript(() => {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = (resource, options) => {
+        const value = typeof resource === 'string' ? resource : resource.url;
+        if (new URL(value, location.origin).pathname === '/api/v1/audit/export') {
+          return Promise.resolve(new Response(new Blob(['actor,action\\n'], { type: 'text/csv' }), {
+            status: 200,
+            headers: {
+              'content-type': 'text/csv',
+              'content-disposition': 'attachment; filename="auditoria-test.csv"'
+            }
+          }));
+        }
+        return originalFetch(resource, options);
+      };
+    });
     await page.route('**/api/v1/audit**', route => {
       const url = new URL(route.request().url());
       auditReads.push(url);
