@@ -116,8 +116,8 @@ public class TwilioPhoneProvisioningClient {
             Map<?, ?> response = restClient.get()
                     .uri(builder -> builder
                             .path("/2010-04-01/Accounts/{accountSid}/IncomingPhoneNumbers.json")
-                            .queryParam("PhoneNumber", number)
-                            .build(account))
+                            .queryParam("PhoneNumber", "{verifiedNumber}")
+                            .build(account, number))
                     .headers(headers -> headers.setBasicAuth(account, properties.getAuthToken().trim()))
                     .retrieve()
                     .body(Map.class);
