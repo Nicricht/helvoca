@@ -39,6 +39,18 @@ public class PhoneProvisioningService {
         return new PhoneProvisioningStatusResponse(enabled, configured, enabled && configured, "TWILIO", message);
     }
 
+    /**
+     * Read-only diagnosis of the tenant's stored Twilio evidence.
+     * No carrier GET, purchase, activation, test call or database mutation.
+     */
+    public List<PhoneVoiceReadinessResponse> readiness() {
+        UUID businessId = tenantProvider.requireBusinessId();
+        String accountSid = twilio.managedAccountSid();
+        return repository.findAllByBusinessIdOrderByCreatedAtDesc(businessId).stream()
+                .map(phone -> PhoneVoiceReadinessResponse.from(phone, accountSid))
+                .toList();
+    }
+
     public List<AvailablePhoneNumberResponse> available(String country, String areaCode, int limit) {
         tenantProvider.requireBusinessId();
         return twilio.searchAvailable(country, areaCode, limit);
