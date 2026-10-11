@@ -250,6 +250,42 @@ class TwilioSubaccountVoiceBootstrapRunnerTest {
         assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrDenied().mode());
     }
 
+
+    @Test
+    void existingTenantPhoneWithAbsentOrEmptySidIsSafelyLinkedToVerifiedSid() throws Exception {
+        for (String previousSid : new String[] {null, ""}) {
+            PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+            TenantDatabaseContext context = new TenantDatabaseContext();
+            UUID tenant = UUID.randomUUID();
+            PhoneNumber anchor = new PhoneNumber();
+            anchor.setBusinessId(tenant);
+            when(phones.findByPhoneNumberAndActiveTrue(TENANT_PHONE)).thenReturn(Optional.of(anchor));
+            PhoneNumber existing = new PhoneNumber();
+            existing.setBusinessId(tenant);
+            existing.setPhoneNumber(PHONE);
+            existing.setExternalId(previousSid);
+            when(phones.findByPhoneNumber(PHONE)).thenReturn(Optional.of(existing));
+            when(phones.save(any())).thenAnswer(invocation -> {
+                assertEquals(TenantDatabaseContext.Mode.SYSTEM, context.currentOrDenied().mode());
+                return invocation.getArgument(0);
+            });
+            HttpClient http = mock(HttpClient.class);
+            HttpResponse<String> lookup = returnedPhone();
+            HttpResponse<String> update = updatedPhone();
+            when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                    .thenReturn(lookup, update);
+
+            var runner = new TwilioSubaccountVoiceBootstrapRunner(
+                    true, SUBACCOUNT_SID, PHONE, readyTwilio(), tenantSettings(), phones, context, http);
+            runner.run(null);
+            verify(http, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+            verify(phones).save(existing);
+            assertEquals(PHONE_SID, existing.getExternalId());
+            assertEquals(tenant, existing.getBusinessId());
+            assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrDenied().mode());
+        }
+    }
+
     @Test
     void doesNothingWhenDisabled() throws Exception {
         TwilioProperties twilio = new TwilioProperties();
