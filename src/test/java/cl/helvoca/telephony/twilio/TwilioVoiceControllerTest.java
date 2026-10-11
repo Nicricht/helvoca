@@ -56,7 +56,8 @@ class TwilioVoiceControllerTest {
 
         assertEquals(twiml, response.getBody());
         verify(router).route("+14355652512", "+56966939611", CALL_SID, "Sadachbia");
-        verifyNoInteractions(calls, summaries);
+        verify(calls).startInboundCall(CALL_SID, "+56966939611", "+14355652512");
+        verifyNoInteractions(summaries);
     }
 
     @Test
