@@ -41,3 +41,27 @@ Example **only**, not a recommendation or an actual price quote: if operations s
 6. Roll out to one consenting trial business with a small operational budget, manual monitoring and one-click emergency-off. Only after validation, consider self-service general availability.
 
 No provider requests, production environment variable changes, price assumptions or extra Railway services are part of this PR.
+
+## Gemini opt-in for business import (PR #777)
+
+Dedicated Gemini document import works through the existing authenticated preview endpoint.
+It extracts products, FAQ and business hours for human review. Extras and promotions
+are NOT automatically published or silently converted into catalog items.
+The API adapter defaults to OFF; the presence of a live voice API key does not enable it.
+
+Use a separate import-only key, never the existing GEMINI_API_KEY used by voice:
+- HELVOCA_BUSINESS_IMPORT_AI_PROVIDER=gemini
+- HELVOCA_BUSINESS_IMPORT_GEMINI_API_KEY: dedicated private key, not committed
+- HELVOCA_BUSINESS_IMPORT_GEMINI_MODEL=gemini-3.5-flash-lite
+- HELVOCA_BUSINESS_IMPORT_AI_ENABLED remains false until explicit cost authorization.
+
+Global/tenant shared AI budget, subscription entitlement, max attempts and reserved
+cents still require positive operator-configured values. A zero budget blocks requests.
+The provider token receipt records Gemini promptTokenCount/candidatesTokenCount, not
+document contents, and does NOT prove actual charges are zero. Never enable paid
+requests without verified provider quotas and billing restrictions.
+
+Real provider calls from the Java server and tenant-safe E2E are still pending.
+The verified PowerShell Gemini request was a separate offline test of 11 products.
+Do not deploy or merge this draft until exact-head CI passes and the operator
+explicitly approves the separate project key and provider use.
