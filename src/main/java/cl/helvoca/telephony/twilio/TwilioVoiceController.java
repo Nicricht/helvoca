@@ -32,6 +32,9 @@ public class TwilioVoiceController {
     private final TwilioProperties properties;
     private TwilioCertificationIngressTokenGate certificationIngressTokenGate;
 
+    @Autowired
+    private TwilioCallBindingGuard bindingGuard;
+
     @Autowired(required = false)
     private ControlledPilotExternalEffectGuard pilotExternalEffects;
 
@@ -63,15 +66,17 @@ public class TwilioVoiceController {
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> incoming(@RequestParam("CallSid") String callSid,
                                            @RequestParam("From") String from,
-                                           @RequestParam("To") String to) {
-        return route(to, from, callSid, "inbound", null, null);
+                                           @RequestParam("To") String to,
+                                           @RequestParam("AccountSid") String accountSid) {
+        return route(to, from, callSid, "inbound", null, null, accountSid);
     }
 
     @PostMapping(value = "/outbound-test", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> outboundTest(@RequestParam("CallSid") String callSid,
                                                @RequestParam("From") String from,
-                                               @RequestParam("To") String to) {
+                                               @RequestParam("To") String to,
+                                               @RequestParam("AccountSid") String accountSid) {
         if (!VoiceCallRouter.validCertificationProviderOverride(certificationProviderOverride)) {
             log.warn("Blocked Twilio outbound-test call={} because certification provider override is invalid",
                     callSid);
@@ -81,19 +86,20 @@ public class TwilioVoiceController {
         String providerOverride =
                 VoiceCallRouter.normalizeCertificationProviderOverride(certificationProviderOverride);
         String voiceOverride = VoiceBakeOffCatalog.normalize(certificationVoiceOverride);
-        return route(from, to, callSid, "outbound-test", providerOverride, voiceOverride);
+        return route(from, to, callSid, "outbound-test", providerOverride, voiceOverride, accountSid);
     }
 
     @PostMapping(value = "/inbound-certification", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
             produces = MediaType.APPLICATION_XML_VALUE)
     public ResponseEntity<String> inboundCertification(@RequestParam("CallSid") String callSid,
                                                        @RequestParam("From") String from,
-                                                       @RequestParam("To") String to) {
+                                                       @RequestParam("To") String to,
+                                                       @RequestParam("AccountSid") String accountSid) {
         if (!properties.isCertificationIngressEnabled()) {
             log.warn("Blocked disabled Twilio certification ingress call={}", callSid);
             return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
-        return route(from, to, callSid, "inbound-certification", null, null);
+        return route(from, to, callSid, "inbound-certification", null, null, accountSid);
     }
 
     @PostMapping(value = "/inbound-certification/{token}",
@@ -102,7 +108,8 @@ public class TwilioVoiceController {
     public ResponseEntity<String> oneShotInboundCertification(@PathVariable String token,
                                                               @RequestParam("CallSid") String callSid,
                                                               @RequestParam("From") String from,
-                                                              @RequestParam("To") String to) {
+                                                              @RequestParam("To") String to,
+                                                              @RequestParam("AccountSid") String accountSid) {
         boolean authorized = certificationIngressTokenGate != null
                 && certificationIngressTokenGate.authorize(token, callSid, from, to);
         if (!authorized) {
@@ -110,14 +117,19 @@ public class TwilioVoiceController {
             return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
         log.info("Authorized one-shot Twilio certification ingress call={}", callSid);
-        return route(from, to, callSid, "inbound-certification", null, null);
+        return route(from, to, callSid, "inbound-certification", null, null, accountSid);
     }
 
     @PostMapping(value = "/stream-status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<Void> streamStatus(@RequestParam("StreamSid") String streamSid,
                                              @RequestParam("StreamEvent") String streamEvent,
                                              @RequestParam(value = "CallSid", required = false) String callSid,
-                                             @RequestParam(value = "StreamError", required = false) String streamError) {
+                                             @RequestParam(value = "StreamError", required = false) String streamError,
+                                             @RequestParam("AccountSid") String accountSid) {
+        if (bindingGuard == null || !bindingGuard.allowsStreamCallback(callSid, streamSid, accountSid)) {
+            log.warn("Ignoring unbound Twilio stream callback");
+            return ResponseEntity.noContent().build();
+        }
         if ("stream-stopped".equalsIgnoreCase(streamEvent)
                 || "stream-error".equalsIgnoreCase(streamEvent)) {
             calls.markStreamStopped(streamSid);
@@ -134,7 +146,12 @@ public class TwilioVoiceController {
     @PostMapping(value = "/status", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<Void> status(@RequestParam("CallSid") String callSid,
                                        @RequestParam("CallStatus") String callStatus,
-                                       @RequestParam(value = "CallDuration", required = false) Integer callDuration) {
+                                       @RequestParam(value = "CallDuration", required = false) Integer callDuration,
+                                       @RequestParam("AccountSid") String accountSid) {
+        if (bindingGuard == null || !bindingGuard.allowsCallback(callSid, accountSid)) {
+            log.warn("Ignoring unbound Twilio status callback");
+            return ResponseEntity.noContent().build();
+        }
         try {
             UUID callId = calls.updateStatus(callSid, callStatus, callDuration);
             if (TwilioCallService.mapStatus(callStatus).terminal()) {
@@ -151,7 +168,12 @@ public class TwilioVoiceController {
                                          String callSid,
                                          String direction,
                                          String providerOverride,
-                                         String voiceOverride) {
+                                         String voiceOverride,
+                                         String accountSid) {
+        if (bindingGuard == null || !bindingGuard.allowsIncoming(callSid, businessPhone, callerPhone, accountSid)) {
+            log.warn("Rejecting Twilio ingress with uncertified number or inconsistent tenant call binding");
+            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+        }
         if (pilotExternalEffects != null && pilotPhoneNumbers != null) {
             UUID businessId = pilotPhoneNumbers.findByPhoneNumberAndActiveTrue(businessPhone)
                     .map(phone -> phone.getBusinessId())
@@ -173,19 +195,20 @@ public class TwilioVoiceController {
             }
         }
 
-        if (!"outbound-test".equals(direction)) {
-            try {
-                UUID callId = calls.startInboundCall(callSid, callerPhone, businessPhone);
-                if ("inbound-certification".equals(direction)) {
-                    calls.markCertification(callId);
-                }
-            } catch (CallCapacityExceededException e) {
-                log.warn("Rejecting Twilio {} call={} because tenant capacity is full", direction, callSid);
-                return ResponseEntity.ok(BUSY_REJECT_TWIML);
-            } catch (NotFoundException e) {
-                log.warn("Blocking Twilio {} call={} because destination is not registered", direction, callSid);
-                return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+        // Outbound test calls must also be admitted and persisted BEFORE TwiML
+        // is issued; otherwise their subsequent media socket has no trusted call
+        // to bind to, and unauthenticated callers could create one from WS input.
+        try {
+            UUID callId = calls.startInboundCall(callSid, callerPhone, businessPhone);
+            if ("inbound-certification".equals(direction)) {
+                calls.markCertification(callId);
             }
+        } catch (CallCapacityExceededException e) {
+            log.warn("Rejecting Twilio {} call={} because tenant capacity is full", direction, callSid);
+            return ResponseEntity.ok(BUSY_REJECT_TWIML);
+        } catch (NotFoundException e) {
+            log.warn("Blocking Twilio {} call={} because destination is not registered", direction, callSid);
+            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
 
         var routeDecision = providerOverride != null

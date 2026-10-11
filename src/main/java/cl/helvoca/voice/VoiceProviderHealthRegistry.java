@@ -1,9 +1,12 @@
 package cl.helvoca.voice;
 
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+import io.micrometer.core.instrument.MeterRegistry;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -16,9 +19,24 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class VoiceProviderHealthRegistry {
     private final Map<String, Circuit> circuits = new ConcurrentHashMap<>();
+    private MeterRegistry meters;
+
+    @Autowired(required = false)
+    void setMeters(MeterRegistry meters) {
+        this.meters = meters;
+    }
+
+    private void record(String metric, String key, String value) {
+        if (meters != null) {
+            meters.counter(metric, key, value).increment();
+        }
+    }
 
     public boolean allow(String providerId, boolean configured) {
-        if (!configured) return false;
+        if (!configured) {
+            record("helvoca.voice.provider.admission.rejected", "reason", "unconfigured");
+            return false;
+        }
         Circuit circuit = circuits.get(normalize(providerId));
         if (circuit == null) return true;
         Instant blockedUntil = circuit.blockedUntil();
@@ -26,11 +44,14 @@ public class VoiceProviderHealthRegistry {
             circuits.remove(normalize(providerId), circuit);
             return true;
         }
+        record("helvoca.voice.provider.admission.rejected", "reason", "circuit_open");
         return false;
     }
 
     public void success(String providerId) {
-        circuits.remove(normalize(providerId));
+        if (circuits.remove(normalize(providerId)) != null) {
+            record("helvoca.voice.provider.circuit.recovered", "reason", "success");
+        }
     }
 
     public void failure(String providerId, FailureKind kind, String reason) {
@@ -40,7 +61,9 @@ public class VoiceProviderHealthRegistry {
             case SESSION, UPSTREAM -> Duration.ofSeconds(30);
             case UNKNOWN -> Duration.ofSeconds(15);
         };
+        // Raw provider errors may include secrets or caller data.
         circuits.put(normalize(providerId), new Circuit(kind, safe(reason), Instant.now().plus(duration)));
+        record("helvoca.voice.provider.circuit.opened", "kind", kind.name().toLowerCase(Locale.ROOT));
     }
 
     public ProviderHealth snapshot(String providerId, boolean configured) {
@@ -84,7 +107,6 @@ public class VoiceProviderHealthRegistry {
     }
 
     private static String safe(String value) {
-        if (value == null || value.isBlank()) return "provider failure";
-        return value.length() <= 240 ? value : value.substring(0, 240);
+        return "Provider temporarily unavailable";
     }
 }

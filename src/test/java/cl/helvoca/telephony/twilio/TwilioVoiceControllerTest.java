@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 class TwilioVoiceControllerTest {
+    private static final String ACCOUNT_SID = "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private static final String SILENT_HANGUP =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>";
     private static final String BUSY_REJECT =
@@ -28,7 +29,13 @@ class TwilioVoiceControllerTest {
                                                     boolean certificationEnabled) {
         TwilioProperties properties = new TwilioProperties();
         properties.setCertificationIngressEnabled(certificationEnabled);
-        return new TwilioVoiceController(calls, router, summaries, properties);
+        TwilioVoiceController controller = new TwilioVoiceController(calls, router, summaries, properties);
+        TwilioCallBindingGuard guard = mock(TwilioCallBindingGuard.class);
+        when(guard.allowsIncoming(anyString(), anyString(), anyString(), anyString())).thenReturn(true);
+        when(guard.allowsCallback(anyString(), anyString())).thenReturn(true);
+        when(guard.allowsStreamCallback(anyString(), anyString(), anyString())).thenReturn(true);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "bindingGuard", guard);
+        return controller;
     }
 
     @Test
@@ -45,11 +52,12 @@ class TwilioVoiceControllerTest {
                         "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
 
         var response = controller.outboundTest(
-                CALL_SID, "+14355652512", "+56966939611");
+                CALL_SID, "+14355652512", "+56966939611", ACCOUNT_SID);
 
         assertEquals(twiml, response.getBody());
         verify(router).route("+14355652512", "+56966939611", CALL_SID, "Sadachbia");
-        verifyNoInteractions(calls, summaries);
+        verify(calls).startInboundCall(CALL_SID, "+56966939611", "+14355652512");
+        verifyNoInteractions(summaries);
     }
 
     @Test
@@ -66,7 +74,7 @@ class TwilioVoiceControllerTest {
                         "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
 
         var response = controller.outboundTest(
-                CALL_SID, "+14355652512", "+56966939611");
+                CALL_SID, "+14355652512", "+56966939611", ACCOUNT_SID);
 
         assertEquals(twiml, response.getBody());
         verify(router).route("+14355652512", "+56966939611", CALL_SID);
@@ -84,7 +92,7 @@ class TwilioVoiceControllerTest {
                         "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
 
         var response = controller(calls, router, summaries, false)
-                .incoming(CALL_SID, "+56911111111", "+14355652512");
+                .incoming(CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(twiml, response.getBody());
@@ -103,7 +111,7 @@ class TwilioVoiceControllerTest {
                 .when(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
 
         var response = controller(calls, router, summaries, false)
-                .incoming(CALL_SID, "+56911111111", "+14355652512");
+                .incoming(CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(BUSY_REJECT, response.getBody());
@@ -123,7 +131,7 @@ class TwilioVoiceControllerTest {
                         "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
 
         var response = controller(calls, router, summaries, true)
-                .inboundCertification(CALL_SID, "+14355652512", "+56911111111");
+                .inboundCertification(CALL_SID, "+14355652512", "+56911111111", ACCOUNT_SID);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(twiml, response.getBody());
@@ -153,7 +161,7 @@ class TwilioVoiceControllerTest {
         controller.setCertificationIngressTokenGate(gate);
 
         var response = controller.oneShotInboundCertification(
-                token, CALL_SID, "+14355652512", "+56966939611");
+                token, CALL_SID, "+14355652512", "+56966939611", ACCOUNT_SID);
 
         assertEquals(twiml, response.getBody());
         verify(gate).authorize(token, CALL_SID, "+14355652512", "+56966939611");
@@ -175,7 +183,7 @@ class TwilioVoiceControllerTest {
         controller.setCertificationIngressTokenGate(gate);
 
         var response = controller.oneShotInboundCertification(
-                token, CALL_SID, "+14355652512", "+56966939611");
+                token, CALL_SID, "+14355652512", "+56966939611", ACCOUNT_SID);
 
         assertEquals(SILENT_HANGUP, response.getBody());
         verifyNoInteractions(router, calls, summaries);
@@ -188,7 +196,7 @@ class TwilioVoiceControllerTest {
         CallSummaryService summaries = mock(CallSummaryService.class);
 
         var response = controller(calls, router, summaries, false)
-                .inboundCertification(CALL_SID, "+14355652512", "+56911111111");
+                .inboundCertification(CALL_SID, "+14355652512", "+56911111111", ACCOUNT_SID);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(SILENT_HANGUP, response.getBody());
@@ -203,7 +211,7 @@ class TwilioVoiceControllerTest {
         when(router.route("+14355652512", "+56911111111", CALL_SID)).thenReturn(Optional.empty());
 
         var response = controller(calls, router, summaries, false)
-                .incoming(CALL_SID, "+56911111111", "+14355652512");
+                .incoming(CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID);
 
         assertEquals(SILENT_HANGUP, response.getBody());
         verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
@@ -236,7 +244,7 @@ class TwilioVoiceControllerTest {
         ReflectionTestUtils.setField(controller, "pilotPhoneNumbers", phones);
 
         var response = controller.incoming(
-                CALL_SID, "+56911111111", "+14355652512");
+                CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID);
 
         assertEquals(SILENT_HANGUP, response.getBody());
         verifyNoInteractions(calls, router, summaries);
@@ -272,7 +280,7 @@ class TwilioVoiceControllerTest {
         ReflectionTestUtils.setField(controller, "pilotPhoneNumbers", phones);
 
         var response = controller.incoming(
-                CALL_SID, "+56911111111", "+14355652512");
+                CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID);
 
         assertEquals(twiml, response.getBody());
         verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
@@ -286,7 +294,7 @@ class TwilioVoiceControllerTest {
         CallSummaryService summaries = mock(CallSummaryService.class);
 
         var response = controller(calls, router, summaries, false)
-                .streamStatus("MZ-1", "stream-error", CALL_SID, "network");
+                .streamStatus("MZ-1", "stream-error", CALL_SID, "network", ACCOUNT_SID);
 
         assertEquals(204, response.getStatusCode().value());
         verify(calls).markStreamStopped("MZ-1");
@@ -300,7 +308,7 @@ class TwilioVoiceControllerTest {
         UUID callId = UUID.randomUUID();
         when(calls.updateStatus(CALL_SID, "completed", 42)).thenReturn(callId);
 
-        var response = controller(calls, router, summaries, false).status(CALL_SID, "completed", 42);
+        var response = controller(calls, router, summaries, false).status(CALL_SID, "completed", 42, ACCOUNT_SID);
 
         assertEquals(204, response.getStatusCode().value());
         verify(summaries).generate(callId);
@@ -313,9 +321,75 @@ class TwilioVoiceControllerTest {
         CallSummaryService summaries = mock(CallSummaryService.class);
         when(calls.updateStatus(CALL_SID, "in-progress", null)).thenReturn(UUID.randomUUID());
 
-        var response = controller(calls, router, summaries, false).status(CALL_SID, "in-progress", null);
+        var response = controller(calls, router, summaries, false).status(CALL_SID, "in-progress", null, ACCOUNT_SID);
 
         assertEquals(204, response.getStatusCode().value());
         verifyNoInteractions(summaries);
     }
+    @Test
+    void uncertifiedOrCrossTenantInboundCallNeverTouchesLifecycleOrAi() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        TwilioCallBindingGuard gate =
+                (TwilioCallBindingGuard) ReflectionTestUtils.getField(controller, "bindingGuard");
+        when(gate.allowsIncoming(CALL_SID, "+14355652512", "+56911111111", ACCOUNT_SID))
+                .thenReturn(false);
+
+        var response = controller.incoming(CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID);
+
+        assertEquals(SILENT_HANGUP, response.getBody());
+        verifyNoInteractions(calls, router, summaries);
+    }
+
+    @Test
+    void crossTenantStatusAndStreamCallbackCannotMutateAnotherCall() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        TwilioCallBindingGuard gate =
+                (TwilioCallBindingGuard) ReflectionTestUtils.getField(controller, "bindingGuard");
+        when(gate.allowsCallback(CALL_SID, ACCOUNT_SID)).thenReturn(false);
+        when(gate.allowsStreamCallback(CALL_SID, "MZ-foreign", ACCOUNT_SID)).thenReturn(false);
+
+        assertEquals(204, controller.status(CALL_SID, "completed", 30, ACCOUNT_SID).getStatusCode().value());
+        assertEquals(204, controller.streamStatus(
+                "MZ-foreign", "stream-stopped", CALL_SID, null, ACCOUNT_SID).getStatusCode().value());
+        verifyNoInteractions(calls, router, summaries);
+    }
+
+    @Test
+    void missingCarrierBindingGuardFailsClosed() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        TwilioVoiceController controller = new TwilioVoiceController(
+                calls, router, summaries, new TwilioProperties());
+
+        assertEquals(SILENT_HANGUP, controller.incoming(
+                CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID).getBody());
+        assertEquals(204, controller.status(
+                CALL_SID, "completed", 30, ACCOUNT_SID).getStatusCode().value());
+        assertEquals(204, controller.streamStatus(
+                "MZ-foreign", "stream-error", CALL_SID, "failed", ACCOUNT_SID).getStatusCode().value());
+        verifyNoInteractions(calls, router, summaries);
+    }
+
+    @Test
+    void missingDestinationAfterCarrierAttestationStillHangsUpWithoutAi() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        doThrow(new cl.helvoca.common.NotFoundException("number removed"))
+                .when(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
+
+        var response = controller(calls, router, summaries, false)
+                .incoming(CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID);
+
+        assertEquals(SILENT_HANGUP, response.getBody());
+        verifyNoInteractions(router, summaries);
+    }
+
 }
