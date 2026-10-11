@@ -604,8 +604,9 @@ export function HomePage() {
   const roles = meQuery.data?.roles ?? [];
   // Match the server's hasAnyRole('BUSINESS_ADMIN', 'OPERATOR') operations contract.
   const canReadOperations = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
-  const onboardingValid = hasValidOnboardingStatus(onboardingQuery.data);
-  const adminReady = !isAdmin || (onboardingValid && onboardingQuery.data.readyForCalls === true);
+  const onboardingStatus = onboardingQuery.data;
+  const onboardingValid = hasValidOnboardingStatus(onboardingStatus);
+  const adminReady = !isAdmin || (onboardingValid && onboardingStatus.readyForCalls === true);
   const readyToLoad = Boolean(meQuery.data) && canReadOperations && adminReady;
   const restricted = Boolean(meQuery.data) && !canReadOperations;
   const canReadAttention = canReadOperations;
@@ -649,7 +650,7 @@ export function HomePage() {
   const onboardingIncomplete =
     isAdmin &&
     onboardingValid &&
-    onboardingQuery.data.readyForCalls === false;
+    onboardingStatus.readyForCalls === false;
   const onboardingFailed = isAdmin &&
     (onboardingQuery.isError || (onboardingQuery.isSuccess && !onboardingValid));
 
