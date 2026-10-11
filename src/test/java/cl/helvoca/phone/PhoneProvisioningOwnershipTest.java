@@ -6,6 +6,7 @@ import cl.helvoca.telephony.twilio.TwilioPhoneProvisioningClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -291,6 +292,14 @@ class PhoneProvisioningOwnershipTest {
         attested();
         service.connectExisting(new PhoneNumberRequest(PHONE, null, true));
         assertNotNull(verifySave().getVoiceVerifiedAt());
+    }
+
+    @Test
+    void availableNumbersRequireTenantAndDelegateToManagedProvider() {
+        when(twilio.searchAvailable("US", "202", 5)).thenReturn(List.of());
+        assertTrue(service.available("US", "202", 5).isEmpty());
+        verify(tenant).requireBusinessId();
+        verify(twilio).searchAvailable("US", "202", 5);
     }
 
     private PhoneNumber verifySave() {
