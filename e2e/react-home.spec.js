@@ -365,12 +365,18 @@ test.describe('React Home migration', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Estado de tu negocio' })).toContainText(/todo bajo control|necesita tu atención/i);
 
-    const heroBox = await page.getByRole('region', { name: 'Estado de tu negocio' }).boundingBox();
+    const hero = page.getByRole('region', { name: 'Estado de tu negocio' });
+    const heroBox = await hero.boundingBox();
     expect(heroBox).not.toBeNull();
-    expect(heroBox.height).toBeLessThanOrEqual(190);
+    // The accessible hero is content-sized: it must not clip or overlap its next section.
+    expect(heroBox.height).toBeGreaterThanOrEqual(168);
+    expect(await hero.evaluate(node => node.scrollHeight <= node.clientHeight + 2)).toBe(true);
 
     const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
     await expect(value).toBeVisible();
+    const valueBox = await value.boundingBox();
+    expect(valueBox).not.toBeNull();
+    expect(valueBox.y).toBeGreaterThanOrEqual(heroBox.y + heroBox.height - 2);
     await expect(value).toContainText(/valor.*atribuido|ventas.*atribuidas/i);
     await expect(value).toContainText('$209.900');
     await expect(value).toContainText(/4 pedidos|2 reservas/i);
