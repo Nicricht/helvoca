@@ -625,6 +625,12 @@ export function HomePage() {
   const reduceMotion = useReducedMotion();
   const [salesDays, setSalesDays] = useState(7);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Retain an actionable error with visible progress while awaiting a manual retry.
+  const [retrying, setRetrying] = useState<"identity" | "onboarding" | "operations" | null>(null);
+  function retry(target: "identity" | "onboarding" | "operations", fetcher: () => Promise<unknown>) {
+    setRetrying(target);
+    void fetcher().finally(() => setRetrying(null));
+  }
 
   const meQuery = useQuery({
     // AppShell reads the same identity; share the cache and the underlying HTTP request.
@@ -693,10 +699,11 @@ export function HomePage() {
   const onboardingFailed = isAdmin &&
     (onboardingQuery.isError || (onboardingQuery.isSuccess && !onboardingValid));
 
-  const loading =
+  const loading = retrying === null && (
     meQuery.isPending ||
     (isAdmin && onboardingQuery.isPending) ||
-    (readyToLoad && operationsQuery.isPending);
+    (readyToLoad && operationsQuery.isPending)
+  );
 
   return (
     <AppShell>
@@ -713,7 +720,7 @@ export function HomePage() {
           <h1>Inicio</h1>
         </header>
 
-        {meQuery.isError ? (
+        {meQuery.isError || retrying === "identity" ? (
           <div className={styles.errorState} role="alert">
             <TriangleAlert size={20} aria-hidden="true" />
             <div>
@@ -723,15 +730,15 @@ export function HomePage() {
             <button
               className={styles.errorRetry}
               type="button"
-              disabled={meQuery.isFetching}
-              onClick={() => void meQuery.refetch()}
+              disabled={meQuery.isFetching || retrying === "identity"}
+              onClick={() => retry("identity", () => meQuery.refetch())}
             >
-              {meQuery.isFetching ? "Reintentando…" : "Reintentar"}
+              {retrying === "identity" ? "Reintentando…" : "Reintentar"}
             </button>
           </div>
         ) : onboardingIncomplete && onboardingQuery.data ? (
           <OnboardingCard status={onboardingQuery.data} />
-        ) : onboardingFailed ? (
+        ) : onboardingFailed || retrying === "onboarding" ? (
           <div className={styles.errorState} role="alert">
             <TriangleAlert size={20} aria-hidden="true" />
             <div>
@@ -741,10 +748,10 @@ export function HomePage() {
             <button
               className={styles.errorRetry}
               type="button"
-              disabled={onboardingQuery.isFetching}
-              onClick={() => void onboardingQuery.refetch()}
+              disabled={onboardingQuery.isFetching || retrying === "onboarding"}
+              onClick={() => retry("onboarding", () => onboardingQuery.refetch())}
             >
-              {onboardingQuery.isFetching ? "Reintentando…" : "Reintentar"}
+              {retrying === "onboarding" ? "Reintentando…" : "Reintentar"}
             </button>
           </div>
         ) : loading ? (
@@ -763,7 +770,7 @@ export function HomePage() {
               <span>Los datos de actividad y pendientes de otros negocios permanecen protegidos.</span>
             </div>
           </div>
-        ) : operationsQuery.isError ? (
+        ) : operationsQuery.isError || retrying === "operations" ? (
           <div className={styles.errorState} role="alert">
             <TriangleAlert size={20} aria-hidden="true" />
             <div>
@@ -773,10 +780,10 @@ export function HomePage() {
             <button
               className={styles.errorRetry}
               type="button"
-              disabled={operationsQuery.isFetching}
-              onClick={() => void operationsQuery.refetch()}
+              disabled={operationsQuery.isFetching || retrying === "operations"}
+              onClick={() => retry("operations", () => operationsQuery.refetch())}
             >
-              {operationsQuery.isFetching ? "Reintentando…" : "Reintentar"}
+              {retrying === "operations" ? "Reintentando…" : "Reintentar"}
             </button>
           </div>
         ) : operationsQuery.data ? (
@@ -827,10 +834,10 @@ export function HomePage() {
             <button
               className={styles.errorRetry}
               type="button"
-              disabled={operationsQuery.isFetching}
-              onClick={() => void operationsQuery.refetch()}
+              disabled={operationsQuery.isFetching || retrying === "operations"}
+              onClick={() => retry("operations", () => operationsQuery.refetch())}
             >
-              Reintentar
+              {retrying === "operations" ? "Reintentando…" : "Reintentar"}
             </button>
           </div>
         )}
