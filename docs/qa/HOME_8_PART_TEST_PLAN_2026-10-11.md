@@ -97,7 +97,8 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 ## Phase 8 final release verification
 
 - [x] Inspected exact PR HEAD and historical GitHub Actions; failures on earlier phase 4 and 5 runs were isolated to the same Home transient identity retry assertion while backend 1,915 tests succeeded.
-- [x] Diagnosed implicit React Query default retry (1) conflicting with an explicit-retry test. Disable silent automatic retry only for Home identity, and use a single deterministic mock 503 before the user's retry.
+- [x] Diagnosed two independent issues in the identity retry test: React Query's implicit retry and duplicate identity queries from Home (`["home","me"]`) and AppShell (`["auth","me"]`). Both now share `["auth","me"]`, use `retry: false`, and exercise one 503 followed by one explicit retry, asserting the request count.
+- [x] Resolved historical fixed-height hero test incompatible with accessible content reflow; now assert the text fits and the following commercial panel never overlaps.
 - [ ] Exact-HEAD Full Gate including Playwright, backend/JaCoCo, real-stack PostgreSQL, Golden Journey, webhook smoke and frontend inventory coverage.
 - [ ] Confirm no remaining failures, verify Java differential coverage gate and publish objective release evidence; do not claim global 100% feature coverage.
 - [ ] Merge/deploy requires separate explicit approval.

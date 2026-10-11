@@ -625,9 +625,10 @@ export function HomePage() {
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const meQuery = useQuery({
-    queryKey: ["home", "me"],
+    // AppShell reads the same identity; share the cache and the underlying HTTP request.
+    queryKey: ["auth", "me"],
     queryFn: getCurrentUser,
-    // Identity reads must not silently recover before the user can inspect a failure.
+    // Authentication errors remain visible until an explicit user retry.
     retry: false
   });
 

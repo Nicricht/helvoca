@@ -853,10 +853,15 @@ test.describe('React Home migration', () => {
     const error = page.locator('main[data-visual-page="home"] [role="alert"]');
     await expect(error).toContainText('No pudimos verificar tus permisos de acceso.');
     expect(api.requests.some(request => request.url.includes('/operations/dashboard'))).toBe(false);
+    // Home and AppShell must share one identity read instead of racing two GETs.
+    const identityReads = () => api.requests.filter(request =>
+      new URL(request.url).pathname === '/api/v1/auth/me').length;
+    expect(identityReads()).toBe(1);
 
     await error.getByRole('button', { name: 'Reintentar' }).click();
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
     await expect(error).toHaveCount(0);
+    expect(identityReads()).toBe(2);
     expect(api.attentionMutations()).toBe(0);
   });
 
