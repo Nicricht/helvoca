@@ -186,8 +186,10 @@ function HeroOverview({ dashboard, attention }: { dashboard: OperationsDashboard
 
         <h2>Tu negocio está siendo atendido.</h2>
         <p>
-          Hoy se registraron <strong>{dashboard.callsToday}</strong> llamadas y{" "}
-          <strong>{dashboard.bookingsToday}</strong> reservas.
+          Hoy se registraron <strong>{dashboard.callsToday}</strong>{" "}
+          {dashboard.callsToday === 1 ? "llamada" : "llamadas"} y{" "}
+          <strong>{dashboard.bookingsToday}</strong>{" "}
+          {dashboard.bookingsToday === 1 ? "reserva" : "reservas"}.
         </p>
 
         {pending > 0 && (

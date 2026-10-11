@@ -138,7 +138,7 @@ class OperationsDashboardServiceTest {
         assertEquals("FAILED", dashboard.recentCalls().getFirst().status());
         assertEquals("FAILED", dashboard.recentCalls().getFirst().resolution());
         assertEquals("+56910000000", dashboard.recentCalls().getFirst().callerNumber());
-        assertEquals(40, dashboard.recentCalls().getFirst().durationSeconds());
+        assertEquals(Integer.valueOf(40), dashboard.recentCalls().getFirst().durationSeconds());
         verify(bookings).countByBusinessIdAndStatusNotAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
                 eq(businessId), eq(BookingStatus.CANCELLED), any(Instant.class), any(Instant.class));
     }

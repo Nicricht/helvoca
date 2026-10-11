@@ -394,7 +394,7 @@ test.describe('React Home migration', () => {
 
     const hero = page.getByRole('region', { name: 'Estado de tu negocio' });
     const today = page.getByRole('region', { name: 'Resultados de hoy' });
-    await expect(hero).toContainText('Hoy se registraron 2 llamadas y 1 reservas.');
+    await expect(hero).toContainText('Hoy se registraron 2 llamadas y 1 reserva.');
     await expect(hero).not.toContainText(/atendió|creó/i);
     await expect(today).toContainText('Llamadas registradas');
     await expect(today).toContainText('Reservas registradas');
@@ -402,6 +402,21 @@ test.describe('React Home migration', () => {
     await expect(page.getByRole('region', { name: 'Necesita tu atención' }))
       .toContainText('2 fallos de llamada');
     expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('single call and zero bookings render grammatically accurate daily summary', async ({ page }) => {
+    await bootHome(page, {
+      operations: {
+        ...EMPTY_OPERATIONS,
+        callsToday: 1,
+        recentCalls: []
+      },
+      attention: []
+    });
+    await page.goto('/app');
+    const hero = page.getByRole('region', { name: 'Estado de tu negocio' });
+    await expect(hero).toContainText('1 llamada y 0 reservas.');
+    await expect(hero).not.toContainText('1 llamadas');
   });
 
   test('in-progress provider call displays live status without manufacturing a completed call', async ({ page }) => {
