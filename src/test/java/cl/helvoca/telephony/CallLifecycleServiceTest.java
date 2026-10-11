@@ -43,6 +43,23 @@ class CallLifecycleServiceTest {
     }
 
     @Test
+    void delayedNonterminalCarrierCallbacksNeverResurrectClosedCalls() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallLifecycleService lifecycle = lifecycle(
+                mock(PhoneNumberRepository.class), mock(CustomerRepository.class), calls, new CallCommercialProperties());
+        CallSession call = new CallSession();
+        call.setStatus(CallStatus.COMPLETED);
+        call.setStartedAt(Instant.now().minusSeconds(30));
+        call.setEndedAt(Instant.now());
+        when(calls.findByProviderCallId("CA-stale")).thenReturn(Optional.of(call));
+
+        lifecycle.updateStatus("CA-stale", "ringing", null);
+
+        assertEquals(CallStatus.COMPLETED, call.getStatus());
+        verify(calls, never()).saveAndFlush(any(CallSession.class));
+    }
+
+    @Test
     void internalLiveCompletionCanFinishAnInProgressCall() {
         CallSessionRepository calls = mock(CallSessionRepository.class);
         CallLifecycleService lifecycle = lifecycle(
