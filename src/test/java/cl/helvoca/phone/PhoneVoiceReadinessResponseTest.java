@@ -137,9 +137,14 @@ class PhoneVoiceReadinessResponseTest {
         PhoneProvisioningService provisioning = mock(PhoneProvisioningService.class);
         PhoneNumberService legacy = mock(PhoneNumberService.class);
         when(provisioning.readiness()).thenReturn(List.of());
+        PhoneProvisioningStatusResponse status = new PhoneProvisioningStatusResponse(
+                false, true, false, "TWILIO", "Solo consulta");
+        when(provisioning.status()).thenReturn(status);
         PhoneNumberController controller = new PhoneNumberController(legacy, provisioning);
         assertTrue(controller.voiceReadiness().isEmpty());
+        assertSame(status, controller.provisioningStatus());
         verify(provisioning).readiness();
+        verify(provisioning).status();
         verifyNoInteractions(legacy);
     }
 }
