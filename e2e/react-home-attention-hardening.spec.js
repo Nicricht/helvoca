@@ -295,6 +295,51 @@ test.describe('Inicio Parte 3: solicitudes y escalamiento humano', () => {
     expect(state.mutations).toEqual([]);
   });
 
+  test('respuesta 200 nula no equivale a bandeja vacía ni Todo bajo control', async ({ page }) => {
+    const state = await boot(page);
+    state.items = null;
+    await page.goto('/app');
+    await expect(panel(page).getByRole('alert')).toContainText('No pudimos verificar los pendientes');
+    await expect(panel(page)).not.toContainText('Sin intervenciones pendientes');
+    await expect(page.getByRole('region', { name: 'Estado de tu negocio' }))
+      .not.toContainText('Todo bajo control');
+    state.items = [];
+    await panel(page).getByRole('button', { name: 'Reintentar' }).click();
+    await expect(panel(page)).toContainText('Sin intervenciones pendientes');
+  });
+
+  test('respuesta 200 con elemento malformado impide mostrar datos incompletos como válidos', async ({ page }) => {
+    const state = await boot(page);
+    state.items = [{ id: 'bad', kind: 'HANDOFF' }];
+    await page.goto('/app');
+    await expect(panel(page).getByRole('alert')).toContainText('No pudimos verificar los pendientes');
+    await expect(panel(page)).not.toContainText('Sin intervenciones pendientes');
+  });
+
+  test('doble clic en confirmación de cierre genera exactamente un PATCH', async ({ page }) => {
+    let release;
+    const pending = new Promise(resolve => { release = resolve; });
+    const state = await boot(page, { attention: [{
+      ...initialAttention[0], status: 'IN_PROGRESS'
+    }] });
+    state.requestGate = pending;
+    await page.goto('/app');
+    await panel(page).getByRole('button', { name: 'Marcar resuelta' }).click();
+    await page.evaluate(() => {
+      const button = [...document.querySelectorAll('button')]
+        .find(el => el.textContent.trim() === 'Confirmar cierre');
+      if (!button) throw new Error('Missing confirmation');
+      button.click();
+      button.click();
+    });
+    await expect.poll(() => state.mutations.length).toBe(1);
+    release();
+    await expect(panel(page)).toContainText('Sin intervenciones pendientes');
+    expect(state.mutations).toEqual([{
+      method: 'PATCH', action: 'request', requestedStatus: 'RESOLVED'
+    }]);
+  });
+
   test('HTTP 401 en PATCH limpia sesión y no marca caso como gestionado', async ({ page }) => {
     const state = await boot(page);
     state.requestStatus = 401;
