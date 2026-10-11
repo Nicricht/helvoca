@@ -16,6 +16,7 @@ import static org.mockito.Mockito.*;
 class PhoneProvisioningOwnershipTest {
     private static final String PHONE = "+12025550123";
     private static final String SID = "PN" + "a".repeat(32);
+    private static final String ACCOUNT = "AC" + "c".repeat(32);
     private PhoneNumberRepository repository;
     private TenantProvider tenant;
     private TwilioPhoneProvisioningClient twilio;
@@ -29,6 +30,7 @@ class PhoneProvisioningOwnershipTest {
         twilio = mock(TwilioPhoneProvisioningClient.class);
         owner = UUID.randomUUID();
         when(tenant.requireBusinessId()).thenReturn(owner);
+        when(twilio.managedAccountSid()).thenReturn(ACCOUNT);
         when(repository.saveAndFlush(any(PhoneNumber.class))).thenAnswer(inv -> inv.getArgument(0));
         service = new PhoneProvisioningService(repository, tenant, twilio);
     }
@@ -39,6 +41,8 @@ class PhoneProvisioningOwnershipTest {
         phone.setPhoneNumber(PHONE);
         phone.setProvider(provider);
         phone.setExternalId(sid);
+        phone.setTwilioBindingSource("MANAGED_PURCHASE");
+        phone.setTwilioAccountSid(ACCOUNT);
         phone.setActive(false);
         when(repository.findByPhoneNumber(PHONE)).thenReturn(Optional.of(phone));
         return phone;
@@ -56,11 +60,11 @@ class PhoneProvisioningOwnershipTest {
     }
 
     @Test
-    void acceptsBlankClientSidButNeverTreatsItAsProof() {
+    void blankClientSidCannotRepairUntrustedLegacyBinding() {
         alreadyAssigned(owner, null, "TWILIO");
-        attested();
-        assertTrue(service.connectExisting(new PhoneNumberRequest(PHONE, "  ", true)).active());
-        verify(twilio).verifyManagedPhone(PHONE);
+        assertThrows(ConflictException.class,
+                () -> service.connectExisting(new PhoneNumberRequest(PHONE, "  ", true)));
+        verify(twilio, never()).verifyManagedPhone(any());
     }
 
     @Test
@@ -110,21 +114,20 @@ class PhoneProvisioningOwnershipTest {
     }
 
     @Test
-    void reconnectingAPlaceholderRequiresCarrierProofAndPersistsAttestedSid() {
+    void rejectsUnprovenLegacyNullSidRatherThanClaimingCarrierOwnership() {
         PhoneNumber phone = alreadyAssigned(owner, null, "TWILIO");
-        attested();
-        PhoneNumberResponse response = service.connectExisting(new PhoneNumberRequest(PHONE, null, true));
-        assertEquals(SID, phone.getExternalId());
-        assertEquals(SID, response.externalId());
-        assertTrue(phone.isActive());
+        assertThrows(ConflictException.class,
+                () -> service.connectExisting(new PhoneNumberRequest(PHONE, null, true)));
+        assertFalse(phone.isActive());
+        verify(twilio, never()).verifyManagedPhone(any());
     }
 
     @Test
-    void reconnectingBlankStoredSidRequiresCarrierProof() {
-        PhoneNumber phone = alreadyAssigned(owner, "", "TWILIO");
-        attested();
-        assertTrue(service.connectExisting(new PhoneNumberRequest(PHONE, null, true)).active());
-        assertEquals(SID, phone.getExternalId());
+    void rejectsUnprovenLegacyBlankSidBeforeCarrierLookup() {
+        alreadyAssigned(owner, "", "TWILIO");
+        assertThrows(ConflictException.class,
+                () -> service.connectExisting(new PhoneNumberRequest(PHONE, null, true)));
+        verify(twilio, never()).verifyManagedPhone(any());
     }
 
     @Test
@@ -167,19 +170,19 @@ class PhoneProvisioningOwnershipTest {
     }
 
     @Test
-    void repeatPurchaseCanReconcileBlankSidOnlyForPreviouslyAssignedTenant() {
-        PhoneNumber phone = alreadyAssigned(owner, "", "TWILIO");
-        attested();
-        PhoneNumberResponse response = service.provision(new ProvisionPhoneNumberRequest(PHONE, true));
-        assertEquals(SID, phone.getExternalId());
-        assertTrue(response.active());
+    void repeatPurchaseCannotClaimLegacyBlankSid() {
+        alreadyAssigned(owner, "", "TWILIO");
+        assertThrows(ConflictException.class,
+                () -> service.provision(new ProvisionPhoneNumberRequest(PHONE, true)));
+        verify(twilio, never()).verifyManagedPhone(any());
     }
 
     @Test
-    void repeatPurchaseCanReconcileNullSidOnlyForPreviouslyAssignedTenant() {
-        PhoneNumber phone = alreadyAssigned(owner, null, "TWILIO");
-        attested();
-        assertEquals(SID, service.provision(new ProvisionPhoneNumberRequest(PHONE, true)).externalId());
+    void repeatPurchaseCannotClaimLegacyNullSid() {
+        alreadyAssigned(owner, null, "TWILIO");
+        assertThrows(ConflictException.class,
+                () -> service.provision(new ProvisionPhoneNumberRequest(PHONE, true)));
+        verify(twilio, never()).verifyManagedPhone(any());
     }
 
     @Test
@@ -221,14 +224,12 @@ class PhoneProvisioningOwnershipTest {
     }
 
     @Test
-    void activateVerifiedReconcilesEmptySidOnlyForAssignedTenant() {
+    void activateVerifiedRejectsUnprovenLegacySid() {
         UUID id = UUID.randomUUID();
         PhoneNumber phone = alreadyAssigned(owner, null, "TWILIO");
         when(repository.findByIdAndBusinessId(id, owner)).thenReturn(Optional.of(phone));
-        attested();
-        PhoneNumberResponse response = service.activateVerified(id);
-        assertTrue(response.active());
-        assertEquals(SID, response.externalId());
+        assertThrows(ConflictException.class, () -> service.activateVerified(id));
+        assertFalse(phone.isActive());
     }
 
     @Test
@@ -239,8 +240,8 @@ class PhoneProvisioningOwnershipTest {
         attested();
         assertTrue(service.activateVerified(id).active());
         phone.setExternalId("   ");
-        assertTrue(service.activateVerified(id).active());
-        assertEquals(SID, phone.getExternalId());
+        assertThrows(ConflictException.class, () -> service.activateVerified(id));
+        assertEquals("   ", phone.getExternalId());
     }
 
     @Test
@@ -254,6 +255,42 @@ class PhoneProvisioningOwnershipTest {
         verifyNoInteractions(legacy);
         controller.setActive(id, new PhoneNumberActiveRequest(false));
         verify(legacy).setActive(id, false);
+    }
+
+    @Test
+    void rejectsUntrustedManualBindingEvenWhenCarrierAccountCanSeeNumber() {
+        PhoneNumber phone = alreadyAssigned(owner, SID, "TWILIO");
+        phone.setTwilioBindingSource(null);
+        assertThrows(ConflictException.class,
+                () -> service.connectExisting(new PhoneNumberRequest(PHONE, null, true)));
+        verify(twilio, never()).verifyManagedPhone(any());
+    }
+
+    @Test
+    void rejectsWrongCarrierAccountFromProvenance() {
+        PhoneNumber phone = alreadyAssigned(owner, SID, "TWILIO");
+        phone.setTwilioAccountSid("AC" + "d".repeat(32));
+        assertThrows(ConflictException.class,
+                () -> service.connectExisting(new PhoneNumberRequest(PHONE, null, true)));
+    }
+
+    @Test
+    void rejectsEmptyAndMissingConfiguredCarrierAccount() {
+        alreadyAssigned(owner, SID, "TWILIO");
+        when(twilio.managedAccountSid()).thenReturn("");
+        assertThrows(ConflictException.class,
+                () -> service.connectExisting(new PhoneNumberRequest(PHONE, null, true)));
+        when(twilio.managedAccountSid()).thenReturn(null);
+        assertThrows(ConflictException.class,
+                () -> service.connectExisting(new PhoneNumberRequest(PHONE, null, true)));
+    }
+
+    @Test
+    void successfulCarrierAttestationRecordsVerificationTime() {
+        alreadyAssigned(owner, SID, "TWILIO");
+        attested();
+        service.connectExisting(new PhoneNumberRequest(PHONE, null, true));
+        assertNotNull(verifySave().getVoiceVerifiedAt());
     }
 
     private PhoneNumber verifySave() {
