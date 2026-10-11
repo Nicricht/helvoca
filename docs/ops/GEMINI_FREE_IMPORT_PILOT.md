@@ -98,3 +98,24 @@ python3 scripts/pilot/benchmark_batch.py /tmp/recepvoz-gemini-menu-tests/manifes
 ```
 
 El resultado de cada llamada se valida automáticamente contra los datos visibles revisados: se detiene en el primer error; no hay reintentos ni escrituras comerciales. Nunca colocar la clave en este repositorio, un issue, un chat o la UI web. La existencia de una clave Gemini en Railway para **voz/mensajería** no autoriza importaciones con esa clave ni un proyecto diferente. La ejecución CI no realiza peticiones de IA y no puede probar calidad visual del modelo en vivo.
+
+## Windows: un único asistente privado
+
+El archivo `scripts/pilot/Run-GeminiPilot.ps1` automatiza la preparación y evaluación. No requiere volver al Playground para cada prueba. Usa el identificador del proyecto personal ficticio `gen-lang-client-0812582341` registrado por el propietario. **No usa `GEMINI_API_KEY` de producción ni modifica Railway.**
+
+Desde PowerShell, **en la carpeta raíz de este repositorio**:
+
+```powershell
+# Primera vez: introducir la clave exclusivamente en la ventana privada de PowerShell
+.\scripts\pilot\Run-GeminiPilot.ps1 -Configure
+
+# Evaluación sin Gemini y sin costo (default)
+.\scripts\pilot\Run-GeminiPilot.ps1
+
+# Evaluación con el endpoint real, solo tras volver a confirmar Free Tier sin facturación
+.\scripts\pilot\Run-GeminiPilot.ps1 -Send
+```
+
+La clave queda cifrada con Windows DPAPI bajo `%LOCALAPPDATA%\RecepVoz\GeminiImportPilot`, vinculada al usuario Windows, fuera del repositorio. El script no envía secretos en argumentos, URL, stdout ni archivos Git, los carga como variable del proceso solo para la corrida real y los elimina al terminar. Los recibos/revisiones privados permanecen en esa carpeta. **No ejecutar el modo `-Send` si Google solicita habilitar facturación** o si el propietario no ha verificado el nivel gratuito, la cuota o la clave. Es una confirmación humana, no una comprobación técnica infalible del estado de facturación.
+
+La primera corrida real sigue bloqueada mientras no exista una clave aislada aportada privadamente por el propietario. La ruta de API está implementada pero no certificada contra el servidor del proveedor hasta entonces; las pruebas de GitHub usan respuestas simuladas y nunca llaman al proveedor.
