@@ -30,7 +30,10 @@ function readableStatus(item: HumanAttentionItem): string {
   return item.status === "IN_PROGRESS" ? "En progreso" : "Abierta";
 }
 
-function actionFor(item: HumanAttentionItem, canManageRequests: boolean) {
+type AttentionAction = "REQUEST_PROGRESS" | "REQUEST_RESOLVE" | "HANDOFF_ACK" | "HANDOFF_RESOLVE";
+
+function actionFor(item: HumanAttentionItem, canManageRequests: boolean):
+  { label: string; action: AttentionAction } | null {
   if (item.kind === "REQUEST" && canManageRequests) {
     if (item.status === "OPEN") return { label: "Empezar gestión", action: "REQUEST_PROGRESS" };
     if (item.status === "IN_PROGRESS") return { label: "Marcar resuelta", action: "REQUEST_RESOLVE" };
@@ -59,28 +62,21 @@ export function HomeAttentionRows({
   const [error, setError] = useState("");
   const [confirmationId, setConfirmationId] = useState<string | null>(null);
 
-  async function perform(item: HumanAttentionItem, action: string) {
+  async function perform(item: HumanAttentionItem, action: AttentionAction) {
     if (pendingMutation.current || refreshing) return;
     pendingMutation.current = true;
     setBusyId(item.id);
     setError("");
     try {
-      switch (action) {
-        case "REQUEST_PROGRESS":
-          await updateRequestStatus(item.id, "IN_PROGRESS");
-          break;
-        case "REQUEST_RESOLVE":
-          await updateRequestStatus(item.id, "RESOLVED");
-          break;
-        case "HANDOFF_ACK":
-          await acknowledgeHumanHandoff(item.id);
-          break;
-        case "HANDOFF_RESOLVE":
-          await resolveHumanHandoff(item.id);
-          break;
-        default:
-          throw new Error("Acción no disponible.");
-      }
+      // The UI can emit only this closed, typed action set. A missing entry
+      // rejects and enters the existing fail-closed catch rather than succeeding.
+      const mutations: Record<AttentionAction, () => Promise<unknown>> = {
+        REQUEST_PROGRESS: () => updateRequestStatus(item.id, "IN_PROGRESS"),
+        REQUEST_RESOLVE: () => updateRequestStatus(item.id, "RESOLVED"),
+        HANDOFF_ACK: () => acknowledgeHumanHandoff(item.id),
+        HANDOFF_RESOLVE: () => resolveHumanHandoff(item.id)
+      };
+      await mutations[action]();
       setConfirmationId(null);
       await Promise.all([
         client.invalidateQueries({ queryKey: ["operations", "attention"] }),
