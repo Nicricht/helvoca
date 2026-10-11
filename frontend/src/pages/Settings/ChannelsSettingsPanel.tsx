@@ -25,6 +25,7 @@ import {
   type PhoneNumber
 } from "../../features/settings/api";
 import styles from "./SettingsPage.module.css";
+import { VoiceSetupGuide } from "./VoiceSetupGuide";
 
 declare global {
   interface Window {
@@ -158,6 +159,7 @@ export function ChannelsSettingsPanel({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["settings", "phone-numbers"] }),
       queryClient.invalidateQueries({ queryKey: ["settings", "phone-provisioning-status"] }),
+      queryClient.invalidateQueries({ queryKey: ["settings", "phone-voice-readiness"] }),
       queryClient.invalidateQueries({ queryKey: ["settings", "meta-whatsapp-status"] }),
       queryClient.invalidateQueries({ queryKey: ["settings", "meta-whatsapp-certification-readiness"] }),
       queryClient.invalidateQueries({ queryKey: ["settings", "meta-whatsapp-deployment-readiness"] })
@@ -177,7 +179,10 @@ export function ChannelsSettingsPanel({
     mutationFn: provisionPhoneNumber,
     onSuccess: async result => {
       setAvailable([]);
-      setPhoneMessage((result.phoneNumber || "El número") + " quedó conectado.");
+      setPhoneMessage((result.phoneNumber || "El número")
+        + (result.active
+          ? " quedó activado tras verificar la vinculación."
+          : " quedó registrado e inactivo. Debes verificarlo antes de recibir llamadas."));
       await refreshChannels();
     },
     onError: error => setPhoneMessage(errorMessage(error, "No pudimos aprovisionar ese número."))
@@ -187,7 +192,10 @@ export function ChannelsSettingsPanel({
     mutationFn: connectExistingPhoneNumber,
     onSuccess: async result => {
       setExistingPhone("");
-      setPhoneMessage((result.phoneNumber || "El número") + " quedó conectado.");
+      setPhoneMessage((result.phoneNumber || "El número")
+        + (result.active
+          ? " quedó activado tras verificar la vinculación."
+          : " quedó registrado e inactivo. Debes verificarlo antes de recibir llamadas."));
       await refreshChannels();
     },
     onError: error => setPhoneMessage(errorMessage(error, "No pudimos conectar ese número."))
@@ -249,6 +257,14 @@ export function ChannelsSettingsPanel({
       "Vas a aprovisionar " + item.phoneNumber + " con el proveedor. Puede generar cargos. ¿Confirmas?"
     );
     if (accepted) provisionPhone.mutate(item.phoneNumber);
+  }
+
+  function verifyAndActivate(phoneId: string) {
+    if (!canManage || togglePhoneActive.isPending) return;
+    const accepted = window.confirm(
+      "Vamos a consultar a Twilio para verificar el SID, la cuenta y los webhooks antes de activar el número. No compraremos ningún número ni realizaremos llamadas. ¿Continuar?"
+    );
+    if (accepted) togglePhoneActive.mutate({ id: phoneId, active: true });
   }
 
   function doConnectExisting() {
@@ -420,6 +436,13 @@ export function ChannelsSettingsPanel({
           </div>
           <Phone size={18} aria-hidden="true" />
         </div>
+
+        <VoiceSetupGuide
+          canRead={canRead}
+          canManage={canManage}
+          onVerifyAndActivate={verifyAndActivate}
+          activationPending={togglePhoneActive.isPending}
+        />
 
         <div className={styles.compactList}>
           {connectedPhones.length === 0 && (

@@ -26,13 +26,19 @@ public class PhoneNumberController {
     @PostMapping
     @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public PhoneNumberResponse create(@Valid @RequestBody PhoneNumberRequest request) {
-        return service.create(request);
+        return provisioning.connectExisting(request);
     }
 
     @GetMapping("/provisioning/status")
     @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
     public PhoneProvisioningStatusResponse provisioningStatus() {
         return provisioning.status();
+    }
+
+    @GetMapping("/provisioning/readiness")
+    @PreAuthorize("hasAnyRole('BUSINESS_ADMIN','OPERATOR')")
+    public List<PhoneVoiceReadinessResponse> voiceReadiness() {
+        return provisioning.readiness();
     }
 
     @GetMapping("/provisioning/available")
@@ -53,7 +59,7 @@ public class PhoneNumberController {
     @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public PhoneNumberResponse setActive(@PathVariable UUID id,
                                          @RequestBody PhoneNumberActiveRequest request) {
-        return service.setActive(id, request.active());
+        return request.active() ? provisioning.activateVerified(id) : service.setActive(id, false);
     }
 
     @PatchMapping("/{id}/whatsapp")
