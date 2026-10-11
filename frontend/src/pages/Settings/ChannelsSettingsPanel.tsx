@@ -14,6 +14,7 @@ import {
   getMetaWhatsAppBootstrap,
   getMetaWhatsAppStatus,
   getPhoneProvisioningStatus,
+  getVoiceSetupReadiness,
   provisionPhoneNumber,
   searchAvailablePhoneNumbers,
   setPhoneActive,
@@ -113,6 +114,14 @@ export function ChannelsSettingsPanel({
     refetchOnWindowFocus: false
   });
 
+  const voiceReadiness = useQuery({
+    queryKey: ["settings", "voice-setup-readiness"],
+    queryFn: getVoiceSetupReadiness,
+    enabled: canRead,
+    retry: false,
+    refetchOnWindowFocus: false
+  });
+
   const metaStatus = useQuery({
     queryKey: ["settings", "meta-whatsapp-status"],
     queryFn: getMetaWhatsAppStatus,
@@ -158,6 +167,7 @@ export function ChannelsSettingsPanel({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["settings", "phone-numbers"] }),
       queryClient.invalidateQueries({ queryKey: ["settings", "phone-provisioning-status"] }),
+      queryClient.invalidateQueries({ queryKey: ["settings", "voice-setup-readiness"] }),
       queryClient.invalidateQueries({ queryKey: ["settings", "meta-whatsapp-status"] }),
       queryClient.invalidateQueries({ queryKey: ["settings", "meta-whatsapp-certification-readiness"] }),
       queryClient.invalidateQueries({ queryKey: ["settings", "meta-whatsapp-deployment-readiness"] })
@@ -177,7 +187,7 @@ export function ChannelsSettingsPanel({
     mutationFn: provisionPhoneNumber,
     onSuccess: async result => {
       setAvailable([]);
-      setPhoneMessage((result.phoneNumber || "El número") + " quedó conectado.");
+      setPhoneMessage((result.phoneNumber || "El número") + " quedó registrado. Consulta el diagnóstico antes de recibir llamadas.");
       await refreshChannels();
     },
     onError: error => setPhoneMessage(errorMessage(error, "No pudimos aprovisionar ese número."))
@@ -187,7 +197,7 @@ export function ChannelsSettingsPanel({
     mutationFn: connectExistingPhoneNumber,
     onSuccess: async result => {
       setExistingPhone("");
-      setPhoneMessage((result.phoneNumber || "El número") + " quedó conectado.");
+      setPhoneMessage((result.phoneNumber || "El número") + " quedó registrado. Consulta el diagnóstico antes de recibir llamadas.");
       await refreshChannels();
     },
     onError: error => setPhoneMessage(errorMessage(error, "No pudimos conectar ese número."))
@@ -419,6 +429,60 @@ export function ChannelsSettingsPanel({
             <span>Conecta un número existente o busca uno nuevo. Ninguna compra ocurre al abrir esta pantalla.</span>
           </div>
           <Phone size={18} aria-hidden="true" />
+        </div>
+
+        <div className={styles.voiceSetupGuide} aria-label="Guía de activación de voz">
+          <div className={styles.voiceSetupHeading}>
+            <div>
+              <strong>Preparar recepcionista IA</strong>
+              <p>Diagnóstico de configuración, sin llamar, comprar números ni activar el canal.</p>
+            </div>
+            <button
+              className="button secondary"
+              type="button"
+              disabled={!canRead || voiceReadiness.isFetching}
+              onClick={() => void voiceReadiness.refetch()}
+            >
+              {voiceReadiness.isFetching ? "Revisando…" : "Actualizar diagnóstico"}
+            </button>
+          </div>
+
+          {!canRead && <p role="status">No tienes permiso para consultar la configuración de voz.</p>}
+          {canRead && voiceReadiness.isPending && <p role="status">Revisando configuración de voz…</p>}
+          {canRead && voiceReadiness.isError && (
+            <p role="alert">No pudimos comprobar la configuración. No se puede confirmar que la voz esté lista.</p>
+          )}
+          {canRead && voiceReadiness.data && (
+            <>
+              <p className={styles.voiceSetupStatus} role="status">
+                {voiceReadiness.data.configurationReady
+                  ? "Configuración completada. Falta certificar una llamada real autorizada."
+                  : "Configuración incompleta. Corrige los pasos pendientes antes de probar una llamada."}
+              </p>
+              {voiceReadiness.data.activePhoneNumber && (
+                <p>Número activo registrado: <strong>{voiceReadiness.data.activePhoneNumber}</strong>.
+                  Que figure activo no implica que Twilio y la IA funcionen en producción.</p>
+              )}
+              <ol className={styles.voiceSetupSteps}>
+                {voiceReadiness.data.steps.map(step => (
+                  <li key={step.code}>
+                    <span className={step.complete ? styles.voiceSetupComplete : styles.voiceSetupPending}>
+                      {step.complete ? "Completado" : "Pendiente"}
+                    </span>
+                    <div>
+                      <strong>{step.label}</strong>
+                      {!step.complete && <p>{step.guidance}</p>}
+                      {!step.complete && step.href && <a href={step.href}>Ir a configurar</a>}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <p className={styles.voiceSetupNotice}>
+                La revisión es local y de solo lectura. No verifica en tiempo real el proveedor
+                ni autoriza llamadas reales. Estado comercial: <strong>no certificado</strong>.
+              </p>
+            </>
+          )}
         </div>
 
         <div className={styles.compactList}>
