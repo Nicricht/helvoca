@@ -619,6 +619,75 @@ test.describe('React Home migration', () => {
     expect(api.attentionMutations()).toBe(4);
   });
 
+  test('a full attention batch states the 100-case limit without calling it the historical total', async ({ page }) => {
+    const items = Array.from({ length: 100 }, (_, i) => ({
+      ...DEFAULT_ATTENTION[0],
+      id: 'request-batch-' + i,
+      operationId: 'operation-batch-' + i,
+      priority: 'NORMAL',
+      title: 'Pendiente real ' + i
+    }));
+    const api = await bootHome(page, { attention: items });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('100 casos recientes');
+    await expect(panel).toContainText('Se muestran hasta 100 casos recientes');
+    await expect(panel.locator('article[data-kind="REQUEST"]')).toHaveCount(100);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('assigned and unknown human statuses remain displayed without inventing actions', async ({ page }) => {
+    const items = [
+      { ...DEFAULT_ATTENTION[1], id: 'assigned-human', operationId: 'o-assigned', status: 'ASSIGNED', priority: 'NORMAL', createdAt: 'invalid-date', title: '' },
+      { ...DEFAULT_ATTENTION[1], id: 'unknown-human', operationId: 'o-unknown', status: 'WAITING_CONTACT', priority: 'LOW', createdAt: '', title: 'Escalamiento en espera' }
+    ];
+    const api = await bootHome(page, { attention: items });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('Asignado');
+    await expect(panel).toContainText('WAITING_CONTACT');
+    await expect(panel).toContainText('Caso sin título');
+    await expect(panel).toContainText('Fecha no disponible');
+    await expect(panel.getByRole('button', { name: 'Cerrar escalamiento' })).toHaveCount(1);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('two same-tick start actions send one request even before React disables the button', async ({ page }) => {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const api = await bootHome(page, { mutationGates: { requestProgress: gate } });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel.getByRole('button', { name: 'Empezar gestión' })).toBeVisible();
+    await panel.getByRole('button', { name: 'Empezar gestión' }).evaluate(button => {
+      button.click();
+      button.click();
+    });
+    await expect.poll(() => api.mutationAttempts().requestProgress).toBe(1);
+    release();
+    await expect(panel).toContainText('En progreso');
+    expect(api.attentionMutations()).toBe(1);
+  });
+
+  test('non-Error provider failure shows a safe retry message without claiming a case was changed', async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = window.fetch.bind(window);
+      window.fetch = (resource, init) => {
+        if (String(resource).includes('/api/v1/requests/req-1/status') && init?.method === 'PATCH') {
+          return Promise.reject('transport dropped');
+        }
+        return original(resource, init);
+      };
+    });
+    const api = await bootHome(page);
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await panel.getByRole('button', { name: 'Empezar gestión' }).click();
+    await expect(panel.getByRole('alert')).toContainText('No pudimos actualizar el caso.');
+    await expect(panel).toContainText('Abierta');
+    expect(api.attentionMutations()).toBe(0);
+  });
+
   test('does not fabricate a clear queue when the attention API fails', async ({ page }) => {
     await bootHome(page, { attentionError: 503 });
     await page.goto('/app');
@@ -968,6 +1037,54 @@ test.describe('React Home migration', () => {
 
     await value.getByRole('button', { name: '30 días' }).click();
     await expect.poll(() => requests.filter(request => request.url.includes('/api/v1/commercial/analytics?days=30')).length).toBeGreaterThan(0);
+  });
+
+  test('currency rendering remains readable when Intl.format itself throws after valid constructor checks', async ({ page }) => {
+    await page.addInitScript(() => {
+      const Native = Intl.NumberFormat;
+      Intl.NumberFormat = function(...args) {
+        const formatter = new Native(...args);
+        if (args[1]?.style !== 'currency') return formatter;
+        return new Proxy(formatter, {
+          get(target, key) {
+            if (key === 'format') throw new Error('format unavailable');
+            const value = Reflect.get(target, key, target);
+            return typeof value === 'function' ? value.bind(target) : value;
+          }
+        });
+      };
+      Intl.NumberFormat.prototype = Native.prototype;
+    });
+    await bootHome(page);
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('CLP');
+    await expect(value).toContainText('209.900');
+  });
+
+  test('unsupported formatter currency is partial, never silently counted as attributed revenue', async ({ page }) => {
+    await page.addInitScript(() => {
+      const Native = Intl.NumberFormat;
+      Intl.NumberFormat = function(...args) {
+        if (args[1]?.style === 'currency' && args[1]?.currency === 'ZZZ') {
+          throw new RangeError('unsupported test currency');
+        }
+        return new Native(...args);
+      };
+      Intl.NumberFormat.prototype = Native.prototype;
+    });
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      primaryCurrency: 'ZZZ',
+      recepVozRevenue: 100000,
+      bookingCurrency: 'CLP',
+      recepVozBookingRevenue: 20000
+    } });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(panel).toContainText('Importes atribuidos parcialmente verificables');
+    await expect(panel).toContainText('20.000');
+    await expect(panel).not.toContainText('120.000');
   });
 
   test('value panel survives nullable analytics fields omitted by backend JSON serialization', async ({ page }) => {

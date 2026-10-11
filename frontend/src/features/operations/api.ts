@@ -38,24 +38,7 @@ export interface RequestTransition {
   evidenceEventId: string | null;
 }
 
-export async function getHumanAttention(): Promise<HumanAttentionItem[]> {
-  const payload = await apiRequest<unknown>("/api/v1/operations/attention");
-  // A malformed/empty HTTP response is not proof that the queue is empty.
-  if (!Array.isArray(payload) || !payload.every(item =>
-    item != null
-      && typeof item === "object"
-      && (item.kind === "REQUEST" || item.kind === "HANDOFF")
-      && typeof item.id === "string" && item.id.length > 0
-      && (item.operationId == null || typeof item.operationId === "string")
-      && typeof item.title === "string"
-      && typeof item.priority === "string"
-      && typeof item.status === "string"
-      && typeof item.createdAt === "string"
-  )) {
-    throw new ApiError(502, "No pudimos verificar los pendientes.");
-  }
-  return payload as HumanAttentionItem[];
-}
+export { getHumanAttention } from "./attentionApi";
 
 export function acknowledgeHumanHandoff(id: string) {
   return apiRequest("/api/v1/handoffs/" + encodeURIComponent(id) + "/acknowledge", {

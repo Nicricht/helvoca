@@ -11,7 +11,7 @@ const outDir = path.join(process.cwd(), 'test-results', 'home-coverage');
 const expected = [
   'src/pages/Home/HomePage.tsx',
   'src/pages/Home/HomeAttentionRows.tsx',
-  'src/features/operations/api.ts'
+  'src/features/operations/attentionApi.ts'
 ];
 const dimensions = ['statements', 'lines', 'branches', 'functions'];
 

@@ -65,7 +65,7 @@ export default defineConfig({
       include: homeCoverage ? [
         "src/pages/Home/HomePage.tsx",
         "src/pages/Home/HomeAttentionRows.tsx",
-        "src/features/operations/api.ts"
+        "src/features/operations/attentionApi.ts"
       ] : [
         "src/pages/Inventory/*",
         "src/features/inventory/api.ts",

@@ -105,12 +105,21 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 
 ## Independent source-level Home coverage
 
-- [x] VITE_HOME_COVERAGE mode instruments HomePage.tsx, HomeAttentionRows.tsx and operations/api.ts only.
+- [x] VITE_HOME_COVERAGE mode instruments HomePage.tsx, HomeAttentionRows.tsx and operations/attentionApi.ts only.
 - [x] Home Playwright fixture preserves counters across page navigations.
 - [x] Source-map remapping reconstructs original TS/TSX and enforces 100% statements, lines, branches and functions per file.
 - [x] Strict separate CI job with test inventory and missed branches/functions artifacts, no Inventory-specific exception.
 - [ ] Investigate actual measured uncovered paths; no claim of Home 100% until this gate is green.
 - [ ] Verify exact-HEAD Full Gate and security/integration once additions are accepted.
+
+## Source-coverage follow-up after measured browser run
+
+- [x] First real instrumented run captured 87/87 Home tests and three remapped sources with 0 missing tests.
+- [x] Initial measured HomePage: 97.63% statements, 98.24% lines, 91.17% branches, 100% functions.
+- [x] Initial measured HomeAttentionRows: 94.91% statements, 96.36% lines, 84.41% branches, 100% functions.
+- [x] Initial shared operations/api.ts module contained exports unrelated to Home (audits/downloads); extracted the changed Home attention read into its own typed module, preserving API re-export and rejecting malformed values.
+- [x] Added browser branches for full 100-row inbox, handoff assigned/unrecognized statuses, invalid dates, empty title, rapid double submit, non-Error request failure, formatMoney fallback and Intl constructor failure.
+- [ ] Rerun instrumented source-coverage and keep strict 100% gate; do not claim certified until it passes.
 
 ## Change safety
 
