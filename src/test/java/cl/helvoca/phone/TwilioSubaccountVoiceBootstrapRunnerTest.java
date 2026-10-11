@@ -286,6 +286,29 @@ class TwilioSubaccountVoiceBootstrapRunnerTest {
         }
     }
 
+
+    @Test
+    void missingOrInactiveTenantAnchorRejectsBootstrapBeforeAnyTwilioRequest() throws Exception {
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantDatabaseContext context = new TenantDatabaseContext();
+        when(phones.findByPhoneNumberAndActiveTrue(TENANT_PHONE)).thenAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, context.currentOrDenied().mode());
+            return Optional.empty();
+        });
+        HttpClient http = mock(HttpClient.class);
+        var runner = new TwilioSubaccountVoiceBootstrapRunner(
+                true, SUBACCOUNT_SID, PHONE, readyTwilio(), tenantSettings(), phones, context, http);
+
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> runner.run(null));
+        assertEquals("WhatsApp Sandbox tenant phone must resolve to an active Helvoca tenant before voice bootstrap",
+                error.getMessage());
+        verify(phones).findByPhoneNumberAndActiveTrue(TENANT_PHONE);
+        verify(phones, never()).findByPhoneNumber(PHONE);
+        verify(phones, never()).save(any());
+        verifyNoInteractions(http);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrDenied().mode());
+    }
+
     @Test
     void doesNothingWhenDisabled() throws Exception {
         TwilioProperties twilio = new TwilioProperties();
