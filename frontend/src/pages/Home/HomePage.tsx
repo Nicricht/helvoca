@@ -519,10 +519,10 @@ function LatestActivity({ dashboard }: { dashboard: OperationsDashboard }) {
 
 
 function hasValidOnboardingStatus(status: OnboardingStatus | undefined): status is OnboardingStatus {
-  return Boolean(status)
-    && typeof status?.readyForCalls === "boolean"
+  return status != null
+    && typeof status.readyForCalls === "boolean"
     && coreOnboardingSteps.every(step => typeof status[step.key] === "boolean")
-    && (typeof status?.nextStep === "string" || status?.nextStep === null);
+    && (typeof status.nextStep === "string" || status.nextStep === null);
 }
 
 function OnboardingCard({ status }: { status: OnboardingStatus }) {
