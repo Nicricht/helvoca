@@ -67,8 +67,7 @@ public class PhoneProvisioningService {
         }
         requireManagedAssignment(existing);
         TwilioPhoneProvisioningClient.VerifiedPhoneNumber verified = twilio.verifyManagedPhone(number);
-        if (existing.getExternalId() != null && !existing.getExternalId().isBlank()
-                && !existing.getExternalId().equals(verified.sid())) {
+        if (!existing.getExternalId().equals(verified.sid())) {
             throw new ConflictException("El SID verificado no coincide con el registro existente.");
         }
         existing.setExternalId(verified.sid());
@@ -91,8 +90,7 @@ public class PhoneProvisioningService {
         requireManagedAssignment(existing);
         TwilioPhoneProvisioningClient.VerifiedPhoneNumber verified =
                 twilio.verifyManagedPhone(existing.getPhoneNumber());
-        if (existing.getExternalId() != null && !existing.getExternalId().isBlank()
-                && !existing.getExternalId().equals(verified.sid())) {
+        if (!existing.getExternalId().equals(verified.sid())) {
             throw new ConflictException("El SID del proveedor cambió; no se activó el número.");
         }
         existing.setExternalId(verified.sid());
@@ -127,8 +125,7 @@ public class PhoneProvisioningService {
             }
             requireManagedAssignment(existing);
             TwilioPhoneProvisioningClient.VerifiedPhoneNumber verified = twilio.verifyManagedPhone(requestedNumber);
-            if (existing.getExternalId() != null && !existing.getExternalId().isBlank()
-                    && !existing.getExternalId().equals(verified.sid())) {
+            if (!existing.getExternalId().equals(verified.sid())) {
                 throw new ConflictException("El SID registrado difiere del SID propietario en Twilio.");
             }
             existing.setExternalId(verified.sid());
