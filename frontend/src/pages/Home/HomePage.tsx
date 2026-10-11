@@ -234,6 +234,9 @@ function ValueGenerated({
 }) {
   const totals = attributedTotals(data);
   const single = totals.length === 1 ? totals[0] : null;
+  const incompleteAttribution = Boolean(data) &&
+    [data?.recepVozRevenue, data?.recepVozBookingRevenue].some(amount =>
+      typeof amount !== "number" || !Number.isFinite(amount) || amount < 0);
   const periods = [
     { days: 1, label: "Hoy" },
     { days: 7, label: "7 días" },
@@ -299,6 +302,9 @@ function ValueGenerated({
               </div>
             )}
             <span>valor comercial atribuido a RecepVoz</span>
+            {incompleteAttribution && totals.length > 0 && (
+              <em>Datos parciales: hay ingresos sin verificar.</em>
+            )}
             {refreshing && <em>Actualizando…</em>}
           </div>
 
