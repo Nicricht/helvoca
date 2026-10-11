@@ -652,6 +652,28 @@
   color: #ffb020;
 }
 
+.errorRetry {
+  margin-top: 12px;
+  padding: 8px 14px;
+  border: 1px solid var(--rv-accent);
+  border-radius: var(--rv-radius-md);
+  background: transparent;
+  color: var(--rv-text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.errorRetry:hover,
+.errorRetry:focus-visible {
+  background: rgba(255, 255, 255, .08);
+}
+
+.errorRetry:focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 2px;
+}
+
 .spinner {
   flex: 0 0 auto;
   width: 22px;
