@@ -51,9 +51,12 @@ public class VoiceSetupReadinessService {
         String managedAccount = providerConfigured ? twilio.managedAccountSid() : "";
 
         List<PhoneNumber> assigned = phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId);
-        PhoneNumber active = assigned.stream().filter(PhoneNumber::isActive).findFirst().orElse(null);
+        PhoneNumber active = assigned.stream()
+                .filter(phone -> businessId.equals(phone.getBusinessId()) && phone.isActive())
+                .findFirst().orElse(null);
         boolean verifiedPhone = assigned.stream().anyMatch(phone ->
-                phone.isActive()
+                businessId.equals(phone.getBusinessId())
+                        && phone.isActive()
                         && "TWILIO".equalsIgnoreCase(phone.getProvider())
                         && "MANAGED_PURCHASE".equals(phone.getTwilioBindingSource())
                         && phone.getTwilioAccountSid() != null
@@ -62,7 +65,7 @@ public class VoiceSetupReadinessService {
                         && PHONE_SID.matcher(phone.getExternalId()).matches()
                         && phone.getVoiceVerifiedAt() != null
                         && providerConfigured);
-        boolean agentEnabled = agents.current().isActive();
+        boolean agentEnabled = agents.configuredCurrent() && agents.current().isActive();
 
         List<Step> steps = List.of(
                 new Step("BUSINESS", "Datos del negocio", setup.businessProfileConfigured(),
