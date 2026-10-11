@@ -26,7 +26,7 @@ public class PhoneNumberController {
     @PostMapping
     @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public PhoneNumberResponse create(@Valid @RequestBody PhoneNumberRequest request) {
-        return service.create(request);
+        return provisioning.connectExisting(request);
     }
 
     @GetMapping("/provisioning/status")
