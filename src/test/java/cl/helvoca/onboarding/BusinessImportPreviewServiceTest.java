@@ -64,20 +64,23 @@ class BusinessImportPreviewServiceTest {
         var second = new MockMultipartFile("files", "cambio.csv", "text/csv",
                 "Día,Apertura,Cierre\\nLunes,10:00,17:00\\n".replace("\\n", "\n")
                         .getBytes(StandardCharsets.UTF_8));
+        var repeated = new MockMultipartFile("files", "repetido.csv", "text/csv",
+                "Día,Apertura,Cierre\\nLunes,09:00,18:00\\n".replace("\\n", "\n")
+                        .getBytes(StandardCharsets.UTF_8));
         var faq = new MockMultipartFile("files", "faq.csv", "text/csv",
                 "Pregunta,Respuesta\\n¿Se puede reservar?,Sí\\n".replace("\\n", "\n")
                         .getBytes(StandardCharsets.UTF_8));
 
-        var preview = service.preview("Salón", List.of(first, second, faq));
+        var preview = service.preview("Salón", List.of(first, second, repeated, faq));
         assertFalse(preview.aiUsed());
         assertTrue(preview.products().isEmpty());
-        assertEquals(3, preview.setupSuggestions().size());
+        assertEquals(4, preview.setupSuggestions().size());
         assertEquals("BUSINESS_HOURS", preview.setupSuggestions().getFirst().kind());
         assertEquals("MONDAY", preview.setupSuggestions().getFirst().key());
         assertEquals("09:00-18:00", preview.setupSuggestions().getFirst().value());
         assertEquals(1.0, preview.setupSuggestions().getFirst().confidence());
         assertEquals(2, preview.setupSuggestions().getFirst().sourceRow());
-        assertEquals("FAQ", preview.setupSuggestions().get(2).kind());
+        assertEquals("FAQ", preview.setupSuggestions().get(3).kind());
         assertTrue(preview.warnings().stream().anyMatch(w -> w.contains("distintas")));
         assertFalse(preview.warnings().stream().anyMatch(w -> w.contains("No encontré productos")));
         verify(tenant).requireBusinessId();

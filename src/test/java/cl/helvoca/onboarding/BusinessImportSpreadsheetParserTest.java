@@ -42,6 +42,8 @@ class BusinessImportSpreadsheetParserTest {
                 Miércoles,9:00,18:00
                 Jueves,12:00,
                 Viernes,10:00,10:00
+                Martes,09:00
+                Viernes,09:00,invalid
                 Domingo,00:00,23:59
                 """;
         var file = new MockMultipartFile("files", "horario.csv", "text/csv",
@@ -54,7 +56,7 @@ class BusinessImportSpreadsheetParserTest {
         assertEquals("09:00-18:00", result.setupRows().get(0).value());
         assertEquals("SATURDAY", result.setupRows().get(1).key());
         assertEquals("SUNDAY", result.setupRows().get(2).key());
-        assertEquals(5, result.warnings().size());
+        assertEquals(7, result.warnings().size());
     }
 
     @Test
@@ -71,6 +73,23 @@ class BusinessImportSpreadsheetParserTest {
         assertEquals(1, result.setupRows().size());
         assertEquals("Respuesta declarada", result.setupRows().getFirst().value());
         assertEquals(4, result.warnings().size());
+    }
+
+    @Test
+    void malformedReorderedColumnsNeverInventQuestionOrOpeningTime() {
+        var faq = new MockMultipartFile("files", "faq.csv", "text/csv",
+                "Respuesta,Pregunta\nSí\n".getBytes(StandardCharsets.UTF_8));
+        var hours = new MockMultipartFile("files", "hours.csv", "text/csv",
+                "Día,Cierre,Apertura\nMonday,18:00\n".getBytes(StandardCharsets.UTF_8));
+        var parser = new BusinessImportSpreadsheetParser();
+        var faqResult = parser.parse(faq);
+        var hoursResult = parser.parse(hours);
+        assertEquals(BusinessImportSpreadsheetParser.DatasetKind.FAQS, faqResult.kind());
+        assertEquals(BusinessImportSpreadsheetParser.DatasetKind.BUSINESS_HOURS, hoursResult.kind());
+        assertTrue(faqResult.setupRows().isEmpty());
+        assertTrue(hoursResult.setupRows().isEmpty());
+        assertEquals(1, faqResult.warnings().size());
+        assertEquals(1, hoursResult.warnings().size());
     }
 
     @Test

@@ -115,6 +115,7 @@ public class BusinessImportPreviewService {
         List<ProductProposal> products = new ArrayList<>();
         List<SetupProposal> setupSuggestions = new ArrayList<>();
         Map<String, String> seenSetupValues = new LinkedHashMap<>();
+        boolean setupOverflowWarned = false;
         List<SourcePreview> sources = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         List<MultipartFile> semantic = new ArrayList<>();
@@ -152,10 +153,10 @@ public class BusinessImportPreviewService {
                     if (setupSuggestions.size() < MAX_SETUP_SUGGESTIONS) {
                         setupSuggestions.add(new SetupProposal(row.kind(), row.key(), row.value(),
                                 row.sourceName(), row.sheetName(), row.sourceRow(), 1.0));
-                    } else if (setupSuggestions.size() == MAX_SETUP_SUGGESTIONS) {
+                    } else if (!setupOverflowWarned) {
                         warnings.add("Se limitaron las propuestas de configuración a "
                                 + MAX_SETUP_SUGGESTIONS + "; importa el resto por separado.");
-                        setupSuggestions.add(new SetupProposal("LIMIT_REACHED", "", "", "", null, 0, 0));
+                        setupOverflowWarned = true;
                     }
                 }
                 warnings.addAll(parsed.warnings());
@@ -261,10 +262,7 @@ public class BusinessImportPreviewService {
         if (normalized.isEmpty() && setupSuggestions.isEmpty()) {
             warnings.add("No encontré productos o servicios listos para importar. Revisa los archivos o agrega datos manualmente.");
         }
-        List<SetupProposal> readySetup = setupSuggestions.size() > MAX_SETUP_SUGGESTIONS
-                ? setupSuggestions.subList(0, MAX_SETUP_SUGGESTIONS) : setupSuggestions;
-
-        return new Preview(safeBusinessName, List.copyOf(normalized), List.copyOf(readySetup),
+        return new Preview(safeBusinessName, List.copyOf(normalized), List.copyOf(setupSuggestions),
                 List.copyOf(sources), List.copyOf(dedupeWarnings(warnings)), aiUsed);
     }
 
