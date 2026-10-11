@@ -767,6 +767,8 @@ test.describe('React Home migration', () => {
     download = page.waitForEvent('download');
     await panel.getByRole('button', { name: 'Exportar XLSX' }).click();
     expect((await download).suggestedFilename()).toBe('helvoca-clientes.xlsx');
+    // Assert that generated object URLs are revoked by the real delayed callback.
+    await page.waitForTimeout(1150);
 
     await page.evaluate(() => { window.__exportMode = '503'; });
     await panel.getByRole('button', { name: 'Exportar CSV' }).click();
