@@ -67,6 +67,7 @@ async function boot(page, options = {}) {
     if (path === '/api/v1/onboarding/voice-readiness') {
       guideFetches++;
       if (options.error) return route.fulfill(json({ message: 'Readiness unavailable' }, 503));
+      if (options.malformed) return route.fulfill(json({}));
       return route.fulfill(json(guide(options.ready)));
     }
     if (path === '/api/v1/phone-numbers/provisioning/status') return route.fulfill(json({
@@ -112,6 +113,15 @@ test('readiness API outage fails closed, not ready', async ({ page }) => {
   const panel = page.getByLabel('Guía de activación de voz');
   await expect(panel.getByRole('alert')).toContainText('No pudimos comprobar');
   await expect(panel.getByText('Configuración completada')).toHaveCount(0);
+});
+
+test('malformed readiness responses fail closed while preserving channel controls', async ({ page }) => {
+  const state = await boot(page, { malformed: true });
+  const panel = page.getByLabel('Guía de activación de voz');
+  await expect(panel.getByRole('alert')).toContainText('No pudimos comprobar');
+  await expect(panel.getByText('Configuración completada')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Desvincular +14355652512' })).toBeVisible();
+  expect(state.requests.filter(x => x.method !== 'GET')).toEqual([]);
 });
 
 test('operator can read the guide without number purchase or activation controls', async ({ page }) => {
