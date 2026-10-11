@@ -235,6 +235,9 @@ public class CallLifecycleService {
                                                  Integer durationSeconds,
                                                  boolean carrierCallback) {
         boolean wasTerminal = call.getStatus() != null && call.getStatus().terminal();
+        // Carrier callbacks can arrive late or be delivered more than once.
+        // A stale ringing/in-progress event must never resurrect a closed call.
+        if (wasTerminal && !mapStatus(providerStatus).terminal()) return;
         applyStatus(call, providerStatus, durationSeconds, carrierCallback);
         if (call.getStatus() != null && call.getStatus().terminal()) {
             updateEstimatedCost(call);
