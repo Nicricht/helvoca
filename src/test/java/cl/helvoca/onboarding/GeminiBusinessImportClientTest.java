@@ -197,7 +197,7 @@ class GeminiBusinessImportClientTest {
     }
 
     @Test
-    void geminiNeverUsesLiveVoiceKeyOrCallsBudgetWhenDedicatedKeyIsAbsent() {
+    void geminiNeverUsesLiveVoiceKeyOrCallsBudgetWhenDedicatedKeyIsAbsent() throws Exception {
         TenantProvider tenant = mock(TenantProvider.class);
         when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
         GeminiBusinessImportClient provider = mock(GeminiBusinessImportClient.class);
