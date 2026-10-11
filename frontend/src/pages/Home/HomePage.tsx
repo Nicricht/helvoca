@@ -760,14 +760,17 @@ export function HomePage() {
               <section id="home-history" className={styles.historySection} aria-label="Historial de gestión">
                 <button type="button" className={styles.historyToggle}
                   aria-expanded={historyOpen}
+                  aria-controls="home-history-panel"
                   onClick={() => setHistoryOpen(previous => !previous)}>
                   <ClipboardList size={17} aria-hidden="true" />
                   {historyOpen ? "Ocultar historial y auditoría" : "Consultar historial de solicitudes y auditoría"}
                   <ArrowUpRight size={15} aria-hidden="true" />
                 </button>
-                {historyOpen && (
-                  <OperationsSupportPanel user={meQuery.data} showCustomerTools={false} />
-                )}
+                <div id="home-history-panel" hidden={!historyOpen}>
+                  {historyOpen && (
+                    <OperationsSupportPanel user={meQuery.data} showCustomerTools={false} />
+                  )}
+                </div>
               </section>
             )}
           </motion.div>
