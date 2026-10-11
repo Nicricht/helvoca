@@ -29,6 +29,7 @@ POM_CHANGED=false
 RUN_CHAOS=false
 RUN_PILOT=false
 RUN_SOFTWARE_FACTORY=false
+RUN_OPENAI_IMPORT_PILOT=false
 FRONTEND_CHANGED=false
 
 add_tests_from_dir() {
@@ -109,6 +110,9 @@ for file in "${CHANGED[@]}"; do
     software-factory/*|software-factory/**/*)
       RUN_SOFTWARE_FACTORY=true
       ;;
+    scripts/pilot/*)
+      RUN_OPENAI_IMPORT_PILOT=true
+      ;;
     src/main/resources/static/*.js|src/main/resources/static/**/*.js|e2e/*.js|e2e/**/*.js)
       if [[ -f "$file" ]]; then
         echo "Syntax check: $file"
@@ -159,6 +163,13 @@ fi
 if [[ "$RUN_SOFTWARE_FACTORY" == true ]]; then
   echo "Software Factory surface changed. Running contract tests..."
   python3 -m unittest discover -s software-factory/tests -p 'test_*.py' -v
+fi
+
+if [[ "$RUN_OPENAI_IMPORT_PILOT" == true ]]; then
+  echo "Installing reproducible synthetic menu image dependency..."
+  python3 -m pip install --disable-pip-version-check --quiet Pillow==11.3.0
+  echo "Running OFFLINE provider, benchmark and synthetic-document safety tests..."
+  python3 -m unittest discover -s scripts/pilot -p 'test_*.py' -v
 fi
 
 echo "Checking protected frontend frame contract..."
