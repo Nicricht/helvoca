@@ -1,5 +1,4 @@
--- Preserve historical phone rows unmodified. NULL means NOT provider-certified.
--- Only trusted server-side provisioning may create MANAGED_PURCHASE bindings.
+-- Existing phone mappings remain untouched: NULL provenance is NOT carrier proof.
 ALTER TABLE phone_number
     ADD COLUMN IF NOT EXISTS twilio_binding_source VARCHAR(32),
     ADD COLUMN IF NOT EXISTS twilio_account_sid VARCHAR(34),
@@ -7,7 +6,7 @@ ALTER TABLE phone_number
 
 ALTER TABLE phone_number
     ADD CONSTRAINT chk_phone_twilio_binding_source
-    CHECK (twilio_binding_source IS NULL OR twilio_binding_source IN ('MANAGED_PURCHASE'));
+    CHECK (twilio_binding_source IS NULL OR twilio_binding_source = 'MANAGED_PURCHASE');
 
 ALTER TABLE phone_number
     ADD CONSTRAINT chk_phone_twilio_binding_account
@@ -16,27 +15,15 @@ ALTER TABLE phone_number
         OR
         (twilio_binding_source = 'MANAGED_PURCHASE'
          AND twilio_account_sid IS NOT NULL
-         AND twilio_account_sid ~ '^AC[0-9a-fA-F]{32}
-    );
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_managed_twilio_account_sid
-    ON phone_number (twilio_account_sid, external_id)
-    WHERE twilio_binding_source = 'MANAGED_PURCHASE';
-
+         AND twilio_account_sid ~ '^AC[0-9a-fA-F]{32}$'
          AND external_id IS NOT NULL
-         AND external_id ~ '^PN[0-9a-fA-F]{32}
+         AND external_id ~ '^PN[0-9a-fA-F]{32}$')
     );
-
-CREATE INDEX IF NOT EXISTS idx_phone_twilio_account_sid
-    ON phone_number (twilio_account_sid, external_id)
-    WHERE twilio_account_sid IS NOT NULL;
-)
-    );
-
-CREATE INDEX IF NOT EXISTS idx_phone_twilio_account_sid
-    ON phone_number (twilio_account_sid, external_id)
-    WHERE twilio_account_sid IS NOT NULL;
 
 ALTER TABLE phone_number
     ADD CONSTRAINT chk_phone_verified_requires_managed_binding
     CHECK (voice_verified_at IS NULL OR twilio_binding_source = 'MANAGED_PURCHASE');
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_managed_twilio_account_sid
+    ON phone_number (twilio_account_sid, external_id)
+    WHERE twilio_binding_source = 'MANAGED_PURCHASE';
