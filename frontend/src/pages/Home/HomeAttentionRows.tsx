@@ -157,7 +157,9 @@ export function HomeAttentionRows({
                 )}
               </div>
               {next && (
-                <div className={styles.action}>
+                <div className={styles.action}
+                  role={destructive && ask ? "group" : undefined}
+                  aria-label={destructive && ask ? "Confirmación de cierre: " + (item.title || "Caso sin título") : undefined}>
                   {destructive && !ask ? (
                     <button type="button" disabled={Boolean(busyId) || refreshing}
                       onClick={() => setConfirmationId(item.id)}>{next.label} <ArrowUpRight size={13} /></button>
