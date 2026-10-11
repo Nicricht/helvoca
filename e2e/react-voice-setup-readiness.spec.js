@@ -62,7 +62,7 @@ async function boot(page, options = {}) {
     }));
     if (path === '/api/v1/ai-agent/voices') return route.fulfill(json([]));
     if (path === '/api/v1/phone-numbers') return route.fulfill(json([{
-      id: 'phone-1', phoneNumber: '+14355652512', provider: 'TWILIO', active: true
+      id: 'phone-1', phoneNumber: '+14355652512', provider: 'TWILIO', active: options.phoneActive ?? true
     }]));
     if (path === '/api/v1/onboarding/voice-readiness') {
       guideFetches++;
@@ -122,6 +122,23 @@ test('malformed readiness responses fail closed while preserving channel control
   await expect(panel.getByText('Configuración completada')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Desvincular +14355652512' })).toBeVisible();
   expect(state.requests.filter(x => x.method !== 'GET')).toEqual([]);
+});
+
+test('activation requires explicit confirmation, never calls or buys during readiness', async ({ page }) => {
+  const state = await boot(page, { phoneActive: false });
+  const activate = page.getByRole('button', { name: 'Activar', exact: true });
+  await expect(activate).toBeVisible();
+  page.once('dialog', dialog => dialog.dismiss());
+  await activate.click();
+  expect(state.requests.filter(x => x.method !== 'GET')).toEqual([]);
+
+  page.once('dialog', dialog => dialog.accept());
+  await activate.click();
+  await expect.poll(() => state.requests.filter(x => x.method === 'PATCH').length).toBe(1);
+  expect(state.requests.filter(x => x.method !== 'GET')).toEqual([
+    { path: '/api/v1/phone-numbers/phone-1/active', method: 'PATCH' }
+  ]);
+  expect(state.requests.filter(x => /calls|provisioning$/.test(x.path))).toEqual([]);
 });
 
 test('operator can read the guide without number purchase or activation controls', async ({ page }) => {
