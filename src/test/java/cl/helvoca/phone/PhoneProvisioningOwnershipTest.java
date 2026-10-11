@@ -189,7 +189,8 @@ class PhoneProvisioningOwnershipTest {
         attested();
         PhoneNumberResponse response = service.provision(new ProvisionPhoneNumberRequest(PHONE, true));
         assertTrue(response.active());
-        assertEquals(SID, response.externalId());
+        assertNull(response.externalId(), "Carrier PhoneNumberSid must not reach frontend");
+        assertEquals(SID, phone.getExternalId(), "Provider identity still persists internally");
         assertSame(phone, verifySave());
         verify(twilio, never()).provision(any());
     }
