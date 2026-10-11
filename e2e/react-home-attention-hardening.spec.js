@@ -316,6 +316,67 @@ test.describe('Inicio Parte 3: solicitudes y escalamiento humano', () => {
     await expect(panel(page)).not.toContainText('Sin intervenciones pendientes');
   });
 
+
+  for (const [label, malformed] of [
+    ['null entry', [null]],
+    ['scalar entry', [23]],
+    ['unknown attention kind', [{ ...initialAttention[0], kind: 'UNKNOWN' }]],
+    ['missing attention id', [{ ...initialAttention[0], id: '' }]],
+    ['non-string attention status', [{ ...initialAttention[0], status: null }]]
+  ]) {
+    test('malformed HTTP 200 fails closed for ' + label + ' and recovers after valid retry', async ({ page }) => {
+      const state = await boot(page);
+      state.items = malformed;
+      await page.goto('/app');
+      await expect(panel(page).getByRole('alert')).toContainText('No pudimos verificar los pendientes');
+      await expect(page.getByRole('region', { name: 'Estado de tu negocio' }))
+        .not.toContainText('Todo bajo control');
+      expect(state.mutations).toEqual([]);
+      state.items = [];
+      await panel(page).getByRole('button', { name: 'Reintentar' }).click();
+      await expect(panel(page)).toContainText('Sin intervenciones pendientes');
+      assertNoProviders(state);
+    });
+  }
+
+  test('unsupported attention status is safely read-only, never sent to mutation API', async ({ page }) => {
+    const state = await boot(page, { attention: [
+      { ...initialAttention[0], status: 'FUTURE_STATUS' },
+      { ...initialAttention[1], status: 'FUTURE_STATUS' }
+    ] });
+    await page.goto('/app');
+    await expect(panel(page)).toContainText('Solicitud de prueba');
+    await expect(panel(page)).toContainText('Transferencia de prueba');
+    await expect(panel(page).getByRole('button', { name: 'Empezar gestión' })).toHaveCount(0);
+    await expect(panel(page).getByRole('button', { name: 'Marcar resuelta' })).toHaveCount(0);
+    await expect(panel(page).getByRole('button', { name: 'Tomar caso' })).toHaveCount(0);
+    await expect(panel(page).getByRole('button', { name: 'Cerrar escalamiento' })).toHaveCount(0);
+    expect(state.mutations).toEqual([]);
+  });
+
+  test('malformed case title or timestamp never crashes Home or guesses a date', async ({ page }) => {
+    const state = await boot(page, { attention: [{
+      ...initialAttention[0], title: '', createdAt: 'this-is-not-a-date', priority: 'LOW'
+    }] });
+    await page.goto('/app');
+    await expect(panel(page)).toContainText('Caso sin título');
+    await expect(panel(page)).toContainText('Fecha no disponible');
+    await expect(panel(page).getByRole('button', { name: 'Empezar gestión' })).toBeVisible();
+    expect(state.mutations).toEqual([]);
+  });
+
+  test('100 visible cases are presented as recent sample, not all-time workload', async ({ page }) => {
+    const state = await boot(page, { attention: Array.from({ length: 100 }, (_, i) => ({
+      ...initialAttention[0], id: 'request-' + i, operationId: 'operation-' + i,
+      title: 'Caso de muestra ' + i, status: 'OPEN'
+    })) });
+    await page.goto('/app');
+    await expect(panel(page)).toContainText('100 casos recientes');
+    await expect(panel(page)).toContainText('hasta 100 casos recientes');
+    await expect(panel(page).locator('article[data-kind="REQUEST"]')).toHaveCount(100);
+    expect(state.mutations).toEqual([]);
+  });
+
   test('doble clic en confirmación de cierre genera exactamente un PATCH', async ({ page }) => {
     let release;
     const pending = new Promise(resolve => { release = resolve; });
