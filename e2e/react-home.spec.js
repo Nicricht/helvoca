@@ -692,6 +692,39 @@ test.describe('React Home migration', () => {
     await expect(value).not.toContainText(/ROI positivo|retorno de inversión confirmado/i);
   });
 
+  test('partial verified revenue is presented as partial, not the total business value', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      recepVozRevenue: null,
+      bookingCurrency: 'CLP', recepVozBookingRevenue: 25000
+    }});
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('$25.000');
+    await expect(value).toContainText('Datos parciales');
+  });
+
+  test('malformed string amounts are not parsed into trusted money', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS, recepVozRevenue: '999999', recepVozBookingRevenue: null
+    }});
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('Valor no disponible');
+    await expect(value).not.toContainText('$999.999');
+  });
+
+  test('unsupported currency formatting is never hidden behind a fictitious currency conversion', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS, primaryCurrency: 'INVALID', recepVozRevenue: 123,
+      bookingCurrency: null, recepVozBookingRevenue: null
+    }});
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('Valor no disponible');
+    await expect(value).not.toContainText('INVALID 123');
+  });
+
   test('different currencies remain separate instead of blending attributed revenue', async ({ page }) => {
     await bootHome(page, { analytics: {
       ...READY_ANALYTICS,
