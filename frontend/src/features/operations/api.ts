@@ -38,8 +38,19 @@ export interface RequestTransition {
   evidenceEventId: string | null;
 }
 
-export function getHumanAttention() {
-  return apiRequest<HumanAttentionItem[]>("/api/v1/operations/attention");
+export async function getHumanAttention(): Promise<HumanAttentionItem[]> {
+  const payload = await apiRequest<unknown>("/api/v1/operations/attention");
+  // HTTP 200 with malformed data must never be displayed as "all clear".
+  if (!Array.isArray(payload) || !payload.every(item => {
+    if (!item || typeof item !== "object") return false;
+    const entry = item as Record<string, unknown>;
+    return (entry.kind === "REQUEST" || entry.kind === "HANDOFF") &&
+      typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.status === "string" && entry.status.length > 0;
+  })) {
+    throw new Error("No pudimos validar los pendientes del negocio.");
+  }
+  return payload as HumanAttentionItem[];
 }
 
 export function acknowledgeHumanHandoff(id: string) {
