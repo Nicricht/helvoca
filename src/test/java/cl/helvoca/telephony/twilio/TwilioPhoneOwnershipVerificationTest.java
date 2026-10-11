@@ -74,6 +74,23 @@ class TwilioPhoneOwnershipVerificationTest {
     }
 
     @Test
+    void carrierAvailabilityQueryUsesManagedAccountCredentials() {
+        assertTrue(client.enabled());
+        server.expect(once(), requestTo("https://api.twilio.com/2010-04-01/Accounts/"
+                        + ACCOUNT + "/AvailablePhoneNumbers/US/Local.json?VoiceEnabled=true&Limit=5"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"available_phone_numbers":[
+                          {"phone_number":"+12025550123",
+                           "capabilities":{"voice":true},
+                           "iso_country":"US","friendly_name":"Test Number"}
+                        ]}
+                        """, MediaType.APPLICATION_JSON));
+        assertEquals(PHONE, client.searchAvailable("US", null, 5).getFirst().phoneNumber());
+        server.verify();
+    }
+
+    @Test
     void credentialsMustBeConfiguredBeforeLookup() {
         properties.setAuthToken("");
         assertThrows(ExternalProviderException.class, () -> client.verifyManagedPhone(PHONE));
