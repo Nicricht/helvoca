@@ -133,7 +133,8 @@ class PhoneProvisioningOwnershipTest {
         attested();
         PhoneNumberResponse result = service.connectExisting(new PhoneNumberRequest(PHONE, null, null));
         assertTrue(result.active());
-        assertEquals(SID, result.externalId());
+        assertNull(result.externalId(), "Carrier PhoneNumberSid must not reach frontend");
+        assertEquals(SID, phone.getExternalId(), "Provider identity still persists internally");
         assertSame(phone, verifySave());
     }
 
