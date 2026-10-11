@@ -1577,7 +1577,8 @@ test.describe('React Home migration', () => {
     await expect(hero).toContainText('Hay una llamada en curso.');
     const announcement = hero.locator('span').filter({ hasText: /^Hay una llamada en curso\.$/ });
     await expect(announcement).toHaveCount(1);
-    await expect(announcement).not.toBeVisible();
+    await expect(announcement).toHaveClass(/srOnly/);
+    await expect(announcement).not.toHaveAttribute('aria-hidden', 'true');
   });
 
   test('reduced-motion preference removes ambient and dashboard decorative animations', async ({ page }) => {
