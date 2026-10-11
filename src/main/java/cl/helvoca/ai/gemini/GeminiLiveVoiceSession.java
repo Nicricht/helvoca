@@ -73,6 +73,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final VoiceProviderHealthRegistry health;
     private final HttpClient http;
     private final LocalBargeInDetector localBargeInDetector;
+    private final GeminiTwilioAudioFramer assistantAudioFramer = new GeminiTwilioAudioFramer();
     private final Queue<String> pendingAudio = new ConcurrentLinkedQueue<>();
     private final Set<String> completedToolCalls = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<String, CachedToolResult> recentReadToolResults = new ConcurrentHashMap<>();
@@ -294,7 +295,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     }
 
     private void handleServerContent(JSONObject content) {
-        if (content.optBoolean("interrupted", false)) {
+        boolean interrupted = content.optBoolean("interrupted", false);
+        if (interrupted) {
+            assistantAudioFramer.clear();
             transport.clearPlayback(context.streamSid());
             flushTranscripts();
         }
@@ -317,25 +320,23 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
         JSONObject modelTurn = content.optJSONObject("modelTurn");
         JSONArray parts = modelTurn == null ? null : modelTurn.optJSONArray("parts");
-        if (parts != null) {
+        if (parts != null && !interrupted) {
             for (int i = 0; i < parts.length(); i++) {
                 JSONObject part = parts.optJSONObject(i);
                 JSONObject inline = part == null ? null : part.optJSONObject("inlineData");
                 if (inline == null) continue;
                 String data = inline.optString("data", null);
                 if (data == null || data.isBlank()) continue;
-                String mulaw = PcmuAudioCodec.geminiPcm24kToTwilioMulaw8k(data);
-                if (!mulaw.isBlank()) {
-                    recordFirstResponseAudioLatency();
-                    lastAssistantAudioAtMillis = System.currentTimeMillis();
-                    transport.sendAudio(context.streamSid(), mulaw);
-                }
+                sendFramedAssistantAudio(assistantAudioFramer.accept(data));
             }
         }
 
         boolean turnComplete = content.optBoolean("turnComplete", false);
         boolean generationComplete = content.optBoolean("generationComplete", false);
         boolean waitingForInput = content.optBoolean("waitingForInput", false);
+        if (turnComplete || generationComplete) {
+            sendFramedAssistantAudio(assistantAudioFramer.finishTurn());
+        }
 
         if (context.voiceBakeOff() && turnComplete) {
             flushTranscripts();
@@ -365,6 +366,14 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             certificationAwaitingPostToolBoundary.set(false);
             certificationPostToolOutputSeen.set(false);
             advanceCertificationSimulation();
+        }
+    }
+
+    private void sendFramedAssistantAudio(List<String> frames) {
+        for (String mulaw : frames) {
+            recordFirstResponseAudioLatency();
+            lastAssistantAudioAtMillis = System.currentTimeMillis();
+            transport.sendAudio(context.streamSid(), mulaw);
         }
     }
 
@@ -713,6 +722,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 || now - lastAudio > properties.getLocalBargeInRecentAssistantAudioMs()) {
             return;
         }
+        assistantAudioFramer.clear();
         transport.clearPlayback(context.streamSid());
         log.info("VOICE_LOCAL_BARGE_IN call={} playback_age_ms={} threshold={} speech_frames={}",
                 context.callId(),
@@ -834,6 +844,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             out.put(new JSONObject()
                     .put("name", tool.getString("name"))
                     .put("description", tool.optString("description", ""))
+                    .put("behavior", "BLOCKING")
                     .put("parameters", sanitizeGeminiSchema(tool.getJSONObject("parameters"))));
         }
         return out;
@@ -1016,6 +1027,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     public void close() {
         if (!closed.compareAndSet(false, true)) return;
         inboundFrames.reset();
+        assistantAudioFramer.clear();
         flushTranscripts();
         WebSocket current = socket;
         if (current != null) {

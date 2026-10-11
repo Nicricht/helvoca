@@ -45,6 +45,11 @@ public class TwilioPhoneProvisioningClient {
         return properties.isProvisioningEnabled();
     }
 
+    /** The managed carrier account, not a tenant-supplied account SID. */
+    public String managedAccountSid() {
+        return properties.getAccountSid().trim();
+    }
+
     public boolean configured() {
         return properties.hasCommercialProvisioningCredentials()
                 && ACCOUNT_SID.matcher(properties.getAccountSid().trim()).matches();
@@ -100,6 +105,59 @@ public class TwilioPhoneProvisioningClient {
         } catch (Exception ex) {
             throw new ExternalProviderException("No pude comunicarme con Twilio para buscar números disponibles", ex);
         }
+    }
+
+    /**
+     * Read-only carrier attestation for an already assigned number in the managed Twilio account.
+     * An E.164 supplied by a tenant is NEVER proof of ownership or voice readiness.
+     */
+    public VerifiedPhoneNumber verifyManagedPhone(String phoneNumber) {
+        if (!configured()) {
+            throw new ExternalProviderException("No hay credenciales Twilio verificables para conectar el número.");
+        }
+        String number = normalizePhone(phoneNumber);
+        String account = properties.getAccountSid().trim();
+        try {
+            Map<?, ?> response = restClient.get()
+                    .uri(builder -> builder
+                            .path("/2010-04-01/Accounts/{accountSid}/IncomingPhoneNumbers.json")
+                            .queryParam("PhoneNumber", "{verifiedNumber}")
+                            .build(account, number))
+                    .headers(headers -> headers.setBasicAuth(account, properties.getAuthToken().trim()))
+                    .retrieve()
+                    .body(Map.class);
+            Object raw = response == null ? null : response.get("incoming_phone_numbers");
+            if (!(raw instanceof List<?> numbers) || numbers.size() != 1
+                    || !(numbers.get(0) instanceof Map<?, ?> item)) {
+                throw new ExternalProviderException("Twilio no confirmó exactamente un número gestionado.");
+            }
+            String sid = string(item.get("sid"));
+            if (sid == null || !PHONE_SID.matcher(sid).matches()
+                    || !number.equals(string(item.get("phone_number")))
+                    || !account.equals(string(item.get("account_sid")))
+                    || !capability(item.get("capabilities"), "voice")) {
+                throw new ExternalProviderException("Twilio no confirmó SID, titularidad y capacidad de voz.");
+            }
+            if (!properties.absoluteWebhook("/webhooks/v1/twilio/voice").equals(string(item.get("voice_url")))
+                    || !"POST".equalsIgnoreCase(string(item.get("voice_method")))
+                    || !properties.absoluteWebhook("/webhooks/v1/twilio/status").equals(string(item.get("status_callback")))
+                    || !"POST".equalsIgnoreCase(string(item.get("status_callback_method")))
+                    || hasValue(item.get("voice_application_sid"))
+                    || hasValue(item.get("trunk_sid"))) {
+                throw new ExternalProviderException("Twilio no tiene los webhooks de voz certificados para este número.");
+            }
+            return new VerifiedPhoneNumber(sid, number);
+        } catch (RestClientResponseException ex) {
+            throw providerFailure("Twilio rechazó la verificación del número", ex);
+        } catch (ExternalProviderException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ExternalProviderException("No fue posible verificar el número con Twilio", ex);
+        }
+    }
+
+    private static boolean hasValue(Object raw) {
+        return raw != null && !String.valueOf(raw).isBlank();
     }
 
     public ProvisionedPhoneNumber provision(String phoneNumber) {
@@ -208,4 +266,5 @@ public class TwilioPhoneProvisioningClient {
     }
 
     public record ProvisionedPhoneNumber(String sid, String phoneNumber) {}
+    public record VerifiedPhoneNumber(String sid, String phoneNumber) {}
 }
