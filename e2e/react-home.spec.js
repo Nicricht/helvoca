@@ -811,11 +811,14 @@ test.describe('React Home migration', () => {
     await page.goto('/app');
     const toggle = page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/ });
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toHaveAttribute('aria-controls', 'home-history-panel');
+    await expect(page.locator('#home-history-panel')).toBeHidden();
     await toggle.focus();
     await page.keyboard.press('Enter');
     const collapse = page.getByRole('button', { name: /Ocultar historial y auditoría/ });
     await expect(collapse).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByRole('heading', { name: 'Historial y auditoría' })).toBeVisible();
+    await expect(page.locator('#home-history-panel')).toBeVisible();
     await collapse.focus();
     await page.keyboard.press('Space');
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -834,6 +837,7 @@ test.describe('React Home migration', () => {
     await page.keyboard.press('Enter');
     const cancel = panel.getByRole('button', { name: 'Cancelar' });
     await expect(cancel).toBeVisible();
+    await expect(panel.getByRole('group', { name: /Confirmación de cierre: Cliente pidió devolución de llamada/ })).toBeVisible();
     await cancel.focus();
     await page.keyboard.press('Space');
     await expect(panel.getByRole('button', { name: 'Confirmar cierre' })).toHaveCount(0);
@@ -885,6 +889,20 @@ test.describe('React Home migration', () => {
     expect(visual.size).toBeGreaterThanOrEqual(2);
     expect(state.attentionMutations()).toBe(0);
     expect(state.requests.some(req => req.url.includes('/api/v1/operations/dashboard'))).toBe(false);
+  });
+
+  test('attention failure alert and retry are accessible with Enter, never a mutation', async ({ page }) => {
+    const state = await bootHome(page, { attentionError: 503 });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel.getByRole('alert')).toContainText('No pudimos verificar los pendientes');
+    const before = state.attentionReads();
+    const retry = panel.getByRole('button', { name: 'Reintentar' });
+    await retry.focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(state.attentionReads).toBeGreaterThan(before);
+    await expect(panel.getByRole('alert')).toContainText('No pudimos verificar los pendientes');
+    expect(state.attentionMutations()).toBe(0);
   });
 
   test('Home uses one page-level heading, labelled regions and decorative non-semantic layers', async ({ page }) => {
