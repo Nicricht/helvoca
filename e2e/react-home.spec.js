@@ -184,6 +184,8 @@ async function bootHome(page, options = {}) {
   const permissions = options.permissions;
   const requests = [];
   let onboardingRequests = 0;
+  let onboardingFailuresRemaining = options.onboardingFailures ?? 0;
+  let operationsFailuresRemaining = options.operationsFailures ?? 0;
   let attentionReads = 0;
   let attentionMutations = 0;
   let attentionItems = [...(options.attention || (options.operations === EMPTY_OPERATIONS ? [] : DEFAULT_ATTENTION))];
@@ -220,6 +222,13 @@ async function bootHome(page, options = {}) {
 
   await page.route('**/api/v1/onboarding/status', route => {
     onboardingRequests += 1;
+    if (onboardingFailuresRemaining > 0) {
+      onboardingFailuresRemaining -= 1;
+      return route.fulfill(json({ message: 'onboarding unavailable' }, 503));
+    }
+    if (options.onboardingError) {
+      return route.fulfill(json({ message: 'onboarding unavailable' }, options.onboardingError));
+    }
     return route.fulfill(json(options.onboarding || READY_ONBOARDING));
   });
 
@@ -257,6 +266,10 @@ async function bootHome(page, options = {}) {
 
   await page.route('**/api/v1/operations/dashboard', async route => {
     if (options.operationsGate) await options.operationsGate;
+    if (operationsFailuresRemaining > 0) {
+      operationsFailuresRemaining -= 1;
+      return route.fulfill(json({ message: 'operations unavailable' }, 503));
+    }
     if (options.operationsError) {
       return route.fulfill(json({ message: 'operations unavailable' }, options.operationsError));
     }
@@ -527,6 +540,58 @@ test.describe('React Home migration', () => {
       /\/app\/settings\?section=receptionist/
     );
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+  });
+
+  test('owner onboarding outage fails closed without loading unverified business metrics', async ({ page }) => {
+    const api = await bootHome(page, { onboardingError: 503 });
+
+    await page.goto('/app');
+
+    const error = page.locator('main[data-visual-page="home"] [role="alert"]');
+    await expect(error).toContainText('No pudimos verificar la configuración de tu negocio.');
+    await expect(error.getByRole('button', { name: 'Reintentar' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Estado de tu negocio' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+
+    const apiRequests = api.requests.filter(request => request.url.includes('/api/v1/'));
+    expect(apiRequests.some(request => request.url.includes('/operations/dashboard'))).toBe(false);
+    expect(apiRequests.some(request => request.url.includes('/commercial/analytics'))).toBe(false);
+    expect(apiRequests.some(request => request.url.includes('/operations/attention'))).toBe(false);
+    expect(apiRequests.every(request => request.method === 'GET')).toBe(true);
+  });
+
+  test('owner explicitly retries a transient onboarding outage and sees authoritative results', async ({ page }) => {
+    const api = await bootHome(page, { onboardingFailures: 2 });
+
+    await page.goto('/app');
+    const error = page.locator('main[data-visual-page="home"] [role="alert"]');
+    await expect(error).toContainText('No pudimos verificar la configuración de tu negocio.');
+    expect(api.requests.some(request => request.url.includes('/operations/dashboard'))).toBe(false);
+
+    await error.getByRole('button', { name: 'Reintentar' }).click();
+
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toContainText('6');
+    await expect(error).toHaveCount(0);
+    expect(api.onboardingRequests()).toBeGreaterThanOrEqual(3);
+  });
+
+  test('operational dashboard outage does not invent results and can recover on retry', async ({ page }) => {
+    const api = await bootHome(page, { operationsFailures: 2 });
+
+    await page.goto('/app');
+    const error = page.locator('main[data-visual-page="home"] [role="alert"]');
+    await expect(error).toContainText('No pudimos cargar el resumen operativo.');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Estado de tu negocio' })).toHaveCount(0);
+    expect(api.attentionMutations()).toBe(0);
+
+    await error.getByRole('button', { name: 'Reintentar' }).click();
+
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toContainText('6');
+    await expect(page.getByRole('region', { name: 'Estado de tu negocio' })).toBeVisible();
+    await expect(error).toHaveCount(0);
+    expect(api.attentionMutations()).toBe(0);
   });
 
   test('shows an explicit loading state while the daily summary is pending', async ({ page }) => {
