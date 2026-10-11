@@ -657,6 +657,95 @@ test.describe('React Home migration', () => {
     expect(unsafe).toEqual([]);
   });
 
+  test('unknown attributed revenue never becomes a fictional $0', async ({ page }) => {
+    const analytics = {
+      ...READY_ANALYTICS,
+      recepVozRevenue: null,
+      recepVozBookingRevenue: null
+    };
+    await bootHome(page, { analytics });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('Valor no disponible');
+    await expect(value).not.toContainText('$0');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+  });
+
+  test('verified zero revenue remains zero rather than unknown', async ({ page }) => {
+    await bootHome(page, { analytics: EMPTY_ANALYTICS });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('$0');
+    await expect(value).not.toContainText('Valor no disponible');
+  });
+
+  test('negative or malformed attributed amounts never produce revenue or a positive ROI', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      recepVozRevenue: -9000,
+      recepVozBookingRevenue: -35
+    }});
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('Valor no disponible');
+    await expect(value).not.toContainText('$-');
+    await expect(value).not.toContainText(/rentabilidad garantizada|retorno de inversión/i);
+  });
+
+  test('different currencies remain separate instead of blending attributed revenue', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      primaryCurrency: 'USD', recepVozRevenue: 30,
+      bookingCurrency: 'CLP', recepVozBookingRevenue: 50000
+    }});
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('USD');
+    await expect(value).toContainText('CLP');
+    await expect(value).not.toContainText('50.030');
+  });
+
+  test('same currency groups attributed sales and bookings without double counting other totals', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      primaryCurrency: 'CLP', recepVozRevenue: 10000,
+      bookingCurrency: 'CLP', recepVozBookingRevenue: 25000,
+      totalRevenue: 999999
+    }});
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('$35.000');
+    await expect(value).not.toContainText('999.999');
+  });
+
+  test('changing Hoy / 7 días / 30 días uses its own API period, never the previous period total', async ({ page }) => {
+    const calls = [];
+    await bootHome(page);
+    await page.route('**/api/v1/commercial/analytics**', route => {
+      const days = Number(new URL(route.request().url()).searchParams.get('days'));
+      calls.push(days);
+      return route.fulfill(json({
+        ...READY_ANALYTICS, days,
+        recepVozRevenue: ({ 1: 1100, 7: 7700, 30: 33000 })[days],
+        recepVozBookingRevenue: 0
+      }));
+    });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('$7.700');
+    await value.getByRole('button', { name: 'Hoy' }).click();
+    await expect(value).toContainText('$1.100');
+    await expect(value).not.toContainText('$7.700');
+    await value.getByRole('button', { name: '30 días' }).click();
+    await expect(value).toContainText('$33.000');
+    await expect(value).not.toContainText('$1.100');
+    await value.getByRole('button', { name: '7 días' }).click();
+    await expect(value).toContainText('$7.700');
+    expect(calls).toContain(1);
+    expect(calls).toContain(7);
+    expect(calls).toContain(30);
+  });
+
   for (const viewport of [
     { name: 'desktop', width: 1440, height: 900 },
     { name: 'tablet', width: 768, height: 1024 },
