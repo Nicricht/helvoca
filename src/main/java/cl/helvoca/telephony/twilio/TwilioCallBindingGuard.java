@@ -29,10 +29,14 @@ public class TwilioCallBindingGuard {
         this.databaseContext = databaseContext;
     }
 
-    public boolean allowsIncoming(String destination, String accountSid) {
-        if (blank(destination) || blank(accountSid)) return false;
+    public boolean allowsIncoming(String callSid, String destination, String caller, String accountSid) {
+        if (blank(callSid) || blank(destination) || blank(caller) || blank(accountSid)) return false;
         return databaseContext.callAsSystem(() -> phones.findByPhoneNumberAndActiveTrue(destination)
-                .filter(phone -> certified(phone, accountSid)).isPresent());
+                .filter(phone -> certified(phone, accountSid))
+                .filter(phone -> calls.findByProviderCallId(callSid)
+                        .map(existing -> boundTo(existing, phone, caller, destination))
+                        .orElse(true))
+                .isPresent());
     }
 
     public boolean allowsCallback(String callSid, String accountSid) {
