@@ -39,6 +39,18 @@ class GeminiBusinessImportClientTest {
     }
 
     @Test
+    void versionCompatibleRequestOmitsDeprecatedSamplingKnobs() {
+        var body = GeminiBusinessImportClient.createRequestBody(
+                new org.json.JSONArray().put(new org.json.JSONObject().put("text", "menu ficticio")));
+        var config = body.getJSONObject("generationConfig");
+        assertEquals("application/json", config.getString("responseMimeType"));
+        assertEquals(7500, config.getInt("maxOutputTokens"));
+        assertFalse(config.has("temperature"));
+        assertFalse(config.has("topP"));
+        assertFalse(config.has("topK"));
+    }
+
+    @Test
     void parsesRealisticMenuAndFlagsPromotionsInsteadOfPublishingThem() {
         var result = GeminiBusinessImportClient.parse(RESPONSE_TEXT, "menu.png");
         assertEquals(3, result.products().size());

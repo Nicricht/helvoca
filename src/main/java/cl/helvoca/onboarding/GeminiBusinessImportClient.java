@@ -93,6 +93,18 @@ public class GeminiBusinessImportClient {
                      List<BusinessImportPreviewService.SetupProposal> setupSuggestions,
                      List<String> warnings) {}
 
+    // Gemini 3.5 Flash-Lite ignores deprecated temperature/topP/topK, and
+    // Google's current API warns future models may reject them with HTTP 400.
+    // Stable JSON schema constraints, not sampling parameters, control safety.
+    static JSONObject createRequestBody(JSONArray parts) {
+        return new JSONObject()
+                .put("contents", new JSONArray().put(new JSONObject()
+                        .put("role", "user").put("parts", parts)))
+                .put("generationConfig", new JSONObject()
+                        .put("maxOutputTokens", 7500)
+                        .put("responseMimeType", "application/json"));
+    }
+
     Extracted analyze(List<MultipartFile> files, BusinessImportAiUsageLedger ledger)
             throws IOException, InterruptedException {
         if (!hasApiKey()) throw new IllegalStateException("La clave de importación Gemini no está configurada");
@@ -121,13 +133,7 @@ public class GeminiBusinessImportClient {
                     new JSONObject().put("mimeType", mime)
                             .put("data", Base64.getEncoder().encodeToString(file.getBytes()))));
         }
-        JSONObject requestJson = new JSONObject()
-                .put("contents", new JSONArray().put(new JSONObject()
-                        .put("role", "user").put("parts", parts)))
-                .put("generationConfig", new JSONObject()
-                        .put("temperature", 0)
-                        .put("maxOutputTokens", 7500)
-                        .put("responseMimeType", "application/json"));
+        JSONObject requestJson = createRequestBody(parts);
 
         // Provider URI is fixed. The model is strictly validated, never a user URL.
         HttpRequest request = HttpRequest.newBuilder(URI.create(BASE_URL + model + ":generateContent"))
