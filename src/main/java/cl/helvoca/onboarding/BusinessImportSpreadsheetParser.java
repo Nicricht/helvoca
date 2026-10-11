@@ -54,6 +54,22 @@ public class BusinessImportSpreadsheetParser {
             "boleta", "nro boleta", "numero boleta", "folio", "documento", "nro documento", "factura");
     private static final Set<String> CUSTOMER_HEADERS = Set.of(
             "cliente", "customer", "nombre cliente", "rut", "run", "email", "correo", "telefono");
+    private static final Set<String> FAQ_QUESTION_HEADERS = Set.of("pregunta", "question", "consulta frecuente");
+    private static final Set<String> FAQ_ANSWER_HEADERS = Set.of("respuesta", "answer", "solucion");
+    private static final Set<String> HOURS_DAY_HEADERS = Set.of("dia", "dia semana", "day", "day of week");
+    private static final Set<String> HOURS_OPEN_HEADERS = Set.of("apertura", "hora apertura", "open time", "abre");
+    private static final Set<String> HOURS_CLOSE_HEADERS = Set.of("cierre", "hora cierre", "close time", "cierra");
+    private static final int MAX_FAQ_QUESTION_LENGTH = 240;
+    private static final int MAX_FAQ_ANSWER_LENGTH = 1200;
+    private static final String TIME_PATTERN = "([01]\\d|2[0-3]):[0-5]\\d";
+    private static final Map<String, String> DAY_NAMES = Map.ofEntries(
+            Map.entry("lunes", "MONDAY"), Map.entry("monday", "MONDAY"),
+            Map.entry("martes", "TUESDAY"), Map.entry("tuesday", "TUESDAY"),
+            Map.entry("miercoles", "WEDNESDAY"), Map.entry("wednesday", "WEDNESDAY"),
+            Map.entry("jueves", "THURSDAY"), Map.entry("thursday", "THURSDAY"),
+            Map.entry("viernes", "FRIDAY"), Map.entry("friday", "FRIDAY"),
+            Map.entry("sabado", "SATURDAY"), Map.entry("saturday", "SATURDAY"),
+            Map.entry("domingo", "SUNDAY"), Map.entry("sunday", "SUNDAY"));
 
     public ParseResult parse(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -91,6 +107,7 @@ public class BusinessImportSpreadsheetParser {
 
     private ParseResult parseWorkbook(String sourceName, byte[] bytes) throws Exception {
         List<ProductRow> products = new ArrayList<>();
+        List<SetupRow> setupRows = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         StringBuilder extracted = new StringBuilder();
         int rowCount = 0;
@@ -125,6 +142,7 @@ public class BusinessImportSpreadsheetParser {
                 ParseResult one = parseTable(sourceName, sheet.getSheetName(), table);
                 if (one.recognized()) kinds.add(one.kind());
                 products.addAll(one.products());
+                setupRows.addAll(one.setupRows());
                 warnings.addAll(one.warnings());
                 rowCount += one.rowCount();
 
@@ -138,7 +156,7 @@ public class BusinessImportSpreadsheetParser {
         if (!recognized && warnings.isEmpty()) {
             warnings.add("No reconocí columnas de productos, ventas, boletas o clientes.");
         }
-        return new ParseResult(recognized, kind, List.copyOf(products), rowCount,
+        return new ParseResult(recognized, kind, List.copyOf(products), List.copyOf(setupRows), rowCount,
                 extracted.toString().trim(), List.copyOf(dedupe(warnings)));
     }
 
@@ -151,6 +169,7 @@ public class BusinessImportSpreadsheetParser {
         DatasetKind kind = classify(columns.keySet());
 
         List<ProductRow> products = new ArrayList<>();
+        List<SetupRow> setupRows = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         int dataRows = 0;
         StringBuilder extracted = new StringBuilder();
@@ -166,6 +185,10 @@ public class BusinessImportSpreadsheetParser {
                 ProductRow product = productFromRow(sourceName, sheetName, i + 1, kind, columns, row, warnings);
                 if (product != null) products.add(product);
             }
+            if (kind == DatasetKind.FAQS || kind == DatasetKind.BUSINESS_HOURS) {
+                SetupRow suggestion = setupFromRow(sourceName, sheetName, i + 1, kind, columns, row, warnings);
+                if (suggestion != null) setupRows.add(suggestion);
+            }
         }
 
         if (kind == DatasetKind.UNKNOWN) {
@@ -175,7 +198,7 @@ public class BusinessImportSpreadsheetParser {
         }
 
         return new ParseResult(kind != DatasetKind.UNKNOWN, kind, List.copyOf(products),
-                dataRows, extracted.toString().trim(), List.copyOf(warnings));
+                List.copyOf(setupRows), dataRows, extracted.toString().trim(), List.copyOf(warnings));
     }
 
     private static ProductRow productFromRow(String sourceName,
@@ -227,6 +250,38 @@ public class BusinessImportSpreadsheetParser {
         );
     }
 
+    /**
+     * Return only facts explicitly represented in columns. Unknown/invalid rows
+     * never become a receptionist schedule or a knowledge answer.
+     */
+    private static SetupRow setupFromRow(String sourceName, String sheetName, int sourceRow,
+                                        DatasetKind kind, Map<String, Integer> columns,
+                                        List<String> row, List<String> warnings) {
+        if (kind == DatasetKind.FAQS) {
+            String question = value(row, first(columns, FAQ_QUESTION_HEADERS));
+            String answer = value(row, first(columns, FAQ_ANSWER_HEADERS));
+            if (question == null || question.isBlank() || answer == null || answer.isBlank()
+                    || question.length() > MAX_FAQ_QUESTION_LENGTH
+                    || answer.length() > MAX_FAQ_ANSWER_LENGTH) {
+                warnings.add("Pregunta/respuesta incompleta o demasiado larga en "
+                        + sourceLocation(sheetName, sourceRow) + "; requiere revisión manual.");
+                return null;
+            }
+            return new SetupRow("FAQ", question, answer, sourceName, sheetName, sourceRow);
+        }
+        String day = DAY_NAMES.get(normalize(value(row, first(columns, HOURS_DAY_HEADERS))));
+        String open = value(row, first(columns, HOURS_OPEN_HEADERS));
+        String close = value(row, first(columns, HOURS_CLOSE_HEADERS));
+        if (day == null || open == null || close == null
+                || !open.matches(TIME_PATTERN) || !close.matches(TIME_PATTERN)
+                || open.compareTo(close) >= 0) {
+            warnings.add("Horario incompleto, ambiguo o inválido en "
+                    + sourceLocation(sheetName, sourceRow) + "; requiere revisión manual.");
+            return null;
+        }
+        return new SetupRow("BUSINESS_HOURS", day, open + "-" + close, sourceName, sheetName, sourceRow);
+    }
+
     private static DatasetKind classify(Set<String> headers) {
         boolean name = containsAny(headers, NAME_HEADERS);
         boolean productName = containsAny(headers, PRODUCT_NAME_HEADERS);
@@ -247,6 +302,10 @@ public class BusinessImportSpreadsheetParser {
         // Sales exports often contain Producto/Precio/Cantidad per receipt line and must never become live catalog/stock.
         if (date && total && receipt) return DatasetKind.SALES;
         if (receipt && total) return DatasetKind.RECEIPTS;
+        if (containsAny(headers, FAQ_QUESTION_HEADERS) && containsAny(headers, FAQ_ANSWER_HEADERS))
+            return DatasetKind.FAQS;
+        if (containsAny(headers, HOURS_DAY_HEADERS) && containsAny(headers, HOURS_OPEN_HEADERS)
+                && containsAny(headers, HOURS_CLOSE_HEADERS)) return DatasetKind.BUSINESS_HOURS;
         if (serviceName && !sku && !stock && (price || category || description || duration)) return DatasetKind.SERVICES;
         if ((productName || name) && productSignals) return DatasetKind.PRODUCTS;
         if (customer && !productSignals && (name || headers.contains("cliente") || headers.contains("nombre cliente"))) {
@@ -495,7 +554,7 @@ public class BusinessImportSpreadsheetParser {
     }
 
     private static ParseResult unknown(String warning) {
-        return new ParseResult(false, DatasetKind.UNKNOWN, List.of(), 0, "", List.of(warning));
+        return new ParseResult(false, DatasetKind.UNKNOWN, List.of(), List.of(), 0, "", List.of(warning));
     }
 
     public enum DatasetKind {
@@ -504,6 +563,8 @@ public class BusinessImportSpreadsheetParser {
         SALES,
         RECEIPTS,
         CUSTOMERS,
+        FAQS,
+        BUSINESS_HOURS,
         MIXED,
         UNKNOWN
     }
@@ -528,10 +589,14 @@ public class BusinessImportSpreadsheetParser {
             int sourceRow
     ) {}
 
+    public record SetupRow(String kind, String key, String value,
+                           String sourceName, String sheetName, int sourceRow) {}
+
     public record ParseResult(
             boolean recognized,
             DatasetKind kind,
             List<ProductRow> products,
+            List<SetupRow> setupRows,
             int rowCount,
             String extractedText,
             List<String> warnings

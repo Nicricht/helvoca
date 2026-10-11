@@ -35,6 +35,7 @@ public class BusinessImportPreviewService {
     private static final long MAX_FILE_BYTES = 10L * 1024L * 1024L;
     private static final long MAX_SEMANTIC_BYTES = 20L * 1024L * 1024L;
     private static final int MAX_PRODUCTS = 500;
+    private static final int MAX_SETUP_SUGGESTIONS = 100;
 
     private final BusinessImportSpreadsheetParser spreadsheets;
     private final OpenAiRealtimeProperties openAi;
@@ -112,6 +113,8 @@ public class BusinessImportPreviewService {
         if (files.size() > MAX_FILES) throw new IllegalArgumentException("A maximum of 12 files can be imported at once");
 
         List<ProductProposal> products = new ArrayList<>();
+        List<SetupProposal> setupSuggestions = new ArrayList<>();
+        Map<String, String> seenSetupValues = new LinkedHashMap<>();
         List<SourcePreview> sources = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         List<MultipartFile> semantic = new ArrayList<>();
@@ -138,6 +141,22 @@ public class BusinessImportPreviewService {
                         parsed.warnings()));
                 for (BusinessImportSpreadsheetParser.ProductRow row : parsed.products()) {
                     products.add(fromSpreadsheet(row));
+                }
+                for (BusinessImportSpreadsheetParser.SetupRow row : parsed.setupRows()) {
+                    String identity = row.kind() + ":" + row.key().trim().toLowerCase(Locale.ROOT);
+                    String previous = seenSetupValues.putIfAbsent(identity, row.value());
+                    if (previous != null && !previous.equals(row.value())) {
+                        warnings.add("Fuentes con propuestas distintas para " + row.kind()
+                                + " (" + row.key() + "). Revisa el conflicto antes de aplicar.");
+                    }
+                    if (setupSuggestions.size() < MAX_SETUP_SUGGESTIONS) {
+                        setupSuggestions.add(new SetupProposal(row.kind(), row.key(), row.value(),
+                                row.sourceName(), row.sheetName(), row.sourceRow(), 1.0));
+                    } else if (setupSuggestions.size() == MAX_SETUP_SUGGESTIONS) {
+                        warnings.add("Se limitaron las propuestas de configuración a "
+                                + MAX_SETUP_SUGGESTIONS + "; importa el resto por separado.");
+                        setupSuggestions.add(new SetupProposal("LIMIT_REACHED", "", "", "", null, 0, 0));
+                    }
                 }
                 warnings.addAll(parsed.warnings());
                 continue;
@@ -239,12 +258,14 @@ public class BusinessImportPreviewService {
             warnings.add("Se detectaron más de " + MAX_PRODUCTS + " elementos de catálogo; la previsualización fue limitada.");
             normalized = normalized.subList(0, MAX_PRODUCTS);
         }
-        if (normalized.isEmpty()) {
+        if (normalized.isEmpty() && setupSuggestions.isEmpty()) {
             warnings.add("No encontré productos o servicios listos para importar. Revisa los archivos o agrega datos manualmente.");
         }
+        List<SetupProposal> readySetup = setupSuggestions.size() > MAX_SETUP_SUGGESTIONS
+                ? setupSuggestions.subList(0, MAX_SETUP_SUGGESTIONS) : setupSuggestions;
 
-        return new Preview(safeBusinessName, List.copyOf(normalized), List.copyOf(sources),
-                List.copyOf(dedupeWarnings(warnings)), aiUsed);
+        return new Preview(safeBusinessName, List.copyOf(normalized), List.copyOf(readySetup),
+                List.copyOf(sources), List.copyOf(dedupeWarnings(warnings)), aiUsed);
     }
 
     private static List<MultipartFile> distinctSemanticFiles(List<MultipartFile> files,
@@ -621,9 +642,15 @@ public class BusinessImportPreviewService {
             List<String> warnings
     ) {}
 
+    public record SetupProposal(
+            String kind, String key, String value,
+            String sourceName, String sheetName, int sourceRow, double confidence
+    ) {}
+
     public record Preview(
             String businessName,
             List<ProductProposal> products,
+            List<SetupProposal> setupSuggestions,
             List<SourcePreview> sources,
             List<String> warnings,
             boolean aiUsed

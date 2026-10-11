@@ -53,6 +53,55 @@ class BusinessImportPreviewServiceTest {
     }
 
     @Test
+    void freeConfigSuggestionsHaveEvidenceAndConflictingHoursAreNeverSilentlyApplied() {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        var service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), new OpenAiRealtimeProperties(), tenant);
+        var first = new MockMultipartFile("files", "horario.csv", "text/csv",
+                "Día,Apertura,Cierre\\nLunes,09:00,18:00\\n".replace("\\n", "\n")
+                        .getBytes(StandardCharsets.UTF_8));
+        var second = new MockMultipartFile("files", "cambio.csv", "text/csv",
+                "Día,Apertura,Cierre\\nLunes,10:00,17:00\\n".replace("\\n", "\n")
+                        .getBytes(StandardCharsets.UTF_8));
+        var faq = new MockMultipartFile("files", "faq.csv", "text/csv",
+                "Pregunta,Respuesta\\n¿Se puede reservar?,Sí\\n".replace("\\n", "\n")
+                        .getBytes(StandardCharsets.UTF_8));
+
+        var preview = service.preview("Salón", List.of(first, second, faq));
+        assertFalse(preview.aiUsed());
+        assertTrue(preview.products().isEmpty());
+        assertEquals(3, preview.setupSuggestions().size());
+        assertEquals("BUSINESS_HOURS", preview.setupSuggestions().getFirst().kind());
+        assertEquals("MONDAY", preview.setupSuggestions().getFirst().key());
+        assertEquals("09:00-18:00", preview.setupSuggestions().getFirst().value());
+        assertEquals(1.0, preview.setupSuggestions().getFirst().confidence());
+        assertEquals(2, preview.setupSuggestions().getFirst().sourceRow());
+        assertEquals("FAQ", preview.setupSuggestions().get(2).kind());
+        assertTrue(preview.warnings().stream().anyMatch(w -> w.contains("distintas")));
+        assertFalse(preview.warnings().stream().anyMatch(w -> w.contains("No encontré productos")));
+        verify(tenant).requireBusinessId();
+    }
+
+    @Test
+    void freeSetupPreviewCapsResultSizeAndMarksOverflow() {
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        var service = new BusinessImportPreviewService(
+                new BusinessImportSpreadsheetParser(), new OpenAiRealtimeProperties(), tenant);
+        StringBuilder input = new StringBuilder("Pregunta,Respuesta\n");
+        for (int i = 0; i < 102; i++) {
+            input.append("¿Pregunta ").append(i).append("?,Respuesta ").append(i).append("\n");
+        }
+        var file = new MockMultipartFile("files", "faq.csv", "text/csv",
+                input.toString().getBytes(StandardCharsets.UTF_8));
+        var preview = service.preview("Salón", List.of(file));
+        assertFalse(preview.aiUsed());
+        assertEquals(100, preview.setupSuggestions().size());
+        assertTrue(preview.warnings().stream().anyMatch(w -> w.contains("limitaron")));
+    }
+
+    @Test
     void imageWithoutConfiguredAiFailsClosedWithActionableWarning() {
         TenantProvider tenant = mock(TenantProvider.class);
         when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
