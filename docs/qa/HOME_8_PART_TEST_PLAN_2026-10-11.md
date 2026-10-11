@@ -33,6 +33,23 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 - [x] Add Playwright checks for onboarding fail-closed, transient onboarding recovery, and transient operations recovery.
 - [ ] Verify the PR test job and browser E2E results; check actual execution before marking this done.
 
+## Phase 2 implementation
+
+- [x] Compare React Home access decisions with Spring's actual operations controller roles.
+- [x] Stop operational dashboard, attention and sales requests for roles without server-side operations access.
+- [x] Render an explicit restricted Home state instead of attempting protected reads.
+- [x] E2E: anonymous entry never makes protected Home reads; STAFF is restricted even if forged permission labels suggest operations access.
+- [x] E2E: fake `businessId` query string is not forwarded by Home.
+- [x] Real-stack E2E: register an independent test tenant and confirm its dashboard and attention cannot be influenced by tenant A's `businessId`.
+- [ ] Verify the full PR CI, including the latest head, prior to merging.
+
+## Change safety
+
+- No existing database schema or production credentials touched.
+- Browser tests mock API responses; real-stack test uses disposable CI Postgres.
+- The restricted Home state follows actual server controller authorization and avoids interpreting frontend-only permission claims as tenant or role authority.
+- This phase adds no production API calls beyond reads and no provider calls.
+
 ## Exit conditions
 
 For each phase: tests are committed to the QA branch, assertions check observable behavior (not only implementation strings), no production side effects occur, and failures are fixed or documented. The final certification in Phase 8 requires a successful verified release gate.
