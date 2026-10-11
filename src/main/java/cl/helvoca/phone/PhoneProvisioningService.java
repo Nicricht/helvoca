@@ -74,6 +74,28 @@ public class PhoneProvisioningService {
         return PhoneNumberResponse.from(repository.saveAndFlush(existing));
     }
 
+    /**
+     * Existing inactive numbers cannot be reactivated from a toggle until Twilio
+     * confirms the exact provider SID, managed account and live voice callbacks.
+     */
+    public PhoneNumberResponse activateVerified(UUID id) {
+        UUID businessId = tenantProvider.requireBusinessId();
+        PhoneNumber existing = repository.findByIdAndBusinessId(id, businessId)
+                .orElseThrow(() -> new ConflictException("El número no pertenece a este negocio."));
+        if (!"TWILIO".equalsIgnoreCase(existing.getProvider())) {
+            throw new ConflictException("El proveedor de este número no está habilitado para voz Twilio.");
+        }
+        TwilioPhoneProvisioningClient.VerifiedPhoneNumber verified =
+                twilio.verifyManagedPhone(existing.getPhoneNumber());
+        if (existing.getExternalId() != null && !existing.getExternalId().isBlank()
+                && !existing.getExternalId().equals(verified.sid())) {
+            throw new ConflictException("El SID del proveedor cambió; no se activó el número.");
+        }
+        existing.setExternalId(verified.sid());
+        existing.setActive(true);
+        return PhoneNumberResponse.from(repository.saveAndFlush(existing));
+    }
+
     public PhoneNumberResponse provision(ProvisionPhoneNumberRequest request) {
         UUID businessId = tenantProvider.requireBusinessId();
         if (!Boolean.TRUE.equals(request.confirmed())) {
