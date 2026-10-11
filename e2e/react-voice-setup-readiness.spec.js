@@ -141,6 +141,23 @@ test('activation requires explicit confirmation, never calls or buys during read
   expect(state.requests.filter(x => /calls|provisioning$/.test(x.path))).toEqual([]);
 });
 
+test('voice guide is usable at mobile width with keyboard, focus and reduced motion', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const state = await boot(page);
+  const panel = page.getByLabel('Guía de activación de voz');
+  const refresh = panel.getByRole('button', { name: 'Actualizar diagnóstico' });
+  await expect(refresh).toBeVisible();
+  await refresh.focus();
+  await expect(refresh).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect.poll(state.fetchCount).toBe(2);
+  expect(await page.evaluate(() =>
+    document.documentElement.scrollWidth <= document.documentElement.clientWidth
+  )).toBe(true);
+  expect(state.requests.filter(x => x.method !== 'GET')).toEqual([]);
+});
+
 test('operator can read the guide without number purchase or activation controls', async ({ page }) => {
   const state = await boot(page, { role: 'OPERATOR' });
   const panel = page.getByLabel('Guía de activación de voz');
