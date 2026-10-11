@@ -3,6 +3,7 @@ package cl.helvoca.telephony.twilio;
 import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.ai.gemini.VoiceBakeOffCatalog;
 import cl.helvoca.telephony.CallLifecycleService;
+import cl.helvoca.security.TenantDatabaseContext;
 import cl.helvoca.voice.VoiceAiProvider;
 import cl.helvoca.voice.VoiceAiProviderRegistry;
 import cl.helvoca.voice.VoiceAiSession;
@@ -30,18 +31,21 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     private final VoiceProviderHealthRegistry health;
     private final CallLifecycleService lifecycle;
     private final TwilioCallControl callControl;
+    private final TenantDatabaseContext databaseContext;
     private final ConcurrentMap<String, StreamState> states = new ConcurrentHashMap<>();
 
     public TwilioMediaStreamHandler(TwilioMediaRouteSigner routeSigner,
                                     VoiceAiProviderRegistry providers,
                                     VoiceProviderHealthRegistry health,
                                     CallLifecycleService lifecycle,
-                                    TwilioCallControl callControl) {
+                                    TwilioCallControl callControl,
+                                    TenantDatabaseContext databaseContext) {
         this.routeSigner = routeSigner;
         this.providers = providers;
         this.health = health;
         this.lifecycle = lifecycle;
         this.callControl = callControl;
+        this.databaseContext = databaseContext;
     }
 
     @Override
@@ -129,15 +133,19 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
             return;
         }
 
-        UUID callId = lifecycle.startInboundCall("twilio", callSid, callerPhone, businessPhone);
-        RealtimeCallContext context = lifecycle.markStreamStarted(callId, callSid, streamSid, provider.id());
-        lifecycle.markAiModel(callId, provider.modelId());
+        // WebSocket messages bypass the servlet tenant filter. Elevate only after
+        // the media route signature is verified; each DB access restores its scope.
+        UUID callId = databaseContext.callAsSystem(
+                () -> lifecycle.startInboundCall("twilio", callSid, callerPhone, businessPhone));
+        RealtimeCallContext context = databaseContext.callAsSystem(
+                () -> lifecycle.markStreamStarted(callId, callSid, streamSid, provider.id()));
+        databaseContext.runAsSystem(() -> lifecycle.markAiModel(callId, provider.modelId()));
         if (voiceOverride != null) {
             context = context.withVoiceOverride(voiceOverride);
             log.info("VOICE_BAKEOFF_ROUTE call={} voice={}", callId, voiceOverride);
         }
         if (provider.certificationSession(context)) {
-            lifecycle.markCertification(callId);
+            databaseContext.runAsSystem(() -> lifecycle.markCertification(callId));
             log.info("RECEPVOZ_CALL_CERTIFICATION armed call={} provider={}", callId, provider.id());
         }
         TwilioVoiceTransportSession transport = new TwilioVoiceTransportSession(
@@ -154,7 +162,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         try {
             ai.start();
         } catch (RuntimeException e) {
-            lifecycle.updateStatus(callId, "failed", null);
+            databaseContext.runAsSystem(() -> lifecycle.updateStatus(callId, "failed", null));
             health.failure(provider.id(), VoiceProviderHealthRegistry.FailureKind.UPSTREAM, e.getMessage());
             transport.closeOnUpstreamFailure();
             throw e;
@@ -183,7 +191,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     public void handleTransportError(WebSocketSession session, Throwable exception) {
         StreamState state = states.get(session.getId());
         if (state != null && state.callId != null) {
-            try { lifecycle.updateStatus(state.callId, "failed", null); }
+            try { databaseContext.runAsSystem(() -> lifecycle.updateStatus(state.callId, "failed", null)); }
             catch (Exception ignored) { }
             if (state.providerId != null) {
                 health.failure(state.providerId, VoiceProviderHealthRegistry.FailureKind.UPSTREAM,
@@ -205,7 +213,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         state.ai = null;
         state.transport = null;
         if (state.streamSid != null) {
-            try { lifecycle.markStreamStopped(state.streamSid); }
+            try { databaseContext.runAsSystem(() -> lifecycle.markStreamStopped(state.streamSid)); }
             catch (Exception ignored) { }
         }
         if (ai != null) {
