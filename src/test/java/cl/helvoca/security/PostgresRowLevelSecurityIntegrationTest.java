@@ -92,6 +92,33 @@ class PostgresRowLevelSecurityIntegrationTest {
     }
 
     @Test
+    void certificationRunClaimRequiresSystemScopeAndIsIdempotent() {
+        String runId = "startup-system-" + UUID.randomUUID();
+        String claimSql = """
+                INSERT INTO twilio_certification_run (run_id, direction, claimed_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (run_id) DO NOTHING
+                """;
+
+        // Unscoped startup JDBC and a regular tenant cannot create a certification run.
+        assertThrows(DataAccessException.class,
+                () -> runtimeJdbc.update(claimSql, runId, "outbound-test"));
+        assertThrows(DataAccessException.class,
+                () -> databaseContext.runAsTenant(businessA,
+                        () -> runtimeJdbc.update(claimSql, runId, "outbound-test")));
+
+        // Only the explicitly scoped SYSTEM role may perform the one-shot claim.
+        assertEquals(1, databaseContext.callAsSystem(
+                () -> runtimeJdbc.update(claimSql, runId, "outbound-test")));
+        assertEquals(0, databaseContext.callAsSystem(
+                () -> runtimeJdbc.update(claimSql, runId, "outbound-test")));
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+        assertEquals(1L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM twilio_certification_run WHERE run_id = ?",
+                Long.class, runId));
+    }
+
+    @Test
     void businessProfilePhoneConstraintAcceptsApiValidE164Phone() {
         ownerJdbc.update(
                 "INSERT INTO business_profile(business_id, public_phone) VALUES (?, ?)",
