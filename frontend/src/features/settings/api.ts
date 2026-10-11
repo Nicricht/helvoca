@@ -147,6 +147,16 @@ export interface PhoneProvisioningStatus {
   message?: string | null;
 }
 
+export interface PhoneVoiceReadiness {
+  phoneId: string;
+  phoneNumber: string;
+  state: "UNSUPPORTED_PROVIDER" | "UNVERIFIED_BINDING" | "ACCOUNT_MISMATCH"
+    | "NEEDS_VERIFICATION" | "ACTIVATION_REQUIRED" | "PREVIOUSLY_VERIFIED";
+  canAttemptActivation: boolean;
+  lastVerifiedAt: string | null;
+  message: string;
+}
+
 export interface AvailablePhoneNumber {
   phoneNumber: string;
   friendlyName?: string | null;
@@ -452,6 +462,10 @@ export function deleteScheduleException(date: string) {
 
 export function getPhoneProvisioningStatus() {
   return apiRequest<PhoneProvisioningStatus>("/api/v1/phone-numbers/provisioning/status");
+}
+
+export function getPhoneVoiceReadiness() {
+  return apiRequest<PhoneVoiceReadiness[]>("/api/v1/phone-numbers/provisioning/readiness");
 }
 
 export function searchAvailablePhoneNumbers(country: string, areaCode: string) {
