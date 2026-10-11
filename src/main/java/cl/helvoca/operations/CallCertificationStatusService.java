@@ -2,6 +2,7 @@ package cl.helvoca.operations;
 
 import cl.helvoca.call.CallAction;
 import cl.helvoca.call.CallActionRepository;
+import cl.helvoca.call.CallStatus;
 import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.call.CallSummaryRepository;
@@ -41,8 +42,11 @@ public class CallCertificationStatusService {
         CallSession call = calls.findFirstByBusinessIdAndCertificationTrueOrderByStartedAtDesc(businessId)
                 .orElse(null);
         if (call == null) {
-            return new Status(false, "NOT_RUN", null, null, null, null, null, 0, 8, List.of());
+            return notRun();
         }
+
+        // Reject a foreign call even if its repository query was misconfigured.
+        if (!businessId.equals(call.getBusinessId())) return notRun();
 
         List<CallAction> persistedActions = actions.findAllByCallIdOrderByCreatedAtAsc(call.getId());
         List<Check> checks = new ArrayList<>();
@@ -64,6 +68,20 @@ public class CallCertificationStatusService {
         checks.add(check("SUMMARY", "Resumen final", summaries.findByCallId(call.getId()).isPresent(),
                 "La llamada debe finalizar con resumen persistido."));
 
+        checks.add(check("MEDIA_STOPPED", "Audio finalizado", call.getStreamEndedAt() != null,
+                "El stream debe cerrarse antes de aprobar evidencia técnica."));
+        checks.add(check("CALL_COMPLETED", "Llamada completada", call.getStatus() == CallStatus.COMPLETED,
+                "El carrier debe confirmar terminación normal, no FAILED/BUSY."));
+        checks.add(check("CARRIER_BOUND", "Metadatos Twilio vinculados",
+                "twilio".equalsIgnoreCase(call.getTelephonyProvider())
+                        && call.getProviderCallId() != null
+                        && call.getProviderCallId().matches("CA[0-9a-fA-F]{32}")
+                        && call.getPhoneNumberId() != null,
+                "Exige CallSid y vínculo del número; no sustituye una consulta a Twilio."));
+        checks.add(check("AI_PROVIDER", "Proveedor IA identificado",
+                call.getAiProvider() != null && !call.getAiProvider().isBlank(),
+                "El proveedor debe constar. No acredita audio audible al cliente."));
+
         int passed = (int) checks.stream().filter(Check::passed).count();
         boolean allPassed = passed == checks.size();
         boolean ended = call.getStreamEndedAt() != null || (call.getStatus() != null && call.getStatus().terminal());
@@ -79,7 +97,12 @@ public class CallCertificationStatusService {
                 call.getStatus() == null ? null : call.getStatus().name(),
                 passed,
                 checks.size(),
-                checks);
+                checks,
+                false);
+    }
+
+    private static Status notRun() {
+        return new Status(false, "NOT_RUN", null, null, null, null, null, 0, 12, List.of(), false);
     }
 
     private static Check check(String code, String label, boolean passed, String detail) {
@@ -100,7 +123,8 @@ public class CallCertificationStatusService {
             String callStatus,
             int passedChecks,
             int totalChecks,
-            List<Check> checks
+            List<Check> checks,
+            boolean commercialCertified
     ) {}
 
     public record Check(String code, String label, boolean passed, String detail) {}

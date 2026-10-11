@@ -113,7 +113,7 @@ public class VoiceCallRouter {
                 return Optional.of(new RouteDecision(provider.id(), RouteMode.MEDIA_STREAM, twiml));
             } catch (RuntimeException e) {
                 log.warn("Voice route candidate unavailable provider={} call={} reason={}",
-                        id, twilioCallSid, e.getMessage());
+                        id, twilioCallSid, e.getClass().getSimpleName());
             }
         }
         log.error("No healthy voice provider available call={} providers={} provider_override={} voice_override={}",
@@ -141,7 +141,8 @@ public class VoiceCallRouter {
                 providers.add(new ProviderStatus(provider.id(), "MEDIA_STREAM", snapshot.configured(), snapshot.available(),
                         snapshot.state(), snapshot.detail()));
             } catch (RuntimeException e) {
-                providers.add(new ProviderStatus(id, "UNKNOWN", false, false, "UNKNOWN_PROVIDER", e.getMessage()));
+                providers.add(new ProviderStatus(id, "UNKNOWN", false, false, "UNKNOWN_PROVIDER",
+                        "Provider configuration is unavailable"));
             }
         }
         boolean ready = providers.stream().anyMatch(ProviderStatus::available);
