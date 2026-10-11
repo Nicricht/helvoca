@@ -1,6 +1,7 @@
 package cl.helvoca.phone;
 
 import cl.helvoca.messaging.WhatsAppProperties;
+import cl.helvoca.security.TenantDatabaseContext;
 import cl.helvoca.telephony.twilio.TwilioProperties;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +33,7 @@ class TwilioSubaccountVoiceBootstrapRunnerTest {
         whatsApp.setSandboxTenantPhone(TENANT_PHONE);
 
         PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantDatabaseContext databaseContext = new TenantDatabaseContext();
         PhoneNumber anchor = new PhoneNumber();
         UUID businessId = UUID.randomUUID();
         anchor.setBusinessId(businessId);
@@ -69,6 +71,7 @@ class TwilioSubaccountVoiceBootstrapRunnerTest {
                 twilio,
                 whatsApp,
                 phones,
+                databaseContext,
                 http);
 
         runner.run(null);
@@ -97,11 +100,159 @@ class TwilioSubaccountVoiceBootstrapRunnerTest {
         assertFalse(saved.isWhatsappEnabled());
     }
 
+
+    private TwilioProperties readyTwilio() {
+        TwilioProperties twilio = new TwilioProperties();
+        twilio.setAccountSid(PARENT_SID);
+        twilio.setAuthToken("parent-token");
+        twilio.setPublicBaseUrl("https://recepvoz.example");
+        return twilio;
+    }
+
+    private WhatsAppProperties tenantSettings() {
+        WhatsAppProperties whatsApp = new WhatsAppProperties();
+        whatsApp.setSandboxTenantPhone(TENANT_PHONE);
+        return whatsApp;
+    }
+
+    private HttpResponse<String> returnedPhone() {
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn("""
+                {"incoming_phone_numbers":[{
+                    "sid":"PNcccccccccccccccccccccccccccccccc",
+                    "account_sid":"ACbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    "phone_number":"+14705331828"
+                }]}
+                """);
+        return response;
+    }
+
+    private HttpResponse<String> updatedPhone() {
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn("""
+                {"account_sid":"ACbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+                """);
+        return response;
+    }
+
+    @Test
+    void rejectsAnotherTenantBeforeAnyExternalTwilioRequest() throws Exception {
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantDatabaseContext context = new TenantDatabaseContext();
+        PhoneNumber anchor = new PhoneNumber();
+        anchor.setBusinessId(UUID.randomUUID());
+        when(phones.findByPhoneNumberAndActiveTrue(TENANT_PHONE)).thenAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, context.currentOrDenied().mode());
+            return Optional.of(anchor);
+        });
+        PhoneNumber existing = new PhoneNumber();
+        existing.setBusinessId(UUID.randomUUID());
+        when(phones.findByPhoneNumber(PHONE)).thenReturn(Optional.of(existing));
+        HttpClient http = mock(HttpClient.class);
+
+        var runner = new TwilioSubaccountVoiceBootstrapRunner(
+                true, SUBACCOUNT_SID, PHONE, readyTwilio(), tenantSettings(), phones, context, http);
+        assertEquals("Twilio subaccount phone is already attached to a different Helvoca tenant",
+                assertThrows(IllegalStateException.class, () -> runner.run(null)).getMessage());
+        verifyNoInteractions(http);
+        verify(phones, never()).save(any());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrDenied().mode());
+    }
+
+    @Test
+    void rejectsExistingWrongProviderBeforeAnyExternalTwilioRequest() throws Exception {
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantDatabaseContext context = new TenantDatabaseContext();
+        UUID tenant = UUID.randomUUID();
+        PhoneNumber anchor = new PhoneNumber();
+        anchor.setBusinessId(tenant);
+        when(phones.findByPhoneNumberAndActiveTrue(TENANT_PHONE)).thenReturn(Optional.of(anchor));
+        PhoneNumber existing = new PhoneNumber();
+        existing.setBusinessId(tenant);
+        existing.setProvider("OTHER");
+        when(phones.findByPhoneNumber(PHONE)).thenReturn(Optional.of(existing));
+        HttpClient http = mock(HttpClient.class);
+
+        var runner = new TwilioSubaccountVoiceBootstrapRunner(
+                true, SUBACCOUNT_SID, PHONE, readyTwilio(), tenantSettings(), phones, context, http);
+        assertEquals("Twilio subaccount phone is registered with a different provider",
+                assertThrows(IllegalStateException.class, () -> runner.run(null)).getMessage());
+        verifyNoInteractions(http);
+        verify(phones, never()).save(any());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrDenied().mode());
+    }
+
+    @Test
+    void existingOtherSidBlocksWebhookUpdateAfterReadOnlyLookup() throws Exception {
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantDatabaseContext context = new TenantDatabaseContext();
+        UUID tenant = UUID.randomUUID();
+        PhoneNumber anchor = new PhoneNumber();
+        anchor.setBusinessId(tenant);
+        when(phones.findByPhoneNumberAndActiveTrue(TENANT_PHONE)).thenReturn(Optional.of(anchor));
+        PhoneNumber existing = new PhoneNumber();
+        existing.setBusinessId(tenant);
+        existing.setExternalId("PNdddddddddddddddddddddddddddddddd");
+        when(phones.findByPhoneNumber(PHONE)).thenReturn(Optional.of(existing));
+        HttpClient http = mock(HttpClient.class);
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(returnedPhone());
+
+        var runner = new TwilioSubaccountVoiceBootstrapRunner(
+                true, SUBACCOUNT_SID, PHONE, readyTwilio(), tenantSettings(), phones, context, http);
+        assertEquals("Twilio subaccount phone SID conflicts with existing Helvoca mapping",
+                assertThrows(IllegalStateException.class, () -> runner.run(null)).getMessage());
+        var requests = org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
+        verify(http).send(requests.capture(), any(HttpResponse.BodyHandler.class));
+        assertEquals("GET", requests.getValue().method());
+        verify(phones, never()).save(any());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrDenied().mode());
+    }
+
+    @Test
+    void matchingTenantAndPhoneSidAllowsUpdateAndRestoresSystemScope() throws Exception {
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantDatabaseContext context = new TenantDatabaseContext();
+        UUID tenant = UUID.randomUUID();
+        PhoneNumber anchor = new PhoneNumber();
+        anchor.setBusinessId(tenant);
+        when(phones.findByPhoneNumberAndActiveTrue(TENANT_PHONE)).thenReturn(Optional.of(anchor));
+        PhoneNumber existing = new PhoneNumber();
+        existing.setBusinessId(tenant);
+        existing.setPhoneNumber(PHONE);
+        existing.setExternalId(PHONE_SID);
+        when(phones.findByPhoneNumber(PHONE)).thenAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, context.currentOrDenied().mode());
+            return Optional.of(existing);
+        });
+        when(phones.save(any())).thenAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, context.currentOrDenied().mode());
+            return invocation.getArgument(0);
+        });
+        HttpClient http = mock(HttpClient.class);
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(returnedPhone(), updatedPhone());
+
+        var runner = new TwilioSubaccountVoiceBootstrapRunner(
+                true, SUBACCOUNT_SID, PHONE, readyTwilio(), tenantSettings(), phones, context, http);
+        runner.run(null);
+        verify(http, times(2)).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        verify(phones).save(existing);
+        assertEquals(tenant, existing.getBusinessId());
+        assertEquals(PHONE_SID, existing.getExternalId());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrDenied().mode());
+    }
+
     @Test
     void doesNothingWhenDisabled() throws Exception {
         TwilioProperties twilio = new TwilioProperties();
         WhatsAppProperties whatsApp = new WhatsAppProperties();
         PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantDatabaseContext databaseContext = new TenantDatabaseContext();
         HttpClient http = mock(HttpClient.class);
 
         new TwilioSubaccountVoiceBootstrapRunner(
@@ -111,6 +262,7 @@ class TwilioSubaccountVoiceBootstrapRunnerTest {
                 twilio,
                 whatsApp,
                 phones,
+                databaseContext,
                 http).run(null);
 
         verifyNoInteractions(phones, http);
@@ -127,6 +279,7 @@ class TwilioSubaccountVoiceBootstrapRunnerTest {
         whatsApp.setSandboxTenantPhone(TENANT_PHONE);
 
         PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        TenantDatabaseContext databaseContext = new TenantDatabaseContext();
         PhoneNumber anchor = new PhoneNumber();
         anchor.setBusinessId(UUID.randomUUID());
         anchor.setPhoneNumber(TENANT_PHONE);
@@ -154,6 +307,7 @@ class TwilioSubaccountVoiceBootstrapRunnerTest {
                 twilio,
                 whatsApp,
                 phones,
+                databaseContext,
                 http);
 
         IllegalStateException error = assertThrows(IllegalStateException.class, () -> runner.run(null));
