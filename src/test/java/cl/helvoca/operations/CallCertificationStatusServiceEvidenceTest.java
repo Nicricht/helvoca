@@ -77,6 +77,7 @@ class CallCertificationStatusServiceEvidenceTest {
         assertEquals(12, status.totalChecks());
         assertFalse(status.commercialCertified());
         assertTrue(status.checks().stream().allMatch(CallCertificationStatusService.Check::passed));
+        verify(tenants).requireBusinessId();
         verifyNoMoreInteractions(tenants);
     }
 
