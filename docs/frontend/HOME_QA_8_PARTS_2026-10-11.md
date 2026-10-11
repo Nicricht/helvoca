@@ -21,7 +21,7 @@ Per `AGENTS.md` and `docs/engineering/QA_POLICY.md`:
 | Part | Scope and acceptance criteria | Status |
 | --- | --- | --- |
 | 1 | Inspect current main, map coverage, repair stale special-certification Playwright paths, add fail-closed path-existence regression assertions, create draft PR and checkpoint | **IMPLEMENTED; CI NOT YET CERTIFIED** |
-| 2 | Inicio session/onboarding and dashboard lifecycle: 401/403/500/503, loading, empty/error/refetch, next-step mapping, missing/partial responses | PENDING |
+| 2 | Inicio session/onboarding and dashboard lifecycle: missing token, 401/403/503, network interruption, loading, fail-closed malformed payloads, retry and next-step mappings | **IMPLEMENTED; CI PENDING** |
 | 3 | Human attention: request/handoff actions, success/failure, confirmation cancellation, duplicate clicks, 401/403/409, stale/refetch, least privilege | PENDING |
 | 4 | Backend / PostgreSQL: dashboard count and daily-window correctness, tenant boundary, attention deduplication/order/LIMIT, concurrency and request lifecycle where applicable | PENDING |
 | 5 | Commercial analytics: currency aggregation and formatting, null/missing/invalid values, daily/7/30-day query switching, no fabricated ROI or zero, timezone boundaries | PENDING |
@@ -58,7 +58,19 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 
 ## Continuity checkpoint
 
-- Current tracked milestone: **Part 1 implemented**, exact certification pending.
+- Current tracked milestone: **Parts 1 and 2 implemented**, exact certification pending.
 - New branch is deliberately kept separate from `main`. Do not merge until Part 8 evidence satisfies the repository quality contract.
-- Resume next with **Part 2**, first reconstruct repository -> PR -> branch HEAD -> latest CI -> this document; do not restart or redo Part 1.
+- Resume next with **Part 3** after inspecting GitHub CI for exact HEAD, PR and this checkpoint. Parts 1-2 must not be repeated.
 - After every phase update this document and draft PR with exact HEAD/evidence before responding to the user.
+
+## Part 2 checkpoint: Inicio identity / onboarding / dashboard resilience
+
+**Scope edited:** `frontend/src/pages/Home/HomePage.tsx`, `HomePage.module.css`, new `e2e/react-home-resilience.spec.js`. Shared app frame and API clients unchanged.
+
+- **Regression suite:** 17 explicit fixture-driven tests plus 8 parameterized onboarding next-step variants (25 browser cases total). Existing `e2e/react-home.spec.js` coverage remains intact. Includes missing token, auth 403/503, malformed success identity, onboarding 401/403/503/malformed, pending gate, all 8 settings routes, dashboard 403/503/network outage, retries and no business data before validation.
+- **Implementation:** fail closed with visible accessible error and retry rather than spinner/blank page on invalid authentication/onboarding; on dashboard failure provide a local retry. Only Home-local CSS updated.
+- **Side effect boundary:** all new network requests are intercepted with local Playwright mocks. No calls, messages, payments or production writes.
+- **Preexisting tests:** main React Home assertions and project Fast/Full Gate still required. Part 7 will enforce 100% *measured* original-source coverage for affected TSX, including the new branches; no unsupported 100% claim is made here.
+- **Verification:** JavaScript syntax was parsed successfully through V8 (`new Function`) after test edits; full Playwright and TypeScript build must be proven via GitHub Actions on the exact final HEAD. A static/parse check is not a test pass. **RED was not directly observed in a completed runner**; tests were added before fixing the Home failures.
+- **CI:** workflows for intermediate Part 2 commits were pending or in progress when authored. Consult latest final-HEAD run before completing or merging.
+- **No merge:** PR remains draft until complete eight-part QA and coverage evidence.
