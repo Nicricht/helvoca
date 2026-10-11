@@ -24,6 +24,20 @@ def clean(value: str) -> str:
     return " ".join(unicodedata.normalize("NFC", value).strip().casefold().split())
 
 
+def is_missing_rule_explanation(value: object) -> bool:
+    """An explicit statement that eligibility is unknown is NOT an offer rule.
+
+    Intentionally accept only narrow whole-string forms, never an arbitrary
+    phrase containing 'no se especifican' plus hidden restrictions.
+    """
+    return isinstance(value, str) and clean(value).rstrip(".") in {
+        "no se especifican productos elegibles ni condiciones del 2x1",
+        "no se especifican productos elegibles",
+        "no se especifican condiciones del 2x1",
+        "no se especifican condiciones"
+    }
+
+
 def compare(expected: dict, actual: dict) -> dict:
     if not isinstance(expected, dict) or not isinstance(actual, dict):
         raise ValueError("Expected and actual must be JSON objects")
@@ -34,6 +48,12 @@ def compare(expected: dict, actual: dict) -> dict:
     def check(location: str, want, got, critical: bool = False):
         nonlocal passed, checked
         checked += 1
+        if (location.startswith("promotions.") and location.endswith(".conditions")
+                and want is None and is_missing_rule_explanation(got)):
+            errors.append({"field": location, "expected": None, "actual": got,
+                           "severity": "format",
+                           "reason": "Missing-rule disclaimer belongs in warnings, not conditions"})
+            return
         if isinstance(want, str) and isinstance(got, str):
             ok = clean(want) == clean(got)
         elif isinstance(want, list) and isinstance(got, list):
@@ -65,6 +85,13 @@ def compare(expected: dict, actual: dict) -> dict:
             if not isinstance(item, dict) or not isinstance(item.get("name"), str):
                 raise ValueError(f"Malformed {section} proposal")
             key = clean(item["name"])
+            # The provider may append visually printed bundle components after
+            # a colon. Accept the heading only when it matches a known expected
+            # promotion; never merge an arbitrary unknown promotion into one.
+            if section == "promotions" and key not in want_index:
+                heading = clean(item["name"].split(":", 1)[0])
+                if heading in want_index:
+                    key = heading
             if key in got_index:
                 errors.append({"field": section + "." + item["name"],
                                "expected": "unique", "actual": "duplicate",

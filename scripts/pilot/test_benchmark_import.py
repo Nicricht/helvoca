@@ -83,5 +83,46 @@ class DocumentBenchmarkTests(unittest.TestCase):
         self.assertTrue(compare(TRUTH, data)["passed"])
 
 
+    def test_extra_bundle_components_in_promotion_name_are_not_missing_offer(self):
+        target = {"products": [], "extras": [], "promotions": [
+            {"name": "HAPPY HOUR DULCE", "price": 4900,
+             "startTime": None, "endTime": None}
+        ]}
+        model = {"products": [], "extras": [], "promotions": [
+            {"name": "HAPPY HOUR DULCE: Cappuccino + cookie gigante",
+             "price": 4900, "startTime": None, "endTime": None}
+        ]}
+        result = compare(target, model)
+        self.assertTrue(result["passed"], result["errors"])
+
+    def test_explicit_missing_eligibility_is_format_issue_not_invented_offer(self):
+        target = {"products": [], "extras": [], "promotions": [
+            {"name": "PROMO BRUNCH 2x1", "conditions": None,
+             "days": ["lunes", "martes", "miércoles"],
+             "startTime": "08:00", "endTime": "11:30"}
+        ]}
+        model = {"products": [], "extras": [], "promotions": [
+            {"name": "PROMO BRUNCH 2x1",
+             "conditions": "No se especifican productos elegibles ni condiciones del 2x1.",
+             "days": ["lunes", "martes", "miércoles"],
+             "startTime": "08:00", "endTime": "11:30"}
+        ]}
+        result = compare(target, model)
+        self.assertFalse(result["passed"])
+        self.assertEqual(0, result["criticalErrors"])
+        self.assertEqual("format", result["errors"][0]["severity"])
+
+    def test_missing_eligibility_disclaimer_cannot_hide_real_promo_restriction(self):
+        target = {"products": [], "extras": [], "promotions": [
+            {"name": "PROMO BRUNCH 2x1", "conditions": None}
+        ]}
+        model = {"products": [], "extras": [], "promotions": [
+            {"name": "PROMO BRUNCH 2x1",
+             "conditions": "No se especifican condiciones, pero solo con desayuno"}
+        ]}
+        result = compare(target, model)
+        self.assertEqual(1, result["criticalErrors"])
+
+
 if __name__ == "__main__":
     unittest.main()
