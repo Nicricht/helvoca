@@ -23,7 +23,7 @@ Per `AGENTS.md` and `docs/engineering/QA_POLICY.md`:
 | 1 | Inspect current main, map coverage, repair stale special-certification Playwright paths, add fail-closed path-existence regression assertions, create draft PR and checkpoint | **IMPLEMENTED; CI NOT YET CERTIFIED** |
 | 2 | Inicio session/onboarding and dashboard lifecycle: missing token, 401/403/503, network interruption, loading, fail-closed malformed payloads, retry and next-step mappings | **IMPLEMENTED; CI PENDING** |
 | 3 | Human attention: request/handoff actions, success/failure, confirmation cancellation, duplicate clicks, 401/403/409/503, stale/refetch, least privilege, malformed success payload | **IMPLEMENTED; CI PENDING** |
-| 4 | Backend / PostgreSQL: dashboard count and daily-window correctness, tenant boundary, attention deduplication/order/LIMIT, concurrency and request lifecycle where applicable | PENDING |
+| 4 | Backend / PostgreSQL: tenant-isolated dashboard metrics/calls/costs, Santiago/Auckland day boundaries, attention deduplication/order/LIMIT 100, RLS, concurrency and request lifecycle | **IMPLEMENTED; CI NOT YET CERTIFIED** |
 | 5 | Commercial analytics: currency aggregation and formatting, null/missing/invalid values, daily/7/30-day query switching, no fabricated ROI or zero, timezone boundaries | PENDING |
 | 6 | Responsive/accessibility and non-side-effect browser behavior: keyboard, focus, live states, reduced motion, multiple viewports, no provider/payment requests | PENDING |
 | 7 | Frontend original-source coverage measurement, per-file 100% statement/line/branch/function gate for affected scope; complete interaction-to-test traceability | PENDING |
@@ -58,9 +58,9 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 
 ## Continuity checkpoint
 
-- Current tracked milestone: **Parts 1–3 implemented**, exact certification pending.
+- Current tracked milestone: **Parts 1–4 implemented**, exact certification pending.
 - New branch is deliberately kept separate from `main`. Do not merge until Part 8 evidence satisfies the repository quality contract.
-- Resume next with **Part 4** after inspecting the exact PR HEAD and CI. Parts 1-3 must not be repeated; unresolved CI issues take priority.
+- Resume next with **Part 5** only after inspecting latest PR HEAD, CI, checkpoint and resolving any red runs. Do not redo Parts 1–4; unfinished certification remains a blocker.
 - After every phase update this document and draft PR with exact HEAD/evidence before responding to the user.
 
 ## Part 2 checkpoint: Inicio identity / onboarding / dashboard resilience
@@ -101,3 +101,28 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 **Previous Part 2 CI:** exact SHA `4fb4666002f1f1d064e14fbcca0207fc3d37fba5`, workflow `38113544485`: Fast Gate, Golden Journey and system-integration jobs were green when last checked; backend/full browser `test` and Inventory coverage were still in progress. It cannot certify later HEAD commits.
 
 **Safety and hold:** Mock-only browser calls, no live calls/messages/payments. PR stays Draft; no merge until all eight phases, Fast/Full Gate and exact-HEAD code/source/invariant evidence are green.
+
+## Part 4 checkpoint: actual PostgreSQL invariants and dashboard
+
+**Scope:** Java **test-only** additions to `RequestLifecycleAttentionIntegrationTest.java` (4 tests) and `OperationsDashboardServiceTest.java` (2 tests). No production Java or SQL migrations modified. Testcontainers `postgres:16-alpine`, Flyway migrations, explicit scoped tenant execution. No external provider calls.
+
+### Behavioral matrix (all must pass in real CI)
+
+1. Tenant A vs tenant B: active handoff overrides paired request; each visible exactly once; resolved handoff restores still-open request; resolved request disappears.
+2. Tenant RLS: direct SQL `SELECT` under A cannot read B's handoff or business_request even without service WHERE filters; B can read its own. Cross-tenant handoff update fails.
+3. List bounds: 105 stored A handoffs and an out-of-tenant newer B handoff; `LIMIT 100` gives newest A 100, in order, without duplicates or foreign row; no incorrect "historical total" assertion.
+4. Two real concurrent transactions from same tenant progress OPEN -> IN_PROGRESS; returned status correct; one durable audit transition, one actionable item, no lost update.
+5. Real dashboard with tenant-linked synthetic test calls: Auckland local-day `[dayStart, nextDayStart)`, failure count, duration and cost, boundary exclusion, certification/simulator exclusion, no cross-tenant calls or requests, real saved request lifecycle count changes, independent tenant B view.
+6. Unit: all dashboard repositories use the same tenant and local-day window, distinct failed statuses, 10-item recent-call page descending, zero defaults and absence of SQL calls without authenticated tenant.
+
+### Debugging evidence
+
+- Earlier Part 4 Fast Gate from intermediate commit (workflow `38114172089`) failed **for the intended test-fixture reason**: PostgreSQL's V93 `fk_human_handoff_operation_tenant` rejected fake `operation_id` UUID references (2 new test errors; all other focused tests passed). This was a genuine observed RED, not a product failure.
+- Fixed the foreign handoff to reference the real foreign request's persisted `operation_id`.
+- Fixed the 105+1 LIMIT fixtures by using unique `source_reference_id` values with nullable `operation_id`, respecting the composite FK and active-handoff uniqueness.
+- Read V4 call_session schema and added tenant-linked **synthetic phone_number fixtures**, because `phone_number_id` is NOT NULL and constrained to the same business. No real Twilio provision or message/call.
+- **GREEN NOT YET VERIFIED:** Later exact-HEAD CI must prove tests pass. Do not merge, lower coverage, mark a skipped/failed gate green or claim full 100%.
+- Part 2 and Part 3 Fast Gate/Golden Journey successfully completed. The long-running Full Gate browser jobs were not yet fully certified at the last check.
+- **Next:** inspect this document plus `PR #780`, exact HEAD and Fast/Full CI results; if red resolve root cause first, else ask the user for Part 5.
+
+**Safety:** test data only, Testcontainers ephemeral PostgreSQL, mock voice-provider *rows* without external requests. No production DB, live phone, WhatsApp, payment or deployment. The PR stays Draft until Part 8 exact HEAD/merged-main certification.
