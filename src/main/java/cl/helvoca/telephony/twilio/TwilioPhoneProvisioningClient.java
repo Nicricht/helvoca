@@ -45,6 +45,11 @@ public class TwilioPhoneProvisioningClient {
         return properties.isProvisioningEnabled();
     }
 
+    /** The managed carrier account, not a tenant-supplied account SID. */
+    public String managedAccountSid() {
+        return properties.getAccountSid().trim();
+    }
+
     public boolean configured() {
         return properties.hasCommercialProvisioningCredentials()
                 && ACCOUNT_SID.matcher(properties.getAccountSid().trim()).matches();
