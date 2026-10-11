@@ -26,7 +26,7 @@ Per `AGENTS.md` and `docs/engineering/QA_POLICY.md`:
 | 4 | Backend / PostgreSQL: tenant-isolated dashboard metrics/calls/costs, Santiago/Auckland day boundaries, attention deduplication/order/LIMIT 100, RLS, concurrency and request lifecycle | **CERTIFIED exact SHA c6f2ebe8, CI 38114322289 GREEN** |
 | 5 | Commercial analytics: currency aggregation and formatting, null/missing/invalid values, daily/7/30-day query switching, no fabricated ROI or zero, timezone boundaries | **IMPLEMENTED; exact-HEAD CI PENDING** |
 | 6 | Responsive/accessibility and non-side-effect browser behavior: keyboard, focus, live states, reduced motion, multiple viewports, no provider/payment requests | **IMPLEMENTED; exact-HEAD CI PENDING** |
-| 7 | Frontend original-source coverage measurement, per-file 100% statement/line/branch/function gate for affected scope; complete interaction-to-test traceability | PENDING |
+| 7 | Frontend original-source coverage measurement, per-file 100% statement/line/branch/function gate for affected scope; complete interaction-to-test traceability | **INSTRUMENTATION AND GATE IMPLEMENTED; exact-HEAD measured outcome PENDING** |
 | 8 | Fast Gate, Full Gate, adverse review, exact-HEAD CI and coverage report, merge only if green, exact-main verification and evidence checkpoint | PENDING |
 
 ## Part 1 findings (reproducible RED evidence)
@@ -58,9 +58,9 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 
 ## Continuity checkpoint
 
-- Current tracked milestone: **Part 4 certified; Parts 5–6 implemented, exact-HEAD CI pending**.
+- Current tracked milestone: **Parts 4 and 5 certified on exact previous SHAs; Part 6 Full Gate pending; Part 7 gate implemented, exact-HEAD result pending**.
 - New branch is deliberately kept separate from `main`. Do not merge until Part 8 evidence satisfies the repository quality contract.
-- Resume next with **Part 7** only after inspecting final CI of Parts 5–6 and fixing any RED. Do not redo Parts 1–4.
+- Resume next with **Part 8** ONLY after resolving Parts 6–7 RED and certifying exact-HEAD original-source 100% plus cross-layer gates. Never merge a pending or red branch.
 - After every phase update this document and draft PR with exact HEAD/evidence before responding to the user.
 
 ## Part 2 checkpoint: Inicio identity / onboarding / dashboard resilience
@@ -166,3 +166,20 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 **Verification limits:** The new JavaScript test file passed V8 syntax parsing with `new Function`; this does **not** prove browser tests passed. New exact-HEAD Fast Gate, browser E2E, mobile reflow, and source coverage measurements still need GitHub Actions evidence. Part 7 must enforce 100% executable source statement/line/branch/function coverage for all changed frontend behaviors, with complete interaction traceability. Never infer this from Playwright case counts alone.
 
 **Safety:** Existing mocked localhost browser routes only. No real phone calls, WhatsApp, Twilio, outbound messages, Stripe/provider payments, Railway deployment or production SQL writes. PR remains Draft and unmerged. Await user confirmation after this phase; do not automatically start Part 7.
+
+## Part 7 checkpoint: actual Home original-source coverage
+
+**Part 5 prerequisite certified:** GitHub workflow `38115261252` for exact commit `d2cb0883f3d1509fc1d3316676264b3ed20c7a33` completed `success`; Fast Gate, full backend/browser, Golden Journey, system integration, Inventory coverage passed. This verifies Part 5 only, not a later HEAD.
+
+**Part 6 previous gate:** GitHub workflow `38115721621` for exact commit `7bd630aa91496f8f22b74f827dbc26bcdc59014a` had Fast Gate/Golden Journey/integration green, browser Full Gate still in progress at Part 7 entry. Check before allowing later release.
+
+**Scoped new original-source instrumentation:**
+- `frontend/vite.config.ts` has explicit `VITE_HOME_COVERAGE=true` Istanbul build (separate from `VITE_COVERAGE=true` Inventory), instrumenting only three affected sources: `HomePage.tsx`, `HomeAttentionRows.tsx`, `features/operations/api.ts`. Plain/prod builds are not instrumented and cannot accidentally combine both coverage modes.
+- `e2e/home-coverage-fixture.js` captures real per-test `window.__coverage__` via Chromium, archives counters across page navigations and records success/failure for each test. The fixture was enabled in all four suites: `react-home.spec.js`, `react-home-resilience.spec.js`, `react-home-attention-hardening.spec.js`, `dashboard-motion.spec.js`.
+- `scripts/ci/check-home-frontend-coverage.cjs` checks independent Playwright discovery total (all four suites) against all recorded tests; rejects missing suites, lost snapshots, source archive errors, missing embedded source maps or any of the three original files absent after Vite/Istanbul remapping. **Per-file 100%** for statements, lines, branches and functions; no exception/threshold relaxation. Artifacts: JSON + Markdown per source with uncovered original lines/functions/branches; job log prints actionable gaps on RED.
+- `.github/workflows/ci.yml` adds independent `home-frontend-coverage` PR job, with explicit instrumented build, all four Playwright suites, strict remapping gate and artifacts on failure. Existing Inventory gate is not edited or relaxed.
+- `docs/frontend/HOME_INTERACTIONS_COVERAGE_MATRIX.md` records the complete known affected Home control/state and cross-layer acceptance inventory, mapped to browser/Java/PostgreSQL tests, and explicitly flags reused support-panel inventory as a hold.
+
+**Limits / honesty:** Parser validation of JS/CJS is not a measured browser pass. Actual original-source coverage percentages require the **new exact HEAD** workflow. The gate is expected to fail if any true gap remains; only add meaningful tests or smallest verified fixes to close it. Do not artificially suppress source counters or treat a test pass as percentage coverage. No merge or Part 8 certification while any required check is pending/red.
+
+**Safety:** All browser API traffic is local mocked Playwright; no real calls, provider messages, billing, production DB, production deployments or remote side-effect tests.
