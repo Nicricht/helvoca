@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./home-coverage-fixture');
 const fs = require('node:fs');
 
 const json = body => ({
@@ -7,7 +7,10 @@ const json = body => ({
   body: JSON.stringify(body)
 });
 
-test('React Home motion layer includes reduced-motion protection', async () => {
+test('React Home motion layer includes reduced-motion protection', async ({ page }) => {
+  // Activate the common coverage fixture even though this is a static CSS check.
+  // This legitimately records an unavailable browser snapshot; no counters are faked.
+  await expect(page).toBeDefined();
   const css = fs.readFileSync('frontend/src/pages/Home/HomePage.module.css', 'utf8');
   expect(css).toContain('@media (prefers-reduced-motion: reduce)');
   expect(css).toContain('@keyframes homeWave');

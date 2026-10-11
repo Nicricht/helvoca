@@ -29,17 +29,19 @@ export interface HumanAttentionItem {
   createdAt: string;
 }
 
-export interface RequestTransition {
-  id: string;
-  previousStatus: RequestStatus;
-  status: RequestStatus;
-  actorType: "BUSINESS_USER" | "AUTOMATION";
-  reasonCode: string;
-  evidenceEventId: string | null;
-}
-
-export function getHumanAttention() {
-  return apiRequest<HumanAttentionItem[]>("/api/v1/operations/attention");
+export async function getHumanAttention(): Promise<HumanAttentionItem[]> {
+  const payload = await apiRequest<unknown>("/api/v1/operations/attention");
+  // HTTP 200 with malformed data must never be displayed as "all clear".
+  if (!Array.isArray(payload) || !payload.every(item => {
+    if (!item || typeof item !== "object") return false;
+    const entry = item as Record<string, unknown>;
+    return (entry.kind === "REQUEST" || entry.kind === "HANDOFF") &&
+      typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.status === "string" && entry.status.length > 0;
+  })) {
+    throw new Error("No pudimos validar los pendientes del negocio.");
+  }
+  return payload as HumanAttentionItem[];
 }
 
 export function acknowledgeHumanHandoff(id: string) {
@@ -52,12 +54,6 @@ export function resolveHumanHandoff(id: string) {
   return apiRequest("/api/v1/handoffs/" + encodeURIComponent(id) + "/resolve", {
     method: "POST"
   });
-}
-
-export function getRequestHistory(id: string) {
-  return apiRequest<RequestTransition[]>(
-    "/api/v1/requests/" + encodeURIComponent(id) + "/history"
-  );
 }
 
 export interface AuditEntry {
@@ -83,7 +79,7 @@ export interface AuditFilters {
   to?: string;
 }
 
-function query(filters: AuditFilters = {}) {
+function query(filters: AuditFilters) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (value) params.set(key, value);
@@ -105,7 +101,7 @@ export function updateRequestStatus(id: string, status: RequestStatus) {
   );
 }
 
-export function getAudit(filters: AuditFilters = {}) {
+export function getAudit(filters: AuditFilters) {
   const suffix = query(filters);
   return apiRequest<AuditEntry[]>("/api/v1/audit" + (suffix ? "?" + suffix : ""));
 }
@@ -118,7 +114,7 @@ async function downloadAuthenticated(path: string, fallbackName: string) {
 
   if (response.status === 401) {
     clearAccessToken();
-    window.location.replace("/");
+    window.location.replace("/app/auth");
     throw new ApiError(401, "La sesión expiró.");
   }
   if (!response.ok) {
@@ -145,7 +141,7 @@ export function exportCustomers(format: "csv" | "xlsx") {
   );
 }
 
-export function exportAudit(format: "csv" | "xlsx", filters: AuditFilters = {}) {
+export function exportAudit(format: "csv" | "xlsx", filters: AuditFilters) {
   const params = new URLSearchParams({ format });
   const filterQuery = query(filters);
   if (filterQuery) {

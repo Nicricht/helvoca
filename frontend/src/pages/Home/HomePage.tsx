@@ -15,6 +15,7 @@ import {
   WalletCards
 } from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
+import { ApiError } from "../../api/client";
 import { getHumanAttention, type HumanAttentionItem } from "../../features/operations/api";
 import { OperationsSupportPanel } from "../../features/operations/OperationsSupportPanel";
 import { HomeAttentionRows } from "./HomeAttentionRows";
@@ -72,15 +73,13 @@ const nextStepCopy: Record<string, { text: string; href: string }> = {
 };
 
 function formatMoney(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: currency === "CLP" ? 0 : 2
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toLocaleString("es-CL")}`;
-  }
+  // Attributed totals accept only finite values and 3-letter currency codes.
+  // Keep the formatter deterministic rather than concealing invalid payloads.
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: currency === "CLP" ? 0 : 2
+  }).format(amount);
 }
 
 function formatActivityTime(value: string, timeZone: string): string {
@@ -101,7 +100,9 @@ function attributedTotals(data?: SalesAnalytics): Array<{ currency: string; amou
 
   const totals = new Map<string, number>();
   const add = (currency: string | null, amount: number | null) => {
-    if (!currency || amount == null) return;
+    // Unknown, malformed and negative values are not verified commercial revenue.
+    if (typeof currency !== "string" || !/^[A-Z]{3}$/.test(currency) ||
+        typeof amount !== "number" || !Number.isFinite(amount) || amount < 0) return;
     totals.set(currency, (totals.get(currency) || 0) + amount);
   };
 
@@ -220,7 +221,8 @@ function ValueGenerated({
   refreshing,
   failed,
   days,
-  onDaysChange
+  onDaysChange,
+  onRefresh
 }: {
   data?: SalesAnalytics;
   loading: boolean;
@@ -228,9 +230,13 @@ function ValueGenerated({
   failed: boolean;
   days: number;
   onDaysChange: (days: number) => void;
+  onRefresh: () => void;
 }) {
   const totals = attributedTotals(data);
   const single = totals.length === 1 ? totals[0] : null;
+  const incompleteAttribution = Boolean(data) &&
+    [data?.recepVozRevenue, data?.recepVozBookingRevenue].some(amount =>
+      typeof amount !== "number" || !Number.isFinite(amount) || amount < 0);
   const periods = [
     { days: 1, label: "Hoy" },
     { days: 7, label: "7 días" },
@@ -267,6 +273,13 @@ function ValueGenerated({
               {period.label}
             </button>
           ))}
+          <button
+            type="button"
+            className={styles.periodButton}
+            disabled={loading || refreshing}
+            aria-label="Actualizar valor comercial"
+            onClick={onRefresh}
+          >Actualizar</button>
         </div>
       </div>
 
@@ -280,7 +293,9 @@ function ValueGenerated({
         <div className={styles.valueBody}>
           <div className={styles.valueAmount}>
             {totals.length === 0 ? (
-              <strong>$0</strong>
+              data?.recepVozRevenue === 0 && data?.recepVozBookingRevenue === 0
+                ? <strong>$0</strong>
+                : <strong>Valor no disponible</strong>
             ) : single ? (
               <strong><AnimatedMoney amount={single.amount} currency={single.currency} /></strong>
             ) : (
@@ -294,6 +309,9 @@ function ValueGenerated({
               </div>
             )}
             <span>valor comercial atribuido a RecepVoz</span>
+            {incompleteAttribution && totals.length > 0 && (
+              <em>Datos parciales: hay ingresos sin verificar.</em>
+            )}
             {refreshing && <em>Actualizando…</em>}
           </div>
 
@@ -312,7 +330,11 @@ function ValueGenerated({
             Atribución por origen registrado en RecepVoz. No representa utilidad neta ni rentabilidad garantizada.
           </p>
         </div>
-      ) : null}
+      ) : (
+        <div className={styles.valueError} role="alert">
+          No pudimos verificar los datos comerciales. El resumen operativo sigue disponible.
+        </div>
+      )}
     </motion.section>
   );
 }
@@ -577,6 +599,26 @@ function OnboardingCard({ status }: { status: OnboardingStatus }) {
   );
 }
 
+function HomeLoadFailure({
+  title, description, retryLabel, onRetry
+}: {
+  title: string;
+  description: string;
+  retryLabel: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className={styles.errorState} role="alert">
+      <TriangleAlert size={20} aria-hidden="true" />
+      <div>
+        <strong>{title}</strong>
+        <span>{description}</span>
+        <button type="button" className={styles.errorRetry} onClick={onRetry}>{retryLabel}</button>
+      </div>
+    </div>
+  );
+}
+
 export function HomePage() {
   const reduceMotion = useReducedMotion();
   const [salesDays, setSalesDays] = useState(7);
@@ -587,16 +629,23 @@ export function HomePage() {
     queryFn: getCurrentUser
   });
 
-  const isAdmin = meQuery.data?.roles?.includes("BUSINESS_ADMIN") ?? false;
+  // A successful HTTP status is not proof of a usable identity contract.
+  const validIdentity = Boolean(meQuery.data) &&
+    Array.isArray(meQuery.data?.roles) && meQuery.data.roles.length > 0;
+  const isAdmin = validIdentity && meQuery.data?.roles?.includes("BUSINESS_ADMIN") === true;
   const onboardingQuery = useQuery({
     queryKey: ["home", "onboarding"],
     queryFn: getOnboardingStatus,
     enabled: isAdmin
   });
 
-  const adminReady = !isAdmin || onboardingQuery.data?.readyForCalls === true;
-  const readyToLoad = Boolean(meQuery.data) && adminReady;
-  const roles = meQuery.data?.roles ?? [];
+  const onboardingValid = !isAdmin || !onboardingQuery.isSuccess ||
+    (Boolean(onboardingQuery.data) &&
+      typeof onboardingQuery.data?.readyForCalls === "boolean" &&
+      coreOnboardingSteps.every(step => typeof onboardingQuery.data?.[step.key] === "boolean"));
+  const adminReady = !isAdmin || (onboardingValid && onboardingQuery.data?.readyForCalls === true);
+  const readyToLoad = validIdentity && adminReady && onboardingValid;
+  const roles = validIdentity ? (meQuery.data?.roles as string[]) : [];
   const canReadAttention = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
   const permissions = meQuery.data?.permissions;
   const canManageRequests = canReadAttention && (!Array.isArray(permissions)
@@ -660,22 +709,37 @@ export function HomePage() {
           <h1>Inicio</h1>
         </header>
 
-        {onboardingIncomplete && onboardingQuery.data ? (
+        {meQuery.isError || (meQuery.isSuccess && !validIdentity) ? (
+          <HomeLoadFailure
+            title={meQuery.error instanceof ApiError && meQuery.error.status === 403
+              ? "No tienes permiso para acceder a Inicio."
+              : "No pudimos verificar tu acceso."}
+            description="No podemos mostrar datos del negocio sin validar la sesión."
+            retryLabel="Reintentar acceso"
+            onRetry={() => { void meQuery.refetch(); }}
+          />
+        ) : isAdmin && (onboardingQuery.isError || !onboardingValid) ? (
+          <HomeLoadFailure
+            title="No pudimos comprobar la configuración de tu negocio."
+            description="No se mostrarán métricas hasta comprobar que la configuración está lista."
+            retryLabel="Reintentar configuración"
+            onRetry={() => { void onboardingQuery.refetch(); }}
+          />
+        ) : onboardingIncomplete && onboardingQuery.data ? (
           <OnboardingCard status={onboardingQuery.data} />
+        ) : readyToLoad && operationsQuery.isError ? (
+          <HomeLoadFailure
+            title="No pudimos cargar el resumen operativo."
+            description="La actividad no está verificada. Intenta nuevamente."
+            retryLabel="Reintentar resumen"
+            onRetry={() => { void operationsQuery.refetch(); }}
+          />
         ) : loading ? (
           <div className={styles.loadingState} role="status">
             <span className={styles.spinner} aria-hidden="true" />
             <div>
               <strong>Cargando tu negocio…</strong>
               <span>Estamos preparando el resumen operativo.</span>
-            </div>
-          </div>
-        ) : operationsQuery.isError ? (
-          <div className={styles.errorState} role="alert">
-            <TriangleAlert size={20} aria-hidden="true" />
-            <div>
-              <strong>No pudimos cargar el resumen operativo.</strong>
-              <span>Intenta nuevamente en unos momentos.</span>
             </div>
           </div>
         ) : operationsQuery.data ? (
@@ -695,6 +759,7 @@ export function HomePage() {
               failed={salesQuery.isError}
               days={salesDays}
               onDaysChange={setSalesDays}
+              onRefresh={() => { void salesQuery.refetch(); }}
             />
 
             <TodaySummary dashboard={operationsQuery.data} />
@@ -707,18 +772,28 @@ export function HomePage() {
               <section id="home-history" className={styles.historySection} aria-label="Historial de gestión">
                 <button type="button" className={styles.historyToggle}
                   aria-expanded={historyOpen}
+                  aria-controls="home-history-panel"
                   onClick={() => setHistoryOpen(previous => !previous)}>
                   <ClipboardList size={17} aria-hidden="true" />
                   {historyOpen ? "Ocultar historial y auditoría" : "Consultar historial de solicitudes y auditoría"}
                   <ArrowUpRight size={15} aria-hidden="true" />
                 </button>
-                {historyOpen && (
-                  <OperationsSupportPanel user={meQuery.data} showCustomerTools={false} />
-                )}
+                <div id="home-history-panel" hidden={!historyOpen}>
+                  {historyOpen && (
+                    <OperationsSupportPanel user={meQuery.data} showCustomerTools={false} />
+                  )}
+                </div>
               </section>
             )}
           </motion.div>
-        ) : null}
+        ) : (
+          <HomeLoadFailure
+            title="No pudimos validar el resumen operativo."
+            description="El servidor no entregó datos utilizables. No mostraremos cifras inventadas."
+            retryLabel="Reintentar resumen"
+            onRetry={() => { void operationsQuery.refetch(); }}
+          />
+        )}
       </main>
       </MotionConfig>
     </AppShell>

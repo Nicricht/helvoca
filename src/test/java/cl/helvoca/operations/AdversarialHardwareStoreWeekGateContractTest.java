@@ -46,6 +46,15 @@ class AdversarialHardwareStoreWeekGateContractTest {
             assertTrue(script.contains(scenario), "week gate must name scenario " + scenario);
         }
 
+        for (String file : new String[] {
+                "e2e/react-inventory.spec.js",
+                "e2e/react-home.spec.js",
+                "e2e/operations-internal.spec.js"
+        }) {
+            assertTrue(script.contains(file), "adversarial browser gate must include " + file);
+            assertTrue(Files.isRegularFile(Path.of(file)), "adversarial browser spec must exist: " + file);
+        }
+
         assertTrue(script.contains("180 simulated conversations"),
                 "week gate must retain the large adversarial sample");
         assertTrue(script.contains("no real calls"), "week gate must forbid real calls");

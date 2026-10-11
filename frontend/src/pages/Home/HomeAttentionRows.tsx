@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, CheckCircle2, CircleAlert, Clock3, RefreshCw, UserRoundCheck } from "lucide-react";
 import {
@@ -30,7 +30,10 @@ function readableStatus(item: HumanAttentionItem): string {
   return item.status === "IN_PROGRESS" ? "En progreso" : "Abierta";
 }
 
-function actionFor(item: HumanAttentionItem, canManageRequests: boolean) {
+type AttentionAction = "REQUEST_PROGRESS" | "REQUEST_RESOLVE" | "HANDOFF_ACK" | "HANDOFF_RESOLVE";
+
+function actionFor(item: HumanAttentionItem, canManageRequests: boolean):
+  { label: string; action: AttentionAction } | null {
   if (item.kind === "REQUEST" && canManageRequests) {
     if (item.status === "OPEN") return { label: "Empezar gestión", action: "REQUEST_PROGRESS" };
     if (item.status === "IN_PROGRESS") return { label: "Marcar resuelta", action: "REQUEST_RESOLVE" };
@@ -54,30 +57,26 @@ export function HomeAttentionRows({
 }: Props) {
   const client = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Synchronous lock: React state alone can batch two same-tick clicks.
+  const pendingMutation = useRef(false);
   const [error, setError] = useState("");
   const [confirmationId, setConfirmationId] = useState<string | null>(null);
 
-  async function perform(item: HumanAttentionItem, action: string) {
-    if (busyId) return;
+  async function perform(item: HumanAttentionItem, action: AttentionAction) {
+    if (pendingMutation.current || refreshing) return;
+    pendingMutation.current = true;
     setBusyId(item.id);
     setError("");
     try {
-      switch (action) {
-        case "REQUEST_PROGRESS":
-          await updateRequestStatus(item.id, "IN_PROGRESS");
-          break;
-        case "REQUEST_RESOLVE":
-          await updateRequestStatus(item.id, "RESOLVED");
-          break;
-        case "HANDOFF_ACK":
-          await acknowledgeHumanHandoff(item.id);
-          break;
-        case "HANDOFF_RESOLVE":
-          await resolveHumanHandoff(item.id);
-          break;
-        default:
-          throw new Error("Acción no disponible.");
-      }
+      // The UI can emit only this closed, typed action set. A missing entry
+      // rejects and enters the existing fail-closed catch rather than succeeding.
+      const mutations: Record<AttentionAction, () => Promise<unknown>> = {
+        REQUEST_PROGRESS: () => updateRequestStatus(item.id, "IN_PROGRESS"),
+        REQUEST_RESOLVE: () => updateRequestStatus(item.id, "RESOLVED"),
+        HANDOFF_ACK: () => acknowledgeHumanHandoff(item.id),
+        HANDOFF_RESOLVE: () => resolveHumanHandoff(item.id)
+      };
+      await mutations[action]();
       setConfirmationId(null);
       await Promise.all([
         client.invalidateQueries({ queryKey: ["operations", "attention"] }),
@@ -87,6 +86,7 @@ export function HomeAttentionRows({
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No pudimos actualizar el caso.");
     } finally {
+      pendingMutation.current = false;
       setBusyId(null);
     }
   }
@@ -153,22 +153,24 @@ export function HomeAttentionRows({
                 )}
               </div>
               {next && (
-                <div className={styles.action}>
+                <div className={styles.action}
+                  role={destructive && ask ? "group" : undefined}
+                  aria-label={destructive && ask ? "Confirmación de cierre: " + (item.title || "Caso sin título") : undefined}>
                   {destructive && !ask ? (
-                    <button type="button" disabled={Boolean(busyId)}
+                    <button type="button" disabled={Boolean(busyId) || refreshing}
                       onClick={() => setConfirmationId(item.id)}>{next.label} <ArrowUpRight size={13} /></button>
                   ) : destructive && ask ? (
                     <>
                       <span className={styles.question}>¿Confirmas que gestionaste este caso?</span>
-                      <button type="button" disabled={Boolean(busyId)}
+                      <button type="button" disabled={Boolean(busyId) || refreshing}
                         onClick={() => { void perform(item, next.action); }}>
                         {busyId === item.id ? "Guardando…" : "Confirmar cierre"}
                       </button>
-                      <button type="button" className={styles.cancel} disabled={Boolean(busyId)}
+                      <button type="button" className={styles.cancel} disabled={Boolean(busyId) || refreshing}
                         onClick={() => setConfirmationId(null)}>Cancelar</button>
                     </>
                   ) : (
-                    <button type="button" disabled={Boolean(busyId)}
+                    <button type="button" disabled={Boolean(busyId) || refreshing}
                       onClick={() => { void perform(item, next.action); }}>
                       {busyId === item.id ? "Guardando…" : next.label}
                       <ArrowUpRight size={13} aria-hidden="true" />

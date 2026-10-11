@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./home-coverage-fixture');
 
 const json = (body, status = 200) => ({
   status,
@@ -641,6 +641,176 @@ test.describe('React Home migration', () => {
     expect(state.onboardingRequests()).toBe(0);
   });
 
+
+  test('expanded history shows request state controls and records only explicitly clicked mutation', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.goto('/app');
+    await page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/ }).click();
+    const history = page.locator('#home-history-panel');
+    await expect(history.getByRole('heading', { name: 'Historial y auditoría' })).toBeVisible();
+    await expect(history).toContainText('Cliente pidió devolución de llamada');
+    expect(state.attentionMutations()).toBe(0);
+    await history.getByRole('button', { name: 'Marcar en progreso' }).click();
+    await expect.poll(state.attentionMutations).toBe(1);
+    expect(state.requests.filter(req =>
+      req.url.includes('/api/v1/requests/req-1/status') && req.method === 'PATCH')).toHaveLength(1);
+    expect(state.requests.filter(req => /twilio|whatsapp.*send|payments.*(?:charge|capture)/i.test(req.url))).toEqual([]);
+  });
+
+  test('read-only operator can inspect history but cannot mutate requests or see audit tools', async ({ page }) => {
+    const state = await bootHome(page, {
+      roles: ['OPERATOR'], permissions: ['REQUESTS_READ', 'OPERATIONS_READ']
+    });
+    await page.goto('/app');
+    await page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/ }).click();
+    const history = page.locator('#home-history-panel');
+    await expect(history).toContainText('Cliente pidió devolución de llamada');
+    await expect(history.getByRole('button', { name: 'Marcar en progreso' })).toHaveCount(0);
+    await expect(history.getByRole('button', { name: 'Auditoría' })).toHaveCount(0);
+    await expect(history.getByRole('button', { name: /Exportar auditoría/ })).toHaveCount(0);
+    expect(state.attentionMutations()).toBe(0);
+  });
+
+  test('audit tab filters and local CSV export are explicit, not background provider effects', async ({ page }) => {
+    const state = await bootHome(page);
+    const auditReads = [];
+    // The authenticated download uses native fetch() rather than apiRequest.
+    // Intercept it inside the isolated browser to avoid any local-network fallback
+    // or provider traffic, while keeping the real Blob/download behavior under test.
+    await page.addInitScript(() => {
+      const originalFetch = window.fetch.bind(window);
+      window.__auditExportRequests = [];
+      window.fetch = (resource, options) => {
+        const value = typeof resource === 'string' ? resource : resource.url;
+        const parsed = new URL(value, location.origin);
+        if (parsed.pathname === '/api/v1/audit/export') {
+          window.__auditExportRequests.push(parsed.search);
+          const csv = parsed.searchParams.get('format') === 'csv';
+          return Promise.resolve(new Response(new Blob(['actor,action\\n'], { type: 'text/csv' }), {
+            status: 200,
+            headers: csv ? {
+              'content-type': 'text/csv',
+              'content-disposition': 'attachment; filename="auditoria-test.csv"'
+            } : { 'content-type': 'application/octet-stream' }
+          }));
+        }
+        return originalFetch(resource, options);
+      };
+    });
+    await page.route('**/api/v1/audit**', route => {
+      const url = new URL(route.request().url());
+      auditReads.push(url);
+      if (url.pathname.endsWith('/export')) {
+        return route.fulfill({
+          status: 200, contentType: 'text/csv',
+          headers: { 'content-disposition': 'attachment; filename="auditoria-test.csv"' },
+          body: 'actor,action\\n'
+        });
+      }
+      return route.fulfill(json([{
+        id: 'audit-test-1', action: 'REQUEST_UPDATED', resourceType: 'REQUEST',
+        resourceId: 'req-1', actorName: 'Operador Demo', createdAt: '2026-10-02T12:00:00Z'
+      }]));
+    });
+    await page.goto('/app');
+    await page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/ }).click();
+    const history = page.locator('#home-history-panel');
+    await history.getByRole('button', { name: 'Auditoría' }).click();
+    await expect(history).toContainText('REQUEST_UPDATED');
+    await history.getByRole('textbox', { name: 'Actor de auditoría' }).fill(' Operador Demo ');
+    await history.getByRole('textbox', { name: 'Acción de auditoría' }).fill(' REQUEST_UPDATED ');
+    await history.getByRole('textbox', { name: 'Recurso de auditoría' }).fill(' REQUEST ');
+    await history.getByRole('button', { name: 'Aplicar filtros' }).click();
+    await expect.poll(() => auditReads.some(url =>
+      url.searchParams.get('actor') === 'Operador Demo' &&
+      url.searchParams.get('action') === 'REQUEST_UPDATED' &&
+      url.searchParams.get('resourceType') === 'REQUEST'
+    )).toBe(true);
+    const downloaded = page.waitForEvent('download');
+    await history.getByRole('button', { name: 'Exportar auditoría CSV' }).click();
+    const file = await downloaded;
+    expect(file.suggestedFilename()).toBe('auditoria-test.csv');
+    await expect(history.getByRole('status')).toContainText('Exportación de auditoría preparada');
+    await history.getByRole('textbox', { name: 'Actor de auditoría' }).fill('');
+    await history.getByRole('textbox', { name: 'Acción de auditoría' }).fill('');
+    await history.getByRole('textbox', { name: 'Recurso de auditoría' }).fill('');
+    await history.getByRole('button', { name: 'Aplicar filtros' }).click();
+    await expect.poll(() => auditReads.some(url => !url.search)).toBe(true);
+    const secondDownload = page.waitForEvent('download');
+    await history.getByRole('button', { name: 'Exportar auditoría XLSX' }).click();
+    expect((await secondDownload).suggestedFilename()).toBe('helvoca-auditoria.xlsx');
+    const exported = await page.evaluate(() => window.__auditExportRequests);
+    expect(exported).toHaveLength(2);
+    expect(new URLSearchParams(exported[0]).get('actor')).toBe('Operador Demo');
+    expect(exported[1]).toBe('?format=xlsx');
+    expect(state.attentionMutations()).toBe(0);
+    expect(state.requests.filter(req => req.url.includes('/api/v1/') &&
+      !['GET', 'HEAD', 'OPTIONS'].includes(req.method))).toEqual([]);
+    expect(state.requests.filter(req => /twilio|whatsapp.*send|payments.*(?:charge|capture)/i.test(req.url))).toEqual([]);
+  });
+
+  test('shared customer export API honors CSV filename, XLSX fallback, 503 and expired authentication', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.addInitScript(() => {
+      const original = window.fetch.bind(window);
+      window.__exportMode = 'csv';
+      window.__exportRequests = [];
+      window.fetch = (resource, opts) => {
+        const url = new URL(typeof resource === 'string' ? resource : resource.url, location.origin);
+        if (url.pathname !== '/api/v1/customers/export') return original(resource, opts);
+        window.__exportRequests.push({ url: url.href, authorization: opts?.headers?.Authorization ?? null });
+        const mode = window.__exportMode;
+        if (mode === '401') return Promise.resolve(new Response(null, { status: 401 }));
+        if (mode === '503') return Promise.resolve(new Response(null, { status: 503 }));
+        const name = mode === 'csv' ? 'attachment; filename="clientes-verificados.csv"' : null;
+        return Promise.resolve(new Response(new Blob(['synthetic-local-export'], { type: 'text/plain' }), {
+          status: 200, headers: name ? { 'content-disposition': name } : {}
+        }));
+      };
+    });
+    await page.route('**/api/v1/commercial/orders**', route => route.fulfill(json([])));
+    await page.goto('/app/orders');
+    await page.getByRole('button', { name: 'Clientes', exact: true }).click();
+    const panel = page.getByRole('region', { name: 'Exportación de clientes' });
+    await expect(panel).toBeVisible();
+
+    let download = page.waitForEvent('download');
+    await panel.getByRole('button', { name: 'Exportar CSV' }).click();
+    expect((await download).suggestedFilename()).toBe('clientes-verificados.csv');
+    await expect(panel.getByRole('status')).toContainText('Exportación preparada');
+
+    await page.evaluate(() => { window.__exportMode = 'xlsx'; });
+    download = page.waitForEvent('download');
+    await panel.getByRole('button', { name: 'Exportar XLSX' }).click();
+    expect((await download).suggestedFilename()).toBe('helvoca-clientes.xlsx');
+    // Assert that generated object URLs are revoked by the real delayed callback.
+    await page.waitForTimeout(1150);
+
+    await page.evaluate(() => { window.__exportMode = '503'; });
+    await panel.getByRole('button', { name: 'Exportar CSV' }).click();
+    await expect(panel.getByRole('status')).toContainText('No pudimos preparar la descarga');
+
+    await page.evaluate(() => {
+      sessionStorage.removeItem('helvoca_access_token');
+      window.__exportMode = '503';
+    });
+    await panel.getByRole('button', { name: 'Exportar CSV' }).click();
+    await expect(panel.getByRole('status')).toContainText('No pudimos preparar la descarga');
+    const requests = await page.evaluate(() => window.__exportRequests);
+    expect(requests).toHaveLength(4);
+    expect(requests[0].authorization).toContain('Bearer ');
+    expect(requests[3].authorization).toBeNull();
+
+    await page.evaluate(() => {
+      sessionStorage.setItem('helvoca_access_token', 'react-home-e2e');
+      window.__exportMode = '401';
+    });
+    await panel.getByRole('button', { name: 'Exportar CSV' }).click();
+    await expect(page).toHaveURL(url => url.pathname.startsWith('/app/auth'));
+    expect(await page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBeNull();
+    expect(state.attentionMutations()).toBe(0);
+  });
+
   test('Home performs only read/navigation work and does not trigger external side effects', async ({ page }) => {
     const { requests } = await bootHome(page);
 
@@ -656,6 +826,505 @@ test.describe('React Home migration', () => {
     );
     expect(unsafe).toEqual([]);
   });
+
+
+  test('HTTP 200 null analytics shows a truthful local error instead of an empty card', async ({ page }) => {
+    await bootHome(page);
+    await page.route('**/api/v1/commercial/analytics**', route => route.fulfill(json(null)));
+    await page.goto('/app');
+    const section = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(section.getByRole('alert')).toContainText('No pudimos verificar los datos comerciales');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+  });
+
+  test('HTTP 200 null operational dashboard blocks fabricated metrics and recovers on retry', async ({ page }) => {
+    await bootHome(page);
+    let valid = false;
+    await page.route('**/api/v1/operations/dashboard', route =>
+      route.fulfill(json(valid ? READY_OPERATIONS : null)));
+    await page.goto('/app');
+    await expect(page.getByRole('alert')).toContainText('No pudimos validar el resumen operativo');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+    valid = true;
+    await page.getByRole('button', { name: 'Reintentar resumen' }).click();
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+  });
+
+  test('in-progress call is announced as currently active without creating a call', async ({ page }) => {
+    const state = await bootHome(page, { operations: {
+      ...READY_OPERATIONS,
+      recentCalls: [
+        { ...READY_OPERATIONS.recentCalls[0], id: 'missing-status', status: null },
+        { ...READY_OPERATIONS.recentCalls[1], id: 'live', status: 'IN_PROGRESS' }
+      ]
+    }});
+    await page.goto('/app');
+    await expect(page.getByRole('region', { name: 'Estado de tu negocio' })).toContainText('Atendiendo ahora');
+    expect(state.requests.filter(r => !['GET', 'HEAD', 'OPTIONS'].includes(r.method))).toEqual([]);
+  });
+
+  test('plural operational signals reflect actual unanswered questions and failed calls', async ({ page }) => {
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS, unansweredQuestions: 2, callFailuresToday: 2
+    }});
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('2 preguntas sin respuesta');
+    await expect(panel).toContainText('2 fallos de llamada');
+  });
+
+  test('recent call without phone or statuses has a neutral readable fallback', async ({ page }) => {
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS, recentRequests: [], recentCalls: [{
+        ...READY_OPERATIONS.recentCalls[0],
+        id: 'unknown-call', callerNumber: null, status: null,
+        resolution: null, startedAt: '2026-10-02T17:00:00Z'
+      }]
+    }});
+    await page.goto('/app');
+    const latest = page.getByRole('region', { name: 'Última actividad' });
+    await expect(latest).toContainText('Llamada reciente');
+    await expect(latest).toContainText('Llamada');
+  });
+
+  test('unrecognized recent request status remains descriptive, not fabricated as complete', async ({ page }) => {
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS,
+      recentCalls: [],
+      recentRequests: [{
+        ...READY_OPERATIONS.recentRequests[0], status: 'NEEDS_VERIFICATION', title: 'Caso por revisar'
+      }]
+    }});
+    await page.goto('/app');
+    await expect(page.getByRole('region', { name: 'Última actividad' }))
+      .toContainText('needs verification');
+  });
+
+  test('invalid business timezone leaves activity time blank without throwing', async ({ page }) => {
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS,
+      timezone: 'Definitely/Invalid',
+      recentRequests: [],
+      recentCalls: [{ ...READY_OPERATIONS.recentCalls[0], startedAt: '2026-10-02T16:00:00Z' }]
+    }});
+    await page.goto('/app');
+    const latest = page.getByRole('region', { name: 'Última actividad' });
+    await expect(latest).toBeVisible();
+    await expect(latest.locator('time')).toBeEmpty();
+  });
+
+  test('null onboarding nextStep stays on safe Settings fallback without business metrics', async ({ page }) => {
+    await bootHome(page, { onboarding: {
+      ...INCOMPLETE_ONBOARDING, nextStep: null
+    }});
+    await page.goto('/app');
+    const onboarding = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(onboarding.getByRole('link', { name: /Continuar configuración/ }))
+      .toHaveAttribute('href', '/app/settings');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+  });
+
+  test('real zero attributed without a declared currency does not invent an exchange rate', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...EMPTY_ANALYTICS,
+      primaryCurrency: null, bookingCurrency: null,
+      recepVozRevenue: 0, recepVozBookingRevenue: 0
+    }});
+    await page.goto('/app');
+    const sales = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(sales).toContainText('$0');
+    await expect(sales).not.toContainText('Valor no disponible');
+  });
+
+  test('explicit commercial refresh displays staleness without hiding verified value or duplicating writes', async ({ page }) => {
+    let release;
+    let calls = 0;
+    const gate = new Promise(resolve => { release = resolve; });
+    const state = await bootHome(page);
+    await page.route('**/api/v1/commercial/analytics**', async route => {
+      calls += 1;
+      if (calls > 1) await gate;
+      return route.fulfill(json(READY_ANALYTICS));
+    });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('$209.900');
+    const refresh = value.getByRole('button', { name: 'Actualizar valor comercial' });
+    await refresh.click();
+    await expect(value).toContainText('Actualizando…');
+    await expect(refresh).toBeDisabled();
+    await expect(value).toContainText('$209.900');
+    expect(state.attentionMutations()).toBe(0);
+    release();
+    await expect(refresh).toBeEnabled();
+    await expect(value).not.toContainText('Actualizando…');
+    expect(calls).toBe(2);
+  });
+
+  test('missing recent request status remains a clearly labelled solicitud', async ({ page }) => {
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS,
+      recentCalls: [],
+      recentRequests: [{ ...READY_OPERATIONS.recentRequests[0], status: null }]
+    }});
+    await page.goto('/app');
+    const activity = page.getByRole('region', { name: 'Última actividad' });
+    await expect(activity).toContainText('Cliente pidió devolución de llamada');
+    await expect(activity).toContainText('Solicitud');
+  });
+
+  test('unknown attributed revenue never becomes a fictional $0', async ({ page }) => {
+    const analytics = {
+      ...READY_ANALYTICS,
+      recepVozRevenue: null,
+      recepVozBookingRevenue: null
+    };
+    await bootHome(page, { analytics });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('Valor no disponible');
+    await expect(value).not.toContainText('$0');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+  });
+
+  test('verified zero revenue remains zero rather than unknown', async ({ page }) => {
+    await bootHome(page, { analytics: EMPTY_ANALYTICS });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('$0');
+    await expect(value).not.toContainText('Valor no disponible');
+  });
+
+  test('negative or malformed attributed amounts never produce revenue or a positive ROI', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      recepVozRevenue: -9000,
+      recepVozBookingRevenue: -35
+    }});
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('Valor no disponible');
+    await expect(value).not.toContainText('$-');
+    await expect(value).not.toContainText(/ROI positivo|retorno de inversión confirmado/i);
+  });
+
+  test('partial verified revenue is presented as partial, not the total business value', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      recepVozRevenue: null,
+      bookingCurrency: 'CLP', recepVozBookingRevenue: 25000
+    }});
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('$25.000');
+    await expect(value).toContainText('Datos parciales');
+  });
+
+  test('malformed string amounts are not parsed into trusted money', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS, recepVozRevenue: '999999', recepVozBookingRevenue: null
+    }});
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('Valor no disponible');
+    await expect(value).not.toContainText('$999.999');
+  });
+
+  test('unsupported currency formatting is never hidden behind a fictitious currency conversion', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS, primaryCurrency: 'INVALID', recepVozRevenue: 123,
+      bookingCurrency: null, recepVozBookingRevenue: null
+    }});
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('Valor no disponible');
+    await expect(value).not.toContainText('INVALID 123');
+  });
+
+  test('different currencies remain separate instead of blending attributed revenue', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      primaryCurrency: 'USD', recepVozRevenue: 30,
+      bookingCurrency: 'CLP', recepVozBookingRevenue: 50000
+    }});
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('USD');
+    await expect(value).toContainText('CLP');
+    await expect(value).not.toContainText('50.030');
+  });
+
+  test('same currency groups attributed sales and bookings without double counting other totals', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      primaryCurrency: 'CLP', recepVozRevenue: 10000,
+      bookingCurrency: 'CLP', recepVozBookingRevenue: 25000,
+      totalRevenue: 999999
+    }});
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('$35.000');
+    await expect(value).not.toContainText('999.999');
+  });
+
+  test('changing Hoy / 7 días / 30 días uses its own API period, never the previous period total', async ({ page }) => {
+    const calls = [];
+    await bootHome(page);
+    await page.route('**/api/v1/commercial/analytics**', route => {
+      const days = Number(new URL(route.request().url()).searchParams.get('days'));
+      calls.push(days);
+      return route.fulfill(json({
+        ...READY_ANALYTICS, days,
+        recepVozRevenue: ({ 1: 1100, 7: 7700, 30: 33000 })[days],
+        recepVozBookingRevenue: 0
+      }));
+    });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('$7.700');
+    await value.getByRole('button', { name: 'Hoy' }).click();
+    await expect(value).toContainText('$1.100');
+    await expect(value).not.toContainText('$7.700');
+    await value.getByRole('button', { name: '30 días' }).click();
+    await expect(value).toContainText('$33.000');
+    await expect(value).not.toContainText('$1.100');
+    await value.getByRole('button', { name: '7 días' }).click();
+    await expect(value).toContainText('$7.700');
+    expect(calls).toContain(1);
+    expect(calls).toContain(7);
+    expect(calls).toContain(30);
+  });
+
+
+  test('keyboard Tab, Space and aria-pressed operate the sales period with a visible focus ring', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    const seven = value.getByRole('button', { name: '7 días' });
+    const thirty = value.getByRole('button', { name: '30 días' });
+    await expect(seven).toHaveAttribute('aria-pressed', 'true');
+    await seven.focus();
+    await page.keyboard.press('Tab');
+    await expect(thirty).toBeFocused();
+    const styles = await thirty.evaluate(el => ({
+      focusedByKeyboard: el.matches(':focus-visible'),
+      outline: getComputedStyle(el).outlineStyle,
+      width: parseFloat(getComputedStyle(el).outlineWidth)
+    }));
+    expect(styles.focusedByKeyboard).toBe(true);
+    expect(styles.outline).not.toBe('none');
+    expect(styles.width).toBeGreaterThanOrEqual(2);
+    await page.keyboard.press('Space');
+    await expect(thirty).toHaveAttribute('aria-pressed', 'true');
+    await expect(seven).toHaveAttribute('aria-pressed', 'false');
+    await expect.poll(() => state.requests.some(request =>
+      request.url.includes('/api/v1/commercial/analytics?days=30'))).toBe(true);
+    expect(state.attentionMutations()).toBe(0);
+  });
+
+  test('history expands with Enter and collapses with Space, reflecting aria-expanded', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.goto('/app');
+    const toggle = page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/ });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toHaveAttribute('aria-controls', 'home-history-panel');
+    await expect(page.locator('#home-history-panel')).toBeHidden();
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    const collapse = page.getByRole('button', { name: /Ocultar historial y auditoría/ });
+    await expect(collapse).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('heading', { name: 'Historial y auditoría' })).toBeVisible();
+    await expect(page.locator('#home-history-panel')).toBeVisible();
+    await collapse.focus();
+    await page.keyboard.press('Space');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('heading', { name: 'Historial y auditoría' })).toHaveCount(0);
+    expect(state.attentionMutations()).toBe(0);
+  });
+
+  test('keyboard cancellation of a destructive action never sends a close request', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await panel.getByRole('button', { name: 'Empezar gestión' }).click();
+    await expect(panel).toContainText('En progreso');
+    const resolve = panel.getByRole('button', { name: 'Marcar resuelta' });
+    await resolve.focus();
+    await page.keyboard.press('Enter');
+    const cancel = panel.getByRole('button', { name: 'Cancelar' });
+    await expect(cancel).toBeVisible();
+    await expect(panel.getByRole('group', { name: /Confirmación de cierre: Cliente pidió devolución de llamada/ })).toBeVisible();
+    await cancel.focus();
+    await page.keyboard.press('Space');
+    await expect(panel.getByRole('button', { name: 'Confirmar cierre' })).toHaveCount(0);
+    await expect(panel).toContainText('Cliente pidió devolución de llamada');
+    expect(state.attentionMutations()).toBe(1);
+  });
+
+  test('keyboard confirmation performs only the explicitly accepted request close', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await panel.getByRole('button', { name: 'Empezar gestión' }).click();
+    await expect(panel).toContainText('En progreso');
+    await panel.getByRole('button', { name: 'Marcar resuelta' }).click();
+    expect(state.attentionMutations()).toBe(1);
+    const confirm = panel.getByRole('button', { name: 'Confirmar cierre' });
+    await confirm.focus();
+    await page.keyboard.press('Enter');
+    await expect(panel).not.toContainText('Cliente pidió devolución de llamada');
+    expect(state.attentionMutations()).toBe(2);
+    const writes = state.requests.filter(req =>
+      !['GET', 'OPTIONS', 'HEAD'].includes(req.method) && req.url.includes('/api/v1/'));
+    expect(writes).toHaveLength(2);
+    expect(writes.every(req => req.url.includes('/api/v1/requests/req-1/status'))).toBe(true);
+  });
+
+  test('onboarding progress exposes an accurate numeric accessible value and keyboard link', async ({ page }) => {
+    const state = await bootHome(page, { onboarding: INCOMPLETE_ONBOARDING });
+    await page.goto('/app');
+    const section = page.getByRole('region', { name: 'Configura tu negocio' });
+    const progress = section.getByRole('progressbar', { name: 'Progreso de configuración' });
+    await expect(progress).toHaveAttribute('aria-valuemin', '0');
+    await expect(progress).toHaveAttribute('aria-valuemax', '100');
+    await expect(progress).toHaveAttribute('aria-valuenow', '25');
+    const link = section.getByRole('link', { name: /Continuar configuración/ });
+    await expect(link).toHaveAttribute('href', '/app/settings?section=services');
+    await link.focus();
+    await expect(link).toBeFocused();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    await expect(link).toBeFocused();
+    const visual = await link.evaluate(el => ({
+      focusVisible: el.matches(':focus-visible'),
+      style: getComputedStyle(el).outlineStyle,
+      size: parseFloat(getComputedStyle(el).outlineWidth)
+    }));
+    expect(visual.focusVisible).toBe(true);
+    expect(visual.style).not.toBe('none');
+    expect(visual.size).toBeGreaterThanOrEqual(2);
+    expect(state.attentionMutations()).toBe(0);
+    expect(state.requests.some(req => req.url.includes('/api/v1/operations/dashboard'))).toBe(false);
+  });
+
+  test('attention failure alert and retry are accessible with Enter, never a mutation', async ({ page }) => {
+    const state = await bootHome(page, { attentionError: 503 });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel.getByRole('alert')).toContainText('No pudimos verificar los pendientes');
+    const before = state.attentionReads();
+    const retry = panel.getByRole('button', { name: 'Reintentar' });
+    await retry.focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(state.attentionReads).toBeGreaterThan(before);
+    await expect(panel.getByRole('alert')).toContainText('No pudimos verificar los pendientes');
+    expect(state.attentionMutations()).toBe(0);
+  });
+
+  test('Home uses one page-level heading, labelled regions and decorative non-semantic layers', async ({ page }) => {
+    await bootHome(page);
+    await page.goto('/app');
+    await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toHaveCount(1);
+    for (const title of [
+      'Estado de tu negocio', 'Valor generado por RecepVoz',
+      'Resultados de hoy', 'Necesita tu atención', 'Última actividad'
+    ]) {
+      await expect(page.getByRole('region', { name: title })).toBeVisible();
+    }
+    await expect(page.locator('[data-home-ambient-layer][aria-hidden="true"]')).toHaveCount(0);
+    expect(await page.locator('[data-home-ambient-layer]').evaluateAll(items =>
+      items.every(item => item.closest('[aria-hidden="true"]') !== null))).toBe(true);
+  });
+
+  test('reduced motion removes animation and transition on the Home scene', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await bootHome(page);
+    await page.goto('/app');
+    await expect(page.getByRole('region', { name: 'Valor generado por RecepVoz' })).toBeVisible();
+    expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
+    const state = await page.evaluate(() => {
+      const atmosphere = document.querySelector('[data-home-ambient-layer="flow"]');
+      const section = document.querySelector('[aria-labelledby="homeValueTitle"]');
+      if (!atmosphere || !section) return null;
+      return {
+        ambience: getComputedStyle(atmosphere).animationName,
+        valueAnimationMs: getComputedStyle(section, '::before').animationDuration,
+        periodTransitionMs: getComputedStyle(
+          document.querySelector('[aria-label="Periodo del valor generado"] button')
+        ).transitionDuration
+      };
+    });
+    expect(state).not.toBeNull();
+    expect(state.ambience).toBe('none');
+    expect(state.valueAnimationMs).toMatch(/0\.0?1ms|0s|1e-05s|1e-5s/);
+    expect(state.periodTransitionMs).toMatch(/0\.0?1ms|0s|1e-05s|1e-5s/);
+  });
+
+  test('commercial pending state is announced and marked aria-busy without hiding operations', async ({ page }) => {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    await bootHome(page);
+    await page.route('**/api/v1/commercial/analytics**', async route => {
+      await gate;
+      return route.fulfill(json(READY_ANALYTICS));
+    });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toHaveAttribute('aria-busy', 'true');
+    await expect(value.getByRole('status')).toContainText('Calculando valor atribuido');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+    release();
+    await expect(value).toHaveAttribute('aria-busy', 'false');
+    await expect(value).toContainText('$209.900');
+  });
+
+  test('no provider/payment side effects arise from navigation-only tabs, refresh and history', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await value.getByRole('button', { name: 'Hoy' }).click();
+    await value.getByRole('button', { name: '30 días' }).click();
+    const attention = page.getByRole('region', { name: 'Necesita tu atención' });
+    await attention.getByRole('button', { name: 'Actualizar' }).click();
+    await page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/ }).click();
+    await expect(page.getByRole('heading', { name: 'Historial y auditoría' })).toBeVisible();
+    expect(state.attentionMutations()).toBe(0);
+    const writes = state.requests.filter(req =>
+      req.url.includes('/api/v1/') && !['GET', 'HEAD', 'OPTIONS'].includes(req.method));
+    expect(writes).toEqual([]);
+    expect(state.requests.filter(req => /twilio|outbound|whatsapp.*send|payments.*(?:charge|capture|create)/i.test(req.url))).toEqual([]);
+  });
+
+  for (const viewport of [
+    { name: 'small phone', width: 320, height: 640 },
+    { name: 'compact phone', width: 360, height: 740 },
+    { name: 'small laptop', width: 1024, height: 768 },
+    { name: 'wide desktop', width: 1920, height: 1080 }
+  ]) {
+    test('reflows important Home controls and avoids page overflow at ' + viewport.name, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await bootHome(page);
+      await page.goto('/app');
+      const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+      const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+      await expect(value).toBeVisible();
+      await expect(panel).toBeVisible();
+      for (const label of ['Hoy', '7 días', '30 días']) {
+        const button = value.getByRole('button', { name: label });
+        await expect(button).toBeVisible();
+        const bounds = await button.boundingBox();
+        expect(bounds).not.toBeNull();
+        expect(bounds.width).toBeGreaterThanOrEqual(24);
+        expect(bounds.height).toBeGreaterThanOrEqual(24);
+      }
+      const geometry = await page.evaluate(() => ({
+        document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        body: document.body.scrollWidth - document.body.clientWidth
+      }));
+      expect(geometry.document).toBeLessThanOrEqual(1);
+      expect(geometry.body).toBeLessThanOrEqual(1);
+    });
+  }
 
   for (const viewport of [
     { name: 'desktop', width: 1440, height: 900 },

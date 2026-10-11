@@ -652,6 +652,28 @@
   color: #ffb020;
 }
 
+.errorRetry {
+  margin-top: 12px;
+  padding: 8px 14px;
+  border: 1px solid var(--rv-accent);
+  border-radius: var(--rv-radius-md);
+  background: transparent;
+  color: var(--rv-text-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.errorRetry:hover,
+.errorRetry:focus-visible {
+  background: rgba(255, 255, 255, .08);
+}
+
+.errorRetry:focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 2px;
+}
+
 .spinner {
   flex: 0 0 auto;
   width: 22px;
@@ -3445,3 +3467,23 @@
 .historyToggle:focus-visible { outline: 2px solid #68ded5; outline-offset: 3px; }
 .historyToggle svg:last-child { margin-left: auto; }
 @media (prefers-reduced-motion: reduce) { .historyToggle { transition: none; } }
+
+/* Home Part 6 accessibility: keyboard focus must be obvious even on the
+   active sales period, and reduced motion must cover all local CSS layers. */
+.periodButton:focus-visible,
+.continueButton:focus-visible,
+.heroAction:focus-visible {
+  outline: 3px solid #7af4ee;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page *,
+  .page *::before,
+  .page *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

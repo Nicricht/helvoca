@@ -315,6 +315,56 @@ jobs:
           retention-days: 14
           include-hidden-files: true
 
+
+  home-frontend-coverage:
+    needs: [fast-gate]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install browser testing dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Build instrumented Home original TypeScript
+        env:
+          VITE_HOME_COVERAGE: "true"
+        run: npm run frontend:build
+      - name: Discover every Home browser test
+        run: |
+          npx playwright test e2e/react-home.spec.js e2e/react-home-resilience.spec.js e2e/react-home-attention-hardening.spec.js e2e/dashboard-motion.spec.js --list | tee .home-coverage-tests.txt
+      - name: Capture real Chromium coverage for all Home scenarios
+        id: home_browser
+        continue-on-error: true
+        env:
+          VITE_HOME_COVERAGE: "true"
+        run: |
+          npx playwright test e2e/react-home.spec.js e2e/react-home-resilience.spec.js e2e/react-home-attention-hardening.spec.js e2e/dashboard-motion.spec.js
+      - name: Enforce original-source 100 percent per file and dimension AND all browser tests
+        run: |
+          node scripts/ci/check-home-frontend-coverage.cjs
+          test "${{ steps.home_browser.outcome }}" = "success"
+      - name: Upload Home measured coverage and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-frontend-source-coverage
+          path: |
+            test-results/home-coverage/**
+            .home-coverage-raw/**
+            .home-coverage-tests.txt
+            test-results/**/error-context.md
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: true
+
   system-integration-e2e:
     needs: [fast-gate, golden-journey-release-contract]
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'

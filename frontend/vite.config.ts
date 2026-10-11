@@ -53,6 +53,10 @@ function directReactRoutes() {
 }
 
 const inventoryCoverage = process.env.VITE_COVERAGE === "true";
+const homeCoverage = process.env.VITE_HOME_COVERAGE === "true";
+if (inventoryCoverage && homeCoverage) {
+  throw new Error("Inventory and Home coverage instrumentation must run in separate builds.");
+}
 
 export default defineConfig({
   base: "/app/",
@@ -70,11 +74,25 @@ export default defineConfig({
       checkProd: false,
       forceBuildInstrument: true
     })] : []),
+    ...(homeCoverage ? [istanbul({
+      include: [
+        "src/pages/Home/HomePage.tsx",
+        "src/pages/Home/HomeAttentionRows.tsx",
+        "src/features/operations/api.ts"
+      ],
+      exclude: ["node_modules"],
+      extension: [".ts", ".tsx"],
+      // Istanbul's requireEnv flag specifically reads VITE_COVERAGE, which
+      // belongs to Inventory. Home is already gated by VITE_HOME_COVERAGE.
+      requireEnv: false,
+      checkProd: false,
+      forceBuildInstrument: true
+    })] : []),
     directReactRoutes()
   ],
   build: {
     outDir: "../src/main/resources/static/app",
     emptyOutDir: true,
-    sourcemap: inventoryCoverage ? "hidden" : false
+    sourcemap: inventoryCoverage || homeCoverage ? "hidden" : false
   }
 });

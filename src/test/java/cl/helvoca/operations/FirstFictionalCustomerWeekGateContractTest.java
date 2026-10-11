@@ -53,10 +53,19 @@ class FirstFictionalCustomerWeekGateContractTest {
             assertTrue(script.contains(scenario), "week gate must name scenario " + scenario);
         }
 
-        assertTrue(script.contains("e2e/first-user-ux-v2.spec.js"),
-                "week gate must keep the first-user UX in the certification");
-        assertTrue(script.contains("e2e/home-operational.spec.js"),
+        assertTrue(script.contains("e2e/frontend-ux.spec.js"),
+                "week gate must keep first-user registration and login UX in certification");
+        assertTrue(script.contains("e2e/react-settings-core.spec.js"),
+                "week gate must keep onboarding and settings UX in certification");
+        assertTrue(script.contains("e2e/react-home.spec.js"),
                 "week gate must certify the owner operational dashboard");
+        for (String file : new String[] {
+                "e2e/frontend-ux.spec.js",
+                "e2e/react-settings-core.spec.js",
+                "e2e/react-home.spec.js"
+        }) {
+            assertTrue(Files.isRegularFile(Path.of(file)), "certification spec must exist: " + file);
+        }
         assertTrue(script.contains("no real calls"),
                 "week gate must forbid real calls");
         assertTrue(script.contains("no real WhatsApp"),
