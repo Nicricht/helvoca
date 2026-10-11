@@ -43,6 +43,17 @@ public class BusinessImportPreviewService {
     private final HttpClient http;
     private final BusinessImportAiBudget aiBudget;
     private final BusinessImportAiUsageLedger usageLedger;
+    private final GeminiBusinessImportClient geminiImport;
+
+    @Value("$" + "{app.onboarding.import-ai.provider:openai}")
+    private String importProvider = "openai";
+
+    private boolean providerConfigured() {
+        if ("gemini".equalsIgnoreCase(importProvider)) {
+            return geminiImport != null && geminiImport.hasApiKey();
+        }
+        return "openai".equalsIgnoreCase(importProvider) && openAi.hasApiKey();
+    }
 
     @Value("${app.onboarding.import-ai.max-paid-files:3}")
     private int maxPaidFiles = 3;
@@ -62,9 +73,10 @@ public class BusinessImportPreviewService {
                                         OpenAiRealtimeProperties openAi,
                                         TenantProvider tenantProvider,
                                         BusinessImportAiBudget aiBudget,
-                                        BusinessImportAiUsageLedger usageLedger) {
+                                        BusinessImportAiUsageLedger usageLedger,
+                                        GeminiBusinessImportClient geminiImport) {
         this(spreadsheets, openAi, tenantProvider, aiBudget, usageLedger,
-                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build(), geminiImport);
     }
 
     // Compatibility constructors for focused tests. No quota means fail closed.
@@ -96,11 +108,22 @@ public class BusinessImportPreviewService {
                                  BusinessImportAiBudget aiBudget,
                                  BusinessImportAiUsageLedger usageLedger,
                                  HttpClient http) {
+        this(spreadsheets, openAi, tenantProvider, aiBudget, usageLedger, http, null);
+    }
+
+    BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
+                                 OpenAiRealtimeProperties openAi,
+                                 TenantProvider tenantProvider,
+                                 BusinessImportAiBudget aiBudget,
+                                 BusinessImportAiUsageLedger usageLedger,
+                                 HttpClient http,
+                                 GeminiBusinessImportClient geminiImport) {
         this.spreadsheets = spreadsheets;
         this.openAi = openAi;
         this.tenantProvider = tenantProvider;
         this.aiBudget = aiBudget;
         this.usageLedger = usageLedger;
+        this.geminiImport = geminiImport;
         this.http = http;
     }
 
@@ -186,7 +209,7 @@ public class BusinessImportPreviewService {
 
         // Deduplicate the same image/PDF content before it enters a paid payload.
         // An unreadable file stays local and cannot initiate a provider request.
-        if (!semantic.isEmpty() && paidAiImportEnabled && openAi.hasApiKey()) {
+        if (!semantic.isEmpty() && paidAiImportEnabled && providerConfigured()) {
             semantic = distinctSemanticFiles(semantic, sources, warnings);
         }
 
@@ -202,7 +225,7 @@ public class BusinessImportPreviewService {
                             false,
                             List.of("Análisis pagado desactivado")));
                 }
-            } else if (!openAi.hasApiKey()) {
+            } else if (!providerConfigured()) {
                 warnings.add("Hay fotos o PDF pendientes, pero el análisis con IA no está configurado. Las planillas reconocidas sí fueron procesadas.");
                 for (MultipartFile file : semantic) {
                     sources.add(new SourcePreview(displayName(file),
@@ -230,7 +253,23 @@ public class BusinessImportPreviewService {
                 }
             } else {
                 try {
-                    SemanticResult result = analyzeSemantic(safeBusinessName, semantic);
+                    SemanticResult result;
+                    if ("gemini".equalsIgnoreCase(importProvider)) {
+                        GeminiBusinessImportClient.Extracted extraction =
+                                geminiImport.analyze(semantic, usageLedger);
+                        result = new SemanticResult(extraction.products(), extraction.warnings());
+                        for (SetupProposal suggestion : extraction.setupSuggestions()) {
+                            if (setupSuggestions.size() < MAX_SETUP_SUGGESTIONS) {
+                                setupSuggestions.add(suggestion);
+                            } else if (!setupOverflowWarned) {
+                                warnings.add("Se limitaron las propuestas de configuración a "
+                                        + MAX_SETUP_SUGGESTIONS + "; importa el resto por separado.");
+                                setupOverflowWarned = true;
+                            }
+                        }
+                    } else {
+                        result = analyzeSemantic(safeBusinessName, semantic);
+                    }
                     aiUsed = true;
                     products.addAll(result.products());
                     warnings.addAll(result.warnings());

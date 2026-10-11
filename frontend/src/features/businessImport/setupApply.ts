@@ -39,7 +39,7 @@ export async function applyReviewedSetup(rows: ReviewSetupSuggestion[]): Promise
     if (!key || !value) throw new Error("Completa las preguntas, respuestas y horarios seleccionados.");
     if (item.kind === "BUSINESS_HOURS") {
       const dayOfWeek = DAY[key];
-      const match = /^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/.exec(value);
+      const match = /^((?:[01]\d|2[0-3]):[0-5]\d)-((?:[01]\d|2[0-3]):[0-5]\d)$/.exec(value);
       if (!dayOfWeek || !match || match[1] >= match[2] || seenDays.has(dayOfWeek)) {
         throw new Error("Horario inválido, repetido o con cierre anterior a apertura: " + key);
       }

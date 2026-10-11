@@ -50,6 +50,12 @@ app:
     import-ai:
       # The API key alone cannot enable paid imports.
       enabled: ${HELVOCA_BUSINESS_IMPORT_AI_ENABLED:false}
+      # Legacy provider remains OpenAI until separately authorized.
+      provider: ${HELVOCA_BUSINESS_IMPORT_AI_PROVIDER:openai}
+      gemini:
+        # Never reuse GEMINI_API_KEY from live calls or messaging.
+        api-key: ${HELVOCA_BUSINESS_IMPORT_GEMINI_API_KEY:}
+        model: ${HELVOCA_BUSINESS_IMPORT_GEMINI_MODEL:gemini-3.5-flash-lite}
       # Zero means no paid requests even if the flag is enabled.
       max-attempts-per-30-days: ${HELVOCA_BUSINESS_IMPORT_AI_MAX_ATTEMPTS_PER_30_DAYS:0}
       # Emergency-off unless every budget is configured by an operator.
