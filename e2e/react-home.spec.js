@@ -679,15 +679,19 @@ test.describe('React Home migration', () => {
     // or provider traffic, while keeping the real Blob/download behavior under test.
     await page.addInitScript(() => {
       const originalFetch = window.fetch.bind(window);
+      window.__auditExportRequests = [];
       window.fetch = (resource, options) => {
         const value = typeof resource === 'string' ? resource : resource.url;
-        if (new URL(value, location.origin).pathname === '/api/v1/audit/export') {
+        const parsed = new URL(value, location.origin);
+        if (parsed.pathname === '/api/v1/audit/export') {
+          window.__auditExportRequests.push(parsed.search);
+          const csv = parsed.searchParams.get('format') === 'csv';
           return Promise.resolve(new Response(new Blob(['actor,action\\n'], { type: 'text/csv' }), {
             status: 200,
-            headers: {
+            headers: csv ? {
               'content-type': 'text/csv',
               'content-disposition': 'attachment; filename="auditoria-test.csv"'
-            }
+            } : { 'content-type': 'application/octet-stream' }
           }));
         }
         return originalFetch(resource, options);
@@ -727,6 +731,18 @@ test.describe('React Home migration', () => {
     const file = await downloaded;
     expect(file.suggestedFilename()).toBe('auditoria-test.csv');
     await expect(history.getByRole('status')).toContainText('Exportación de auditoría preparada');
+    await history.getByRole('textbox', { name: 'Actor de auditoría' }).fill('');
+    await history.getByRole('textbox', { name: 'Acción de auditoría' }).fill('');
+    await history.getByRole('textbox', { name: 'Recurso de auditoría' }).fill('');
+    await history.getByRole('button', { name: 'Aplicar filtros' }).click();
+    await expect.poll(() => auditReads.some(url => !url.search)).toBe(true);
+    const secondDownload = page.waitForEvent('download');
+    await history.getByRole('button', { name: 'Exportar auditoría XLSX' }).click();
+    expect((await secondDownload).suggestedFilename()).toBe('helvoca-auditoria.xlsx');
+    const exported = await page.evaluate(() => window.__auditExportRequests);
+    expect(exported).toHaveLength(2);
+    expect(new URLSearchParams(exported[0]).get('actor')).toBe('Operador Demo');
+    expect(exported[1]).toBe('?format=xlsx');
     expect(state.attentionMutations()).toBe(0);
     expect(state.requests.filter(req => req.url.includes('/api/v1/') &&
       !['GET', 'HEAD', 'OPTIONS'].includes(req.method))).toEqual([]);
