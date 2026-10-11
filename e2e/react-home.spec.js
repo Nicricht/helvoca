@@ -641,6 +641,79 @@ test.describe('React Home migration', () => {
     expect(state.onboardingRequests()).toBe(0);
   });
 
+
+  test('expanded history shows request state controls and records only explicitly clicked mutation', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.goto('/app');
+    await page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/ }).click();
+    const history = page.locator('#home-history-panel');
+    await expect(history.getByRole('heading', { name: 'Historial y auditoría' })).toBeVisible();
+    await expect(history).toContainText('Cliente pidió devolución de llamada');
+    expect(state.attentionMutations()).toBe(0);
+    await history.getByRole('button', { name: 'Marcar en progreso' }).click();
+    await expect.poll(state.attentionMutations).toBe(1);
+    expect(state.requests.filter(req =>
+      req.url.includes('/api/v1/requests/req-1/status') && req.method === 'PATCH')).toHaveLength(1);
+    expect(state.requests.filter(req => /twilio|whatsapp.*send|payments.*(?:charge|capture)/i.test(req.url))).toEqual([]);
+  });
+
+  test('read-only operator can inspect history but cannot mutate requests or see audit tools', async ({ page }) => {
+    const state = await bootHome(page, {
+      roles: ['OPERATOR'], permissions: ['REQUESTS_READ', 'OPERATIONS_READ']
+    });
+    await page.goto('/app');
+    await page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/ }).click();
+    const history = page.locator('#home-history-panel');
+    await expect(history).toContainText('Cliente pidió devolución de llamada');
+    await expect(history.getByRole('button', { name: 'Marcar en progreso' })).toHaveCount(0);
+    await expect(history.getByRole('button', { name: 'Auditoría' })).toHaveCount(0);
+    await expect(history.getByRole('button', { name: /Exportar auditoría/ })).toHaveCount(0);
+    expect(state.attentionMutations()).toBe(0);
+  });
+
+  test('audit tab filters and local CSV export are explicit, not background provider effects', async ({ page }) => {
+    const state = await bootHome(page);
+    const auditReads = [];
+    await page.route('**/api/v1/audit**', route => {
+      const url = new URL(route.request().url());
+      auditReads.push(url);
+      if (url.pathname.endsWith('/export')) {
+        return route.fulfill({
+          status: 200, contentType: 'text/csv',
+          headers: { 'content-disposition': 'attachment; filename="auditoria-test.csv"' },
+          body: 'actor,action\\n'
+        });
+      }
+      return route.fulfill(json([{
+        id: 'audit-test-1', action: 'REQUEST_UPDATED', resourceType: 'REQUEST',
+        resourceId: 'req-1', actorName: 'Operador Demo', createdAt: '2026-10-02T12:00:00Z'
+      }]));
+    });
+    await page.goto('/app');
+    await page.getByRole('button', { name: /Consultar historial de solicitudes y auditoría/ }).click();
+    const history = page.locator('#home-history-panel');
+    await history.getByRole('button', { name: 'Auditoría' }).click();
+    await expect(history).toContainText('REQUEST_UPDATED');
+    await history.getByRole('textbox', { name: 'Actor de auditoría' }).fill(' Operador Demo ');
+    await history.getByRole('textbox', { name: 'Acción de auditoría' }).fill(' REQUEST_UPDATED ');
+    await history.getByRole('textbox', { name: 'Recurso de auditoría' }).fill(' REQUEST ');
+    await history.getByRole('button', { name: 'Aplicar filtros' }).click();
+    await expect.poll(() => auditReads.some(url =>
+      url.searchParams.get('actor') === 'Operador Demo' &&
+      url.searchParams.get('action') === 'REQUEST_UPDATED' &&
+      url.searchParams.get('resourceType') === 'REQUEST'
+    )).toBe(true);
+    const downloaded = page.waitForEvent('download');
+    await history.getByRole('button', { name: 'Exportar auditoría CSV' }).click();
+    const file = await downloaded;
+    expect(file.suggestedFilename()).toBe('auditoria-test.csv');
+    await expect(history.getByRole('status')).toContainText('Exportación de auditoría preparada');
+    expect(state.attentionMutations()).toBe(0);
+    expect(state.requests.filter(req => req.url.includes('/api/v1/') &&
+      !['GET', 'HEAD', 'OPTIONS'].includes(req.method))).toEqual([]);
+    expect(state.requests.filter(req => /twilio|whatsapp.*send|payments.*(?:charge|capture)/i.test(req.url))).toEqual([]);
+  });
+
   test('Home performs only read/navigation work and does not trigger external side effects', async ({ page }) => {
     const { requests } = await bootHome(page);
 
