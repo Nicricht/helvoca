@@ -527,7 +527,7 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
         insertHomeSyntheticCall(a, dayStart.plusSeconds(4), "twilio", true, "COMPLETED", 999, "100.00");
         insertHomeSyntheticCall(a, nextDayStart, "twilio", false, "COMPLETED", 300, "5.00");
         insertHomeSyntheticCall(a, dayStart.minusSeconds(1), "twilio", false, "COMPLETED", 300, "5.00");
-        insertHomeSyntheticCall(b, dayStart.plusSeconds(5), "twilio", false, "COMPLETED", 999, "100.00");
+        insertHomeSyntheticCall(b, java.time.Instant.now(), "twilio", false, "COMPLETED", 999, "100.00");
 
         authenticate(a);
         var requestA = requests.create(new BusinessRequestDtos.Create(
