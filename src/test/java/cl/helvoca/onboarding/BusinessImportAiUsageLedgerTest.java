@@ -106,6 +106,31 @@ class BusinessImportAiUsageLedgerTest {
     }
 
     @Test
+    void geminiNativeTokensAreAuditedWithoutInventingBilling() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        var recorder = ledger(jdbc, mock(TenantProvider.class));
+        String gemini = "gemini-3.5-flash-lite";
+        String body = new JSONObject().put("modelVersion", gemini)
+                .put("usageMetadata", new JSONObject().put("promptTokenCount", 1384)
+                        .put("candidatesTokenCount", 1021)
+                        .put("totalTokenCount", 2405)).toString();
+        recorder.receivedGemini(UUID.randomUUID(), gemini, response(200, body, true));
+        Object[] saved = lastWrite(jdbc);
+        assertEquals("RESPONSE", saved[3]);
+        assertEquals(gemini, saved[5]);
+        assertEquals(1384L, saved[9]);
+        assertNull(saved[10]);
+        assertEquals(1021L, saved[11]);
+        assertNull(saved[12]);
+
+        recorder.receivedGemini(UUID.randomUUID(), gemini,
+                response(429, "{\"error\":\"rate limited\"}", false));
+        assertEquals(429, lastWrite(jdbc)[8]);
+        assertNull(lastWrite(jdbc)[9]);
+        assertNull(lastWrite(jdbc)[12]);
+    }
+
+    @Test
     void blankProviderBodyIsUnpricedAndNeverInventsTokenUsage() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         var recorder = ledger(jdbc, mock(TenantProvider.class));

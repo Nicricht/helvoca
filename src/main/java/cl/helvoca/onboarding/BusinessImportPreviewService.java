@@ -35,6 +35,7 @@ public class BusinessImportPreviewService {
     private static final long MAX_FILE_BYTES = 10L * 1024L * 1024L;
     private static final long MAX_SEMANTIC_BYTES = 20L * 1024L * 1024L;
     private static final int MAX_PRODUCTS = 500;
+    private static final int MAX_SETUP_SUGGESTIONS = 100;
 
     private final BusinessImportSpreadsheetParser spreadsheets;
     private final OpenAiRealtimeProperties openAi;
@@ -42,6 +43,17 @@ public class BusinessImportPreviewService {
     private final HttpClient http;
     private final BusinessImportAiBudget aiBudget;
     private final BusinessImportAiUsageLedger usageLedger;
+    private final GeminiBusinessImportClient geminiImport;
+
+    @Value("$" + "{app.onboarding.import-ai.provider:openai}")
+    private String importProvider = "openai";
+
+    private boolean providerConfigured() {
+        if ("gemini".equalsIgnoreCase(importProvider)) {
+            return geminiImport != null && geminiImport.hasApiKey();
+        }
+        return "openai".equalsIgnoreCase(importProvider) && openAi.hasApiKey();
+    }
 
     @Value("${app.onboarding.import-ai.max-paid-files:3}")
     private int maxPaidFiles = 3;
@@ -61,9 +73,10 @@ public class BusinessImportPreviewService {
                                         OpenAiRealtimeProperties openAi,
                                         TenantProvider tenantProvider,
                                         BusinessImportAiBudget aiBudget,
-                                        BusinessImportAiUsageLedger usageLedger) {
+                                        BusinessImportAiUsageLedger usageLedger,
+                                        GeminiBusinessImportClient geminiImport) {
         this(spreadsheets, openAi, tenantProvider, aiBudget, usageLedger,
-                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build(), geminiImport);
     }
 
     // Compatibility constructors for focused tests. No quota means fail closed.
@@ -95,11 +108,22 @@ public class BusinessImportPreviewService {
                                  BusinessImportAiBudget aiBudget,
                                  BusinessImportAiUsageLedger usageLedger,
                                  HttpClient http) {
+        this(spreadsheets, openAi, tenantProvider, aiBudget, usageLedger, http, null);
+    }
+
+    BusinessImportPreviewService(BusinessImportSpreadsheetParser spreadsheets,
+                                 OpenAiRealtimeProperties openAi,
+                                 TenantProvider tenantProvider,
+                                 BusinessImportAiBudget aiBudget,
+                                 BusinessImportAiUsageLedger usageLedger,
+                                 HttpClient http,
+                                 GeminiBusinessImportClient geminiImport) {
         this.spreadsheets = spreadsheets;
         this.openAi = openAi;
         this.tenantProvider = tenantProvider;
         this.aiBudget = aiBudget;
         this.usageLedger = usageLedger;
+        this.geminiImport = geminiImport;
         this.http = http;
     }
 
@@ -112,6 +136,9 @@ public class BusinessImportPreviewService {
         if (files.size() > MAX_FILES) throw new IllegalArgumentException("A maximum of 12 files can be imported at once");
 
         List<ProductProposal> products = new ArrayList<>();
+        List<SetupProposal> setupSuggestions = new ArrayList<>();
+        Map<String, String> seenSetupValues = new LinkedHashMap<>();
+        boolean setupOverflowWarned = false;
         List<SourcePreview> sources = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         List<MultipartFile> semantic = new ArrayList<>();
@@ -138,6 +165,22 @@ public class BusinessImportPreviewService {
                         parsed.warnings()));
                 for (BusinessImportSpreadsheetParser.ProductRow row : parsed.products()) {
                     products.add(fromSpreadsheet(row));
+                }
+                for (BusinessImportSpreadsheetParser.SetupRow row : parsed.setupRows()) {
+                    String identity = row.kind() + ":" + row.key().trim().toLowerCase(Locale.ROOT);
+                    String previous = seenSetupValues.putIfAbsent(identity, row.value());
+                    if (previous != null && !previous.equals(row.value())) {
+                        warnings.add("Fuentes con propuestas distintas para " + row.kind()
+                                + " (" + row.key() + "). Revisa el conflicto antes de aplicar.");
+                    }
+                    if (setupSuggestions.size() < MAX_SETUP_SUGGESTIONS) {
+                        setupSuggestions.add(new SetupProposal(row.kind(), row.key(), row.value(),
+                                row.sourceName(), row.sheetName(), row.sourceRow(), 1.0));
+                    } else if (!setupOverflowWarned) {
+                        warnings.add("Se limitaron las propuestas de configuración a "
+                                + MAX_SETUP_SUGGESTIONS + "; importa el resto por separado.");
+                        setupOverflowWarned = true;
+                    }
                 }
                 warnings.addAll(parsed.warnings());
                 continue;
@@ -166,7 +209,7 @@ public class BusinessImportPreviewService {
 
         // Deduplicate the same image/PDF content before it enters a paid payload.
         // An unreadable file stays local and cannot initiate a provider request.
-        if (!semantic.isEmpty() && paidAiImportEnabled && openAi.hasApiKey()) {
+        if (!semantic.isEmpty() && paidAiImportEnabled && providerConfigured()) {
             semantic = distinctSemanticFiles(semantic, sources, warnings);
         }
 
@@ -182,7 +225,7 @@ public class BusinessImportPreviewService {
                             false,
                             List.of("Análisis pagado desactivado")));
                 }
-            } else if (!openAi.hasApiKey()) {
+            } else if (!providerConfigured()) {
                 warnings.add("Hay fotos o PDF pendientes, pero el análisis con IA no está configurado. Las planillas reconocidas sí fueron procesadas.");
                 for (MultipartFile file : semantic) {
                     sources.add(new SourcePreview(displayName(file),
@@ -210,7 +253,23 @@ public class BusinessImportPreviewService {
                 }
             } else {
                 try {
-                    SemanticResult result = analyzeSemantic(safeBusinessName, semantic);
+                    SemanticResult result;
+                    if ("gemini".equalsIgnoreCase(importProvider)) {
+                        GeminiBusinessImportClient.Extracted extraction =
+                                geminiImport.analyze(semantic, usageLedger);
+                        result = new SemanticResult(extraction.products(), extraction.warnings());
+                        for (SetupProposal suggestion : extraction.setupSuggestions()) {
+                            if (setupSuggestions.size() < MAX_SETUP_SUGGESTIONS) {
+                                setupSuggestions.add(suggestion);
+                            } else if (!setupOverflowWarned) {
+                                warnings.add("Se limitaron las propuestas de configuración a "
+                                        + MAX_SETUP_SUGGESTIONS + "; importa el resto por separado.");
+                                setupOverflowWarned = true;
+                            }
+                        }
+                    } else {
+                        result = analyzeSemantic(safeBusinessName, semantic);
+                    }
                     aiUsed = true;
                     products.addAll(result.products());
                     warnings.addAll(result.warnings());
@@ -239,12 +298,11 @@ public class BusinessImportPreviewService {
             warnings.add("Se detectaron más de " + MAX_PRODUCTS + " elementos de catálogo; la previsualización fue limitada.");
             normalized = normalized.subList(0, MAX_PRODUCTS);
         }
-        if (normalized.isEmpty()) {
+        if (normalized.isEmpty() && setupSuggestions.isEmpty()) {
             warnings.add("No encontré productos o servicios listos para importar. Revisa los archivos o agrega datos manualmente.");
         }
-
-        return new Preview(safeBusinessName, List.copyOf(normalized), List.copyOf(sources),
-                List.copyOf(dedupeWarnings(warnings)), aiUsed);
+        return new Preview(safeBusinessName, List.copyOf(normalized), List.copyOf(setupSuggestions),
+                List.copyOf(sources), List.copyOf(dedupeWarnings(warnings)), aiUsed);
     }
 
     private static List<MultipartFile> distinctSemanticFiles(List<MultipartFile> files,
@@ -621,13 +679,25 @@ public class BusinessImportPreviewService {
             List<String> warnings
     ) {}
 
+    public record SetupProposal(
+            String kind, String key, String value,
+            String sourceName, String sheetName, int sourceRow, double confidence
+    ) {}
+
     public record Preview(
             String businessName,
             List<ProductProposal> products,
+            List<SetupProposal> setupSuggestions,
             List<SourcePreview> sources,
             List<String> warnings,
             boolean aiUsed
-    ) {}
+    ) {
+        // Keep the established preview constructor usable by older controllers/tests.
+        public Preview(String businessName, List<ProductProposal> products,
+                       List<SourcePreview> sources, List<String> warnings, boolean aiUsed) {
+            this(businessName, products, List.of(), sources, warnings, aiUsed);
+        }
+    }
 
     record SemanticResult(List<ProductProposal> products, List<String> warnings) {}
 }

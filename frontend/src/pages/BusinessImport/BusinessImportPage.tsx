@@ -27,6 +27,7 @@ import {
   type BusinessImportPreview,
   type ImportItemKind
 } from "../../features/businessImport/api";
+import { applyReviewedSetup, setupReviewRows, type ReviewSetupSuggestion } from "../../features/businessImport/setupApply";
 import styles from "./BusinessImportPage.module.css";
 
 type EditableRow = {
@@ -161,9 +162,11 @@ export function BusinessImportPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [preview, setPreview] = useState<BusinessImportPreview | null>(null);
   const [rows, setRows] = useState<EditableRow[]>([]);
+  const [setupRows, setSetupRows] = useState<ReviewSetupSuggestion[]>([]);
   const [result, setResult] = useState<BusinessImportApplyResult | null>(null);
   const [previewPending, setPreviewPending] = useState(false);
   const [applyPending, setApplyPending] = useState(false);
+  const [setupPending, setSetupPending] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -226,6 +229,7 @@ export function BusinessImportPage() {
     setFiles(accepted);
     setPreview(null);
     setRows([]);
+    setSetupRows([]);
     setResult(null);
     setMessage("");
     setError(issues.join(" "));
@@ -272,6 +276,7 @@ export function BusinessImportPage() {
       setPreview(next);
       void queryClient.invalidateQueries({ queryKey: ["business-import", "ai-quota"] });
       setRows(rowsFromPreview(next));
+      setSetupRows(setupReviewRows(next.setupSuggestions));
       setMessage("Borrador creado. Revisa cada dato antes de aplicar.");
     } catch (value) {
       setError(value instanceof Error ? value.message : "No pudimos crear el borrador.");
@@ -312,10 +317,37 @@ export function BusinessImportPage() {
     }
   }
 
+  async function approveSetup() {
+    if (mutationLock.current || setupPending) return;
+    if (!setupRows.some(item => item.selected)) {
+      setError("Selecciona las sugerencias que deseas aprobar.");
+      return;
+    }
+    mutationLock.current = true;
+    setSetupPending(true);
+    setError("");
+    setMessage("");
+    try {
+      const saved = await applyReviewedSetup(setupRows);
+      setSetupRows(current => current.map(item => ({ ...item, selected: false })));
+      void queryClient.invalidateQueries({ queryKey: ["settings"] });
+      setMessage("Configuración aprobada: " + saved.hourDaysReplaced + " día(s) de horario, " +
+        saved.faqCreated + " FAQ creada(s), " + saved.faqSkipped +
+        " FAQ existente(s) sin sobrescribir.");
+    } catch (value) {
+      setError((value instanceof Error ? value.message : "No se pudo aplicar la configuración.") +
+        " Si hubo un error de red, comprueba los datos guardados antes de reintentar.");
+    } finally {
+      mutationLock.current = false;
+      setSetupPending(false);
+    }
+  }
+
   function reset() {
     setFiles([]);
     setPreview(null);
     setRows([]);
+    setSetupRows([]);
     setResult(null);
     setMessage("");
     setError("");
@@ -518,7 +550,7 @@ export function BusinessImportPage() {
             {rows.length === 0 ? (
               <div className={styles.emptyState}>
                 <strong>No hay productos o servicios listos para aplicar.</strong>
-                <span>Cambia los archivos o revisa las advertencias detectadas.</span>
+                <span>Si hay FAQ u horarios detectados, revísalos a continuación.</span>
               </div>
             ) : (
               <div className={styles.rows}>
@@ -639,6 +671,69 @@ export function BusinessImportPage() {
                 onClick={apply}
               >
                 {applyPending ? "Importando…" : "Importar al negocio"}
+              </button>
+            </div>
+          </section>
+        )}
+
+        {preview && setupRows.length > 0 && (
+          <section className={styles.card} data-testid="business-import-setup-review">
+            <div className={styles.stepHead}>
+              <span>2</span>
+              <div><strong>Preguntas frecuentes y horarios detectados</strong>
+                <small>Sin IA pagada. Revisa cada cambio antes de aprobarlo.</small></div>
+            </div>
+            <p>Los horarios aprobados reemplazarán solo los días seleccionados y conservarán
+              los demás. Las preguntas ya existentes no se sobrescribirán.</p>
+            <div className={styles.rows}>
+              {setupRows.map((item, index) => (
+                <article key={item.sourceName + "-" + item.sourceRow + "-" + index}
+                  className={styles.importRow} data-testid={"setup-review-row-" + index}>
+                  <div className={styles.rowTop}>
+                    <label className={styles.selectItem}>
+                      <input type="checkbox" checked={item.selected}
+                        aria-label={"Aprobar sugerencia " + index}
+                        onChange={event => setSetupRows(current => current.map(
+                          (row, i) => i === index ? { ...row, selected: event.target.checked } : row
+                        ))} />
+                      <span>{item.kind === "FAQ" ? "Pregunta frecuente" : "Horario"}</span>
+                    </label>
+                    <span className={styles.confidence}>Revisión obligatoria</span>
+                  </div>
+                  <div className={styles.rowGrid}>
+                    <label className={styles.field}>
+                      <span>{item.kind === "FAQ" ? "Pregunta" : "Día"}</span>
+                      <input aria-label={"Clave sugerida " + index} value={item.key}
+                        readOnly={item.kind === "BUSINESS_HOURS"} maxLength={200}
+                        onChange={event => setSetupRows(current => current.map(
+                          (row, i) => i === index ? { ...row, key: event.target.value } : row
+                        ))} />
+                    </label>
+                    <label className={styles.field}>
+                      <span>{item.kind === "FAQ" ? "Respuesta" : "Apertura-cierre (HH:MM-HH:MM)"}</span>
+                      <input aria-label={"Valor sugerido " + index} value={item.value}
+                        maxLength={item.kind === "FAQ" ? 4000 : 11}
+                        onChange={event => setSetupRows(current => current.map(
+                          (row, i) => i === index ? { ...row, value: event.target.value } : row
+                        ))} />
+                    </label>
+                  </div>
+                  <div className={styles.rowSource}>
+                    <span>Fuente</span><strong>{item.sourceName} ·
+                      {item.sheetName ? " " + item.sheetName + " ·" : ""} fila {item.sourceRow}</strong>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className={styles.applyBar}>
+              <div>
+                <strong>{setupRows.filter(item => item.selected).length} sugerencia(s) seleccionada(s)</strong>
+                <span>Confirmar modifica FAQ/horarios del negocio. No publica promociones.</span>
+              </div>
+              <button type="button" className="button primary"
+                disabled={setupPending || applyPending || !setupRows.some(item => item.selected)}
+                onClick={approveSetup}>
+                {setupPending ? "Guardando configuración…" : "Aprobar FAQ y horarios seleccionados"}
               </button>
             </div>
           </section>

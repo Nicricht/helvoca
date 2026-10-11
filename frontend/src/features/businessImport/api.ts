@@ -25,9 +25,19 @@ export interface BusinessImportSource {
   warnings?: string[];
 }
 
+export interface BusinessImportSetupSuggestion {
+  kind: "FAQ" | "BUSINESS_HOURS";
+  key: string;
+  value: string;
+  sourceName: string;
+  sheetName?: string | null;
+  sourceRow: number;
+}
+
 export interface BusinessImportPreview {
   businessName: string;
   products: BusinessImportProposal[];
+  setupSuggestions?: BusinessImportSetupSuggestion[];
   sources: BusinessImportSource[];
   warnings: string[];
   aiUsed: boolean;

@@ -55,6 +55,26 @@ public class BusinessImportAiUsageLedger {
                 providerRequestId);
     }
 
+    @Transactional
+    public void receivedGemini(UUID attemptId, String requestedModel, HttpResponse<String> response) {
+        // Adapt native Gemini token usage to the existing tenant-scoped receipt,
+        // WITHOUT persisting the input image, output text or a private API key.
+        JSONObject root = responseJson(response.body());
+        JSONObject usage = root == null ? null : root.optJSONObject("usageMetadata");
+        JSONObject canonical = new JSONObject();
+        if (root != null) canonical.put("model", root.optString("modelVersion", requestedModel));
+        if (usage != null && usage.has("promptTokenCount")
+                && usage.has("candidatesTokenCount")) {
+            canonical.put("usage", new JSONObject()
+                    .put("input_tokens", usage.optLong("promptTokenCount", -1))
+                    .put("output_tokens", usage.optLong("candidatesTokenCount", -1)));
+        }
+        String providerRequestId = response.headers() == null ? null
+                : response.headers().firstValue("x-request-id").orElse(null);
+        insert(attemptId, "RESPONSE", requestedModel, response.statusCode(),
+                canonical.toString(), providerRequestId);
+    }
+
     private void insert(UUID attemptId, String phase, String model, Integer httpStatus,
                         String body, String providerRequestId) {
         // The business id is resolved from the authenticated JWT on every write.
