@@ -377,6 +377,37 @@ test.describe('Inicio Parte 3: solicitudes y escalamiento humano', () => {
     expect(state.mutations).toEqual([]);
   });
 
+  test('confirmation without title announces a safe case fallback to assistive technology', async ({ page }) => {
+    const state = await boot(page, { attention: [{
+      ...initialAttention[0], title: '', status: 'IN_PROGRESS'
+    }] });
+    await page.goto('/app');
+    await panel(page).getByRole('button', { name: 'Marcar resuelta' }).click();
+    await expect(panel(page).getByRole('group', { name: 'Confirmación de cierre: Caso sin título' })).toBeVisible();
+    await panel(page).getByRole('button', { name: 'Cancelar' }).click();
+    expect(state.mutations).toEqual([]);
+  });
+
+  test('non-Error network rejection is reported without marking a request complete', async ({ page }) => {
+    const state = await boot(page);
+    await page.addInitScript(() => {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = (resource, init) => {
+        const url = typeof resource === 'string' ? resource : resource.url;
+        if (new URL(url, location.origin).pathname === '/api/v1/requests/req-1/status') {
+          return Promise.reject('raw mocked network rejection');
+        }
+        return originalFetch(resource, init);
+      };
+    });
+    await page.goto('/app');
+    await panel(page).getByRole('button', { name: 'Empezar gestión' }).click();
+    await expect(panel(page).getByRole('alert')).toContainText('No pudimos actualizar el caso');
+    await expect(panel(page)).toContainText('Solicitud de prueba');
+    expect(state.mutations).toEqual([]);
+    assertNoProviders(state);
+  });
+
   test('doble clic en confirmación de cierre genera exactamente un PATCH', async ({ page }) => {
     let release;
     const pending = new Promise(resolve => { release = resolve; });
