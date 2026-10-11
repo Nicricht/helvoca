@@ -73,15 +73,13 @@ const nextStepCopy: Record<string, { text: string; href: string }> = {
 };
 
 function formatMoney(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: currency === "CLP" ? 0 : 2
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toLocaleString("es-CL")}`;
-  }
+  // Attributed totals accept only finite values and 3-letter currency codes.
+  // Keep the formatter deterministic rather than concealing invalid payloads.
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: currency === "CLP" ? 0 : 2
+  }).format(amount);
 }
 
 function formatActivityTime(value: string, timeZone: string): string {
@@ -323,7 +321,11 @@ function ValueGenerated({
             Atribución por origen registrado en RecepVoz. No representa utilidad neta ni rentabilidad garantizada.
           </p>
         </div>
-      ) : null}
+      ) : (
+        <div className={styles.valueError} role="alert">
+          No pudimos verificar los datos comerciales. El resumen operativo sigue disponible.
+        </div>
+      )}
     </motion.section>
   );
 }
@@ -634,7 +636,7 @@ export function HomePage() {
       coreOnboardingSteps.every(step => typeof onboardingQuery.data?.[step.key] === "boolean"));
   const adminReady = !isAdmin || (onboardingValid && onboardingQuery.data?.readyForCalls === true);
   const readyToLoad = validIdentity && adminReady && onboardingValid;
-  const roles = validIdentity ? meQuery.data?.roles ?? [] : [];
+  const roles = validIdentity ? (meQuery.data?.roles as string[]) : [];
   const canReadAttention = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
   const permissions = meQuery.data?.permissions;
   const canManageRequests = canReadAttention && (!Array.isArray(permissions)
@@ -774,6 +776,13 @@ export function HomePage() {
               </section>
             )}
           </motion.div>
+        ) : readyToLoad ? (
+          <HomeLoadFailure
+            title="No pudimos validar el resumen operativo."
+            description="El servidor no entregó datos utilizables. No mostraremos cifras inventadas."
+            retryLabel="Reintentar resumen"
+            onRetry={() => { void operationsQuery.refetch(); }}
+          />
         ) : null}
       </main>
       </MotionConfig>
