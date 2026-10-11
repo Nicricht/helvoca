@@ -55,6 +55,8 @@ class TwilioPhoneOwnershipVerificationTest {
     }
 
     private void expect(String response) {
+        // Each scenario is an independent request contract.
+        server.reset();
         server.expect(once(), requestTo("https://api.twilio.com/2010-04-01/Accounts/"
                         + ACCOUNT + "/IncomingPhoneNumbers.json?PhoneNumber=%2B12025550123"))
                 .andExpect(method(HttpMethod.GET))
