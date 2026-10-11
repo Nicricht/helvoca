@@ -37,6 +37,7 @@ class TwilioOutboundLiveFlowTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals(twiml, response.getBody());
         verify(router).route("+14355652512", "+56911111111", callSid);
-        verifyNoInteractions(calls, summaries);
+        verify(calls).startInboundCall(callSid, "+56911111111", "+14355652512");
+        verifyNoInteractions(summaries);
     }
 }
