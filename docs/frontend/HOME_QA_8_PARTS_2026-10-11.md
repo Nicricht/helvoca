@@ -25,8 +25,8 @@ Per `AGENTS.md` and `docs/engineering/QA_POLICY.md`:
 | 3 | Human attention: request/handoff actions, success/failure, confirmation cancellation, duplicate clicks, 401/403/409/503, stale/refetch, least privilege, malformed success payload | **IMPLEMENTED; CI PENDING** |
 | 4 | Backend / PostgreSQL: tenant-isolated dashboard metrics/calls/costs, Santiago/Auckland day boundaries, attention deduplication/order/LIMIT 100, RLS, concurrency and request lifecycle | **CERTIFIED exact SHA c6f2ebe8, CI 38114322289 GREEN** |
 | 5 | Commercial analytics: currency aggregation and formatting, null/missing/invalid values, daily/7/30-day query switching, no fabricated ROI or zero, timezone boundaries | **IMPLEMENTED; exact-HEAD CI PENDING** |
-| 6 | Responsive/accessibility and non-side-effect browser behavior: keyboard, focus, live states, reduced motion, multiple viewports, no provider/payment requests | **IMPLEMENTED; exact-HEAD CI PENDING** |
-| 7 | Frontend original-source coverage measurement, per-file 100% statement/line/branch/function gate for affected scope; complete interaction-to-test traceability | **INSTRUMENTATION AND GATE IMPLEMENTED; exact-HEAD measured outcome PENDING** |
+| 6 | Responsive/accessibility and non-side-effect browser behavior: keyboard, focus, live states, reduced motion, multiple viewports, no provider/payment requests | **CERTIFIED exact SHA 7bd630aa, CI 38115721621 GREEN** |
+| 7 | Frontend original-source coverage measurement, per-file 100% statement/line/branch/function gate for affected scope; complete interaction-to-test traceability | **MEASURED RED at 9b4ee237; fixes under CI; NOT CERTIFIED** |
 | 8 | Fast Gate, Full Gate, adverse review, exact-HEAD CI and coverage report, merge only if green, exact-main verification and evidence checkpoint | PENDING |
 
 ## Part 1 findings (reproducible RED evidence)
@@ -58,7 +58,7 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 
 ## Continuity checkpoint
 
-- Current tracked milestone: **Parts 4 and 5 certified on exact previous SHAs; Part 6 Full Gate pending; Part 7 gate implemented, exact-HEAD result pending**.
+- Current tracked milestone: **Parts 4, 5, and 6 certified on exact previous SHAs; Part 7 real source coverage measured RED; remediation not yet certified**.
 - New branch is deliberately kept separate from `main`. Do not merge until Part 8 evidence satisfies the repository quality contract.
 - Resume next with **Part 8** ONLY after resolving Parts 6–7 RED and certifying exact-HEAD original-source 100% plus cross-layer gates. Never merge a pending or red branch.
 - After every phase update this document and draft PR with exact HEAD/evidence before responding to the user.
@@ -187,3 +187,25 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 **Limits / honesty:** Parser validation of JS/CJS is not a measured browser pass. Actual original-source coverage percentages require the **new exact HEAD** workflow. The gate is expected to fail if any true gap remains; only add meaningful tests or smallest verified fixes to close it. Do not artificially suppress source counters or treat a test pass as percentage coverage. No merge or Part 8 certification while any required check is pending/red.
 
 **Safety:** All browser API traffic is local mocked Playwright; no real calls, provider messages, billing, production DB, production deployments or remote side-effect tests.
+
+### Part 7 actual measurement and remediation (do not call green)
+
+**Part 6 certified:** exact commit `7bd630aa91496f8f22b74f827dbc26bcdc59014a`, GitHub workflow `38115721621`, all jobs complete with success including Full Gate.
+
+**Actual original-source RED:** exact intermediate commit `9b4ee23745f53d2343002005c83499703f1ea12a`, workflow `38116889949`, job `home-frontend-coverage` completed failure **by design**, with **99/99** mocked Playwright tests passed, 99/99 independently enumerated test records, 98 browser source snapshots and 3/3 valid embedded mapped original sources.
+
+| Original file | Statements | Lines | Branches | Functions |
+| --- | ---: | ---: | ---: | ---: |
+| `HomePage.tsx` | 98.24% | 98.07% | 92.26% | 100% |
+| `HomeAttentionRows.tsx` | 98.24% | 98.11% | 96.84% | 100% |
+| `features/operations/api.ts` | 85.41% | 86.36% | 69.69% | 78.57% |
+
+**Additional RED:** one CSS-only static test correctly emitted an unavailable record, but its about:blank `sessionStorage` access was mistakenly counted as an archive failure. Corrected `home-coverage-fixture.js` to mark about:blank static contract as unavailable **without pretending it contains runtime counters**. Other 98 instrumented browser samples and the 100% per-file gate remain mandatory.
+
+**Remediation in flight:** added user-visible fail-closed 200/null handling for business dashboard and commercial data and 9 Playwright cases for those contracts, active calls, singular/plural events, null status/phone, bad timezone and null onboarding step; eliminated defensive currency formatter's unreachable fallback because a validated three-letter code is required for `Intl.NumberFormat`; removed unnecessary null fallback after roles validation; replaced an unreachable `switch` default in the typed closed-action dispatcher without bypassing fail-closed promise rejection; added two browser cases for missing confirmation title and scalar network rejection. These are **not certified until the exact final HEAD workflow reports green**.
+
+**Unresolved shared-source scope:** `features/operations/api.ts` includes `getRequestHistory`, `exportCustomers`, audit/download fallback and 401 handling used by other features, not just Home. Do not narrow instrumentation, artificially invoke inaccessible functions, suppress branches or lower the threshold to claim 100%. Any unresolved actual gap blocks this PR and must be handled with meaningful relevant tests or documented true N/A subject to repository QA policy.
+
+**Previous intermediate E2E failure:** `38116514720` found a local download stub not intercepting `fetch('/api/v1/audit/export')`; 98/99 passed. The test now intercepts that native fetch in the browser and retains the real Blob download assertion; CI additionally runs the source checker even on E2E RED while failing the overall job if any E2E failed. Production/source gate unchanged.
+
+**Hold:** Part 8 must not begin until Parts 5–7 are certified on the final HEAD and `home-frontend-coverage` is fully green at 100% for all required source files/dimensions and tests. PR #780 stays DRAFT and unmerged.
