@@ -54,37 +54,27 @@ function directReactRoutes() {
 
 const inventoryCoverage = process.env.VITE_COVERAGE === "true";
 const homeCoverage = process.env.VITE_HOME_COVERAGE === "true";
-if (inventoryCoverage && homeCoverage) {
-  throw new Error("Inventory and Home coverage instrumentation must run in separate builds.");
-}
+if (inventoryCoverage && homeCoverage) throw new Error("Home and Inventory coverage require separate builds.");
+const coverageEnabled = inventoryCoverage || homeCoverage;
 
 export default defineConfig({
   base: "/app/",
   plugins: [
     react(),
-    ...(inventoryCoverage ? [istanbul({
-      include: [
+    ...(coverageEnabled ? [istanbul({
+      include: homeCoverage ? [
+        "src/pages/Home/HomePage.tsx",
+        "src/pages/Home/HomeAttentionRows.tsx",
+        "src/features/operations/attentionApi.ts"
+      ] : [
         "src/pages/Inventory/*",
         "src/features/inventory/api.ts",
         "src/features/inventory/useInventoryWorkspace.ts"
       ],
       exclude: ["node_modules"],
       extension: [".ts", ".tsx"],
-      requireEnv: true,
-      checkProd: false,
-      forceBuildInstrument: true
-    })] : []),
-    ...(homeCoverage ? [istanbul({
-      include: [
-        "src/pages/Home/HomePage.tsx",
-        "src/pages/Home/HomeAttentionRows.tsx",
-        "src/features/operations/api.ts"
-      ],
-      exclude: ["node_modules"],
-      extension: [".ts", ".tsx"],
-      // Istanbul's requireEnv flag specifically reads VITE_COVERAGE, which
-      // belongs to Inventory. Home is already gated by VITE_HOME_COVERAGE.
-      requireEnv: false,
+      // The build already gates plugin activation. The Home flag is separate from VITE_COVERAGE.
+      requireEnv: inventoryCoverage,
       checkProd: false,
       forceBuildInstrument: true
     })] : []),
@@ -93,6 +83,6 @@ export default defineConfig({
   build: {
     outDir: "../src/main/resources/static/app",
     emptyOutDir: true,
-    sourcemap: inventoryCoverage || homeCoverage ? "hidden" : false
+    sourcemap: coverageEnabled ? "hidden" : false
   }
 });

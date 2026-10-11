@@ -14,7 +14,6 @@ interface Props {
   loading: boolean;
   failed: boolean;
   refreshing: boolean;
-  authorized: boolean;
   canManageRequests: boolean;
   onRefresh: () => void;
 }
@@ -27,13 +26,18 @@ function readableStatus(item: HumanAttentionItem): string {
       ASSIGNED: "Asignado"
     } as Record<string, string>)[item.status] || item.status;
   }
-  return item.status === "IN_PROGRESS" ? "En progreso" : "Abierta";
+  return ({
+    OPEN: "Abierta",
+    IN_PROGRESS: "En progreso",
+    RESOLVED: "Resuelta",
+    CANCELLED: "Cancelada"
+  } as Record<string, string>)[item.status] || item.status;
 }
 
 type AttentionAction = "REQUEST_PROGRESS" | "REQUEST_RESOLVE" | "HANDOFF_ACK" | "HANDOFF_RESOLVE";
+type AttentionNext = { label: string; action: AttentionAction };
 
-function actionFor(item: HumanAttentionItem, canManageRequests: boolean):
-  { label: string; action: AttentionAction } | null {
+function actionFor(item: HumanAttentionItem, canManageRequests: boolean): AttentionNext | null {
   if (item.kind === "REQUEST" && canManageRequests) {
     if (item.status === "OPEN") return { label: "Empezar gestión", action: "REQUEST_PROGRESS" };
     if (item.status === "IN_PROGRESS") return { label: "Marcar resuelta", action: "REQUEST_RESOLVE" };
@@ -53,30 +57,29 @@ function actionFor(item: HumanAttentionItem, canManageRequests: boolean):
  * This component never creates an AI conversation or sends a provider message.
  */
 export function HomeAttentionRows({
-  items, loading, failed, refreshing, authorized, canManageRequests, onRefresh
+  items, loading, failed, refreshing, canManageRequests, onRefresh
 }: Props) {
   const client = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
-  // Synchronous lock: React state alone can batch two same-tick clicks.
-  const pendingMutation = useRef(false);
+  // A synchronous lock also rejects repeated clicks before React commits a render.
+  const busyRef = useRef<string | null>(null);
   const [error, setError] = useState("");
   const [confirmationId, setConfirmationId] = useState<string | null>(null);
 
   async function perform(item: HumanAttentionItem, action: AttentionAction) {
-    if (pendingMutation.current || refreshing) return;
-    pendingMutation.current = true;
-    setBusyId(item.id);
+    const key = item.kind + ":" + item.id;
+    if (busyRef.current || refreshing) return;
+    busyRef.current = key;
+    setBusyId(key);
     setError("");
     try {
-      // The UI can emit only this closed, typed action set. A missing entry
-      // rejects and enters the existing fail-closed catch rather than succeeding.
-      const mutations: Record<AttentionAction, () => Promise<unknown>> = {
+      const updates: Record<AttentionAction, () => Promise<unknown>> = {
         REQUEST_PROGRESS: () => updateRequestStatus(item.id, "IN_PROGRESS"),
         REQUEST_RESOLVE: () => updateRequestStatus(item.id, "RESOLVED"),
         HANDOFF_ACK: () => acknowledgeHumanHandoff(item.id),
         HANDOFF_RESOLVE: () => resolveHumanHandoff(item.id)
       };
-      await mutations[action]();
+      await updates[action]();
       setConfirmationId(null);
       await Promise.all([
         client.invalidateQueries({ queryKey: ["operations", "attention"] }),
@@ -86,14 +89,11 @@ export function HomeAttentionRows({
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No pudimos actualizar el caso.");
     } finally {
-      pendingMutation.current = false;
+      busyRef.current = null;
       setBusyId(null);
     }
   }
 
-  if (!authorized) {
-    return <p className={styles.notice}>Tu rol no tiene acceso a esta bandeja.</p>;
-  }
   if (loading) {
     return <div role="status" className={styles.notice}>Consultando casos que requieren intervención…</div>;
   }
@@ -122,14 +122,15 @@ export function HomeAttentionRows({
     <>
       <div className={styles.meta}>
         <span><Clock3 size={14} aria-hidden="true" /> Casos reales registrados</span>
-        <button type="button" className={styles.refresh} onClick={onRefresh} disabled={refreshing}>
+        <button type="button" className={styles.refresh} onClick={onRefresh} disabled={refreshing || Boolean(busyId)}>
           <RefreshCw size={14} aria-hidden="true" /> {refreshing ? "Actualizando…" : "Actualizar"}
         </button>
       </div>
       <div className={styles.list}>
         {items.map(item => {
           const next = actionFor(item, canManageRequests);
-          const ask = confirmationId === item.id;
+          const itemKey = item.kind + ":" + item.id;
+          const ask = confirmationId === itemKey;
           const destructive = next?.action === "REQUEST_RESOLVE" || next?.action === "HANDOFF_RESOLVE";
           return (
             <article className={styles.item} data-kind={item.kind} key={item.kind + "-" + item.id}>
@@ -158,13 +159,13 @@ export function HomeAttentionRows({
                   aria-label={destructive && ask ? "Confirmación de cierre: " + (item.title || "Caso sin título") : undefined}>
                   {destructive && !ask ? (
                     <button type="button" disabled={Boolean(busyId) || refreshing}
-                      onClick={() => setConfirmationId(item.id)}>{next.label} <ArrowUpRight size={13} /></button>
+                      onClick={() => setConfirmationId(itemKey)}>{next.label} <ArrowUpRight size={13} /></button>
                   ) : destructive && ask ? (
                     <>
                       <span className={styles.question}>¿Confirmas que gestionaste este caso?</span>
                       <button type="button" disabled={Boolean(busyId) || refreshing}
                         onClick={() => { void perform(item, next.action); }}>
-                        {busyId === item.id ? "Guardando…" : "Confirmar cierre"}
+                        {busyId === itemKey ? "Guardando…" : "Confirmar cierre"}
                       </button>
                       <button type="button" className={styles.cancel} disabled={Boolean(busyId) || refreshing}
                         onClick={() => setConfirmationId(null)}>Cancelar</button>
@@ -172,7 +173,7 @@ export function HomeAttentionRows({
                   ) : (
                     <button type="button" disabled={Boolean(busyId) || refreshing}
                       onClick={() => { void perform(item, next.action); }}>
-                      {busyId === item.id ? "Guardando…" : next.label}
+                      {busyId === itemKey ? "Guardando…" : next.label}
                       <ArrowUpRight size={13} aria-hidden="true" />
                     </button>
                   )}

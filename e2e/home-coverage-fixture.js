@@ -55,9 +55,7 @@ const test = base.test.extend({
       .update([testInfo.file, testInfo.title, testInfo.repeatEachIndex,
         testInfo.retry, testInfo.workerIndex].join('|'))
       .digest('hex').slice(0, 20);
-    // Static CSS contract tests never navigate away from about:blank.
-    // They still count in test discovery, but have no document to archive.
-    const snapshots = page.isClosed() || page.url() === 'about:blank'
+    const snapshots = page.isClosed()
       ? null
       : await page.evaluate(key => {
         let previous = null;

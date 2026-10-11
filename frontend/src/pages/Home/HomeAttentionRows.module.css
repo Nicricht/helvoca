@@ -75,3 +75,18 @@
 @media (prefers-reduced-motion: reduce) {
   .item { transition: none; }
 }
+
+
+/* Home Phase 7: sufficiently large touch and keyboard targets. */
+.refresh,
+.action button,
+.failure button {
+  min-height: 44px;
+}
+@media (forced-colors: active) {
+  .refresh:focus-visible,
+  .action button:focus-visible,
+  .failure button:focus-visible {
+    outline: 2px solid Highlight;
+  }
+}

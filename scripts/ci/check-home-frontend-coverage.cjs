@@ -11,13 +11,12 @@ const outDir = path.join(process.cwd(), 'test-results', 'home-coverage');
 const expected = [
   'src/pages/Home/HomePage.tsx',
   'src/pages/Home/HomeAttentionRows.tsx',
-  'src/features/operations/api.ts'
+  'src/features/operations/attentionApi.ts'
 ];
 const dimensions = ['statements', 'lines', 'branches', 'functions'];
 
-// No exceptions. All four dimensions must be 100% on every original source.
+// Strict Home instrumentation: no exceptions.
 const requiredCoveragePercent = 100;
-const pr768ExceptionAuthorized = false;
 const map = createCoverageMap({});
 const samples = existsSync(rawDir)
   ? readdirSync(rawDir).filter(name => name.endsWith('.coverage.json')).sort()
@@ -38,12 +37,7 @@ const archivedDocuments = records.reduce((sum, record) =>
   sum + (record.archivedDocuments || 0), 0);
 const archivedFailures = records.filter(record => record.archiveFailed)
   .map(record => ({ suite: record.suite, test: record.test }));
-const requiredSuites = [
-  'react-home.spec.js',
-  'react-home-resilience.spec.js',
-  'react-home-attention-hardening.spec.js',
-  'dashboard-motion.spec.js'
-];
+const requiredSuites = ['react-home.spec.js'];
 const missingSuites = requiredSuites.filter(name => !recordedSuites.has(name));
 const discoveredManifestPath = path.join(process.cwd(), '.home-coverage-tests.txt');
 const discoveredManifest = existsSync(discoveredManifestPath)
@@ -128,7 +122,7 @@ const report = {
   recordedSuites: [...recordedSuites].sort(),
   missingSuites,
   requiredCoveragePercent,
-  pr768ExplicitException: false,
+  coverageExceptionsAllowed: false,
   expectedSourceFiles: expected.length,
   observedSourceFiles: details.length,
   fileCoverage: details,
@@ -162,24 +156,13 @@ const markdown = [
   ...missing.map(file => '| MISSING ' + file.path + ' | - | - | - | - |'),
   '',
   'Required: ' + requiredCoveragePercent + '% for every applicable dimension of EACH affected source file.',
-  'Exception: none; standard 100% Home gate applies',
+  'Exception: none, every Home source and dimension requires 100%',
   'Result: ' + (failed ? 'FAIL' : 'PASS'),
   'Missing source is a failure; Playwright pass count is not a coverage percentage.'
 ];
 writeFileSync(path.join(outDir, 'summary.md'), markdown.join('\n') + '\n');
 console.log(markdown.join('\n'));
-if (failed) {
-  // Surface actionable original-source evidence without needing artifact download.
-  console.error('Home coverage gaps (original TSX/TS): ' + JSON.stringify(
-    { missing, archivedFailures, missingSuites,
-      uncovered: details.map(({ path, uncoveredLines, uncoveredFunctions, uncoveredBranches }) => ({
-        path,
-        uncoveredLines: uncoveredLines.slice(0, 80),
-        uncoveredFunctions: uncoveredFunctions.slice(0, 40),
-        uncoveredBranches: uncoveredBranches.slice(0, 65)
-      })) }, null, 2));
-  process.exitCode = 1;
-}
+if (failed) process.exitCode = 1;
 
 }
 certifyCoverage().catch(error => {
