@@ -20,6 +20,11 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -113,6 +118,105 @@ class PostgresRowLevelSecurityIntegrationTest {
         assertEquals(0, databaseContext.callAsSystem(
                 () -> runtimeJdbc.update(claimSql, runId, "outbound-test")));
         assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+        assertEquals(1L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM twilio_certification_run WHERE run_id = ?",
+                Long.class, runId));
+    }
+
+
+    @Test
+    void concurrentSystemCertificationClaimsInsertExactlyOnce() throws Exception {
+        String runId = "startup-race-" + UUID.randomUUID();
+        String claimSql = """
+                INSERT INTO twilio_certification_run (run_id, direction, claimed_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (run_id) DO NOTHING
+                """;
+        int contenders = 4;
+        CountDownLatch ready = new CountDownLatch(contenders);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(contenders);
+        try {
+            List<Future<Integer>> results = new java.util.ArrayList<>();
+            for (int i = 0; i < contenders; i++) {
+                results.add(executor.submit(() -> {
+                    ready.countDown();
+                    if (!start.await(15, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("concurrent claim start timed out");
+                    }
+                    int inserted = databaseContext.callAsSystem(
+                            () -> runtimeJdbc.update(claimSql, runId, "outbound-test"));
+                    assertEquals(TenantDatabaseContext.Mode.DENIED,
+                            databaseContext.currentOrDenied().mode(),
+                            "SYSTEM scope must not leak on any worker thread");
+                    return inserted;
+                }));
+            }
+            assertTrue(ready.await(15, TimeUnit.SECONDS), "all claims must start together");
+            start.countDown();
+
+            int successfulClaims = 0;
+            for (Future<Integer> result : results) {
+                int inserted = result.get(30, TimeUnit.SECONDS);
+                assertTrue(inserted == 0 || inserted == 1, "unexpected INSERT row count");
+                successfulClaims += inserted;
+            }
+            assertEquals(1, successfulClaims,
+                    "concurrent SYSTEM claims may register one token only");
+            assertEquals(1L, ownerJdbc.queryForObject(
+                    "SELECT COUNT(*) FROM twilio_certification_run WHERE run_id = ?",
+                    Long.class, runId));
+            assertEquals(TenantDatabaseContext.Mode.DENIED,
+                    databaseContext.currentOrDenied().mode());
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS),
+                    "concurrent claim workers must terminate");
+        }
+    }
+
+    @Test
+    void privilegedCertificationScopeRestoresTenantAndPooledConnectionRole() {
+        String runId = "startup-isolation-" + UUID.randomUUID();
+        String claimSql = """
+                INSERT INTO twilio_certification_run (run_id, direction, claimed_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (run_id) DO NOTHING
+                """;
+
+        assertEquals("helvoca_runtime", runtimeJdbc.queryForObject(
+                "SELECT current_role", String.class));
+        try (TenantDatabaseContext.Scope tenantScope = databaseContext.useTenant(businessA)) {
+            assertEquals(TenantDatabaseContext.Mode.TENANT,
+                    databaseContext.currentOrDenied().mode());
+            assertThrows(DataAccessException.class,
+                    () -> runtimeJdbc.update(claimSql, runId, "outbound-test"));
+
+            assertEquals("helvoca_system", databaseContext.callAsSystem(
+                    () -> runtimeJdbc.queryForObject("SELECT current_role", String.class)));
+            assertEquals(1, databaseContext.callAsSystem(
+                    () -> runtimeJdbc.update(claimSql, runId, "outbound-test")));
+
+            assertEquals(TenantDatabaseContext.Mode.TENANT,
+                    databaseContext.currentOrDenied().mode(),
+                    "nested SYSTEM scope must restore the original tenant");
+            assertEquals(businessA, databaseContext.currentOrDenied().businessId());
+            assertEquals("helvoca_runtime", runtimeJdbc.queryForObject(
+                    "SELECT current_role", String.class));
+            assertThrows(DataAccessException.class,
+                    () -> runtimeJdbc.update(claimSql, runId, "outbound-test"));
+        }
+
+        assertEquals(TenantDatabaseContext.Mode.DENIED,
+                databaseContext.currentOrDenied().mode());
+        assertEquals("helvoca_runtime", runtimeJdbc.queryForObject(
+                "SELECT current_role", String.class));
+        assertThrows(DataAccessException.class,
+                () -> databaseContext.runAsTenant(businessB,
+                        () -> runtimeJdbc.update(claimSql, runId, "outbound-test")));
+        assertEquals(TenantDatabaseContext.Mode.DENIED,
+                databaseContext.currentOrDenied().mode());
         assertEquals(1L, ownerJdbc.queryForObject(
                 "SELECT COUNT(*) FROM twilio_certification_run WHERE run_id = ?",
                 Long.class, runId));
