@@ -67,7 +67,7 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 
 **Scope edited:** `frontend/src/pages/Home/HomePage.tsx`, `HomePage.module.css`, new `e2e/react-home-resilience.spec.js`. Shared app frame and API clients unchanged.
 
-- **Regression suite:** 17 explicit fixture-driven tests plus 8 parameterized onboarding next-step variants (25 browser cases total). Existing `e2e/react-home.spec.js` coverage remains intact. Includes missing token, auth 403/503, malformed success identity, onboarding 401/403/503/malformed, pending gate, all 8 settings routes, dashboard 403/503/network outage, retries and no business data before validation.
+- **Regression suite:** 16 standalone fixture-driven tests plus 8 parameterized onboarding next-step variants (24 browser cases total). Existing `e2e/react-home.spec.js` coverage remains intact. Includes missing token, auth 403/503, malformed success identity, onboarding 401/403/503/malformed, pending gate, all 8 settings routes, dashboard 403/503/network outage, retries and no business data before validation.
 - **Implementation:** fail closed with visible accessible error and retry rather than spinner/blank page on invalid authentication/onboarding; on dashboard failure provide a local retry. Only Home-local CSS updated.
 - **Side effect boundary:** all new network requests are intercepted with local Playwright mocks. No calls, messages, payments or production writes.
 - **Preexisting tests:** main React Home assertions and project Fast/Full Gate still required. Part 7 will enforce 100% *measured* original-source coverage for affected TSX, including the new branches; no unsupported 100% claim is made here.
