@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.*;
 
 class MultiProviderVoiceRoutingTest {
+    private static final String ACCOUNT_SID = "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private static final String SILENT_HANGUP =
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>";
     private static final String INBOUND_SID = "CA11111111111111111111111111111111";
@@ -18,8 +19,14 @@ class MultiProviderVoiceRoutingTest {
 
     private static TwilioVoiceController controller(TwilioCallService calls,
                                                     VoiceCallRouter router) {
-        return new TwilioVoiceController(
+        TwilioVoiceController controller = new TwilioVoiceController(
                 calls, router, mock(CallSummaryService.class), new TwilioProperties());
+        TwilioCallBindingGuard guard = mock(TwilioCallBindingGuard.class);
+        when(guard.allowsIncoming(anyString(), anyString(), anyString(), anyString())).thenReturn(true);
+        when(guard.allowsCallback(anyString(), anyString())).thenReturn(true);
+        when(guard.allowsStreamCallback(anyString(), anyString(), anyString())).thenReturn(true);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "bindingGuard", guard);
+        return controller;
     }
 
     private static void assertNoLegacyVoice(String xml) {
@@ -38,7 +45,7 @@ class MultiProviderVoiceRoutingTest {
                         "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
 
         var response = controller(calls, router)
-                .outboundTest(OUTBOUND_SID, "+14355652512", "+56966939611");
+                .outboundTest(OUTBOUND_SID, "+14355652512", "+56966939611", ACCOUNT_SID);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(twiml, response.getBody());
@@ -56,7 +63,7 @@ class MultiProviderVoiceRoutingTest {
                         "openai-live", VoiceCallRouter.RouteMode.SIP, twiml)));
 
         var response = controller(calls, router)
-                .incoming(INBOUND_SID, "+56966939611", "+14355652512");
+                .incoming(INBOUND_SID, "+56966939611", "+14355652512", ACCOUNT_SID);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(twiml, response.getBody());
@@ -72,7 +79,7 @@ class MultiProviderVoiceRoutingTest {
         when(router.route("+14355652512", "+56966939611", OUTBOUND_SID)).thenReturn(Optional.empty());
 
         var response = controller(calls, router)
-                .outboundTest(OUTBOUND_SID, "+14355652512", "+56966939611");
+                .outboundTest(OUTBOUND_SID, "+14355652512", "+56966939611", ACCOUNT_SID);
 
         assertEquals(SILENT_HANGUP, response.getBody());
         assertNoLegacyVoice(response.getBody());
