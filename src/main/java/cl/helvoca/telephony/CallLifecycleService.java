@@ -76,6 +76,7 @@ public class CallLifecycleService {
                                  String providerCallId,
                                  String from,
                                  String to) {
+        lockProviderCall(providerCallId);
         CallSession existing = calls.findByProviderCallId(providerCallId).orElse(null);
         if (existing != null) return existing.getId();
 
@@ -141,6 +142,7 @@ public class CallLifecycleService {
 
     @Transactional
     public UUID updateStatus(String providerCallId, String providerStatus, Integer durationSeconds) {
+        lockProviderCall(providerCallId);
         CallSession call = calls.findByProviderCallId(providerCallId)
                 .orElseThrow(() -> new NotFoundException("Call not found"));
         updateStatusAndCommercialFields(call, providerStatus, durationSeconds, true);
@@ -160,10 +162,19 @@ public class CallLifecycleService {
                                                  String providerCallId,
                                                  String streamId,
                                                  String aiProvider) {
+        lockProviderCall(providerCallId);
         CallSession call = calls.findById(callId)
                 .orElseThrow(() -> new NotFoundException("Call not found"));
         if (!Objects.equals(call.getProviderCallId(), providerCallId)) {
             throw new IllegalArgumentException("Provider call id does not match callId");
+        }
+        // A second provider media stream must never hijack a previously
+        // admitted call. Retries for the exact stream remain idempotent.
+        if (call.getStreamSid() != null) {
+            if (!Objects.equals(call.getStreamSid(), streamId)) {
+                throw new IllegalStateException("Call is already bound to another media stream");
+            }
+            return context(call);
         }
         call.setStreamSid(streamId);
         call.setAiProvider(normalizeProvider(aiProvider));
@@ -235,6 +246,9 @@ public class CallLifecycleService {
                                                  Integer durationSeconds,
                                                  boolean carrierCallback) {
         boolean wasTerminal = call.getStatus() != null && call.getStatus().terminal();
+        // Carrier callbacks can arrive late or be delivered more than once.
+        // A stale ringing/in-progress event must never resurrect a closed call.
+        if (wasTerminal && !mapStatus(providerStatus).terminal()) return;
         applyStatus(call, providerStatus, durationSeconds, carrierCallback);
         if (call.getStatus() != null && call.getStatus().terminal()) {
             updateEstimatedCost(call);
@@ -270,6 +284,13 @@ public class CallLifecycleService {
         call.setEstimatedTelephonyCostUsd(telephony);
         call.setEstimatedAiCostUsd(ai);
         call.setEstimatedTotalCostUsd(telephony.add(ai).setScale(6, RoundingMode.HALF_UP));
+    }
+
+    private void lockProviderCall(String providerCallId) {
+        Objects.requireNonNull(providerCallId, "Provider CallSid is required");
+        // Shared PostgreSQL transaction advisory lock serializes duplicate
+        // admission, media starts and status callbacks for the same CallSid.
+        jdbc.execute("SELECT pg_advisory_xact_lock(2036157186," + providerCallId.hashCode() + ")");
     }
 
     private void lockBusinessCapacity(UUID businessId) {
