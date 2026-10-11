@@ -252,6 +252,9 @@ async function bootHome(page, options = {}) {
     if (options.attentionError) {
       return route.fulfill(json({ message: 'attention unavailable' }, options.attentionError));
     }
+    if (options.attentionPayloads?.length) {
+      return route.fulfill(json(options.attentionPayloads.shift()));
+    }
     return route.fulfill(json(attentionItems));
   });
 
@@ -628,6 +631,37 @@ test.describe('React Home migration', () => {
     await expect(panel).toContainText('Cliente pidió devolución de llamada');
     await expect(panel.getByRole('alert')).toHaveCount(0);
     expect(api.attentionReads()).toBeGreaterThanOrEqual(2);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  for (const [name, malformed] of [
+    ['null response', null],
+    ['object instead of an array', { items: [] }],
+    ['invalid request fields', [{ kind: 'REQUEST', id: 'req-1', status: 'OPEN' }]]
+  ]) {
+    test(`attention ${name} is unavailable rather than falsely cleared`, async ({ page }) => {
+      const api = await bootHome(page, { attentionPayloads: [malformed] });
+      await page.goto('/app');
+      const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+      await expect(panel.getByRole('alert')).toContainText('No pudimos verificar los pendientes');
+      await expect(panel).not.toContainText('Sin intervenciones pendientes');
+      await expect(page.getByRole('region', { name: 'Estado de tu negocio' }))
+        .not.toContainText('Todo bajo control');
+      expect(api.attentionMutations()).toBe(0);
+
+      await panel.getByRole('button', { name: 'Reintentar' }).click();
+      await expect(panel).toContainText('Cliente pidió devolución de llamada');
+      await expect(panel.getByRole('alert')).toHaveCount(0);
+      expect(api.attentionReads()).toBeGreaterThanOrEqual(2);
+    });
+  }
+
+  test('validated empty attention array permits a real empty-state message', async ({ page }) => {
+    const api = await bootHome(page, { attention: [] });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('Sin intervenciones pendientes');
+    await expect(panel.getByRole('alert')).toHaveCount(0);
     expect(api.attentionMutations()).toBe(0);
   });
 

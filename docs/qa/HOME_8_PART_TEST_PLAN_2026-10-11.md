@@ -78,6 +78,7 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 - [x] Protect same-tick duplicate clicks with a synchronous ref lock and disable manual refresh during mutations.
 - [x] Isolate in-progress and confirmation identifiers by `kind:id` instead of raw ID to avoid cross-kind confirmations.
 - [x] Extend Playwright mock to simulate temporary attention-read and mutation failures without committing fake server-side transitions.
+- [x] Reject malformed attention API payloads at the shared API boundary; only an authoritative [] can mean an empty queue. Add null/object/partial-row and legitimate-empty browser tests.
 - [x] Add Playwright checks for cancellation, failure/retry, duplicate submissions, independent handoff/request lifecycle and readonly request permissions.
 - [ ] Verify latest exact SHA Full Gate and any failing browser cases before merge.
 
