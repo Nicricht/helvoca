@@ -102,7 +102,9 @@ function attributedTotals(data?: SalesAnalytics): Array<{ currency: string; amou
 
   const totals = new Map<string, number>();
   const add = (currency: string | null, amount: number | null) => {
-    if (!currency || amount == null) return;
+    // Unknown, malformed and negative values are not verified commercial revenue.
+    if (typeof currency !== "string" || !/^[A-Z]{3}$/.test(currency) ||
+        typeof amount !== "number" || !Number.isFinite(amount) || amount < 0) return;
     totals.set(currency, (totals.get(currency) || 0) + amount);
   };
 
@@ -281,7 +283,9 @@ function ValueGenerated({
         <div className={styles.valueBody}>
           <div className={styles.valueAmount}>
             {totals.length === 0 ? (
-              <strong>$0</strong>
+              data?.recepVozRevenue === 0 && data?.recepVozBookingRevenue === 0
+                ? <strong>$0</strong>
+                : <strong>Valor no disponible</strong>
             ) : single ? (
               <strong><AnimatedMoney amount={single.amount} currency={single.currency} /></strong>
             ) : (
