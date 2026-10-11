@@ -284,11 +284,16 @@ async function bootHome(page, options = {}) {
     return route.fulfill(json(options.operations || READY_OPERATIONS));
   });
 
-  await page.route('**/api/v1/commercial/analytics**', route => {
+  await page.route('**/api/v1/commercial/analytics**', async route => {
+    const days = Number(new URL(route.request().url()).searchParams.get('days') || 7);
+    if (options.analyticsGates?.[days]) await options.analyticsGates[days];
+    if (options.analyticsErrorsByDays?.[days]) {
+      return route.fulfill(json({ message: 'analytics unavailable' }, options.analyticsErrorsByDays[days]));
+    }
     if (options.analyticsError) {
       return route.fulfill(json({ message: 'analytics unavailable' }, options.analyticsError));
     }
-    return route.fulfill(json(options.analytics || READY_ANALYTICS));
+    return route.fulfill(json(options.analyticsByDays?.[days] || options.analytics || READY_ANALYTICS));
   });
 
   // Any accidental legacy Home dependency should not silently make the new cockpit pass.
@@ -1090,6 +1095,150 @@ test.describe('React Home migration', () => {
     await expect(sales).toContainText('USD');
     await expect(sales).toContainText(/origen|atribuci/i);
     await expect(sales).not.toContainText(/ROI|retorno de inversi/i);
+  });
+
+  test('same-currency attributed paid orders and bookings sum exactly once', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      recepVozRevenue: 12000,
+      recepVozBookingRevenue: 8000,
+      primaryCurrency: 'CLP',
+      bookingCurrency: 'clp'
+    } });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value.locator('strong').filter({ hasText: '$20.000' })).toBeVisible();
+    await expect(value).not.toContainText('Importes atribuidos parcialmente verificables');
+  });
+
+  test('mixed CLP and USD attribution stays separated without unsupported conversion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      primaryCurrency: 'CLP',
+      recepVozRevenue: 25000,
+      bookingCurrency: 'USD',
+      recepVozBookingRevenue: 35.5
+    } });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value.locator('div[class*="moneyStack"] > strong')).toHaveCount(2);
+    await expect(value).toContainText('CLP');
+    await expect(value).toContainText('USD');
+    await expect(value).toContainText('$25.000');
+    await expect(value).toContainText('35,5');
+    await expect(value).not.toContainText('$25.035');
+  });
+
+  test('multi-currency backend with unattributable order breakdown never invents zero revenue', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      primaryCurrency: null,
+      recepVozRevenue: null,
+      recepVozOrders: 3,
+      bookingCurrency: null,
+      recepVozBookingRevenue: null,
+      recepVozPaidBookings: 2,
+      currencyTotals: [{ currency: 'CLP', amount: 50000 }, { currency: 'USD', amount: 30 }]
+    } });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('Importe no disponible');
+    await expect(value).toContainText('3 pedidos con origen RecepVoz');
+    await expect(value).toContainText('2 reservas pagadas con origen RecepVoz');
+    await expect(value).toContainText('El importe visible es parcial, no un total.');
+    await expect(value).not.toContainText('$0');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+  });
+
+  test('one verified currency with another missing amount is labelled partial, not a total', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      primaryCurrency: 'CLP', recepVozRevenue: 30000, recepVozOrders: 2,
+      bookingCurrency: null, recepVozBookingRevenue: null, recepVozPaidBookings: 1
+    } });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('$30.000');
+    await expect(value).toContainText('Importes atribuidos parcialmente verificables');
+    await expect(value).toContainText('El importe visible es parcial, no un total.');
+  });
+
+  test('invalid, negative and non-finite amounts never become attributed sales', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      primaryCurrency: 'CLP', recepVozRevenue: -5000,
+      recepVozOrders: 1,
+      bookingCurrency: 'USD', recepVozBookingRevenue: 'NaN',
+      recepVozPaidBookings: 1
+    } });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('Importe no disponible');
+    await expect(value).not.toContainText('-5.000');
+    await expect(value).not.toContainText('NaN');
+    await expect(value).not.toContainText('$0');
+  });
+
+  test('truly empty source counts display zero instead of inventing earned revenue', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...EMPTY_ANALYTICS,
+      primaryCurrency: null,
+      bookingCurrency: null,
+      recepVozRevenue: null,
+      recepVozBookingRevenue: null,
+      recepVozOrders: 0,
+      recepVozPaidBookings: 0
+    } });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('$0');
+    await expect(value).not.toContainText('Importe no disponible');
+  });
+
+  test('rapid period changes cannot overwrite the selected 1-day result with slow old windows', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    let release7, release30;
+    const pending7 = new Promise(resolve => { release7 = resolve; });
+    const pending30 = new Promise(resolve => { release30 = resolve; });
+    const api = await bootHome(page, {
+      analyticsGates: { 7: pending7, 30: pending30 },
+      analyticsByDays: {
+        1: { ...READY_ANALYTICS, days: 1, recepVozRevenue: 111, recepVozBookingRevenue: 0 },
+        7: { ...READY_ANALYTICS, days: 7, recepVozRevenue: 777, recepVozBookingRevenue: 0 },
+        30: { ...READY_ANALYTICS, days: 30, recepVozRevenue: 3030, recepVozBookingRevenue: 0 }
+      }
+    });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect.poll(() => api.requests.some(r => r.url.includes('/api/v1/commercial/analytics?days=7'))).toBe(true);
+    await value.getByRole('button', { name: '30 días' }).click();
+    await expect.poll(() => api.requests.some(r => r.url.includes('/api/v1/commercial/analytics?days=30'))).toBe(true);
+    await value.getByRole('button', { name: 'Hoy' }).click();
+    await expect(value.getByRole('button', { name: 'Hoy' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(value.locator('div[class*="valueAmount"]')).toContainText('$111');
+    release30();
+    release7();
+    await expect(value.locator('div[class*="valueAmount"]')).toContainText('$111');
+    await expect(value).not.toContainText('$777');
+    await expect(value).not.toContainText('$3.030');
+    expect(api.requests.filter(r => /\/api\/v1\/(?:requests\/.*\/status|handoffs\/.*\/(?:resolve|acknowledge))/.test(r.url))).toEqual([]);
+  });
+
+  test('analytics errors for a selected period leave real operational totals visible', async ({ page }) => {
+    await bootHome(page, { analyticsErrorsByDays: { 30: 503 } });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('valor comercial atribuido');
+    await value.getByRole('button', { name: '30 días' }).click();
+    await expect(value.getByRole('alert')).toContainText('No pudimos cargar el valor atribuido.');
+    await expect(value).not.toContainText('$0');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+    await value.getByRole('button', { name: '7 días' }).click();
+    await expect(value.getByRole('alert')).toHaveCount(0);
+    await expect(value).toContainText('valor comercial atribuido');
   });
 
   test('401 clears the browser session and returns to the public entry', async ({ page }) => {

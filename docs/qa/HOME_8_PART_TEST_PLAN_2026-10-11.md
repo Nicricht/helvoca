@@ -61,6 +61,17 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 - [x] Add backend Mockito contract tests for per-tenant local-day query boundaries, simulator/certification filters, failed call counts, booking exclusion, read-model details and null aggregates.
 - [ ] Confirm all Full Gate jobs on the **exact latest PR HEAD** including Playwright and PostgreSQL before certifying Phase 4.
 
+## Phase 5 implementation
+
+- [x] Verify server semantics for completed paid orders, completed paid bookings, source attribution, currency isolation and null aggregate behavior.
+- [x] Normalize currency codes and reject negative/nonfinite/invalid attributed values before display.
+- [x] Show missing/partial attribution transparently instead of inventing $0 when transactions exist without a safe single-currency breakdown.
+- [x] Preserve true zero for empty/zero-attribution contexts, and sum comparable CLP amounts only within the same currency.
+- [x] Test mixed CLP/USD separate display without converting; verify one-sided partial attribution.
+- [x] Test rapid 7→30→1 days query races; reject stale response overwrites using actual React Query query key behavior.
+- [x] Test selected-period HTTP 503 isolation, switching back to healthy period without losing daily operation metrics.
+- [ ] Verify the exact latest head Fast Gate, Java coverage, Playwright and full real-stack CI. Fix any recorded failures before promoting.
+
 ## Change safety
 
 - No existing database schema or production credentials touched.

@@ -96,19 +96,45 @@ function formatActivityTime(value: string, timeZone: string): string {
 }
 
 
+function validatedCurrencyAmount(currency: string | null, amount: number | null): {
+  currency: string;
+  amount: number;
+} | null {
+  if (typeof currency !== "string" || typeof amount !== "number"
+      || !Number.isFinite(amount) || amount < 0) return null;
+  const normalized = currency.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(normalized)) return null;
+  try {
+    new Intl.NumberFormat("es-CL", { style: "currency", currency: normalized });
+    return { currency: normalized, amount };
+  } catch {
+    return null;
+  }
+}
+
 function attributedTotals(data?: SalesAnalytics): Array<{ currency: string; amount: number }> {
   if (!data) return [];
 
   const totals = new Map<string, number>();
-  const add = (currency: string | null, amount: number | null) => {
-    if (!currency || amount == null) return;
-    totals.set(currency, (totals.get(currency) || 0) + amount);
-  };
-
-  add(data.primaryCurrency, data.recepVozRevenue);
-  add(data.bookingCurrency, data.recepVozBookingRevenue);
+  for (const entry of [
+    validatedCurrencyAmount(data.primaryCurrency, data.recepVozRevenue),
+    validatedCurrencyAmount(data.bookingCurrency, data.recepVozBookingRevenue)
+  ]) {
+    if (entry) totals.set(entry.currency, (totals.get(entry.currency) ?? 0) + entry.amount);
+  }
 
   return Array.from(totals, ([currency, amount]) => ({ currency, amount }));
+}
+
+function hasUnverifiedAttributedAmounts(data?: SalesAnalytics): boolean {
+  if (!data) return false;
+  const orderAmountValid = validatedCurrencyAmount(data.primaryCurrency, data.recepVozRevenue);
+  const bookingAmountValid = validatedCurrencyAmount(data.bookingCurrency, data.recepVozBookingRevenue);
+  return ((data.recepVozOrders > 0 || (data.recepVozRevenue != null && data.recepVozRevenue !== 0))
+      && !orderAmountValid)
+    || ((data.recepVozPaidBookings > 0
+      || (data.recepVozBookingRevenue != null && data.recepVozBookingRevenue !== 0))
+      && !bookingAmountValid);
 }
 
 function useAnimatedNumber(value: number, reducedMotion: boolean, duration = 900): number {
@@ -232,6 +258,7 @@ function ValueGenerated({
   onDaysChange: (days: number) => void;
 }) {
   const totals = attributedTotals(data);
+  const unverifiedAmounts = hasUnverifiedAttributedAmounts(data);
   const single = totals.length === 1 ? totals[0] : null;
   const periods = [
     { days: 1, label: "Hoy" },
@@ -282,7 +309,7 @@ function ValueGenerated({
         <div className={styles.valueBody}>
           <div className={styles.valueAmount}>
             {totals.length === 0 ? (
-              <strong>$0</strong>
+              <strong>{unverifiedAmounts ? "Importe no disponible" : "$0"}</strong>
             ) : single ? (
               <strong><AnimatedMoney amount={single.amount} currency={single.currency} /></strong>
             ) : (
@@ -295,7 +322,12 @@ function ValueGenerated({
                 ))}
               </div>
             )}
-            <span>valor comercial atribuido a RecepVoz</span>
+            <span>{unverifiedAmounts
+              ? "Importes atribuidos parcialmente verificables"
+              : "valor comercial atribuido a RecepVoz"}</span>
+            {unverifiedAmounts && (
+              <em>No se pudo determinar todo el valor por moneda. El importe visible es parcial, no un total.</em>
+            )}
             {refreshing && <em>Actualizando…</em>}
           </div>
 
