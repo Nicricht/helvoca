@@ -341,4 +341,48 @@ class TwilioMediaStreamHandlerTest {
         verify(lifecycle).markStreamStopped(streamSid);
         assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
     }
+    @Test
+    void signedMediaRouteWithForeignTenantAccountIsRejectedBeforeAiAndDatabaseAccess() throws Exception {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setAuthToken("twilio-test-secret");
+        TwilioMediaRouteSigner signer = new TwilioMediaRouteSigner(properties);
+        VoiceAiProviderRegistry providers = mock(VoiceAiProviderRegistry.class);
+        VoiceProviderHealthRegistry health = new VoiceProviderHealthRegistry();
+        CallLifecycleService lifecycle = mock(CallLifecycleService.class);
+        TwilioCallControl control = mock(TwilioCallControl.class);
+        TenantDatabaseContext databaseContext = new TenantDatabaseContext();
+        TwilioCallBindingGuard bindingGuard = mock(TwilioCallBindingGuard.class);
+        WebSocketSession socket = mock(WebSocketSession.class);
+        when(socket.getId()).thenReturn("foreign-tenant-socket");
+
+        String callSid = "CA-foreign";
+        String business = "+14355550101";
+        String caller = "+56911111111";
+        String account = "ACbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        long now = Instant.now().getEpochSecond();
+        JSONObject message = new JSONObject()
+                .put("event", "start")
+                .put("streamSid", "MZ-foreign")
+                .put("start", new JSONObject()
+                        .put("accountSid", account)
+                        .put("callSid", callSid)
+                        .put("customParameters", new JSONObject()
+                                .put("business", business)
+                                .put("caller", caller)
+                                .put("callSid", callSid)
+                                .put("provider", "gemini")
+                                .put("issuedAt", String.valueOf(now))
+                                .put("route", signer.sign(business, caller, callSid, "gemini", now))));
+
+        TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
+                signer, providers, health, lifecycle, control, databaseContext, bindingGuard);
+        handler.afterConnectionEstablished(socket);
+        handler.handleTextMessage(socket, new TextMessage(message.toString()));
+
+        verify(bindingGuard).allowsMedia(callSid, business, caller, account);
+        verify(socket).close(org.springframework.web.socket.CloseStatus.POLICY_VIOLATION);
+        verifyNoInteractions(lifecycle, providers, control);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+    }
+
 }
