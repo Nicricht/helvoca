@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./home-coverage-fixture');
 
 // Part 2/8: all HTTP replies are local Playwright fixtures. No real services are called.
 const json = (body, status = 200) => ({
