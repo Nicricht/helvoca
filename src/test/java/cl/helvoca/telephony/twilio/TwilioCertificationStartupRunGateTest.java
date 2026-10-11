@@ -1,9 +1,12 @@
 package cl.helvoca.telephony.twilio;
 
+import cl.helvoca.security.TenantDatabaseContext;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -33,7 +36,7 @@ class TwilioCertificationStartupRunGateTest {
                 false,
                 "deploy-20260914-001",
                 "outbound-test",
-                provider);
+                provider, new TenantDatabaseContext());
 
         assertFalse(gate.authorizeOnce());
         verify(provider, never()).getObject();
@@ -48,7 +51,7 @@ class TwilioCertificationStartupRunGateTest {
                 true,
                 "",
                 "outbound-test",
-                provider);
+                provider, new TenantDatabaseContext());
 
         assertFalse(gate.authorizeOnce());
         verify(provider, never()).getObject();
@@ -64,7 +67,7 @@ class TwilioCertificationStartupRunGateTest {
                 true,
                 "deploy-20260914-001",
                 "outbound-test",
-                provider);
+                provider, new TenantDatabaseContext());
 
         assertTrue(gate.authorizeOnce());
         verify(provider).getObject();
@@ -79,7 +82,7 @@ class TwilioCertificationStartupRunGateTest {
                 true,
                 "deploy-20260914-001",
                 "outbound-test",
-                providerFor(jdbc));
+                providerFor(jdbc), new TenantDatabaseContext());
 
         assertFalse(gate.authorizeOnce());
     }
@@ -93,9 +96,31 @@ class TwilioCertificationStartupRunGateTest {
                 true,
                 "deploy-20260914-001",
                 "outbound-test",
-                providerFor(jdbc));
+                providerFor(jdbc), new TenantDatabaseContext());
 
         assertFalse(gate.authorizeOnce());
+    }
+
+    @Test
+    void databaseClaimUsesSystemRoleAndRestoresDeniedContext() {
+        TenantDatabaseContext context = new TenantDatabaseContext();
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.update(anyString(), eq("deploy-20260914-001"), eq("outbound-test")))
+                .thenAnswer(invocation -> {
+                    assertEquals(TenantDatabaseContext.Mode.SYSTEM, context.currentOrDenied().mode());
+                    return 1;
+                });
+        TwilioCertificationStartupRunGate gate = new TwilioCertificationStartupRunGate(
+                true,
+                "deploy-20260914-001",
+                "outbound-test",
+                providerFor(jdbc),
+                context);
+
+        assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrDenied().mode());
+        assertTrue(gate.authorizeOnce());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrDenied().mode());
+        verify(jdbc).update(anyString(), eq("deploy-20260914-001"), eq("outbound-test"));
     }
 
     @SuppressWarnings("unchecked")
