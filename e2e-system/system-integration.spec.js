@@ -197,6 +197,59 @@ test.describe('real React + Spring Boot + PostgreSQL system integration', () => 
     expect(tenantBBookings.some(item => item.id === tenantABookingId)).toBe(false);
   });
 
+  test('Home dashboard and human attention use authenticated tenant identity, ignoring forged businessId', async ({ page, request }) => {
+    await login(page);
+
+    const tenantA = await authenticatedJson(page, '/api/v1/auth/me');
+    expect(tenantA.status).toBe(200);
+    const dashboardA = await authenticatedJson(page, '/api/v1/operations/dashboard');
+    expect(dashboardA.status).toBe(200);
+    expect(dashboardA.body.businessName).toBeTruthy();
+
+    const suffix = Date.now() + '-' + Math.floor(Math.random() * 100000);
+    const tenantBName = 'Isolated Home Tenant ' + suffix;
+    const register = await request.post('/api/v1/auth/register', {
+      data: {
+        adminName: 'Home Tenant B Admin',
+        email: `home-tenant-b-${suffix}@example.invalid`,
+        password: 'HomeTenantB-System-123!',
+        businessName: tenantBName,
+        timezone: 'America/Santiago',
+        language: 'es',
+        humanTransferPhone: null
+      }
+    });
+    expect(register.status()).toBe(200);
+    const registered = await register.json();
+    expect(registered.user.businessId).not.toBe(tenantA.body.businessId);
+    const headers = { Authorization: `Bearer ${registered.accessToken}` };
+
+    // A forged selector must never override the tenant bound to this JWT.
+    const dashboardB = await request.get(
+      `/api/v1/operations/dashboard?businessId=${tenantA.body.businessId}`,
+      { headers }
+    );
+    expect(dashboardB.status()).toBe(200);
+    const isolated = await dashboardB.json();
+    expect(isolated.businessName).toBe(tenantBName);
+    expect(isolated.businessName).not.toBe(dashboardA.body.businessName);
+    expect(isolated.callsToday).toBe(0);
+    expect(isolated.bookingsToday).toBe(0);
+    expect(isolated.openRequests).toBe(0);
+    expect(isolated.recentCalls).toEqual([]);
+    expect(isolated.recentRequests).toEqual([]);
+
+    const attentionB = await request.get(
+      `/api/v1/operations/attention?businessId=${tenantA.body.businessId}`,
+      { headers }
+    );
+    expect(attentionB.status()).toBe(200);
+    expect(await attentionB.json()).toEqual([]);
+
+    const unauthenticated = await request.get('/api/v1/operations/dashboard');
+    expect(unauthenticated.status()).toBe(401);
+  });
+
   test('a real public booking becomes visible in the authenticated Agenda', async ({ page, request, browser }) => {
     await login(page);
     await page.goto('/app/agenda');
