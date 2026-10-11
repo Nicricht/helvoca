@@ -518,6 +518,13 @@ function LatestActivity({ dashboard }: { dashboard: OperationsDashboard }) {
 }
 
 
+function hasValidOnboardingStatus(status: OnboardingStatus | undefined): status is OnboardingStatus {
+  return Boolean(status)
+    && typeof status?.readyForCalls === "boolean"
+    && coreOnboardingSteps.every(step => typeof status[step.key] === "boolean")
+    && (typeof status?.nextStep === "string" || status?.nextStep === null);
+}
+
 function OnboardingCard({ status }: { status: OnboardingStatus }) {
   const completed = coreOnboardingSteps.filter(step => status[step.key]).length;
   const percent = Math.round((completed / coreOnboardingSteps.length) * 100);
@@ -597,7 +604,8 @@ export function HomePage() {
   const roles = meQuery.data?.roles ?? [];
   // Match the server's hasAnyRole('BUSINESS_ADMIN', 'OPERATOR') operations contract.
   const canReadOperations = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
-  const adminReady = !isAdmin || onboardingQuery.data?.readyForCalls === true;
+  const onboardingValid = hasValidOnboardingStatus(onboardingQuery.data);
+  const adminReady = !isAdmin || (onboardingValid && onboardingQuery.data.readyForCalls === true);
   const readyToLoad = Boolean(meQuery.data) && canReadOperations && adminReady;
   const restricted = Boolean(meQuery.data) && !canReadOperations;
   const canReadAttention = canReadOperations;
@@ -640,9 +648,10 @@ export function HomePage() {
 
   const onboardingIncomplete =
     isAdmin &&
-    Boolean(onboardingQuery.data) &&
-    onboardingQuery.data?.readyForCalls === false;
-  const onboardingFailed = isAdmin && onboardingQuery.isError;
+    onboardingValid &&
+    onboardingQuery.data.readyForCalls === false;
+  const onboardingFailed = isAdmin &&
+    (onboardingQuery.isError || (onboardingQuery.isSuccess && !onboardingValid));
 
   const loading =
     meQuery.isPending ||

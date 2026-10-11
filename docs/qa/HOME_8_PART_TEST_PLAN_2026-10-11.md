@@ -43,6 +43,15 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 - [x] Real-stack E2E: register an independent test tenant and confirm its dashboard and attention cannot be influenced by tenant A's `businessId`.
 - [ ] Verify the full PR CI, including the latest head, prior to merging.
 
+## Phase 3 implementation
+
+- [x] Verify canonical backend readiness semantics: business profile and active phone are required, services/hours depend on business type, knowledge and human transfer remain optional.
+- [x] Cover the four onboarding steps, correct 0/25/50/75% progress and no premature Home operational API requests.
+- [x] Verify legacy next-step aliases still navigate to canonical React Settings.
+- [x] Verify that a product business not needing reservations or services can be ready despite those optional steps remaining false.
+- [x] Validate onboarding API payloads at the UI boundary; missing readiness or non-boolean step flags fail closed with a retry action.
+- [ ] Confirm exact HEAD browser tests, backend tests, real-stack integration and all required CI jobs.
+
 ## Change safety
 
 - No existing database schema or production credentials touched.

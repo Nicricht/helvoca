@@ -587,6 +587,190 @@ test.describe('React Home migration', () => {
     await expect(page.getByRole('region', { name: 'Resumen de ventas' })).toHaveCount(0);
   });
 
+  // Onboarding must reflect the authoritative backend state, never invent progress.
+
+  test('onboarding business profile step directs to canonical Settings with exact 0% progress', async ({ page }) => {
+    const api = await bootHome(page, { onboarding: {
+      ...READY_ONBOARDING,
+      businessProfileConfigured: false,
+        servicesConfigured: false,
+        scheduleConfigured: false,
+        phoneConfigured: false,
+      readyForCalls: false,
+      nextStep: 'CONFIGURE_BUSINESS'
+    } });
+    await page.goto('/app');
+    const card = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(card).toBeVisible();
+    await expect(card.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+    await expect(card).toContainText('0 de 4 pasos completos');
+    await expect(card.locator('[data-complete="true"]')).toHaveCount(0);
+    await expect(card.getByRole('link', { name: 'Continuar configuración' }))
+      .toHaveAttribute('href', '/app/settings?section=business');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+    expect(api.requests.filter(request => /\/api\/v1\/(operations\/|commercial\/analytics)/.test(request.url))).toEqual([]);
+    expect(api.attentionReads()).toBe(0);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('onboarding services step directs to canonical Settings with exact 25% progress', async ({ page }) => {
+    const api = await bootHome(page, { onboarding: {
+      ...READY_ONBOARDING,
+      businessProfileConfigured: true,
+        servicesConfigured: false,
+        scheduleConfigured: false,
+        phoneConfigured: false,
+      readyForCalls: false,
+      nextStep: 'ADD_SERVICE'
+    } });
+    await page.goto('/app');
+    const card = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(card).toBeVisible();
+    await expect(card.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '25');
+    await expect(card).toContainText('1 de 4 pasos completos');
+    await expect(card.locator('[data-complete="true"]')).toHaveCount(1);
+    await expect(card.getByRole('link', { name: 'Continuar configuración' }))
+      .toHaveAttribute('href', '/app/settings?section=services');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+    expect(api.requests.filter(request => /\/api\/v1\/(operations\/|commercial\/analytics)/.test(request.url))).toEqual([]);
+    expect(api.attentionReads()).toBe(0);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('onboarding hours step directs to canonical Settings with exact 50% progress', async ({ page }) => {
+    const api = await bootHome(page, { onboarding: {
+      ...READY_ONBOARDING,
+      businessProfileConfigured: true,
+        servicesConfigured: true,
+        scheduleConfigured: false,
+        phoneConfigured: false,
+      readyForCalls: false,
+      nextStep: 'CONFIGURE_HOURS'
+    } });
+    await page.goto('/app');
+    const card = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(card).toBeVisible();
+    await expect(card.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '50');
+    await expect(card).toContainText('2 de 4 pasos completos');
+    await expect(card.locator('[data-complete="true"]')).toHaveCount(2);
+    await expect(card.getByRole('link', { name: 'Continuar configuración' }))
+      .toHaveAttribute('href', '/app/settings?section=hours');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+    expect(api.requests.filter(request => /\/api\/v1\/(operations\/|commercial\/analytics)/.test(request.url))).toEqual([]);
+    expect(api.attentionReads()).toBe(0);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('onboarding phone step directs to canonical Settings with exact 75% progress', async ({ page }) => {
+    const api = await bootHome(page, { onboarding: {
+      ...READY_ONBOARDING,
+      businessProfileConfigured: true,
+        servicesConfigured: true,
+        scheduleConfigured: true,
+        phoneConfigured: false,
+      readyForCalls: false,
+      nextStep: 'CONNECT_PHONE_NUMBER'
+    } });
+    await page.goto('/app');
+    const card = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(card).toBeVisible();
+    await expect(card.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '75');
+    await expect(card).toContainText('3 de 4 pasos completos');
+    await expect(card.locator('[data-complete="true"]')).toHaveCount(3);
+    await expect(card.getByRole('link', { name: 'Continuar configuración' }))
+      .toHaveAttribute('href', '/app/settings?section=receptionist');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+    expect(api.requests.filter(request => /\/api\/v1\/(operations\/|commercial\/analytics)/.test(request.url))).toEqual([]);
+    expect(api.attentionReads()).toBe(0);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('legacy BUSINESS_PROFILE onboarding alias preserves the correct Settings destination', async ({ page }) => {
+    await bootHome(page, { onboarding: {
+      ...READY_ONBOARDING, businessProfileConfigured: false, readyForCalls: false, nextStep: 'BUSINESS_PROFILE'
+    } });
+    await page.goto('/app');
+    const card = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(card.getByRole('link', { name: 'Continuar configuración' }))
+      .toHaveAttribute('href', '/app/settings?section=business');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+  });
+
+  test('legacy SERVICES onboarding alias preserves the correct Settings destination', async ({ page }) => {
+    await bootHome(page, { onboarding: {
+      ...READY_ONBOARDING, servicesConfigured: false, readyForCalls: false, nextStep: 'SERVICES'
+    } });
+    await page.goto('/app');
+    const card = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(card.getByRole('link', { name: 'Continuar configuración' }))
+      .toHaveAttribute('href', '/app/settings?section=services');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+  });
+
+  test('legacy SCHEDULE onboarding alias preserves the correct Settings destination', async ({ page }) => {
+    await bootHome(page, { onboarding: {
+      ...READY_ONBOARDING, scheduleConfigured: false, readyForCalls: false, nextStep: 'SCHEDULE'
+    } });
+    await page.goto('/app');
+    const card = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(card.getByRole('link', { name: 'Continuar configuración' }))
+      .toHaveAttribute('href', '/app/settings?section=hours');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+  });
+
+  test('legacy PHONE onboarding alias preserves the correct Settings destination', async ({ page }) => {
+    await bootHome(page, { onboarding: {
+      ...READY_ONBOARDING, phoneConfigured: false, readyForCalls: false, nextStep: 'PHONE'
+    } });
+    await page.goto('/app');
+    const card = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(card.getByRole('link', { name: 'Continuar configuración' }))
+      .toHaveAttribute('href', '/app/settings?section=receptionist');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+  });
+
+  test('service-free business already ready for calls is never blocked by optional services or hours', async ({ page }) => {
+    const api = await bootHome(page, { onboarding: {
+      ...READY_ONBOARDING,
+      servicesConfigured: false,
+      scheduleConfigured: false,
+      knowledgeConfigured: false,
+      humanTransferConfigured: false,
+      readyForCalls: true,
+      nextStep: 'OPTIONAL_HUMAN_TRANSFER'
+    } });
+    await page.goto('/app');
+
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Configura tu negocio' })).toHaveCount(0);
+    expect(api.requests.some(request => request.url.includes('/operations/dashboard'))).toBe(true);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('missing readiness flag fails closed and never renders an empty Home', async ({ page }) => {
+    const api = await bootHome(page, { onboarding: {
+      ...INCOMPLETE_ONBOARDING, readyForCalls: undefined
+    } });
+    await page.goto('/app');
+    const alert = page.locator('main[data-visual-page="home"] [role="alert"]');
+    await expect(alert).toContainText('No pudimos verificar la configuración de tu negocio.');
+    await expect(alert.getByRole('button', { name: 'Reintentar' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Configura tu negocio' })).toHaveCount(0);
+    expect(api.requests.some(request => request.url.includes('/operations/dashboard'))).toBe(false);
+  });
+
+  test('malformed onboarding step flags fail closed instead of declaring 100% progress', async ({ page }) => {
+    const api = await bootHome(page, { onboarding: {
+      ...INCOMPLETE_ONBOARDING, phoneConfigured: 'yes'
+    } });
+    await page.goto('/app');
+    await expect(page.locator('main[data-visual-page="home"] [role="alert"]'))
+      .toContainText('No pudimos verificar la configuración de tu negocio.');
+    await expect(page.getByRole('region', { name: 'Configura tu negocio' })).toHaveCount(0);
+    expect(api.requests.some(request => request.url.includes('/operations/dashboard'))).toBe(false);
+  });
+
   test('unknown onboarding steps still stay inside canonical React Settings', async ({ page }) => {
     await bootHome(page, {
       onboarding: {
