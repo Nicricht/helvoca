@@ -193,6 +193,69 @@ class PhoneProvisioningOwnershipTest {
         verifyNoInteractions(legacy);
     }
 
+    @Test
+    void activateVerifiedRejectsUnknownOrForeignTenantPhoneId() {
+        UUID missing = UUID.randomUUID();
+        assertThrows(ConflictException.class, () -> service.activateVerified(missing));
+        verify(twilio, never()).verifyManagedPhone(any());
+    }
+
+    @Test
+    void activateVerifiedRejectsWrongProvider() {
+        UUID id = UUID.randomUUID();
+        PhoneNumber phone = alreadyAssigned(owner, SID, "OTHER");
+        when(repository.findByIdAndBusinessId(id, owner)).thenReturn(Optional.of(phone));
+        assertThrows(ConflictException.class, () -> service.activateVerified(id));
+        verify(twilio, never()).verifyManagedPhone(any());
+    }
+
+    @Test
+    void activateVerifiedRejectsCarrierSidChangedAndKeepsInactive() {
+        UUID id = UUID.randomUUID();
+        PhoneNumber phone = alreadyAssigned(owner, "PN" + "f".repeat(32), "TWILIO");
+        when(repository.findByIdAndBusinessId(id, owner)).thenReturn(Optional.of(phone));
+        attested();
+        assertThrows(ConflictException.class, () -> service.activateVerified(id));
+        assertFalse(phone.isActive());
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void activateVerifiedReconcilesEmptySidOnlyForAssignedTenant() {
+        UUID id = UUID.randomUUID();
+        PhoneNumber phone = alreadyAssigned(owner, null, "TWILIO");
+        when(repository.findByIdAndBusinessId(id, owner)).thenReturn(Optional.of(phone));
+        attested();
+        PhoneNumberResponse response = service.activateVerified(id);
+        assertTrue(response.active());
+        assertEquals(SID, response.externalId());
+    }
+
+    @Test
+    void activateVerifiedRechecksMatchingAndBlankSid() {
+        UUID id = UUID.randomUUID();
+        PhoneNumber phone = alreadyAssigned(owner, SID, "TWILIO");
+        when(repository.findByIdAndBusinessId(id, owner)).thenReturn(Optional.of(phone));
+        attested();
+        assertTrue(service.activateVerified(id).active());
+        phone.setExternalId("   ");
+        assertTrue(service.activateVerified(id).active());
+        assertEquals(SID, phone.getExternalId());
+    }
+
+    @Test
+    void activationToggleDelegatesToCarrierAttestationButDeactivationDoesNot() {
+        PhoneNumberService legacy = mock(PhoneNumberService.class);
+        PhoneProvisioningService verified = mock(PhoneProvisioningService.class);
+        PhoneNumberController controller = new PhoneNumberController(legacy, verified);
+        UUID id = UUID.randomUUID();
+        controller.setActive(id, new PhoneNumberActiveRequest(true));
+        verify(verified).activateVerified(id);
+        verifyNoInteractions(legacy);
+        controller.setActive(id, new PhoneNumberActiveRequest(false));
+        verify(legacy).setActive(id, false);
+    }
+
     private PhoneNumber verifySave() {
         org.mockito.ArgumentCaptor<PhoneNumber> captor = org.mockito.ArgumentCaptor.forClass(PhoneNumber.class);
         verify(repository).saveAndFlush(captor.capture());
