@@ -128,6 +128,18 @@ class VoiceSetupReadinessServiceTest {
     }
 
     @Test
+    void unspecifiedServicesStillRequireCatalogWhenNoReservationsAreNeeded() {
+        setupComplete();
+        when(profiles.current()).thenReturn(profile(null, false));
+        when(onboarding.status()).thenReturn(new OnboardingStatusResponse(
+                true, false, false, false, false, true, false, "ADD_SERVICE"));
+        var guide = service.current();
+
+        assertFalse(step(guide, "SERVICES").complete());
+        assertTrue(step(guide, "SCHEDULE").complete());
+    }
+
+    @Test
     void reservationsRequireServicesEvenWhenServicesFlagIsFalse() {
         setupComplete();
         when(profiles.current()).thenReturn(profile(false, true));
@@ -235,6 +247,19 @@ class VoiceSetupReadinessServiceTest {
         when(twilio.configured()).thenReturn(false);
         assertFalse(step(service.current(), "PHONE").complete());
         assertFalse(step(service.current(), "CARRIER").complete());
+    }
+
+    @Test
+    void missingCarrierAttestationCannotBeBypassedByBlankMatchingAccount() {
+        setupComplete();
+        when(twilio.configured()).thenReturn(false);
+        PhoneNumber number = managed();
+        number.setTwilioAccountSid("");
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of(number));
+
+        var guide = service.current();
+        assertFalse(step(guide, "CARRIER").complete());
+        assertFalse(step(guide, "PHONE").complete());
     }
 
     @Test
