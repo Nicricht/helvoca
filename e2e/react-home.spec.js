@@ -749,6 +749,115 @@ test.describe('React Home migration', () => {
     expect(unsafe).toEqual([]);
   });
 
+
+  test('HTTP 200 null analytics shows a truthful local error instead of an empty card', async ({ page }) => {
+    await bootHome(page);
+    await page.route('**/api/v1/commercial/analytics**', route => route.fulfill(json(null)));
+    await page.goto('/app');
+    const section = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(section.getByRole('alert')).toContainText('No pudimos verificar los datos comerciales');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+  });
+
+  test('HTTP 200 null operational dashboard blocks fabricated metrics and recovers on retry', async ({ page }) => {
+    await bootHome(page);
+    let valid = false;
+    await page.route('**/api/v1/operations/dashboard', route =>
+      route.fulfill(json(valid ? READY_OPERATIONS : null)));
+    await page.goto('/app');
+    await expect(page.getByRole('alert')).toContainText('No pudimos validar el resumen operativo');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+    valid = true;
+    await page.getByRole('button', { name: 'Reintentar resumen' }).click();
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+  });
+
+  test('in-progress call is announced as currently active without creating a call', async ({ page }) => {
+    const state = await bootHome(page, { operations: {
+      ...READY_OPERATIONS,
+      recentCalls: [
+        { ...READY_OPERATIONS.recentCalls[0], id: 'missing-status', status: null },
+        { ...READY_OPERATIONS.recentCalls[1], id: 'live', status: 'IN_PROGRESS' }
+      ]
+    }});
+    await page.goto('/app');
+    await expect(page.getByRole('region', { name: 'Estado de tu negocio' })).toContainText('Atendiendo ahora');
+    expect(state.requests.filter(r => !['GET', 'HEAD', 'OPTIONS'].includes(r.method))).toEqual([]);
+  });
+
+  test('plural operational signals reflect actual unanswered questions and failed calls', async ({ page }) => {
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS, unansweredQuestions: 2, callFailuresToday: 2
+    }});
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('2 preguntas sin respuesta');
+    await expect(panel).toContainText('2 fallos de llamada');
+  });
+
+  test('recent call without phone or statuses has a neutral readable fallback', async ({ page }) => {
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS, recentRequests: [], recentCalls: [{
+        ...READY_OPERATIONS.recentCalls[0],
+        id: 'unknown-call', callerNumber: null, status: null,
+        resolution: null, startedAt: '2026-10-02T17:00:00Z'
+      }]
+    }});
+    await page.goto('/app');
+    const latest = page.getByRole('region', { name: 'Última actividad' });
+    await expect(latest).toContainText('Llamada reciente');
+    await expect(latest).toContainText('Llamada');
+  });
+
+  test('unrecognized recent request status remains descriptive, not fabricated as complete', async ({ page }) => {
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS,
+      recentCalls: [],
+      recentRequests: [{
+        ...READY_OPERATIONS.recentRequests[0], status: 'NEEDS_VERIFICATION', title: 'Caso por revisar'
+      }]
+    }});
+    await page.goto('/app');
+    await expect(page.getByRole('region', { name: 'Última actividad' }))
+      .toContainText('needs verification');
+  });
+
+  test('invalid business timezone leaves activity time blank without throwing', async ({ page }) => {
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS,
+      timezone: 'Definitely/Invalid',
+      recentRequests: [],
+      recentCalls: [{ ...READY_OPERATIONS.recentCalls[0], startedAt: '2026-10-02T16:00:00Z' }]
+    }});
+    await page.goto('/app');
+    const latest = page.getByRole('region', { name: 'Última actividad' });
+    await expect(latest).toBeVisible();
+    await expect(latest.locator('time')).toBeEmpty();
+  });
+
+  test('null onboarding nextStep stays on safe Settings fallback without business metrics', async ({ page }) => {
+    await bootHome(page, { onboarding: {
+      ...INCOMPLETE_ONBOARDING, nextStep: null
+    }});
+    await page.goto('/app');
+    const onboarding = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(onboarding.getByRole('link', { name: /Continuar configuración/ }))
+      .toHaveAttribute('href', '/app/settings');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+  });
+
+  test('real zero attributed without a declared currency does not invent an exchange rate', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...EMPTY_ANALYTICS,
+      primaryCurrency: null, bookingCurrency: null,
+      recepVozRevenue: 0, recepVozBookingRevenue: 0
+    }});
+    await page.goto('/app');
+    const sales = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(sales).toContainText('$0');
+    await expect(sales).not.toContainText('Valor no disponible');
+  });
+
   test('unknown attributed revenue never becomes a fictional $0', async ({ page }) => {
     const analytics = {
       ...READY_ANALYTICS,
