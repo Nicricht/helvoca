@@ -121,6 +121,15 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 - [x] Added browser branches for full 100-row inbox, handoff assigned/unrecognized statuses, invalid dates, empty title, rapid double submit, non-Error request failure, formatMoney fallback and Intl constructor failure.
 - [ ] Rerun instrumented source-coverage and keep strict 100% gate; do not claim certified until it passes.
 
+## Source coverage round 3
+
+- [x] Remove impossible Home-only authorization fallback code inside components that are never mounted for forbidden identities. Parent role gate still prevents rendering and protected reads; server enforces permissions.
+- [x] Use a typed exhaustive map of request/handoff actions instead of an unreachable runtime default.
+- [x] Show truthful status labels for stale resolved/cancelled requests rather than incorrectly calling them OPEN.
+- [x] Fail closed when commercial GET returns HTTP 200 but no data.
+- [x] Add browser coverage for null value, short currency, missing call metadata, empty request status, null onboarding nextStep, stale attention statuses and plural signal counts.
+- [ ] Confirm exact commit CI and strict source coverage; no claim of 100% pending report.
+
 ## Change safety
 
 - No existing database schema or production credentials touched.

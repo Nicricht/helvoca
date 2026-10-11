@@ -323,6 +323,7 @@ async function bootHome(page, options = {}) {
     if (options.analyticsError) {
       return route.fulfill(json({ message: 'analytics unavailable' }, options.analyticsError));
     }
+    if (options.analyticsPayloads?.length) return route.fulfill(json(options.analyticsPayloads.shift()));
     return route.fulfill(json(options.analyticsByDays?.[days] || options.analytics || READY_ANALYTICS));
   });
 
@@ -1098,6 +1099,115 @@ test.describe('React Home migration', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Inicio' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Valor generado por RecepVoz' })).toBeVisible();
     await expect(page.locator('#root')).not.toBeEmpty();
+  });
+
+  test('HTTP 200 with null commercial payload shows an unknown state, never an empty $0', async ({ page }) => {
+    await bootHome(page, { analyticsPayloads: [null] });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(panel.getByRole('alert')).toContainText('No recibimos datos verificables');
+    await expect(panel).not.toContainText('$0');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+  });
+
+  test('short invalid currency code is rejected before Intl formatting', async ({ page }) => {
+    await bootHome(page, { analytics: {
+      ...READY_ANALYTICS,
+      primaryCurrency: 'CL',
+      recepVozRevenue: 100000,
+      bookingCurrency: 'CLP',
+      recepVozBookingRevenue: 20000
+    } });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('Importes atribuidos parcialmente verificables');
+    await expect(value).toContainText('20.000');
+    await expect(value).not.toContainText('120.000');
+  });
+
+  test('unknown call status and absent caller number preserve an informative fallback', async ({ page }) => {
+    const operations = {
+      ...READY_OPERATIONS,
+      recentRequests: [],
+      recentCalls: [{
+        id: 'no-caller',
+        callerNumber: null,
+        status: null,
+        resolution: null,
+        startedAt: '2026-10-02T15:20:00Z',
+        durationSeconds: 0
+      }]
+    };
+    await bootHome(page, { operations, attention: [] });
+    await page.goto('/app');
+    const activity = page.getByRole('region', { name: 'Última actividad' });
+    await expect(activity).toContainText('Llamada reciente');
+    await expect(activity).toContainText('Llamada');
+    await expect(page.getByRole('region', { name: 'Estado de tu negocio' }))
+      .not.toContainText('Hay una llamada en curso');
+  });
+
+  test('unknown request status is human-readable and missing known status uses Solicitud fallback', async ({ page }) => {
+    await bootHome(page, {
+      operations: {
+        ...READY_OPERATIONS,
+        recentCalls: [],
+        recentRequests: [{
+          id: 'unrecognized-status',
+          title: 'Seguimiento especializado',
+          status: null,
+          priority: 'MEDIUM',
+          createdAt: '2026-10-02T15:20:00Z'
+        }]
+      },
+      attention: []
+    });
+    await page.goto('/app');
+    const activity = page.getByRole('region', { name: 'Última actividad' });
+    await expect(activity).toContainText('Seguimiento especializado');
+    await expect(activity).toContainText('Solicitud');
+  });
+
+  test('nullable nextStep retains valid incomplete onboarding and directs to the safe Settings fallback', async ({ page }) => {
+    await bootHome(page, { onboarding: {
+      ...INCOMPLETE_ONBOARDING,
+      nextStep: null
+    } });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Configura tu negocio' });
+    await expect(panel).toContainText('Completa la configuración pendiente');
+    await expect(panel.getByRole('link', { name: 'Continuar configuración' }))
+      .toHaveAttribute('href', '/app/settings');
+  });
+
+  test('request statuses from stale attention data are not wrongly labelled Abierta', async ({ page }) => {
+    await bootHome(page, { attention: [
+      { ...DEFAULT_ATTENTION[0], id: 'resolved-row', status: 'RESOLVED', priority: 'NORMAL', operationId: null },
+      { ...DEFAULT_ATTENTION[0], id: 'cancelled-row', status: 'CANCELLED', priority: 'NORMAL', operationId: null },
+      { ...DEFAULT_ATTENTION[0], id: 'unknown-row', status: 'WAITING_ON_CUSTOMER', priority: 'NORMAL', operationId: null }
+    ] });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('Resuelta');
+    await expect(panel).toContainText('Cancelada');
+    await expect(panel).toContainText('WAITING_ON_CUSTOMER');
+    await expect(panel.getByRole('button', { name: 'Empezar gestión' })).toHaveCount(0);
+    await expect(panel.getByRole('button', { name: 'Marcar resuelta' })).toHaveCount(0);
+  });
+
+  test('two operational signal categories use accurate plural counts', async ({ page }) => {
+    await bootHome(page, {
+      operations: {
+        ...READY_OPERATIONS,
+        unansweredQuestions: 2,
+        callFailuresToday: 2
+      },
+      attention: []
+    });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('2 preguntas sin respuesta');
+    await expect(panel).toContainText('2 fallos de llamada');
   });
 
   test('incomplete owner sees onboarding guidance instead of duplicated operational workspaces', async ({ page }) => {

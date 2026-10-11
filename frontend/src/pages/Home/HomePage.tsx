@@ -182,14 +182,13 @@ interface AttentionState {
   loading: boolean;
   failed: boolean;
   refreshing: boolean;
-  authorized: boolean;
   canManageRequests: boolean;
   onRefresh: () => void;
 }
 
 function HeroOverview({ dashboard, attention }: { dashboard: OperationsDashboard; attention: AttentionState }) {
   const pending = attentionTotal(attention.items);
-  const unknown = attention.authorized && (attention.loading || attention.failed);
+  const unknown = attention.loading || attention.failed;
   const liveCall = dashboard.recentCalls.find(call =>
     ["IN_PROGRESS", "RINGING", "ACTIVE"].includes(call.status || "")
   );
@@ -205,9 +204,9 @@ function HeroOverview({ dashboard, attention }: { dashboard: OperationsDashboard
       <div className={styles.heroCopy}>
         <span className={styles.heroStatus} data-tone={unknown || pending > 0 ? "attention" : "calm"}>
           <i aria-hidden="true" />
-          {unknown ? "Verificando pendientes…" : attention.authorized
-            ? (pending > 0 ? "Necesita tu atención · " + (pending === 100 ? "100 casos recientes" : pending + " asuntos") : "Todo bajo control")
-            : "Atención según permisos de tu rol"}
+          {unknown ? "Verificando pendientes…"
+            : pending > 0 ? "Necesita tu atención · " + (pending === 100 ? "100 casos recientes" : pending + " asuntos")
+            : "Todo bajo control"}
         </span>
 
         <h2>Tu negocio está siendo atendido.</h2>
@@ -347,7 +346,11 @@ function ValueGenerated({
             Atribución por origen registrado en RecepVoz. No representa utilidad neta ni rentabilidad garantizada.
           </p>
         </div>
-      ) : null}
+      ) : (
+        <div className={styles.valueError} role="alert">
+          No recibimos datos verificables del valor atribuido. Tu operación diaria sigue disponible.
+        </div>
+      )}
     </motion.section>
   );
 }
@@ -438,7 +441,7 @@ function AttentionPanel({ dashboard, attention }: {
           <span className={styles.kicker}>INTERVENCIÓN HUMANA</span>
           <h2 id="homeAttentionTitle">Necesita tu atención</h2>
         </div>
-        {attention.authorized && !attention.loading && !attention.failed && total > 0 && (
+        {!attention.loading && !attention.failed && total > 0 && (
           <span className={styles.countPill} aria-label="Casos visibles">{total === 100 ? "100 casos recientes" : total + " pendientes"}</span>
         )}
       </div>
@@ -448,7 +451,6 @@ function AttentionPanel({ dashboard, attention }: {
         loading={attention.loading}
         failed={attention.failed}
         refreshing={attention.refreshing}
-        authorized={attention.authorized}
         canManageRequests={attention.canManageRequests}
         onRefresh={attention.onRefresh}
       />
@@ -668,7 +670,6 @@ export function HomePage() {
     loading: attentionQuery.isPending && readyToLoad && canReadAttention,
     failed: attentionQuery.isError,
     refreshing: attentionQuery.isFetching,
-    authorized: canReadAttention,
     canManageRequests,
     onRefresh: () => { void attentionQuery.refetch(); }
   };
@@ -803,8 +804,7 @@ export function HomePage() {
               <AttentionPanel dashboard={operationsQuery.data} attention={attention} />
               <LatestActivity dashboard={operationsQuery.data} />
             </div>
-            {canReadAttention && (
-              <section id="home-history" className={styles.historySection} aria-label="Historial de gestión">
+            <section id="home-history" className={styles.historySection} aria-label="Historial de gestión">
                 <button type="button" className={styles.historyToggle}
                   aria-expanded={historyOpen}
                   onClick={() => setHistoryOpen(previous => !previous)}>
@@ -816,7 +816,6 @@ export function HomePage() {
                   <OperationsSupportPanel user={meQuery.data} showCustomerTools={false} />
                 )}
               </section>
-            )}
           </motion.div>
         ) : null}
       </main>

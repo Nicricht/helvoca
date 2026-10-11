@@ -14,7 +14,6 @@ interface Props {
   loading: boolean;
   failed: boolean;
   refreshing: boolean;
-  authorized: boolean;
   canManageRequests: boolean;
   onRefresh: () => void;
 }
@@ -27,10 +26,18 @@ function readableStatus(item: HumanAttentionItem): string {
       ASSIGNED: "Asignado"
     } as Record<string, string>)[item.status] || item.status;
   }
-  return item.status === "IN_PROGRESS" ? "En progreso" : "Abierta";
+  return ({
+    OPEN: "Abierta",
+    IN_PROGRESS: "En progreso",
+    RESOLVED: "Resuelta",
+    CANCELLED: "Cancelada"
+  } as Record<string, string>)[item.status] || item.status;
 }
 
-function actionFor(item: HumanAttentionItem, canManageRequests: boolean) {
+type AttentionAction = "REQUEST_PROGRESS" | "REQUEST_RESOLVE" | "HANDOFF_ACK" | "HANDOFF_RESOLVE";
+type AttentionNext = { label: string; action: AttentionAction };
+
+function actionFor(item: HumanAttentionItem, canManageRequests: boolean): AttentionNext | null {
   if (item.kind === "REQUEST" && canManageRequests) {
     if (item.status === "OPEN") return { label: "Empezar gestión", action: "REQUEST_PROGRESS" };
     if (item.status === "IN_PROGRESS") return { label: "Marcar resuelta", action: "REQUEST_RESOLVE" };
@@ -50,7 +57,7 @@ function actionFor(item: HumanAttentionItem, canManageRequests: boolean) {
  * This component never creates an AI conversation or sends a provider message.
  */
 export function HomeAttentionRows({
-  items, loading, failed, refreshing, authorized, canManageRequests, onRefresh
+  items, loading, failed, refreshing, canManageRequests, onRefresh
 }: Props) {
   const client = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -59,29 +66,20 @@ export function HomeAttentionRows({
   const [error, setError] = useState("");
   const [confirmationId, setConfirmationId] = useState<string | null>(null);
 
-  async function perform(item: HumanAttentionItem, action: string) {
+  async function perform(item: HumanAttentionItem, action: AttentionAction) {
     const key = item.kind + ":" + item.id;
     if (busyRef.current) return;
     busyRef.current = key;
     setBusyId(key);
     setError("");
     try {
-      switch (action) {
-        case "REQUEST_PROGRESS":
-          await updateRequestStatus(item.id, "IN_PROGRESS");
-          break;
-        case "REQUEST_RESOLVE":
-          await updateRequestStatus(item.id, "RESOLVED");
-          break;
-        case "HANDOFF_ACK":
-          await acknowledgeHumanHandoff(item.id);
-          break;
-        case "HANDOFF_RESOLVE":
-          await resolveHumanHandoff(item.id);
-          break;
-        default:
-          throw new Error("Acción no disponible.");
-      }
+      const updates: Record<AttentionAction, () => Promise<unknown>> = {
+        REQUEST_PROGRESS: () => updateRequestStatus(item.id, "IN_PROGRESS"),
+        REQUEST_RESOLVE: () => updateRequestStatus(item.id, "RESOLVED"),
+        HANDOFF_ACK: () => acknowledgeHumanHandoff(item.id),
+        HANDOFF_RESOLVE: () => resolveHumanHandoff(item.id)
+      };
+      await updates[action]();
       setConfirmationId(null);
       await Promise.all([
         client.invalidateQueries({ queryKey: ["operations", "attention"] }),
@@ -96,9 +94,6 @@ export function HomeAttentionRows({
     }
   }
 
-  if (!authorized) {
-    return <p className={styles.notice}>Tu rol no tiene acceso a esta bandeja.</p>;
-  }
   if (loading) {
     return <div role="status" className={styles.notice}>Consultando casos que requieren intervención…</div>;
   }
