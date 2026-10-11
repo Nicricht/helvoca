@@ -19,6 +19,7 @@ class PhoneProvisioningPersistenceTest {
         TwilioPhoneProvisioningClient twilio = mock(TwilioPhoneProvisioningClient.class);
         UUID businessId = UUID.randomUUID();
         when(tenant.requireBusinessId()).thenReturn(businessId);
+        when(twilio.managedAccountSid()).thenReturn("AC" + "c".repeat(32));
         when(repository.findByPhoneNumber("+12025550123")).thenReturn(Optional.empty());
         when(twilio.provision("+12025550123")).thenReturn(
                 new TwilioPhoneProvisioningClient.ProvisionedPhoneNumber(
@@ -30,7 +31,12 @@ class PhoneProvisioningPersistenceTest {
 
         assertEquals("+12025550123", response.phoneNumber());
         assertEquals("TWILIO", response.provider());
-        assertTrue(response.active());
-        verify(repository).saveAndFlush(argThat(phone -> businessId.equals(phone.getBusinessId())));
+        assertFalse(response.active(), "Newly purchased numbers remain pending carrier attestation");
+        verify(repository).saveAndFlush(argThat(phone ->
+                businessId.equals(phone.getBusinessId())
+                        && "MANAGED_PURCHASE".equals(phone.getTwilioBindingSource())
+                        && ("AC" + "c".repeat(32)).equals(phone.getTwilioAccountSid())
+                        && phone.getVoiceVerifiedAt() == null
+                        && !phone.isActive()));
     }
 }
