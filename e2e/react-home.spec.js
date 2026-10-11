@@ -733,6 +733,66 @@ test.describe('React Home migration', () => {
     expect(state.requests.filter(req => /twilio|whatsapp.*send|payments.*(?:charge|capture)/i.test(req.url))).toEqual([]);
   });
 
+  test('shared customer export API honors CSV filename, XLSX fallback, 503 and expired authentication', async ({ page }) => {
+    const state = await bootHome(page);
+    await page.addInitScript(() => {
+      const original = window.fetch.bind(window);
+      window.__exportMode = 'csv';
+      window.__exportRequests = [];
+      window.fetch = (resource, opts) => {
+        const url = new URL(typeof resource === 'string' ? resource : resource.url, location.origin);
+        if (url.pathname !== '/api/v1/customers/export') return original(resource, opts);
+        window.__exportRequests.push({ url: url.href, authorization: opts?.headers?.Authorization ?? null });
+        const mode = window.__exportMode;
+        if (mode === '401') return Promise.resolve(new Response(null, { status: 401 }));
+        if (mode === '503') return Promise.resolve(new Response(null, { status: 503 }));
+        const name = mode === 'csv' ? 'attachment; filename="clientes-verificados.csv"' : null;
+        return Promise.resolve(new Response(new Blob(['synthetic-local-export'], { type: 'text/plain' }), {
+          status: 200, headers: name ? { 'content-disposition': name } : {}
+        }));
+      };
+    });
+    await page.route('**/api/v1/commercial/orders**', route => route.fulfill(json([])));
+    await page.goto('/app/orders');
+    await page.getByRole('button', { name: 'Clientes', exact: true }).click();
+    const panel = page.getByRole('region', { name: 'Exportación de clientes' });
+    await expect(panel).toBeVisible();
+
+    let download = page.waitForEvent('download');
+    await panel.getByRole('button', { name: 'Exportar CSV' }).click();
+    expect((await download).suggestedFilename()).toBe('clientes-verificados.csv');
+    await expect(panel.getByRole('status')).toContainText('Exportación preparada');
+
+    await page.evaluate(() => { window.__exportMode = 'xlsx'; });
+    download = page.waitForEvent('download');
+    await panel.getByRole('button', { name: 'Exportar XLSX' }).click();
+    expect((await download).suggestedFilename()).toBe('helvoca-clientes.xlsx');
+
+    await page.evaluate(() => { window.__exportMode = '503'; });
+    await panel.getByRole('button', { name: 'Exportar CSV' }).click();
+    await expect(panel.getByRole('status')).toContainText('No pudimos preparar la descarga');
+
+    await page.evaluate(() => {
+      sessionStorage.removeItem('helvoca_access_token');
+      window.__exportMode = '503';
+    });
+    await panel.getByRole('button', { name: 'Exportar CSV' }).click();
+    await expect(panel.getByRole('status')).toContainText('No pudimos preparar la descarga');
+    const requests = await page.evaluate(() => window.__exportRequests);
+    expect(requests).toHaveLength(4);
+    expect(requests[0].authorization).toContain('Bearer ');
+    expect(requests[3].authorization).toBeNull();
+
+    await page.evaluate(() => {
+      sessionStorage.setItem('helvoca_access_token', 'react-home-e2e');
+      window.__exportMode = '401';
+    });
+    await panel.getByRole('button', { name: 'Exportar CSV' }).click();
+    await expect(page).toHaveURL(url => url.pathname.startsWith('/app/auth'));
+    expect(await page.evaluate(() => sessionStorage.getItem('helvoca_access_token'))).toBeNull();
+    expect(state.attentionMutations()).toBe(0);
+  });
+
   test('Home performs only read/navigation work and does not trigger external side effects', async ({ page }) => {
     const { requests } = await bootHome(page);
 
