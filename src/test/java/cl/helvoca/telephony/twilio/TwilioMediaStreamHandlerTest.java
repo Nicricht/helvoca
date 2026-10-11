@@ -2,6 +2,7 @@ package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.ai.realtime.RealtimeCallContext;
 import cl.helvoca.telephony.CallLifecycleService;
+import cl.helvoca.security.TenantDatabaseContext;
 import cl.helvoca.voice.VoiceAiProvider;
 import cl.helvoca.voice.VoiceAiProviderRegistry;
 import cl.helvoca.voice.VoiceAiSession;
@@ -17,6 +18,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
@@ -32,6 +34,7 @@ class TwilioMediaStreamHandlerTest {
         VoiceProviderHealthRegistry health = new VoiceProviderHealthRegistry();
         CallLifecycleService lifecycle = mock(CallLifecycleService.class);
         TwilioCallControl control = mock(TwilioCallControl.class);
+        TenantDatabaseContext databaseContext = new TenantDatabaseContext();
         VoiceAiProvider provider = mock(VoiceAiProvider.class);
         VoiceAiSession ai = mock(VoiceAiSession.class);
         WebSocketSession socket = mock(WebSocketSession.class);
@@ -52,12 +55,15 @@ class TwilioMediaStreamHandlerTest {
         when(providers.require("gemini")).thenReturn(provider);
         when(provider.id()).thenReturn("gemini");
         when(provider.configured()).thenReturn(true);
-        when(lifecycle.startInboundCall("twilio", callSid, caller, business)).thenReturn(callId);
+        when(lifecycle.startInboundCall("twilio", callSid, caller, business)).thenAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, databaseContext.currentOrDenied().mode());
+            return callId;
+        });
         when(lifecycle.markStreamStarted(callId, callSid, streamSid, "gemini")).thenReturn(baseContext);
         when(provider.createSession(any(RealtimeCallContext.class), any(VoiceTransportSession.class))).thenReturn(ai);
 
         TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
-                signer, providers, health, lifecycle, control);
+                signer, providers, health, lifecycle, control, databaseContext);
         handler.afterConnectionEstablished(socket);
 
         JSONObject start = new JSONObject()
@@ -93,6 +99,118 @@ class TwilioMediaStreamHandlerTest {
         verify(tamperedSocket).close(org.springframework.web.socket.CloseStatus.POLICY_VIOLATION);
     }
 
+
+    @Test
+    void signedMediaStartFailureRestoresDeniedDatabaseScope() throws Exception {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setAuthToken("twilio-test-secret");
+        TwilioMediaRouteSigner signer = new TwilioMediaRouteSigner(properties);
+        VoiceAiProviderRegistry providers = mock(VoiceAiProviderRegistry.class);
+        VoiceProviderHealthRegistry health = new VoiceProviderHealthRegistry();
+        CallLifecycleService lifecycle = mock(CallLifecycleService.class);
+        TwilioCallControl control = mock(TwilioCallControl.class);
+        TenantDatabaseContext databaseContext = new TenantDatabaseContext();
+        VoiceAiProvider provider = mock(VoiceAiProvider.class);
+        WebSocketSession socket = mock(WebSocketSession.class);
+        String callSid = "CA-db-scope";
+        String streamSid = "MZ-db-scope";
+        String business = "+14355652512";
+        String caller = "+56911111111";
+        long issuedAt = Instant.now().getEpochSecond();
+        String route = signer.sign(business, caller, callSid, "gemini", issuedAt);
+
+        when(socket.getId()).thenReturn("socket-db-failure");
+        when(providers.require("gemini")).thenReturn(provider);
+        when(provider.id()).thenReturn("gemini");
+        when(provider.configured()).thenReturn(true);
+        when(lifecycle.startInboundCall("twilio", callSid, caller, business))
+                .thenAnswer(invocation -> {
+                    assertEquals(TenantDatabaseContext.Mode.SYSTEM, databaseContext.currentOrDenied().mode());
+                    throw new IllegalStateException("database unavailable");
+                });
+
+        TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
+                signer, providers, health, lifecycle, control, databaseContext);
+        handler.afterConnectionEstablished(socket);
+        JSONObject start = new JSONObject()
+                .put("event", "start")
+                .put("streamSid", streamSid)
+                .put("start", new JSONObject()
+                        .put("streamSid", streamSid)
+                        .put("accountSid", "AC-db-scope")
+                        .put("callSid", callSid)
+                        .put("customParameters", new JSONObject()
+                                .put("business", business)
+                                .put("caller", caller)
+                                .put("callSid", callSid)
+                                .put("provider", "gemini")
+                                .put("issuedAt", String.valueOf(issuedAt))
+                                .put("route", route)));
+        assertThrows(IllegalStateException.class,
+                () -> handler.handleTextMessage(socket, new TextMessage(start.toString())));
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+        verify(provider, never()).createSession(any(), any());
+    }
+
+    @Test
+    void signedMediaAiStartupFailureUpdatesStatusUnderSystemAndRestoresScope() throws Exception {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setAuthToken("twilio-test-secret");
+        TwilioMediaRouteSigner signer = new TwilioMediaRouteSigner(properties);
+        VoiceAiProviderRegistry providers = mock(VoiceAiProviderRegistry.class);
+        VoiceProviderHealthRegistry health = new VoiceProviderHealthRegistry();
+        CallLifecycleService lifecycle = mock(CallLifecycleService.class);
+        TwilioCallControl control = mock(TwilioCallControl.class);
+        TenantDatabaseContext databaseContext = new TenantDatabaseContext();
+        VoiceAiProvider provider = mock(VoiceAiProvider.class);
+        VoiceAiSession ai = mock(VoiceAiSession.class);
+        WebSocketSession socket = mock(WebSocketSession.class);
+        String callSid = "CA-ai-start-failure";
+        String streamSid = "MZ-ai-start-failure";
+        String business = "+14355652512";
+        String caller = "+56911111111";
+        long issuedAt = Instant.now().getEpochSecond();
+        String route = signer.sign(business, caller, callSid, "gemini", issuedAt);
+        UUID callId = UUID.randomUUID();
+        RealtimeCallContext context = new RealtimeCallContext(
+                callId, UUID.randomUUID(), null, caller, business, streamSid);
+        when(socket.getId()).thenReturn("socket-ai-start-failure");
+        when(socket.isOpen()).thenReturn(true);
+        when(providers.require("gemini")).thenReturn(provider);
+        when(provider.id()).thenReturn("gemini");
+        when(provider.configured()).thenReturn(true);
+        when(lifecycle.startInboundCall("twilio", callSid, caller, business)).thenReturn(callId);
+        when(lifecycle.markStreamStarted(callId, callSid, streamSid, "gemini")).thenReturn(context);
+        when(provider.createSession(eq(context), any(VoiceTransportSession.class))).thenReturn(ai);
+        doThrow(new IllegalStateException("upstream unavailable")).when(ai).start();
+        doAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, databaseContext.currentOrDenied().mode());
+            return null;
+        }).when(lifecycle).updateStatus(eq(callId), eq("failed"), isNull());
+
+        TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
+                signer, providers, health, lifecycle, control, databaseContext);
+        handler.afterConnectionEstablished(socket);
+        JSONObject start = new JSONObject()
+                .put("event", "start")
+                .put("streamSid", streamSid)
+                .put("start", new JSONObject()
+                        .put("streamSid", streamSid)
+                        .put("accountSid", "AC-ai-failure")
+                        .put("callSid", callSid)
+                        .put("customParameters", new JSONObject()
+                                .put("business", business)
+                                .put("caller", caller)
+                                .put("callSid", callSid)
+                                .put("provider", "gemini")
+                                .put("issuedAt", String.valueOf(issuedAt))
+                                .put("route", route)));
+        assertThrows(IllegalStateException.class,
+                () -> handler.handleTextMessage(socket, new TextMessage(start.toString())));
+        verify(lifecycle).updateStatus(callId, "failed", null);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+    }
+
     @Test
     void signedStartCreatesProviderSessionAndForwardsInboundAudio() throws Exception {
         TwilioProperties properties = new TwilioProperties();
@@ -102,6 +220,7 @@ class TwilioMediaStreamHandlerTest {
         VoiceProviderHealthRegistry health = new VoiceProviderHealthRegistry();
         CallLifecycleService lifecycle = mock(CallLifecycleService.class);
         TwilioCallControl control = mock(TwilioCallControl.class);
+        TenantDatabaseContext databaseContext = new TenantDatabaseContext();
         VoiceAiProvider provider = mock(VoiceAiProvider.class);
         VoiceAiSession ai = mock(VoiceAiSession.class);
         WebSocketSession socket = mock(WebSocketSession.class);
@@ -122,12 +241,35 @@ class TwilioMediaStreamHandlerTest {
         when(providers.require("gemini")).thenReturn(provider);
         when(provider.id()).thenReturn("gemini");
         when(provider.configured()).thenReturn(true);
-        when(lifecycle.startInboundCall("twilio", callSid, caller, business)).thenReturn(callId);
-        when(lifecycle.markStreamStarted(callId, callSid, streamSid, "gemini")).thenReturn(context);
+        when(lifecycle.startInboundCall("twilio", callSid, caller, business)).thenAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, databaseContext.currentOrDenied().mode());
+            return callId;
+        });
+        when(lifecycle.markStreamStarted(callId, callSid, streamSid, "gemini")).thenAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, databaseContext.currentOrDenied().mode());
+            return context;
+        });
         when(provider.createSession(eq(context), any(VoiceTransportSession.class))).thenReturn(ai);
+        when(provider.certificationSession(context)).thenReturn(true);
+        doAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, databaseContext.currentOrDenied().mode());
+            return null;
+        }).when(lifecycle).markCertification(callId);
+        doAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, databaseContext.currentOrDenied().mode());
+            return null;
+        }).when(lifecycle).markAiModel(eq(callId), any());
+        doAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, databaseContext.currentOrDenied().mode());
+            return null;
+        }).when(lifecycle).markStreamStopped(streamSid);
+        doAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, databaseContext.currentOrDenied().mode());
+            return null;
+        }).when(lifecycle).updateStatus(eq(callId), eq("failed"), isNull());
 
         TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
-                signer, providers, health, lifecycle, control);
+                signer, providers, health, lifecycle, control, databaseContext);
         handler.afterConnectionEstablished(socket);
 
         JSONObject start = new JSONObject()
@@ -156,6 +298,8 @@ class TwilioMediaStreamHandlerTest {
 
         verify(ai).start();
         verify(ai).acceptInboundAudio("/////w==");
+        verify(lifecycle).markCertification(callId);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
         verify(lifecycle).startInboundCall("twilio", callSid, caller, business);
         verify(lifecycle).markStreamStarted(callId, callSid, streamSid, "gemini");
 
@@ -184,5 +328,9 @@ class TwilioMediaStreamHandlerTest {
         handler.handleTextMessage(socket, new TextMessage(mark.toString()));
 
         verify(control).hangup(accountSid, callSid);
+        handler.handleTransportError(socket, new IllegalStateException("stream disconnected"));
+        verify(lifecycle, atLeastOnce()).updateStatus(callId, "failed", null);
+        verify(lifecycle).markStreamStopped(streamSid);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
     }
 }

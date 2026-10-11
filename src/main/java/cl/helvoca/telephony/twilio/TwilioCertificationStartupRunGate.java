@@ -1,5 +1,7 @@
 package cl.helvoca.telephony.twilio;
 
+import cl.helvoca.security.TenantDatabaseContext;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
@@ -28,16 +30,19 @@ public class TwilioCertificationStartupRunGate implements BeanPostProcessor {
     private final String runId;
     private final String direction;
     private final ObjectProvider<JdbcTemplate> jdbcTemplateProvider;
+    private final TenantDatabaseContext databaseContext;
 
     public TwilioCertificationStartupRunGate(
             @Value("${TWILIO_CERTIFICATION_CALL_ON_STARTUP:false}") boolean enabled,
             @Value("${TWILIO_CERTIFICATION_RUN_ID:}") String runId,
             @Value("${TWILIO_CERTIFICATION_DIRECTION:outbound-test}") String direction,
-            ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
+            ObjectProvider<JdbcTemplate> jdbcTemplateProvider,
+            TenantDatabaseContext databaseContext) {
         this.enabled = enabled;
         this.runId = runId;
         this.direction = TwilioCertificationStartupRunner.normalizeDirection(direction);
         this.jdbcTemplateProvider = jdbcTemplateProvider;
+        this.databaseContext = databaseContext;
     }
 
     @Override
@@ -63,7 +68,7 @@ public class TwilioCertificationStartupRunGate implements BeanPostProcessor {
             return false;
         }
 
-        try {
+        try (TenantDatabaseContext.Scope ignored = databaseContext.useSystem()) {
             JdbcTemplate jdbcTemplate = jdbcTemplateProvider.getObject();
             int inserted = jdbcTemplate.update("""
                     INSERT INTO twilio_certification_run (run_id, direction, claimed_at)
