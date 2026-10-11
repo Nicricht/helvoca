@@ -608,16 +608,23 @@ export function HomePage() {
     queryFn: getCurrentUser
   });
 
-  const isAdmin = meQuery.data?.roles?.includes("BUSINESS_ADMIN") ?? false;
+  // A successful HTTP status is not proof of a usable identity contract.
+  const validIdentity = Boolean(meQuery.data) &&
+    Array.isArray(meQuery.data?.roles) && meQuery.data.roles.length > 0;
+  const isAdmin = validIdentity && meQuery.data?.roles?.includes("BUSINESS_ADMIN") === true;
   const onboardingQuery = useQuery({
     queryKey: ["home", "onboarding"],
     queryFn: getOnboardingStatus,
     enabled: isAdmin
   });
 
-  const adminReady = !isAdmin || onboardingQuery.data?.readyForCalls === true;
-  const readyToLoad = Boolean(meQuery.data) && adminReady;
-  const roles = meQuery.data?.roles ?? [];
+  const onboardingValid = !isAdmin || !onboardingQuery.isSuccess ||
+    (Boolean(onboardingQuery.data) &&
+      typeof onboardingQuery.data?.readyForCalls === "boolean" &&
+      coreOnboardingSteps.every(step => typeof onboardingQuery.data?.[step.key] === "boolean"));
+  const adminReady = !isAdmin || (onboardingValid && onboardingQuery.data?.readyForCalls === true);
+  const readyToLoad = validIdentity && adminReady && onboardingValid;
+  const roles = validIdentity ? meQuery.data?.roles ?? [] : [];
   const canReadAttention = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
   const permissions = meQuery.data?.permissions;
   const canManageRequests = canReadAttention && (!Array.isArray(permissions)
@@ -681,7 +688,7 @@ export function HomePage() {
           <h1>Inicio</h1>
         </header>
 
-        {meQuery.isError ? (
+        {meQuery.isError || (meQuery.isSuccess && !validIdentity) ? (
           <HomeLoadFailure
             title={meQuery.error instanceof ApiError && meQuery.error.status === 403
               ? "No tienes permiso para acceder a Inicio."
@@ -690,7 +697,7 @@ export function HomePage() {
             retryLabel="Reintentar acceso"
             onRetry={() => { void meQuery.refetch(); }}
           />
-        ) : isAdmin && onboardingQuery.isError ? (
+        ) : isAdmin && (onboardingQuery.isError || !onboardingValid) ? (
           <HomeLoadFailure
             title="No pudimos comprobar la configuración de tu negocio."
             description="No se mostrarán métricas hasta comprobar que la configuración está lista."
