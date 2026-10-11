@@ -594,10 +594,13 @@ export function HomePage() {
     enabled: isAdmin
   });
 
-  const adminReady = !isAdmin || onboardingQuery.data?.readyForCalls === true;
-  const readyToLoad = Boolean(meQuery.data) && adminReady;
   const roles = meQuery.data?.roles ?? [];
-  const canReadAttention = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
+  // Match the server's hasAnyRole('BUSINESS_ADMIN', 'OPERATOR') operations contract.
+  const canReadOperations = roles.some(role => role === "BUSINESS_ADMIN" || role === "OPERATOR");
+  const adminReady = !isAdmin || onboardingQuery.data?.readyForCalls === true;
+  const readyToLoad = Boolean(meQuery.data) && canReadOperations && adminReady;
+  const restricted = Boolean(meQuery.data) && !canReadOperations;
+  const canReadAttention = canReadOperations;
   const permissions = meQuery.data?.permissions;
   const canManageRequests = canReadAttention && (!Array.isArray(permissions)
     || permissions.includes("REQUESTS_MANAGE")
@@ -685,6 +688,14 @@ export function HomePage() {
             <div>
               <strong>Cargando tu negocio…</strong>
               <span>Estamos preparando el resumen operativo.</span>
+            </div>
+          </div>
+        ) : restricted ? (
+          <div className={styles.errorState} role="status">
+            <TriangleAlert size={20} aria-hidden="true" />
+            <div>
+              <strong>Tu rol no tiene acceso al resumen operativo.</strong>
+              <span>Los datos de actividad y pendientes de otros negocios permanecen protegidos.</span>
             </div>
           </div>
         ) : operationsQuery.isError ? (
