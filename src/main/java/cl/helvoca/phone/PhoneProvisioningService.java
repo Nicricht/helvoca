@@ -6,6 +6,7 @@ import cl.helvoca.telephony.twilio.TwilioPhoneProvisioningClient;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -64,12 +65,14 @@ public class PhoneProvisioningService {
                 || !"TWILIO".equalsIgnoreCase(existing.getProvider())) {
             throw new ConflictException("El número no está asignado a este negocio en Twilio.");
         }
+        requireManagedAssignment(existing);
         TwilioPhoneProvisioningClient.VerifiedPhoneNumber verified = twilio.verifyManagedPhone(number);
         if (existing.getExternalId() != null && !existing.getExternalId().isBlank()
                 && !existing.getExternalId().equals(verified.sid())) {
             throw new ConflictException("El SID verificado no coincide con el registro existente.");
         }
         existing.setExternalId(verified.sid());
+        existing.setVoiceVerifiedAt(Instant.now());
         existing.setActive(true);
         return PhoneNumberResponse.from(repository.saveAndFlush(existing));
     }
@@ -85,6 +88,7 @@ public class PhoneProvisioningService {
         if (!"TWILIO".equalsIgnoreCase(existing.getProvider())) {
             throw new ConflictException("El proveedor de este número no está habilitado para voz Twilio.");
         }
+        requireManagedAssignment(existing);
         TwilioPhoneProvisioningClient.VerifiedPhoneNumber verified =
                 twilio.verifyManagedPhone(existing.getPhoneNumber());
         if (existing.getExternalId() != null && !existing.getExternalId().isBlank()
@@ -92,8 +96,20 @@ public class PhoneProvisioningService {
             throw new ConflictException("El SID del proveedor cambió; no se activó el número.");
         }
         existing.setExternalId(verified.sid());
+        existing.setVoiceVerifiedAt(Instant.now());
         existing.setActive(true);
         return PhoneNumberResponse.from(repository.saveAndFlush(existing));
+    }
+
+    private void requireManagedAssignment(PhoneNumber phone) {
+        String account = twilio.managedAccountSid();
+        if (!"MANAGED_PURCHASE".equals(phone.getTwilioBindingSource())
+                || account == null || account.isBlank()
+                || !account.equals(phone.getTwilioAccountSid())
+                || phone.getExternalId() == null || phone.getExternalId().isBlank()) {
+            throw new ConflictException(
+                    "Esta fila no tiene evidencia de aprovisionamiento para este tenant y cuenta Twilio. Requiere conciliación segura.");
+        }
     }
 
     public PhoneNumberResponse provision(ProvisionPhoneNumberRequest request) {
@@ -109,12 +125,14 @@ public class PhoneProvisioningService {
                     || !"TWILIO".equalsIgnoreCase(existing.getProvider())) {
                 throw new ConflictException("Este número ya pertenece a otro negocio o proveedor.");
             }
+            requireManagedAssignment(existing);
             TwilioPhoneProvisioningClient.VerifiedPhoneNumber verified = twilio.verifyManagedPhone(requestedNumber);
             if (existing.getExternalId() != null && !existing.getExternalId().isBlank()
                     && !existing.getExternalId().equals(verified.sid())) {
                 throw new ConflictException("El SID registrado difiere del SID propietario en Twilio.");
             }
             existing.setExternalId(verified.sid());
+            existing.setVoiceVerifiedAt(Instant.now());
             existing.setActive(true);
             return PhoneNumberResponse.from(repository.saveAndFlush(existing));
         }
@@ -131,7 +149,11 @@ public class PhoneProvisioningService {
         phone.setProvider("TWILIO");
         phone.setExternalId(provisioned.sid());
         phone.setPhoneNumber(actualNumber);
-        phone.setActive(true);
+        phone.setTwilioBindingSource("MANAGED_PURCHASE");
+        phone.setTwilioAccountSid(twilio.managedAccountSid());
+        // A purchased number is not live-ready until the carrier GET attests
+        // identity AND the deployed voice/status webhooks.
+        phone.setActive(false);
 
         try {
             return PhoneNumberResponse.from(repository.saveAndFlush(phone));
