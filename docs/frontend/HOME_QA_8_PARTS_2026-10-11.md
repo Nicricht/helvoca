@@ -25,7 +25,7 @@ Per `AGENTS.md` and `docs/engineering/QA_POLICY.md`:
 | 3 | Human attention: request/handoff actions, success/failure, confirmation cancellation, duplicate clicks, 401/403/409/503, stale/refetch, least privilege, malformed success payload | **IMPLEMENTED; CI PENDING** |
 | 4 | Backend / PostgreSQL: tenant-isolated dashboard metrics/calls/costs, Santiago/Auckland day boundaries, attention deduplication/order/LIMIT 100, RLS, concurrency and request lifecycle | **CERTIFIED exact SHA c6f2ebe8, CI 38114322289 GREEN** |
 | 5 | Commercial analytics: currency aggregation and formatting, null/missing/invalid values, daily/7/30-day query switching, no fabricated ROI or zero, timezone boundaries | **IMPLEMENTED; exact-HEAD CI PENDING** |
-| 6 | Responsive/accessibility and non-side-effect browser behavior: keyboard, focus, live states, reduced motion, multiple viewports, no provider/payment requests | PENDING |
+| 6 | Responsive/accessibility and non-side-effect browser behavior: keyboard, focus, live states, reduced motion, multiple viewports, no provider/payment requests | **IMPLEMENTED; exact-HEAD CI PENDING** |
 | 7 | Frontend original-source coverage measurement, per-file 100% statement/line/branch/function gate for affected scope; complete interaction-to-test traceability | PENDING |
 | 8 | Fast Gate, Full Gate, adverse review, exact-HEAD CI and coverage report, merge only if green, exact-main verification and evidence checkpoint | PENDING |
 
@@ -58,9 +58,9 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 
 ## Continuity checkpoint
 
-- Current tracked milestone: **Part 4 certified on exact SHA; Part 5 implemented with final CI pending**.
+- Current tracked milestone: **Part 4 certified; Parts 5–6 implemented, exact-HEAD CI pending**.
 - New branch is deliberately kept separate from `main`. Do not merge until Part 8 evidence satisfies the repository quality contract.
-- Resume next with **Part 6** only after inspecting Part 5 exact-HEAD CI, resolving any RED and verifying its 100% applicable contract. Do not redo Parts 1–4.
+- Resume next with **Part 7** only after inspecting final CI of Parts 5–6 and fixing any RED. Do not redo Parts 1–4.
 - After every phase update this document and draft PR with exact HEAD/evidence before responding to the user.
 
 ## Part 2 checkpoint: Inicio identity / onboarding / dashboard resilience
@@ -138,3 +138,31 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 **Explicit certification limitations:** 100% measured React source statement/line/branch/function coverage remains the dedicated Part 7 gate, not inferred from nine passing E2E cases. Part 5 browser/backend test execution requires exact-HEAD CI; do not merge or call this certified until green. Previous Part 4 green is distinct from Part 5 HEAD.
 
 **No side effects:** E2E API routes are mock-only, no real phone call, Twilio, WhatsApp, payment, production DB mutation or deployment.
+
+## Part 6 checkpoint: accessible Home, keyboard, reduced motion and reflow
+
+**Risk:** MEDIUM for presentation and keyboard access; HIGH for unsafe writes, false confirmations or provider effects. **FRAME CHANGE:** NO. Production edits are strictly inside Home's local page/components/styles.
+
+**Part 5 CI prerequisite:** Commit `d2cb0883f3d1509fc1d3316676264b3ed20c7a33` workflow `38115261252`. Fast Gate, Golden Journey, system integration, and inventory coverage jobs were green at last inspection; long-running full browser `test` job was still IN PROGRESS. This is NOT a completed green certification, and any final failure must be resolved before promoting Part 5/6.
+
+**New end-to-end cases:** **14** new browser test invocations appended to `e2e/react-home.spec.js` (10 singular cases, 4 viewport variants); uses current mock-only `bootHome` fixture:
+1. Tab + Space toggles sales period, validates `aria-pressed`, authenticated GET with `days=30`, actual keyboard focus outline.
+2. History's Enter-open and Space-close, `aria-expanded`, `aria-controls` and controlled `hidden` region without mutation.
+3. Keyboard confirmation cancellation results in **zero close requests**.
+4. Keyboard confirmation of explicit status close produces exactly one authorized PATCH after prior progress action.
+5. Incomplete onboarding `progressbar` value 25/100, keyboard link navigation target and visible focus, protected operations not fetched.
+6. Attention error exposes `role=alert`, Enter-triggered retry, still no mutation.
+7. Semantic headings, five labelled operational regions, and inaccessible decorative animation backgrounds.
+8. Motion preference reduce disables Home CSS animations/transitions (computed style and `matchMedia`).
+9. Pending commercial data has `aria-busy`, announces `status`, does not hide operational summaries; recovers when mocked response resolves.
+10. Navigating read-only periods, updating inbox GET, opening history never POSTs, calls Twilio or submits payments.
+11–14. Reflow and 24px minimum period control bounds at **320x640, 360x740, 1024x768, 1920x1080**, with no document/body horizontal overflow.
+
+**Smallest production fixes:**
+- `HomePage.module.css`: explicit keyboard `:focus-visible` outline for sales periods, onboarding link and hero action; scoped reduced-motion CSS override including background layers and transitions.
+- `HomePage.tsx`: history button declares `aria-controls="home-history-panel"` and an always addressable, conditionally hidden controlled region.
+- `HomeAttentionRows.tsx`: destructive inline confirmation receives a labelled accessible `group` with case context.
+
+**Verification limits:** The new JavaScript test file passed V8 syntax parsing with `new Function`; this does **not** prove browser tests passed. New exact-HEAD Fast Gate, browser E2E, mobile reflow, and source coverage measurements still need GitHub Actions evidence. Part 7 must enforce 100% executable source statement/line/branch/function coverage for all changed frontend behaviors, with complete interaction traceability. Never infer this from Playwright case counts alone.
+
+**Safety:** Existing mocked localhost browser routes only. No real phone calls, WhatsApp, Twilio, outbound messages, Stripe/provider payments, Railway deployment or production SQL writes. PR remains Draft and unmerged. Await user confirmation after this phase; do not automatically start Part 7.
