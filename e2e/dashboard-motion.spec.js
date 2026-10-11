@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./home-coverage-fixture');
 const fs = require('node:fs');
 
 const json = body => ({
