@@ -170,6 +170,27 @@ class CallLifecycleServiceTest {
     }
 
     @Test
+    void missingOrMismatchedProviderCallCannotTakeOverMediaStream() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallLifecycleService lifecycle = lifecycle(
+                mock(PhoneNumberRepository.class), mock(CustomerRepository.class),
+                calls, new CallCommercialProperties());
+        UUID callId = UUID.randomUUID();
+
+        assertThrows(cl.helvoca.common.NotFoundException.class,
+                () -> lifecycle.markStreamStarted(callId, "CA-missing", "MZ-foreign", "gemini"));
+
+        CallSession call = new CallSession();
+        call.setProviderCallId("CA-original");
+        when(calls.findById(callId)).thenReturn(Optional.of(call));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> lifecycle.markStreamStarted(callId, "CA-mismatched", "MZ-foreign", "gemini"));
+        assertNull(call.getStreamSid());
+        verify(calls, never()).saveAndFlush(any(CallSession.class));
+    }
+
+    @Test
     void mediaStreamStartIsIdempotentOnlyForSameBoundStream() {
         CallSessionRepository calls = mock(CallSessionRepository.class);
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
