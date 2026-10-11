@@ -22,7 +22,7 @@ Per `AGENTS.md` and `docs/engineering/QA_POLICY.md`:
 | --- | --- | --- |
 | 1 | Inspect current main, map coverage, repair stale special-certification Playwright paths, add fail-closed path-existence regression assertions, create draft PR and checkpoint | **IMPLEMENTED; CI NOT YET CERTIFIED** |
 | 2 | Inicio session/onboarding and dashboard lifecycle: missing token, 401/403/503, network interruption, loading, fail-closed malformed payloads, retry and next-step mappings | **IMPLEMENTED; CI PENDING** |
-| 3 | Human attention: request/handoff actions, success/failure, confirmation cancellation, duplicate clicks, 401/403/409, stale/refetch, least privilege | PENDING |
+| 3 | Human attention: request/handoff actions, success/failure, confirmation cancellation, duplicate clicks, 401/403/409/503, stale/refetch, least privilege, malformed success payload | **IMPLEMENTED; CI PENDING** |
 | 4 | Backend / PostgreSQL: dashboard count and daily-window correctness, tenant boundary, attention deduplication/order/LIMIT, concurrency and request lifecycle where applicable | PENDING |
 | 5 | Commercial analytics: currency aggregation and formatting, null/missing/invalid values, daily/7/30-day query switching, no fabricated ROI or zero, timezone boundaries | PENDING |
 | 6 | Responsive/accessibility and non-side-effect browser behavior: keyboard, focus, live states, reduced motion, multiple viewports, no provider/payment requests | PENDING |
@@ -58,9 +58,9 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 
 ## Continuity checkpoint
 
-- Current tracked milestone: **Parts 1 and 2 implemented**, exact certification pending.
+- Current tracked milestone: **Parts 1–3 implemented**, exact certification pending.
 - New branch is deliberately kept separate from `main`. Do not merge until Part 8 evidence satisfies the repository quality contract.
-- Resume next with **Part 3** after inspecting GitHub CI for exact HEAD, PR and this checkpoint. Parts 1-2 must not be repeated.
+- Resume next with **Part 4** after inspecting the exact PR HEAD and CI. Parts 1-3 must not be repeated; unresolved CI issues take priority.
 - After every phase update this document and draft PR with exact HEAD/evidence before responding to the user.
 
 ## Part 2 checkpoint: Inicio identity / onboarding / dashboard resilience
@@ -74,3 +74,30 @@ The branch replaces those paths with the **existing** suites `e2e/frontend-ux.sp
 - **Verification:** JavaScript syntax was parsed successfully through V8 (`new Function`) after test edits; full Playwright and TypeScript build must be proven via GitHub Actions on the exact final HEAD. A static/parse check is not a test pass. **RED was not directly observed in a completed runner**; tests were added before fixing the Home failures.
 - **CI:** workflows for intermediate Part 2 commits were pending or in progress when authored. Consult latest final-HEAD run before completing or merging.
 - **No merge:** PR remains draft until complete eight-part QA and coverage evidence.
+
+## Part 3 checkpoint: actionable request/handoff integrity
+
+**Risk:** HIGH for explicit human mutation, authorization and false-clear data. **FRAME CHANGE:** NO.
+
+**New test suite:** `e2e/react-home-attention-hardening.spec.js`, **20** deterministic Playwright cases:
+- no mutations at first render/refetch; no provider calls;
+- authorized request OPEN -> IN_PROGRESS PATCH;
+- request resolution confirmation and cancellation without mutation;
+- HTTP 409/403 request failures preserve authoritative state and allow controlled retry;
+- handoff take/resolve failures (HTTP 503) preserve open cases and successful retry;
+- handoff resolution confirmation cancellation without POST;
+- duplicated same-tick progress/close click yields at most one mutation;
+- stale visible items are non-actionable while attention query refetches;
+- failed GET 503/403 never becomes "Todo bajo control"; retry recovery;
+- staff without attention role cannot read/mutate;
+- operator lacking `REQUESTS_MANAGE` cannot mutate requests; a separate handoff can be acknowledged by operator per existing `HumanHandoffController` role authorization;
+- request PATCH 401 clears session, does not persist a fabricated success;
+- malformed HTTP 200 `null`/entry from attention API fails closed and can recover upon valid refetch.
+
+**Smallest behavioral fixes:** `HomeAttentionRows.tsx` uses a synchronous `useRef` mutation lock alongside React state; actionable buttons are disabled during authoritative refetch. `getHumanAttention` validates the HTTP 200 response is an array of actionable records before confirming the queue state. **No Java, database, global AppShell, payment, provider, or production mutation.**
+
+**Evidence:** New JavaScript Playwright source passed V8 parse through `new Function` before commit. This is *not* test execution. New source-code branches in `HomeAttentionRows.tsx` and `features/operations/api.ts` must reach the project-required **100% measured frontend coverage** in Part 7. Browser suite and Full Gate are awaiting exact-HEAD CI. Any observed failure requires investigation and fresh commit/certification.
+
+**Previous Part 2 CI:** exact SHA `4fb4666002f1f1d064e14fbcca0207fc3d37fba5`, workflow `38113544485`: Fast Gate, Golden Journey and system-integration jobs were green when last checked; backend/full browser `test` and Inventory coverage were still in progress. It cannot certify later HEAD commits.
+
+**Safety and hold:** Mock-only browser calls, no live calls/messages/payments. PR stays Draft; no merge until all eight phases, Fast/Full Gate and exact-HEAD code/source/invariant evidence are green.
