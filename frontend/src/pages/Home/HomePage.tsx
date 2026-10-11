@@ -186,7 +186,7 @@ function HeroOverview({ dashboard, attention }: { dashboard: OperationsDashboard
 
         <h2>Tu negocio está siendo atendido.</h2>
         <p>
-          RecepVoz atendió <strong>{dashboard.callsToday}</strong> llamadas hoy y creó{" "}
+          Hoy se registraron <strong>{dashboard.callsToday}</strong> llamadas y{" "}
           <strong>{dashboard.bookingsToday}</strong> reservas.
         </p>
 
@@ -323,9 +323,9 @@ function TodaySummary({ dashboard }: { dashboard: OperationsDashboard }) {
     : 0;
 
   const items = [
-    { label: "Llamadas atendidas", value: dashboard.callsToday, meta: "hoy", icon: Phone, tone: "cyan" },
-    { label: "Reservas generadas", value: dashboard.bookingsToday, meta: "hoy", icon: CalendarDays, tone: "violet" },
-    { label: "Minutos gestionados por IA", value: managedMinutes, meta: "en llamadas", icon: Clock3, tone: "emerald" }
+    { label: "Llamadas registradas", value: dashboard.callsToday, meta: "hoy", icon: Phone, tone: "cyan" },
+    { label: "Reservas registradas", value: dashboard.bookingsToday, meta: "hoy", icon: CalendarDays, tone: "violet" },
+    { label: "Minutos de llamadas registradas", value: managedMinutes, meta: "en llamadas", icon: Clock3, tone: "emerald" }
   ] as const;
 
   const quiet = dashboard.callsToday === 0 && dashboard.bookingsToday === 0;

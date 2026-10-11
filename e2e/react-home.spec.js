@@ -343,11 +343,11 @@ test.describe('React Home migration', () => {
     const today = page.getByRole('region', { name: 'Resultados de hoy' });
     await expect(today).toBeVisible();
     await expect(today).toContainText('6');
-    await expect(today).toContainText(/llamadas atendidas/i);
+    await expect(today).toContainText(/llamadas registradas/i);
     await expect(today).toContainText('4');
-    await expect(today).toContainText(/reservas generadas/i);
+    await expect(today).toContainText(/reservas registradas/i);
     await expect(today).toContainText('15');
-    await expect(today).toContainText(/minutos.*IA|min.*gestionados/i);
+    await expect(today).toContainText(/minutos de llamadas registradas/i);
 
     const attention = page.getByRole('region', { name: 'Necesita tu atención' });
     await expect(attention).toBeVisible();
@@ -374,6 +374,150 @@ test.describe('React Home migration', () => {
     expect(requests.some(request => request.url.includes('/operations/pilot-metrics'))).toBe(false);
     expect(requests.some(request => request.url.includes('/operations/readiness'))).toBe(false);
   });
+
+
+  test('daily totals describe all logged calls and bookings without claiming each was answered or AI-created', async ({ page }) => {
+    const api = await bootHome(page, {
+      operations: {
+        ...READY_OPERATIONS,
+        callsToday: 2,
+        bookingsToday: 1,
+        callFailuresToday: 2,
+        recentCalls: [{
+          ...READY_OPERATIONS.recentCalls[1],
+          status: 'FAILED',
+          resolution: 'FAILED'
+        }]
+      }
+    });
+    await page.goto('/app');
+
+    const hero = page.getByRole('region', { name: 'Estado de tu negocio' });
+    const today = page.getByRole('region', { name: 'Resultados de hoy' });
+    await expect(hero).toContainText('Hoy se registraron 2 llamadas y 1 reservas.');
+    await expect(hero).not.toContainText(/atendió|creó/i);
+    await expect(today).toContainText('Llamadas registradas');
+    await expect(today).toContainText('Reservas registradas');
+    await expect(today).not.toContainText(/llamadas atendidas|reservas generadas/i);
+    await expect(page.getByRole('region', { name: 'Necesita tu atención' }))
+      .toContainText('2 fallos de llamada');
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('in-progress provider call displays live status without manufacturing a completed call', async ({ page }) => {
+    const active = {
+      ...READY_OPERATIONS.recentCalls[0],
+      status: 'IN_PROGRESS',
+      resolution: null
+    };
+    const api = await bootHome(page, {
+      operations: {
+        ...READY_OPERATIONS,
+        callsToday: 1,
+        bookingsToday: 0,
+        recentCalls: [active],
+        recentRequests: []
+      }
+    });
+    await page.goto('/app');
+
+    await expect(page.locator('[data-visual-page="home"]')).toContainText('Atendiendo ahora');
+    await expect(page.getByRole('region', { name: 'Última actividad' })).toContainText('En curso');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toContainText('Llamadas registradas');
+    expect(api.requests.filter(request => request.url.includes('/api/v1/') && request.method !== 'GET')).toEqual([]);
+  });
+
+  test('latest activity picks a newer human request instead of an older call', async ({ page }) => {
+    await bootHome(page, {
+      operations: {
+        ...READY_OPERATIONS,
+        recentCalls: [{ ...READY_OPERATIONS.recentCalls[0], startedAt: '2026-10-02T14:00:00Z' }],
+        recentRequests: [{
+          ...READY_OPERATIONS.recentRequests[0],
+          createdAt: '2026-10-02T15:00:00Z',
+          title: 'Solicitud más reciente'
+        }]
+      }
+    });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Última actividad' });
+    await expect(panel).toContainText('Solicitud más reciente');
+    await expect(panel).toContainText('Abierta');
+    await expect(panel).not.toContainText('+56911112222');
+  });
+
+  test('latest activity chooses the newer call and formats time in the business timezone', async ({ page }) => {
+    const instant = '2026-10-02T15:00:00Z';
+    const expected = new Intl.DateTimeFormat('es-CL', {
+      hour: '2-digit', minute: '2-digit', timeZone: 'America/Santiago'
+    }).format(new Date(instant));
+    const api = await bootHome(page, {
+      operations: {
+        ...READY_OPERATIONS,
+        timezone: 'America/Santiago',
+        recentCalls: [{
+          ...READY_OPERATIONS.recentCalls[0],
+          startedAt: instant,
+          resolution: 'BOOKING_CREATED'
+        }],
+        recentRequests: [{
+          ...READY_OPERATIONS.recentRequests[0],
+          createdAt: '2026-10-02T14:59:59Z'
+        }]
+      }
+    });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/app');
+    const latest = page.getByRole('region', { name: 'Última actividad' });
+    await expect(latest).toContainText('+56911112222');
+    await expect(latest).toContainText('Reserva creada');
+    await expect(latest.locator('time')).toHaveAttribute('dateTime', instant);
+    await expect(latest.locator('time')).toHaveText(expected);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('invalid timezone never crashes the activity summary', async ({ page }) => {
+    await bootHome(page, {
+      operations: { ...READY_OPERATIONS, timezone: 'Invalid/Business_Zone' }
+    });
+    await page.goto('/app');
+    const latest = page.getByRole('region', { name: 'Última actividad' });
+    await expect(latest).toBeVisible();
+    await expect(latest.locator('time')).toBeEmpty();
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
+  });
+
+  test('business with only reservations does not appear empty despite zero calls', async ({ page }) => {
+    await bootHome(page, {
+      operations: {
+        ...EMPTY_OPERATIONS,
+        bookingsToday: 3
+      },
+      attention: []
+    });
+    await page.goto('/app');
+    const today = page.getByRole('region', { name: 'Resultados de hoy' });
+    await expect(today).toContainText('Reservas registradas');
+    await expect(today).not.toContainText('Todavía no hay actividad registrada hoy.');
+  });
+
+  for (const [seconds, minutes] of [
+    [0, 0], [1, 1], [29, 1], [59, 1],
+    [60, 1], [89, 1], [90, 2], [3600, 60]
+  ]) {
+    test(`daily call duration ${seconds}s maps to ${minutes} rounded minutes`, async ({ page }) => {
+      await bootHome(page, {
+        operations: {
+          ...READY_OPERATIONS,
+          callDurationSecondsToday: seconds
+        }
+      });
+      await page.goto('/app');
+      const section = page.getByRole('region', { name: 'Resultados de hoy' });
+      const minuteMetric = section.locator('article').filter({ hasText: 'Minutos de llamadas registradas' });
+      await expect(minuteMetric.locator('strong')).toHaveText(String(minutes));
+    });
+  }
 
   test('loads a deduplicated actionable attention inbox and keeps the human history secondary', async ({ page }) => {
     const api = await bootHome(page);

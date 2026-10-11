@@ -52,6 +52,15 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 - [x] Validate onboarding API payloads at the UI boundary; missing readiness or non-boolean step flags fail closed with a retry action.
 - [ ] Confirm exact HEAD browser tests, backend tests, real-stack integration and all required CI jobs.
 
+## Phase 4 implementation
+
+- [x] Match frontend count labels to backend truth: logged calls can include failed/unanswered calls; new bookings can have multiple sources. Avoid claiming all calls were answered or all bookings were AI-created.
+- [x] Exercise in-progress call chip and resolution labels with safe Playwright mocks.
+- [x] Exercise mixed recent requests/calls ordering and business-local display time, including invalid timezone fallback.
+- [x] Exercise no-call/booking-present state and exact duration rounding boundaries (0/1/29/59/60/89/90/3600 seconds).
+- [x] Add backend Mockito contract tests for per-tenant local-day query boundaries, simulator/certification filters, failed call counts, booking exclusion, read-model details and null aggregates.
+- [ ] Confirm all Full Gate jobs on the **exact latest PR HEAD** including Playwright and PostgreSQL before certifying Phase 4.
+
 ## Change safety
 
 - No existing database schema or production credentials touched.
