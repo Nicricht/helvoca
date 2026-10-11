@@ -166,7 +166,9 @@ if [[ "$RUN_SOFTWARE_FACTORY" == true ]]; then
 fi
 
 if [[ "$RUN_OPENAI_IMPORT_PILOT" == true ]]; then
-  echo "Running no-network OpenAI document pilot safety tests..."
+  echo "Installing reproducible synthetic menu image dependency..."
+  python3 -m pip install --disable-pip-version-check --quiet Pillow==11.3.0
+  echo "Running OFFLINE provider, benchmark and synthetic-document safety tests..."
   python3 -m unittest discover -s scripts/pilot -p 'test_*.py' -v
 fi
 

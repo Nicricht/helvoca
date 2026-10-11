@@ -80,3 +80,21 @@ python3 scripts/pilot/gemini_import_probe.py --send \
 ```
 
 El puntaje compara todos los campos explícitos y se detiene después del primer resultado inseguro. No existe acción que publique productos o promociones. En CI se verifican regresiones usando respuestas simuladas: **nunca se dispara la API externa**. El ground truth se creó revisando la tercera imagen ficticia; los límites y credenciales humanas del piloto siguen vigentes.
+
+## Pruebas automáticas de principio a fin (sin subir menús a mano)
+
+Genera tres archivos JPEG **ficticios** reproducibles (limpio, inclinado, con brillo), sus respuestas esperadas y un manifiesto. Las imágenes son carteles con texto sintetizado, no fotografías de platos. El tercer menú manual sigue siendo un caso independiente.
+
+```bash
+python3 -m pip install Pillow==11.3.0
+python3 scripts/pilot/fixture_factory.py --out /tmp/recepvoz-gemini-menu-tests
+python3 scripts/pilot/benchmark_batch.py /tmp/recepvoz-gemini-menu-tests/manifest.json --out /tmp/recepvoz-gemini-offline
+```
+
+**Importante:** estas órdenes son OFFLINE. Revisan archivos y autorización sin solicitar IA real. Para hacer una única corrida real de hasta 3 solicitudes, el propietario debe verificar personalmente proyecto gratuito, facturación ausente y la clave aislada, configurar las variables `GEMINI_PILOT_*` conforme a la guía anterior y utilizar un directorio **nuevo** fuera del repositorio:
+
+```bash
+python3 scripts/pilot/benchmark_batch.py /tmp/recepvoz-gemini-menu-tests/manifest.json --out /tmp/recepvoz-gemini-live-first --send
+```
+
+El resultado de cada llamada se valida automáticamente contra los datos visibles revisados: se detiene en el primer error; no hay reintentos ni escrituras comerciales. Nunca colocar la clave en este repositorio, un issue, un chat o la UI web. La existencia de una clave Gemini en Railway para **voz/mensajería** no autoriza importaciones con esa clave ni un proyecto diferente. La ejecución CI no realiza peticiones de IA y no puede probar calidad visual del modelo en vivo.
