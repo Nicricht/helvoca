@@ -221,7 +221,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
             catch (Exception ignored) { }
         }
         if (failed && state.callId != null) {
-            try { lifecycle.updateStatus(state.callId, "failed", null); }
+            try { databaseContext.runAsSystem(() -> lifecycle.updateStatus(state.callId, "failed", null)); }
             catch (Exception ignored) { }
         }
     }
