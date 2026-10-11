@@ -35,6 +35,8 @@ class TwilioMediaStreamHandlerTest {
         CallLifecycleService lifecycle = mock(CallLifecycleService.class);
         TwilioCallControl control = mock(TwilioCallControl.class);
         TenantDatabaseContext databaseContext = new TenantDatabaseContext();
+        TwilioCallBindingGuard bindingGuard = mock(TwilioCallBindingGuard.class);
+        when(bindingGuard.allowsMedia(anyString(), anyString(), anyString(), anyString())).thenReturn(true);
         VoiceAiProvider provider = mock(VoiceAiProvider.class);
         VoiceAiSession ai = mock(VoiceAiSession.class);
         WebSocketSession socket = mock(WebSocketSession.class);
@@ -63,7 +65,7 @@ class TwilioMediaStreamHandlerTest {
         when(provider.createSession(any(RealtimeCallContext.class), any(VoiceTransportSession.class))).thenReturn(ai);
 
         TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
-                signer, providers, health, lifecycle, control, databaseContext);
+                signer, providers, health, lifecycle, control, databaseContext, bindingGuard);
         handler.afterConnectionEstablished(socket);
 
         JSONObject start = new JSONObject()
@@ -110,6 +112,8 @@ class TwilioMediaStreamHandlerTest {
         CallLifecycleService lifecycle = mock(CallLifecycleService.class);
         TwilioCallControl control = mock(TwilioCallControl.class);
         TenantDatabaseContext databaseContext = new TenantDatabaseContext();
+        TwilioCallBindingGuard bindingGuard = mock(TwilioCallBindingGuard.class);
+        when(bindingGuard.allowsMedia(anyString(), anyString(), anyString(), anyString())).thenReturn(true);
         VoiceAiProvider provider = mock(VoiceAiProvider.class);
         WebSocketSession socket = mock(WebSocketSession.class);
         String callSid = "CA-db-scope";
@@ -130,7 +134,7 @@ class TwilioMediaStreamHandlerTest {
                 });
 
         TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
-                signer, providers, health, lifecycle, control, databaseContext);
+                signer, providers, health, lifecycle, control, databaseContext, bindingGuard);
         handler.afterConnectionEstablished(socket);
         JSONObject start = new JSONObject()
                 .put("event", "start")
@@ -162,6 +166,8 @@ class TwilioMediaStreamHandlerTest {
         CallLifecycleService lifecycle = mock(CallLifecycleService.class);
         TwilioCallControl control = mock(TwilioCallControl.class);
         TenantDatabaseContext databaseContext = new TenantDatabaseContext();
+        TwilioCallBindingGuard bindingGuard = mock(TwilioCallBindingGuard.class);
+        when(bindingGuard.allowsMedia(anyString(), anyString(), anyString(), anyString())).thenReturn(true);
         VoiceAiProvider provider = mock(VoiceAiProvider.class);
         VoiceAiSession ai = mock(VoiceAiSession.class);
         WebSocketSession socket = mock(WebSocketSession.class);
@@ -189,7 +195,7 @@ class TwilioMediaStreamHandlerTest {
         }).when(lifecycle).updateStatus(eq(callId), eq("failed"), isNull());
 
         TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
-                signer, providers, health, lifecycle, control, databaseContext);
+                signer, providers, health, lifecycle, control, databaseContext, bindingGuard);
         handler.afterConnectionEstablished(socket);
         JSONObject start = new JSONObject()
                 .put("event", "start")
@@ -221,6 +227,8 @@ class TwilioMediaStreamHandlerTest {
         CallLifecycleService lifecycle = mock(CallLifecycleService.class);
         TwilioCallControl control = mock(TwilioCallControl.class);
         TenantDatabaseContext databaseContext = new TenantDatabaseContext();
+        TwilioCallBindingGuard bindingGuard = mock(TwilioCallBindingGuard.class);
+        when(bindingGuard.allowsMedia(anyString(), anyString(), anyString(), anyString())).thenReturn(true);
         VoiceAiProvider provider = mock(VoiceAiProvider.class);
         VoiceAiSession ai = mock(VoiceAiSession.class);
         WebSocketSession socket = mock(WebSocketSession.class);
@@ -269,7 +277,7 @@ class TwilioMediaStreamHandlerTest {
         }).when(lifecycle).updateStatus(eq(callId), eq("failed"), isNull());
 
         TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
-                signer, providers, health, lifecycle, control, databaseContext);
+                signer, providers, health, lifecycle, control, databaseContext, bindingGuard);
         handler.afterConnectionEstablished(socket);
 
         JSONObject start = new JSONObject()
