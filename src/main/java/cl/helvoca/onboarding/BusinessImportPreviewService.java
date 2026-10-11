@@ -654,7 +654,13 @@ public class BusinessImportPreviewService {
             List<SourcePreview> sources,
             List<String> warnings,
             boolean aiUsed
-    ) {}
+    ) {
+        // Keep the established preview constructor usable by older controllers/tests.
+        public Preview(String businessName, List<ProductProposal> products,
+                       List<SourcePreview> sources, List<String> warnings, boolean aiUsed) {
+            this(businessName, products, List.of(), sources, warnings, aiUsed);
+        }
+    }
 
     record SemanticResult(List<ProductProposal> products, List<String> warnings) {}
 }
