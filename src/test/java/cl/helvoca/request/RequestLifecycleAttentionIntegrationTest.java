@@ -50,6 +50,7 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
     @Autowired BusinessRequestService requests;
     @Autowired RequestLifecycleEventService events;
     @Autowired HumanAttentionService attention;
+    @Autowired cl.helvoca.operations.OperationsDashboardService homeDashboard;
     @Autowired HumanHandoffService handoffs;
     @Autowired JdbcTemplate jdbc;
     @Autowired MessagingConversationRepository messagingConversations;
@@ -500,6 +501,85 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
                 String.class, business.getId(), request.id()));
         assertEquals(1, databaseContext.callAsTenant(business.getId(), attention::pending)
                 .stream().filter(item -> item.id().equals(request.id())).count());
+    }
+
+
+    @Test
+    void homeDashboardRealPostgresIsTenantScopedAndUsesHalfOpenLocalDayWithNoSimulatorCost() {
+        Business tenantA = new Business();
+        tenantA.setName("Home Dashboard A");
+        tenantA.setTimezone("Pacific/Auckland");
+        tenantA = businesses.saveAndFlush(tenantA);
+        Business tenantB = new Business();
+        tenantB.setName("Home Dashboard B");
+        tenantB.setTimezone("UTC");
+        tenantB = businesses.saveAndFlush(tenantB);
+
+        UUID a = tenantA.getId();
+        UUID b = tenantB.getId();
+        java.time.ZoneId zone = java.time.ZoneId.of("Pacific/Auckland");
+        java.time.LocalDate today = java.time.LocalDate.now(zone);
+        java.time.Instant dayStart = today.atStartOfDay(zone).toInstant();
+        java.time.Instant nextDayStart = today.plusDays(1).atStartOfDay(zone).toInstant();
+        insertHomeSyntheticCall(a, dayStart, "twilio", false, "COMPLETED", 60, "0.60");
+        insertHomeSyntheticCall(a, dayStart.plusSeconds(2), "twilio", false, "FAILED", 30, "0.20");
+        insertHomeSyntheticCall(a, dayStart.plusSeconds(3), "simulator", false, "COMPLETED", 999, "100.00");
+        insertHomeSyntheticCall(a, dayStart.plusSeconds(4), "twilio", true, "COMPLETED", 999, "100.00");
+        insertHomeSyntheticCall(a, nextDayStart, "twilio", false, "COMPLETED", 300, "5.00");
+        insertHomeSyntheticCall(a, dayStart.minusSeconds(1), "twilio", false, "COMPLETED", 300, "5.00");
+        insertHomeSyntheticCall(b, dayStart.plusSeconds(5), "twilio", false, "COMPLETED", 999, "100.00");
+
+        authenticate(a);
+        var requestA = requests.create(new BusinessRequestDtos.Create(
+                "GENERAL", "Only dashboard A", null, null, null, RequestPriority.NORMAL, null));
+        requests.create(new BusinessRequestDtos.Create(
+                "GENERAL", "Second A request", null, null, null, RequestPriority.HIGH, null));
+        authenticate(b);
+        var requestB = requests.create(new BusinessRequestDtos.Create(
+                "GENERAL", "Only dashboard B", null, null, null, RequestPriority.NORMAL, null));
+
+        authenticate(a);
+        var result = databaseContext.callAsTenant(a, homeDashboard::dashboard);
+        assertEquals("Home Dashboard A", result.businessName());
+        assertEquals("Pacific/Auckland", result.timezone());
+        assertEquals(today, java.time.OffsetDateTime.parse(result.localNow()).toLocalDate());
+        assertEquals(2, result.callsToday(), "beginning of day included, next day excluded");
+        assertEquals(1, result.callFailuresToday(), "only production failure in local day");
+        assertEquals(90, result.callDurationSecondsToday(), "simulator/certification excluded");
+        assertEquals(0, new java.math.BigDecimal("0.80")
+                .compareTo(result.estimatedCallCostTodayUsd()), "simulator/certification cost excluded");
+        assertEquals(2, result.openRequests(), "only tenant A's OPEN requests");
+        assertEquals(0, result.bookingsToday());
+        assertEquals(0, result.newCustomersToday());
+        assertTrue(result.recentRequests().stream().anyMatch(x -> x.id().equals(requestA.id())));
+        assertFalse(result.recentRequests().stream().anyMatch(x -> x.id().equals(requestB.id())));
+        assertTrue(result.recentCalls().stream().allMatch(x ->
+                x.durationSeconds() == 30 || x.durationSeconds() == 60 || x.durationSeconds() == 300));
+        assertFalse(result.recentCalls().stream().anyMatch(x -> x.durationSeconds() == 999));
+
+        requests.setStatus(requestA.id(), RequestStatus.RESOLVED);
+        assertEquals(1, databaseContext.callAsTenant(a, homeDashboard::dashboard).openRequests());
+        authenticate(b);
+        var foreignResult = databaseContext.callAsTenant(b, homeDashboard::dashboard);
+        assertEquals("Home Dashboard B", foreignResult.businessName());
+        assertEquals(1, foreignResult.callsToday());
+        assertEquals(1, foreignResult.openRequests());
+        assertFalse(foreignResult.recentRequests().stream()
+                .anyMatch(x -> x.id().equals(requestA.id())));
+    }
+
+    private void insertHomeSyntheticCall(UUID businessId, java.time.Instant startedAt,
+                                         String provider, boolean certification, String status,
+                                         int durationSeconds, String totalCost) {
+        jdbc.update("""
+                INSERT INTO call_session(
+                    id, business_id, telephony_provider, provider_call_id, destination_number,
+                    direction, status, started_at, duration_seconds, estimated_total_cost_usd,
+                    certification, created_at, updated_at)
+                VALUES (?, ?, ?, ?, '+56900000000', 'INBOUND', ?, ?, ?, ?, ?, NOW(), NOW())
+                """, UUID.randomUUID(), businessId, provider, "home-qa-" + UUID.randomUUID(),
+                status, java.sql.Timestamp.from(startedAt), durationSeconds,
+                new java.math.BigDecimal(totalCost), certification);
     }
 
     private int receiptCount(UUID businessId, UUID requestId) {
