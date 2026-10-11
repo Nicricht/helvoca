@@ -221,7 +221,8 @@ function ValueGenerated({
   refreshing,
   failed,
   days,
-  onDaysChange
+  onDaysChange,
+  onRefresh
 }: {
   data?: SalesAnalytics;
   loading: boolean;
@@ -229,6 +230,7 @@ function ValueGenerated({
   failed: boolean;
   days: number;
   onDaysChange: (days: number) => void;
+  onRefresh: () => void;
 }) {
   const totals = attributedTotals(data);
   const single = totals.length === 1 ? totals[0] : null;
@@ -271,6 +273,13 @@ function ValueGenerated({
               {period.label}
             </button>
           ))}
+          <button
+            type="button"
+            className={styles.periodButton}
+            disabled={loading || refreshing}
+            aria-label="Actualizar valor comercial"
+            onClick={onRefresh}
+          >Actualizar</button>
         </div>
       </div>
 
@@ -750,6 +759,7 @@ export function HomePage() {
               failed={salesQuery.isError}
               days={salesDays}
               onDaysChange={setSalesDays}
+              onRefresh={() => { void salesQuery.refetch(); }}
             />
 
             <TodaySummary dashboard={operationsQuery.data} />
@@ -776,14 +786,14 @@ export function HomePage() {
               </section>
             )}
           </motion.div>
-        ) : readyToLoad ? (
+        ) : (
           <HomeLoadFailure
             title="No pudimos validar el resumen operativo."
             description="El servidor no entregó datos utilizables. No mostraremos cifras inventadas."
             retryLabel="Reintentar resumen"
             onRetry={() => { void operationsQuery.refetch(); }}
           />
-        ) : null}
+        )}
       </main>
       </MotionConfig>
     </AppShell>
