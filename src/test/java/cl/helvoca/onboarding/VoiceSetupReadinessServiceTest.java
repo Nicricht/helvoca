@@ -39,6 +39,7 @@ class VoiceSetupReadinessServiceTest {
         when(onboarding.status()).thenReturn(new OnboardingStatusResponse(
                 true, true, true, false, false, true, true, "READY"));
         when(profiles.current()).thenReturn(profile(true, true));
+        when(agents.configuredCurrent()).thenReturn(true);
         when(agents.current()).thenReturn(agent);
         when(agent.isActive()).thenReturn(true);
         when(twilio.configured()).thenReturn(true);
@@ -147,6 +148,28 @@ class VoiceSetupReadinessServiceTest {
         var guide = service.current();
         assertFalse(step(guide, "BUSINESS").complete());
         assertFalse(step(guide, "AGENT").complete());
+        assertFalse(guide.configurationReady());
+    }
+
+    @Test
+    void defaultAgentThatWasNeverSavedDoesNotPassTheAgentGate() {
+        setupComplete();
+        when(agents.configuredCurrent()).thenReturn(false);
+        var guide = service.current();
+        assertFalse(step(guide, "AGENT").complete());
+        assertFalse(guide.configurationReady());
+    }
+
+    @Test
+    void phoneFromAnotherTenantNeverAppearsEvenIfItIsManaged() {
+        setupComplete();
+        PhoneNumber foreign = managed();
+        foreign.setBusinessId(UUID.randomUUID());
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId)).thenReturn(List.of(foreign));
+        var guide = service.current();
+
+        assertNull(guide.activePhoneNumber());
+        assertFalse(step(guide, "PHONE").complete());
         assertFalse(guide.configurationReady());
     }
 
