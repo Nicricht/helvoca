@@ -195,19 +195,20 @@ public class TwilioVoiceController {
             }
         }
 
-        if (!"outbound-test".equals(direction)) {
-            try {
-                UUID callId = calls.startInboundCall(callSid, callerPhone, businessPhone);
-                if ("inbound-certification".equals(direction)) {
-                    calls.markCertification(callId);
-                }
-            } catch (CallCapacityExceededException e) {
-                log.warn("Rejecting Twilio {} call={} because tenant capacity is full", direction, callSid);
-                return ResponseEntity.ok(BUSY_REJECT_TWIML);
-            } catch (NotFoundException e) {
-                log.warn("Blocking Twilio {} call={} because destination is not registered", direction, callSid);
-                return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+        // Outbound test calls must also be admitted and persisted BEFORE TwiML
+        // is issued; otherwise their subsequent media socket has no trusted call
+        // to bind to, and unauthenticated callers could create one from WS input.
+        try {
+            UUID callId = calls.startInboundCall(callSid, callerPhone, businessPhone);
+            if ("inbound-certification".equals(direction)) {
+                calls.markCertification(callId);
             }
+        } catch (CallCapacityExceededException e) {
+            log.warn("Rejecting Twilio {} call={} because tenant capacity is full", direction, callSid);
+            return ResponseEntity.ok(BUSY_REJECT_TWIML);
+        } catch (NotFoundException e) {
+            log.warn("Blocking Twilio {} call={} because destination is not registered", direction, callSid);
+            return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
 
         var routeDecision = providerOverride != null
