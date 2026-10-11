@@ -98,7 +98,7 @@ class PilotSafetyTests(unittest.TestCase):
         self.assertEqual("Café", parsed["products"][0]["name"])
         with self.assertRaisesRegex(PilotBlocked, "valid JSON"):
             parse_proposals({"output": [{"content": [{"type": "output_text", "text": "not json"}]}]})
-        with self.assertRaisesRegex(PilotBlocked, "Missing output"):
+        with self.assertRaisesRegex(PilotBlocked, "Missing model output"):
             parse_proposals({"output": []})
         with self.assertRaisesRegex(PilotBlocked, "review contract"):
             parse_proposals({"output": [{"content": [
