@@ -858,6 +858,43 @@ test.describe('React Home migration', () => {
     await expect(sales).not.toContainText('Valor no disponible');
   });
 
+  test('explicit commercial refresh displays staleness without hiding verified value or duplicating writes', async ({ page }) => {
+    let release;
+    let calls = 0;
+    const gate = new Promise(resolve => { release = resolve; });
+    const state = await bootHome(page);
+    await page.route('**/api/v1/commercial/analytics**', async route => {
+      calls += 1;
+      if (calls > 1) await gate;
+      return route.fulfill(json(READY_ANALYTICS));
+    });
+    await page.goto('/app');
+    const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
+    await expect(value).toContainText('$209.900');
+    const refresh = value.getByRole('button', { name: 'Actualizar valor comercial' });
+    await refresh.click();
+    await expect(value).toContainText('Actualizando…');
+    await expect(refresh).toBeDisabled();
+    await expect(value).toContainText('$209.900');
+    expect(state.attentionMutations()).toBe(0);
+    release();
+    await expect(refresh).toBeEnabled();
+    await expect(value).not.toContainText('Actualizando…');
+    expect(calls).toBe(2);
+  });
+
+  test('missing recent request status remains a clearly labelled solicitud', async ({ page }) => {
+    await bootHome(page, { operations: {
+      ...READY_OPERATIONS,
+      recentCalls: [],
+      recentRequests: [{ ...READY_OPERATIONS.recentRequests[0], status: null }]
+    }});
+    await page.goto('/app');
+    const activity = page.getByRole('region', { name: 'Última actividad' });
+    await expect(activity).toContainText('Cliente pidió devolución de llamada');
+    await expect(activity).toContainText('Solicitud');
+  });
+
   test('unknown attributed revenue never becomes a fictional $0', async ({ page }) => {
     const analytics = {
       ...READY_ANALYTICS,
