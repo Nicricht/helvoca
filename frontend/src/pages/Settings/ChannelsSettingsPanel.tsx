@@ -431,7 +431,7 @@ export function ChannelsSettingsPanel({
           <Phone size={18} aria-hidden="true" />
         </div>
 
-        <div className={styles.voiceSetupGuide} aria-label="Guía de activación de voz">
+        <div className={styles.voiceSetupGuide} role="region" aria-label="Guía de activación de voz">
           <div className={styles.voiceSetupHeading}>
             <div>
               <strong>Preparar recepcionista IA</strong>
