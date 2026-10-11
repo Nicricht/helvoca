@@ -33,7 +33,9 @@ async function boot(page, opts = {}) {
     authStatus: opts.authStatus ?? 200,
     onboardingStatus: opts.onboardingStatus ?? 200,
     dashboardStatus: opts.dashboardStatus ?? 200,
-    onboarding: opts.onboarding ?? ready,
+    onboarding: Object.prototype.hasOwnProperty.call(opts, 'onboarding') ? opts.onboarding : ready,
+    authPayload: Object.prototype.hasOwnProperty.call(opts, 'authPayload') ? opts.authPayload :
+      { email: 'owner@example.test', roles: ['BUSINESS_ADMIN'], permissions: ['REQUESTS_READ'] },
     counts: { auth: 0, onboarding: 0, dashboard: 0, analytics: 0, attention: 0 },
     methods: [],
     dashboardGate: opts.dashboardGate ?? null,
@@ -64,7 +66,7 @@ async function boot(page, opts = {}) {
   await page.route('**/api/v1/auth/me', route => {
     state.counts.auth += 1;
     return route.fulfill(json(state.authStatus === 200
-      ? { email: 'owner@example.test', roles: ['BUSINESS_ADMIN'], permissions: ['REQUESTS_READ'] }
+      ? state.authPayload
       : { message: 'unavailable' }, state.authStatus));
   });
   await page.route('**/api/v1/onboarding/status', async route => {
@@ -127,6 +129,27 @@ test.describe('Inicio Parte 2: identidad, onboarding, carga y recuperación', ()
     state.authStatus = 200;
     await page.getByRole('button', { name: 'Reintentar acceso' }).click();
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toContainText('3');
+    assertReadOnly(state);
+  });
+
+  test('respuesta 200 sin roles verificables no habilita consultas ni métricas', async ({ page }) => {
+    const state = await boot(page, { authPayload: { email: 'owner@example.test', roles: null } });
+    await page.goto('/app');
+    await expect(page.getByRole('alert')).toContainText('No pudimos verificar tu acceso');
+    expect(state.counts.onboarding).toBe(0);
+    expect(state.counts.dashboard).toBe(0);
+    expect(state.counts.attention).toBe(0);
+    assertReadOnly(state);
+  });
+
+  test('respuesta 200 nula en onboarding no muestra una pantalla vacía ni inventa actividad', async ({ page }) => {
+    const state = await boot(page, { onboarding: null });
+    await page.goto('/app');
+    await expect(page.getByRole('alert')).toContainText('No pudimos comprobar la configuración');
+    expect(state.counts.dashboard).toBe(0);
+    state.onboarding = ready;
+    await page.getByRole('button', { name: 'Reintentar configuración' }).click();
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
     assertReadOnly(state);
   });
 
