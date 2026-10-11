@@ -230,6 +230,65 @@ class SalesAnalyticsServiceTest {
                 .anyMatch(insight -> insight.text().contains("bajaron 50%")));
     }
 
+    @Test
+    void commercialQueriesUseTenantLocalHalfOpenWindowsForHoySevenAndThirtyDays() {
+        for (String timezone : List.of("America/Santiago", "Pacific/Auckland", "UTC")) {
+            java.time.ZoneId zone = java.time.ZoneId.of(timezone);
+            for (int days : List.of(1, 7, 30)) {
+                UUID businessId = UUID.randomUUID();
+                BusinessRepository businesses = mock(BusinessRepository.class);
+                BusinessPaymentRepository payments = mock(BusinessPaymentRepository.class);
+                BusinessOrderRepository orders = mock(BusinessOrderRepository.class);
+                BusinessOrderLineRepository lines = mock(BusinessOrderLineRepository.class);
+                TenantProvider tenant = mock(TenantProvider.class);
+                Business business = new Business();
+                business.setTimezone(timezone);
+                when(tenant.requireBusinessId()).thenReturn(businessId);
+                when(businesses.findById(businessId)).thenReturn(Optional.of(business));
+                when(payments.findAllByBusinessIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+                        eq(businessId), any(Instant.class), any(Instant.class)))
+                        .thenReturn(List.of());
+
+                java.time.LocalDate before = java.time.LocalDate.now(zone);
+                SalesAnalyticsService.AnalyticsResponse result =
+                        new SalesAnalyticsService(businesses, payments, orders, lines, tenant)
+                                .analytics(days);
+                java.time.LocalDate after = java.time.LocalDate.now(zone);
+
+                assertEquals(days, result.days());
+                assertEquals(timezone, result.timezone());
+                assertNull(result.totalRevenue(), "no verified currency must not invent aggregate");
+                assertNull(result.recepVozRevenue(), "no paid order currency must not invent revenue");
+                assertEquals(0, result.paidOrders());
+                assertEquals(days, result.salesOverTime().size());
+
+                org.mockito.ArgumentCaptor<Instant> starts =
+                        org.mockito.ArgumentCaptor.forClass(Instant.class);
+                org.mockito.ArgumentCaptor<Instant> ends =
+                        org.mockito.ArgumentCaptor.forClass(Instant.class);
+                verify(payments, times(2))
+                        .findAllByBusinessIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+                                eq(businessId), starts.capture(), ends.capture());
+                java.util.List<Instant> from = starts.getAllValues();
+                java.util.List<Instant> until = ends.getAllValues();
+                // Before/after avoid flakiness if the test crosses midnight.
+                boolean matchesBefore = from.get(0).equals(
+                        before.minusDays(days - 1L).atStartOfDay(zone).toInstant());
+                boolean matchesAfter = from.get(0).equals(
+                        after.minusDays(days - 1L).atStartOfDay(zone).toInstant());
+                assertTrue(matchesBefore || matchesAfter);
+                assertEquals(from.get(0), until.get(1), "previous window ends at current start");
+                assertEquals(from.get(0).atZone(zone).toLocalDate().minusDays(days)
+                                .atStartOfDay(zone).toInstant(),
+                        from.get(1), "previous window is exactly N local calendar days");
+                java.time.LocalDate startDay = from.get(0).atZone(zone).toLocalDate();
+                assertEquals(startDay.plusDays(days).atStartOfDay(zone).toInstant(),
+                        until.get(0), "current end is exclusive next local midnight");
+                verifyNoInteractions(orders, lines);
+            }
+        }
+    }
+
     private static BusinessPayment payment(UUID targetOperationId,
                                            BigDecimal amount,
                                            String currency,
