@@ -2,6 +2,7 @@ package cl.helvoca.phone;
 
 import cl.helvoca.messaging.WhatsAppProperties;
 import cl.helvoca.telephony.twilio.TwilioProperties;
+import cl.helvoca.security.TenantDatabaseContext;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -36,6 +37,7 @@ public class TwilioSubaccountVoiceBootstrapRunner implements ApplicationRunner {
     private final TwilioProperties twilio;
     private final WhatsAppProperties whatsApp;
     private final PhoneNumberRepository phones;
+    private final TenantDatabaseContext databaseContext;
     private final HttpClient http;
 
     @Autowired
@@ -45,7 +47,8 @@ public class TwilioSubaccountVoiceBootstrapRunner implements ApplicationRunner {
             @Value("${HELVOCA_TWILIO_SUBACCOUNT_PHONE_E164:}") String phoneE164,
             TwilioProperties twilio,
             WhatsAppProperties whatsApp,
-            PhoneNumberRepository phones) {
+            PhoneNumberRepository phones,
+            TenantDatabaseContext databaseContext) {
         this(
                 enabled,
                 subaccountSid,
@@ -53,6 +56,7 @@ public class TwilioSubaccountVoiceBootstrapRunner implements ApplicationRunner {
                 twilio,
                 whatsApp,
                 phones,
+                databaseContext,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
     }
 
@@ -63,6 +67,7 @@ public class TwilioSubaccountVoiceBootstrapRunner implements ApplicationRunner {
             TwilioProperties twilio,
             WhatsAppProperties whatsApp,
             PhoneNumberRepository phones,
+            TenantDatabaseContext databaseContext,
             HttpClient http) {
         this.enabled = enabled;
         this.subaccountSid = clean(subaccountSid);
@@ -70,6 +75,7 @@ public class TwilioSubaccountVoiceBootstrapRunner implements ApplicationRunner {
         this.twilio = twilio;
         this.whatsApp = whatsApp;
         this.phones = phones;
+        this.databaseContext = databaseContext;
         this.http = http;
     }
 
@@ -78,14 +84,21 @@ public class TwilioSubaccountVoiceBootstrapRunner implements ApplicationRunner {
         if (!enabled) return;
         validateConfiguration();
 
-        PhoneNumber anchor = phones.findByPhoneNumberAndActiveTrue(whatsApp.getSandboxTenantPhone())
-                .orElseThrow(() -> new IllegalStateException(
-                        "WhatsApp Sandbox tenant phone must resolve to an active Helvoca tenant before voice bootstrap"));
+        PhoneNumber anchor = databaseContext.callAsSystem(
+                () -> phones.findByPhoneNumberAndActiveTrue(whatsApp.getSandboxTenantPhone())
+                        .orElseThrow(() -> new IllegalStateException(
+                                "WhatsApp Sandbox tenant phone must resolve to an active Helvoca tenant before voice bootstrap")));
+
+        // Reject an already-owned route before making any external Twilio changes.
+        databaseContext.runAsSystem(() -> verifyLocalOwnership(anchor, null));
 
         String authorization = basicAuthorization();
         PhoneLookup lookup = findPhone(authorization);
+
+        // The verified carrier PN SID must match any existing Helvoca mapping.
+        databaseContext.runAsSystem(() -> verifyLocalOwnership(anchor, lookup.phoneSid()));
         configureVoiceWebhook(authorization, lookup.phoneSid());
-        attachLocalRoute(anchor, lookup.phoneSid());
+        databaseContext.runAsSystem(() -> attachLocalRoute(anchor, lookup.phoneSid()));
 
         log.info(
                 "TWILIO_SUBACCOUNT_VOICE_CONFIGURED phoneEnding={} subaccountEnding={} tenantReady=true",
@@ -152,11 +165,26 @@ public class TwilioSubaccountVoiceBootstrapRunner implements ApplicationRunner {
         }
     }
 
-    private void attachLocalRoute(PhoneNumber anchor, String phoneSid) {
-        PhoneNumber phone = phones.findByPhoneNumber(phoneE164).orElseGet(PhoneNumber::new);
-        if (phone.getBusinessId() != null && !phone.getBusinessId().equals(anchor.getBusinessId())) {
+    private void verifyLocalOwnership(PhoneNumber anchor, String phoneSid) {
+        PhoneNumber existing = phones.findByPhoneNumber(phoneE164).orElse(null);
+        if (existing == null) return;
+        if (!anchor.getBusinessId().equals(existing.getBusinessId())) {
             throw new IllegalStateException("Twilio subaccount phone is already attached to a different Helvoca tenant");
         }
+        if (!"TWILIO".equalsIgnoreCase(existing.getProvider())) {
+            throw new IllegalStateException("Twilio subaccount phone is registered with a different provider");
+        }
+        if (phoneSid != null && existing.getExternalId() != null
+                && !existing.getExternalId().isBlank()
+                && !phoneSid.equals(existing.getExternalId())) {
+            throw new IllegalStateException("Twilio subaccount phone SID conflicts with existing Helvoca mapping");
+        }
+    }
+
+    private void attachLocalRoute(PhoneNumber anchor, String phoneSid) {
+        // Re-check after the external update to guard against intervening changes.
+        verifyLocalOwnership(anchor, phoneSid);
+        PhoneNumber phone = phones.findByPhoneNumber(phoneE164).orElseGet(PhoneNumber::new);
 
         phone.setBusinessId(anchor.getBusinessId());
         phone.setProvider("TWILIO");
