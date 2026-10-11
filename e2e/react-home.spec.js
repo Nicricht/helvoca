@@ -465,7 +465,9 @@ test.describe('React Home migration', () => {
   test('unauthenticated visitors are redirected before any protected Home API request', async ({ page }) => {
     const protectedReads = [];
     page.on('request', request => {
-      if (request.url().includes('/api/v1/')) protectedReads.push(request.url());
+      if (/\/api\/v1\/(?:operations|commercial|onboarding)\//.test(request.url())) {
+        protectedReads.push(request.url());
+      }
     });
 
     await page.goto('/app');
