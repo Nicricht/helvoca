@@ -82,7 +82,9 @@ export default defineConfig({
       ],
       exclude: ["node_modules"],
       extension: [".ts", ".tsx"],
-      requireEnv: true,
+      // Istanbul's requireEnv flag specifically reads VITE_COVERAGE, which
+      // belongs to Inventory. Home is already gated by VITE_HOME_COVERAGE.
+      requireEnv: false,
       checkProd: false,
       forceBuildInstrument: true
     })] : []),
