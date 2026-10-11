@@ -15,6 +15,7 @@ import {
   WalletCards
 } from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
+import { ApiError } from "../../api/client";
 import { getHumanAttention, type HumanAttentionItem } from "../../features/operations/api";
 import { OperationsSupportPanel } from "../../features/operations/OperationsSupportPanel";
 import { HomeAttentionRows } from "./HomeAttentionRows";
@@ -577,6 +578,26 @@ function OnboardingCard({ status }: { status: OnboardingStatus }) {
   );
 }
 
+function HomeLoadFailure({
+  title, description, retryLabel, onRetry
+}: {
+  title: string;
+  description: string;
+  retryLabel: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className={styles.errorState} role="alert">
+      <TriangleAlert size={20} aria-hidden="true" />
+      <div>
+        <strong>{title}</strong>
+        <span>{description}</span>
+        <button type="button" className={styles.errorRetry} onClick={onRetry}>{retryLabel}</button>
+      </div>
+    </div>
+  );
+}
+
 export function HomePage() {
   const reduceMotion = useReducedMotion();
   const [salesDays, setSalesDays] = useState(7);
@@ -660,22 +681,37 @@ export function HomePage() {
           <h1>Inicio</h1>
         </header>
 
-        {onboardingIncomplete && onboardingQuery.data ? (
+        {meQuery.isError ? (
+          <HomeLoadFailure
+            title={meQuery.error instanceof ApiError && meQuery.error.status === 403
+              ? "No tienes permiso para acceder a Inicio."
+              : "No pudimos verificar tu acceso."}
+            description="No podemos mostrar datos del negocio sin validar la sesión."
+            retryLabel="Reintentar acceso"
+            onRetry={() => { void meQuery.refetch(); }}
+          />
+        ) : isAdmin && onboardingQuery.isError ? (
+          <HomeLoadFailure
+            title="No pudimos comprobar la configuración de tu negocio."
+            description="No se mostrarán métricas hasta comprobar que la configuración está lista."
+            retryLabel="Reintentar configuración"
+            onRetry={() => { void onboardingQuery.refetch(); }}
+          />
+        ) : onboardingIncomplete && onboardingQuery.data ? (
           <OnboardingCard status={onboardingQuery.data} />
+        ) : readyToLoad && operationsQuery.isError ? (
+          <HomeLoadFailure
+            title="No pudimos cargar el resumen operativo."
+            description="La actividad no está verificada. Intenta nuevamente."
+            retryLabel="Reintentar resumen"
+            onRetry={() => { void operationsQuery.refetch(); }}
+          />
         ) : loading ? (
           <div className={styles.loadingState} role="status">
             <span className={styles.spinner} aria-hidden="true" />
             <div>
               <strong>Cargando tu negocio…</strong>
               <span>Estamos preparando el resumen operativo.</span>
-            </div>
-          </div>
-        ) : operationsQuery.isError ? (
-          <div className={styles.errorState} role="alert">
-            <TriangleAlert size={20} aria-hidden="true" />
-            <div>
-              <strong>No pudimos cargar el resumen operativo.</strong>
-              <span>Intenta nuevamente en unos momentos.</span>
             </div>
           </div>
         ) : operationsQuery.data ? (
