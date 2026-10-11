@@ -29,7 +29,7 @@ public class PhoneProvisioningService {
         boolean configured = twilio.configured();
         String message;
         if (!enabled) {
-            message = "El aprovisionamiento automático está deshabilitado. Puedes conectar un número existente manualmente.";
+            message = "El aprovisionamiento automático está deshabilitado. Solo puedes reconectar números previamente asignados y verificados en Twilio.";
         } else if (!configured) {
             message = "El proveedor telefónico aún no tiene toda la configuración necesaria para aprovisionar números.";
         } else {
@@ -43,6 +43,37 @@ public class PhoneProvisioningService {
         return twilio.searchAvailable(country, areaCode, limit);
     }
 
+    /**
+     * A self-service tenant may only re-connect a number already assigned to itself.
+     * Twilio must independently attest account, SID, voice capability and webhooks.
+     * Unassigned/BYON numbers require a separate verified-ownership enrollment.
+     */
+    public PhoneNumberResponse connectExisting(PhoneNumberRequest request) {
+        UUID businessId = tenantProvider.requireBusinessId();
+        if (request.externalId() != null && !request.externalId().isBlank()) {
+            throw new ConflictException("El SID debe verificarse con Twilio, no ingresarse manualmente.");
+        }
+        if (Boolean.FALSE.equals(request.active())) {
+            throw new ConflictException("Para desactivar un número utiliza su control de estado.");
+        }
+        String number = request.phoneNumber().trim();
+        PhoneNumber existing = repository.findByPhoneNumber(number)
+                .orElseThrow(() -> new ConflictException(
+                        "El número no está asignado a este negocio. Utiliza aprovisionamiento verificado."));
+        if (!businessId.equals(existing.getBusinessId())
+                || !"TWILIO".equalsIgnoreCase(existing.getProvider())) {
+            throw new ConflictException("El número no está asignado a este negocio en Twilio.");
+        }
+        TwilioPhoneProvisioningClient.VerifiedPhoneNumber verified = twilio.verifyManagedPhone(number);
+        if (existing.getExternalId() != null && !existing.getExternalId().isBlank()
+                && !existing.getExternalId().equals(verified.sid())) {
+            throw new ConflictException("El SID verificado no coincide con el registro existente.");
+        }
+        existing.setExternalId(verified.sid());
+        existing.setActive(true);
+        return PhoneNumberResponse.from(repository.saveAndFlush(existing));
+    }
+
     public PhoneNumberResponse provision(ProvisionPhoneNumberRequest request) {
         UUID businessId = tenantProvider.requireBusinessId();
         if (!Boolean.TRUE.equals(request.confirmed())) {
@@ -52,14 +83,18 @@ public class PhoneProvisioningService {
         String requestedNumber = request.phoneNumber().trim();
         PhoneNumber existing = repository.findByPhoneNumber(requestedNumber).orElse(null);
         if (existing != null) {
-            if (existing.getBusinessId().equals(businessId)
-                    && "TWILIO".equalsIgnoreCase(existing.getProvider())
-                    && existing.getExternalId() != null
-                    && existing.getExternalId().startsWith("PN")) {
-                existing.setActive(true);
-                return PhoneNumberResponse.from(repository.save(existing));
+            if (!businessId.equals(existing.getBusinessId())
+                    || !"TWILIO".equalsIgnoreCase(existing.getProvider())) {
+                throw new ConflictException("Este número ya pertenece a otro negocio o proveedor.");
             }
-            throw new ConflictException("Este número ya está registrado en Helvoca y no se aprovisionará de nuevo.");
+            TwilioPhoneProvisioningClient.VerifiedPhoneNumber verified = twilio.verifyManagedPhone(requestedNumber);
+            if (existing.getExternalId() != null && !existing.getExternalId().isBlank()
+                    && !existing.getExternalId().equals(verified.sid())) {
+                throw new ConflictException("El SID registrado difiere del SID propietario en Twilio.");
+            }
+            existing.setExternalId(verified.sid());
+            existing.setActive(true);
+            return PhoneNumberResponse.from(repository.saveAndFlush(existing));
         }
 
         TwilioPhoneProvisioningClient.ProvisionedPhoneNumber provisioned = twilio.provision(requestedNumber);
