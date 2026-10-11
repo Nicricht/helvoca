@@ -50,7 +50,7 @@ class MultiProviderVoiceRoutingTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals(twiml, response.getBody());
         assertNoLegacyVoice(response.getBody());
-        verifyNoInteractions(calls);
+        verify(calls).startInboundCall(OUTBOUND_SID, "+56966939611", "+14355652512");
     }
 
     @Test
@@ -83,6 +83,6 @@ class MultiProviderVoiceRoutingTest {
 
         assertEquals(SILENT_HANGUP, response.getBody());
         assertNoLegacyVoice(response.getBody());
-        verifyNoInteractions(calls);
+        verify(calls).startInboundCall(OUTBOUND_SID, "+56966939611", "+14355652512");
     }
 }
