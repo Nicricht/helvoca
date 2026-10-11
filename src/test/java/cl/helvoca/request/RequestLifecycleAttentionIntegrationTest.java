@@ -377,6 +377,16 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
                 && item.kind() == HumanAttentionService.Kind.HANDOFF));
         assertTrue(tenantAEntries.stream().noneMatch(item ->
                 item.id().equals(foreign.id()) || item.id().equals(foreignActive.handoffId())));
+        // Independent database RLS assertions, not just service WHERE business_id filters.
+        assertEquals(0L, databaseContext.callAsTenant(tenantA.getId(), () ->
+                jdbc.queryForObject("SELECT count(*) FROM public.human_handoff WHERE id = ?",
+                        Long.class, foreignActive.handoffId())));
+        assertEquals(0L, databaseContext.callAsTenant(tenantA.getId(), () ->
+                jdbc.queryForObject("SELECT count(*) FROM public.business_request WHERE id = ?",
+                        Long.class, foreign.id())));
+        assertEquals(1L, databaseContext.callAsTenant(tenantB.getId(), () ->
+                jdbc.queryForObject("SELECT count(*) FROM public.human_handoff WHERE id = ?",
+                        Long.class, foreignActive.handoffId())));
 
         assertThrows(IllegalArgumentException.class,
                 () -> databaseContext.callAsTenant(tenantA.getId(),
