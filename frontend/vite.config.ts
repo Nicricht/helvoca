@@ -73,7 +73,8 @@ export default defineConfig({
       ],
       exclude: ["node_modules"],
       extension: [".ts", ".tsx"],
-      requireEnv: true,
+      // The build already gates plugin activation. The Home flag is separate from VITE_COVERAGE.
+      requireEnv: inventoryCoverage,
       checkProd: false,
       forceBuildInstrument: true
     })] : []),
