@@ -21,13 +21,13 @@ La comprobación de PHONE falla cerrada si falta cualquiera de estos requisitos:
 
 ## Frontend
 
-`Configuración → Canales → Telefonía` muestra la guía, un enlace contextual a cada paso pendiente y un botón **Actualizar diagnóstico**, que realiza exclusivamente un GET. Maneja carga, autorización de lectura y fallo de API sin tratar un error como señal de disponibilidad. Una configuración completa todavía muestra explícitamente “Falta certificar una llamada real autorizada”. El mensaje de conexión de números ya no asegura que pueden atender llamadas.
+`Configuración → Canales → Telefonía` muestra la guía, un enlace contextual a cada paso pendiente y un botón **Actualizar diagnóstico**, que realiza exclusivamente un GET. Maneja carga, autorización de lectura y fallo de API sin tratar un error como señal de disponibilidad. Una configuración completa todavía muestra explícitamente “Falta certificar una llamada real autorizada”. El mensaje de conexión de números ya no asegura que pueden atender llamadas. La activación de un número inactivo exige confirmación explícita del administrador antes de ejecutar el PATCH existente; el backend vuelve a verificar Twilio, pertenencia, SID y webhooks. Cancelar no envía mutaciones; la verificación de activación nunca equivale a una prueba telefónica end-to-end.
 
 ## Tests y criterio de salida
 
 - Unitarios sobre rutas opcionales de servicios y horarios, inexistencia de SID, SID ajeno, cuenta errónea, proveedor incorrecto, filas legadas, tenant scoped, fecha de verificación y bloqueo de configuración remota.
 - Test de contrato endpoint con `BUSINESS_ADMIN` y `OPERATOR`.
-- Playwright de UI en escenario incompleto, local completo (sigue NO-GO), error GET fail closed y operador sin controles de pago.
+- Playwright de UI en escenario incompleto, local completo (sigue NO-GO), error GET fail closed, operador sin controles de pago, y cancelación/confirmación de activación sin llamadas ni compras.
 - Gates: 100% diferencial Java (líneas, ramas, métodos); suite de integración Postgres/Testcontainers; Playwright y frontend. Sin relajar umbrales.
 - PR apilado sobre Partes 2–5 (#783 a #786), por lo que NO MERGE y NO DEPLOY sin reconciliar main.
 - Hasta verificar propiedad actual del número, webhooks y llamada real autorizada: **NO-GO comercial**.
