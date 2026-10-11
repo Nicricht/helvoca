@@ -2040,7 +2040,7 @@ test.describe('React Home migration', () => {
     await page.route('**/api/v1/commercial/analytics**', route => route.fulfill(json(null)));
     await page.goto('/app');
     const section = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
-    await expect(section.getByRole('alert')).toContainText('No pudimos verificar los datos comerciales');
+    await expect(section.getByRole('alert')).toContainText('No recibimos datos verificables del valor atribuido');
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
   });
 
@@ -2050,10 +2050,10 @@ test.describe('React Home migration', () => {
     await page.route('**/api/v1/operations/dashboard', route =>
       route.fulfill(json(valid ? READY_OPERATIONS : null)));
     await page.goto('/app');
-    await expect(page.getByRole('alert')).toContainText('No pudimos validar el resumen operativo');
+    await expect(page.getByRole('alert')).toContainText('No recibimos datos verificables del resumen operativo');
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
     valid = true;
-    await page.getByRole('button', { name: 'Reintentar resumen' }).click();
+    await page.getByRole('button', { name: 'Reintentar' }).click();
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
   });
 
@@ -2140,7 +2140,7 @@ test.describe('React Home migration', () => {
     await page.goto('/app');
     const sales = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
     await expect(sales).toContainText('$0');
-    await expect(sales).not.toContainText('Valor no disponible');
+    await expect(sales).not.toContainText('Importe no disponible');
   });
 
   test('explicit commercial refresh displays staleness without hiding verified value or duplicating writes', async ({ page }) => {
@@ -2189,7 +2189,7 @@ test.describe('React Home migration', () => {
     await bootHome(page, { analytics });
     await page.goto('/app');
     const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
-    await expect(value).toContainText('Valor no disponible');
+    await expect(value).toContainText('Importe no disponible');
     await expect(value).not.toContainText('$0');
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
   });
@@ -2199,7 +2199,7 @@ test.describe('React Home migration', () => {
     await page.goto('/app');
     const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
     await expect(value).toContainText('$0');
-    await expect(value).not.toContainText('Valor no disponible');
+    await expect(value).not.toContainText('Importe no disponible');
   });
 
   test('negative or malformed attributed amounts never produce revenue or a positive ROI', async ({ page }) => {
@@ -2210,7 +2210,7 @@ test.describe('React Home migration', () => {
     }});
     await page.goto('/app');
     const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
-    await expect(value).toContainText('Valor no disponible');
+    await expect(value).toContainText('Importe no disponible');
     await expect(value).not.toContainText('$-');
     await expect(value).not.toContainText(/ROI positivo|retorno de inversión confirmado/i);
   });
@@ -2224,7 +2224,7 @@ test.describe('React Home migration', () => {
     await page.goto('/app');
     const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
     await expect(value).toContainText('$25.000');
-    await expect(value).toContainText('Datos parciales');
+    await expect(value).toContainText('El importe visible es parcial, no un total.');
   });
 
   test('malformed string amounts are not parsed into trusted money', async ({ page }) => {
@@ -2233,7 +2233,7 @@ test.describe('React Home migration', () => {
     }});
     await page.goto('/app');
     const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
-    await expect(value).toContainText('Valor no disponible');
+    await expect(value).toContainText('Importe no disponible');
     await expect(value).not.toContainText('$999.999');
   });
 
@@ -2244,7 +2244,7 @@ test.describe('React Home migration', () => {
     }});
     await page.goto('/app');
     const value = page.getByRole('region', { name: 'Valor generado por RecepVoz' });
-    await expect(value).toContainText('Valor no disponible');
+    await expect(value).toContainText('Importe no disponible');
     await expect(value).not.toContainText('INVALID 123');
   });
 
@@ -2575,7 +2575,8 @@ test.describe('React Home migration', () => {
       page.getByRole('button', { name: 'Hoy' }),
       page.getByRole('button', { name: '7 días' }),
       page.getByRole('button', { name: '30 días' }),
-      page.getByRole('button', { name: 'Actualizar' }),
+      page.getByRole('button', { name: 'Actualizar', exact: true }),
+      page.getByRole('button', { name: 'Actualizar valor comercial' }),
       page.getByRole('button', { name: 'Empezar gestión' }),
       page.getByRole('button', { name: 'Tomar caso' }),
       page.getByRole('link', { name: 'Revisar pendientes' })
@@ -2693,6 +2694,14 @@ test.describe('React Home migration', () => {
   }
   test('HTTP success with missing roles fails closed without operations leakage', async ({ page }) => {
     await bootHome(page, { roles: [] });
+    await page.goto('/app');
+    await expect(page.locator('main[data-visual-page="home"] [role="alert"]'))
+      .toContainText('No pudimos verificar tus permisos de acceso.');
+    await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
+  });
+
+  test('malformed string roles in HTTP 200 never grant operational access', async ({ page }) => {
+    await bootHome(page, { roles: 'BUSINESS_ADMIN' });
     await page.goto('/app');
     await expect(page.locator('main[data-visual-page="home"] [role="alert"]'))
       .toContainText('No pudimos verificar tus permisos de acceso.');

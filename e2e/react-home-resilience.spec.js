@@ -115,7 +115,7 @@ test.describe('Inicio Parte 2: identidad, onboarding, carga y recuperación', ()
     const state = await boot(page, { authStatus: 403 });
     await page.goto('/app');
     await expect(page.getByRole('alert')).toContainText(/permiso|acceso/i);
-    await expect(page.getByRole('button', { name: 'Reintentar acceso' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Reintentar' })).toBeVisible();
     expect(state.counts.dashboard).toBe(0);
     expect(state.counts.onboarding).toBe(0);
     expect(state.counts.attention).toBe(0);
@@ -125,11 +125,11 @@ test.describe('Inicio Parte 2: identidad, onboarding, carga y recuperación', ()
   test('503 en identidad no se queda cargando y permite reintentar sin duplicar efectos', async ({ page }) => {
     const state = await boot(page, { authStatus: 503 });
     await page.goto('/app');
-    await expect(page.getByRole('alert')).toContainText('No pudimos verificar tu acceso');
+    await expect(page.getByRole('alert')).toContainText('No pudimos verificar tus permisos de acceso');
     await expect(page.getByRole('status')).toHaveCount(0);
     expect(state.counts.dashboard).toBe(0);
     state.authStatus = 200;
-    await page.getByRole('button', { name: 'Reintentar acceso' }).click();
+    await page.getByRole('button', { name: 'Reintentar' }).click();
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toContainText('3');
     assertReadOnly(state);
   });
@@ -137,7 +137,7 @@ test.describe('Inicio Parte 2: identidad, onboarding, carga y recuperación', ()
   test('respuesta 200 sin roles verificables no habilita consultas ni métricas', async ({ page }) => {
     const state = await boot(page, { authPayload: { email: 'owner@example.test', roles: null } });
     await page.goto('/app');
-    await expect(page.getByRole('alert')).toContainText('No pudimos verificar tu acceso');
+    await expect(page.getByRole('alert')).toContainText('No pudimos verificar tus permisos de acceso');
     expect(state.counts.onboarding).toBe(0);
     expect(state.counts.dashboard).toBe(0);
     expect(state.counts.attention).toBe(0);
@@ -147,10 +147,10 @@ test.describe('Inicio Parte 2: identidad, onboarding, carga y recuperación', ()
   test('respuesta 200 nula en onboarding no muestra una pantalla vacía ni inventa actividad', async ({ page }) => {
     const state = await boot(page, { onboarding: null });
     await page.goto('/app');
-    await expect(page.getByRole('alert')).toContainText('No pudimos comprobar la configuración');
+    await expect(page.getByRole('alert')).toContainText('No pudimos verificar la configuración');
     expect(state.counts.dashboard).toBe(0);
     state.onboarding = ready;
-    await page.getByRole('button', { name: 'Reintentar configuración' }).click();
+    await page.getByRole('button', { name: 'Reintentar' }).click();
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toBeVisible();
     assertReadOnly(state);
   });
@@ -158,12 +158,12 @@ test.describe('Inicio Parte 2: identidad, onboarding, carga y recuperación', ()
   test('error 503 del onboarding no inventa un negocio listo y se recupera a pasos pendientes', async ({ page }) => {
     const state = await boot(page, { onboardingStatus: 503, onboarding: incomplete });
     await page.goto('/app');
-    await expect(page.getByRole('alert')).toContainText('No pudimos comprobar la configuración');
+    await expect(page.getByRole('alert')).toContainText('No pudimos verificar la configuración');
     await expect(page.getByRole('status')).toHaveCount(0);
     expect(state.counts.dashboard).toBe(0);
     expect(state.counts.analytics).toBe(0);
     state.onboardingStatus = 200;
-    await page.getByRole('button', { name: 'Reintentar configuración' }).click();
+    await page.getByRole('button', { name: 'Reintentar' }).click();
     const card = page.getByRole('region', { name: 'Configura tu negocio' });
     await expect(card.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '25');
     await expect(card.getByRole('link', { name: /Continuar configuración/ }))
@@ -175,7 +175,7 @@ test.describe('Inicio Parte 2: identidad, onboarding, carga y recuperación', ()
   test('403 de onboarding bloquea carga operativa hasta poder comprobar configuración', async ({ page }) => {
     const state = await boot(page, { onboardingStatus: 403 });
     await page.goto('/app');
-    await expect(page.getByRole('alert')).toContainText('No pudimos comprobar la configuración');
+    await expect(page.getByRole('alert')).toContainText('No pudimos verificar la configuración');
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
     expect(state.counts.dashboard).toBe(0);
     expect(state.counts.attention).toBe(0);
@@ -213,7 +213,7 @@ test.describe('Inicio Parte 2: identidad, onboarding, carga y recuperación', ()
     await expect(page.getByRole('status')).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toHaveCount(0);
     state.dashboardStatus = 200;
-    await page.getByRole('button', { name: 'Reintentar resumen' }).click();
+    await page.getByRole('button', { name: 'Reintentar' }).click();
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toContainText('3');
     assertReadOnly(state);
   });
@@ -224,7 +224,7 @@ test.describe('Inicio Parte 2: identidad, onboarding, carga y recuperación', ()
     await expect(page.getByRole('alert')).toContainText('No pudimos cargar el resumen operativo');
     expect(state.counts.dashboard).toBeGreaterThan(0);
     state.dashboardNetworkError = false;
-    await page.getByRole('button', { name: 'Reintentar resumen' }).click();
+    await page.getByRole('button', { name: 'Reintentar' }).click();
     await expect(page.getByRole('region', { name: 'Resultados de hoy' })).toContainText('3');
     assertReadOnly(state);
   });

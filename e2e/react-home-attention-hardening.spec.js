@@ -260,7 +260,7 @@ test.describe('Inicio Parte 3: solicitudes y escalamiento humano', () => {
   test('rol STAFF sin autorización no consulta ni puede gestionar la bandeja', async ({ page }) => {
     const state = await boot(page, { roles: ['STAFF'], permissions: ['BOOKINGS_READ'] });
     await page.goto('/app');
-    await expect(panel(page)).toContainText('Tu rol no tiene acceso');
+    await expect(page.locator('main[data-visual-page="home"] [role="status"]')).toContainText('Tu rol no tiene acceso');
     expect(state.reads).toBe(0);
     expect(state.mutations).toEqual([]);
   });

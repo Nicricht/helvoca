@@ -72,13 +72,15 @@ const nextStepCopy: Record<string, { text: string; href: string }> = {
 };
 
 function formatMoney(amount: number, currency: string): string {
-  // Attributed totals accept only finite values and 3-letter currency codes.
-  // Keep the formatter deterministic rather than concealing invalid payloads.
-  return new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: currency === "CLP" ? 0 : 2
-  }).format(amount);
+  try {
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: currency === "CLP" ? 0 : 2
+    }).format(amount);
+  } catch {
+    return `${currency} ${amount.toLocaleString("es-CL")}`;
+  }
 }
 
 function formatActivityTime(value: string, timeZone: string): string {

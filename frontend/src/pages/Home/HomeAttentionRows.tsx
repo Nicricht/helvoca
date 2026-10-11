@@ -68,7 +68,7 @@ export function HomeAttentionRows({
 
   async function perform(item: HumanAttentionItem, action: AttentionAction) {
     const key = item.kind + ":" + item.id;
-    if (busyRef.current) return;
+    if (busyRef.current || refreshing) return;
     busyRef.current = key;
     setBusyId(key);
     setError("");
@@ -154,22 +154,24 @@ export function HomeAttentionRows({
                 )}
               </div>
               {next && (
-                <div className={styles.action}>
+                <div className={styles.action}
+                  role={destructive && ask ? "group" : undefined}
+                  aria-label={destructive && ask ? "Confirmación de cierre: " + (item.title || "Caso sin título") : undefined}>
                   {destructive && !ask ? (
-                    <button type="button" disabled={Boolean(busyId)}
+                    <button type="button" disabled={Boolean(busyId) || refreshing}
                       onClick={() => setConfirmationId(itemKey)}>{next.label} <ArrowUpRight size={13} /></button>
                   ) : destructive && ask ? (
                     <>
                       <span className={styles.question}>¿Confirmas que gestionaste este caso?</span>
-                      <button type="button" disabled={Boolean(busyId)}
+                      <button type="button" disabled={Boolean(busyId) || refreshing}
                         onClick={() => { void perform(item, next.action); }}>
                         {busyId === itemKey ? "Guardando…" : "Confirmar cierre"}
                       </button>
-                      <button type="button" className={styles.cancel} disabled={Boolean(busyId)}
+                      <button type="button" className={styles.cancel} disabled={Boolean(busyId) || refreshing}
                         onClick={() => setConfirmationId(null)}>Cancelar</button>
                     </>
                   ) : (
-                    <button type="button" disabled={Boolean(busyId)}
+                    <button type="button" disabled={Boolean(busyId) || refreshing}
                       onClick={() => { void perform(item, next.action); }}>
                       {busyId === itemKey ? "Guardando…" : next.label}
                       <ArrowUpRight size={13} aria-hidden="true" />
