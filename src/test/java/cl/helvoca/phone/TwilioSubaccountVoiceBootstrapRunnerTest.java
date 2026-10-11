@@ -199,8 +199,9 @@ class TwilioSubaccountVoiceBootstrapRunnerTest {
         existing.setExternalId("PNdddddddddddddddddddddddddddddddd");
         when(phones.findByPhoneNumber(PHONE)).thenReturn(Optional.of(existing));
         HttpClient http = mock(HttpClient.class);
+        HttpResponse<String> lookupResponse = returnedPhone();
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-                .thenReturn(returnedPhone());
+                .thenReturn(lookupResponse);
 
         var runner = new TwilioSubaccountVoiceBootstrapRunner(
                 true, SUBACCOUNT_SID, PHONE, readyTwilio(), tenantSettings(), phones, context, http);
@@ -234,8 +235,10 @@ class TwilioSubaccountVoiceBootstrapRunnerTest {
             return invocation.getArgument(0);
         });
         HttpClient http = mock(HttpClient.class);
+        HttpResponse<String> lookupResponse = returnedPhone();
+        HttpResponse<String> updateResponse = updatedPhone();
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-                .thenReturn(returnedPhone(), updatedPhone());
+                .thenReturn(lookupResponse, updateResponse);
 
         var runner = new TwilioSubaccountVoiceBootstrapRunner(
                 true, SUBACCOUNT_SID, PHONE, readyTwilio(), tenantSettings(), phones, context, http);
