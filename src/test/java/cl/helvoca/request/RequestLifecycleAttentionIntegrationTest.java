@@ -341,6 +341,167 @@ class RequestLifecycleAttentionIntegrationTest extends ExplicitSystemDatabaseSco
                 "SELECT status FROM public.business_request WHERE id = ?", String.class, request.getId()));
     }
 
+
+    @Test
+    void homeInboxRealPostgresFiltersTenantStatusesAndKeepsRequestAfterHandoffCloses() {
+        Business tenantA = business("Home scoped attention A");
+        Business tenantB = business("Home scoped attention B");
+        authenticate(tenantA.getId());
+
+        var request = requests.create(new BusinessRequestDtos.Create(
+                "GENERAL", "Tenant A needs a person", null, null, null,
+                RequestPriority.HIGH, null));
+        UUID operationId = jdbc.queryForObject(
+                "SELECT operation_id FROM business_request WHERE business_id = ? AND id = ?",
+                UUID.class, tenantA.getId(), request.id());
+        var active = handoffs.createForUnresolvable(
+                tenantA.getId(), BusinessOperation.Type.REQUEST, null, operationId,
+                "create_request", "HOME_TEST_SUPPORT", 0);
+
+        authenticate(tenantB.getId());
+        var foreign = requests.create(new BusinessRequestDtos.Create(
+                "GENERAL", "Tenant B private request", null, null, null,
+                RequestPriority.NORMAL, null));
+        var foreignActive = handoffs.createForUnresolvable(
+                tenantB.getId(), BusinessOperation.Type.REQUEST, null, UUID.randomUUID(),
+                "create_request", "HOME_TEST_FOREIGN", 0);
+
+        authenticate(tenantA.getId());
+        var tenantAEntries = databaseContext.callAsTenant(tenantA.getId(), attention::pending);
+        assertEquals(1, tenantAEntries.stream()
+                .filter(item -> operationId.equals(item.operationId())).count(),
+                "active handoff and underlying request must never count twice");
+        assertTrue(tenantAEntries.stream().anyMatch(item ->
+                item.id().equals(active.handoffId())
+                && item.kind() == HumanAttentionService.Kind.HANDOFF));
+        assertTrue(tenantAEntries.stream().noneMatch(item ->
+                item.id().equals(foreign.id()) || item.id().equals(foreignActive.handoffId())));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> databaseContext.callAsTenant(tenantA.getId(),
+                        () -> handoffs.acknowledge(foreignActive.handoffId(), "forged tenant")));
+        assertEquals("OPEN", jdbc.queryForObject(
+                "SELECT status FROM public.human_handoff WHERE id = ?",
+                String.class, foreignActive.handoffId()));
+
+        handoffs.resolve(active.handoffId(), "test operator");
+        var afterHandoff = databaseContext.callAsTenant(tenantA.getId(), attention::pending);
+        assertEquals(1, afterHandoff.stream()
+                .filter(item -> operationId.equals(item.operationId())).count());
+        assertTrue(afterHandoff.stream().anyMatch(item ->
+                item.id().equals(request.id())
+                && item.kind() == HumanAttentionService.Kind.REQUEST));
+        requests.setStatus(request.id(), RequestStatus.RESOLVED);
+        assertTrue(databaseContext.callAsTenant(tenantA.getId(), attention::pending)
+                .stream().noneMatch(item -> operationId.equals(item.operationId())));
+        assertTrue(databaseContext.callAsTenant(tenantB.getId(), () -> {
+            authenticate(tenantB.getId());
+            return attention.pending();
+        }).stream().anyMatch(item -> item.id().equals(foreignActive.handoffId())));
+    }
+
+    @Test
+    void homeInboxRealPostgresOrdersNewestFirstAndNeverReturnsMoreThanHundred() {
+        Business tenantA = business("Home attention limit A");
+        Business tenantB = business("Home attention limit B");
+        authenticate(tenantA.getId());
+
+        java.time.Instant base = java.time.Instant.parse("2026-10-01T00:00:00Z");
+        List<UUID> inserted = new java.util.ArrayList<>();
+        for (int i = 0; i < 105; i++) {
+            UUID id = UUID.randomUUID();
+            inserted.add(id);
+            jdbc.update("""
+                    INSERT INTO human_handoff(
+                        id, business_id, operation_id, operation_type,
+                        tool_name, reason_code, failure_class, priority, status,
+                        safe_summary, created_at)
+                    VALUES (?, ?, ?, 'REQUEST', 'home_qa', 'HOME_INBOX_LIMIT',
+                            'UNRESOLVABLE', 'NORMAL', 'OPEN', ?, ?)
+                    """, id, tenantA.getId(), UUID.randomUUID(),
+                    "Caso número " + i, java.sql.Timestamp.from(base.plusSeconds(i)));
+        }
+        UUID foreignId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO human_handoff(
+                    id, business_id, operation_id, operation_type,
+                    tool_name, reason_code, failure_class, status, created_at)
+                VALUES (?, ?, ?, 'REQUEST', 'home_qa', 'HOME_FOREIGN_LIMIT',
+                        'UNRESOLVABLE', 'OPEN', ?)
+                """, foreignId, tenantB.getId(), UUID.randomUUID(),
+                java.sql.Timestamp.from(base.plusSeconds(9999)));
+
+        var items = databaseContext.callAsTenant(tenantA.getId(), attention::pending);
+        assertEquals(100, items.size(), "backend must cap the actionable inbox at 100");
+        assertEquals(inserted.get(104), items.getFirst().id(),
+                "highest created_at must be shown first");
+        assertEquals(inserted.get(5), items.getLast().id(),
+                "the five oldest rows must be excluded");
+        assertFalse(items.stream().anyMatch(item -> item.id().equals(foreignId)));
+        assertEquals(100, items.stream().map(HumanAttentionService.AttentionItem::id).distinct().count());
+
+        // The literal limit is the maximum number of rows, not a global history total.
+        assertEquals(105L, jdbc.queryForObject(
+                "SELECT count(*) FROM human_handoff WHERE business_id = ?",
+                Long.class, tenantA.getId()));
+    }
+
+    @Test
+    void concurrentRequestProgressInRealPostgresProducesOneDurableTransition() throws Exception {
+        Business business = business("Home request concurrent users");
+        authenticate(business.getId());
+        var request = requests.create(new BusinessRequestDtos.Create(
+                "GENERAL", "Two simultaneous operators", null, null, null,
+                RequestPriority.NORMAL, null));
+
+        java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(2);
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        try (java.util.concurrent.ExecutorService executor =
+                     java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            java.util.List<java.util.concurrent.Future<RequestStatus>> futures =
+                    new java.util.ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                futures.add(executor.submit(() -> {
+                    authenticate(business.getId());
+                    try {
+                        return databaseContext.callAsTenant(business.getId(), () -> {
+                            ready.countDown();
+                            try {
+                                if (!start.await(20, java.util.concurrent.TimeUnit.SECONDS)) {
+                                    throw new IllegalStateException("Concurrent test start timed out");
+                                }
+                            } catch (InterruptedException interrupted) {
+                                Thread.currentThread().interrupt();
+                                throw new IllegalStateException(interrupted);
+                            }
+                            return requests.setStatus(request.id(), RequestStatus.IN_PROGRESS).status();
+                        });
+                    } finally {
+                        SecurityContextHolder.clearContext();
+                    }
+                }));
+            }
+            assertTrue(ready.await(20, java.util.concurrent.TimeUnit.SECONDS),
+                    "both operators must enter before mutations start");
+            start.countDown();
+            for (var future : futures) {
+                assertEquals(RequestStatus.IN_PROGRESS,
+                        future.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            }
+        }
+
+        authenticate(business.getId());
+        assertEquals(List.of(RequestStatus.IN_PROGRESS),
+                events.history(request.id()).stream()
+                        .map(RequestLifecycleEventService.Transition::status).toList(),
+                "one real DB transition/event despite simultaneous API-equivalent writes");
+        assertEquals("IN_PROGRESS", jdbc.queryForObject(
+                "SELECT status FROM business_request WHERE business_id = ? AND id = ?",
+                String.class, business.getId(), request.id()));
+        assertEquals(1, databaseContext.callAsTenant(business.getId(), attention::pending)
+                .stream().filter(item -> item.id().equals(request.id())).count());
+    }
+
     private int receiptCount(UUID businessId, UUID requestId) {
         return jdbc.queryForObject("""
                 SELECT count(*)
