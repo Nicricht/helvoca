@@ -168,7 +168,18 @@ const markdown = [
 ];
 writeFileSync(path.join(outDir, 'summary.md'), markdown.join('\n') + '\n');
 console.log(markdown.join('\n'));
-if (failed) process.exitCode = 1;
+if (failed) {
+  // Surface actionable original-source evidence without needing artifact download.
+  console.error('Home coverage gaps (original TSX/TS): ' + JSON.stringify(
+    { missing, archivedFailures, missingSuites,
+      uncovered: details.map(({ path, uncoveredLines, uncoveredFunctions, uncoveredBranches }) => ({
+        path,
+        uncoveredLines: uncoveredLines.slice(0, 80),
+        uncoveredFunctions: uncoveredFunctions.slice(0, 40),
+        uncoveredBranches: uncoveredBranches.slice(0, 65)
+      })) }, null, 2));
+  process.exitCode = 1;
+}
 
 }
 certifyCoverage().catch(error => {
