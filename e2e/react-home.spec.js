@@ -2368,6 +2368,24 @@ test.describe('React Home migration', () => {
     expect(state.attentionMutations()).toBe(1);
   });
 
+  test('untitled request exposes a safe accessible confirmation and cancel never mutates', async ({ page }) => {
+    const state = await bootHome(page, { attention: [
+      { ...DEFAULT_ATTENTION[0], title: '', status: 'IN_PROGRESS' }
+    ] });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('Caso sin título');
+    await panel.getByRole('button', { name: 'Marcar resuelta' }).click();
+    const confirmation = panel.getByRole('group', { name: 'Confirmación de cierre: Caso sin título' });
+    await expect(confirmation).toBeVisible();
+    await expect(confirmation.getByRole('button', { name: 'Confirmar cierre' })).toBeVisible();
+    expect(state.attentionMutations()).toBe(0);
+    await confirmation.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(confirmation).toHaveCount(0);
+    await expect(panel).toContainText('Caso sin título');
+    expect(state.attentionMutations()).toBe(0);
+  });
+
   test('keyboard confirmation performs only the explicitly accepted request close', async ({ page }) => {
     const state = await bootHome(page);
     await page.goto('/app');
