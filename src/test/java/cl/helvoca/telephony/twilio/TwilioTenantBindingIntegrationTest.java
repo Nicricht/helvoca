@@ -87,6 +87,41 @@ class TwilioTenantBindingIntegrationTest extends ExplicitSystemDatabaseScopeSupp
         assertFalse(databaseContext.callAsTenant(tenantB, () -> calls.findByProviderCallId(callA).isPresent()));
     }
 
+    @Test
+    void certificationEvidenceIsScopedToEachTenantUnderRealPostgresRls() {
+        UUID tenantA = business("Certification Evidence A");
+        UUID tenantB = business("Certification Evidence B");
+        PhoneNumber phoneA = phone(tenantA, "+14355551231",
+                "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "PNaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        PhoneNumber phoneB = phone(tenantB, "+14355551232",
+                "ACbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "PNbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        String callSidA = "CAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        String callSidB = "CAbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        session(tenantA, phoneA, callSidA, "+56911111111");
+        session(tenantB, phoneB, callSidB, "+56922222222");
+        CallSession a = calls.findByProviderCallId(callSidA).orElseThrow();
+        a.setCertification(true);
+        calls.saveAndFlush(a);
+        CallSession b = calls.findByProviderCallId(callSidB).orElseThrow();
+        b.setCertification(true);
+        calls.saveAndFlush(b);
+
+        assertEquals(a.getId(), databaseContext.callAsTenant(tenantA, () ->
+                calls.findFirstByBusinessIdAndCertificationTrueOrderByStartedAtDesc(tenantA)
+                        .orElseThrow().getId()));
+        assertEquals(b.getId(), databaseContext.callAsTenant(tenantB, () ->
+                calls.findFirstByBusinessIdAndCertificationTrueOrderByStartedAtDesc(tenantB)
+                        .orElseThrow().getId()));
+        assertTrue(databaseContext.callAsTenant(tenantA, () ->
+                calls.findFirstByBusinessIdAndCertificationTrueOrderByStartedAtDesc(tenantB).isEmpty()));
+        assertTrue(databaseContext.callAsTenant(tenantB, () ->
+                calls.findFirstByBusinessIdAndCertificationTrueOrderByStartedAtDesc(tenantA).isEmpty()));
+        assertTrue(databaseContext.callAsTenant(tenantA, () -> calls.findById(b.getId()).isEmpty()));
+        assertTrue(databaseContext.callAsTenant(tenantB, () -> calls.findById(a.getId()).isEmpty()));
+    }
+
     private UUID business(String name) {
         Business business = new Business();
         business.setName(name);
