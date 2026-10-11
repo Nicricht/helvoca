@@ -273,6 +273,28 @@ test.describe('Inicio Parte 3: solicitudes y escalamiento humano', () => {
     expect(state.mutations.filter(x => x.action === 'request')).toEqual([]);
   });
 
+  test('operador con lectura de solicitudes conserva acceso al handoff permitido por su rol', async ({ page }) => {
+    const state = await boot(page, {
+      roles: ['OPERATOR'], permissions: ['REQUESTS_READ', 'OPERATIONS_READ']
+    });
+    await page.goto('/app');
+    await expect(panel(page).getByRole('button', { name: 'Empezar gestión' })).toHaveCount(0);
+    await panel(page).getByRole('button', { name: 'Tomar caso' }).click();
+    await expect(panel(page)).toContainText('Recibido');
+    expect(state.mutations).toEqual([{ method: 'POST', action: 'acknowledge' }]);
+    assertNoProviders(state);
+  });
+
+  test('403 al consultar la bandeja nunca presenta estado todo resuelto', async ({ page }) => {
+    const state = await boot(page);
+    state.attentionStatus = 403;
+    await page.goto('/app');
+    await expect(panel(page).getByRole('alert')).toContainText('No pudimos verificar los pendientes');
+    await expect(page.getByRole('region', { name: 'Estado de tu negocio' }))
+      .not.toContainText('Todo bajo control');
+    expect(state.mutations).toEqual([]);
+  });
+
   test('HTTP 401 en PATCH limpia sesión y no marca caso como gestionado', async ({ page }) => {
     const state = await boot(page);
     state.requestStatus = 401;
