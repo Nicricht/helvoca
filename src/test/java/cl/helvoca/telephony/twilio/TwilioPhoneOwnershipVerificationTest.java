@@ -65,6 +65,7 @@ class TwilioPhoneOwnershipVerificationTest {
     void carrierAttestsExactOwnerNumberSidAndVoiceRoutesWithoutWrites() {
         expect(validBody());
         TwilioPhoneProvisioningClient.VerifiedPhoneNumber verified = client.verifyManagedPhone(PHONE);
+        assertEquals(ACCOUNT, client.managedAccountSid());
         assertEquals(PHONE_SID, verified.sid());
         assertEquals(PHONE, verified.phoneNumber());
         server.verify();
