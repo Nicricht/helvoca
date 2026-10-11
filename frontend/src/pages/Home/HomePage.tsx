@@ -834,10 +834,10 @@ export function HomePage() {
             <button
               className={styles.errorRetry}
               type="button"
-              disabled={operationsQuery.isFetching || retrying === "operations"}
+              disabled={operationsQuery.isFetching}
               onClick={() => retry("operations", () => operationsQuery.refetch())}
             >
-              {retrying === "operations" ? "Reintentando…" : "Reintentar"}
+              Reintentar
             </button>
           </div>
         )}
