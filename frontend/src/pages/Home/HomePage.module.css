@@ -3445,3 +3445,40 @@
 .historyToggle:focus-visible { outline: 2px solid #68ded5; outline-offset: 3px; }
 .historyToggle svg:last-child { margin-left: auto; }
 @media (prefers-reduced-motion: reduce) { .historyToggle { transition: none; } }
+
+
+/* Keep failed Home reads recoverable on desktop, tablet, and mobile. */
+.errorRetry {
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-height: 40px;
+  padding: 8px 15px;
+  border: 1px solid var(--rv-accent);
+  border-radius: 10px;
+  color: var(--rv-text-primary);
+  background: rgba(22, 217, 245, .08);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.errorRetry:focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 3px;
+}
+
+.errorRetry:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+@media (max-width: 620px) {
+  .errorState {
+    flex-wrap: wrap;
+  }
+
+  .errorRetry {
+    margin-left: 0;
+  }
+}
