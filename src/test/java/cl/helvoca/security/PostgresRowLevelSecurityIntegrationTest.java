@@ -222,6 +222,38 @@ class PostgresRowLevelSecurityIntegrationTest {
                 Long.class, runId));
     }
 
+
+    @Test
+    void twilioInboundPhoneMappingIsVisibleOnlyToOwningTenantOrSystem() {
+        UUID phoneId = UUID.randomUUID();
+        String number = "+12025550137";
+        ownerJdbc.update("""
+                INSERT INTO phone_number (id, business_id, provider, phone_number, active)
+                VALUES (?, ?, 'TWILIO', ?, TRUE)
+                """, phoneId, businessA, number);
+        String lookup = """
+                SELECT COUNT(*) FROM phone_number
+                WHERE phone_number = ? AND active = TRUE
+                """;
+
+        // A WebSocket thread has no servlet JWT scope: an unscoped lookup sees no tenant.
+        assertEquals(0L, runtimeJdbc.queryForObject(lookup, Long.class, number));
+        assertEquals(1L, databaseContext.callAsTenant(businessA,
+                () -> runtimeJdbc.queryForObject(lookup, Long.class, number)));
+        assertEquals(0L, databaseContext.callAsTenant(businessB,
+                () -> runtimeJdbc.queryForObject(lookup, Long.class, number)));
+
+        // Only a signed inbound media route may explicitly open the SYSTEM scope.
+        assertEquals(1L, databaseContext.callAsSystem(
+                () -> runtimeJdbc.queryForObject(lookup, Long.class, number)));
+        assertEquals(TenantDatabaseContext.Mode.DENIED,
+                databaseContext.currentOrDenied().mode());
+        assertEquals(0L, runtimeJdbc.queryForObject(lookup, Long.class, number));
+        assertEquals(businessA, ownerJdbc.queryForObject(
+                "SELECT business_id FROM phone_number WHERE phone_number = ?",
+                UUID.class, number));
+    }
+
     @Test
     void businessProfilePhoneConstraintAcceptsApiValidE164Phone() {
         ownerJdbc.update(
