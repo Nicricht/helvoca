@@ -140,6 +140,39 @@ def parse_usage(response: dict) -> tuple[int, int, float]:
     return input_tokens, output_tokens, estimate
 
 
+def parse_proposals(response: dict) -> dict:
+    """Extract model text for owner review; never automatically apply anything."""
+    parts = response.get("output")
+    require(isinstance(parts, list), "Missing output list; stop")
+    texts = []
+    for block in parts:
+        if not isinstance(block, dict):
+            continue
+        for content in block.get("content", []):
+            if isinstance(content, dict) and content.get("type") == "output_text":
+                if isinstance(content.get("text"), str):
+                    texts.append(content["text"])
+    require(bool(texts), "Missing model output; stop")
+    text = "\n".join(texts)
+    require(len(text) <= 32000, "Model output exceeded review boundary")
+    try:
+        parsed = json.loads(text)
+    except ValueError as exc:
+        raise PilotBlocked("Model did not return valid JSON; owner must review") from exc
+    require(isinstance(parsed, dict)
+            and isinstance(parsed.get("products"), list)
+            and isinstance(parsed.get("warnings"), list),
+            "Model output did not meet the import review contract")
+    require(len(parsed["products"]) <= 50 and len(parsed["warnings"]) <= 30,
+            "Model output exceeds review limits")
+    for product in parsed["products"]:
+        require(isinstance(product, dict)
+                and isinstance(product.get("name"), str)
+                and bool(product["name"].strip()),
+                "Invalid product proposal; stop")
+    return {"products": parsed["products"], "warnings": parsed["warnings"]}
+
+
 def send_one(project: str, key: str, body: dict) -> dict:
     request = urllib.request.Request(
         ENDPOINT, data=json.dumps(body).encode(), method="POST",
@@ -158,7 +191,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="No-send document AI pilot unless explicitly authorized")
     parser.add_argument("files", type=Path, nargs="+", help="Consent-approved local image or PDF")
     parser.add_argument("--send", action="store_true", help="Authorize paid calls only after hard-cap preflight")
-    parser.add_argument("--audit", type=Path, help="Local private receipt log; required for --send")
+    parser.add_argument("--audit", type=Path, help="Private receipt log; required for --send")
+    parser.add_argument("--report", type=Path, help="Private proposals for owner review; required for --send")
     args = parser.parse_args(argv)
 
     require(1 <= len(args.files) <= MAX_CALLS, "Pilot accepts at most three files")
@@ -170,9 +204,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     require(args.audit is not None, "--audit is mandatory for paid calls")
+    require(args.report is not None, "--report is mandatory for owner review")
+    require(args.audit.resolve() != args.report.resolve(), "Audit and report must be separate")
+    require(not args.audit.resolve().is_relative_to(Path.cwd().resolve())
+            and not args.report.resolve().is_relative_to(Path.cwd().resolve()),
+            "Keep private report and audit outside the source repository")
     project, key = validate_authorization()
     prior = existing_receipts(args.audit)
-    require(not prior, "Use one new private audit log per pilot; no hidden retries")
+    require(not prior and not args.report.exists(),
+            "Use new private receipt/report files per pilot; no hidden retries")
     require(MAX_CALLS * RESERVE_USD_PER_CALL <= BUDGET_USD,
             "Estimated pilot reservation exceeds approved budget")
     spend_estimate = 0.0
@@ -195,7 +235,12 @@ def main(argv: list[str] | None = None) -> int:
             "number": index, "phase": "RESPONSE", "response_id": str(response.get("id", ""))[:120],
             "model": MODEL, "input_tokens": in_tok, "output_tokens": out_tok,
             "estimated_usd": round(estimate, 8), "cumulative_estimated_usd": round(spend_estimate, 8)})
+        # Private owner-reviewed output, separate from the metadata-only audit.
+        proposals = parse_proposals(response)
+        append_receipt(args.report, {"file_hash": fingerprint, "number": index,
+                                     "proposals": proposals})
         print(f"Call {index}: token usage {in_tok} in / {out_tok} out; estimated USD {estimate:.6f}")
+        print(f"Call {index}: {len(proposals['products'])} proposal(s) saved to local private review")
         # Never auto-apply proposals, print private documents or log response bodies.
         if spend_estimate + RESERVE_USD_PER_CALL > BUDGET_USD:
             break
