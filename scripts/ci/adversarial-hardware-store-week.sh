@@ -77,8 +77,8 @@ npx playwright install --with-deps chromium
 
 echo "Running relevant browser E2E..."
 npx playwright test \
-  e2e/inventory.spec.js \
-  e2e/home-operational.spec.js \
+  e2e/react-inventory.spec.js \
+  e2e/react-home.spec.js \
   e2e/operations-internal.spec.js
 
 CURRENT_SCENARIO="complete"
