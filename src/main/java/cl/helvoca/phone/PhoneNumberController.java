@@ -53,7 +53,7 @@ public class PhoneNumberController {
     @PreAuthorize("hasRole('BUSINESS_ADMIN')")
     public PhoneNumberResponse setActive(@PathVariable UUID id,
                                          @RequestBody PhoneNumberActiveRequest request) {
-        return service.setActive(id, request.active());
+        return request.active() ? provisioning.activateVerified(id) : service.setActive(id, false);
     }
 
     @PatchMapping("/{id}/whatsapp")
