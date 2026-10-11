@@ -72,6 +72,15 @@ Do not call live phone, WhatsApp or payment providers; use safe mocks/fixtures f
 - [x] Test selected-period HTTP 503 isolation, switching back to healthy period without losing daily operation metrics.
 - [ ] Verify the exact latest head Fast Gate, Java coverage, Playwright and full real-stack CI. Fix any recorded failures before promoting.
 
+## Phase 6 implementation
+
+- [x] Confirm server read model scopes each row to tenant and deduplicates active handoff/request pairs; PostgreSQL already verifies handoff priority and request resurfacing after handoff-only resolution.
+- [x] Protect same-tick duplicate clicks with a synchronous ref lock and disable manual refresh during mutations.
+- [x] Isolate in-progress and confirmation identifiers by `kind:id` instead of raw ID to avoid cross-kind confirmations.
+- [x] Extend Playwright mock to simulate temporary attention-read and mutation failures without committing fake server-side transitions.
+- [x] Add Playwright checks for cancellation, failure/retry, duplicate submissions, independent handoff/request lifecycle and readonly request permissions.
+- [ ] Verify latest exact SHA Full Gate and any failing browser cases before merge.
+
 ## Change safety
 
 - No existing database schema or production credentials touched.

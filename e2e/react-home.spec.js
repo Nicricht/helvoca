@@ -188,6 +188,9 @@ async function bootHome(page, options = {}) {
   let onboardingFailuresRemaining = options.onboardingFailures ?? 0;
   let operationsFailuresRemaining = options.operationsFailures ?? 0;
   let attentionReads = 0;
+  let attentionFailuresRemaining = options.attentionFailures ?? 0;
+  const mutationFailures = { ...(options.mutationFailures || {}) };
+  const mutationAttempts = { requestProgress: 0, requestResolve: 0, handoffAck: 0, handoffResolve: 0 };
   let attentionMutations = 0;
   let attentionItems = [...(options.attention || (options.operations === EMPTY_OPERATIONS ? [] : DEFAULT_ATTENTION))];
 
@@ -242,29 +245,53 @@ async function bootHome(page, options = {}) {
 
   await page.route('**/api/v1/operations/attention', async route => {
     attentionReads += 1;
+    if (attentionFailuresRemaining > 0) {
+      attentionFailuresRemaining -= 1;
+      return route.fulfill(json({ message: 'attention temporarily unavailable' }, 503));
+    }
     if (options.attentionError) {
       return route.fulfill(json({ message: 'attention unavailable' }, options.attentionError));
     }
     return route.fulfill(json(attentionItems));
   });
 
-  await page.route('**/api/v1/requests/req-1/status', route => {
-    attentionMutations += 1;
+  await page.route('**/api/v1/requests/req-1/status', async route => {
     const status = route.request().postDataJSON()?.status;
+    const action = status === 'IN_PROGRESS' ? 'requestProgress' : 'requestResolve';
+    mutationAttempts[action] += 1;
+    if (options.mutationGates?.[action]) await options.mutationGates[action];
+    if (mutationFailures[action] > 0) {
+      mutationFailures[action] -= 1;
+      return route.fulfill(json({ message: 'No se pudo guardar la solicitud' }, 503));
+    }
+    attentionMutations += 1;
     attentionItems = attentionItems
-      .map(item => item.id === 'req-1' ? { ...item, status } : item)
+      .map(item => item.id === 'req-1' && item.kind === 'REQUEST' ? { ...item, status } : item)
       .filter(item => item.status !== 'RESOLVED' && item.status !== 'CANCELLED');
     return route.fulfill(json({ id: 'req-1', status }));
   });
-  await page.route('**/api/v1/handoffs/handoff-1/acknowledge', route => {
+  await page.route('**/api/v1/handoffs/handoff-1/acknowledge', async route => {
+    mutationAttempts.handoffAck += 1;
+    if (options.mutationGates?.handoffAck) await options.mutationGates.handoffAck;
+    if (mutationFailures.handoffAck > 0) {
+      mutationFailures.handoffAck -= 1;
+      return route.fulfill(json({ message: 'No se pudo tomar el escalamiento' }, 503));
+    }
     attentionMutations += 1;
-    attentionItems = attentionItems.map(item => item.id === 'handoff-1'
+    attentionItems = attentionItems.map(item => item.id === 'handoff-1' && item.kind === 'HANDOFF'
       ? { ...item, status: 'ACKNOWLEDGED' } : item);
     return route.fulfill(json({ id: 'handoff-1', status: 'ACKNOWLEDGED' }));
   });
-  await page.route('**/api/v1/handoffs/handoff-1/resolve', route => {
+  await page.route('**/api/v1/handoffs/handoff-1/resolve', async route => {
+    mutationAttempts.handoffResolve += 1;
+    if (options.mutationGates?.handoffResolve) await options.mutationGates.handoffResolve;
+    if (mutationFailures.handoffResolve > 0) {
+      mutationFailures.handoffResolve -= 1;
+      return route.fulfill(json({ message: 'No se pudo cerrar el escalamiento' }, 503));
+    }
     attentionMutations += 1;
-    attentionItems = attentionItems.filter(item => item.id !== 'handoff-1');
+    attentionItems = attentionItems.filter(item => item.id !== 'handoff-1' || item.kind !== 'HANDOFF');
+    if (options.requestAfterHandoffResolved) attentionItems.push(options.requestAfterHandoffResolved);
     return route.fulfill(json({ id: 'handoff-1', status: 'RESOLVED' }));
   });
   await page.route('**/api/v1/requests', route => route.fulfill(json([
@@ -311,7 +338,8 @@ async function bootHome(page, options = {}) {
     requests,
     onboardingRequests: () => onboardingRequests,
     attentionReads: () => attentionReads,
-    attentionMutations: () => attentionMutations
+    attentionMutations: () => attentionMutations,
+    mutationAttempts: () => ({ ...mutationAttempts })
   };
 }
 
@@ -585,6 +613,179 @@ test.describe('React Home migration', () => {
     await expect(panel).not.toContainText('Sin intervenciones pendientes');
     await expect(page.getByRole('region', { name: 'Estado de tu negocio' }))
       .not.toContainText('Todo bajo control');
+  });
+
+  test('attention API outage stays unknown until explicit retry succeeds', async ({ page }) => {
+    const api = await bootHome(page, { attentionFailures: 1 });
+    await page.goto('/app');
+
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel.getByRole('alert')).toContainText('No pudimos verificar los pendientes');
+    await expect(panel).not.toContainText('Sin intervenciones pendientes');
+    expect(api.attentionMutations()).toBe(0);
+
+    await panel.getByRole('button', { name: 'Reintentar' }).click();
+    await expect(panel).toContainText('Cliente pidió devolución de llamada');
+    await expect(panel.getByRole('alert')).toHaveCount(0);
+    expect(api.attentionReads()).toBeGreaterThanOrEqual(2);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('cancelling request resolution never mutates or closes the request', async ({ page }) => {
+    const api = await bootHome(page, { attention: [{
+      ...DEFAULT_ATTENTION[0], status: 'IN_PROGRESS'
+    }] });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await panel.getByRole('button', { name: 'Marcar resuelta' }).click();
+    await expect(panel.getByRole('button', { name: 'Confirmar cierre' })).toBeVisible();
+    expect(api.attentionMutations()).toBe(0);
+    await panel.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(panel.getByRole('button', { name: 'Marcar resuelta' })).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Confirmar cierre' })).toHaveCount(0);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('cancelled handoff close never sends a resolve request', async ({ page }) => {
+    const api = await bootHome(page, { attention: [{
+      ...DEFAULT_ATTENTION[1], status: 'ACKNOWLEDGED'
+    }] });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await panel.getByRole('button', { name: 'Cerrar escalamiento' }).click();
+    await expect(panel.getByRole('button', { name: 'Confirmar cierre' })).toBeVisible();
+    await panel.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(panel.getByRole('button', { name: 'Cerrar escalamiento' })).toBeVisible();
+    expect(api.mutationAttempts().handoffResolve).toBe(0);
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('failed request start leaves the authoritative OPEN row and permits a single retry', async ({ page }) => {
+    const api = await bootHome(page, { mutationFailures: { requestProgress: 1 } });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await panel.getByRole('button', { name: 'Empezar gestión' }).click();
+    await expect(panel.getByRole('alert')).toContainText('No se pudo guardar la solicitud');
+    await expect(panel).toContainText('Abierta');
+    expect(api.attentionMutations()).toBe(0);
+    expect(api.mutationAttempts().requestProgress).toBe(1);
+
+    await panel.getByRole('button', { name: 'Empezar gestión' }).click();
+    await expect(panel).toContainText('En progreso');
+    await expect(panel.getByRole('alert')).toHaveCount(0);
+    expect(api.attentionMutations()).toBe(1);
+    expect(api.mutationAttempts().requestProgress).toBe(2);
+  });
+
+  test('failed request resolution stays pending until a new explicit confirmation', async ({ page }) => {
+    const api = await bootHome(page, {
+      attention: [{ ...DEFAULT_ATTENTION[0], status: 'IN_PROGRESS' }],
+      mutationFailures: { requestResolve: 1 }
+    });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await panel.getByRole('button', { name: 'Marcar resuelta' }).click();
+    await panel.getByRole('button', { name: 'Confirmar cierre' }).click();
+    await expect(panel.getByRole('alert')).toContainText('No se pudo guardar la solicitud');
+    await expect(panel).toContainText('En progreso');
+    expect(api.attentionMutations()).toBe(0);
+
+    await panel.getByRole('button', { name: 'Confirmar cierre' }).click();
+    await expect(panel).not.toContainText('Cliente pidió devolución de llamada');
+    expect(api.attentionMutations()).toBe(1);
+    expect(api.mutationAttempts().requestResolve).toBe(2);
+  });
+
+  test('an in-flight request transition prevents duplicate submissions', async ({ page }) => {
+    let releaseMutation;
+    const gate = new Promise(resolve => { releaseMutation = resolve; });
+    const api = await bootHome(page, { mutationGates: { requestProgress: gate } });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await panel.getByRole('button', { name: 'Empezar gestión' }).click();
+    await expect.poll(() => api.mutationAttempts().requestProgress).toBe(1);
+    await expect(panel.getByRole('button', { name: /Guardando/ })).toBeDisabled();
+    await expect(panel.getByRole('button', { name: 'Actualizar' })).toBeDisabled();
+    expect(api.attentionMutations()).toBe(0);
+
+    releaseMutation();
+    await expect(panel).toContainText('En progreso');
+    expect(api.mutationAttempts().requestProgress).toBe(1);
+    expect(api.attentionMutations()).toBe(1);
+  });
+
+  test('an in-flight human acknowledgement prevents a duplicate provider-independent action', async ({ page }) => {
+    let releaseMutation;
+    const gate = new Promise(resolve => { releaseMutation = resolve; });
+    const api = await bootHome(page, {
+      attention: [DEFAULT_ATTENTION[1]],
+      mutationGates: { handoffAck: gate }
+    });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await panel.getByRole('button', { name: 'Tomar caso' }).click();
+    await expect.poll(() => api.mutationAttempts().handoffAck).toBe(1);
+    await expect(panel.getByRole('button', { name: /Guardando/ })).toBeDisabled();
+    expect(api.attentionMutations()).toBe(0);
+
+    releaseMutation();
+    await expect(panel).toContainText('Recibido');
+    expect(api.mutationAttempts().handoffAck).toBe(1);
+    expect(api.attentionMutations()).toBe(1);
+  });
+
+  test('closing the human handoff does not falsely close its associated request', async ({ page }) => {
+    const operationId = 'operation-shared';
+    const api = await bootHome(page, {
+      attention: [{ ...DEFAULT_ATTENTION[1], operationId, status: 'ACKNOWLEDGED' }],
+      requestAfterHandoffResolved: {
+        ...DEFAULT_ATTENTION[0],
+        operationId,
+        title: 'La solicitud original sigue abierta'
+      }
+    });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('Reclamo de cliente pendiente');
+    await expect(panel).not.toContainText('La solicitud original sigue abierta');
+    await panel.getByRole('button', { name: 'Cerrar escalamiento' }).click();
+    await panel.getByRole('button', { name: 'Confirmar cierre' }).click();
+    await expect(panel).not.toContainText('Reclamo de cliente pendiente');
+    await expect(panel).toContainText('La solicitud original sigue abierta');
+    await expect(panel.getByRole('button', { name: 'Empezar gestión' })).toBeVisible();
+    expect(api.attentionMutations()).toBe(1);
+  });
+
+  test('identical request and handoff IDs keep independent confirmation state', async ({ page }) => {
+    const api = await bootHome(page, {
+      attention: [
+        { ...DEFAULT_ATTENTION[0], id: 'handoff-1', operationId: 'operation-request', status: 'IN_PROGRESS' },
+        { ...DEFAULT_ATTENTION[1], id: 'handoff-1', operationId: 'operation-handoff', status: 'ACKNOWLEDGED' }
+      ]
+    });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    const rows = panel.locator('article[data-kind]');
+    await expect(rows).toHaveCount(2);
+    await rows.nth(0).getByRole('button', { name: 'Marcar resuelta' }).click();
+    await expect(rows.nth(0).getByRole('button', { name: 'Confirmar cierre' })).toBeVisible();
+    await expect(rows.nth(1).getByRole('button', { name: 'Confirmar cierre' })).toHaveCount(0);
+    await expect(rows.nth(1).getByRole('button', { name: 'Cerrar escalamiento' })).toBeVisible();
+    expect(api.attentionMutations()).toBe(0);
+  });
+
+  test('read-only operator cannot change request status even when cases remain visible', async ({ page }) => {
+    const api = await bootHome(page, {
+      roles: ['OPERATOR'],
+      permissions: ['REQUESTS_READ', 'OPERATIONS_READ'],
+      attention: [DEFAULT_ATTENTION[0]]
+    });
+    await page.goto('/app');
+    const panel = page.getByRole('region', { name: 'Necesita tu atención' });
+    await expect(panel).toContainText('Cliente pidió devolución de llamada');
+    await expect(panel.getByRole('button', { name: 'Empezar gestión' })).toHaveCount(0);
+    await expect(panel.getByRole('button', { name: 'Confirmar cierre' })).toHaveCount(0);
+    expect(api.attentionMutations()).toBe(0);
   });
 
   test('403 identity check fails closed before any protected operational API call', async ({ page }) => {

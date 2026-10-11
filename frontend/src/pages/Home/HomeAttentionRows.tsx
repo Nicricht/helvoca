@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, CheckCircle2, CircleAlert, Clock3, RefreshCw, UserRoundCheck } from "lucide-react";
 import {
@@ -54,12 +54,16 @@ export function HomeAttentionRows({
 }: Props) {
   const client = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
+  // A synchronous lock also rejects repeated clicks before React commits a render.
+  const busyRef = useRef<string | null>(null);
   const [error, setError] = useState("");
   const [confirmationId, setConfirmationId] = useState<string | null>(null);
 
   async function perform(item: HumanAttentionItem, action: string) {
-    if (busyId) return;
-    setBusyId(item.id);
+    const key = item.kind + ":" + item.id;
+    if (busyRef.current) return;
+    busyRef.current = key;
+    setBusyId(key);
     setError("");
     try {
       switch (action) {
@@ -87,6 +91,7 @@ export function HomeAttentionRows({
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No pudimos actualizar el caso.");
     } finally {
+      busyRef.current = null;
       setBusyId(null);
     }
   }
@@ -122,14 +127,15 @@ export function HomeAttentionRows({
     <>
       <div className={styles.meta}>
         <span><Clock3 size={14} aria-hidden="true" /> Casos reales registrados</span>
-        <button type="button" className={styles.refresh} onClick={onRefresh} disabled={refreshing}>
+        <button type="button" className={styles.refresh} onClick={onRefresh} disabled={refreshing || Boolean(busyId)}>
           <RefreshCw size={14} aria-hidden="true" /> {refreshing ? "Actualizando…" : "Actualizar"}
         </button>
       </div>
       <div className={styles.list}>
         {items.map(item => {
           const next = actionFor(item, canManageRequests);
-          const ask = confirmationId === item.id;
+          const itemKey = item.kind + ":" + item.id;
+          const ask = confirmationId === itemKey;
           const destructive = next?.action === "REQUEST_RESOLVE" || next?.action === "HANDOFF_RESOLVE";
           return (
             <article className={styles.item} data-kind={item.kind} key={item.kind + "-" + item.id}>
@@ -156,13 +162,13 @@ export function HomeAttentionRows({
                 <div className={styles.action}>
                   {destructive && !ask ? (
                     <button type="button" disabled={Boolean(busyId)}
-                      onClick={() => setConfirmationId(item.id)}>{next.label} <ArrowUpRight size={13} /></button>
+                      onClick={() => setConfirmationId(itemKey)}>{next.label} <ArrowUpRight size={13} /></button>
                   ) : destructive && ask ? (
                     <>
                       <span className={styles.question}>¿Confirmas que gestionaste este caso?</span>
                       <button type="button" disabled={Boolean(busyId)}
                         onClick={() => { void perform(item, next.action); }}>
-                        {busyId === item.id ? "Guardando…" : "Confirmar cierre"}
+                        {busyId === itemKey ? "Guardando…" : "Confirmar cierre"}
                       </button>
                       <button type="button" className={styles.cancel} disabled={Boolean(busyId)}
                         onClick={() => setConfirmationId(null)}>Cancelar</button>
@@ -170,7 +176,7 @@ export function HomeAttentionRows({
                   ) : (
                     <button type="button" disabled={Boolean(busyId)}
                       onClick={() => { void perform(item, next.action); }}>
-                      {busyId === item.id ? "Guardando…" : next.label}
+                      {busyId === itemKey ? "Guardando…" : next.label}
                       <ArrowUpRight size={13} aria-hidden="true" />
                     </button>
                   )}
