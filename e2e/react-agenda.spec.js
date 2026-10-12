@@ -7,6 +7,9 @@ const json = body => ({
 });
 
 async function bootAgenda(page, options = {}) {
+  // Mock bookings live in the 2026-10-05 week. Freeze only Date, not timers,
+  // so the calendar stays deterministic across Monday/UTC CI rollovers.
+  await page.clock.setFixedTime(new Date('2026-10-07T12:00:00-03:00'));
   await page.addInitScript(
     token => sessionStorage.setItem('helvoca_access_token', token),
     options.token || 'agenda-react-e2e'
