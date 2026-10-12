@@ -65,14 +65,23 @@ class TwilioExistingReleaseCandidateContractTest {
     }
 
     @Test
-    void importedPhoneNeverInheritsManagedPurchasesPermissionOrLiveBadge() throws Exception {
+    void importedPhoneOnlyEligibleBehindNewIndependentFailClosedVoiceGate() throws Exception {
         String binding = Files.readString(Path.of(
                 "src/main/java/cl/helvoca/telephony/twilio/TwilioCallBindingGuard.java"));
         String guide = Files.readString(Path.of(
                 "src/main/java/cl/helvoca/onboarding/VoiceSetupReadinessService.java"));
         assertTrue(binding.contains("\"MANAGED_PURCHASE\".equals(phone.getTwilioBindingSource())"));
-        assertFalse(binding.contains("\"VERIFIED_EXISTING\""),
-                "No launch-time provenance promotion without a new review");
+        assertTrue(binding.contains("\"VERIFIED_EXISTING\""));
+        assertTrue(binding.contains("existingRoute.test(phone)"));
+        String route = Files.readString(Path.of(
+                "src/main/java/cl/helvoca/telephony/twilio/TwilioVerifiedExistingVoiceRouteGate.java"));
+        assertTrue(route.contains("existing-voice-route-enabled:false"));
+        assertTrue(route.contains("r.state = 'APPLIED'"));
+        assertTrue(route.contains("c.requester_id <> c.approver_id"));
+        assertTrue(route.contains("NOT_PILOT_MANAGED"));
+        assertTrue(route.contains("a.action = 'EXECUTED'"));
+        String application = Files.readString(Path.of("src/main/resources/application.yml"));
+        assertTrue(application.contains("HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED:false"));
         assertTrue(guide.contains("\"MANAGED_PURCHASE\".equals(phone.getTwilioBindingSource())"));
         assertTrue(guide.contains("new Step(\"LIVE_CALL\", \"Prueba de llamada real autorizada\", false"));
 
