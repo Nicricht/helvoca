@@ -111,7 +111,7 @@ class GeminiLiveRuntimeReadinessTest {
                 source.getProperty("app.gemini.live.model"));
         assertEquals("${GEMINI_LIVE_ENABLED:false}",
                 source.getProperty("app.gemini.live.enabled"));
-        assertEquals("${GEMINI_LIVE_PROBE_ON_STARTUP:false}",
-                "${GEMINI_LIVE_PROBE_ON_STARTUP:false}");
+        assertEquals("${GEMINI_API_KEY:}",
+                source.getProperty("app.gemini.live.api-key"));
     }
 }
