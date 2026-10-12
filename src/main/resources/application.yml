@@ -46,6 +46,14 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  telephony:
+    twilio:
+      # Existing-number voice routing is deliberately OFF until a distinct
+      # authorized, tenant-and-phone-pinned controlled pilot.
+      existing-voice-route-enabled: ${HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED:false}
+      existing-voice-route-business-id: ${HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_BUSINESS_ID:}
+      existing-voice-route-phone-id: ${HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_PHONE_ID:}
+      existing-voice-route-account-sid: ${HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ACCOUNT_SID:}
   onboarding:
     import-ai:
       # The API key alone cannot enable paid imports.
