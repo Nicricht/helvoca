@@ -152,10 +152,45 @@ class CallCertificationServiceTest {
         verifyNoInteractions(fixture.bookings, fixture.actions, fixture.transcripts, fixture.summaries);
     }
 
+    @Test
+    void persistedToolSuccessCannotOverrideCarrierFailureOrMissingTrustedBinding() {
+        Fixture fixture = new Fixture();
+        UUID id = UUID.randomUUID();
+        CallSession call = certifiedCall();
+        when(fixture.calls.findById(id)).thenReturn(Optional.of(call));
+
+        call.setStatus(CallStatus.FAILED);
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("carrier_call_not_completed"));
+        call.setStatus(CallStatus.COMPLETED);
+        call.setTelephonyProvider("simulator");
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("carrier_binding_incomplete"));
+        call.setTelephonyProvider("twilio");
+        call.setProviderCallId(null);
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("carrier_binding_incomplete"));
+        call.setProviderCallId("CA-invalid");
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("carrier_binding_incomplete"));
+        call.setProviderCallId("CA" + "a".repeat(32));
+        call.setPhoneNumberId(null);
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("carrier_binding_incomplete"));
+        call.setPhoneNumberId(UUID.randomUUID());
+        call.setAiProvider(null);
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("ai_provider_missing"));
+        call.setAiProvider(" ");
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("ai_provider_missing"));
+        call.setAiProvider("gemini");
+        assertFalse(fixture.service.verifyAndCleanup(id).success());
+        verifyNoInteractions(fixture.bookings);
+    }
+
     private static CallSession certifiedCall() {
         CallSession call = new CallSession();
         call.setBusinessId(UUID.randomUUID());
         call.setCertification(true);
+        call.setStatus(CallStatus.COMPLETED);
+        call.setTelephonyProvider("twilio");
+        call.setProviderCallId("CA" + "a".repeat(32));
+        call.setPhoneNumberId(UUID.randomUUID());
+        call.setAiProvider("gemini");
         call.setStreamStartedAt(Instant.now().minusSeconds(10));
         call.setStreamEndedAt(Instant.now());
         call.setAiSetupCompletedAt(Instant.now().minusSeconds(9));

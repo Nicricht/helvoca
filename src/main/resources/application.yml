@@ -180,7 +180,7 @@ app:
       certification-simulation: ${GEMINI_CERTIFICATION_SIMULATION:false}
       certification-caller: ${GEMINI_CERTIFICATION_CALLER:}
       api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_LIVE_MODEL:gemini-3.1-flash-live-preview}
+      model: ${GEMINI_LIVE_MODEL:gemini-3.8-live}
       voice: ${GEMINI_LIVE_VOICE:Sulafat}
       websocket-url: ${GEMINI_LIVE_WEBSOCKET_URL:wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent}
       start-of-speech-sensitivity: ${GEMINI_LIVE_START_SENSITIVITY:START_SENSITIVITY_HIGH}
