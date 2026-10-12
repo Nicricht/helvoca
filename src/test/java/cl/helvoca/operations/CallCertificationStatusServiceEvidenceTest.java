@@ -58,11 +58,16 @@ class CallCertificationStatusServiceEvidenceTest {
                 .thenReturn(List.of(mock(CallTranscript.class)));
         when(summaries.findByCallId(callId)).thenReturn(Optional.of(mock(CallSummary.class)));
         List<CallAction> records = new ArrayList<>();
+        UUID bookingId = UUID.randomUUID();
         for (String type : List.of("SERVICES_LISTED", "AVAILABILITY_CHECKED",
                 "BOOKING_CREATED", "BOOKING_CANCELLED")) {
             CallAction action = mock(CallAction.class);
             when(action.getActionType()).thenReturn(type);
             when(action.isSuccess()).thenReturn(true);
+            if (type.startsWith("BOOKING_")) {
+                when(action.getEntityType()).thenReturn("BOOKING");
+                when(action.getEntityId()).thenReturn(bookingId);
+            }
             records.add(action);
         }
         when(actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(records);
@@ -172,6 +177,40 @@ class CallCertificationStatusServiceEvidenceTest {
         when(actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(copy);
         assertTrue(check("AVAILABILITY").passed());
         assertFalse(service.current().commercialCertified());
+    }
+
+    @Test
+    void completedCarrierAndUnrelatedBookingCancellationAreNotEnough() {
+        var records = new ArrayList<>(actions.findAllByCallIdOrderByCreatedAtAsc(callId));
+        CallAction foreignCancellation = mock(CallAction.class);
+        when(foreignCancellation.isSuccess()).thenReturn(true);
+        when(foreignCancellation.getActionType()).thenReturn("BOOKING_CANCELLED");
+        when(foreignCancellation.getEntityType()).thenReturn("BOOKING");
+        when(foreignCancellation.getEntityId()).thenReturn(UUID.randomUUID());
+        records.set(3, foreignCancellation);
+        when(actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(records);
+
+        var status = service.current();
+        assertEquals("FAILED", status.state());
+        assertTrue(status.checks().stream().filter(c -> c.code().equals("BOOKING_CREATED"))
+                .findFirst().orElseThrow().passed());
+        assertFalse(status.checks().stream().filter(c -> c.code().equals("BOOKING_CANCELLED"))
+                .findFirst().orElseThrow().passed());
+        assertFalse(status.commercialCertified());
+    }
+
+    @Test
+    void bookingWithoutPersistedEntityDoesNotCountAsCreatedOrCancelled() {
+        CallAction missing = mock(CallAction.class);
+        when(missing.isSuccess()).thenReturn(true);
+        when(missing.getActionType()).thenReturn("BOOKING_CREATED");
+        when(missing.getEntityType()).thenReturn("BOOKING");
+        when(missing.getEntityId()).thenReturn(null);
+        when(actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(List.of(missing));
+
+        assertFalse(check("BOOKING_CREATED").passed());
+        assertFalse(check("BOOKING_CANCELLED").passed());
+        assertEquals("FAILED", service.current().state());
     }
 
     private CallCertificationStatusService.Check check(String code) {
