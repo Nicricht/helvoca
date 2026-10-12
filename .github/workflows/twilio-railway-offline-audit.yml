@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - 'audit/twilio-railway-offline-*'
+      - 'feat/twilio-verified-existing-voice-route-phase4-*'
   workflow_dispatch:
 
 permissions:
@@ -40,5 +41,5 @@ jobs:
         # postgres:16-alpine instance. Production is not contacted or modified.
         run: >-
           mvn --batch-mode --no-transfer-progress
-          -Dtest=TwilioProductionAuditPreparationContractTest,TwilioLegacyBindingInspectorTest,TwilioExistingNumberOwnershipVerifierTest,TwilioCallBindingGuardTest,ControlledPilotExternalEffectGuardTest,TwilioSignatureValidationFilterTest,TwilioMediaStreamEventBindingTest,TwilioTenantBindingIntegrationTest,TwilioVerifiedExistingMigrationPostgresIntegrationTest,TwilioExistingEnrollmentReconcilerPostgresIntegrationTest,TwilioExistingEnrollmentAdminPostgresIntegrationTest
+          -Dtest=TwilioProductionAuditPreparationContractTest,TwilioLegacyBindingInspectorTest,TwilioExistingNumberOwnershipVerifierTest,TwilioCallBindingGuardTest,ControlledPilotExternalEffectGuardTest,TwilioSignatureValidationFilterTest,TwilioMediaStreamEventBindingTest,TwilioTenantBindingIntegrationTest,TwilioVerifiedExistingMigrationPostgresIntegrationTest,TwilioExistingEnrollmentReconcilerPostgresIntegrationTest,TwilioExistingEnrollmentAdminPostgresIntegrationTest,TwilioVerifiedExistingVoiceRouteGateTest,TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest,TwilioExistingReleaseCandidateContractTest
           test
