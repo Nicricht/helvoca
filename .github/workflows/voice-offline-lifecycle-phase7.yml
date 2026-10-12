@@ -31,5 +31,5 @@ jobs:
       - name: Test Twilio offline media lifecycle, session recovery and RLS on PostgreSQL 16
         run: >-
           mvn --batch-mode --no-transfer-progress
-          -Dtest=TwilioMediaStreamStartupRecoveryPhase7Test,TwilioMediaStreamHandlerTest,TwilioMediaStreamEventBindingTest,TwilioVoiceControllerTest,TwilioVoiceTransportSessionTest,TwilioCallBindingGuardTest,TwilioTenantBindingIntegrationTest,PostgresRowLevelSecurityIntegrationTest,GeminiLiveVoiceSessionTest,GeminiLiveAudioInterruptionContractTest,GeminiLiveToolReplayContractTest
+          -Dtest=TwilioMediaStreamStartupRecoveryPhase7Test,TwilioVoiceCallbackRedactionPhase7Test,TwilioMediaStreamHandlerTest,TwilioMediaStreamEventBindingTest,TwilioVoiceControllerTest,TwilioVoiceTransportSessionTest,TwilioCallBindingGuardTest,TwilioTenantBindingIntegrationTest,PostgresRowLevelSecurityIntegrationTest,GeminiLiveVoiceSessionTest,GeminiLiveAudioInterruptionContractTest,GeminiLiveToolReplayContractTest
           test
