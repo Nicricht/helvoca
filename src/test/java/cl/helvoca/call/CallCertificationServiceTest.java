@@ -182,6 +182,66 @@ class CallCertificationServiceTest {
         verifyNoInteractions(fixture.bookings);
     }
 
+    @Test
+    void cancelledAnotherBookingCannotCertifyCompletedVoiceCall() {
+        Fixture fixture = new Fixture();
+        UUID callId = UUID.randomUUID();
+        UUID createdBooking = UUID.randomUUID();
+        UUID unrelatedBooking = UUID.randomUUID();
+        CallSession call = certifiedCall();
+
+        when(fixture.calls.findById(callId)).thenReturn(Optional.of(call));
+        when(fixture.transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId))
+                .thenReturn(List.of(mock(CallTranscript.class)));
+        when(fixture.summaries.findByCallId(callId))
+                .thenReturn(Optional.of(mock(CallSummary.class)));
+        when(fixture.actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(List.of(
+                action("SERVICES_LISTED", true, null),
+                action("AVAILABILITY_CHECKED", true, null),
+                action("BOOKING_CREATED", true, createdBooking),
+                action("BOOKING_CANCELLED", true, unrelatedBooking)));
+        when(fixture.bookings.findByIdAndBusinessId(createdBooking, call.getBusinessId()))
+                .thenReturn(Optional.of(booking(BookingStatus.CANCELLED)));
+
+        var result = fixture.service.verifyAndCleanup(callId);
+
+        assertFalse(result.success());
+        assertTrue(result.reason().contains("booking_cancelled_not_successful"));
+        assertEquals(0, result.cleanupCancelled());
+        verify(fixture.bookings, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void multipleCreatedBookingsRequireMatchingCancellationForEach() {
+        Fixture fixture = new Fixture();
+        UUID callId = UUID.randomUUID();
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        CallSession call = certifiedCall();
+
+        when(fixture.calls.findById(callId)).thenReturn(Optional.of(call));
+        when(fixture.transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId))
+                .thenReturn(List.of(mock(CallTranscript.class)));
+        when(fixture.summaries.findByCallId(callId))
+                .thenReturn(Optional.of(mock(CallSummary.class)));
+        when(fixture.actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(List.of(
+                action("SERVICES_LISTED", true, null),
+                action("AVAILABILITY_CHECKED", true, null),
+                action("BOOKING_CREATED", true, first),
+                action("BOOKING_CREATED", true, second),
+                action("BOOKING_CANCELLED", true, first)));
+        when(fixture.bookings.findByIdAndBusinessId(first, call.getBusinessId()))
+                .thenReturn(Optional.of(booking(BookingStatus.CANCELLED)));
+        when(fixture.bookings.findByIdAndBusinessId(second, call.getBusinessId()))
+                .thenReturn(Optional.of(booking(BookingStatus.CANCELLED)));
+
+        var result = fixture.service.verifyAndCleanup(callId);
+
+        assertFalse(result.success());
+        assertTrue(result.reason().contains("booking_cancelled_not_successful"));
+        assertEquals(0, result.cleanupCancelled());
+    }
+
     private static CallSession certifiedCall() {
         CallSession call = new CallSession();
         call.setBusinessId(UUID.randomUUID());
