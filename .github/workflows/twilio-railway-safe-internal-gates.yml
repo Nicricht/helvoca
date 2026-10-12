@@ -13,6 +13,7 @@ on:
       - 'test/voice-offline-lifecycle-phase7-*'
       - 'test/voice-final-certification-phase8-*'
       - 'feat/voice-real-pilot-1of6-*'
+      - 'feat/voice-real-pilot-2of6-*'
 
 permissions:
   contents: read
@@ -80,7 +81,7 @@ jobs:
 
       - name: Run targeted Fast Gate
         env:
-          BASE_SHA: 'd95c16951c3fde1f18082b86404d85c214c60320'
+          BASE_SHA: '1fe7ecf6d9070c84b71ecb395444088ed3fe77a1'
         run: bash scripts/ci/fast-gate.sh "$BASE_SHA"
 
   test:
@@ -121,7 +122,7 @@ jobs:
 
       - name: Enforce differential Java coverage
         env:
-          BASE_SHA: 'd95c16951c3fde1f18082b86404d85c214c60320'
+          BASE_SHA: '1fe7ecf6d9070c84b71ecb395444088ed3fe77a1'
           DIFF_LINE_COVERAGE: "100"
           DIFF_BRANCH_COVERAGE: "100"
           DIFF_METHOD_COVERAGE: "100"
