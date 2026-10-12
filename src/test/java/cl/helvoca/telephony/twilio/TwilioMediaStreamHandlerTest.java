@@ -490,4 +490,26 @@ class TwilioMediaStreamHandlerTest {
         verify(socket, never()).close(any(org.springframework.web.socket.CloseStatus.class));
     }
 
+
+    @Test
+    void firstUntrustedFrameWithoutConnectionCallbackCreatesOnlyAnInertState() throws Exception {
+        VoiceAiProviderRegistry providers = mock(VoiceAiProviderRegistry.class);
+        CallLifecycleService lifecycle = mock(CallLifecycleService.class);
+        TwilioCallControl control = mock(TwilioCallControl.class);
+        TwilioCallBindingGuard guard = mock(TwilioCallBindingGuard.class);
+        TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
+                mock(TwilioMediaRouteSigner.class), providers, new VoiceProviderHealthRegistry(),
+                lifecycle, control, new TenantDatabaseContext(), guard);
+        WebSocketSession socket = mock(WebSocketSession.class);
+        when(socket.getId()).thenReturn("no-initialization-hook");
+        // Deliberately omit afterConnectionEstablished: this exercises the
+        // safe lazy state creation, never an authenticated or routed call.
+        handler.handleTextMessage(socket, new TextMessage(new JSONObject()
+                .put("event", "media").put("streamSid", "MZ-foreign")
+                .put("media", new JSONObject().put("payload", "untrusted-audio"))
+                .toString()));
+        verifyNoInteractions(lifecycle, providers, control, guard);
+        verify(socket, never()).close(any(org.springframework.web.socket.CloseStatus.class));
+    }
+
 }
