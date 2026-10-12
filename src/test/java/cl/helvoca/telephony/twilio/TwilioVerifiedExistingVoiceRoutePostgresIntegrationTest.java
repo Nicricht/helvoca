@@ -62,14 +62,14 @@ class TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest {
     @BeforeEach
     void resetFakeInventory() {
         owner = new JdbcTemplate(migrationDataSource);
-        scope.callAsSystem(() -> {
-            jdbc.update("DELETE FROM twilio_existing_enrollment_audit");
-            jdbc.update("DELETE FROM twilio_existing_enrollment_request");
-            jdbc.update("DELETE FROM twilio_existing_enrollment_claim");
-            jdbc.update("DELETE FROM phone_number WHERE id = ?", PHONE_ID);
-            jdbc.update("DELETE FROM pilot_launch_control WHERE business_id = ?", TENANT);
-            return null;
-        });
+        // V102/V103 audit tables are SYSTEM-only append-only. A disposable
+        // Testcontainers migration-owner connection resets fixtures; never
+        // bypass these privileges in the application or in production.
+        owner.update("DELETE FROM twilio_existing_enrollment_audit");
+        owner.update("DELETE FROM twilio_existing_enrollment_claim");
+        owner.update("DELETE FROM twilio_existing_enrollment_request");
+        scope.callAsSystem(() -> jdbc.update("DELETE FROM phone_number WHERE id = ?", PHONE_ID));
+        owner.update("DELETE FROM pilot_launch_control WHERE business_id = ?", TENANT);
         owner.update("INSERT INTO business(id, name) VALUES (?, ?) ON CONFLICT DO NOTHING",
                 TENANT, "Synthetic phase4 tenant");
         for (UUID admin : new UUID[]{REQUESTER, APPROVER}) {
