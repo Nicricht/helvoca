@@ -39,7 +39,7 @@ class VoiceRealCallPreflightServiceTest {
     }
 
     @Test
-    void successfulLocalPreflightIsNeverLiveCertificationOrCommercialGo() {
+    void successfulLocalPreflightIsNeverLiveCertificationOrCommercialGo() throws Exception {
         var result = service.inspect(PHONE);
         assertEquals("LOCAL_PREFLIGHT_PASSED", result.state());
         assertTrue(result.localPreflightPassed());
