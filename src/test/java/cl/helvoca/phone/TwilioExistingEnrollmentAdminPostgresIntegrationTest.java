@@ -392,6 +392,23 @@ class TwilioExistingEnrollmentAdminPostgresIntegrationTest {
     void signedJwtIdentityStillNeedsCorrectAuthoritiesAndLivePlatformRole() {
         try(TenantDatabaseContext.Scope ignored=context.useSystem()) {
             assertThrows(AccessDeniedException.class, () -> service.status(UUID.randomUUID()));
+            SecurityContextHolder.getContext().setAuthentication(
+                    org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+                            .unauthenticated("unauthenticated", null));
+            assertThrows(AccessDeniedException.class, () -> service.status(UUID.randomUUID()));
+            SecurityContextHolder.getContext().setAuthentication(
+                    org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+                            .authenticated("not-a-jwt", null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"))));
+            assertThrows(AccessDeniedException.class, () -> service.status(UUID.randomUUID()));
+            Jwt differentRole = Jwt.withTokenValue("integration-test-only")
+                    .header("alg", "HS256")
+                    .subject(adminA.toString())
+                    .claim("email", email(adminA))
+                    .claim("roles", List.of("BUSINESS_ADMIN"))
+                    .build();
+            auth(differentRole, true);
+            assertThrows(AccessDeniedException.class, () -> service.status(UUID.randomUUID()));
             auth(jwt(adminA,false,true,adminA.toString(),email(adminA)),false);
             assertThrows(AccessDeniedException.class, () -> service.status(UUID.randomUUID()));
             auth(jwt(adminA,true,false,adminA.toString(),email(adminA)),true);
