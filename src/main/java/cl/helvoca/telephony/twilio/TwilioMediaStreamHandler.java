@@ -162,33 +162,35 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         // the media route signature is verified; each DB access restores its scope.
         UUID callId = databaseContext.callAsSystem(
                 () -> lifecycle.startInboundCall("twilio", callSid, callerPhone, businessPhone));
-        RealtimeCallContext context = databaseContext.callAsSystem(
-                () -> lifecycle.markStreamStarted(callId, callSid, streamSid, provider.id()));
-        databaseContext.runAsSystem(() -> lifecycle.markAiModel(callId, provider.modelId()));
-        if (voiceOverride != null) {
-            context = context.withVoiceOverride(voiceOverride);
-            log.info("VOICE_BAKEOFF_ROUTE call={} voice={}", callId, voiceOverride);
-        }
-        if (provider.certificationSession(context)) {
-            databaseContext.runAsSystem(() -> lifecycle.markCertification(callId));
-            log.info("RECEPVOZ_CALL_CERTIFICATION armed call={} provider={}", callId, provider.id());
-        }
-        TwilioVoiceTransportSession transport = new TwilioVoiceTransportSession(
-                socket, streamSid, accountSid, callSid, callControl);
-        VoiceAiSession ai = provider.createSession(context, transport);
-
-        state.started = true;
+        state.callId = callId;
         state.streamSid = streamSid;
         state.callSid = callSid;
-        state.callId = callId;
         state.providerId = provider.id();
-        state.ai = ai;
+        TwilioVoiceTransportSession transport = new TwilioVoiceTransportSession(
+                socket, streamSid, accountSid, callSid, callControl);
         state.transport = transport;
         try {
+            RealtimeCallContext context = databaseContext.callAsSystem(
+                    () -> lifecycle.markStreamStarted(callId, callSid, streamSid, provider.id()));
+            databaseContext.runAsSystem(() -> lifecycle.markAiModel(callId, provider.modelId()));
+            if (voiceOverride != null) {
+                context = context.withVoiceOverride(voiceOverride);
+                log.info("VOICE_BAKEOFF_ROUTE call={} voice={}", callId, voiceOverride);
+            }
+            if (provider.certificationSession(context)) {
+                databaseContext.runAsSystem(() -> lifecycle.markCertification(callId));
+                log.info("RECEPVOZ_CALL_CERTIFICATION armed call={} provider={}", callId, provider.id());
+            }
+            VoiceAiSession ai = provider.createSession(context, transport);
+            state.ai = ai;
+            state.started = true;
             ai.start();
         } catch (RuntimeException e) {
-            databaseContext.runAsSystem(() -> lifecycle.updateStatus(callId, "failed", null));
-            health.failure(provider.id(), VoiceProviderHealthRegistry.FailureKind.UPSTREAM, e.getMessage());
+            // A failed provider/session initialization must not leave an active
+            // call, an orphaned stream, or a live carrier connection.
+            // Cleanup uses scoped SYSTEM operations and restores DENIED.
+            health.failure(provider.id(), VoiceProviderHealthRegistry.FailureKind.UPSTREAM, null);
+            closeState(state, true);
             transport.closeOnUpstreamFailure();
             throw e;
         }

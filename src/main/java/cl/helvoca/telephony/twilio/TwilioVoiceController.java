@@ -135,10 +135,11 @@ public class TwilioVoiceController {
             calls.markStreamStopped(streamSid);
         }
         if ("stream-error".equalsIgnoreCase(streamEvent)) {
-            log.warn("Twilio Media Stream error call={} stream={} error={}",
-                    callSid, streamSid, streamError == null ? "unknown" : streamError);
+            // Carrier-provided error bodies can contain credentials or caller data.
+            log.warn("Twilio Media Stream error call={} stream={} (carrier detail suppressed)",
+                    callSid, streamSid);
         } else {
-            log.info("Twilio Media Stream event call={} stream={} event={}", callSid, streamSid, streamEvent);
+            log.info("Twilio Media Stream callback call={} stream={}", callSid, streamSid);
         }
         return ResponseEntity.noContent().build();
     }
