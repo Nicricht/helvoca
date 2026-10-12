@@ -5,6 +5,7 @@ import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.security.TenantDatabaseContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Objects;
@@ -20,13 +21,31 @@ public class TwilioCallBindingGuard {
     private final PhoneNumberRepository phones;
     private final CallSessionRepository calls;
     private final TenantDatabaseContext databaseContext;
+    private final java.util.function.Predicate<PhoneNumber> existingRoute;
 
+    @Autowired
     public TwilioCallBindingGuard(PhoneNumberRepository phones,
                                   CallSessionRepository calls,
-                                  TenantDatabaseContext databaseContext) {
+                                  TenantDatabaseContext databaseContext,
+                                  TwilioVerifiedExistingVoiceRouteGate existingRouteGate) {
+        this(phones, calls, databaseContext, existingRouteGate::allows);
+    }
+
+    // Kept for pre-existing unit tests only. No Spring use and never opt-in.
+    TwilioCallBindingGuard(PhoneNumberRepository phones,
+                           CallSessionRepository calls,
+                           TenantDatabaseContext databaseContext) {
+        this(phones, calls, databaseContext, phone -> false);
+    }
+
+    TwilioCallBindingGuard(PhoneNumberRepository phones,
+                           CallSessionRepository calls,
+                           TenantDatabaseContext databaseContext,
+                           java.util.function.Predicate<PhoneNumber> existingRoute) {
         this.phones = phones;
         this.calls = calls;
         this.databaseContext = databaseContext;
+        this.existingRoute = existingRoute;
     }
 
     public boolean allowsIncoming(String callSid, String destination, String caller, String accountSid) {
@@ -80,17 +99,19 @@ public class TwilioCallBindingGuard {
                 && Objects.equals(call.getCallerNumber(), caller);
     }
 
-    private static boolean certified(PhoneNumber phone, String accountSid) {
+    private boolean certified(PhoneNumber phone, String accountSid) {
         return phone != null
                 && phone.isActive()
                 && "TWILIO".equalsIgnoreCase(phone.getProvider())
-                && "MANAGED_PURCHASE".equals(phone.getTwilioBindingSource())
                 && phone.getVoiceVerifiedAt() != null
                 && accountSid.equals(phone.getTwilioAccountSid())
                 && accountSid.matches("AC[0-9a-fA-F]{32}")
                 && phone.getExternalId() != null
                 && phone.getExternalId().matches("PN[0-9a-fA-F]{32}")
-                && phone.getBusinessId() != null;
+                && phone.getBusinessId() != null
+                && ("MANAGED_PURCHASE".equals(phone.getTwilioBindingSource())
+                    || ("VERIFIED_EXISTING".equals(phone.getTwilioBindingSource())
+                        && existingRoute.test(phone)));
     }
 
     private static boolean blank(String value) {
