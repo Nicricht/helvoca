@@ -1,6 +1,7 @@
 package cl.helvoca.operations;
 
 import cl.helvoca.call.CallAction;
+import cl.helvoca.call.CallCertificationBookingEvidence;
 import cl.helvoca.call.CallActionRepository;
 import cl.helvoca.call.CallStatus;
 import cl.helvoca.call.CallSession;
@@ -61,9 +62,9 @@ public class CallCertificationStatusService {
         checks.add(check("AVAILABILITY", "Disponibilidad consultada",
                 hasSuccessful(persistedActions, "AVAILABILITY_CHECKED") || hasSuccessful(persistedActions, "AVAILABILITY_LISTED"),
                 "El agente debe comprobar disponibilidad mediante backend."));
-        checks.add(check("BOOKING_CREATED", "Reserva creada", hasSuccessful(persistedActions, "BOOKING_CREATED"),
+        checks.add(check("BOOKING_CREATED", "Reserva creada", CallCertificationBookingEvidence.hasCreatedBooking(persistedActions),
                 "Debe existir una reserva creada por una tool autorizada."));
-        checks.add(check("BOOKING_CANCELLED", "Reserva cancelada", hasSuccessful(persistedActions, "BOOKING_CANCELLED"),
+        checks.add(check("BOOKING_CANCELLED", "Reserva cancelada", CallCertificationBookingEvidence.hasMatchingCancellation(persistedActions),
                 "La reserva de certificación debe cancelarse para no dejar datos operativos falsos."));
         checks.add(check("SUMMARY", "Resumen final", summaries.findByCallId(call.getId()).isPresent(),
                 "La llamada debe finalizar con resumen persistido."));
