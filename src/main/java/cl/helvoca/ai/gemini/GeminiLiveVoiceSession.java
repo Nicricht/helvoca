@@ -186,6 +186,12 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     @Override
     public void onOpen(WebSocket webSocket) {
         this.socket = webSocket;
+        // The customer may hang up while buildAsync is still connecting.
+        // Never leave a late upstream socket open after the call closed.
+        if (closed.get()) {
+            abortUpstream(webSocket);
+            return;
+        }
         webSocket.request(1);
         send(buildSetup());
         log.info("Gemini Live socket connected call={} model={}", context.callId(), properties.getModel());
@@ -966,14 +972,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         pendingAudio.clear();
         inboundFrames.reset();
         assistantAudioFramer.clear();
-        WebSocket upstream = socket;
-        if (upstream != null) {
-            try {
-                upstream.abort();
-            } catch (RuntimeException ignored) {
-                log.debug("Could not abort failed Gemini socket call={}", context.callId());
-            }
-        }
+        abortUpstream(socket);
         health.failure(GeminiLiveVoiceProvider.ID, kind, reason);
         // Never log provider-controlled reasons: they can include API keys or
         // caller data. The circuit-breaker also stores only a generic detail.
@@ -990,6 +989,15 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             log.warn("Could not close carrier after Gemini failure call={}", context.callId());
         } finally {
             finalizeCall();
+        }
+    }
+
+    private void abortUpstream(WebSocket current) {
+        if (current == null) return;
+        try {
+            current.abort();
+        } catch (RuntimeException ignored) {
+            log.debug("Could not abort failed Gemini socket call={}", context.callId());
         }
     }
 
