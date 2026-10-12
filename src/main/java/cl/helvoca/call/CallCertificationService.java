@@ -86,6 +86,18 @@ public class CallCertificationService {
         List<CallTranscript> persistedTranscripts = transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId);
         List<String> reasons = new ArrayList<>();
 
+        // A finished tool journey is not a successful phone call if Twilio
+        // reported failure or the managed media transport never completed.
+        if (call.getStatus() != CallStatus.COMPLETED) reasons.add("carrier_call_not_completed");
+        if (!"twilio".equalsIgnoreCase(call.getTelephonyProvider())
+                || call.getProviderCallId() == null
+                || !call.getProviderCallId().matches("CA[0-9a-fA-F]{32}")
+                || call.getPhoneNumberId() == null) {
+            reasons.add("carrier_binding_incomplete");
+        }
+        if (call.getAiProvider() == null || call.getAiProvider().isBlank()) {
+            reasons.add("ai_provider_missing");
+        }
         if (call.getAiSetupCompletedAt() == null) reasons.add("gemini_setup_incomplete");
         if (call.getStreamStartedAt() == null) reasons.add("media_stream_not_started");
         if (call.getStreamEndedAt() == null) reasons.add("media_stream_not_stopped");
