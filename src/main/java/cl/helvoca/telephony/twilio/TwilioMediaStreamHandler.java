@@ -32,6 +32,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     private final CallLifecycleService lifecycle;
     private final TwilioCallControl callControl;
     private final TenantDatabaseContext databaseContext;
+    private final TwilioCallBindingGuard bindingGuard;
     private final ConcurrentMap<String, StreamState> states = new ConcurrentHashMap<>();
 
     public TwilioMediaStreamHandler(TwilioMediaRouteSigner routeSigner,
@@ -39,13 +40,15 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
                                     VoiceProviderHealthRegistry health,
                                     CallLifecycleService lifecycle,
                                     TwilioCallControl callControl,
-                                    TenantDatabaseContext databaseContext) {
+                                    TenantDatabaseContext databaseContext,
+                                    TwilioCallBindingGuard bindingGuard) {
         this.routeSigner = routeSigner;
         this.providers = providers;
         this.health = health;
         this.lifecycle = lifecycle;
         this.callControl = callControl;
         this.databaseContext = databaseContext;
+        this.bindingGuard = bindingGuard;
     }
 
     @Override
@@ -68,13 +71,23 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         switch (event.optString("event", "")) {
             case "connected" -> { }
             case "start" -> handleStart(session, state, event);
-            case "media" -> handleMedia(state, event);
-            case "mark" -> handleMark(state, event);
-            case "stop" -> closeState(state, false);
+            case "media" -> { if (requireStream(session, state, event)) handleMedia(state, event); }
+            case "mark" -> { if (requireStream(session, state, event)) handleMark(state, event); }
+            case "stop" -> { if (requireStream(session, state, event)) closeState(state, false); }
             case "dtmf" -> { }
             default -> log.debug("Ignoring Twilio media event={} socket={}",
                     event.optString("event", ""), session.getId());
         }
+    }
+
+    private boolean requireStream(WebSocketSession socket, StreamState state, JSONObject event) throws Exception {
+        if (!state.started) return false;
+        if (TwilioMediaStreamEventBinding.matchesStream(state.streamSid, event)) return true;
+        // Never forward a second stream's audio, playback acknowledgement or stop event.
+        log.warn("Rejected cross-stream Twilio media event socket={}", socket.getId());
+        closeState(state, true);
+        socket.close(CloseStatus.POLICY_VIOLATION);
+        return false;
     }
 
     private void handleStart(WebSocketSession socket, StreamState state, JSONObject event) throws Exception {
@@ -86,6 +99,10 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         JSONObject start = event.optJSONObject("start");
         if (start == null) {
             socket.close(CloseStatus.BAD_DATA);
+            return;
+        }
+        if (!TwilioMediaStreamEventBinding.consistentStart(event, start)) {
+            socket.close(CloseStatus.POLICY_VIOLATION);
             return;
         }
         JSONObject parameters = start.optJSONObject("customParameters");
@@ -115,6 +132,14 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
                         businessPhone, callerPhone, callSid, providerId, voiceOverride, issuedAt, route);
         if (!valid) {
             log.warn("Rejected invalid Twilio media route socket={} call={}", socket.getId(), callSid);
+            socket.close(CloseStatus.POLICY_VIOLATION);
+            return;
+        }
+
+        // A signed route alone is insufficient: the socket's untrusted
+        // AccountSid and CallSid must identify the already admitted tenant call.
+        if (!bindingGuard.allowsMedia(callSid, businessPhone, callerPhone, accountSid)) {
+            log.warn("Rejected unbound Twilio media stream socket={}", socket.getId());
             socket.close(CloseStatus.POLICY_VIOLATION);
             return;
         }

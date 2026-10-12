@@ -43,6 +43,23 @@ class CallLifecycleServiceTest {
     }
 
     @Test
+    void delayedNonterminalCarrierCallbacksNeverResurrectClosedCalls() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallLifecycleService lifecycle = lifecycle(
+                mock(PhoneNumberRepository.class), mock(CustomerRepository.class), calls, new CallCommercialProperties());
+        CallSession call = new CallSession();
+        call.setStatus(CallStatus.COMPLETED);
+        call.setStartedAt(Instant.now().minusSeconds(30));
+        call.setEndedAt(Instant.now());
+        when(calls.findByProviderCallId("CA-stale")).thenReturn(Optional.of(call));
+
+        lifecycle.updateStatus("CA-stale", "ringing", null);
+
+        assertEquals(CallStatus.COMPLETED, call.getStatus());
+        verify(calls, never()).saveAndFlush(any(CallSession.class));
+    }
+
+    @Test
     void internalLiveCompletionCanFinishAnInProgressCall() {
         CallSessionRepository calls = mock(CallSessionRepository.class);
         CallLifecycleService lifecycle = lifecycle(
@@ -150,6 +167,63 @@ class CallLifecycleServiceTest {
 
         lifecycle.markAiModel(callId, oversized);
         verify(calls, times(1)).saveAndFlush(call);
+    }
+
+    @Test
+    void missingOrMismatchedProviderCallCannotTakeOverMediaStream() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallLifecycleService lifecycle = lifecycle(
+                mock(PhoneNumberRepository.class), mock(CustomerRepository.class),
+                calls, new CallCommercialProperties());
+        UUID callId = UUID.randomUUID();
+
+        assertThrows(cl.helvoca.common.NotFoundException.class,
+                () -> lifecycle.markStreamStarted(callId, "CA-missing", "MZ-foreign", "gemini"));
+
+        CallSession call = new CallSession();
+        call.setProviderCallId("CA-original");
+        when(calls.findById(callId)).thenReturn(Optional.of(call));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> lifecycle.markStreamStarted(callId, "CA-mismatched", "MZ-foreign", "gemini"));
+        assertNull(call.getStreamSid());
+        verify(calls, never()).saveAndFlush(any(CallSession.class));
+    }
+
+    @Test
+    void mediaStreamStartIsIdempotentOnlyForSameBoundStream() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        CallLifecycleService lifecycle = new CallLifecycleService(
+                mock(PhoneNumberRepository.class),
+                mock(CustomerRepository.class),
+                calls,
+                jdbc,
+                new CallCommercialProperties(),
+                new SimpleMeterRegistry());
+        UUID callId = UUID.randomUUID();
+        UUID businessId = UUID.randomUUID();
+        CallSession call = new CallSession();
+        call.setBusinessId(businessId);
+        call.setProviderCallId("CA-stream");
+        call.setCallerNumber("+56910000000");
+        call.setDestinationNumber("+14355550101");
+        call.setStatus(CallStatus.RINGING);
+        when(calls.findById(callId)).thenReturn(Optional.of(call));
+
+        var initial = lifecycle.markStreamStarted(callId, "CA-stream", "MZ-one", "gemini");
+        assertEquals(businessId, initial.businessId());
+        assertEquals("MZ-one", call.getStreamSid());
+        verify(calls).saveAndFlush(call);
+
+        var retry = lifecycle.markStreamStarted(callId, "CA-stream", "MZ-one", "gemini");
+        assertEquals(initial, retry);
+        verify(calls, times(1)).saveAndFlush(call);
+
+        assertThrows(IllegalStateException.class,
+                () -> lifecycle.markStreamStarted(callId, "CA-stream", "MZ-other", "gemini"));
+        assertEquals("MZ-one", call.getStreamSid());
+        verify(jdbc, times(3)).execute(contains("pg_advisory_xact_lock"));
     }
 
     @Test

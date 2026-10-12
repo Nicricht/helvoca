@@ -14,6 +14,7 @@ import {
   getMetaWhatsAppBootstrap,
   getMetaWhatsAppStatus,
   getPhoneProvisioningStatus,
+  getVoiceSetupReadiness,
   provisionPhoneNumber,
   searchAvailablePhoneNumbers,
   setPhoneActive,
@@ -113,6 +114,14 @@ export function ChannelsSettingsPanel({
     refetchOnWindowFocus: false
   });
 
+  const voiceReadiness = useQuery({
+    queryKey: ["settings", "voice-setup-readiness"],
+    queryFn: getVoiceSetupReadiness,
+    enabled: canRead,
+    retry: false,
+    refetchOnWindowFocus: false
+  });
+
   const metaStatus = useQuery({
     queryKey: ["settings", "meta-whatsapp-status"],
     queryFn: getMetaWhatsAppStatus,
@@ -149,6 +158,28 @@ export function ChannelsSettingsPanel({
     refetchOnWindowFocus: false
   });
 
+  const receivedVoiceGuide = voiceReadiness.data;
+  const voiceGuideValid = Boolean(
+    receivedVoiceGuide
+    && (receivedVoiceGuide.status === "CONFIGURATION_INCOMPLETE"
+      || receivedVoiceGuide.status === "AWAITING_LIVE_CERTIFICATION")
+    && typeof receivedVoiceGuide.configurationReady === "boolean"
+    && receivedVoiceGuide.liveCertified === false
+    && receivedVoiceGuide.readyForCommercialCalls === false
+    && (receivedVoiceGuide.activePhoneNumber == null
+      || typeof receivedVoiceGuide.activePhoneNumber === "string")
+    && Array.isArray(receivedVoiceGuide.steps)
+    && receivedVoiceGuide.steps.length > 0
+    && receivedVoiceGuide.steps.some(step => step?.code === "LIVE_CALL" && step.complete === false)
+    && receivedVoiceGuide.steps.every(step => step
+      && typeof step.code === "string"
+      && typeof step.label === "string"
+      && typeof step.complete === "boolean"
+      && typeof step.guidance === "string"
+      && (step.href === null || typeof step.href === "string"))
+  );
+  const voiceGuide = voiceGuideValid ? receivedVoiceGuide : null;
+
   const activationReady = metaStatus.data?.configured === true
     && metaStatus.data?.enabled === false
     && certification.data?.ready === true
@@ -158,6 +189,7 @@ export function ChannelsSettingsPanel({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["settings", "phone-numbers"] }),
       queryClient.invalidateQueries({ queryKey: ["settings", "phone-provisioning-status"] }),
+      queryClient.invalidateQueries({ queryKey: ["settings", "voice-setup-readiness"] }),
       queryClient.invalidateQueries({ queryKey: ["settings", "meta-whatsapp-status"] }),
       queryClient.invalidateQueries({ queryKey: ["settings", "meta-whatsapp-certification-readiness"] }),
       queryClient.invalidateQueries({ queryKey: ["settings", "meta-whatsapp-deployment-readiness"] })
@@ -177,7 +209,7 @@ export function ChannelsSettingsPanel({
     mutationFn: provisionPhoneNumber,
     onSuccess: async result => {
       setAvailable([]);
-      setPhoneMessage((result.phoneNumber || "El número") + " quedó conectado.");
+      setPhoneMessage((result.phoneNumber || "El número") + " quedó registrado. Consulta el diagnóstico antes de recibir llamadas.");
       await refreshChannels();
     },
     onError: error => setPhoneMessage(errorMessage(error, "No pudimos aprovisionar ese número."))
@@ -187,7 +219,7 @@ export function ChannelsSettingsPanel({
     mutationFn: connectExistingPhoneNumber,
     onSuccess: async result => {
       setExistingPhone("");
-      setPhoneMessage((result.phoneNumber || "El número") + " quedó conectado.");
+      setPhoneMessage((result.phoneNumber || "El número") + " quedó registrado. Consulta el diagnóstico antes de recibir llamadas.");
       await refreshChannels();
     },
     onError: error => setPhoneMessage(errorMessage(error, "No pudimos conectar ese número."))
@@ -196,7 +228,9 @@ export function ChannelsSettingsPanel({
   const togglePhoneActive = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) => setPhoneActive(id, active),
     onSuccess: async result => {
-      setPhoneMessage((result.phoneNumber || "El número") + (result.active ? " quedó activo." : " quedó inactivo."));
+      setPhoneMessage((result.phoneNumber || "El número") + (result.active
+        ? " quedó activo tras verificar la vinculación con el proveedor. Falta certificar una llamada real."
+        : " quedó inactivo."));
       await refreshChannels();
     },
     onError: error => setPhoneMessage(errorMessage(error, "No pudimos cambiar el estado del número."))
@@ -249,6 +283,17 @@ export function ChannelsSettingsPanel({
       "Vas a aprovisionar " + item.phoneNumber + " con el proveedor. Puede generar cargos. ¿Confirmas?"
     );
     if (accepted) provisionPhone.mutate(item.phoneNumber);
+  }
+
+  function doTogglePhoneActive(phone: PhoneNumber) {
+    if (!canManage || !phone.id || togglePhoneActive.isPending) return;
+    if (!phone.active && !window.confirm(
+      "¿Activar " + (phone.phoneNumber || "este número") + "? "
+      + "Esto consulta a Twilio para comprobar la pertenencia, el SID y los webhooks, "
+      + "y modifica su estado si la verificación es correcta. "
+      + "No realiza una llamada real ni certifica la recepcionista IA."
+    )) return;
+    togglePhoneActive.mutate({ id: phone.id, active: !phone.active });
   }
 
   function doConnectExisting() {
@@ -421,6 +466,60 @@ export function ChannelsSettingsPanel({
           <Phone size={18} aria-hidden="true" />
         </div>
 
+        <div className={styles.voiceSetupGuide} role="region" aria-label="Guía de activación de voz">
+          <div className={styles.voiceSetupHeading}>
+            <div>
+              <strong>Preparar recepcionista IA</strong>
+              <p>Diagnóstico de configuración, sin llamar, comprar números ni activar el canal.</p>
+            </div>
+            <button
+              className="button secondary"
+              type="button"
+              disabled={!canRead || voiceReadiness.isFetching}
+              onClick={() => void voiceReadiness.refetch()}
+            >
+              {voiceReadiness.isFetching ? "Revisando…" : "Actualizar diagnóstico"}
+            </button>
+          </div>
+
+          {!canRead && <p role="status">No tienes permiso para consultar la configuración de voz.</p>}
+          {canRead && voiceReadiness.isPending && <p role="status">Revisando configuración de voz…</p>}
+          {canRead && (voiceReadiness.isError || (voiceReadiness.isSuccess && !voiceGuide)) && (
+            <p role="alert">No pudimos comprobar la configuración. No se puede confirmar que la voz esté lista.</p>
+          )}
+          {canRead && voiceGuide && (
+            <>
+              <p className={styles.voiceSetupStatus} role="status">
+                {voiceGuide.configurationReady
+                  ? "Configuración completada. Falta certificar una llamada real autorizada."
+                  : "Configuración incompleta. Corrige los pasos pendientes antes de probar una llamada."}
+              </p>
+              {voiceGuide.activePhoneNumber && (
+                <p>Número activo registrado: <strong>{voiceGuide.activePhoneNumber}</strong>.
+                  Que figure activo no implica que Twilio y la IA funcionen en producción.</p>
+              )}
+              <ol className={styles.voiceSetupSteps}>
+                {voiceGuide.steps.map(step => (
+                  <li key={step.code}>
+                    <span className={step.complete ? styles.voiceSetupComplete : styles.voiceSetupPending}>
+                      {step.complete ? "Completado" : "Pendiente"}
+                    </span>
+                    <div>
+                      <strong>{step.label}</strong>
+                      {!step.complete && <p>{step.guidance}</p>}
+                      {!step.complete && step.href && <a href={step.href}>Ir a configurar</a>}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <p className={styles.voiceSetupNotice}>
+                La revisión es local y de solo lectura. No verifica en tiempo real el proveedor
+                ni autoriza llamadas reales. Estado comercial: <strong>no certificado</strong>.
+              </p>
+            </>
+          )}
+        </div>
+
         <div className={styles.compactList}>
           {connectedPhones.length === 0 && (
             <div className={styles.mutedState}>No hay números conectados.</div>
@@ -441,7 +540,7 @@ export function ChannelsSettingsPanel({
                       className="button ghost"
                       type="button"
                       disabled={togglePhoneActive.isPending}
-                      onClick={() => togglePhoneActive.mutate({ id: phone.id as string, active: !phone.active })}
+                      onClick={() => doTogglePhoneActive(phone)}
                     >
                       {phone.active ? "Desactivar" : "Activar"}
                     </button>

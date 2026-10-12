@@ -12,7 +12,7 @@ public class GeminiLiveProperties {
     private String apiKey = "";
     private String model = "gemini-3.8-live";
     private String voice = "Sulafat";
-    private String websocketUrl = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
+    private String websocketUrl = GeminiLiveModelPolicy.OFFICIAL_WEBSOCKET_URL;
 
     // Tuned for fast phone dialogue while preserving short natural pauses.
     private String startOfSpeechSensitivity = "START_SENSITIVITY_HIGH";
@@ -107,10 +107,9 @@ public class GeminiLiveProperties {
     public boolean ready() {
         return enabled
                 && notBlank(apiKey)
-                && notBlank(model)
+                && GeminiLiveModelPolicy.supported(model)
                 && notBlank(voice)
-                && websocketUrl != null
-                && websocketUrl.trim().startsWith("wss://");
+                && GeminiLiveModelPolicy.approvedEndpoint(websocketUrl);
     }
 
     public boolean certificationSimulationAllowedFor(String callerNumber) {

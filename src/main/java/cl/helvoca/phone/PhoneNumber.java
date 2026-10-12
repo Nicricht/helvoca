@@ -20,6 +20,15 @@ public class PhoneNumber {
     @Column(name = "external_id", length = 100)
     private String externalId;
 
+    @Column(name = "twilio_binding_source", length = 32)
+    private String twilioBindingSource;
+
+    @Column(name = "twilio_account_sid", length = 34)
+    private String twilioAccountSid;
+
+    @Column(name = "voice_verified_at")
+    private Instant voiceVerifiedAt;
+
     @Column(name = "phone_number", nullable = false, unique = true, length = 30)
     private String phoneNumber;
 
@@ -73,6 +82,12 @@ public class PhoneNumber {
     public void setWhatsappExternalId(String whatsappExternalId) { this.whatsappExternalId = whatsappExternalId; }
     public Instant getWhatsappCertifiedAt() { return whatsappCertifiedAt; }
     public void setWhatsappCertifiedAt(Instant whatsappCertifiedAt) { this.whatsappCertifiedAt = whatsappCertifiedAt; }
+    public String getTwilioBindingSource() { return twilioBindingSource; }
+    public void setTwilioBindingSource(String twilioBindingSource) { this.twilioBindingSource = twilioBindingSource; }
+    public String getTwilioAccountSid() { return twilioAccountSid; }
+    public void setTwilioAccountSid(String twilioAccountSid) { this.twilioAccountSid = twilioAccountSid; }
+    public Instant getVoiceVerifiedAt() { return voiceVerifiedAt; }
+    public void setVoiceVerifiedAt(Instant voiceVerifiedAt) { this.voiceVerifiedAt = voiceVerifiedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
