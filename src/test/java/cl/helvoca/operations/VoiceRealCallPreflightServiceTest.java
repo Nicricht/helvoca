@@ -3,6 +3,7 @@ package cl.helvoca.operations;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.security.TenantProvider;
+import cl.helvoca.telephony.twilio.TwilioLiveCallAdmissionReadiness;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ class VoiceRealCallPreflightServiceTest {
     private ChannelRuntimeReadinessService runtime;
     private ControlledPilotExternalEffectGuard pilot;
     private VoiceRealCallPreflightService service;
+    private TwilioLiveCallAdmissionReadiness carrierAdmission;
 
     @BeforeEach
     void init() {
@@ -30,12 +32,14 @@ class VoiceRealCallPreflightServiceTest {
         numbers = mock(PhoneNumberRepository.class);
         runtime = mock(ChannelRuntimeReadinessService.class);
         pilot = mock(ControlledPilotExternalEffectGuard.class);
+        carrierAdmission = mock(TwilioLiveCallAdmissionReadiness.class);
+        when(carrierAdmission.locallyAllowed(any(PhoneNumber.class))).thenReturn(true);
         when(tenants.requireBusinessId()).thenReturn(tenantId);
         when(numbers.findAllByBusinessIdOrderByCreatedAtDesc(tenantId)).thenReturn(List.of(phone()));
         when(runtime.snapshot()).thenReturn(readiness(true, true, true, "gemini", true, true));
         when(pilot.evaluate(tenantId, ControlledPilotExternalEffectGuard.Effect.VOICE))
                 .thenReturn(decision(true, true));
-        service = new VoiceRealCallPreflightService(tenants, numbers, runtime, pilot);
+        service = new VoiceRealCallPreflightService(tenants, numbers, runtime, pilot, carrierAdmission);
     }
 
     @Test
@@ -130,6 +134,13 @@ class VoiceRealCallPreflightServiceTest {
         when(pilot.evaluate(tenantId, ControlledPilotExternalEffectGuard.Effect.VOICE))
                 .thenReturn(decision(false, true));
         assertBlocked(service.inspect(PHONE), "GEMINI_MEDIA_PROVIDER_NOT_READY", "TENANT_NOT_PILOT_ENROLLED");
+    }
+
+    @Test
+    void validPhoneSidWithoutCertifiedCarrierBindingMustFailClosed() {
+        when(carrierAdmission.locallyAllowed(any(PhoneNumber.class))).thenReturn(false);
+        assertBlocked(service.inspect(PHONE), "TWILIO_VOICE_BINDING_NOT_CERTIFIED");
+        verify(carrierAdmission).locallyAllowed(any(PhoneNumber.class));
     }
 
     @Test
