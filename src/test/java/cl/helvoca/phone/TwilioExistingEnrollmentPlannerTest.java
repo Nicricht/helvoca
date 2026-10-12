@@ -234,6 +234,17 @@ class TwilioExistingEnrollmentPlannerTest {
     }
 
     @Test
+    void reviewableFlagAlwaysRequiresAnActualInternalCandidate() {
+        var unbacked = new TwilioExistingEnrollmentPlanner.Preview(
+                Code.REVIEWABLE_ONLY,
+                TwilioExistingNumberOwnershipVerifier.Code.VERIFIED,
+                null);
+        assertFalse(unbacked.reviewable());
+        assertNull(unbacked.candidate());
+        verifyNoInteractions(carrier);
+    }
+
+    @Test
     void nullOrCarrierRejectionNeverCreatesCandidate() {
         assertEquals(Code.CARRIER_REJECTED, decision());
         verify(carrier).verify(E164, ACCOUNT, null);
