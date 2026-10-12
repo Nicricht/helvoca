@@ -8,6 +8,7 @@ on:
     branches:
       - 'audit/twilio-railway-offline-*'
       - 'feat/twilio-verified-existing-voice-route-phase4-*'
+      - 'feat/gemini-live-offline-session-config-phase5-*'
 
 permissions:
   contents: read
@@ -75,7 +76,7 @@ jobs:
 
       - name: Run targeted Fast Gate
         env:
-          BASE_SHA: '161cfb8f15a25b30c2aaa8e06ba7a2e8cad7cb6e'
+          BASE_SHA: 'abb37ed7b81cb1e885cfe8a0bfa9820f1522f917'
         run: bash scripts/ci/fast-gate.sh "$BASE_SHA"
 
   test:
@@ -116,7 +117,7 @@ jobs:
 
       - name: Enforce differential Java coverage
         env:
-          BASE_SHA: '161cfb8f15a25b30c2aaa8e06ba7a2e8cad7cb6e'
+          BASE_SHA: 'abb37ed7b81cb1e885cfe8a0bfa9820f1522f917'
           DIFF_LINE_COVERAGE: "100"
           DIFF_BRANCH_COVERAGE: "100"
           DIFF_METHOD_COVERAGE: "100"
