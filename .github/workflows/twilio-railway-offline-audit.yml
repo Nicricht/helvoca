@@ -1,0 +1,32 @@
+name: Twilio Railway Offline Audit Contracts
+
+# Safe isolated validation for audit preparation only.
+# Never exercises public production smoke, carrier endpoints, Railway, or Gemini.
+on:
+  push:
+    branches:
+      - 'audit/twilio-railway-offline-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-twilio-railway-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout audited commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Validate offline audit contract without provider calls
+        run: mvn --batch-mode --no-transfer-progress -Dtest=TwilioProductionAuditPreparationContractTest test
