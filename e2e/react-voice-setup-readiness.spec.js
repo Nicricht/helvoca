@@ -62,7 +62,8 @@ async function boot(page, options = {}) {
     }));
     if (path === '/api/v1/ai-agent/voices') return route.fulfill(json([]));
     if (path === '/api/v1/phone-numbers') return route.fulfill(json([{
-      id: 'phone-1', phoneNumber: '+14355652512', provider: 'TWILIO', active: options.phoneActive ?? true
+      id: 'phone-1', phoneNumber: '+14355652512', provider: 'TWILIO',
+      active: options.phoneActive ?? true, twilioBindingSource: options.bindingSource ?? null
     }]));
     if (path === '/api/v1/onboarding/voice-readiness') {
       guideFetches++;
@@ -94,6 +95,22 @@ test('setup guides an admin without treating an active legacy number as certifie
   );
   expect(state.requests.filter(x => x.path.includes('provisioning') && x.method !== 'GET')).toEqual([]);
   expect(state.requests.filter(x => x.method !== 'GET')).toEqual([]);
+});
+
+
+test('fully verified imported phone never converts the guide into a commercial voice green light', async ({ page }) => {
+  const state = await boot(page, { phoneActive: true, bindingSource: 'VERIFIED_EXISTING' });
+  const panel = page.getByLabel('Guía de activación de voz');
+  await expect(panel).toContainText('Configuración incompleta');
+  await expect(panel).toContainText('Número Twilio certificado para este negocio');
+  await expect(panel).toContainText('Pendiente');
+  await expect(panel).toContainText('no certificado');
+  await expect(page.getByText('Listo para atender', { exact: true })).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Actualizar diagnóstico' }).click();
+  await expect.poll(state.fetchCount).toBe(2);
+  expect(state.requests.filter(x => x.method !== 'GET')).toEqual([]);
+  expect(state.requests.filter(x => /call|provisioning|purchase|activate/.test(x.path)
+      && x.method !== 'GET')).toEqual([]);
 });
 
 test('all local checks passing still never claims live certification or places calls', async ({ page }) => {

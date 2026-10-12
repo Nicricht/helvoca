@@ -272,6 +272,26 @@ class VoiceSetupReadinessServiceTest {
         assertTrue(step(service.current(), "PHONE").complete());
     }
 
+
+    @Test
+    void fullyAttestedActiveVerifiedExistingStillCannotShowVoiceReadyOrLiveCertified() {
+        setupComplete();
+        PhoneNumber imported = managed();
+        imported.setTwilioBindingSource("VERIFIED_EXISTING");
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(imported));
+
+        VoiceSetupReadinessService.Guide guide = service.current();
+        assertEquals("+14355652512", guide.activePhoneNumber());
+        assertEquals("CONFIGURATION_INCOMPLETE", guide.status());
+        assertFalse(step(guide, "PHONE").complete());
+        assertTrue(step(guide, "CARRIER").complete());
+        assertFalse(guide.configurationReady());
+        assertFalse(guide.liveCertified());
+        assertFalse(guide.readyForCommercialCalls());
+        verify(twilio, never()).verifyManagedPhone(anyString());
+    }
+
     private static VoiceSetupReadinessService.Step step(VoiceSetupReadinessService.Guide guide, String code) {
         return guide.steps().stream().filter(item -> code.equals(item.code())).findFirst().orElseThrow();
     }

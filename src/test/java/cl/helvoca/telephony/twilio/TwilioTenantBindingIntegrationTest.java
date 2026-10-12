@@ -122,6 +122,76 @@ class TwilioTenantBindingIntegrationTest extends ExplicitSystemDatabaseScopeSupp
         assertTrue(databaseContext.callAsTenant(tenantB, () -> calls.findById(a.getId()).isEmpty()));
     }
 
+
+    @Test
+    void verifiedExistingMayBeRecordedButNeverAdmittedAcrossTwoLiveTenantBoundaries() {
+        UUID importedTenant = business("Imported Existing Tenant Phase Nine");
+        UUID managedTenant = business("Managed Separate Tenant Phase Nine");
+        String importedAccount = "ACeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+        String managedAccount = "ACffffffffffffffffffffffffffffffff";
+        String importedCall = "CAeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+        String managedCall = "CAffffffffffffffffffffffffffffffff";
+        String importedPhone = "+14355559391";
+        String managedPhone = "+14355559392";
+        String importedCaller = "+56993333931";
+        String managedCaller = "+56993333932";
+
+        // Synthetic imported number is deliberately ACTIVE, verified and fully
+        // populated: carrier proof alone MUST NOT switch on commercial voice.
+        PhoneNumber imported = new PhoneNumber();
+        imported.setBusinessId(importedTenant);
+        imported.setPhoneNumber(importedPhone);
+        imported.setProvider("TWILIO");
+        imported.setActive(true);
+        imported.setExternalId("PNeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        imported.setTwilioAccountSid(importedAccount);
+        imported.setTwilioBindingSource("VERIFIED_EXISTING");
+        imported.setVoiceVerifiedAt(Instant.now());
+        PhoneNumber storedImported = databaseContext.callAsSystem(() -> phones.saveAndFlush(imported));
+        PhoneNumber storedManaged = phone(managedTenant, managedPhone, managedAccount,
+                "PNffffffffffffffffffffffffffffffff");
+        session(importedTenant, storedImported, importedCall, importedCaller);
+        session(managedTenant, storedManaged, managedCall, managedCaller);
+
+        // A correctly matched old CallSid and StreamSid must not override the
+        // provenance lock even when all other carrier and tenant data match.
+        CallSession importedSession = calls.findByProviderCallId(importedCall).orElseThrow();
+        importedSession.setStreamSid("MZeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+        calls.saveAndFlush(importedSession);
+        CallSession managedSession = calls.findByProviderCallId(managedCall).orElseThrow();
+        managedSession.setStreamSid("MZffffffffffffffffffffffffffffffff");
+        calls.saveAndFlush(managedSession);
+
+        assertFalse(binding.allowsIncoming(importedCall, importedPhone, importedCaller, importedAccount));
+        assertFalse(binding.allowsMedia(importedCall, importedPhone, importedCaller, importedAccount));
+        assertFalse(binding.allowsCallback(importedCall, importedAccount));
+        assertFalse(binding.allowsStreamCallback(importedCall,
+                "MZeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", importedAccount));
+        assertFalse(binding.allowsIncoming(importedCall, managedPhone, importedCaller, managedAccount));
+        assertFalse(binding.allowsMedia(importedCall, managedPhone, importedCaller, managedAccount));
+
+        assertTrue(binding.allowsIncoming(managedCall, managedPhone, managedCaller, managedAccount));
+        assertTrue(binding.allowsMedia(managedCall, managedPhone, managedCaller, managedAccount));
+        assertTrue(binding.allowsCallback(managedCall, managedAccount));
+        assertTrue(binding.allowsStreamCallback(managedCall,
+                "MZffffffffffffffffffffffffffffffff", managedAccount));
+        assertFalse(binding.allowsIncoming(managedCall, importedPhone, managedCaller, importedAccount));
+        assertFalse(binding.allowsCallback(managedCall, importedAccount));
+
+        assertTrue(databaseContext.callAsTenant(importedTenant,
+                () -> phones.findById(storedImported.getId()).isPresent()));
+        assertFalse(databaseContext.callAsTenant(importedTenant,
+                () -> phones.findById(storedManaged.getId()).isPresent()));
+        assertTrue(databaseContext.callAsTenant(managedTenant,
+                () -> calls.findByProviderCallId(managedCall).isPresent()));
+        assertFalse(databaseContext.callAsTenant(managedTenant,
+                () -> calls.findByProviderCallId(importedCall).isPresent()));
+        assertEquals("VERIFIED_EXISTING", databaseContext.callAsSystem(
+                () -> phones.findById(storedImported.getId()).orElseThrow().getTwilioBindingSource()));
+        assertTrue(databaseContext.callAsSystem(
+                () -> phones.findById(storedImported.getId()).orElseThrow().isActive()));
+    }
+
     private UUID business(String name) {
         Business business = new Business();
         business.setName(name);
