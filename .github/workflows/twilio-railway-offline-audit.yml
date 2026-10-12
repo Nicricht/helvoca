@@ -1,7 +1,7 @@
 name: Twilio Railway Offline Audit Contracts
 
-# Safe isolated validation for audit preparation only.
-# Never exercises public production smoke, carrier endpoints, Railway, or Gemini.
+# Deliberately independent of the normal production-facing smoke workflow.
+# No Twilio/Google/Railway credentials, carrier requests, real calls or deployed-domain checks.
 on:
   push:
     branches:
@@ -14,7 +14,14 @@ permissions:
 jobs:
   offline-twilio-railway-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    env:
+      TWILIO_PROVISIONING_ENABLED: 'false'
+      TWILIO_CERTIFICATION_INGRESS_ENABLED: 'false'
+      TWILIO_CERTIFICATION_CALL_ON_STARTUP: 'false'
+      GEMINI_LIVE_ENABLED: 'false'
+      GEMINI_LIVE_PROBE_ON_STARTUP: 'false'
+      HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
     steps:
       - name: Checkout audited commit
         uses: actions/checkout@v7
@@ -28,5 +35,10 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Validate offline audit contract without provider calls
-        run: mvn --batch-mode --no-transfer-progress -Dtest=TwilioProductionAuditPreparationContractTest test
+      - name: Verify synthetic Twilio, tenant RLS, pilot and audit contracts
+        # The carrier uses MockRestServiceServer; PostgreSQL is a throwaway Testcontainers
+        # postgres:16-alpine instance. Production is not contacted or modified.
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dtest=TwilioProductionAuditPreparationContractTest,TwilioLegacyBindingInspectorTest,TwilioExistingNumberOwnershipVerifierTest,TwilioCallBindingGuardTest,ControlledPilotExternalEffectGuardTest,TwilioSignatureValidationFilterTest,TwilioMediaStreamEventBindingTest,TwilioTenantBindingIntegrationTest,TwilioVerifiedExistingMigrationPostgresIntegrationTest,TwilioExistingEnrollmentReconcilerPostgresIntegrationTest,TwilioExistingEnrollmentAdminPostgresIntegrationTest
+          test
