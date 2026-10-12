@@ -115,6 +115,14 @@ class VoiceRealCallPreflightServiceTest {
         assertBlocked(service.inspect(PHONE), "GEMINI_MEDIA_PROVIDER_NOT_READY");
         when(runtime.snapshot()).thenReturn(readiness(true, true, true, "gemini", true, false));
         assertBlocked(service.inspect(PHONE), "GEMINI_MEDIA_PROVIDER_NOT_READY");
+        var foreignProvider = readiness(true, true, true, "gemini", true, true);
+        when(runtime.snapshot()).thenReturn(new ChannelRuntimeReadinessService.ChannelRuntimeReadiness(
+                foreignProvider.twilio(),
+                new ChannelRuntimeReadinessService.VoiceRuntimeReadiness(true, "gemini", "READY",
+                        List.of(new ChannelRuntimeReadinessService.ProviderRuntimeStatus(
+                                "openai-live", "SIP", true, true, "CLOSED"))),
+                foreignProvider.whatsApp()));
+        assertBlocked(service.inspect(PHONE), "GEMINI_MEDIA_PROVIDER_NOT_READY");
         var missing = readiness(true, true, true, "gemini", true, true);
         when(runtime.snapshot()).thenReturn(new ChannelRuntimeReadinessService.ChannelRuntimeReadiness(
                 missing.twilio(),
