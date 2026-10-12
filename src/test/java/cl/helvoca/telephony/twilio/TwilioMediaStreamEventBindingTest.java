@@ -37,4 +37,13 @@ class TwilioMediaStreamEventBindingTest {
         assertFalse(TwilioMediaStreamEventBinding.matchesStream(" ", event));
         assertFalse(TwilioMediaStreamEventBinding.matchesStream("MZ-admitted", new JSONObject()));
     }
+
+    @Test
+    void utilityConstructorIsNotAccessibleToNormalCallers() throws Exception {
+        var constructor = TwilioMediaStreamEventBinding.class.getDeclaredConstructor();
+        assertTrue(java.lang.reflect.Modifier.isPrivate(constructor.getModifiers()));
+        constructor.setAccessible(true);
+        assertNotNull(constructor.newInstance());
+    }
+
 }
