@@ -1,0 +1,37 @@
+name: Pilot Voice Real Call Phase 1 Offline Preflight
+
+# Read-only unit contracts, ephemeral PostgreSQL and no billable provider interactions.
+on:
+  push:
+    branches:
+      - 'feat/voice-real-pilot-1of6-*'
+
+permissions:
+  contents: read
+
+jobs:
+  pilot-voice-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TWILIO_PROVISIONING_ENABLED: 'false'
+      HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED: 'false'
+      GEMINI_LIVE_ENABLED: 'false'
+      GEMINI_LIVE_PROBE_ON_STARTUP: 'false'
+      HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+      TWILIO_CERTIFICATION_CALL_ON_STARTUP: 'false'
+      HELVOCA_TWILIO_SUBACCOUNT_VOICE_CONFIGURE_ON_STARTUP: 'false'
+    steps:
+      - name: Checkout exact candidate commit
+        uses: actions/checkout@v7
+      - name: Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Prove admin-only no-side-effect pilot readiness and tenant isolation
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dtest=VoiceRealCallPreflightServiceTest,VoiceRealCallPreflightControllerTest,ChannelRuntimeReadinessServiceTest,PilotGoNoGoServiceTest,TwilioTenantBindingIntegrationTest,PostgresRowLevelSecurityIntegrationTest
+          test
