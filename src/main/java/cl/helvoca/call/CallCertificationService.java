@@ -111,7 +111,9 @@ public class CallCertificationService {
             reasons.add("availability_tool_not_successful");
         }
         requireSuccessful(persistedActions, "BOOKING_CREATED", reasons);
-        requireSuccessful(persistedActions, "BOOKING_CANCELLED", reasons);
+        if (!CallCertificationBookingEvidence.hasMatchingCancellation(persistedActions)) {
+            reasons.add("booking_cancelled_not_successful");
+        }
 
         logCertificationTranscript(callId, persistedTranscripts);
 

@@ -11,6 +11,7 @@ on:
       - 'feat/gemini-live-offline-session-config-phase5-*'
       - 'test/voice-cross-tenant-postgres-phase6-*'
       - 'test/voice-offline-lifecycle-phase7-*'
+      - 'test/voice-final-certification-phase8-*'
 
 permissions:
   contents: read
@@ -78,7 +79,7 @@ jobs:
 
       - name: Run targeted Fast Gate
         env:
-          BASE_SHA: 'c88eea19f07b361c0a00f7d77d258d68db9db29a'
+          BASE_SHA: '73f94adcdf9a416c6cfd0ed016a4c91fe77d5cdd'
         run: bash scripts/ci/fast-gate.sh "$BASE_SHA"
 
   test:
@@ -119,7 +120,7 @@ jobs:
 
       - name: Enforce differential Java coverage
         env:
-          BASE_SHA: 'c88eea19f07b361c0a00f7d77d258d68db9db29a'
+          BASE_SHA: '73f94adcdf9a416c6cfd0ed016a4c91fe77d5cdd'
           DIFF_LINE_COVERAGE: "100"
           DIFF_BRANCH_COVERAGE: "100"
           DIFF_METHOD_COVERAGE: "100"
