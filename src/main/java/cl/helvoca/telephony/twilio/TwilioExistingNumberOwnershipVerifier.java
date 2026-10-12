@@ -87,7 +87,7 @@ public class TwilioExistingNumberOwnershipVerifier {
         }
         String parent = properties.getAccountSid().trim();
         if (!ownerAccountSid.equals(parent)
-                && !(ownerAccountSid.equals(allowedSubaccount) && ACCOUNT.matcher(allowedSubaccount).matches())) {
+                && !(ownerAccountSid.equals(allowedSubaccount))) {
             return denied(Code.ACCOUNT_NOT_ALLOWED);
         }
         try {
