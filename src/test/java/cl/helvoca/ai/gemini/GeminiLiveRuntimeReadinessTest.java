@@ -100,6 +100,16 @@ class GeminiLiveRuntimeReadinessTest {
         assertTrue(status.localConfigurationReady());
         props.setEnabled(false);
         assertFalse(new GeminiLiveRuntimeReadiness(props, router).snapshot().localConfigurationReady());
+
+        props.setEnabled(true);
+        props.setApiKey(null);
+        var noKey = new GeminiLiveRuntimeReadiness(props, router).snapshot();
+        assertFalse(noKey.apiKeyConfigured());
+        assertFalse(noKey.localConfigurationReady());
+        props.setApiKey(" ");
+        var blankKey = new GeminiLiveRuntimeReadiness(props, router).snapshot();
+        assertFalse(blankKey.apiKeyConfigured());
+        assertFalse(blankKey.localConfigurationReady());
     }
 
     @Test
