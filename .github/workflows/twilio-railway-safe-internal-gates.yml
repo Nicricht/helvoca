@@ -81,7 +81,7 @@ jobs:
 
       - name: Run targeted Fast Gate
         env:
-          BASE_SHA: '1fe7ecf6d9070c84b71ecb395444088ed3fe77a1'
+          BASE_SHA: '82335652263599eeca4ba5ee55d9d1186cfb690c'
         run: bash scripts/ci/fast-gate.sh "$BASE_SHA"
 
   test:
@@ -122,7 +122,7 @@ jobs:
 
       - name: Enforce differential Java coverage
         env:
-          BASE_SHA: '1fe7ecf6d9070c84b71ecb395444088ed3fe77a1'
+          BASE_SHA: '82335652263599eeca4ba5ee55d9d1186cfb690c'
           DIFF_LINE_COVERAGE: "100"
           DIFF_BRANCH_COVERAGE: "100"
           DIFF_METHOD_COVERAGE: "100"
