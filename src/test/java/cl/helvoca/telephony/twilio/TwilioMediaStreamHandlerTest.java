@@ -336,9 +336,11 @@ class TwilioMediaStreamHandlerTest {
         handler.handleTextMessage(socket, new TextMessage(mark.toString()));
 
         verify(control).hangup(accountSid, callSid);
+        handler.handleTextMessage(socket, new TextMessage(new JSONObject()
+                .put("event", "stop").put("streamSid", streamSid).toString()));
         handler.handleTransportError(socket, new IllegalStateException("stream disconnected"));
         verify(lifecycle, atLeastOnce()).updateStatus(callId, "failed", null);
-        verify(lifecycle).markStreamStopped(streamSid);
+        verify(lifecycle, atLeastOnce()).markStreamStopped(streamSid);
         assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
     }
     @Test
@@ -383,6 +385,109 @@ class TwilioMediaStreamHandlerTest {
         verify(socket).close(org.springframework.web.socket.CloseStatus.POLICY_VIOLATION);
         verifyNoInteractions(lifecycle, providers, control);
         assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+    }
+
+
+    @Test
+    void mismatchedTwilioStartStreamSidNeverReachesAdmissionOrAi() throws Exception {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setAuthToken("fake-test-secret");
+        TwilioMediaRouteSigner signer = new TwilioMediaRouteSigner(properties);
+        VoiceAiProviderRegistry providers = mock(VoiceAiProviderRegistry.class);
+        CallLifecycleService lifecycle = mock(CallLifecycleService.class);
+        TwilioCallBindingGuard guard = mock(TwilioCallBindingGuard.class);
+        WebSocketSession socket = mock(WebSocketSession.class);
+        when(socket.getId()).thenReturn("rejected-start-socket");
+        TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
+                signer, providers, new VoiceProviderHealthRegistry(), lifecycle,
+                mock(TwilioCallControl.class), new TenantDatabaseContext(), guard);
+        handler.afterConnectionEstablished(socket);
+        String business = "+14355550101", caller = "+56911111111", call = "CA-unit-test";
+        long now = Instant.now().getEpochSecond();
+        JSONObject start = new JSONObject().put("event", "start").put("streamSid", "MZ-one")
+                .put("start", new JSONObject().put("streamSid", "MZ-another")
+                        .put("accountSid", "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                        .put("callSid", call)
+                        .put("customParameters", new JSONObject().put("business", business)
+                                .put("caller", caller).put("callSid", call)
+                                .put("provider", "gemini").put("issuedAt", String.valueOf(now))
+                                .put("route", signer.sign(business, caller, call, "gemini", now))));
+        handler.handleTextMessage(socket, new TextMessage(start.toString()));
+        verify(socket).close(org.springframework.web.socket.CloseStatus.POLICY_VIOLATION);
+        verifyNoInteractions(guard, lifecycle, providers);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"media", "mark", "stop"})
+    void crossStreamFrameNeverReachesAiOrStopsUnrelatedStream(String kind) throws Exception {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setAuthToken("fake-test-secret");
+        TwilioMediaRouteSigner signer = new TwilioMediaRouteSigner(properties);
+        VoiceAiProviderRegistry providers = mock(VoiceAiProviderRegistry.class);
+        VoiceAiProvider provider = mock(VoiceAiProvider.class);
+        VoiceAiSession ai = mock(VoiceAiSession.class);
+        CallLifecycleService lifecycle = mock(CallLifecycleService.class);
+        TwilioCallBindingGuard guard = mock(TwilioCallBindingGuard.class);
+        TwilioCallControl control = mock(TwilioCallControl.class);
+        TenantDatabaseContext db = new TenantDatabaseContext();
+        WebSocketSession socket = mock(WebSocketSession.class);
+        when(socket.getId()).thenReturn("cross-stream-socket");
+        when(guard.allowsMedia(anyString(), anyString(), anyString(), anyString())).thenReturn(true);
+        when(providers.require("gemini")).thenReturn(provider);
+        when(provider.id()).thenReturn("gemini");
+        when(provider.configured()).thenReturn(true);
+        UUID id = UUID.randomUUID();
+        String business = "+14355550101", caller = "+56911111111";
+        String call = "CA-tenant-one", stream = "MZ-tenant-one";
+        String account = "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        when(lifecycle.startInboundCall("twilio", call, caller, business)).thenReturn(id);
+        RealtimeCallContext context = new RealtimeCallContext(id, UUID.randomUUID(), null, caller, business, stream);
+        when(lifecycle.markStreamStarted(id, call, stream, "gemini")).thenReturn(context);
+        when(provider.createSession(eq(context), any(VoiceTransportSession.class))).thenReturn(ai);
+        TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
+                signer, providers, new VoiceProviderHealthRegistry(), lifecycle, control, db, guard);
+        handler.afterConnectionEstablished(socket);
+        long now = Instant.now().getEpochSecond();
+        JSONObject start = new JSONObject().put("event", "start").put("streamSid", stream)
+                .put("start", new JSONObject().put("streamSid", stream)
+                        .put("accountSid", account).put("callSid", call)
+                        .put("customParameters", new JSONObject()
+                                .put("business", business).put("caller", caller)
+                                .put("callSid", call).put("provider", "gemini")
+                                .put("issuedAt", String.valueOf(now))
+                                .put("route", signer.sign(business, caller, call, "gemini", now))));
+        handler.handleTextMessage(socket, new TextMessage(start.toString()));
+        verify(ai).start();
+
+        JSONObject foreign = new JSONObject().put("event", kind)
+                .put("streamSid", "MZ-tenant-two")
+                .put("media", new JSONObject().put("track", "inbound").put("payload", "foreign-audio"))
+                .put("mark", new JSONObject().put("name", "foreign-ack"));
+        handler.handleTextMessage(socket, new TextMessage(foreign.toString()));
+        verify(socket).close(org.springframework.web.socket.CloseStatus.POLICY_VIOLATION);
+        verify(ai, never()).acceptInboundAudio(anyString());
+        verify(ai).close();
+        verify(lifecycle).markStreamStopped(stream);
+        verify(lifecycle).updateStatus(id, "failed", null);
+        verifyNoInteractions(control);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, db.currentOrDenied().mode());
+    }
+
+    @Test
+    void preStartAudioAndMarksAreNeverForwarded() throws Exception {
+        TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
+                mock(TwilioMediaRouteSigner.class), mock(VoiceAiProviderRegistry.class),
+                new VoiceProviderHealthRegistry(), mock(CallLifecycleService.class),
+                mock(TwilioCallControl.class), new TenantDatabaseContext(),
+                mock(TwilioCallBindingGuard.class));
+        WebSocketSession socket = mock(WebSocketSession.class);
+        when(socket.getId()).thenReturn("pre-start-socket");
+        handler.afterConnectionEstablished(socket);
+        for (String kind : new String[]{"media", "mark", "stop"}) {
+            handler.handleTextMessage(socket, new TextMessage(
+                    new JSONObject().put("event", kind).put("streamSid", "MZ-forged").toString()));
+        }
+        verify(socket, never()).close(any(org.springframework.web.socket.CloseStatus.class));
     }
 
 }

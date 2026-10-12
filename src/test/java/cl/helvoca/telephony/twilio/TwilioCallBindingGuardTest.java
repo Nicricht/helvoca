@@ -203,4 +203,15 @@ class TwilioCallBindingGuardTest {
         });
         assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
     }
+
+    @Test
+    void truthfulVerifiedExistingDoesNotOpenAnyCallPathBeforeCommercialAuthorization() {
+        when(phone.getTwilioBindingSource()).thenReturn("VERIFIED_EXISTING");
+        assertFalse(guard.allowsIncoming(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        assertFalse(guard.allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        assertFalse(guard.allowsCallback(CALL_SID, ACCOUNT));
+        assertFalse(guard.allowsStreamCallback(CALL_SID, STREAM_SID, ACCOUNT));
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+    }
+
 }
