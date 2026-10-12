@@ -223,10 +223,16 @@ class TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest {
         owner.update("INSERT INTO business(id, name) VALUES (?, ?)",
                 otherTenant, "Synthetic foreign tenant phase6");
         owner.update("""
-                INSERT INTO phone_number(id,business_id,phone_number,provider,external_id,active,
-                                         twilio_binding_source,twilio_account_sid,voice_verified_at)
-                VALUES (?,?,?,'TWILIO',?,TRUE,'VERIFIED_EXISTING',?,clock_timestamp())
-                """, otherPhone, otherTenant, otherE164, "PN" + "f".repeat(32), otherAccount);
+                INSERT INTO phone_number(id,business_id,phone_number,provider,external_id,active)
+                VALUES (?,?,?,'TWILIO',?,TRUE)
+                """, otherPhone, otherTenant, otherE164, "PN" + "f".repeat(32));
+        // Production V101 forbids migration-owner/tenant fabrication of provenance.
+        // Only an explicit SYSTEM-scoped update may set VERIFIED_EXISTING.
+        scope.runAsSystem(() -> jdbc.update("""
+                UPDATE phone_number SET twilio_binding_source = 'VERIFIED_EXISTING',
+                    twilio_account_sid = ?, voice_verified_at = clock_timestamp()
+                WHERE id = ?
+                """, otherAccount, otherPhone));
 
         assertFalse(scope.callAsSystem(() -> gate.allows(phones.findById(otherPhone).orElseThrow())));
         assertFalse(binding.allowsIncoming("CA" + "e".repeat(32),
