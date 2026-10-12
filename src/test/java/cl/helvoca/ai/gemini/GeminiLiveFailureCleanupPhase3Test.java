@@ -115,6 +115,31 @@ class GeminiLiveFailureCleanupPhase3Test {
     }
 
     @Test
+    void customerHangupWhileAsyncGeminiConnectionIsPendingAbortsLateSocket() {
+        var scenario = new Scenario();
+        // No socket exists when Twilio ends the call; Gemini connects later.
+        scenario.session.close();
+        scenario.session.onOpen(scenario.socket);
+        verify(scenario.socket, times(1)).abort();
+        verify(scenario.socket, never()).request(anyLong());
+        verify(scenario.socket, never()).sendText(any(CharSequence.class), anyBoolean());
+        verify(scenario.summaries, times(1)).generate(scenario.context.callId());
+        verify(scenario.certifications, times(1)).verifyAfterCall(scenario.context.callId());
+        verify(scenario.transport, never()).closeOnUpstreamFailure();
+    }
+
+    @Test
+    void aLateSocketAfterPreConnectFailureMustNotSendSetupOrLeak() {
+        var scenario = new Scenario();
+        scenario.session.onError(scenario.socket, new IllegalStateException("connect failed"));
+        scenario.session.onOpen(scenario.socket);
+        verify(scenario.socket).abort();
+        verify(scenario.socket, never()).request(anyLong());
+        verify(scenario.socket, never()).sendText(any(CharSequence.class), anyBoolean());
+        scenario.assertFinalizedOnce();
+    }
+
+    @Test
     void normalEndRequestsGracefulCloseNotAbruptAbort() {
         var scenario = new Scenario();
         scenario.open();
