@@ -452,6 +452,32 @@ class TwilioExistingEnrollmentReconcilerPostgresIntegrationTest {
     }
 
     @Test
+    void inFlightDuplicateClaimIsRecheckedInsideTransactionBeforeAnyWrite() {
+        String number = e164();
+        String sid = pn();
+        UUID id = phone(tenantA, number, null, false);
+        var request = intent(tenantA, id, number);
+        java.util.concurrent.atomic.AtomicBoolean once = new java.util.concurrent.atomic.AtomicBoolean(true);
+        when(carrier.verify(eq(number), eq(ACCOUNT), isNull())).thenAnswer(inv -> {
+            if (once.getAndSet(false)) {
+                // Another successful actor commits after the outer preview's DB
+                // snapshot but before its transaction. No second write is allowed.
+                assertEquals(TwilioExistingEnrollmentReconciler.Code.APPLIED,
+                        apply(request).code());
+            }
+            return new TwilioExistingNumberOwnershipVerifier.Outcome(
+                    TwilioExistingNumberOwnershipVerifier.Code.VERIFIED,
+                    new TwilioExistingNumberOwnershipVerifier.Evidence(
+                            sid, ACCOUNT, TwilioExistingNumberOwnershipVerifier.AccountKind.MAIN));
+        });
+        assertEquals(TwilioExistingEnrollmentReconciler.Code.ALREADY_APPLIED,
+                apply(request).code());
+        assertEquals(1L, countClaim(request.changeId()));
+        assertEquals("VERIFIED_EXISTING", source(id));
+        verify(carrier, times(2)).verify(number, ACCOUNT, null);
+    }
+
+    @Test
     void twoDifferentChangeIdsCompetingForOneRowNeverOverwriteEachOther() throws Exception {
         String number = e164();
         String sid = pn();
