@@ -15,7 +15,7 @@ La migración no contiene instrucciones para modificar filas de phone_number. No
 - VERIFIED_EXISTING exige provider TWILIO, número E.164 canónico, SID de cuenta AC válido, SID telefónico PN válido y voice_verified_at no nulo en un único estado persistente. El timestamp por sí solo NO constituye prueba de titularidad ni de un webhook funcional.
 - Se mantienen los índices históricos de unicidad de SID y de MANAGED_PURCHASE. V101 añade un índice parcial único de SID entre ambas procedencias certificadas.
 - Se mantienen FORCE ROW LEVEL SECURITY, las políticas RLS y las columnas existentes: no hay ampliación de permisos de lectura ni backfill.
-- El trigger BEFORE INSERT OR UPDATE impide que un rol normal de tenant o el propietario del esquema establezca o cambie registros VERIFIED_EXISTING. Solo el rol interno helvoca_system puede escribirlos. También impide retirar la procedencia desde un rol normal. No afecta filas NULL o MANAGED_PURCHASE.
+- El trigger BEFORE INSERT OR UPDATE OR DELETE impide que un rol normal de tenant o el propietario del esquema establezca o cambie registros VERIFIED_EXISTING. Solo el rol interno helvoca_system puede escribirlos. También impide retirar la procedencia o eliminar un número VERIFIED_EXISTING desde un rol normal. No afecta filas NULL o MANAGED_PURCHASE.
 
 El trigger limita además las modificaciones corrientes de un número VERIFIED_EXISTING, incluida su desactivación por rol tenant, hasta diseñar el flujo controlado posterior. Es una restricción intencional fail-closed, no un control administrativo final.
 

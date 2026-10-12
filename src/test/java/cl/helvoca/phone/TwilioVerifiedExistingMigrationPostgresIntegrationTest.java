@@ -65,7 +65,7 @@ class TwilioVerifiedExistingMigrationPostgresIntegrationTest {
     void seed() {
         owner = new JdbcTemplate(migrationDataSource);
         // Each test starts with a clean phone inventory; these are container-only rows.
-        owner.update("DELETE FROM phone_number");
+        databaseContext.callAsSystem(() -> runtimeJdbc.update("DELETE FROM phone_number"));
         tenantA = UUID.randomUUID();
         tenantB = UUID.randomUUID();
         owner.update("INSERT INTO business(id, name) VALUES (?, ?)",
@@ -319,6 +319,32 @@ class TwilioVerifiedExistingMigrationPostgresIntegrationTest {
                 "SELECT active FROM phone_number WHERE id = ?", Boolean.class, id)));
         assertEquals(1, databaseContext.callAsSystem(() ->
                 runtimeJdbc.update("UPDATE phone_number SET active = FALSE WHERE id = ?", id)));
+    }
+
+    @Test
+    void tenantAndOwnerCannotDeleteVerifiedExistingButSystemCanAndLegacyDeleteStillWorks() {
+        UUID verified = insertLegacy(tenantA, number(), null, true);
+        String verifiedE164 = owner.queryForObject(
+                "SELECT phone_number FROM phone_number WHERE id = ?", String.class, verified);
+        assertEquals(1, promoteSystem(verified, "VERIFIED_EXISTING",
+                ACCOUNT, PN, VERIFIED_AT, "TWILIO", verifiedE164));
+
+        assertThrows(DataAccessException.class, () ->
+                databaseContext.callAsTenant(tenantA, () ->
+                        runtimeJdbc.update("DELETE FROM phone_number WHERE id = ?", verified)));
+        assertEquals(0, databaseContext.callAsTenant(tenantB, () ->
+                runtimeJdbc.update("DELETE FROM phone_number WHERE id = ?", verified)));
+        assertThrows(DataAccessException.class, () ->
+                owner.update("DELETE FROM phone_number WHERE id = ?", verified));
+        assertEquals(1L, count(verified));
+        assertEquals(1, databaseContext.callAsSystem(() ->
+                runtimeJdbc.update("DELETE FROM phone_number WHERE id = ?", verified)));
+        assertEquals(0L, count(verified));
+
+        UUID legacy = insertLegacy(tenantA, number(), null, true);
+        assertEquals(1, databaseContext.callAsTenant(tenantA, () ->
+                runtimeJdbc.update("DELETE FROM phone_number WHERE id = ?", legacy)));
+        assertEquals(0L, count(legacy));
     }
 
     @Test

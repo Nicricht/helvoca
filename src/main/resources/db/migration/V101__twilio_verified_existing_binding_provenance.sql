@@ -61,6 +61,13 @@ BEGIN
             RAISE EXCEPTION 'verified-existing binding requires platform system scope'
                 USING ERRCODE = '42501';
         END IF;
+    ELSIF TG_OP = 'DELETE' THEN
+        IF OLD.twilio_binding_source = 'VERIFIED_EXISTING'
+           AND current_user <> 'helvoca_system' THEN
+            RAISE EXCEPTION 'verified-existing binding requires platform system scope'
+                USING ERRCODE = '42501';
+        END IF;
+        RETURN OLD;
     END IF;
     RETURN NEW;
 END
@@ -71,7 +78,7 @@ GRANT EXECUTE ON FUNCTION public.helvoca_verified_existing_write_guard()
     TO helvoca_runtime, helvoca_system;
 
 CREATE TRIGGER trg_phone_verified_existing_write_guard
-    BEFORE INSERT OR UPDATE ON phone_number
+    BEFORE INSERT OR UPDATE OR DELETE ON phone_number
     FOR EACH ROW EXECUTE FUNCTION public.helvoca_verified_existing_write_guard();
 
 COMMENT ON COLUMN phone_number.twilio_binding_source IS
