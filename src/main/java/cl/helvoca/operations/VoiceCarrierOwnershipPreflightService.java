@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  * Never changes carrier resources, local rows, secrets or pilot switches.
  */
 @Service
-public final class VoiceCarrierOwnershipPreflightService {
+public class VoiceCarrierOwnershipPreflightService {
     private static final Pattern E164 = Pattern.compile("\\+[1-9][0-9]{7,14}");
     private static final Pattern ACCOUNT = Pattern.compile("AC[0-9a-fA-F]{32}");
     private static final Pattern PHONE = Pattern.compile("PN[0-9a-fA-F]{32}");
