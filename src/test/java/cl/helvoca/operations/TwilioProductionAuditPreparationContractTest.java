@@ -90,7 +90,13 @@ class TwilioProductionAuditPreparationContractTest {
         String pilot = source("src/main/java/cl/helvoca/operations/ControlledPilotExternalEffectGuard.java");
         String plan = source(PLAN);
         assertTrue(guard.contains("\"MANAGED_PURCHASE\".equals(phone.getTwilioBindingSource())"));
-        assertFalse(guard.contains("\"VERIFIED_EXISTING\""));
+        assertTrue(guard.contains("\"VERIFIED_EXISTING\""));
+        assertTrue(guard.contains("existingRoute.test(phone)"));
+        String route = source("src/main/java/cl/helvoca/telephony/twilio/TwilioVerifiedExistingVoiceRouteGate.java");
+        assertTrue(route.contains("existing-voice-route-enabled:false"));
+        assertTrue(route.contains("r.state = 'APPLIED'"));
+        assertTrue(route.contains("c.requester_id <> c.approver_id"));
+        assertTrue(route.contains("NOT_PILOT_MANAGED"));
         assertTrue(pilot.contains("new Decision(true, false, \"NOT_PILOT_MANAGED\""));
         assertTrue(plan.contains("NOT_PILOT_MANAGED"));
         assertTrue(plan.contains("PAUSED"));
