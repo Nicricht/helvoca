@@ -33,7 +33,7 @@ CREATE TABLE public.twilio_existing_enrollment_request (
                 ELSE FALSE END))
 );
 CREATE FUNCTION public.helvoca_twilio_enrollment_request_immutable_guard()
-RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER AS $$
 BEGIN
     IF (OLD.change_id, OLD.business_id, OLD.phone_number_id, OLD.destination_e164,
         OLD.owner_account_sid, OLD.requester_id, OLD.requested_at, OLD.expires_at)
@@ -50,7 +50,7 @@ BEGIN
     END IF;
     RETURN NEW;
 END
-$;
+$$;
 REVOKE ALL ON FUNCTION public.helvoca_twilio_enrollment_request_immutable_guard() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.helvoca_twilio_enrollment_request_immutable_guard()
     TO helvoca_system;
