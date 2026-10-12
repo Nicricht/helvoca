@@ -156,4 +156,42 @@ class TwilioVerifiedExistingVoiceRouteGateTest {
         reset(pilot);
         assertFalse(scope.callAsSystem(() -> pinned(true).allows(number)));
     }
+
+    @Test
+    void missingPhoneAndTenantIdentifiersDenyBeforeAnyPilotOrDatabaseAccess() {
+        var route = pinned(true);
+        when(number.getId()).thenReturn(null);
+        assertFalse(scope.callAsSystem(() -> route.allows(number)));
+        when(number.getId()).thenReturn(PHONE);
+        when(number.getBusinessId()).thenReturn(null);
+        assertFalse(scope.callAsSystem(() -> route.allows(number)));
+        verifyNoInteractions(pilot, jdbc);
+    }
+
+    @Test
+    void foreignProviderAndMissingCarrierIdentityDenyBeforeAnyExternalEffect() {
+        var route = pinned(true);
+        when(number.getProvider()).thenReturn("OTHER");
+        assertFalse(scope.callAsSystem(() -> route.allows(number)));
+        when(number.getProvider()).thenReturn("TWILIO");
+        when(number.getTwilioAccountSid()).thenReturn(null);
+        assertFalse(scope.callAsSystem(() -> route.allows(number)));
+        when(number.getTwilioAccountSid()).thenReturn(ACCOUNT);
+        when(number.getExternalId()).thenReturn(null);
+        assertFalse(scope.callAsSystem(() -> route.allows(number)));
+        when(number.getExternalId()).thenReturn("PN" + "b".repeat(32));
+        when(number.getPhoneNumber()).thenReturn(null);
+        assertFalse(scope.callAsSystem(() -> route.allows(number)));
+        verifyNoInteractions(pilot, jdbc);
+    }
+
+    @Test
+    void registeredPilotInReadyRatherThanRunningCannotOpenExistingVoice() {
+        when(pilot.evaluate(BUSINESS, ControlledPilotExternalEffectGuard.Effect.VOICE))
+                .thenReturn(new ControlledPilotExternalEffectGuard.Decision(
+                        true, true, "ALLOWED", "READY", ControlledPilotExternalEffectGuard.Effect.VOICE));
+        assertFalse(scope.callAsSystem(() -> pinned(true).allows(number)));
+        verifyNoInteractions(jdbc);
+        verify(pilot, never()).globalExternalEffectsEnabled();
+    }
 }
