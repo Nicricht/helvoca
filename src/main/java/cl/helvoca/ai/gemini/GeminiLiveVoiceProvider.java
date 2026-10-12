@@ -93,6 +93,24 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
         session.setCertificationCaller(properties.getCertificationCaller());
         session.setCertificationSimulation(
                 properties.certificationSimulationAllowedFor(context == null ? null : context.callerNumber()));
+
+        // Snapshot the actual validated conversation settings for this call.
+        // Do not accidentally reset VAD, barge-in or latency budgets to Java
+        // defaults when resolving the tenant-specific voice. Getters clamp
+        // out-of-range operator configuration before it reaches the session.
+        session.setStartOfSpeechSensitivity(properties.getStartOfSpeechSensitivity());
+        session.setPrefixPaddingMs(properties.getPrefixPaddingMs());
+        session.setEndOfSpeechSensitivity(properties.getEndOfSpeechSensitivity());
+        session.setSilenceDurationMs(properties.getSilenceDurationMs());
+        session.setHybridVadEnabled(properties.isHybridVadEnabled());
+        session.setLocalBargeInEnabled(properties.isLocalBargeInEnabled());
+        session.setLocalBargeInMeanAmplitudeThreshold(properties.getLocalBargeInMeanAmplitudeThreshold());
+        session.setLocalBargeInSpeechFrames(properties.getLocalBargeInSpeechFrames());
+        session.setLocalBargeInReleaseFrames(properties.getLocalBargeInReleaseFrames());
+        session.setLocalBargeInRecentAssistantAudioMs(properties.getLocalBargeInRecentAssistantAudioMs());
+        session.setToolLatencyBudgetMs(properties.getToolLatencyBudgetMs());
+        session.setToolBatchLatencyBudgetMs(properties.getToolBatchLatencyBudgetMs());
+        session.setResponseLatencyBudgetMs(properties.getResponseLatencyBudgetMs());
         return session;
     }
 }
