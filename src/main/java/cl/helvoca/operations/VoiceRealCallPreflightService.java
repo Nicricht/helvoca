@@ -3,6 +3,7 @@ package cl.helvoca.operations;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.security.TenantProvider;
+import cl.helvoca.telephony.twilio.TwilioLiveCallAdmissionReadiness;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,15 +25,18 @@ public class VoiceRealCallPreflightService {
     private final PhoneNumberRepository numbers;
     private final ChannelRuntimeReadinessService runtime;
     private final ControlledPilotExternalEffectGuard pilot;
+    private final TwilioLiveCallAdmissionReadiness carrierAdmission;
 
     public VoiceRealCallPreflightService(TenantProvider tenants,
                                         PhoneNumberRepository numbers,
                                         ChannelRuntimeReadinessService runtime,
-                                        ControlledPilotExternalEffectGuard pilot) {
+                                        ControlledPilotExternalEffectGuard pilot,
+                                        TwilioLiveCallAdmissionReadiness carrierAdmission) {
         this.tenants = tenants;
         this.numbers = numbers;
         this.runtime = runtime;
         this.pilot = pilot;
+        this.carrierAdmission = carrierAdmission;
     }
 
     @Transactional(readOnly = true)
@@ -54,6 +58,9 @@ public class VoiceRealCallPreflightService {
         if (number == null || number.getExternalId() == null
                 || !TWILIO_PHONE_SID.matcher(number.getExternalId()).matches()) {
             blockers.add("TWILIO_PHONE_SID_NOT_BOUND");
+        }
+        if (number == null || !carrierAdmission.locallyAllowed(number)) {
+            blockers.add("TWILIO_VOICE_BINDING_NOT_CERTIFIED");
         }
 
         ChannelRuntimeReadinessService.ChannelRuntimeReadiness state = runtime.snapshot();
