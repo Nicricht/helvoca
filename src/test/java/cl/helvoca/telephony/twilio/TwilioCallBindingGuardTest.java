@@ -214,4 +214,43 @@ class TwilioCallBindingGuardTest {
         assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
     }
 
+
+    @Test
+    void independentlyAuthorizedExistingPhoneCanReachAllFourBoundRoutesWithoutWeakeningIdentity() {
+        when(phone.getTwilioBindingSource()).thenReturn("VERIFIED_EXISTING");
+        var permitted = new TwilioCallBindingGuard(phones, calls, databaseContext,
+                candidate -> candidate == phone);
+        assertTrue(permitted.allowsIncoming(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        assertTrue(permitted.allowsCallback(CALL_SID, ACCOUNT));
+        assertTrue(permitted.allowsStreamCallback(CALL_SID, STREAM_SID, ACCOUNT));
+        assertTrue(permitted.allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+
+        assertFalse(permitted.allowsIncoming(CALL_SID, NUMBER, CALLER,
+                "AC" + "c".repeat(32)));
+        assertFalse(permitted.allowsCallback(CALL_SID, "AC" + "c".repeat(32)));
+        assertFalse(permitted.allowsMedia(CALL_SID, NUMBER, "+56933333333", ACCOUNT));
+        assertFalse(permitted.allowsStreamCallback(CALL_SID, "MZ" + "f".repeat(32), ACCOUNT));
+        when(call.getBusinessId()).thenReturn(UUID.randomUUID());
+        assertFalse(permitted.allowsIncoming(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        assertFalse(permitted.allowsCallback(CALL_SID, ACCOUNT));
+        assertFalse(permitted.allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+    }
+
+    @Test
+    void existingRouteOptInCannotApplyToLegacyManagedMissingVoiceOrInactivePhone() {
+        var permissiveGate = new TwilioCallBindingGuard(phones, calls, databaseContext,
+                candidate -> true);
+        when(phone.getTwilioBindingSource()).thenReturn(null);
+        assertFalse(permissiveGate.allowsIncoming(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        when(phone.getTwilioBindingSource()).thenReturn("VERIFIED_EXISTING");
+        when(phone.getVoiceVerifiedAt()).thenReturn(null);
+        assertFalse(permissiveGate.allowsIncoming(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        when(phone.getVoiceVerifiedAt()).thenReturn(Instant.now());
+        when(phone.isActive()).thenReturn(false);
+        assertFalse(permissiveGate.allowsIncoming(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        when(phone.isActive()).thenReturn(true);
+        when(phone.getExternalId()).thenReturn("unverified");
+        assertFalse(permissiveGate.allowsIncoming(CALL_SID, NUMBER, CALLER, ACCOUNT));
+    }
 }
