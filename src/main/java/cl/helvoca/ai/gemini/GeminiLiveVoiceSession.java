@@ -186,6 +186,12 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     @Override
     public void onOpen(WebSocket webSocket) {
         this.socket = webSocket;
+        // The customer may hang up while buildAsync is still connecting.
+        // Never leave a late upstream socket open after the call closed.
+        if (closed.get()) {
+            abortUpstream(webSocket);
+            return;
+        }
         webSocket.request(1);
         send(buildSetup());
         log.info("Gemini Live socket connected call={} model={}", context.callId(), properties.getModel());
@@ -961,16 +967,38 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     private void fail(String reason, VoiceProviderHealthRegistry.FailureKind kind) {
         if (!closed.compareAndSet(false, true)) return;
+        // A failed carrier call must not leave an expensive upstream Gemini
+        // session connected. close() cannot run after the closed CAS above.
+        pendingAudio.clear();
+        inboundFrames.reset();
+        assistantAudioFramer.clear();
+        abortUpstream(socket);
         health.failure(GeminiLiveVoiceProvider.ID, kind, reason);
-        log.warn("Gemini Live failure call={} reason={}", context.callId(), reason);
+        // Never log provider-controlled reasons: they can include API keys or
+        // caller data. The circuit-breaker also stores only a generic detail.
+        log.warn("Gemini Live failure call={} kind={}", context.callId(), kind);
         try {
             lifecycle.updateStatus(context.callId(), "failed", null);
-        } catch (Exception e) {
-            log.warn("Could not mark Gemini call failed call={}: {}", context.callId(), e.getMessage());
+        } catch (Exception ignored) {
+            log.warn("Could not mark Gemini call failed call={}", context.callId());
         }
         flushTranscripts();
-        transport.closeOnUpstreamFailure();
-        finalizeCall();
+        try {
+            transport.closeOnUpstreamFailure();
+        } catch (RuntimeException ignored) {
+            log.warn("Could not close carrier after Gemini failure call={}", context.callId());
+        } finally {
+            finalizeCall();
+        }
+    }
+
+    private void abortUpstream(WebSocket current) {
+        if (current == null) return;
+        try {
+            current.abort();
+        } catch (RuntimeException ignored) {
+            log.debug("Could not abort failed Gemini socket call={}", context.callId());
+        }
     }
 
     private void flushTranscripts() {
