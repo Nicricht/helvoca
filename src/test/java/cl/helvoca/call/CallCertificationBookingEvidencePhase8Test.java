@@ -18,6 +18,14 @@ class CallCertificationBookingEvidencePhase8Test {
     }
 
     @Test
+    void utilityCannotBeConstructedByOrdinaryCallers() throws Exception {
+        var constructor = CallCertificationBookingEvidence.class.getDeclaredConstructor();
+        assertTrue(java.lang.reflect.Modifier.isPrivate(constructor.getModifiers()));
+        constructor.setAccessible(true);
+        assertNotNull(constructor.newInstance());
+    }
+
+    @Test
     void requiresARealCreatedBookingWithBusinessEntityIdentity() {
         UUID id = UUID.randomUUID();
         assertFalse(CallCertificationBookingEvidence.hasCreatedBooking(List.of()));
