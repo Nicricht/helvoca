@@ -196,7 +196,7 @@ class TwilioExistingNumberOwnershipVerifierTest {
 
     @Test
     void rejectsEmptyDuplicateIncompleteAndPaginatedFilteredResults() {
-        for (String page : new String[]{
+        String[] pages = new String[]{
                 "{\"incoming_phone_numbers\":[],\"next_page_uri\":null}",
                 "{\"incoming_phone_numbers\":[" + phone(MAIN) + "," + phone(MAIN) + "],\"next_page_uri\":null}",
                 "null",
@@ -204,17 +204,17 @@ class TwilioExistingNumberOwnershipVerifierTest {
                 "{\"incoming_phone_numbers\":[],\"next_page_uri\":\"/more\"}",
                 "{\"incoming_phone_numbers\":null,\"next_page_uri\":null}",
                 "{\"incoming_phone_numbers\":[true],\"next_page_uri\":null}"
-        }) {
+        };
+        Code[] expected = {
+                Code.NUMBER_NOT_FOUND, Code.AMBIGUOUS_NUMBER,
+                Code.INCOMPLETE_RESPONSE, Code.INCOMPLETE_RESPONSE,
+                Code.INCOMPLETE_RESPONSE, Code.INCOMPLETE_RESPONSE,
+                Code.INCOMPLETE_RESPONSE
+        };
+        for (int i = 0; i < pages.length; i++) {
             server.reset();
-            expectAccountAndList(MAIN, page);
-            Code result = check(MAIN, null);
-            if (page.contains("\"incoming_phone_numbers\":[]") && page.contains("\"next_page_uri\":null")) {
-                assertEquals(Code.NUMBER_NOT_FOUND, result);
-            } else if (page.contains("},{")) {
-                assertEquals(Code.AMBIGUOUS_NUMBER, result);
-            } else {
-                assertEquals(Code.INCOMPLETE_RESPONSE, result);
-            }
+            expectAccountAndList(MAIN, pages[i]);
+            assertEquals(expected[i], check(MAIN, null), "case " + i);
             server.verify();
         }
     }
@@ -337,6 +337,13 @@ class TwilioExistingNumberOwnershipVerifierTest {
         assertNull(row.getVoiceVerifiedAt());
         assertTrue(row.isActive());
         server.verify();
+    }
+
+    @Test
+    void springConstructorBuildsSafeClientAndUnprovenVerifiedStateIsNotAccepted() {
+        var springWired = new TwilioExistingNumberOwnershipVerifier(properties, CHILD);
+        assertEquals(Code.INVALID_TARGET, springWired.verify(null, MAIN, null).code());
+        assertFalse(new TwilioExistingNumberOwnershipVerifier.Outcome(Code.VERIFIED, null).verified());
     }
 
     @Test
