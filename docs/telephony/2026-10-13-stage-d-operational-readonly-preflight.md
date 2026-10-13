@@ -58,15 +58,15 @@ su hash SHA-256 confirmado. Esta ejecución solo requiere
 `railway` CLI y Python 3; no requiere Docker Desktop ni nuevo
 `pg_dump`. Puede hacerse desde cualquier carpeta.
 
-El ejecutable está fijado al commit `027b54e2ca642d336cd6d2f3c4ec0f8fb1ccbe78`
-y a SHA-256 `9757f1fd4a383ba1498e71ac62bbae8a44a9dc845b636d0347ef85e52a193186`.
+El ejecutable está fijado al commit `38ff2aa90deca3598e05d960b451ff13e44c1272`
+y a SHA-256 `aeb86ac44d8fe3613d902c7f970a2e8534c121083ab527ecf38da25f490f5987`.
 Ejecutar **solo una vez confirmado SUCCESS del CI exacto**:
 
 ~~~powershell
 $p = Join-Path $env:TEMP 'helvoca-stage-d-flyway.py'
-$u = 'https://raw.githubusercontent.com/Nicricht/helvoca/027b54e2ca642d336cd6d2f3c4ec0f8fb1ccbe78/scripts/ops/railway_pg18_flyway_readonly_preflight.py'
+$u = 'https://raw.githubusercontent.com/Nicricht/helvoca/38ff2aa90deca3598e05d960b451ff13e44c1272/scripts/ops/railway_pg18_flyway_readonly_preflight.py'
 Invoke-WebRequest -Uri $u -OutFile $p
-if ((Get-FileHash $p -Algorithm SHA256).Hash.ToLowerInvariant() -ne '9757f1fd4a383ba1498e71ac62bbae8a44a9dc845b636d0347ef85e52a193186') {
+if ((Get-FileHash $p -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'aeb86ac44d8fe3613d902c7f970a2e8534c121083ab527ecf38da25f490f5987') {
     throw 'Stage D: el script no coincide con la versión verificada'
 }
 py -3 $p
@@ -118,7 +118,7 @@ El primer intento local devolvió:
 `STAGE_D_BLOCKED: Railway SSH or read-only psql query failed`.
 Ese mensaje no distinguía fallo de transporte de un error SQL.
 La herramienta se reparó en commit
-`027b54e2ca642d336cd6d2f3c4ec0f8fb1ccbe78`: codifica el SQL fijo en Base64 antes de pasarlo
+`38ff2aa90deca3598e05d960b451ff13e44c1272`: codifica el SQL fijo en Base64 antes de pasarlo
 al contenedor por Railway SSH, evitando interacciones entre comillas del
 CLI/PowerShell/SH. El SQL **sigue siendo el mismo y siempre READ ONLY**.
 Ahora captura `stderr` solo en memoria para clasificar
@@ -132,3 +132,25 @@ no divulgación. **La ejecución real todavía debe repetirse en Windows**.
 Si el estado sigue `STAGE_D_BLOCKED` después de la corrección,
 no reinterpretarlo como `PASS`, no realizar cambios productivos y
 utilizar solamente la categoría segura del error para el siguiente paso.
+
+## Segunda ejecución del operador: error de escritura local en Windows
+
+El operador recibió:
+`STAGE_D_BLOCKED: [Errno 13] Permission denied: ...private-backups/helvoca-stage-d-read-only-flyway-*.private.json`.
+Este error ocurrió **después** de obtener y validar la salida de
+`railway ssh` y de `psql`, pero **antes** de guardar el informe y
+mostrar el estado de compatibilidad. No afirmar aprobación Flyway
+hasta completar un nuevo intento y guardar la evidencia.
+
+El script v3 fijado a
+`38ff2aa90deca3598e05d960b451ff13e44c1272` intenta primero el
+directorio local habitual `%LOCALAPPDATA%/Helvoca/private-backups` y,
+si Windows deniega la creación del archivo, el directorio privado
+alternativo `%LOCALAPPDATA%/Helvoca/private-evidence`.
+**No envía resultados al CI, no sube el JSON, no modifica Railway**
+y rechaza ubicaciones externas, Git y enlaces simbólicos. Si ambos
+destinos son inaccesibles, termina `STAGE_D_BLOCKED`. La prueba
+`test_railway_pg18_flyway_readonly_preflight.py` verifica ambos casos.
+
+El script sigue consultando solo catálogo e historial Flyway en una
+transacción `READ ONLY`; los bloqueos de Twilio y despliegue se mantienen.
