@@ -25,9 +25,12 @@ despliega, compra números, toca PostgreSQL productivo ni inicia llamadas.
   `STAGE_B_RESTORED_COPY_MIGRATION=PASS_OPERATOR_REPORTED`. Evidencia
   local aportada por el operador, sin acceso de este agente al dump o
   reportes JSON privados.
-- El conector Railway consultado NO devuelve el Git SHA exacto del
-  despliegue actual, ni ofrece SQL read-only de `flyway_schema_history`
-  ni confirmación autenticada de AccountSid/PhoneNumberSid Twilio.
+- Una segunda consulta read-only a los metadatos de despliegues de Railway
+  **sí confirmó** que el deployment `4636d0d9-7be0-4a66-abce-58c68ccaede5`
+  corresponde al commit Git exacto de `main`
+  `ca58693e167752bd6eab8ff4e9be770391fe4293`.
+  La conexión disponible sigue sin proporcionar SQL read-only de
+  `flyway_schema_history` ni confirmación autenticada de AccountSid/PhoneNumberSid Twilio.
 
 Estos hechos se fijan sin secretos en:
 `docs/telephony/evidence/2026-10-13-stage-c-observed-no-go.json`.
@@ -86,7 +89,7 @@ comprobaciones del candidato**, no un despliegue. Resultado esperado:
 `STAGE_C_PRODUCTION_RELEASE=BLOCKED` hasta corroborar evidencias externas.
 
 Lo pendiente para otra etapa (sin comenzar aquí) incluye: historial Flyway
-real consultado en producción read-only; confirmar SHA exacto desplegado;
+real consultado en producción read-only; verificar de nuevo SHA exacto desplegado en la fecha del release;
 CI 7/7 del candidato consolidado; comprobación Twilio autenticada;
 copia nueva antes del despliegue; plan de reversión/ventana y
 autorización para afectar producción.
