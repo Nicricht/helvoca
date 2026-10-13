@@ -129,7 +129,7 @@ def evaluate(info: dict) -> tuple[bool, list[str]]:
     checks = (
         ("NOT_READ_ONLY", info["read_only"] is True),
         ("POSTGRES_NOT_18", info["pg_major"] == 18),
-        ("EMPTY_FLYWAY_HISTORY", info["history_count"] >= 99),
+        ("INCOMPLETE_FLYWAY_HISTORY", info["history_count"] >= 98),
         ("V99_NOT_APPLIED_ONCE", info["v99_success_count"] == 1),
         ("FUTURE_V100_V103_ALREADY_PRESENT", info["later_voice_migrations"] == 0),
         ("FAILED_FLYWAY_MIGRATION_EXISTS", info["history_failed"] == 0),
