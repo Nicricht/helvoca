@@ -1,0 +1,159 @@
+{
+  "observed_utc": "2026-10-13",
+  "scope": "Operator-reported backup rehearsal plus GitHub/Railway read-only observations, not independent carrier/production SQL proof",
+  "git": {
+    "main_branch": "main",
+    "main_sha": "ca58693e167752bd6eab8ff4e9be770391fe4293",
+    "candidate_sha": "9c1810457468fc2be8ab8cfe105af8c7448ac324",
+    "candidate_branch": "test/voice-pilot-stage-b-pg18-migration-rehearsal-20261013",
+    "pull_requests": [
+      {
+        "number": 793,
+        "base": "integration/voice-main-phase2-candidate-20261012",
+        "head": "audit/twilio-railway-offline-phase3-20261012",
+        "head_sha": "161cfb8f15a25b30c2aaa8e06ba7a2e8cad7cb6e",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 794,
+        "base": "audit/twilio-railway-offline-phase3-20261012",
+        "head": "feat/twilio-verified-existing-voice-route-phase4-20261012",
+        "head_sha": "abb37ed7b81cb1e885cfe8a0bfa9820f1522f917",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 795,
+        "base": "feat/twilio-verified-existing-voice-route-phase4-20261012",
+        "head": "feat/gemini-live-offline-session-config-phase5-20261012",
+        "head_sha": "c9a233a5336cc0df50ba35302941929c3f17b235",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 796,
+        "base": "feat/gemini-live-offline-session-config-phase5-20261012",
+        "head": "test/voice-cross-tenant-postgres-phase6-20261012",
+        "head_sha": "c88eea19f07b361c0a00f7d77d258d68db9db29a",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 797,
+        "base": "test/voice-cross-tenant-postgres-phase6-20261012",
+        "head": "test/voice-offline-lifecycle-phase7-20261012",
+        "head_sha": "73f94adcdf9a416c6cfd0ed016a4c91fe77d5cdd",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 798,
+        "base": "test/voice-offline-lifecycle-phase7-20261012",
+        "head": "test/voice-final-certification-phase8-20261012",
+        "head_sha": "d95c16951c3fde1f18082b86404d85c214c60320",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 799,
+        "base": "test/voice-final-certification-phase8-20261012",
+        "head": "feat/voice-real-pilot-1of6-preflight-20261012",
+        "head_sha": "82335652263599eeca4ba5ee55d9d1186cfb690c",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 800,
+        "base": "feat/voice-real-pilot-1of6-preflight-20261012",
+        "head": "feat/voice-real-pilot-2of6-carrier-binding-20261012",
+        "head_sha": "522b4cd9eaae8edc1e2ebf3fba78dda50c0ed70e",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 801,
+        "base": "feat/voice-real-pilot-2of6-carrier-binding-20261012",
+        "head": "feat/voice-real-pilot-3of6-gemini-audio-20261012",
+        "head_sha": "8b13ea90ca6dff50f47a094825e4a7c096c8aa9e",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 802,
+        "base": "feat/voice-real-pilot-3of6-gemini-audio-20261012",
+        "head": "test/voice-real-pilot-4of6-integrated-release-20261012",
+        "head_sha": "92f430ba92b772e0109bdb2f4a337ddbfc463d33",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 803,
+        "base": "test/voice-real-pilot-4of6-integrated-release-20261012",
+        "head": "chore/voice-real-pilot-5of6-production-gate-20261012",
+        "head_sha": "738d0f9f6055b74db1894d7c323e1bc18de623ae",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 804,
+        "base": "chore/voice-real-pilot-5of6-production-gate-20261012",
+        "head": "test/voice-real-pilot-6of6-live-evidence-20261012",
+        "head_sha": "783bef015d3edc2030ab63f003c8806dd9959bd6",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 806,
+        "base": "test/voice-real-pilot-6of6-live-evidence-20261012",
+        "head": "chore/voice-pilot-post6-railway-recovery-audit-20261013",
+        "head_sha": "06ed0b2dc9a41baf2b8a02f81725dd80ce6467a9",
+        "merged": false,
+        "draft": true
+      },
+      {
+        "number": 807,
+        "base": "chore/voice-pilot-post6-railway-recovery-audit-20261013",
+        "head": "test/voice-pilot-stage-b-pg18-migration-rehearsal-20261013",
+        "head_sha": "9c1810457468fc2be8ab8cfe105af8c7448ac324",
+        "merged": false,
+        "draft": true
+      }
+    ]
+  },
+  "railway": {
+    "project_id": "41988ee6-f9f6-48eb-b726-abb973bb5740",
+    "environment_id": "8bbc755a-58b5-46e8-8227-eefa4adbbce4",
+    "api_source_branch": "main",
+    "api_status": "online",
+    "postgres_status": "online",
+    "pending_changes": 0,
+    "deployed_git_sha": null
+  },
+  "ci": {
+    "head_sha": "9c1810457468fc2be8ab8cfe105af8c7448ac324",
+    "conclusion": "stage-b-specialized-only",
+    "full_gate_jobs": 0,
+    "passed_jobs": 0,
+    "run_url": null
+  },
+  "postgres": {
+    "volume_id": "b28c1046-168e-4f2e-bf02-18a2a2f1e611",
+    "stage_a_archive_sha256": "46f1ce16c694d22c7650ab2f26f6c96ded0cd0f1c4e5a3aa1fedd0be88cfbe18",
+    "stage_a_isolated_restore": true,
+    "stage_b_copy_migrations_verified": true,
+    "fresh_backup_for_release_verified": false,
+    "production_flyway_read_only_checked": false,
+    "schema_backward_compatibility_checked": false,
+    "independent_encrypted_backup_verified": false
+  },
+  "controls": {
+    "carrier_twilio_ownership_checked": false,
+    "pilot_tenant_sid_binding_checked": false,
+    "global_call_effects_disabled": false,
+    "other_tenants_protected": false,
+    "maintenance_window_approved": false,
+    "rollback_operator_assigned": false,
+    "incident_stop_plan_verified": false
+  }
+}
