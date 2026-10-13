@@ -2,6 +2,10 @@
 
 These rules are mandatory for implementation work in this repository.
 
+## V1 commercial completion: single controlling plan
+
+When the user asks to continue, finish, commercialize, or report remaining work on Helvoca V1, start from **`docs/PLAN_MAESTRO_CIERRE_COMERCIAL.md`** and **[Issue #823](https://github.com/Nicricht/helvoca/issues/823)**. They alone track the final product scope, gates C0–C7, evidence and completion. This adds no permission to merge, deploy, migrate, buy numbers, contact paying providers, place live calls, charge customers, or expose secrets. Reuse valid CI/restore/provider evidence; do not restart completed ten-phase programs, reimplement existing voice/billing, or invent more project-wide phases. Before each task identify a Cn gate, actual missing evidence, exact acceptance criterion, current HEAD and risk. Maintain a dated checkpoint in #823, and request only specific indispensable operator actions. `AGENTS.md` security/QA/safety rules always still apply. Optional integrations are explicitly excluded from the commercial V1 contract unless the owner expands scope.
+
 Helvoca follows **First-Pass Engineering**: understand the complete impact before coding, implement the smallest coherent solution, verify the exact final commit, and preserve durable state so interrupted work can resume safely. The user is not the QA system.
 
 Before implementation, read `software-factory/skill/first-pass-engineering/SKILL.md` when it is present so a fresh conversation does not depend on prior chat memory.
