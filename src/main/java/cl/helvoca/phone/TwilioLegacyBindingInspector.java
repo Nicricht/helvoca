@@ -79,7 +79,12 @@ public class TwilioLegacyBindingInspector {
         }
 
         // Legacy/manual entries must never be silently promoted to a purchased number.
-        if (!"MANAGED_PURCHASE".equals(phone.getTwilioBindingSource())) {
+        String source = phone.getTwilioBindingSource();
+        // Managed purchases and independently attested existing numbers are
+        // distinct, legitimate evidence classes. A complete database row
+        // still cannot replace fresh carrier proof or platform approval.
+        if (!"MANAGED_PURCHASE".equals(source)
+                && !"VERIFIED_EXISTING".equals(source)) {
             gaps.add(Gap.PROVENANCE_UNVERIFIED);
         }
 
