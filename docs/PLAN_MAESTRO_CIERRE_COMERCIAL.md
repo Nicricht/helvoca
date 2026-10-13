@@ -24,7 +24,7 @@ Dos hitos distintos:
 | Corrección Stage D | [PR #822](https://github.com/Nicricht/helvoca/pull/822), SHA `61ced933d04361b2d7e0f7ab9e886216cd7e1c51`, CI push #38391306689 **9/9** y PR #38391339854 **9/9** | Auditor ya sabe distinguir Flyway V99 sin columnas de SID realmente incoherente. No repetir esa corrección |
 | Railway producción | Último `main` comprobado: `ca58693e167752bd6eab8ff4e9be770391fe4293`; API y PostgreSQL 18 online, sin staged work | No asumir que código de PR ya está en Railway |
 | Flyway producción | Log histórico del arranque 11-10-2026: V99 | V100–V103 **no confirmadas en producción**; se requiere consulta fresca solo lectura antes de migrar |
-| Backup | [Restauración PG18 local](telephony/evidence/2026-10-13-stage-a-local-pg18-restore-attestation.md) reportada por operador, hash SHA-256 registrado; `docs/POSTGRES_PRODUCTION_RECOVERY.md` describe backup diario Railway a 01-10-2026 | No repetir simulación por repetir; falta prueba actual de copia **externa independiente cifrada** y restauración desde ella |
+| Backup | [Restauración PG18 local](https://github.com/Nicricht/helvoca/blob/b11b73571fde1e248fe3111e60a3ad7602affd0a/docs/telephony/evidence/2026-10-13-stage-a-local-pg18-restore-attestation.md) reportada por operador, hash SHA-256 registrado; `docs/POSTGRES_PRODUCTION_RECOVERY.md` describe backup diario Railway a 01-10-2026 | No repetir simulación por repetir; falta prueba actual de copia **externa independiente cifrada** y restauración desde ella |
 | Twilio existente | La auditoría previa GET autenticado + PostgreSQL READ ONLY no informó discrepancias de PN SID, teléfono o tenant; tres bloques eran columnas de provenance ausentes en V99 | **No comprar ni reparar el número otra vez**; tras migrar, reconciliar campos con dos administradores reales |
 | Modelo Gemini | Candidato configura por defecto `gemini-3.8-live`, modelo en allowlist. Ya existe evidencia de llamada humana controlada de 27-09-2026 en `docs/COMMERCIAL_EXTERNAL_GATES_V1.md` | La llamada anterior no prueba que **el proyecto/tenant desplegado ahora** tenga derecho, coste ni conexión real exitosa |
 | Suscripciones SaaS | Código y contratos de Mercado Pago, precios, entitlements y pruebas sintéticas existentes | Round-trip **auténtico TEST** y cobro LIVE controlado aún no certificados. No confundir con merchant payments |
@@ -175,7 +175,7 @@ PROD_DEPLOY / LIVE_CALL / COMMERCIAL_GO:
 - [Issue #821](https://github.com/Nicricht/helvoca/issues/821): subexpediente sobre producción, Flyway, carrier, backups, costes.
 - [PR #820](https://github.com/Nicricht/helvoca/pull/820) y [PR #822](https://github.com/Nicricht/helvoca/pull/822): software y certificación offline, no deployments.
 - `docs/POSTGRES_PRODUCTION_RECOVERY.md`, `docs/telephony/2026-10-13-stage-a-postgres18-recovery.md`: respaldo/recuperación.
-- `docs/telephony/2026-10-13-voice-release-part10-final-handoff-no-go.md`: gates voz y GitHub.
+- Gates voz y GitHub, todavía en cadena PR sin fusionar: `docs/telephony/2026-10-13-voice-release-part10-final-handoff-no-go.md` ([PR #820](https://github.com/Nicricht/helvoca/pull/820)).
 - `docs/COMMERCIAL_EXTERNAL_GATES_V1.md`: llamada humana previa, Mercado Pago TEST y tenant.
 - `docs/SAAS_BILLING_COMMERCIAL_READINESS.md`, `docs/SAAS_BILLING_SANDBOX_PROVIDER_GATE.md`: suscripciones Helvoca versus merchant payments.
 - `docs/GOLDEN_JOURNEY_RELEASE_CONTRACT.md`, `docs/CONTROLLED_REAL_BUSINESS_PILOT_V1.md`: recorrido y launch cage.
