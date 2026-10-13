@@ -1,0 +1,70 @@
+{
+  "description": "Explicitly incomplete real-call evidence; all unknowns remain null/false. DO NOT use as authorization.",
+  "observation": {
+    "date_local": "2026-10-12",
+    "verified_github_pr": 803,
+    "ci_run_phase5": 38334418052,
+    "production_service": "helvoca-api",
+    "source": "Railway read-only query and prior user screenshot of DB number"
+  },
+  "deployment": {
+    "candidate_sha": "738d0f9f6055b74db1894d7c323e1bc18de623ae",
+    "railway_deployed_sha": "ca58693e167752bd6eab8ff4e9be770391fe4293",
+    "main_sha": "ca58693e167752bd6eab8ff4e9be770391fe4293",
+    "full_ci_sha": "738d0f9f6055b74db1894d7c323e1bc18de623ae",
+    "full_ci_success": false,
+    "isolated_backup_restore_verified": false,
+    "backup_restore_evidence_ref": null,
+    "flyway_migrations_verified": false,
+    "flyway_evidence_ref": null,
+    "carrier_ownership_verified": false,
+    "local_preflight_passed": false,
+    "carrier_evidence_ref": null,
+    "pilot_running_for_target_tenant": false,
+    "controlled_global_voice_enabled": false,
+    "other_tenants_protected": false
+  },
+  "authorization": {
+    "participant_consented": false,
+    "consent_evidence_ref": null,
+    "controlled_time_window_confirmed": false,
+    "caller_e164": "+14355652512",
+    "test_recipient_e164": null,
+    "max_duration_seconds": null,
+    "carrier_termination_control_verified": false,
+    "max_total_cost_usd": null,
+    "twilio_tariff_verified": false,
+    "gemini_tariff_verified": false
+  },
+  "call": {
+    "tenant_id": "044a5d73-2df7-4e77-849f-8639d05ac30b",
+    "phone_sid": "PN62601c6420599e74bc940f42de2dd1e4",
+    "telephony_provider": "twilio",
+    "ai_provider": "gemini",
+    "call_sid": null,
+    "stream_sid": null,
+    "carrier_call_evidence_ref": null,
+    "started_at": null,
+    "ended_at": null,
+    "carrier_completed": false,
+    "media_started": false,
+    "media_stopped": false,
+    "gemini_connected": false,
+    "audio_from_ai_received": false,
+    "no_audio_after_hangup": false,
+    "human_heard_ai": false,
+    "human_spoke_to_ai": false,
+    "barge_in_successful": false,
+    "human_observation_ref": null,
+    "created_booking_id": null,
+    "cancelled_booking_id": null,
+    "synthetic_booking_cleanup_verified": false,
+    "booking_audit_evidence_ref": null
+  },
+  "cost": {
+    "twilio_billed_usd": null,
+    "gemini_billed_usd": null,
+    "twilio_billing_ref": null,
+    "gemini_billing_ref": null
+  }
+}
