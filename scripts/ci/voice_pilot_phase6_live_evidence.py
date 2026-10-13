@@ -115,9 +115,12 @@ def assess(payload: object) -> Assessment:
         and _ref(auth.get("consent_evidence_ref"))
         and auth.get("controlled_time_window_confirmed") is True,
         "PARTICIPANT_CONSENT_MISSING")
-    req(auth.get("caller_e164") == DESTINATION
-        and isinstance(auth.get("test_recipient_e164"), str)
-        and E164.fullmatch(auth["test_recipient_e164"]) is not None,
+    # This pilot exercises INBOUND voice: the human caller dials Helvoca's
+    # Twilio number. Do not reverse the caller and called numbers.
+    req(auth.get("helvoca_called_e164") == DESTINATION
+        and isinstance(auth.get("authorized_human_caller_e164"), str)
+        and E164.fullmatch(auth["authorized_human_caller_e164"]) is not None
+        and auth["authorized_human_caller_e164"] != DESTINATION,
         "TEST_NUMBERS_NOT_CONFIRMED")
     max_seconds = auth.get("max_duration_seconds")
     req(type(max_seconds) is int and 1 <= max_seconds <= 300
