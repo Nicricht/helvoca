@@ -13,6 +13,14 @@ SPEC.loader.exec_module(snapshot)
 
 
 class BackupDrillTests(unittest.TestCase):
+    def test_sensitive_ssh_errors_only_produce_safe_category(self):
+        self.assertEqual("SSH_KEY_OR_AUTH",
+                         snapshot.classify_ssh_error(b"Permission denied (publickey)."))
+        self.assertEqual("PG_DUMP_OR_DATABASE_AUTH",
+                         snapshot.classify_ssh_error(b"pg_dump: error: sensitive details"))
+        self.assertEqual("UNCLASSIFIED",
+                         snapshot.classify_ssh_error(b"unknown private text"))
+
     def test_archive_signature_and_digest(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "valid.dump"
