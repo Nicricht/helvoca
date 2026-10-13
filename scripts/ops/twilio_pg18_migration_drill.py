@@ -36,6 +36,14 @@ GUARDED_TABLES = (
     "twilio_existing_enrollment_audit",
 )
 
+# V100 adds exactly these three columns. Compare every *pre-existing* field
+# before/after migrations instead of comparing newly extended tuple shapes.
+PHONE_INVARIANT_SQL = (
+    "SELECT md5(COALESCE(string_agg((to_jsonb(t) - "
+    "'twilio_binding_source' - 'twilio_account_sid' - 'voice_verified_at')::text, "
+    "',' ORDER BY t.id),'')) FROM public.phone_number t"
+)
+
 
 def run(command: list[str], *, data: bytes | None = None, timeout: int = 90):
     # stderr intentionally never printed: it may contain private DB metadata.
@@ -129,8 +137,7 @@ def restore_and_rehearse(docker: str, archive: Path,
             "('100','101','102','103')") == 0,
             "Source is not a pre-V100 baseline; no automatic reapplication")
         phone_before = psql(docker, container,
-            "SELECT md5(COALESCE(string_agg(t::text, ',' ORDER BY t.id),'') ) "
-            "FROM public.phone_number t")
+            PHONE_INVARIANT_SQL)
         business_before = number(docker, container, "SELECT COUNT(*) FROM public.business")
         phone_count = number(docker, container, "SELECT COUNT(*) FROM public.phone_number")
 
@@ -145,8 +152,7 @@ def restore_and_rehearse(docker: str, archive: Path,
                     "Isolated SQL migration V" + str(version) + " failed")
 
         phone_after = psql(docker, container,
-            "SELECT md5(COALESCE(string_agg(t::text, ',' ORDER BY t.id),'') ) "
-            "FROM public.phone_number t")
+            PHONE_INVARIANT_SQL)
         require(phone_after == phone_before, "Migration changed existing phone rows")
         require(number(docker, container, "SELECT COUNT(*) FROM public.phone_number") == phone_count,
                 "Migration changed phone row count")
