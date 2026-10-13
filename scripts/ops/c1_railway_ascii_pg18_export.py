@@ -45,9 +45,11 @@ def dump_from_railway_ascii(railway: str, path: Path) -> dict:
            "--service", SERVICE, "--", "bash", "-c", remote]
     started = False
     complete = False
+    archive_created = False
     deadline_reached = threading.Event()
     try:
         with path.open("xb") as archive, tempfile.TemporaryFile(mode="w+b") as errors:
+            archive_created = True
             if __import__("os").name != "nt":
                 path.chmod(0o600)
             with subprocess.Popen(cmd, stdin=subprocess.DEVNULL,
@@ -116,5 +118,7 @@ def dump_from_railway_ascii(railway: str, path: Path) -> dict:
         except (ValueError, OSError):
             raise ExportBlocked("RAILWAY_ASCII_PGDMP_VALIDATION_FAILED") from None
     except BaseException:
-        path.unlink(missing_ok=True)
+        # Never remove a backup that existed BEFORE exclusive creation.
+        if archive_created:
+            path.unlink(missing_ok=True)
         raise
