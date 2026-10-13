@@ -155,6 +155,48 @@ class TwilioMediaSessionDeadlineHandlerTest {
         assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
     }
 
+
+    @Test
+    void timerThatExpiresSynchronouslyBeforeScheduleReturnsCancelsItsFuture() throws Exception {
+        when(scheduler.schedule(any(Runnable.class), eq(30L), eq(TimeUnit.SECONDS)))
+                .thenAnswer(invocation -> {
+                    expiry = invocation.getArgument(0);
+                    expiry.run();
+                    return future;
+                });
+        validStart();
+        verify(control).hangup(ACCOUNT, CALL);
+        verify(ai).close();
+        verify(future).cancel(false);
+        verify(lifecycle).updateStatus(callId, "failed", null);
+    }
+
+    @Test
+    void carrierApiExceptionStillForcesSocketClosedAndCleansUp() throws Exception {
+        when(control.hangup(ACCOUNT, CALL)).thenThrow(new IllegalStateException("provider unavailable"));
+        validStart();
+        expiry.run();
+        verify(control).hangup(ACCOUNT, CALL);
+        verify(socket).close(CloseStatus.SERVER_ERROR);
+        verify(ai).close();
+        verify(lifecycle).updateStatus(callId, "failed", null);
+        verify(future).cancel(false);
+    }
+
+    @Test
+    void bothCarrierAndSocketErrorsStillCloseAiAndSetFailure() throws Exception {
+        when(control.hangup(ACCOUNT, CALL)).thenThrow(new IllegalStateException("provider unavailable"));
+        doThrow(new java.io.IOException("socket unavailable"))
+                .when(socket).close(CloseStatus.SERVER_ERROR);
+        validStart();
+        expiry.run();
+        verify(control).hangup(ACCOUNT, CALL);
+        verify(socket).close(CloseStatus.SERVER_ERROR);
+        verify(ai).close();
+        verify(lifecycle).updateStatus(callId, "failed", null);
+        verify(future).cancel(false);
+    }
+
     @Test
     void unboundMediaCannotArmASpendTimer() throws Exception {
         when(binding.allowsMedia(CALL, NUMBER, CALLER, ACCOUNT)).thenReturn(false);
