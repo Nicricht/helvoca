@@ -1,0 +1,49 @@
+name: Helvoca C4 bounded Twilio media session (offline)
+on:
+  push:
+    branches:
+      - 'feat/c4-voice-session-deadline-*'
+  pull_request:
+    branches:
+      - 'feat/c2-commercial-v1-integration-preflight-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-voice-session-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Prove deadline cutoff and existing Twilio security/admission regressions offline
+        run: >-
+          mvn --batch-mode --no-transfer-progress -Pcoverage
+          -Dtest=TwilioMediaSessionDeadlineTest,TwilioMediaSessionDeadlineHandlerTest,TwilioMediaStreamHandlerTest,TwilioVoiceTransportSessionTest,TwilioCallBindingGuardTest,TwilioVerifiedExistingVoiceRouteGateTest
+          test
+      - name: Enforce changed Java code coverage on exact base
+        env:
+          BASE_SHA: d5b7cf1fe5e5232dddea86a15610528275677714
+          DIFF_LINE_COVERAGE: '100'
+          DIFF_BRANCH_COVERAGE: '100'
+          DIFF_METHOD_COVERAGE: '100'
+        run: python3 scripts/ci/check_diff_coverage.py "$BASE_SHA"
+      - name: Check no live paid effects in test
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('src/main/java/cl/helvoca/telephony/twilio/TwilioMediaSessionDeadline.java').read_text()
+          assert '600' in src
+          assert 'seconds < 30 || seconds > 3600' in src
+          assert 'TimeUnit.SECONDS' in src
+          assert 'ScheduledThreadPoolExecutor' in src
+          print('C4_DURATION_BOUND_STATIC_SAFETY=PASS')
+          PY
