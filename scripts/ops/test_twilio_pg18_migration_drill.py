@@ -23,6 +23,14 @@ class StageBDrillOfflineTests(unittest.TestCase):
         self.assertEqual(3, len(stage_b.GUARDED_TABLES))
         self.assertTrue(all(".sql" in v for v in stage_b.VERSIONS.values()))
 
+    def test_existing_phone_row_digest_ignores_only_new_v100_columns(self):
+        expression = stage_b.PHONE_INVARIANT_SQL
+        self.assertIn("to_jsonb(t)", expression)
+        for name in ("twilio_binding_source", "twilio_account_sid", "voice_verified_at"):
+            self.assertIn(name, expression)
+        self.assertIn("ORDER BY t.id", expression)
+        self.assertNotIn("t::text", expression)
+
     def test_digest_detects_file_mutation(self):
         with tempfile.TemporaryDirectory() as temp:
             archive = Path(temp) / "private.dump"
