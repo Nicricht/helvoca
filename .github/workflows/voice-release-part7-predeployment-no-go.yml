@@ -1,0 +1,120 @@
+name: Helvoca Part 7 Predeployment STOP/NO-GO Offline Gates
+
+# Do not access production, accept credentials, perform a deploy, merge, or phone call.
+on:
+  push:
+    branches:
+      - 'test/voice-release-part7-predeployment-no-go-*'
+  pull_request:
+    branches:
+      - 'test/voice-release-part6-recovery-offline-*'
+
+permissions:
+  contents: read
+
+env:
+  HELVOCA_OUTBOUND_DELIVERY_ENABLED: 'false'
+  HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED: 'false'
+  HELVOCA_TWILIO_SUBACCOUNT_VOICE_CONFIGURE_ON_STARTUP: 'false'
+  HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+  TWILIO_PROVISIONING_ENABLED: 'false'
+  TWILIO_CERTIFICATION_CALL_ON_STARTUP: 'false'
+  TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED: 'false'
+  GEMINI_LIVE_ENABLED: 'false'
+  GEMINI_LIVE_PROBE_ON_STARTUP: 'false'
+  OPENAI_LIVE_ENABLED: 'false'
+  HELVOCA_OUTBOUND_PROVIDER: NONE
+  APP_JOBS_ENABLED: 'false'
+
+jobs:
+  predeployment-stop-decision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v7
+      - name: Run adversarial STOP and evidence-freshness tests
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part7_predeployment_gate.py' -v
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part7_workflow_contract.py' -v
+          python3 scripts/ci/voice_part7_predeployment_gate.py --demo-blocked
+          python3 scripts/ci/voice_part7_predeployment_gate.py --demo-optimistic
+      - name: Recheck Part 6 safe backup workflow and frozen V100-V103 contract
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part6_recovery_contract.py' -v
+          python3 scripts/ci/voice_part6_recovery_contract.py
+          python3 scripts/ci/voice_part2_migration_contract.py
+
+  restore-regression:
+    needs: [predeployment-stop-decision]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v7
+      - name: Verify synthetic encrypted backup and no-network PostgreSQL 18 restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/voice_part6_synthetic_pg18_recovery.sh
+
+  flyway-tenant-rollback-regression:
+    needs: [predeployment-stop-decision]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v7
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Assert incremental Flyway V99 to V103 and tenant RLS invariants on isolated PG18
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dhelvoca.test.postgres.image=postgres:18-alpine
+          -Dtest=TwilioV99ToV103FlywayUpgradePostgresIntegrationTest,PostgresRowLevelSecurityIntegrationTest,TwilioExistingEnrollmentAdminPostgresIntegrationTest
+          test
+
+  react-spring-pg18-system-e2e:
+    needs: [predeployment-stop-decision]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: helvoca
+          POSTGRES_USER: helvoca
+          POSTGRES_PASSWORD: helvoca
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U helvoca -d helvoca"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v7
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Run React to Spring Boot to ephemeral PG18 browser contract
+        env:
+          DB_URL: jdbc:postgresql://127.0.0.1:5432/helvoca
+          DB_USERNAME: helvoca
+          DB_PASSWORD: helvoca
+          SYSTEM_E2E_BASE_URL: http://127.0.0.1:8080
+        run: bash scripts/ci/system-e2e.sh
