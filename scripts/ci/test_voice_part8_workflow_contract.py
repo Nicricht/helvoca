@@ -149,7 +149,8 @@ class Part8WorkflowGuards(unittest.TestCase):
         self.assertIn('private String model = "gemini-3.8-live"', props)
         self.assertIn("GEMINI_LIVE_MODEL:gemini-3.8-live}", config)
         self.assertIn("GEMINI_LIVE_ENABLED:false}", config)
-        self.assertIn("GEMINI_LIVE_PROBE_ON_STARTUP:false}", config)
+        probe = (ROOT / "src/main/java/cl/helvoca/ai/gemini/GeminiLiveStartupProbe.java").read_text()
+        self.assertIn("GEMINI_LIVE_PROBE_ON_STARTUP:false}", probe)
         self.assertIn('EXPECTED_MODEL = "gemini-3.8-live"', gate)
         self.assertIn("A model name being listed here does not prove", policy)
 
