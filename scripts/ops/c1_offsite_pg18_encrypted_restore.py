@@ -137,15 +137,20 @@ def seal_and_verify(source: Path, offsite: Path, age: str, docker: str,
                     "AGE_ENCRYPT_FORMAT_INVALID")
         require(partial.stat().st_size >= size, "AGE_ENCRYPT_SIZE_INVALID")
 
-        # 'xb' protects against overwriting a previous encrypted copy.
+        # Exclusive creation prevents clobbering prior backups, including
+        # a backup created by another process after the initial exists check.
+        created = False
         try:
-            with sealed.open("xb") as dst, partial.open("rb") as src:
-                for block in iter(lambda: src.read(1024 * 1024), b""):
-                    dst.write(block)
+            with sealed.open("xb") as dst:
+                created = True
+                with partial.open("rb") as src:
+                    for block in iter(lambda: src.read(1024 * 1024), b""):
+                        dst.write(block)
                 dst.flush()
                 os.fsync(dst.fileno())
         except BaseException:
-            sealed.unlink(missing_ok=True)
+            if created:
+                sealed.unlink(missing_ok=True)
             raise
         require(sha256_file(partial) == sha256_file(sealed),
                 "OFFSITE_CIPHER_COPY_MISMATCH")
@@ -213,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         print("Private local report: " + str(output))
         print("No changes to Railway, GitHub main, Twilio or any production database.")
         return 0
-    except (SafeBlocker, OSError, ValueError, subprocess.SubprocessError) as exc:
+    except (SafeBlocker, OSError, RuntimeError, ValueError, subprocess.SubprocessError) as exc:
         code = str(exc) if isinstance(exc, SafeBlocker) else "PRIVATE_IO_OR_VERIFY_FAILED"
         print("C1_BLOCKED: " + code)
         print("Production remains unchanged; NO-GO.")
