@@ -26,7 +26,8 @@ from c1_offsite_pg18_encrypted_restore import (
     AGE_HEADER, SafeBlocker, local_private_root, require, run_age,
     secure_directory, sha256_file, write_private_report,
 )
-from railway_pg18_snapshot_drill import dump_from_railway, restore_to_disposable_docker, validate_dump
+from c1_railway_ascii_pg18_export import ExportBlocked, dump_from_railway_ascii as dump_from_railway
+from railway_pg18_snapshot_drill import restore_to_disposable_docker, validate_dump
 
 
 @contextmanager
@@ -37,6 +38,8 @@ def guarded_stage(code: str):
     except SafeBlocker:
         raise
     except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as exc:
+        if code == "RAILWAY_READONLY_EXPORT_FAILED" and isinstance(exc, ExportBlocked):
+            raise SafeBlocker(str(exc)) from None
         if code == "RAILWAY_READONLY_EXPORT_FAILED":
             # The existing Railway exporter already replaces private stderr
             # with a limited safe classification. Forward only known codes.
@@ -75,8 +78,8 @@ def backup_encrypt_and_verify(offsite_dir: Path, railway: str, age: str, docker:
     stamp = datetime.now(timezone.utc)
     name = "helvoca-postgres18-" + stamp.strftime("%Y%m%dT%H%M%SZ") + "-" + secrets.token_hex(3) + ".dump"
     local_dump = source_dir / name
-    # This helper uses Railway SSH pg_dump --format=custom (read-only) and
-    # writes exclusively to local private storage with exclusive creation.
+    # Remote pg_dump is sent as framed ASCII base64 over SSH and decoded
+    # incrementally into LOCAL private storage. This avoids binary/PTY corruption.
     with guarded_stage("RAILWAY_READONLY_EXPORT_FAILED"):
         metadata = dump_from_railway(railway, local_dump)
     require(local_dump.is_file() and not local_dump.is_symlink(), "NEW_DUMP_UNSAFE")
