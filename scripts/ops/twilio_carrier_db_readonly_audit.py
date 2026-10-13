@@ -103,9 +103,9 @@ def twilio_get(path: str, parent: str, token: str) -> dict:
     """Provider reads restricted to the account/phone resource namespace."""
     allowed = re.fullmatch(
         r"/2010-04-01/Accounts/AC[0-9a-fA-F]{32}(?:"
-        r"\\.json|"
-        r"/IncomingPhoneNumbers\\.json\\?PhoneNumber=%2B[1-9][0-9]{7,14}&PageSize=20|"
-        r"/IncomingPhoneNumbers/PN[0-9a-fA-F]{32}\\.json)",
+        r"\.json|"
+        r"/IncomingPhoneNumbers\.json\?PhoneNumber=%2B[1-9][0-9]{7,14}&PageSize=20|"
+        r"/IncomingPhoneNumbers/PN[0-9a-fA-F]{32}\.json)",
         path,
     )
     expect(allowed is not None, "INVALID_PROVIDER_PATH")
