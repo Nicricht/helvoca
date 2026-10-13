@@ -58,10 +58,23 @@ su hash SHA-256 confirmado. Esta ejecución solo requiere
 `railway` CLI y Python 3; no requiere Docker Desktop ni nuevo
 `pg_dump`. Puede hacerse desde cualquier carpeta.
 
-Se aportará el comando PowerShell exacto tras certificar
-el archivo final. El operador debe compartir únicamente la salida
+El ejecutable está fijado al commit `1cdaacf3a11749eaf1d2b428f0150ca46ad9c26c`
+y a SHA-256 `ae1acda6a42ecbfb9ce2ed56238027584ecef7bf04ccfd6768231f12902a27db`.
+Ejecutar **solo una vez confirmado SUCCESS del CI exacto**:
+
+~~~powershell
+$p = Join-Path $env:TEMP 'helvoca-stage-d-flyway.py'
+$u = 'https://raw.githubusercontent.com/Nicricht/helvoca/1cdaacf3a11749eaf1d2b428f0150ca46ad9c26c/scripts/ops/railway_pg18_flyway_readonly_preflight.py'
+Invoke-WebRequest -Uri $u -OutFile $p
+if ((Get-FileHash $p -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'ae1acda6a42ecbfb9ce2ed56238027584ecef7bf04ccfd6768231f12902a27db') {
+    throw 'Stage D: el script no coincide con la versión verificada'
+}
+py -3 $p
+~~~
+
+El operador debe compartir únicamente la salida
 `STAGE_D_PRODUCTION_FLYWAY_READ_ONLY_VERIFIED` o `STAGE_D_BLOCKED`,
-sin revelar el JSON ni credenciales.
+sin revelar el JSON ni credenciales. **Esta ejecución aún no ha ocurrido.**
 
 ## Otros controles de la Etapa D
 
