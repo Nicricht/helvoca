@@ -24,7 +24,7 @@ jobs:
       - name: Checkout exact commit
         uses: actions/checkout@v7
       - name: Validate offline fail-closed backup contracts
-        run: python3 -m unittest discover -s scripts/ops -p 'test_railway_pg18_snapshot_drill.py' -v
+        run: python3 -m unittest discover -s scripts/ops -p 'test_railway_*.py' -v
       - name: Reject accidental production restore commands
         shell: bash
         run: |
