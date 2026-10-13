@@ -58,7 +58,7 @@ def audit(text: str) -> list[str]:
     for job in EXPECTED - {"predeployment-stop-decision"}:
         part = body.split("\n  " + job + ":\n", 1)
         need(len(part) == 2 and
-             "    needs: [predeployment-stop-decision]" in part[1].split("\n  ", 1)[0],
+             "    needs: [predeployment-stop-decision]" in re.split(r"(?m)^  [a-z][a-z0-9-]*:\s*$", part[1], maxsplit=1)[0],
              "UNGUARDED_DEPENDENT_JOB")
     need("python3 scripts/ci/voice_part7_predeployment_gate.py --demo-blocked" in body
          and "python3 scripts/ci/voice_part7_predeployment_gate.py --demo-optimistic" in body
