@@ -16,6 +16,7 @@ from pathlib import Path
 import secrets
 import shutil
 import subprocess
+import tempfile
 import sys
 import time
 
@@ -64,23 +65,47 @@ def run_quiet(command: list[str], **kwargs) -> subprocess.CompletedProcess:
                           timeout=kwargs.pop("timeout", 45), check=False, **kwargs)
 
 
+def classify_ssh_error(stderr: bytes) -> str:
+    """Only print safe categories, never raw Railway/SSH diagnostics or secrets."""
+    msg = stderr.decode("utf-8", errors="replace").lower()
+    if ("ssh" in msg or "key" in msg) and any(
+        marker in msg for marker in ("key", "permission denied", "publickey", "register")
+    ):
+        return "SSH_KEY_OR_AUTH"
+    if any(marker in msg for marker in ("pg_dump: error", "connection to server", "password authentication failed")):
+        return "PG_DUMP_OR_DATABASE_AUTH"
+    if any(marker in msg for marker in ("command not found", "not recognized", "no such file")):
+        return "REMOTE_COMMAND_UNAVAILABLE"
+    if any(marker in msg for marker in ("timed out", "timeout", "could not connect")):
+        return "SSH_CONNECTIVITY"
+    return "UNCLASSIFIED"
+
+
 def dump_from_railway(railway: str, path: Path) -> dict:
     cmd = [railway, "ssh", "--project", PROJECT, "--environment", ENVIRONMENT,
            "--service", SERVICE, "--", "sh", "-c", SSH_DUMP]
     try:
-        with path.open("xb") as stream:
+        with path.open("xb") as stream, tempfile.TemporaryFile(mode="w+b") as errors:
             if os.name != "nt":
                 path.chmod(0o600)
             with subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=stream,
-                                  stderr=subprocess.DEVNULL) as process:
+                                  stderr=errors) as process:
                 try:
                     code = process.wait(timeout=300)
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
                     raise RuntimeError("Railway export timeout")
-        if code != 0:
-            raise RuntimeError("Railway SSH/pg_dump failed")
+            if code != 0:
+                errors.seek(0)
+                kind = classify_ssh_error(errors.read(65536))
+                raise RuntimeError(
+                    "Railway SSH/pg_dump failed; category=" + kind +
+                    ". First test SSH interactively with "
+                    "'railway ssh --project " + PROJECT +
+                    " --environment " + ENVIRONMENT +
+                    " --service " + SERVICE + " -- pg_dump --version'."
+                )
         return validate_dump(path)
     except Exception:
         path.unlink(missing_ok=True)
