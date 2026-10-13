@@ -67,16 +67,48 @@ SELECT 'STAGE_D_FLYWAY_PROBE:' || json_build_object(
 COMMIT;"""
 
 
-def private_directory() -> Path:
+def private_directory(folder: str = "private-backups") -> Path:
+    # Never accept arbitrary locations from the CLI/environment. Both
+    # destinations inherit the user's LOCALAPPDATA ACL.
+    if folder not in ("private-backups", "private-evidence"):
+        raise RuntimeError("Evidence directory is not on the allowlist")
     value = os.environ.get("LOCALAPPDATA")
     if not value:
         raise RuntimeError("LOCALAPPDATA is not configured")
-    dest = (Path(value) / "Helvoca" / "private-backups").absolute()
+    dest = (Path(value) / "Helvoca" / folder).absolute()
     for part in (dest, *dest.parents):
         if part.is_symlink() or (part / ".git").exists():
             raise RuntimeError("Evidence directory is unsafe (symlink or Git repository)")
     dest.mkdir(mode=0o700, parents=True, exist_ok=True)
     return dest
+
+
+def write_private_evidence(evidence: dict) -> Path:
+    # Some Windows installations prohibit new files in private-backups
+    # even though Railway SSH, psql, and the read-only probe all succeeded.
+    # Fall back to a separate LOCALAPPDATA-only directory. Never write to
+    # the repository, stdout, cloud or an arbitrary environment path.
+    denied = False
+    for folder in ("private-backups", "private-evidence"):
+        try:
+            directory = private_directory(folder)
+            output = directory / (
+                "helvoca-stage-d-read-only-flyway-"
+                + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                + "-" + secrets.token_hex(3) + ".private.json"
+            )
+            with output.open("x", encoding="utf-8") as stream:
+                json.dump(evidence, stream, indent=2, sort_keys=True)
+            return output
+        except PermissionError:
+            denied = True
+        except OSError:
+            denied = True
+    if denied:
+        raise RuntimeError(
+            "Windows denied evidence writes in both private LOCALAPPDATA locations"
+        )
+    raise RuntimeError("Could not save private evidence")
 
 
 def railway_command(railway: str) -> list[str]:
@@ -189,12 +221,6 @@ def main() -> int:
             raise RuntimeError("Railway SSH/psql failed; category=" + reason)
         info = parse_result(process.stdout)
         good, blockers = evaluate(info)
-        directory = private_directory()
-        output = directory / (
-            "helvoca-stage-d-read-only-flyway-"
-            + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-            + "-" + secrets.token_hex(3) + ".private.json"
-        )
         evidence = {
             "run_utc": datetime.now(timezone.utc).isoformat(),
             "environment": "Helvoca Railway production (read-only SSH)",
@@ -208,8 +234,7 @@ def main() -> int:
             "live_call_certified": False,
             "commercial_go": False,
         }
-        with output.open("x", encoding="utf-8") as f:
-            json.dump(evidence, f, indent=2, sort_keys=True)
+        output = write_private_evidence(evidence)
         if good:
             print("STAGE_D_PRODUCTION_FLYWAY_READ_ONLY_VERIFIED")
         else:
