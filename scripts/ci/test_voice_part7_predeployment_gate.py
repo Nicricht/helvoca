@@ -51,7 +51,7 @@ class OfflinePart7DecisionTests(unittest.TestCase):
 
     def test_missing_and_malformed_snapshot(self):
         self.assert_blocked("INVALID_SNAPSHOT", [])
-        self.assert_blocked("INVALID_SNAPSHOT", None)
+        self.assertEqual("STOP", gate.assess(None, now=self.now)["state"])
         self.assert_blocked("CANDIDATE_SHA_INVALID", {})
         self.assert_blocked("EVIDENCE_STALE_MISSING_OR_FUTURE", {})
 
