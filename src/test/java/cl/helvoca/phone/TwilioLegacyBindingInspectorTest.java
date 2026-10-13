@@ -83,6 +83,44 @@ class TwilioLegacyBindingInspectorTest {
     }
 
     @Test
+    void verifiedExistingWithAllStoredFieldsIsLocallyCompleteButNotCarrierAttested() {
+        PhoneNumber row = completeRow();
+        row.setTwilioBindingSource("VERIFIED_EXISTING");
+
+        var result = inspector.inspect(row, BUSINESS, PHONE);
+        assertTrue(result.hasCompletePersistedFields());
+        assertTrue(result.gaps().isEmpty());
+        assertEquals("VERIFIED_EXISTING", row.getTwilioBindingSource());
+        assertEquals(PHONE_SID, row.getExternalId());
+        assertEquals(ACCOUNT_SID, row.getTwilioAccountSid());
+    }
+
+    @Test
+    void verifiedExistingWithoutCarrierSidAccountOrTimestampRemainsIncomplete() {
+        PhoneNumber row = completeRow();
+        row.setTwilioBindingSource("VERIFIED_EXISTING");
+        row.setExternalId(null);
+        row.setTwilioAccountSid(null);
+        row.setVoiceVerifiedAt(null);
+
+        assertEquals(List.of(
+                TwilioLegacyBindingInspector.Gap.PHONE_SID_MISSING,
+                TwilioLegacyBindingInspector.Gap.ACCOUNT_SID_MISSING,
+                TwilioLegacyBindingInspector.Gap.VOICE_NOT_VERIFIED), gaps(row));
+        assertEquals("VERIFIED_EXISTING", row.getTwilioBindingSource());
+    }
+
+    @Test
+    void unknownOrNullProvenanceNeverBecomesApprovedJustBecauseSidsMatch() {
+        PhoneNumber row = completeRow();
+        for (String source : new String[]{null, "", "BYON", "MANUAL", "UNKNOWN"}) {
+            row.setTwilioBindingSource(source);
+            assertEquals(List.of(TwilioLegacyBindingInspector.Gap.PROVENANCE_UNVERIFIED),
+                    gaps(row));
+        }
+    }
+
+    @Test
     void rejectsOtherTenantDifferentDestinationWrongProviderAndInactiveNumber() {
         PhoneNumber row = completeRow();
         row.setBusinessId(UUID.randomUUID());
