@@ -1,6 +1,7 @@
 package cl.helvoca.telephony.twilio;
 
 import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -20,6 +21,7 @@ final class TwilioMediaSessionDeadline {
     private final int seconds;
     private final ScheduledExecutorService scheduler;
 
+    @Autowired
     TwilioMediaSessionDeadline(@Value("${app.telephony.twilio.max-media-session-seconds:600}")
                                int seconds) {
         this(seconds, scheduler());
