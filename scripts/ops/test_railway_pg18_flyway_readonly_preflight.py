@@ -157,7 +157,7 @@ class StageDReadonlyContracts(unittest.TestCase):
             return real_open(path, *args, **kwargs)
 
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.dict(os.environ, {"LOCALAPPDATA": tmp}), \\
+            with patch.dict(os.environ, {"LOCALAPPDATA": tmp}), \
                     patch.object(Path, "open", deny_backups):
                 path = probe.write_private_evidence({"status": "BLOCKED"})
                 self.assertEqual("private-evidence", path.parent.name)
@@ -176,7 +176,7 @@ class StageDReadonlyContracts(unittest.TestCase):
             return real_open(path, *args, **kwargs)
 
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.dict(os.environ, {"LOCALAPPDATA": tmp}), \\
+            with patch.dict(os.environ, {"LOCALAPPDATA": tmp}), \
                     patch.object(Path, "open", refuse_reports):
                 with self.assertRaisesRegex(RuntimeError, "Windows denied"):
                     probe.write_private_evidence({"secret": "never-to-stdout"})
