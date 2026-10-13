@@ -22,9 +22,11 @@ jobs:
         with:
           python-version: '3.11'
       - name: Confirm Python syntax
-        run: python3 -m py_compile scripts/ops/c1_replace_missing_offsite_archive.py scripts/ops/test_c1_replace_missing_offsite_archive.py
+        run: python3 -m py_compile scripts/ops/c1_replace_missing_offsite_archive.py scripts/ops/c1_railway_ascii_pg18_export.py scripts/ops/test_c1_replace_missing_offsite_archive.py scripts/ops/test_c1_railway_ascii_pg18_export.py
       - name: Synthetic offline security and failure regressions
-        run: python3 scripts/ops/test_c1_replace_missing_offsite_archive.py -v
+        run: |
+          python3 scripts/ops/test_c1_replace_missing_offsite_archive.py -v
+          python3 scripts/ops/test_c1_railway_ascii_pg18_export.py -v
       - name: Check no production effects or plain remote dump commands
         run: |
           python3 - <<'PY'
@@ -36,6 +38,11 @@ jobs:
           assert '--passphrase' in src
           assert 'remote_sync_or_offsite_durability_verified": False' in src
           assert 'commercial_go": False' in src
+          transport=Path('scripts/ops/c1_railway_ascii_pg18_export.py').read_text()
+          assert 'set -o pipefail' in transport
+          assert 'base64.b64decode' in transport
+          assert 'path.open("xb")' in transport
+          assert 'archive_created' in transport
           assert 'age-test' not in src
           assert 'merge_pull_request' not in src
           print('C1_MISSING_ARCHIVE_OFFLINE_SAFETY=PASS')
