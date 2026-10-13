@@ -185,6 +185,44 @@ class ReplacementBackupTests(unittest.TestCase):
             self.assertEqual(tool.main(["--offsite-dir", str(self.offsite)]), 2)
             export.assert_not_called()
 
+    def test_private_root_override_used_for_dump_and_evidence(self):
+        custom = Path(self.tmp.name) / "writable-private"
+        with patch.object(tool.shutil, "which", return_value="stub"), \
+                patch.object(tool, "require_docker_engine"), \
+                patch.object(tool, "backup_encrypt_and_verify", return_value={"status": "MOCK"}) as op, \
+                patch.object(tool, "write_private_report", return_value=custom / "report.json") as report:
+            self.assertEqual(tool.main(["--offsite-dir", str(self.offsite),
+                                        "--private-root", str(custom)]), 0)
+            self.assertEqual(op.call_args.kwargs["local_root"], custom)
+            self.assertEqual(report.call_args.args[1], custom)
+        self.assertTrue((custom / "private-backups").is_dir())
+        self.assertTrue((custom / "private-evidence").is_dir())
+        self.assertEqual(list(custom.rglob(".helvoca-c1-writecheck-*")), [])
+
+    def test_permission_denied_before_any_railway_export(self):
+        with patch.object(tool, "probe_local_write",
+                          side_effect=tool.SafeBlocker("LOCAL_PRIVATE_STORAGE_NOT_WRITABLE")), \
+                patch.object(tool, "dump_from_railway") as export:
+            with self.assertRaisesRegex(tool.SafeBlocker, "LOCAL_PRIVATE_STORAGE_NOT_WRITABLE"):
+                tool.backup_encrypt_and_verify(self.offsite, "railway", "age", "docker",
+                                               local_root=self.root)
+            export.assert_not_called()
+
+    def test_probe_files_are_cleaned_and_never_uploaded(self):
+        folder = Path(self.tmp.name) / "writable-local"
+        folder.mkdir()
+        tool.probe_local_write(folder)
+        self.assertEqual(list(folder.iterdir()), [])
+        self.assertEqual(list(self.offsite.iterdir()), [])
+
+    def test_permission_diagnostic_redacts_windows_error(self):
+        folder = Path(self.tmp.name) / "writable-local"
+        folder.mkdir()
+        with patch.object(tool.Path, "open", side_effect=PermissionError("PRIVATE_PATH_OR_SECRET")):
+            with self.assertRaises(tool.SafeBlocker) as raised:
+                tool.probe_local_write(folder)
+        self.assertEqual(str(raised.exception), "LOCAL_PRIVATE_STORAGE_NOT_WRITABLE")
+
     def test_missing_tools_fail_closed_before_any_external_action(self):
         with patch.object(tool.shutil, "which", side_effect=lambda name: None if name == "railway" else "mock"), \
                 patch.object(tool, "backup_encrypt_and_verify") as op:
