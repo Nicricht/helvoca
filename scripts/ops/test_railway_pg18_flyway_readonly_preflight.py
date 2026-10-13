@@ -146,6 +146,46 @@ class StageDReadonlyContracts(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "unsafe"):
                     probe.private_directory()
 
+    def test_windows_backup_directory_permission_denial_uses_private_fallback(self):
+        real_open = Path.open
+
+        def deny_backups(path, *args, **kwargs):
+            if (path.parent.name == "private-backups"
+                    and path.name.startswith("helvoca-stage-d-")
+                    and "x" in (args[0] if args else kwargs.get("mode", "r"))):
+                raise PermissionError(13, "Permission denied")
+            return real_open(path, *args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"LOCALAPPDATA": tmp}), \\
+                    patch.object(Path, "open", deny_backups):
+                path = probe.write_private_evidence({"status": "BLOCKED"})
+                self.assertEqual("private-evidence", path.parent.name)
+                self.assertTrue(path.exists())
+                self.assertEqual("BLOCKED", json.loads(path.read_text())["status"])
+                self.assertEqual([], list((Path(tmp) / "Helvoca" / "private-backups")
+                                            .glob("*.private.json")))
+
+    def test_both_private_locations_denied_fails_closed_no_stdout_evidence(self):
+        real_open = Path.open
+
+        def refuse_reports(path, *args, **kwargs):
+            if (path.name.startswith("helvoca-stage-d-")
+                    and "x" in (args[0] if args else kwargs.get("mode", "r"))):
+                raise PermissionError(13, "Folder protection active")
+            return real_open(path, *args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict(os.environ, {"LOCALAPPDATA": tmp}), \\
+                    patch.object(Path, "open", refuse_reports):
+                with self.assertRaisesRegex(RuntimeError, "Windows denied"):
+                    probe.write_private_evidence({"secret": "never-to-stdout"})
+                self.assertFalse(list(Path(tmp).rglob("*.private.json")))
+
+    def test_evidence_folder_allowlist_blocks_arbitrary_location(self):
+        with self.assertRaisesRegex(RuntimeError, "allowlist"):
+            probe.private_directory("../../../git")
+
     def test_main_simulation_verifies_no_remote_mutations_and_only_safe_stdout(self):
         with tempfile.TemporaryDirectory() as tmp:
             fake = subprocess.CompletedProcess([], 0, response(), b"SECRET_NEVER_LOG")
