@@ -73,7 +73,7 @@ def psql(docker: str, name: str, sql: str, *, role: str | None = None) -> str:
     if role is not None:
         require(role in ("helvoca_runtime", "helvoca_system"), "Forbidden role")
         sql = "SET ROLE " + role + "; " + sql
-    cmd = [docker, "exec", name, "psql", "-X", "-A", "-t",
+    cmd = [docker, "exec", name, "psql", "-X", "-q", "-A", "-t",
            "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d",
            "helvoca_restore", "-c", sql]
     result = run(cmd)
