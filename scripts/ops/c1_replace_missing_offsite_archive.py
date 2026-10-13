@@ -61,19 +61,50 @@ def require_docker_engine(docker: str) -> None:
     require(result.returncode == 0, "DOCKER_ENGINE_NOT_READY")
 
 
+def probe_local_write(directory: Path) -> None:
+    """Verify exclusive create, flush and deletion before any Railway export."""
+    candidate = directory / (".helvoca-c1-writecheck-" + secrets.token_hex(8))
+    created = False
+    try:
+        with candidate.open("xb") as output:
+            created = True
+            output.write(b"local-writecheck")
+            output.flush()
+            os.fsync(output.fileno())
+    except (OSError, ValueError):
+        raise SafeBlocker("LOCAL_PRIVATE_STORAGE_NOT_WRITABLE") from None
+    finally:
+        if created:
+            try:
+                candidate.unlink()
+            except OSError:
+                raise SafeBlocker("LOCAL_PRIVATE_STORAGE_CLEANUP_DENIED") from None
+
+
+def prepare_private_root(root: Path) -> Path:
+    """Private backup AND evidence directories must be writable, never Git/cloud."""
+    with guarded_stage("LOCAL_PRIVATE_ROOT_UNAVAILABLE"):
+        root = secure_directory(root, create=True)
+        source = secure_directory(root / "private-backups", create=True)
+        evidence = secure_directory(root / "private-evidence", create=True)
+    probe_local_write(source)
+    probe_local_write(evidence)
+    return root
+
+
 def backup_encrypt_and_verify(offsite_dir: Path, railway: str, age: str, docker: str,
                               *, local_root: Path) -> dict:
     """No Railway writes, no plaintext in offsite, no false offsite durability claim."""
-    with guarded_stage("LOCAL_BACKUP_DIRECTORY_UNAVAILABLE"):
-        source_dir = secure_directory(local_root / "private-backups", create=True)
     with guarded_stage("OFFSITE_DRIVE_DIRECTORY_UNAVAILABLE"):
         require(offsite_dir.is_dir(), "OFFSITE_DRIVE_DIRECTORY_UNAVAILABLE")
         offsite_dir = secure_directory(offsite_dir, create=False)
     require(source_dir != offsite_dir, "OFFSITE_EQUALS_SOURCE_DIRECTORY")
     require(not offsite_dir.is_relative_to(source_dir)
             and not source_dir.is_relative_to(offsite_dir), "OFFSITE_NESTED_WITH_SOURCE")
-    require(offsite_dir != secure_directory(local_root / "private-evidence", create=True),
-            "OFFSITE_EQUALS_EVIDENCE_DIRECTORY")
+    require(not offsite_dir.is_relative_to(local_root) and not local_root.is_relative_to(offsite_dir),
+            "OFFSITE_NESTED_WITH_PRIVATE_ROOT")
+    local_root = prepare_private_root(local_root)
+    source_dir = local_root / "private-backups"
 
     stamp = datetime.now(timezone.utc)
     name = "helvoca-postgres18-" + stamp.strftime("%Y%m%dT%H%M%SZ") + "-" + secrets.token_hex(3) + ".dump"
@@ -164,6 +195,9 @@ def backup_encrypt_and_verify(offsite_dir: Path, railway: str, age: str, docker:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--offsite-dir", type=Path, required=True)
+    parser.add_argument("--private-root", type=Path,
+                        help="Local private writable root outside Git and cloud. "
+                             "Use if Windows denies access under LOCALAPPDATA.")
     args = parser.parse_args(argv)
     try:
         railway, age, docker = (shutil.which(name) for name in ("railway", "age", "docker"))
@@ -172,11 +206,14 @@ def main(argv: list[str] | None = None) -> int:
         require(bool(docker), "DOCKER_CLI_MISSING")
         with guarded_stage("OFFSITE_DRIVE_DIRECTORY_UNAVAILABLE"):
             require(args.offsite_dir.is_dir(), "OFFSITE_DRIVE_DIRECTORY_UNAVAILABLE")
+        root = args.private_root if args.private_root is not None else local_private_root()
+        # Fail fast: permissions and disposable PG18 preflight BEFORE new export.
+        prepare_private_root(root)
         require_docker_engine(docker)
         result = backup_encrypt_and_verify(args.offsite_dir, railway, age, docker,
-                                           local_root=local_private_root())
+                                           local_root=root)
         with guarded_stage("LOCAL_PRIVATE_REPORT_WRITE_FAILED"):
-            report = write_private_report(result, local_private_root())
+            report = write_private_report(result, root)
         print("C1_NEW_BACKUP_ENCRYPTED_AND_OFFLINE_PG18_RESTORE_VERIFIED")
         print("Private local evidence: " + str(report))
         print("Cloud upload, remote retrieval, separated passphrase custody and RPO/RTO are NOT certified.")
