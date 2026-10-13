@@ -38,8 +38,8 @@ fijada a un commit de la rama Stage B:
 
 ~~~powershell
 $script = Join-Path $env:TEMP 'helvoca-stage-b-pg18.py'
-Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Nicricht/helvoca/f8edef7cca0e3b50028bb2be3ebb666bfe92a613/scripts/ops/twilio_pg18_migration_drill.py' -OutFile $script
-if ((Get-FileHash $script -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'a8acebcf616739b3fdab19be002582d2eafd69f1197d498956a092320a3de97f') { throw 'Stage B: integridad del script falló' }
+Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Nicricht/helvoca/098b1e67f580651a738d9971efc481f24c085b36/scripts/ops/twilio_pg18_migration_drill.py' -OutFile $script
+if ((Get-FileHash $script -Algorithm SHA256).Hash.ToLowerInvariant() -ne '8b6b68456869054c1248981ed93a42f4762f3ba45cd26122084976fd404a442c') { throw 'Stage B: integridad del script falló' }
 py -3 $script
 ~~~
 
