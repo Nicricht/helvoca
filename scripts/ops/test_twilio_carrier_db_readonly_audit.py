@@ -179,6 +179,13 @@ class StageDTwilioCarrierDBAuditTest(unittest.TestCase):
         with self.assertRaisesRegex(tool.AuditError,"TWILIO_NOT_EXACTLY_ONE_OWNED_NUMBER"):
             tool.carrier_observe(PHONE,environment(),pages(False))
 
+    def test_missing_twilio_pagination_marker_fails_closed(self):
+        def incomplete(path, parent, token):
+            return {"incoming_phone_numbers": [twilio_number()]}
+        with self.assertRaisesRegex(tool.AuditError,
+                                    "TWILIO_LIST_AMBIGUOUS_OR_INCOMPLETE"):
+            tool.carrier_observe(PHONE, environment(), incomplete)
+
     def test_wrong_webhook_and_voice_capability_are_blockers(self):
         def fake(path,parent,token):
             if "IncomingPhoneNumbers.json" in path:
