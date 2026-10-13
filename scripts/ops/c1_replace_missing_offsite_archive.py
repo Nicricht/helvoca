@@ -11,6 +11,7 @@ RPO/RTO; neither success nor a local test authorizes a production deployment.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import os
 from pathlib import Path
@@ -28,11 +29,43 @@ from c1_offsite_pg18_encrypted_restore import (
 from railway_pg18_snapshot_drill import dump_from_railway, restore_to_disposable_docker, validate_dump
 
 
+@contextmanager
+def guarded_stage(code: str):
+    """Expose only bounded, actionable step codes, never raw provider errors."""
+    try:
+        yield
+    except SafeBlocker:
+        raise
+    except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as exc:
+        if code == "RAILWAY_READONLY_EXPORT_FAILED":
+            # The existing Railway exporter already replaces private stderr
+            # with a limited safe classification. Forward only known codes.
+            for category in ("SSH_KEY_OR_AUTH", "PG_DUMP_OR_DATABASE_AUTH",
+                             "REMOTE_COMMAND_UNAVAILABLE", "SSH_CONNECTIVITY"):
+                if "category=" + category in str(exc):
+                    raise SafeBlocker("RAILWAY_READONLY_EXPORT_" + category) from None
+        raise SafeBlocker(code) from None
+
+
+def require_docker_engine(docker: str) -> None:
+    """Fail BEFORE a new private export when Docker Desktop is not running."""
+    try:
+        result = subprocess.run([docker, "info", "--format", "{{.ServerVersion}}"],
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, timeout=20, check=False)
+    except (OSError, subprocess.TimeoutExpired, subprocess.SubprocessError):
+        raise SafeBlocker("DOCKER_ENGINE_NOT_READY") from None
+    require(result.returncode == 0, "DOCKER_ENGINE_NOT_READY")
+
+
 def backup_encrypt_and_verify(offsite_dir: Path, railway: str, age: str, docker: str,
                               *, local_root: Path) -> dict:
     """No Railway writes, no plaintext in offsite, no false offsite durability claim."""
-    source_dir = secure_directory(local_root / "private-backups", create=True)
-    offsite_dir = secure_directory(offsite_dir, create=False)
+    with guarded_stage("LOCAL_BACKUP_DIRECTORY_UNAVAILABLE"):
+        source_dir = secure_directory(local_root / "private-backups", create=True)
+    with guarded_stage("OFFSITE_DRIVE_DIRECTORY_UNAVAILABLE"):
+        require(offsite_dir.is_dir(), "OFFSITE_DRIVE_DIRECTORY_UNAVAILABLE")
+        offsite_dir = secure_directory(offsite_dir, create=False)
     require(source_dir != offsite_dir, "OFFSITE_EQUALS_SOURCE_DIRECTORY")
     require(not offsite_dir.is_relative_to(source_dir)
             and not source_dir.is_relative_to(offsite_dir), "OFFSITE_NESTED_WITH_SOURCE")
@@ -44,9 +77,11 @@ def backup_encrypt_and_verify(offsite_dir: Path, railway: str, age: str, docker:
     local_dump = source_dir / name
     # This helper uses Railway SSH pg_dump --format=custom (read-only) and
     # writes exclusively to local private storage with exclusive creation.
-    metadata = dump_from_railway(railway, local_dump)
+    with guarded_stage("RAILWAY_READONLY_EXPORT_FAILED"):
+        metadata = dump_from_railway(railway, local_dump)
     require(local_dump.is_file() and not local_dump.is_symlink(), "NEW_DUMP_UNSAFE")
-    actual = validate_dump(local_dump)
+    with guarded_stage("LOCAL_DUMP_VERIFY_FAILED"):
+        actual = validate_dump(local_dump)
     require(actual["sha256"] == metadata["sha256"] and actual["bytes"] == metadata["bytes"],
             "NEW_DUMP_CHANGED_AFTER_CAPTURE")
 
@@ -60,9 +95,10 @@ def backup_encrypt_and_verify(offsite_dir: Path, railway: str, age: str, docker:
         run_age(age, ["--passphrase", "--output", str(partial), str(local_dump)],
                 code="AGE_ENCRYPT_FAILED")
         require(partial.is_file() and not partial.is_symlink(), "AGE_ENCRYPT_OUTPUT_MISSING")
-        with partial.open("rb") as f:
-            require(f.read(len(AGE_HEADER)) == AGE_HEADER, "AGE_ENCRYPT_FORMAT_INVALID")
-        require(partial.stat().st_size >= actual["bytes"], "AGE_ENCRYPT_SIZE_INVALID")
+        with guarded_stage("OFFSITE_ENCRYPTED_TEMP_READ_FAILED"):
+            with partial.open("rb") as f:
+                require(f.read(len(AGE_HEADER)) == AGE_HEADER, "AGE_ENCRYPT_FORMAT_INVALID")
+            require(partial.stat().st_size >= actual["bytes"], "AGE_ENCRYPT_SIZE_INVALID")
         created = False
         try:
             with ciphertext.open("xb") as dest:
@@ -72,22 +108,29 @@ def backup_encrypt_and_verify(offsite_dir: Path, railway: str, age: str, docker:
                         dest.write(block)
                 dest.flush()
                 os.fsync(dest.fileno())
-        except BaseException:
+        except BaseException as exc:
             if created:
                 ciphertext.unlink(missing_ok=True)
+            if isinstance(exc, (OSError, RuntimeError, ValueError)) and not isinstance(exc, SafeBlocker):
+                raise SafeBlocker("OFFSITE_ENCRYPTED_WRITE_FAILED") from None
             raise
-        require(sha256_file(ciphertext) == sha256_file(partial), "OFFSITE_CIPHER_COPY_MISMATCH")
+        with guarded_stage("OFFSITE_ENCRYPTED_VERIFY_FAILED"):
+            require(sha256_file(ciphertext) == sha256_file(partial), "OFFSITE_CIPHER_COPY_MISMATCH")
         copy_verified = True
 
         t0 = time.monotonic()
-        evidence_dir = secure_directory(local_root / "private-evidence", create=True)
-        with tempfile.TemporaryDirectory(prefix="helvoca-c1-", dir=evidence_dir) as tmp:
-            clear = Path(tmp) / "restored-from-ciphertext.dump"
-            run_age(age, ["--decrypt", "--output", str(clear), str(ciphertext)],
-                    code="AGE_DECRYPT_FAILED")
-            recovered = validate_dump(clear)
-            require(recovered == actual, "RESTORED_DUMP_CHECKSUM_MISMATCH")
-            checked = restore_to_disposable_docker(docker, clear)
+        with guarded_stage("LOCAL_ISOLATED_RESTORE_DIRECTORY_FAILED"):
+            evidence_dir = secure_directory(local_root / "private-evidence", create=True)
+        with guarded_stage("LOCAL_RECOVERY_IO_FAILED"):
+            with tempfile.TemporaryDirectory(prefix="helvoca-c1-", dir=evidence_dir) as tmp:
+                clear = Path(tmp) / "restored-from-ciphertext.dump"
+                run_age(age, ["--decrypt", "--output", str(clear), str(ciphertext)],
+                        code="AGE_DECRYPT_FAILED")
+                with guarded_stage("DECRYPTED_DUMP_FORMAT_FAILED"):
+                    recovered = validate_dump(clear)
+                require(recovered == actual, "RESTORED_DUMP_CHECKSUM_MISMATCH")
+                with guarded_stage("LOCAL_PG18_ISOLATED_RESTORE_FAILED"):
+                    checked = restore_to_disposable_docker(docker, clear)
         duration_seconds = round(time.monotonic() - t0, 3)
         return {
             "status": "NEW_READONLY_PG18_BACKUP_ENCRYPTED_AND_ISOLATED_RESTORE_PASSED",
@@ -124,9 +167,13 @@ def main(argv: list[str] | None = None) -> int:
         require(bool(railway), "RAILWAY_CLI_MISSING")
         require(bool(age), "AGE_CLI_MISSING")
         require(bool(docker), "DOCKER_CLI_MISSING")
+        with guarded_stage("OFFSITE_DRIVE_DIRECTORY_UNAVAILABLE"):
+            require(args.offsite_dir.is_dir(), "OFFSITE_DRIVE_DIRECTORY_UNAVAILABLE")
+        require_docker_engine(docker)
         result = backup_encrypt_and_verify(args.offsite_dir, railway, age, docker,
                                            local_root=local_private_root())
-        report = write_private_report(result, local_private_root())
+        with guarded_stage("LOCAL_PRIVATE_REPORT_WRITE_FAILED"):
+            report = write_private_report(result, local_private_root())
         print("C1_NEW_BACKUP_ENCRYPTED_AND_OFFLINE_PG18_RESTORE_VERIFIED")
         print("Private local evidence: " + str(report))
         print("Cloud upload, remote retrieval, separated passphrase custody and RPO/RTO are NOT certified.")
