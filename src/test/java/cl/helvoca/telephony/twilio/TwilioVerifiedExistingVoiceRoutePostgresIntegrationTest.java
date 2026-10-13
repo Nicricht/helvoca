@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(properties = "HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED=true")
 class TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest {
     @Container
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
 
     private static final UUID TENANT = UUID.fromString("9421dc18-c2de-440d-8730-bd5aa5c22301");
     private static final UUID PHONE_ID = UUID.fromString("9df0f471-4253-482e-ad77-1aec21eb0767");
