@@ -101,17 +101,17 @@ def railway_command(railway: str) -> list[str]:
 def classify_remote_error(stderr: bytes) -> str:
     """Categorize remote/SSH failure without exposing raw database diagnostics."""
     message = stderr[:8192].decode("utf-8", errors="replace").lower()
-    if ("permission denied" in message or "ssh keys" in message
-            or "publickey" in message or "register" in message):
+    if ("flyway_schema_history" in message
+            and ("does not exist" in message or "permission denied" in message)):
+        return "FLYWAY_TABLE_ACCESS_OR_ABSENT"
+    if ("permission denied (publickey)" in message or "ssh keys" in message
+            or "publickey" in message or "register your ssh key" in message):
         return "SSH_KEY_OR_AUTH"
     if "base64" in message and ("not found" in message or "invalid input" in message):
         return "REMOTE_BASE64_UNAVAILABLE"
     if ("password authentication failed" in message
             or ("psql:" in message and "authentication" in message)):
         return "POSTGRES_AUTH"
-    if ("flyway_schema_history" in message
-            and ("does not exist" in message or "permission denied" in message)):
-        return "FLYWAY_TABLE_ACCESS_OR_ABSENT"
     if "syntax error" in message:
         return "REMOTE_SQL_SYNTAX"
     if "psql" in message and ("not found" in message or "no such file" in message):
