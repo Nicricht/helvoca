@@ -229,5 +229,115 @@ class FinalReleaseManifestTests(unittest.TestCase):
                 self.assertEqual("STOP", gate.assess_diff(value)["result"])
 
 
+
+class FinalWorkflowDefinitionGuards(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.source = gate.WORKFLOW.read_text(encoding="utf-8")
+
+    def blocked(self, content, reason):
+        result = gate.assess_workflow(content)
+        self.assertEqual("STOP", result["result"], result)
+        self.assertIn(reason, result["blockers"])
+        self.assertFalse(result["can_call"])
+        self.assertFalse(result["can_deploy"])
+
+    def test_pristine_definition_does_not_authorize_production(self):
+        result = gate.assess_workflow(self.source)
+        self.assertEqual("PASS_OFFLINE_DEFINITION", result["result"], result["blockers"])
+        self.assertFalse(result["can_merge"])
+        self.assertFalse(result["can_call"])
+
+    def test_missing_or_malformed_workflow_fails(self):
+        for value in (None, False, "on: push", {}):
+            with self.subTest(value=value):
+                self.blocked(value, "FOUR_FINAL_GATES_REQUIRED")
+
+    def test_main_trigger_or_renamed_branch_rejected(self):
+        self.blocked(
+            self.source.replace(
+                "test/voice-release-part10-final-handoff-no-go-*", "main", 1),
+            "STACKED_BRANCH_ONLY")
+        self.blocked(
+            self.source.replace(
+                "test/voice-release-part9-full-regression-offline-*", "main", 1),
+            "STACKED_BRANCH_ONLY")
+
+    def test_only_four_exact_ci_jobs(self):
+        self.blocked(
+            self.source.replace("  final-voice-tenant-enrollment:",
+                                "  renamed-voice-test:", 1),
+            "FOUR_FINAL_GATES_REQUIRED")
+
+    def test_no_write_scopes_or_external_secrets(self):
+        self.blocked(self.source.replace("contents: read",
+                                         "contents: write", 1),
+                     "GITHUB_READ_ONLY_REQUIRED")
+        for forbidden in gate.DISALLOWED_ACTIONS:
+            with self.subTest(forbidden=forbidden):
+                self.blocked(
+                    self.source + "\n# " + forbidden + "\n",
+                    "FORBIDDEN_EXTERNAL_ACTIVITY_OR_FALSE_GO")
+
+    def test_every_external_service_flag_must_remain_off(self):
+        for flag in gate.OFF_FLAGS:
+            with self.subTest(flag=flag):
+                self.blocked(
+                    self.source.replace(flag + ": 'false'",
+                                        flag + ": 'true'", 1),
+                    "PAID_OR_WRITABLE_FEATURE_ENABLED_" + flag)
+
+    def test_no_rerouting_outbound_delivery(self):
+        self.blocked(
+            self.source.replace("HELVOCA_OUTBOUND_PROVIDER: NONE",
+                                "HELVOCA_OUTBOUND_PROVIDER: TWILIO", 1),
+            "OUTBOUND_PROVIDER_NOT_DISABLED")
+
+    def test_checkout_uses_real_head_sha_not_merge_ref(self):
+        self.blocked(
+            self.source.replace("ref: " + gate.HEAD_EXPR,
+                                "ref: refs/pull/820/merge", 1),
+            "SHA_PINNED_HEAD_ANCESTRY_AND_FILE_ALLOWLIST_MISSING")
+        self.blocked(
+            self.source.replace("git merge-base --is-ancestor " + gate.PARENT_SHA,
+                                "echo bypass lineage", 1),
+            "SHA_PINNED_HEAD_ANCESTRY_AND_FILE_ALLOWLIST_MISSING")
+
+    def test_diff_allowlist_cannot_be_skipped(self):
+        self.blocked(
+            self.source.replace(
+                "--changed-files .part10-name-status.txt",
+                "--changed-files /dev/null", 1),
+            "SHA_PINNED_HEAD_ANCESTRY_AND_FILE_ALLOWLIST_MISSING")
+
+    def test_child_jobs_must_depend_on_first_guard(self):
+        self.blocked(
+            self.source.replace("    needs: [frozen-lineage-no-go]",
+                                "    needs: []", 1),
+            "UNGUARDED_RELEASE_JOB")
+
+    def test_local_pg18_restoration_and_tenant_tests_are_mandatory(self):
+        self.blocked(
+            self.source.replace("voice_part6_synthetic_pg18_recovery.sh",
+                                "echo skipped", 1),
+            "SYNTHETIC_PG18_RECOVERY_TENANTS_AND_STACK_REQUIRED")
+        self.blocked(
+            self.source.replace("PostgresRowLevelSecurityIntegrationTest",
+                                "RemovedTest", 1),
+            "SYNTHETIC_PG18_RECOVERY_TENANTS_AND_STACK_REQUIRED")
+        self.blocked(
+            self.source.replace("jdbc:postgresql://127.0.0.1:5432/helvoca",
+                                "jdbc:postgresql://production.invalid/helvoca", 1),
+            "SYNTHETIC_PG18_RECOVERY_TENANTS_AND_STACK_REQUIRED")
+
+    def test_previous_fail_closed_gates_remain_enforced(self):
+        self.blocked(
+            self.source.replace("test_voice_part9_integrated_gate_contract.py",
+                                "omitted_prior_contract.py", 1),
+            "RELEASE_AND_PRIOR_NO_GO_GATES_REQUIRED")
+
+
+
+
 if __name__ == "__main__":
     unittest.main()
