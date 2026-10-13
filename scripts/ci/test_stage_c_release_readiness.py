@@ -44,7 +44,6 @@ class StageCReleaseReadinessContractTest(unittest.TestCase):
         self.assertEqual("BLOCKED", result.state)
         for reason in (
             "STACK_HAS_UNMERGED_PRS",
-            "RAILWAY_DEPLOYED_SHA_UNVERIFIED",
             "RELEASE_CANDIDATE_NOT_ON_MAIN",
             "EXACT_SHA_SEVEN_GATE_CI_UNVERIFIED",
             "LIVE_FLYWAY_HISTORY_UNVERIFIED",
@@ -88,6 +87,12 @@ class StageCReleaseReadinessContractTest(unittest.TestCase):
         data = synthetic_reviewable()
         data["ci"]["head_sha"] = gate.MAIN_BEFORE_RELEASE
         self.assertIn("EXACT_SHA_SEVEN_GATE_CI_UNVERIFIED", gate.assess(data).blockers)
+
+    def test_railway_deployment_must_match_main(self):
+        data = synthetic_reviewable()
+        data["railway"]["deployed_git_sha"] = gate.MAIN_BEFORE_RELEASE
+        self.assertIn("RAILWAY_DEPLOYMENT_NOT_EQUAL_TO_MAIN",
+                      gate.assess(data).blockers)
 
     def test_live_flyway_must_be_verified_separately(self):
         data = synthetic_reviewable()
