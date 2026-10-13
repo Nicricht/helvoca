@@ -58,15 +58,15 @@ su hash SHA-256 confirmado. Esta ejecución solo requiere
 `railway` CLI y Python 3; no requiere Docker Desktop ni nuevo
 `pg_dump`. Puede hacerse desde cualquier carpeta.
 
-El ejecutable está fijado al commit `1cdaacf3a11749eaf1d2b428f0150ca46ad9c26c`
-y a SHA-256 `ae1acda6a42ecbfb9ce2ed56238027584ecef7bf04ccfd6768231f12902a27db`.
+El ejecutable está fijado al commit `027b54e2ca642d336cd6d2f3c4ec0f8fb1ccbe78`
+y a SHA-256 `9757f1fd4a383ba1498e71ac62bbae8a44a9dc845b636d0347ef85e52a193186`.
 Ejecutar **solo una vez confirmado SUCCESS del CI exacto**:
 
 ~~~powershell
 $p = Join-Path $env:TEMP 'helvoca-stage-d-flyway.py'
-$u = 'https://raw.githubusercontent.com/Nicricht/helvoca/1cdaacf3a11749eaf1d2b428f0150ca46ad9c26c/scripts/ops/railway_pg18_flyway_readonly_preflight.py'
+$u = 'https://raw.githubusercontent.com/Nicricht/helvoca/027b54e2ca642d336cd6d2f3c4ec0f8fb1ccbe78/scripts/ops/railway_pg18_flyway_readonly_preflight.py'
 Invoke-WebRequest -Uri $u -OutFile $p
-if ((Get-FileHash $p -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'ae1acda6a42ecbfb9ce2ed56238027584ecef7bf04ccfd6768231f12902a27db') {
+if ((Get-FileHash $p -Algorithm SHA256).Hash.ToLowerInvariant() -ne '9757f1fd4a383ba1498e71ac62bbae8a44a9dc845b636d0347ef85e52a193186') {
     throw 'Stage D: el script no coincide con la versión verificada'
 }
 py -3 $p
@@ -111,3 +111,24 @@ restaurado y verificado, diferente de esta comprobación.
 
 Este documento no se debe interpretar como autorización de merge,
 despliegue, migración, llamada pagada o paso a la Etapa E.
+
+## Correción del diagnóstico tras primer intento del operador
+
+El primer intento local devolvió:
+`STAGE_D_BLOCKED: Railway SSH or read-only psql query failed`.
+Ese mensaje no distinguía fallo de transporte de un error SQL.
+La herramienta se reparó en commit
+`027b54e2ca642d336cd6d2f3c4ec0f8fb1ccbe78`: codifica el SQL fijo en Base64 antes de pasarlo
+al contenedor por Railway SSH, evitando interacciones entre comillas del
+CLI/PowerShell/SH. El SQL **sigue siendo el mismo y siempre READ ONLY**.
+Ahora captura `stderr` solo en memoria para clasificar
+`SSH_KEY_OR_AUTH`, `POSTGRES_AUTH`,
+`FLYWAY_TABLE_ACCESS_OR_ABSENT`, `REMOTE_SQL_SYNTAX`,
+`PSQL_COMMAND_UNAVAILABLE` o `REMOTE_ERROR_UNCLASSIFIED`
+sin imprimir ni guardar el stderr sin filtrar. El hash del script fue
+recalculado y las pruebas offline verifican transporte fiel y
+no divulgación. **La ejecución real todavía debe repetirse en Windows**.
+
+Si el estado sigue `STAGE_D_BLOCKED` después de la corrección,
+no reinterpretarlo como `PASS`, no realizar cambios productivos y
+utilizar solamente la categoría segura del error para el siguiente paso.
