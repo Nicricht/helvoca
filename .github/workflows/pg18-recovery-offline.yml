@@ -8,6 +8,7 @@ on:
     paths:
       - 'scripts/ops/railway_pg18_snapshot_drill.py'
       - 'scripts/ops/test_railway_pg18_snapshot_drill.py'
+      - 'scripts/ops/test_railway_postgres_recovery_audit.py'
       - 'scripts/ops/railway_postgres_recovery_audit.py'
       - '.github/workflows/pg18-recovery-offline.yml'
   workflow_dispatch:
