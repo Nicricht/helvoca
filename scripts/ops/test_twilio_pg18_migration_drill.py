@@ -47,6 +47,7 @@ class StageBDrillOfflineTests(unittest.TestCase):
             self.assertEqual("1", stage_b.psql("docker", "scratch", "SELECT 1",
                                                role="helvoca_runtime"))
         self.assertEqual(2, len(calls))
+        self.assertTrue(all("-q" in c for c in calls), "psql must suppress SET tags")
         self.assertTrue(all(c[:3] == ["docker", "exec", "scratch"] for c in calls))
         self.assertFalse(any("railway" in " ".join(c) for c in calls))
 
