@@ -55,6 +55,12 @@ def phone_sql(phone: str) -> str:
         "SELECT '" + PG_MARKER + "' || json_build_object("
         "'read_only', current_setting('transaction_read_only') = 'on',"
         "'major', current_setting('server_version_num')::integer / 10000,"
+        "'last_flyway_version', (SELECT version FROM public.flyway_schema_history "
+        "ORDER BY installed_rank DESC LIMIT 1),"
+        "'provenance_column_count', (SELECT count(*) FROM information_schema.columns "
+        "WHERE table_schema = 'public' AND table_name = 'phone_number' "
+        "AND column_name IN "
+        "('twilio_account_sid','twilio_binding_source','voice_verified_at')),"
         "'rows', (SELECT COALESCE(json_agg(json_build_object("
         "'business_id', p.business_id, 'provider', p.provider,"
         "'active', p.active, 'external_id', p.external_id,"
@@ -95,7 +101,12 @@ def db_query(railway: str, phone: str) -> dict:
     expect(isinstance(data, dict) and data.get("read_only") is True
            and type(data.get("major")) is int and data["major"] == 18
            and isinstance(data.get("rows"), list)
-           and len(data["rows"]) <= 3, "DB_UNEXPECTED_RESPONSE")
+           and len(data["rows"]) <= 3
+           and isinstance(data.get("last_flyway_version"), str)
+           and re.fullmatch(r"[0-9]{1,5}", data["last_flyway_version"]) is not None
+           and type(data.get("provenance_column_count")) is int
+           and 0 <= data["provenance_column_count"] <= 3,
+           "DB_UNEXPECTED_RESPONSE")
     return data
 
 
@@ -229,11 +240,22 @@ def compare(phone: str, tenant: str, db: dict, carrier: dict, variables: dict) -
     require(row.get("provider") == "TWILIO", "DB_PROVIDER_MISMATCH")
     require(row.get("active") is True, "DB_NUMBER_INACTIVE")
     require(row.get("external_id") == carrier["phone_sid"], "DB_PHONE_SID_MISMATCH")
-    require(row.get("twilio_account_sid") == carrier["owner"],
-            "DB_ACCOUNT_SID_MISSING_OR_MISMATCH")
-    require(row.get("twilio_binding_source") in ("VERIFIED_EXISTING", "MANAGED_PURCHASE"),
-            "DB_PROVENANCE_UNVERIFIED")
-    require(bool(row.get("voice_verified_at")), "DB_VOICE_TIMESTAMP_MISSING")
+    # On live Flyway V99 these three fields do not exist. to_jsonb(p)->>'field'
+    # returns NULL by design; reporting a true SID mismatch would be misleading.
+    # Once V100+ is installed, missing/mismatched values remain hard blockers.
+    version = db.get("last_flyway_version")
+    column_count = db.get("provenance_column_count")
+    if version == "99" and type(column_count) is int and column_count == 0:
+        reasons.append("DB_SCHEMA_V100_V103_NOT_DEPLOYED")
+    elif (not isinstance(version, str) or re.fullmatch(r"[0-9]{1,5}", version) is None
+          or int(version) < 100 or type(column_count) is not int or column_count != 3):
+        reasons.append("DB_PROVENANCE_SCHEMA_INCONSISTENT")
+    else:
+        require(row.get("twilio_account_sid") == carrier["owner"],
+                "DB_ACCOUNT_SID_MISSING_OR_MISMATCH")
+        require(row.get("twilio_binding_source") in ("VERIFIED_EXISTING", "MANAGED_PURCHASE"),
+                "DB_PROVENANCE_UNVERIFIED")
+        require(bool(row.get("voice_verified_at")), "DB_VOICE_TIMESTAMP_MISSING")
     require(str(variables.get("HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED",
                               "")).lower() != "true",
             "LIVE_EFFECTS_SWITCH_ENABLED")
@@ -288,6 +310,8 @@ def main(argv=None) -> int:
             "observed_accounts_checked": "PARENT_AND_CONFIGURED_SUBACCOUNT",
             "owned_number_kind": carrier["owner_kind"],
             "matching_number_count": len(db["rows"]),
+            "last_flyway_version": db["last_flyway_version"],
+            "provenance_column_count": db["provenance_column_count"],
             "status": "CARRIER_DB_READONLY_MATCH" if not blockers else "BLOCKED",
             "blockers": blockers,
             "production_modified": False, "live_call_certified": False,
