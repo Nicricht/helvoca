@@ -1,7 +1,11 @@
 # Etapa A: respaldo PostgreSQL 18 y restauración aislada
 
-Estado al 2026-10-13 (UTC): **RESTORE_PROOF_MISSING**. Este documento NO
-certifica que exista ya una copia restaurable ni autoriza despliegues o llamadas.
+**Actualización 2026-10-13:** la persona operadora aportó salida de PowerShell
+con `RESTORE VERIFIED in network-disabled disposable PostgreSQL 18.`
+El respaldo y la restauración local se dan por verificados **según ese resultado**.
+El acta de evidencia sin secretos está en
+`docs/telephony/evidence/2026-10-13-stage-a-local-pg18-restore-attestation.md`.
+No es una inspección independiente del archivo ni autoriza despliegues o llamadas.
 
 ## Alcance y datos comprobados
 
@@ -12,7 +16,7 @@ certifica que exista ya una copia restaurable ni autoriza despliegues o llamadas
 - Inspección Railway (conector): Postgres y API online, sin cambios staged;
   Postgres no tiene TCP proxy público.
 - GitHub main en ca58693e167752bd6eab8ff4e9be770391fe4293.
-- **No se ha realizado dump de datos de producción desde esta sesión.**
+- Se realizó `pg_dump` en Windows por el usuario; esta sesión no tuvo acceso al archivo real.
 
 ## Por qué NO usar el script antiguo como respaldo de producción
 
@@ -91,10 +95,13 @@ habilita, restaura ni elimina nada. Requiere Railway CLI local.
 
 Registrar fecha, SHA-256, tamaño del dump, código de salida, éxito de
 pg_restore y ubicación privada del reporte. No enviar dump, URL de
-conexión, clave, password ni el reporte sin redactar. Si la prueba falla,
-mantener RESTORE_PROOF_MISSING.
+conexión, clave, password ni el reporte sin redactar. Si una ejecución futura falla, no sustituir la evidencia válida anterior
+por un resultado inventado ni autorizar despliegues sin revalidación.
 
-COMMERCIAL_GO=NO-GO, LIVE_CALL_CERTIFIED=false y ninguna migración
+**Etapa A cerrada por evidencia aportada del respaldo restaurado**.
+Las comprobaciones de cifrado local/offsite no están certificadas; mantener
+el archivo protegido y una copia cifrada independiente.
+COMMERCIAL_GO=NO-GO, LIVE_CALL_CERTIFIED=false, PROD_DEPLOY=NO-GO y ninguna migración
 productiva se habilita por haber ejecutado este script.
 
 Referencias oficiales:
