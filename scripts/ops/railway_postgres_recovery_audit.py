@@ -30,7 +30,13 @@ READ_ONLY_COMMANDS = (
 
 
 def safe_write(directory: Path, filename: str, content: bytes) -> Path:
-    """Create owner-only output; do not print possibly sensitive CLI bodies."""
+    """Create owner-only output, outside Git; never print raw CLI bodies."""
+    directory = directory.expanduser().absolute()
+    for ancestor in (directory, *directory.parents):
+        if ancestor.is_symlink():
+            raise ValueError("Output directory or parent may not be a symbolic link")
+        if (ancestor / ".git").exists():
+            raise ValueError("Operational evidence must remain outside Git repositories")
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     if directory.is_symlink():
         raise ValueError("Output directory may not be a symbolic link")
