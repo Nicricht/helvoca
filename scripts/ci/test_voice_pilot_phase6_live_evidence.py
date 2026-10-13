@@ -35,8 +35,8 @@ def synthetic_complete():
         "authorization": {
             "participant_consented": True, "consent_evidence_ref": ref,
             "controlled_time_window_confirmed": True,
-            "caller_e164": "+14355652512",
-            "test_recipient_e164": "+12025550123",
+            "helvoca_called_e164": "+14355652512",
+            "authorized_human_caller_e164": "+12025550123",
             "max_duration_seconds": 60, "carrier_termination_control_verified": True,
             "max_total_cost_usd": "1.00",
             "twilio_tariff_verified": True, "gemini_tariff_verified": True,
@@ -187,7 +187,7 @@ class Phase6RealCallEvidenceTest(unittest.TestCase):
              "CONTROLLED_PILOT_NOT_VERIFIED"),
             ("authorization", "participant_consented", False,
              "PARTICIPANT_CONSENT_MISSING"),
-            ("authorization", "test_recipient_e164", None,
+            ("authorization", "authorized_human_caller_e164", None,
              "TEST_NUMBERS_NOT_CONFIRMED"),
             ("authorization", "max_duration_seconds", 1000,
              "HARD_CALL_DURATION_OR_STOP_NOT_VERIFIED"),
@@ -197,6 +197,14 @@ class Phase6RealCallEvidenceTest(unittest.TestCase):
                 d = synthetic_complete()
                 d[section][key] = bad
                 self.assertIn(expected, assess(d).blockers)
+
+    def test_inbound_caller_cannot_be_reversed_or_same_as_helvoca_number(self):
+        d = synthetic_complete()
+        d["authorization"]["helvoca_called_e164"] = "+12025550123"
+        self.assertIn("TEST_NUMBERS_NOT_CONFIRMED", assess(d).blockers)
+        d = synthetic_complete()
+        d["authorization"]["authorized_human_caller_e164"] = "+14355652512"
+        self.assertIn("TEST_NUMBERS_NOT_CONFIRMED", assess(d).blockers)
 
     def test_untrusted_evidence_does_not_echo_secrets_or_identifying_data(self):
         d = synthetic_complete()
