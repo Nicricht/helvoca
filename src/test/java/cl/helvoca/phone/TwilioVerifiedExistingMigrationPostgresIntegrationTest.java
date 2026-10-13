@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 class TwilioVerifiedExistingMigrationPostgresIntegrationTest {
     @Container
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(System.getProperty("helvoca.test.postgres.image", "postgres:18-alpine"));
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry r) {
