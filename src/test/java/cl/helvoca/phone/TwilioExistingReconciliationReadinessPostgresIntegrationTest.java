@@ -67,7 +67,8 @@ class TwilioExistingReconciliationReadinessPostgresIntegrationTest {
 
     private static final AtomicInteger SEQ = new AtomicInteger(4000);
     private static final String ACCOUNT = "AC" + "a".repeat(32);
-    private static final String PN = "PN" + "b".repeat(32);
+    // Each test has its own provider SID: PostgreSQL enforces global uniqueness.
+    private String PN;
     private static final String OTHER_PN = "PN" + "c".repeat(32);
 
     private JdbcTemplate owner;
@@ -88,6 +89,7 @@ class TwilioExistingReconciliationReadinessPostgresIntegrationTest {
         adminOther = newAdmin();
         tenant = UUID.randomUUID();
         phone = UUID.randomUUID();
+        PN = "PN" + phone.toString().replace("-", "");
         number = "+1202555" + String.format("%04d", SEQ.incrementAndGet());
 
         owner.update("INSERT INTO public.business(id,name) VALUES (?,?)",
