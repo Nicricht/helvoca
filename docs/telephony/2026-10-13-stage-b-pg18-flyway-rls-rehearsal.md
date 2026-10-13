@@ -4,6 +4,14 @@
 `46f1ce16c694d22c7650ab2f26f6c96ded0cd0f1c4e5a3aa1fedd0be88cfbe18`.
 El archivo real se encuentra únicamente en el ordenador del operador.
 
+**Resultado actualizado (2026-10-13): Etapa B completada según evidencia de operador más CI.**
+El operador proporcionó `LOCAL_PG18_MIGRATION_REHEARSAL_VERIFIED` tras ejecutar
+V100–V103 con `psql` sobre la restauración local, mientras que el CI #38346860096
+certificó 76 pruebas Java PostgreSQL 18 / Flyway y 8 Python. El reporte
+privado no se subió a GitHub. Acta: `docs/telephony/evidence/2026-10-13-stage-b-local-pg18-v100-v103-attestation.md`.
+La ejecución local no fue Flyway ni una auditoría de equivalencia global de todos
+los datos. Producción sigue NO-GO; Etapa C todavía no se inicia.
+
 **Dos ensayos separados son obligatorios:**
 
 1. **CI GitHub, sin datos productivos:** Java 21 + Spring Boot 4.1.1 +
@@ -58,11 +66,11 @@ servicios productivos por argumentos. Nunca subir `.dump` o
 ## Gates
 
 - `STAGE_A_LOCAL_RESTORE_VERIFIED`: evidencia aportada por el operador.
-- `STAGE_B_CI_PG18_FLYWAY`: esperar SUCCESS del commit exacto.
-- `STAGE_B_RESTORED_COPY_MIGRATION`: esperar ejecución local real.
+- `STAGE_B_CI_PG18_FLYWAY`: PASS; CI #38346860096 del commit `ff69024568bffcf58e18fc554170a72b0bbbfc38`.
+- `STAGE_B_RESTORED_COPY_MIGRATION`: PASS_OPERATOR_REPORTED, `psql` sobre copia local.
 - `PROD_DEPLOY=NO-GO`.
 - `LIVE_CALL_CERTIFIED=false`.
 - `COMMERCIAL_GO=NO-GO`.
 
-No usar este ensayo para desplegar Flyway sobre producción. No se fusionará
-la rama Stage B a main ni se ejecutarán llamadas facturables en esta etapa.
+No usar este ensayo para desplegar Flyway sobre producción. La rama Stage B permanece en PR #807 sin fusionar a main y no se ejecutaron
+llamadas facturables en esta etapa.
