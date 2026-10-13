@@ -28,13 +28,13 @@
     "participant_consented": false,
     "consent_evidence_ref": null,
     "controlled_time_window_confirmed": false,
-    "caller_e164": "+14355652512",
-    "test_recipient_e164": null,
     "max_duration_seconds": null,
     "carrier_termination_control_verified": false,
     "max_total_cost_usd": null,
     "twilio_tariff_verified": false,
-    "gemini_tariff_verified": false
+    "gemini_tariff_verified": false,
+    "helvoca_called_e164": "+14355652512",
+    "authorized_human_caller_e164": null
   },
   "call": {
     "tenant_id": "044a5d73-2df7-4e77-849f-8639d05ac30b",
