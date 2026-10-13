@@ -162,9 +162,10 @@ def carrier_observe(phone: str, vars: dict, fetch=twilio_get) -> dict:
         page = fetch("/2010-04-01/Accounts/" + sid +
                      "/IncomingPhoneNumbers.json?" +
                      urlencode({"PhoneNumber": phone, "PageSize": 20}), parent, token)
-        expect("incoming_phone_numbers" in page and
-               isinstance(page["incoming_phone_numbers"], list)
-               and page.get("next_page_uri") is None,
+        expect("incoming_phone_numbers" in page
+               and "next_page_uri" in page
+               and isinstance(page["incoming_phone_numbers"], list)
+               and page["next_page_uri"] is None,
                "TWILIO_LIST_AMBIGUOUS_OR_INCOMPLETE")
         expect(len(page["incoming_phone_numbers"]) <= 1,
                "TWILIO_LIST_AMBIGUOUS_OR_INCOMPLETE")
