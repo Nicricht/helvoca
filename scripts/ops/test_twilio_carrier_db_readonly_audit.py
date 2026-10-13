@@ -111,10 +111,15 @@ class StageDTwilioCarrierDBAuditTest(unittest.TestCase):
             def __exit__(self, *args): pass
             def geturl(self): return tool.ROOT + "/2010-04-01/Accounts/" + PARENT + ".json"
             def read(self, n): return b'{"status":"active"}'
-        with patch.object(tool, "urlopen", return_value=FakeResponse()) as op:
+        class FakeOpener:
+            def open(self, request, timeout):
+                self.request = request
+                return FakeResponse()
+        opener=FakeOpener()
+        with patch.object(tool, "build_opener", return_value=opener):
             value=tool.twilio_get("/2010-04-01/Accounts/"+PARENT+".json",PARENT,"fake-token")
         self.assertEqual("active",value["status"])
-        request=op.call_args.args[0]
+        request=opener.request
         self.assertEqual("GET",request.get_method())
         self.assertTrue(request.full_url.startswith("https://api.twilio.com/"))
         self.assertNotIn("fake-token",request.full_url)
@@ -122,8 +127,6 @@ class StageDTwilioCarrierDBAuditTest(unittest.TestCase):
     def test_get_only_restricts_host_and_resource_path(self):
         for p in ("https://attacker.test", "//attacker.test",
                   "/2010-04-01/Calls.json", "/2010-04-01/Accounts/../../evil"):
-            if p.endswith("../evil"):
-                continue
             with self.subTest(path=p):
                 with self.assertRaises(tool.AuditError):
                     tool.twilio_get(p,PARENT,"fake-token")
