@@ -79,7 +79,7 @@ Workflow: .github/workflows/voice-release-part6-recovery-offline.yml
 ## 4. Lista operacional de respaldo real, SIN EJECUTAR AHORA
 
 Un operador autorizado debe completar cada condición en el entorno controlado
-AN TES de siquiera evaluar una ventana de cambios (la evidencia existente no
+ANTES de siquiera evaluar una ventana de cambios (la evidencia existente no
 convalida indefinidamente la frescura):
 
 1. Confirmar lectura actual de main, commit desplegado, nombre y versión
