@@ -30,7 +30,7 @@ FORBIDDEN_RELEASE_CLAIMS = ("PROD_DEPLOY=GO", "COMMERCIAL_GO=true",
 
 def git_blob_sha(data: bytes) -> str:
     return hashlib.sha1(b"blob " + str(len(data)).encode("ascii")
-                        + b"\\0" + data).hexdigest()
+                        + bytes([0]) + data).hexdigest()
 
 
 def assess(repo_root: Path = ROOT) -> dict:
@@ -51,9 +51,9 @@ def assess(repo_root: Path = ROOT) -> dict:
         sources[version] = sql
         if git_blob_sha(source) != expected_sha:
             issues.append(f"MIGRATION_V{version}_CHANGED")
-        if re.search(r"(?im)^\\s*(?:UPDATE\\s+(?:public\\.)?phone_number\\s+SET|"
-                     r"INSERT\\s+INTO\\s+(?:public\\.)?phone_number|"
-                     r"DELETE\\s+FROM\\s+(?:public\\.)?phone_number)\\b", sql):
+        if re.search(r"(?im)^\s*(?:UPDATE\s+(?:public\.)?phone_number\s+SET|"
+                     r"INSERT\s+INTO\s+(?:public\.)?phone_number|"
+                     r"DELETE\s+FROM\s+(?:public\.)?phone_number)\b", sql):
             issues.append(f"MIGRATION_V{version}_LEGACY_PHONE_DML")
         if any(claim in sql for claim in FORBIDDEN_RELEASE_CLAIMS):
             issues.append(f"MIGRATION_V{version}_UNAUTHORIZED_GO")
