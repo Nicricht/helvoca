@@ -122,6 +122,8 @@ def assess(doc: object) -> Assessment:
     require(isinstance(railway.get("deployed_git_sha"), str)
             and SHA.fullmatch(railway["deployed_git_sha"]) is not None,
             "RAILWAY_DEPLOYED_SHA_UNVERIFIED")
+    require(railway.get("deployed_git_sha") == main_sha,
+            "RAILWAY_DEPLOYMENT_NOT_EQUAL_TO_MAIN")
     require(main_sha == candidate, "RELEASE_CANDIDATE_NOT_ON_MAIN")
 
     require(ci.get("head_sha") == candidate
