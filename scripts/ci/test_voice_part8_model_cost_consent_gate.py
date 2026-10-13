@@ -50,7 +50,7 @@ class VoicePart8OfflinePreflightTests(unittest.TestCase):
         self.assertEqual("STOP", self.report(gate.fixture())["state"])
 
     def test_missing_input_stops(self):
-        self.blocked("INVALID_INPUT", None)
+        self.assertIn("INVALID_INPUT", gate.assess(None)["blockers"])
         self.blocked("INVALID_INPUT", [])
         self.blocked("MODEL_NOT_EXACT_LOCAL_ALLOWLIST", {})
 
