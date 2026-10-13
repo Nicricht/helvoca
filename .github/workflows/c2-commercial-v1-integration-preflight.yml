@@ -38,7 +38,7 @@ jobs:
           assert Path('src/main/resources/db/migration/V103__twilio_existing_enrollment_admin_approval.sql').is_file()
           print("C2_INTEGRATION_PLAN_AND_AGENDA_PROVENANCE=PASS")
           PY
-      - name: Static safety check: no production migration or paid provider effects
+      - name: 'Static safety check: no production migration or paid provider effects'
         run: |
           python3 - <<'PY'
           from pathlib import Path
