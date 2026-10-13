@@ -54,10 +54,13 @@ def check(evidence: dict) -> GateResult:
         if not condition:
             errors.append(code)
 
-    baseline = evidence.get("baseline") or {}
-    release = evidence.get("release") or {}
-    postgres = evidence.get("postgres") or {}
-    safeguards = evidence.get("safeguards") or {}
+    def section(value: object) -> dict:
+        return value if isinstance(value, dict) else {}
+
+    baseline = section(evidence.get("baseline"))
+    release = section(evidence.get("release"))
+    postgres = section(evidence.get("postgres"))
+    safeguards = section(evidence.get("safeguards"))
 
     require(baseline.get("service_name") == "helvoca-api", "SERVICE_NOT_PINNED")
     require(baseline.get("production_commit") == BASELINE_MAIN_SHA, "PRODUCTION_BASELINE_CHANGED")
@@ -90,7 +93,7 @@ def check(evidence: dict) -> GateResult:
     require(postgres.get("flyway_history_read_only_confirmed") is True,
             "LIVE_FLYWAY_HISTORY_NOT_READ")
 
-    backup = postgres.get("backup") or {}
+    backup = section(postgres.get("backup"))
     require(bool(backup.get("backup_id"))
             and backup.get("snapshot_freshness_verified") is True,
             "FRESH_BACKUP_NOT_VERIFIED")
