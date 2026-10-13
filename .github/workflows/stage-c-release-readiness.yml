@@ -1,0 +1,36 @@
+name: Stage C Release Readiness Fail-Closed Contract
+
+on:
+  push:
+    branches:
+      - 'chore/voice-pilot-stage-c-release-readiness-*'
+  pull_request:
+    paths:
+      - 'scripts/ci/stage_c_release_readiness.py'
+      - 'scripts/ci/test_stage_c_release_readiness.py'
+      - 'docs/telephony/evidence/2026-10-13-stage-c-observed-no-go.json'
+      - '.github/workflows/stage-c-release-readiness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-release-review-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+      - name: Test all offline release denial and anti-fabrication cases
+        run: python3 -m unittest discover -s scripts/ci -p 'test_stage_c_release_readiness.py' -v
+      - name: Certify real observed PR and Railway snapshot must remain NO-GO
+        run: >-
+          python3 scripts/ci/stage_c_release_readiness.py
+          --evidence docs/telephony/evidence/2026-10-13-stage-c-observed-no-go.json
+          --expect-blocked
+      - name: Check Python source only, no secrets or deploy commands
+        run: >-
+          python3 -m py_compile
+          scripts/ci/stage_c_release_readiness.py
+          scripts/ci/test_stage_c_release_readiness.py

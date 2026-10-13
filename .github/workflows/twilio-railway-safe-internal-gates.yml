@@ -18,6 +18,7 @@ on:
       - 'test/voice-real-pilot-4of6-*'
       - 'chore/voice-real-pilot-5of6-*'
       - 'test/voice-real-pilot-6of6-*'
+      - 'chore/voice-pilot-stage-c-release-readiness-*'
 
 permissions:
   contents: read
