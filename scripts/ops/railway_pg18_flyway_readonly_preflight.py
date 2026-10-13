@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import base64
 import os
 from pathlib import Path
 import secrets
-import shlex
 import shutil
 import subprocess
 import sys
@@ -80,18 +80,46 @@ def private_directory() -> Path:
 
 
 def railway_command(railway: str) -> list[str]:
-    # POSIX quoting applies to the shell INSIDE the Railway Postgres container,
-    # not to PowerShell. Never pass the remote DB password in CLI arguments.
+    # Railway's SSH layer can re-tokenize long/newline/quote-heavy shell
+    # arguments. ASCII base64 avoids nested SQL single quotes altogether.
+    # Decode locally in the remote container; no SQL or secret is uploaded
+    # to a third party (Railway SSH is already the authenticated channel).
+    # The SQL template remains fixed and contains only READ ONLY SELECTs.
+    encoded_sql = base64.b64encode(SQL.encode("utf-8")).decode("ascii")
     remote = (
         'export PGPASSWORD="$POSTGRES_PASSWORD"; '
-        'exec psql -X -q -A -t -v ON_ERROR_STOP=1 '
-        '-U "$POSTGRES_USER" -d "$POSTGRES_DB" '
-        '-c ' + shlex.quote(SQL)
+        'printf %s ' + encoded_sql + ' | base64 -d | '
+        'psql -X -q -A -t -v ON_ERROR_STOP=1 '
+        '-U "$POSTGRES_USER" -d "$POSTGRES_DB"'
     )
     return [
         railway, "ssh", "--project", PROJECT, "--environment", ENVIRONMENT,
         "--service", POSTGRES_SERVICE, "--", "sh", "-c", remote,
     ]
+
+
+def classify_remote_error(stderr: bytes) -> str:
+    """Categorize remote/SSH failure without exposing raw database diagnostics."""
+    message = stderr[:8192].decode("utf-8", errors="replace").lower()
+    if ("permission denied" in message or "ssh keys" in message
+            or "publickey" in message or "register" in message):
+        return "SSH_KEY_OR_AUTH"
+    if "base64" in message and ("not found" in message or "invalid input" in message):
+        return "REMOTE_BASE64_UNAVAILABLE"
+    if ("password authentication failed" in message
+            or ("psql:" in message and "authentication" in message)):
+        return "POSTGRES_AUTH"
+    if ("flyway_schema_history" in message
+            and ("does not exist" in message or "permission denied" in message)):
+        return "FLYWAY_TABLE_ACCESS_OR_ABSENT"
+    if "syntax error" in message:
+        return "REMOTE_SQL_SYNTAX"
+    if "psql" in message and ("not found" in message or "no such file" in message):
+        return "PSQL_COMMAND_UNAVAILABLE"
+    if ("connection refused" in message or "connection closed" in message
+            or "timed out" in message or "could not connect" in message):
+        return "SSH_OR_DATABASE_CONNECTIVITY"
+    return "REMOTE_ERROR_UNCLASSIFIED"
 
 
 def parse_result(stdout: bytes) -> dict:
@@ -152,12 +180,13 @@ def main() -> int:
         try:
             process = subprocess.run(
                 cmd, input=b"", stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL, timeout=110, check=False,
+                stderr=subprocess.PIPE, timeout=110, check=False,
             )
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError("Read-only Railway query timed out") from exc
         if process.returncode != 0:
-            raise RuntimeError("Railway SSH or read-only psql query failed")
+            reason = classify_remote_error(process.stderr)
+            raise RuntimeError("Railway SSH/psql failed; category=" + reason)
         info = parse_result(process.stdout)
         good, blockers = evaluate(info)
         directory = private_directory()
