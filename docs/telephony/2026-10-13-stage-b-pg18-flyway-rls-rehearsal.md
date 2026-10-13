@@ -38,12 +38,14 @@ fijada a un commit de la rama Stage B:
 
 ~~~powershell
 $script = Join-Path $env:TEMP 'helvoca-stage-b-pg18.py'
-Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Nicricht/helvoca/746b952cde8325c2cec73b4f5837842cae5a324d/scripts/ops/twilio_pg18_migration_drill.py' -OutFile $script
+Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/Nicricht/helvoca/f8edef7cca0e3b50028bb2be3ebb666bfe92a613/scripts/ops/twilio_pg18_migration_drill.py' -OutFile $script
+if ((Get-FileHash $script -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'a8acebcf616739b3fdab19be002582d2eafd69f1197d498956a092320a3de97f') { throw 'Stage B: integridad del script falló' }
 py -3 $script
 ~~~
 
-**Importante:** actualizar este enlace a un commit final exacto cuando cierre
-el CI. No iniciar el ensayo sobre una rama no verificada. El script solo lee
+**Importante:** el enlace fija una versión inmutable del script que debe pasar
+el CI exacto antes de ejecutar. El bloque comprueba su SHA-256 y no acepta
+contenido distinto. El script solo lee
 el archivo privado ya certificado en la Etapa A, no vuelve a conectarse a
 Railway. Necesita Internet únicamente para descargar SQL desde una versión
 GitHub fijada a SHA. No acepta URLs, credenciales, archivos alternativos ni
