@@ -1,0 +1,261 @@
+{
+  "schema": "helvoca.part1.readonly-lineage-snapshot.v1",
+  "snapshot_utc_date": "2026-10-13",
+  "repository": "Nicricht/helvoca",
+  "observed_baseline": {
+    "main_sha": "ca58693e167752bd6eab8ff4e9be770391fe4293",
+    "candidate_pr": 810,
+    "candidate_sha": "fa58a1852499ce728554d20f76c1f4b7bb033267",
+    "candidate_compare_to_main": {
+      "status": "ahead",
+      "ahead_by": 300,
+      "behind_by": 0,
+      "files_changed": 173
+    },
+    "deployed_branch": "main",
+    "railway_api_deploy_sha": "ca58693e167752bd6eab8ff4e9be770391fe4293",
+    "railway_api_online": true,
+    "railway_postgres_online": true,
+    "railway_pending_work": 0,
+    "production_flyway_operator_reported": "V99",
+    "twilio_carrier_db_operator_reported": "BLOCKED_V99_PROVENANCE"
+  },
+  "root_candidate": {
+    "pr": 791,
+    "base": "main",
+    "head": "feat/twilio-legacy-reconciliation-phase1-20261011",
+    "head_sha": "7851f1f0868ee8a84634ab0fe08063b41b55dd24",
+    "state": "open",
+    "draft": true,
+    "ancestor_of_pr_792_head": true,
+    "comparison_791_to_792": {
+      "ahead_by": 109,
+      "behind_by": 0,
+      "status": "ahead"
+    }
+  },
+  "ordered_chain": [
+    {
+      "number": 792,
+      "base": "main",
+      "head": "integration/voice-main-phase2-candidate-20261012",
+      "head_sha": "85be445e86ddefb15e58a4904d09e002cb1150e9",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 793,
+      "base": "integration/voice-main-phase2-candidate-20261012",
+      "head": "audit/twilio-railway-offline-phase3-20261012",
+      "head_sha": "161cfb8f15a25b30c2aaa8e06ba7a2e8cad7cb6e",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 794,
+      "base": "audit/twilio-railway-offline-phase3-20261012",
+      "head": "feat/twilio-verified-existing-voice-route-phase4-20261012",
+      "head_sha": "abb37ed7b81cb1e885cfe8a0bfa9820f1522f917",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 795,
+      "base": "feat/twilio-verified-existing-voice-route-phase4-20261012",
+      "head": "feat/gemini-live-offline-session-config-phase5-20261012",
+      "head_sha": "c9a233a5336cc0df50ba35302941929c3f17b235",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 796,
+      "base": "feat/gemini-live-offline-session-config-phase5-20261012",
+      "head": "test/voice-cross-tenant-postgres-phase6-20261012",
+      "head_sha": "c88eea19f07b361c0a00f7d77d258d68db9db29a",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 797,
+      "base": "test/voice-cross-tenant-postgres-phase6-20261012",
+      "head": "test/voice-offline-lifecycle-phase7-20261012",
+      "head_sha": "73f94adcdf9a416c6cfd0ed016a4c91fe77d5cdd",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 798,
+      "base": "test/voice-offline-lifecycle-phase7-20261012",
+      "head": "test/voice-final-certification-phase8-20261012",
+      "head_sha": "d95c16951c3fde1f18082b86404d85c214c60320",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 799,
+      "base": "test/voice-final-certification-phase8-20261012",
+      "head": "feat/voice-real-pilot-1of6-preflight-20261012",
+      "head_sha": "82335652263599eeca4ba5ee55d9d1186cfb690c",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 800,
+      "base": "feat/voice-real-pilot-1of6-preflight-20261012",
+      "head": "feat/voice-real-pilot-2of6-carrier-binding-20261012",
+      "head_sha": "522b4cd9eaae8edc1e2ebf3fba78dda50c0ed70e",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 801,
+      "base": "feat/voice-real-pilot-2of6-carrier-binding-20261012",
+      "head": "feat/voice-real-pilot-3of6-gemini-audio-20261012",
+      "head_sha": "8b13ea90ca6dff50f47a094825e4a7c096c8aa9e",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 802,
+      "base": "feat/voice-real-pilot-3of6-gemini-audio-20261012",
+      "head": "test/voice-real-pilot-4of6-integrated-release-20261012",
+      "head_sha": "92f430ba92b772e0109bdb2f4a337ddbfc463d33",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 803,
+      "base": "test/voice-real-pilot-4of6-integrated-release-20261012",
+      "head": "chore/voice-real-pilot-5of6-production-gate-20261012",
+      "head_sha": "738d0f9f6055b74db1894d7c323e1bc18de623ae",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 804,
+      "base": "chore/voice-real-pilot-5of6-production-gate-20261012",
+      "head": "test/voice-real-pilot-6of6-live-evidence-20261012",
+      "head_sha": "783bef015d3edc2030ab63f003c8806dd9959bd6",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 806,
+      "base": "test/voice-real-pilot-6of6-live-evidence-20261012",
+      "head": "chore/voice-pilot-post6-railway-recovery-audit-20261013",
+      "head_sha": "06ed0b2dc9a41baf2b8a02f81725dd80ce6467a9",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 807,
+      "base": "chore/voice-pilot-post6-railway-recovery-audit-20261013",
+      "head": "test/voice-pilot-stage-b-pg18-migration-rehearsal-20261013",
+      "head_sha": "9c1810457468fc2be8ab8cfe105af8c7448ac324",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 808,
+      "base": "test/voice-pilot-stage-b-pg18-migration-rehearsal-20261013",
+      "head": "chore/voice-pilot-stage-c-release-readiness-20261013",
+      "head_sha": "5e75cc87f824312b363e89c24cf269677677e6de",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 809,
+      "base": "chore/voice-pilot-stage-c-release-readiness-20261013",
+      "head": "chore/voice-pilot-stage-d-operational-preflight-20261013",
+      "head_sha": "e398d1e892ce534bdca250012f7a96c94948e705",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    },
+    {
+      "number": 810,
+      "base": "chore/voice-pilot-stage-d-operational-preflight-20261013",
+      "head": "test/voice-pilot-stage-d-carrier-db-readonly-20261013",
+      "head_sha": "fa58a1852499ce728554d20f76c1f4b7bb033267",
+      "state": "open",
+      "draft": true,
+      "merged": false,
+      "mergeable": true
+    }
+  ],
+  "parallel_805": {
+    "pr": 805,
+    "base": "test/voice-real-pilot-6of6-live-evidence-20261012",
+    "head": "test/voice-pilot-postgres18-compatibility-20261012",
+    "head_sha": "42b045623e0b2985521d2236ee0137433b09c352",
+    "state": "open",
+    "draft": true,
+    "comparison_805_to_810": {
+      "status": "diverged",
+      "candidate_ahead": 69,
+      "candidate_behind": 4
+    },
+    "review_required": true,
+    "unique_workflow": ".github/workflows/voice-pilot-postgres18-compatibility.yml",
+    "notes": "Four unique commits. Candidate pins PG18 directly in integration tests, whereas #805 adds version-selectable tests and a separate workflow. Do not merge #805 blindly."
+  },
+  "ci_evidence": {
+    "stage_c_full_safe_internal_7_of_7": {
+      "run_id": 38348597042,
+      "head_sha": "5e75cc87f824312b363e89c24cf269677677e6de",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": 7
+    },
+    "stage_d_candidate_specialized_18_of_18": {
+      "run_id": 38354260073,
+      "head_sha": "fa58a1852499ce728554d20f76c1f4b7bb033267",
+      "status": "completed",
+      "conclusion": "success",
+      "tests": 18
+    },
+    "candidate_exact_sha_7_gate_internal_certified": false,
+    "external_public_smoke_allowed": false
+  },
+  "safety_gates": {
+    "may_merge": false,
+    "may_deploy": false,
+    "may_execute_migrations": false,
+    "may_call": false,
+    "commercial_go": false,
+    "need_explicit_operator_approval": true
+  }
+}
