@@ -1,0 +1,48 @@
+name: Stage B PostgreSQL 18 Flyway and Tenant Security
+
+on:
+  push:
+    branches:
+      - 'test/voice-pilot-stage-b-pg18-migration-rehearsal-*'
+  pull_request:
+    paths:
+      - 'src/main/resources/db/migration/V10*.sql'
+      - 'src/test/java/cl/helvoca/phone/*PostgresIntegrationTest.java'
+      - 'src/test/java/cl/helvoca/telephony/twilio/*PostgresIntegrationTest.java'
+      - 'src/test/java/cl/helvoca/security/PostgresRowLevelSecurityIntegrationTest.java'
+      - 'scripts/ops/twilio_pg18_migration_drill.py'
+      - 'scripts/ops/test_twilio_pg18_migration_drill.py'
+      - '.github/workflows/pg18-stage-b-migration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres18-flyway-rls-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Confirm PostgreSQL 18 test fixture and four ordered migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'postgres:18-alpine' src/test/java/cl/helvoca/phone/TwilioVerifiedExistingMigrationPostgresIntegrationTest.java
+          for v in 100 101 102 103; do
+            test "$(find src/main/resources/db/migration -maxdepth 1 -type f -name "V${v}__*.sql" | wc -l)" -eq 1
+          done
+      - name: Run real PostgreSQL 18 Testcontainers plus Spring Flyway V1-V103 and RLS
+        env:
+          HELVOCA_OUTBOUND_DELIVERY_ENABLED: 'false'
+          GEMINI_LIVE_ENABLED: 'false'
+          OPENAI_LIVE_ENABLED: 'false'
+        run: |
+          mvn --batch-mode --no-transfer-progress             -Dtest=TwilioVerifiedExistingMigrationPostgresIntegrationTest,TwilioExistingEnrollmentAdminPostgresIntegrationTest,TwilioExistingEnrollmentReconcilerPostgresIntegrationTest,TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest,PostgresRowLevelSecurityIntegrationTest             test
+      - name: Local-only migration drill offline unit tests
+        run: python3 -m unittest discover -s scripts/ops -p 'test_twilio_pg18_migration_drill.py' -v

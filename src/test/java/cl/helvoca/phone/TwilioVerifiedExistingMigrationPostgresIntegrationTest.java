@@ -25,14 +25,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Fresh PostgreSQL 16 + full Flyway V1..V101. No Twilio HTTP or external calls.
+ * Fresh PostgreSQL 18 + full Flyway V1..V101. No Twilio HTTP or external calls.
  * The normal runtime DataSource enforces SET ROLE and row-level security.
  */
 @Testcontainers
 @SpringBootTest
 class TwilioVerifiedExistingMigrationPostgresIntegrationTest {
     @Container
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry r) {
