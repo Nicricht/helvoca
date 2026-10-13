@@ -78,6 +78,16 @@ class Phase5ProductionGateTest(unittest.TestCase):
             result = check(payload)
             self.assertEqual("BLOCKED", result.state)
 
+    def test_corrupt_nested_sections_are_blocked_without_throwing(self):
+        for section in ("baseline", "release", "postgres", "safeguards"):
+            with self.subTest(section=section):
+                data = nominal()
+                data[section] = ["untrusted"]
+                self.assertEqual("BLOCKED", check(data).state)
+        data = nominal()
+        data["postgres"]["backup"] = "untrusted"
+        self.assertIn("FRESH_BACKUP_NOT_VERIFIED", check(data).blockers)
+
     def test_each_critical_production_requirement_is_independently_required(self):
         cases = [
             (("baseline", "production_commit"), "a" * 40, "PRODUCTION_BASELINE_CHANGED"),
