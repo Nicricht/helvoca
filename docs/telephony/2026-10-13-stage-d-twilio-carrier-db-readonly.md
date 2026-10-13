@@ -16,15 +16,15 @@ Date: 2026-10-13. **Status: AUDIT TOOL READY FOR OPERATOR EXECUTION; REAL CARRIE
 
 ```powershell
 $p = Join-Path $env:TEMP 'helvoca-stage-d-carrier-db.py'
-$u = '<commit-pinned raw GitHub URL>'
+$u = 'https://raw.githubusercontent.com/Nicricht/helvoca/1f06e98879f1b839e19267571066723df7940680/scripts/ops/twilio_carrier_db_readonly_audit.py'
 Invoke-WebRequest -Uri $u -OutFile $p -ErrorAction Stop
-if ((Get-FileHash $p -Algorithm SHA256).Hash.ToLowerInvariant() -ne '<verified-script-sha256>') {
+if ((Get-FileHash $p -Algorithm SHA256).Hash.ToLowerInvariant() -ne '18df3e48dbea8ba5837768e8f3c3e1d668ad60feb11ea19fc2347b1d90919237') {
     throw 'Stage D: script hash mismatch'
 }
 railway run --project 41988ee6-f9f6-48eb-b726-abb973bb5740 --environment 8bbc755a-58b5-46e8-8227-eefa4adbbce4 --service edbfc4d2-3487-4cfb-ab7c-52fdb4060c4a --no-local py -3 $p --phone '<pilot-e164>' --tenant '<pilot-tenant-uuid>'
 ```
 
-The operator passes the **specific already known pilot** E.164 and tenant UUID. All Twilio credentials stay in the local process environment. No user needs to paste secrets into chat, GitHub, command-line arguments or terminal output.
+The operator passes the **specific already known pilot** E.164 and tenant UUID. Replace only `<pilot-e164>` and `<pilot-tenant-uuid>`; the example leaves these personal values outside GitHub. The script is pinned to commit `1f06e98879f1b839e19267571066723df7940680`, verified SHA-256 `18df3e48dbea8ba5837768e8f3c3e1d668ad60feb11ea19fc2347b1d90919237`, and was exercised by 18 offline safety checks. All Twilio credentials stay in the local process environment. No user needs to paste secrets into chat, GitHub, command-line arguments or terminal output.
 
 Internally the tool:
 
