@@ -1,5 +1,7 @@
 """Offline safety tests for Stage D Railway PostgreSQL Flyway read-only probe."""
 import importlib.util
+import base64
+import re
 import json
 import os
 from pathlib import Path
@@ -55,6 +57,13 @@ class StageDReadonlyContracts(unittest.TestCase):
         self.assertEqual("-c", cmd[-2])
         self.assertIn("PGPASSWORD", cmd[-1])
         self.assertIn("psql -X -q -A -t", cmd[-1])
+        self.assertIn("base64 -d", cmd[-1])
+        # SQL is transported as ASCII base64; no nested single-quote
+        # fragments to confuse Railway SSH command re-tokenization.
+        encoded = re.search(r"printf %s ([A-Za-z0-9+/=]+) \\| base64 -d", cmd[-1])
+        self.assertIsNotNone(encoded)
+        self.assertEqual(probe.SQL, base64.b64decode(encoded.group(1)).decode())
+        self.assertNotIn("STAGE_D_FLYWAY_PROBE:", cmd[-1])
         self.assertNotIn("pg_dump", cmd[-1])
         self.assertNotIn("pg_restore", cmd[-1])
         self.assertNotIn("--port", cmd)
@@ -148,7 +157,7 @@ class StageDReadonlyContracts(unittest.TestCase):
                 self.assertEqual(1, run.call_count)
                 kwargs = run.call_args.kwargs
                 self.assertEqual(b"", kwargs["input"])
-                self.assertIs(kwargs["stderr"], subprocess.DEVNULL)
+                self.assertIs(kwargs["stderr"], subprocess.PIPE)
                 self.assertLessEqual(kwargs["timeout"], 120)
                 combined = "\n".join(str(x) for c in printer.call_args_list for x in c.args)
                 self.assertIn("STAGE_D_PRODUCTION_FLYWAY_READ_ONLY_VERIFIED", combined)
@@ -160,6 +169,34 @@ class StageDReadonlyContracts(unittest.TestCase):
                 self.assertFalse(evidence["database_modified"])
                 self.assertEqual("NO-GO", evidence["production_deploy"])
                 self.assertFalse(evidence["commercial_go"])
+
+    def test_remote_errors_are_categorized_without_raw_secrets(self):
+        cases = {
+            b"Error: permission denied (publickey); secret 123": "SSH_KEY_OR_AUTH",
+            b"psql: FATAL: password authentication failed for user x": "POSTGRES_AUTH",
+            b"ERROR: relation \\"public.flyway_schema_history\\" does not exist":
+                "FLYWAY_TABLE_ACCESS_OR_ABSENT",
+            b"sh: base64: not found": "REMOTE_BASE64_UNAVAILABLE",
+            b"ERROR: syntax error at or near": "REMOTE_SQL_SYNTAX",
+            b"sh: psql: not found": "PSQL_COMMAND_UNAVAILABLE",
+            b"unexplained private details": "REMOTE_ERROR_UNCLASSIFIED",
+        }
+        for diagnostic, expected in cases.items():
+            with self.subTest(expected=expected):
+                self.assertEqual(expected, probe.classify_remote_error(diagnostic))
+                self.assertNotIn("secret", probe.classify_remote_error(diagnostic))
+
+    def test_remote_failure_stdout_does_not_leak_private_details(self):
+        secret = b"password=highly-private"
+        fake = subprocess.CompletedProcess([], 1, secret, secret)
+        with patch.object(probe.shutil, "which", return_value="railway"), \\
+                patch.object(probe.subprocess, "run", return_value=fake), \\
+                patch("builtins.print") as printer:
+            self.assertEqual(2, probe.main())
+            printed = "\\n".join(str(arg) for call in printer.call_args_list
+                                for arg in call.args)
+            self.assertIn("category=REMOTE_ERROR_UNCLASSIFIED", printed)
+            self.assertNotIn(secret.decode(), printed)
 
     def test_main_fails_closed_if_remote_nonzero(self):
         with patch.object(probe.shutil, "which", return_value="railway"), \
