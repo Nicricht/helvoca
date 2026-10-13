@@ -98,9 +98,6 @@ def backup_encrypt_and_verify(offsite_dir: Path, railway: str, age: str, docker:
     with guarded_stage("OFFSITE_DRIVE_DIRECTORY_UNAVAILABLE"):
         require(offsite_dir.is_dir(), "OFFSITE_DRIVE_DIRECTORY_UNAVAILABLE")
         offsite_dir = secure_directory(offsite_dir, create=False)
-    require(source_dir != offsite_dir, "OFFSITE_EQUALS_SOURCE_DIRECTORY")
-    require(not offsite_dir.is_relative_to(source_dir)
-            and not source_dir.is_relative_to(offsite_dir), "OFFSITE_NESTED_WITH_SOURCE")
     require(not offsite_dir.is_relative_to(local_root) and not local_root.is_relative_to(offsite_dir),
             "OFFSITE_NESTED_WITH_PRIVATE_ROOT")
     local_root = prepare_private_root(local_root)
