@@ -33,7 +33,8 @@ def row(**replacements):
 
 
 def db(**replacements):
-    return {"read_only": True, "major": 18, "rows": [row(**replacements)]}
+    return {"read_only": True, "major": 18, "last_flyway_version": "103",
+            "provenance_column_count": 3, "rows": [row(**replacements)]}
 
 
 def twilio_number(**replacement):
@@ -79,7 +80,9 @@ class StageDTwilioCarrierDBAuditTest(unittest.TestCase):
                     tool.phone_sql(invalid)
 
     def test_db_ssh_invocation_only_target_pg18_and_no_stdout_log(self):
-        wrapped = {"read_only": True, "major": 18, "rows": [row()]}
+        wrapped = {"read_only": True, "major": 18,
+                   "last_flyway_version": "103", "provenance_column_count": 3,
+                   "rows": [row()]}
         raw = ("\n" + tool.PG_MARKER + json.dumps(wrapped) + "\n").encode()
         fake = subprocess.CompletedProcess([], 0, raw, b"SENSITIVE")
         with patch.object(tool.subprocess, "run", return_value=fake) as run:
@@ -261,6 +264,96 @@ class StageDTwilioCarrierDBAuditTest(unittest.TestCase):
                 self.assertNotIn(PARENT,report)
                 self.assertNotIn(SID,report)
                 self.assertIn('"commercial_go": false',report.lower())
+
+
+    def test_read_only_sql_labels_database_version_and_column_count(self):
+        sql = tool.phone_sql(PHONE)
+        self.assertIn("'last_flyway_version'", sql)
+        self.assertIn("'provenance_column_count'", sql)
+        self.assertIn("FROM public.flyway_schema_history", sql)
+        self.assertIn("information_schema.columns", sql)
+        self.assertIn("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY", sql)
+        self.assertIn("current_setting('transaction_read_only')", sql)
+        for forbidden in ("INSERT INTO ", "UPDATE phone_number", "ALTER TABLE ",
+                          "DROP TABLE ", "CREATE TABLE ", "COPY "):
+            self.assertNotIn(forbidden, sql.upper())
+
+    def test_v99_columns_absent_has_one_truthful_schema_blocker(self):
+        data = db(twilio_account_sid=None, twilio_binding_source=None,
+                  voice_verified_at=None)
+        data["last_flyway_version"] = "99"
+        data["provenance_column_count"] = 0
+        reasons = tool.compare(PHONE, TENANT, data, carrier(), environment())
+        self.assertEqual(["DB_SCHEMA_V100_V103_NOT_DEPLOYED"], reasons)
+        self.assertNotIn("DB_ACCOUNT_SID_MISSING_OR_MISMATCH", reasons)
+        self.assertNotIn("DB_PROVENANCE_UNVERIFIED", reasons)
+        self.assertNotIn("DB_VOICE_TIMESTAMP_MISSING", reasons)
+
+    def test_v99_migration_not_present_cannot_make_go_even_when_row_sid_matches(self):
+        data = db()
+        data["last_flyway_version"] = "99"
+        data["provenance_column_count"] = 0
+        reasons = tool.compare(PHONE, TENANT, data, carrier(), environment())
+        self.assertIn("DB_SCHEMA_V100_V103_NOT_DEPLOYED", reasons)
+
+    def test_v99_does_not_hide_wrong_tenant_or_phone_sid(self):
+        data = db(external_id="PN" + "d" * 32, business_id="00000000-0000-4000-8000-000000000000")
+        data["last_flyway_version"] = "99"
+        data["provenance_column_count"] = 0
+        reasons = tool.compare(PHONE, TENANT, data, carrier(), environment())
+        self.assertIn("DB_PHONE_SID_MISMATCH", reasons)
+        self.assertIn("DB_TENANT_MISMATCH", reasons)
+        self.assertIn("DB_SCHEMA_V100_V103_NOT_DEPLOYED", reasons)
+
+    def test_partial_schema_and_legacy_version_with_new_columns_stop(self):
+        for version, count in (("99", 1), ("99", 3), ("100", 1),
+                               ("101", 0), ("103", 2), ("098", 3),
+                               ("bad", 3), (None, 3), ("103", "3")):
+            with self.subTest(version=version, count=count):
+                data = db()
+                data["last_flyway_version"] = version
+                data["provenance_column_count"] = count
+                reasons = tool.compare(PHONE, TENANT, data, carrier(), environment())
+                self.assertIn("DB_PROVENANCE_SCHEMA_INCONSISTENT", reasons)
+
+    def test_v100_plus_with_null_real_data_still_reports_three_distinct_blockers(self):
+        for version in ("100", "101", "102", "103", "104"):
+            with self.subTest(version=version):
+                data = db(twilio_account_sid=None, twilio_binding_source=None,
+                          voice_verified_at=None)
+                data["last_flyway_version"] = version
+                reasons = tool.compare(PHONE, TENANT, data, carrier(), environment())
+                self.assertIn("DB_ACCOUNT_SID_MISSING_OR_MISMATCH", reasons)
+                self.assertIn("DB_PROVENANCE_UNVERIFIED", reasons)
+                self.assertIn("DB_VOICE_TIMESTAMP_MISSING", reasons)
+
+    def test_schema_absence_never_overrides_upstream_carrier_errors(self):
+        data = db()
+        data["last_flyway_version"] = "99"
+        data["provenance_column_count"] = 0
+        reasons = tool.compare(
+            PHONE, TENANT, data,
+            carrier(reasons=["TWILIO_WEBHOOK_MISMATCH"]), environment())
+        self.assertIn("TWILIO_WEBHOOK_MISMATCH", reasons)
+        self.assertIn("DB_SCHEMA_V100_V103_NOT_DEPLOYED", reasons)
+
+    def test_db_response_missing_schema_metadata_is_untrusted(self):
+        valid = db()
+        for key, value in (("last_flyway_version", None),
+                           ("last_flyway_version", "99;DROP"),
+                           ("last_flyway_version", 99),
+                           ("provenance_column_count", True),
+                           ("provenance_column_count", 4),
+                           ("provenance_column_count", "3")):
+            with self.subTest(key=key, value=value):
+                data = dict(valid)
+                data[key] = value
+                raw = (tool.PG_MARKER + json.dumps(data) + "\n").encode()
+                with patch.object(tool.subprocess, "run", return_value=
+                                  subprocess.CompletedProcess([], 0, raw, b"")):
+                    with self.assertRaises(tool.AuditError):
+                        tool.db_query("railway", PHONE)
+
 
 
 if __name__=="__main__":
