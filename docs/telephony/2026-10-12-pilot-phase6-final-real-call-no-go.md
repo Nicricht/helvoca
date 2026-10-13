@@ -29,7 +29,7 @@ Se añade `scripts/ci/voice_pilot_phase6_live_evidence.py` (ningún acceso de re
 
 1. `candidate_sha=main_sha=railway_deployed_sha=full_ci_sha`, CI completo positivo del commit realmente desplegado, restauración PostgreSQL aislada, pruebas de esquema Flyway y titularidad carrier actual.
 2. Pilot tenant explícito `RUNNING`, habilitación controlada de efectos globales con otros tenants protegidos, y preflight local + de propiedad Twilio positivos. Nunca habilitar switch porque la checklist está verde.
-3. Participante realmente informado/consintiente, número llamante + destinatario autorizado, ventana de ensayo y referencias verificables. Una autorización general del propietario del repo **no** reemplaza consentimiento del participante receptor.
+3. Participante realmente informado/consintiente, llamada **entrante** desde el número del humano autorizado hacia **el número Helvoca de Twilio +14355652512** (el llamado/destino), ventana de ensayo y referencias verificables. Nunca invertir origen/destino ni utilizar el propio Twilio como teléfono humano. La autorización general del propietario del repo **no** reemplaza el consentimiento del participante de prueba.
 4. Tarifas de Twilio/Gemini verificadas, límite monetario y máximo 300 segundos por llamada, con mecanismo de colgar verificable. Sin tarifas, destino, límites y corte, **no marcar llamada autorizada**.
 5. `CallSid` válido, `StreamSid` válido, inicio y fin con zona horaria, carrier `COMPLETED`, media stream iniciado/detenido, sesión Gemini conectada y audio transferido. No inferir audible a partir de `media_started`.
 6. Testimonio humano de que escuchó y respondió a Gemini, barge-in funcional, sin audio después de colgar, con referencia auditada sin transcripción completa.
