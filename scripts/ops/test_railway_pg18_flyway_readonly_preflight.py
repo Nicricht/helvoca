@@ -60,9 +60,9 @@ class StageDReadonlyContracts(unittest.TestCase):
         self.assertIn("base64 -d", cmd[-1])
         # SQL is transported as ASCII base64; no nested single-quote
         # fragments to confuse Railway SSH command re-tokenization.
-        encoded = re.search(r"printf %s ([A-Za-z0-9+/=]+) \\| base64 -d", cmd[-1])
-        self.assertIsNotNone(encoded)
-        self.assertEqual(probe.SQL, base64.b64decode(encoded.group(1)).decode())
+        encoded = cmd[-1].split("printf %s ", 1)[1].split(" | base64 -d", 1)[0]
+        self.assertTrue(re.fullmatch(r"[A-Za-z0-9+/=]+", encoded))
+        self.assertEqual(probe.SQL, base64.b64decode(encoded).decode())
         self.assertNotIn("STAGE_D_FLYWAY_PROBE:", cmd[-1])
         self.assertNotIn("pg_dump", cmd[-1])
         self.assertNotIn("pg_restore", cmd[-1])
@@ -174,7 +174,7 @@ class StageDReadonlyContracts(unittest.TestCase):
         cases = {
             b"Error: permission denied (publickey); secret 123": "SSH_KEY_OR_AUTH",
             b"psql: FATAL: password authentication failed for user x": "POSTGRES_AUTH",
-            b"ERROR: relation \\"public.flyway_schema_history\\" does not exist":
+            b'ERROR: relation "public.flyway_schema_history" does not exist':
                 "FLYWAY_TABLE_ACCESS_OR_ABSENT",
             b"sh: base64: not found": "REMOTE_BASE64_UNAVAILABLE",
             b"ERROR: syntax error at or near": "REMOTE_SQL_SYNTAX",
@@ -189,8 +189,8 @@ class StageDReadonlyContracts(unittest.TestCase):
     def test_remote_failure_stdout_does_not_leak_private_details(self):
         secret = b"password=highly-private"
         fake = subprocess.CompletedProcess([], 1, secret, secret)
-        with patch.object(probe.shutil, "which", return_value="railway"), \\
-                patch.object(probe.subprocess, "run", return_value=fake), \\
+        with patch.object(probe.shutil, "which", return_value="railway"), \
+                patch.object(probe.subprocess, "run", return_value=fake), \
                 patch("builtins.print") as printer:
             self.assertEqual(2, probe.main())
             printed = "\\n".join(str(arg) for call in printer.call_args_list
