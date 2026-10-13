@@ -119,7 +119,8 @@
         "merged": false,
         "draft": true
       }
-    ]
+    ],
+    "baseline_main_sha": "ca58693e167752bd6eab8ff4e9be770391fe4293"
   },
   "railway": {
     "project_id": "41988ee6-f9f6-48eb-b726-abb973bb5740",
