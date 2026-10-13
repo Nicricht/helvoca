@@ -264,14 +264,17 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         if (!state.closed.compareAndSet(false, true)) return;
         log.warn("Twilio media session reached the configured wall-clock limit call={}", state.callSid);
         try {
-            if (state.transport instanceof TwilioVoiceTransportSession transport) {
-                transport.closeOnUpstreamFailure();
-            } else if (socket.isOpen()) {
-                socket.close(CloseStatus.POLICY_VIOLATION);
+            // A deadline is armed only after creating this verified Twilio
+            // transport. A concurrent normal close wins the CAS above.
+            ((TwilioVoiceTransportSession) state.transport).closeOnUpstreamFailure();
+        } catch (RuntimeException ignored) {
+            // A failed carrier API request must not leave the local socket and
+            // AI alive. The timeout is a safety mechanism, not a cost receipt.
+            try {
+                socket.close(CloseStatus.SERVER_ERROR);
+            } catch (java.io.IOException ignoredSocketError) {
+                log.debug("Media socket already unavailable at deadline call={}", state.callSid);
             }
-        } catch (Exception ignored) {
-            // Continue closing AI and marking call failed even if Twilio rejects
-            // the carrier hangup or its socket is already disconnected.
         } finally {
             cleanupState(state, true);
         }
