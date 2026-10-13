@@ -1,0 +1,42 @@
+name: Helvoca C1 missing local PG18 archive recovery (offline)
+
+on:
+  push:
+    branches:
+      - 'feat/c1-missing-archive-*'
+  pull_request:
+    branches:
+      - 'feat/c4-voice-session-deadline-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  missing-archive-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Confirm Python syntax
+        run: python3 -m py_compile scripts/ops/c1_replace_missing_offsite_archive.py scripts/ops/test_c1_replace_missing_offsite_archive.py
+      - name: Synthetic offline security and failure regressions
+        run: python3 scripts/ops/test_c1_replace_missing_offsite_archive.py -v
+      - name: Check no production effects or plain remote dump commands
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('scripts/ops/c1_replace_missing_offsite_archive.py').read_text()
+          assert 'dump_from_railway' in src
+          assert 'restore_to_disposable_docker' in src
+          assert 'run_age' in src
+          assert '--passphrase' in src
+          assert 'remote_sync_or_offsite_durability_verified": False' in src
+          assert 'commercial_go": False' in src
+          assert 'age-test' not in src
+          assert 'merge_pull_request' not in src
+          print('C1_MISSING_ARCHIVE_OFFLINE_SAFETY=PASS')
+          PY
