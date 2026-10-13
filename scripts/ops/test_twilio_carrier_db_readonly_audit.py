@@ -227,7 +227,7 @@ class StageDTwilioCarrierDBAuditTest(unittest.TestCase):
                 self.assertNotIn("fake-token",text)
 
     def test_main_missing_railway_run_context_aborts_without_get(self):
-        with patch.dict(os.environ,{"TWILIO_ACCOUNT_SID":"","TWILIO_AUTH_TOKEN":""}), \\
+        with patch.dict(os.environ,{"TWILIO_ACCOUNT_SID":"","TWILIO_AUTH_TOKEN":""}), \
                 patch("builtins.print") as print_mock:
             result=tool.main(["--phone",PHONE,"--tenant",TENANT])
             self.assertEqual(2,result)
@@ -236,10 +236,10 @@ class StageDTwilioCarrierDBAuditTest(unittest.TestCase):
 
     def test_main_simulation_uses_get_read_only_and_no_sid_output(self):
         with tempfile.TemporaryDirectory() as root:
-            with patch.dict(os.environ,{**environment(),"LOCALAPPDATA":root}), \\
-                    patch.object(tool.shutil,"which",return_value="railway"), \\
-                    patch.object(tool,"db_query",return_value=db()), \\
-                    patch.object(tool,"carrier_observe",return_value=carrier()), \\
+            with patch.dict(os.environ,{**environment(),"LOCALAPPDATA":root}), \
+                    patch.object(tool.shutil,"which",return_value="railway"), \
+                    patch.object(tool,"db_query",return_value=db()), \
+                    patch.object(tool,"carrier_observe",return_value=carrier()), \
                     patch("builtins.print") as printer:
                 self.assertEqual(0,tool.main(["--phone",PHONE,"--tenant",TENANT]))
                 prints="\n".join(str(x) for entry in printer.call_args_list for x in entry.args)
