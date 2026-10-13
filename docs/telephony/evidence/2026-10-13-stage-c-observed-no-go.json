@@ -129,7 +129,8 @@
     "api_status": "online",
     "postgres_status": "online",
     "pending_changes": 0,
-    "deployed_git_sha": null
+    "deployed_git_sha": "ca58693e167752bd6eab8ff4e9be770391fe4293",
+    "active_deployment_id": "4636d0d9-7be0-4a66-abce-58c68ccaede5"
   },
   "ci": {
     "head_sha": "9c1810457468fc2be8ab8cfe105af8c7448ac324",
