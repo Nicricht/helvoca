@@ -1,0 +1,28 @@
+name: Stage D Twilio Carrier vs PG Read-Only Audit (offline contract)
+
+on:
+  push:
+    branches:
+      - 'test/voice-pilot-stage-d-carrier-db-readonly-*'
+  pull_request:
+    paths:
+      - 'scripts/ops/twilio_carrier_db_readonly_audit.py'
+      - 'scripts/ops/test_twilio_carrier_db_readonly_audit.py'
+      - '.github/workflows/stage-d-carrier-db-readonly.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provider-and-db-readonly-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+      - name: Ensure script contains no HTTP POST or mutations
+        run: |
+          python3 -m py_compile scripts/ops/twilio_carrier_db_readonly_audit.py
+          python3 -m py_compile scripts/ops/test_twilio_carrier_db_readonly_audit.py
+      - name: Execute mocked GET only and read-only database tests without credentials
+        run: python3 -m unittest discover -s scripts/ops -p 'test_twilio_carrier_db_readonly_audit.py' -v
