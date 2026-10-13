@@ -1,0 +1,137 @@
+name: Helvoca Part 10 Final Offline Handoff and Release NO-GO
+
+# This is NOT a deployment workflow. No production data or provider credentials.
+on:
+  push:
+    branches:
+      - 'test/voice-release-part10-final-handoff-no-go-*'
+  pull_request:
+    branches:
+      - 'test/voice-release-part9-full-regression-offline-*'
+
+permissions:
+  contents: read
+
+env:
+  HELVOCA_OUTBOUND_DELIVERY_ENABLED: 'false'
+  HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED: 'false'
+  HELVOCA_TWILIO_SUBACCOUNT_VOICE_CONFIGURE_ON_STARTUP: 'false'
+  HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+  TWILIO_PROVISIONING_ENABLED: 'false'
+  TWILIO_CERTIFICATION_CALL_ON_STARTUP: 'false'
+  TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED: 'false'
+  GEMINI_LIVE_ENABLED: 'false'
+  GEMINI_LIVE_PROBE_ON_STARTUP: 'false'
+  OPENAI_LIVE_ENABLED: 'false'
+  HELVOCA_OUTBOUND_PROVIDER: NONE
+  APP_JOBS_ENABLED: 'false'
+
+jobs:
+  frozen-lineage-no-go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout actual PR head, NOT synthetic merge commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Reject parent-drift and changes outside five source-only files
+        env:
+          HEAD_PIN: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_PIN"
+          git merge-base --is-ancestor 663ef0c54e02e0e86b828cd913c2aab4bc5b42da HEAD
+          git diff --name-status 663ef0c54e02e0e86b828cd913c2aab4bc5b42da HEAD > .part10-name-status.txt
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part10_release_manifest.py' -v
+          python3 scripts/ci/voice_part10_release_manifest.py --changed-files .part10-name-status.txt
+      - name: Recheck earlier frozen release, money, backup and migration source safeguards
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part9_integrated_gate_contract.py' -v
+          python3 scripts/ci/voice_part9_integrated_gate_contract.py
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part8_model_cost_consent_gate.py' -v
+          python3 scripts/ci/voice_part8_model_cost_consent_gate.py --simulate-blocked
+          python3 scripts/ci/voice_part8_model_cost_consent_gate.py --simulate-review
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part7_predeployment_gate.py' -v
+          python3 scripts/ci/voice_part7_predeployment_gate.py --demo-blocked
+          python3 scripts/ci/voice_part2_migration_contract.py
+
+  final-pg18-synthetic-restore:
+    needs: [frozen-lineage-no-go]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout final candidate
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Synthetic two-database PostgreSQL 18 encrypted backup restore test, NO offsite or real records
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part6_recovery_contract.py' -v
+          bash scripts/ci/voice_part6_synthetic_pg18_recovery.sh
+
+  final-voice-tenant-enrollment:
+    needs: [frozen-lineage-no-go]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout final candidate
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Verify tenant boundaries, carrier ownership, token safety and voice model locally against PG18
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dhelvoca.test.postgres.image=postgres:18-alpine
+          -Dtest=TwilioPhoneTenantBoundaryPostgresIntegrationTest,PostgresRowLevelSecurityIntegrationTest,TwilioExistingEnrollmentAdminPostgresIntegrationTest,TwilioExistingEnrollmentReconcilerPostgresIntegrationTest,TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest,RealtimeToolTenantScopeIntegrationTest,TwilioMediaStreamStartupRecoveryPhase7Test,GeminiLiveRuntimeReadinessTest,GeminiLiveModelPolicyTest,CallCommercialPropertiesTest
+          test
+
+  final-react-spring-pg18:
+    needs: [frozen-lineage-no-go]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: helvoca
+          POSTGRES_USER: helvoca
+          POSTGRES_PASSWORD: helvoca
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U helvoca -d helvoca"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout final candidate
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Final synthetic React to Spring Boot to PostgreSQL18 E2E
+        env:
+          DB_URL: jdbc:postgresql://127.0.0.1:5432/helvoca
+          DB_USERNAME: helvoca
+          DB_PASSWORD: helvoca
+          SYSTEM_E2E_BASE_URL: http://127.0.0.1:8080
+        run: bash scripts/ci/system-e2e.sh
