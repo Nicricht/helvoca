@@ -1,0 +1,36 @@
+name: Voice Pilot Phase 5 Read-Only Production Deployment Gate
+on:
+  push:
+    branches:
+      - 'chore/voice-real-pilot-5of6-*'
+
+permissions:
+  contents: read
+
+jobs:
+  production-no-go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v7
+      - name: Test fail-closed production gate
+        run: python3 -m unittest discover -s scripts/ci -p 'test_voice_pilot_phase5_gate.py' -v
+      - name: Current Railway pre-deploy evidence MUST be blocked
+        run: >-
+          python3 scripts/ci/voice_pilot_phase5_gate.py
+          --evidence docs/telephony/evidence/2026-10-12-phase5-production-no-go.json
+          --expect-blocked
+      - name: Verify exactly four schema-changing migrations await restoration proof
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from scripts.ci.voice_pilot_phase5_gate import EXPECTED_MIGRATIONS
+          root = Path("src/main/resources/db/migration")
+          for filename in EXPECTED_MIGRATIONS:
+              path = root / filename
+              assert path.is_file(), f"Missing migration {filename}"
+              data = path.read_text(encoding="utf-8")
+              assert "ALTER TABLE" in data or "CREATE TABLE" in data, filename
+          print("V100-V103 exist. Verification only; Flyway was NOT executed on production.")
+          PY
