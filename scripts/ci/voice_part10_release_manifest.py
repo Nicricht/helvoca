@@ -216,6 +216,108 @@ def assess_diff(text: object) -> dict:
     }
 
 
+
+WORKFLOW = ROOT / ".github/workflows/voice-release-part10-final-offline.yml"
+REQUIRED_JOBS = {
+    "frozen-lineage-no-go",
+    "final-pg18-synthetic-restore",
+    "final-voice-tenant-enrollment",
+    "final-react-spring-pg18",
+}
+OFF_FLAGS = {
+    "HELVOCA_OUTBOUND_DELIVERY_ENABLED",
+    "HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED",
+    "HELVOCA_TWILIO_SUBACCOUNT_VOICE_CONFIGURE_ON_STARTUP",
+    "HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED",
+    "TWILIO_PROVISIONING_ENABLED",
+    "TWILIO_CERTIFICATION_CALL_ON_STARTUP",
+    "TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED",
+    "GEMINI_LIVE_ENABLED",
+    "GEMINI_LIVE_PROBE_ON_STARTUP",
+    "OPENAI_LIVE_ENABLED",
+    "APP_JOBS_ENABLED",
+}
+HEAD_EXPR = "${{ github.event.pull_request.head.sha || github.sha }}"
+DISALLOWED_ACTIONS = (
+    "secrets.", "workflow_dispatch:", "continue-on-error: true",
+    "railway up", "railway deploy", "railway ssh", "gh pr merge",
+    "git push origin main", "flyway migrate", "meta-webhook-public-smoke:",
+    "https://recepvoz.cl", "https://helvoca-api-production.up.railway.app",
+    "prod_deploy=go", "commercial_go=true", "live_call_certified=true",
+)
+
+
+def assess_workflow(source: object) -> dict:
+    """Validate even the safety definition; PASS never proves its execution."""
+    issues: list[str] = []
+
+    def need(ok: bool, code: str) -> None:
+        if not ok:
+            issues.append(code)
+
+    if not isinstance(source, str):
+        source = ""
+        issues.append("NO_WORKFLOW_SOURCE")
+    header, delimiter, body = source.partition("\njobs:\n")
+    need(bool(delimiter), "MISSING_WORKFLOW_JOBS")
+    jobs = set(re.findall(r"(?m)^  ([a-z][a-z0-9-]*):\s*$", body))
+    need(jobs == REQUIRED_JOBS, "FOUR_FINAL_GATES_REQUIRED")
+    need("test/voice-release-part10-final-handoff-no-go-*" in header
+         and "test/voice-release-part9-full-regression-offline-*" in header
+         and "    - 'main'" not in header
+         and 'branches: ["main"]' not in header,
+         "STACKED_BRANCH_ONLY")
+    need("permissions:\n  contents: read" in header,
+         "GITHUB_READ_ONLY_REQUIRED")
+    for flag in OFF_FLAGS:
+        need(bool(re.search(r"(?m)^  " + re.escape(flag) +
+                             r": 'false'\s*$", header)),
+             "PAID_OR_WRITABLE_FEATURE_ENABLED_" + flag)
+    need("  HELVOCA_OUTBOUND_PROVIDER: NONE" in header,
+         "OUTBOUND_PROVIDER_NOT_DISABLED")
+    need(source.count("ref: " + HEAD_EXPR) == 4
+         and "HEAD_PIN: " + HEAD_EXPR in body
+         and "git rev-parse HEAD" in body
+         and "git merge-base --is-ancestor " + PARENT_SHA in body
+         and "git diff --name-status " + PARENT_SHA in body
+         and "--changed-files .part10-name-status.txt" in body,
+         "SHA_PINNED_HEAD_ANCESTRY_AND_FILE_ALLOWLIST_MISSING")
+    need("test_voice_part10_release_manifest.py" in body
+         and "scripts/ci/voice_part10_release_manifest.py" in body
+         and "test_voice_part9_integrated_gate_contract.py" in body
+         and "test_voice_part8_model_cost_consent_gate.py" in body
+         and "test_voice_part7_predeployment_gate.py" in body,
+         "RELEASE_AND_PRIOR_NO_GO_GATES_REQUIRED")
+    for job in REQUIRED_JOBS - {"frozen-lineage-no-go"}:
+        split = body.split("\n  " + job + ":\n", 1)
+        block = split[1] if len(split) == 2 else ""
+        block = re.split(r"(?m)^  [a-z][a-z0-9-]*:\s*$", block, maxsplit=1)[0]
+        need("    needs: [frozen-lineage-no-go]" in block,
+             "UNGUARDED_RELEASE_JOB")
+    need("voice_part6_synthetic_pg18_recovery.sh" in body
+         and "image: postgres:18" in body
+         and "postgres:18-alpine" in body
+         and "PostgresRowLevelSecurityIntegrationTest" in body
+         and "TwilioExistingEnrollmentReconcilerPostgresIntegrationTest" in body
+         and "GeminiLiveRuntimeReadinessTest" in body
+         and "jdbc:postgresql://127.0.0.1:5432/helvoca" in body
+         and "bash scripts/ci/system-e2e.sh" in body,
+         "SYNTHETIC_PG18_RECOVERY_TENANTS_AND_STACK_REQUIRED")
+    for forbidden in DISALLOWED_ACTIONS:
+        need(forbidden.lower() not in source.lower(),
+             "FORBIDDEN_EXTERNAL_ACTIVITY_OR_FALSE_GO")
+    return {
+        "part": "10/10",
+        "result": "PASS_OFFLINE_DEFINITION" if not issues else "STOP",
+        "blockers": sorted(set(issues)),
+        "source_trusted": False,
+        "can_merge": False,
+        "can_deploy": False,
+        "can_call": False,
+        "production_go": "NO-GO",
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--changed-files", type=Path)
@@ -226,6 +328,14 @@ def main() -> int:
         document = None
     report = assess_manifest(document)
     print(json.dumps(report, sort_keys=True))
+    try:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        workflow = None
+    workflow_result = assess_workflow(workflow)
+    print(json.dumps(workflow_result, sort_keys=True))
+    if workflow_result["result"] != "PASS_OFFLINE_DEFINITION":
+        return 2
     if args.changed_files:
         try:
             diff_text = args.changed_files.read_text(encoding="utf-8")
