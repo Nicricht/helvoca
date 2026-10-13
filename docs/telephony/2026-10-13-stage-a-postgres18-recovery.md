@@ -22,6 +22,26 @@ Postgres productivo como mecanismo de restauración aislada. En su lugar,
 scripts/ops/railway_pg18_snapshot_drill.py restaura exclusivamente dentro de
 un contenedor PostgreSQL 18 local con --network none y sin puertos publicados.
 
+## Preflight SSH de primera conexión (solo si falla el dump)
+
+La CLI de Railway exige una clave SSH local registrada en Railway para usar
+`railway ssh`. La primera conexión puede mostrar un diálogo para registrar
+esa clave. Nuestro dump usa stdin deshabilitado para no aceptar interacciones
+durante la lectura de producción; por ello es obligatorio completar el
+diálogo una sola vez mediante una prueba SSH interactiva. Ejecutar en PowerShell:
+
+~~~powershell
+railway ssh --project 41988ee6-f9f6-48eb-b726-abb973bb5740 --environment 8bbc755a-58b5-46e8-8227-eefa4adbbce4 --service 107bb612-f25d-4c57-98a4-f494ea6b9cb4 -- pg_dump --version
+~~~
+
+El único resultado esperado del comando remoto es la versión instalada de
+`pg_dump`. No exporta ni restaura datos. Si Railway ofrece registrar una clave
+SSH propia, aceptar tras verificar que es el comando de Railway en tu PC;
+nunca compartir clave privada, códigos de autenticación ni credenciales.
+Si falla, conservar la salida local para diagnóstico y no repetir `pg_dump`
+a ciegas. Tras resolver la conexión, descargar la versión más reciente
+del script y verificar su hash antes de ejecutarla.
+
 ## Única ejecución manual en Windows
 
 Requisitos locales: Python 3, Railway CLI autenticado (railway login) con
