@@ -18,7 +18,7 @@ class TwilioMediaSessionDeadlineTest {
         @SuppressWarnings("unchecked")
         ScheduledFuture<?> future = mock(ScheduledFuture.class);
         when(scheduler.schedule(any(Runnable.class), eq(600L), eq(TimeUnit.SECONDS)))
-                .thenReturn(future);
+                .thenAnswer(invocation -> future);
         TwilioMediaSessionDeadline deadline = new TwilioMediaSessionDeadline(600, scheduler);
         AtomicInteger invoked = new AtomicInteger();
         assertSame(future, deadline.schedule(invoked::incrementAndGet));
