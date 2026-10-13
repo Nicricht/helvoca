@@ -1,5 +1,7 @@
 # RecepVoz - Product V1
 
+> **[Plan maestro único de cierre comercial V1](docs/PLAN_MAESTRO_CIERRE_COMERCIAL.md)** · [Tablero de avance C0–C7 (Issue #823)](https://github.com/Nicricht/helvoca/issues/823). Es la fuente rectora para terminar y comercializar el producto. No abrir nuevos programas de fases ni repetir pruebas ya certificadas.
+
 RecepVoz es un SaaS multi-tenant de atención telefónica con IA para empresas. El backend cuenta con autenticación, aislamiento por tenant, clientes, servicios, reservas, conocimiento empresarial, telefonía, agente de voz, herramientas controladas por backend y trazabilidad de llamadas.
 
 ## Enfoque de producto
