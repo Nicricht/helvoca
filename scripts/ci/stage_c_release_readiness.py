@@ -78,7 +78,9 @@ def assess(doc: object) -> Assessment:
     controls = section(doc, "controls")
 
     main_sha = git.get("main_sha")
-    require(git.get("main_branch") == "main" and main_sha == MAIN_BEFORE_RELEASE,
+    require(git.get("main_branch") == "main"
+            and git.get("baseline_main_sha") == MAIN_BEFORE_RELEASE
+            and main_sha in (MAIN_BEFORE_RELEASE, STAGE_B_SHA),
             "PRODUCTION_MAIN_BASELINE_CHANGED")
     candidate = git.get("candidate_sha")
     require(isinstance(candidate, str) and SHA.fullmatch(candidate) is not None
