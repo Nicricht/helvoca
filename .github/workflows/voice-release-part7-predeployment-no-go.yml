@@ -37,6 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s scripts/ci -p 'test_voice_part7_predeployment_gate.py' -v
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part7_workflow_contract.py' -v
           python3 scripts/ci/voice_part7_predeployment_gate.py --demo-blocked
           python3 scripts/ci/voice_part7_predeployment_gate.py --demo-optimistic
       - name: Recheck Part 6 safe backup workflow and frozen V100-V103 contract
