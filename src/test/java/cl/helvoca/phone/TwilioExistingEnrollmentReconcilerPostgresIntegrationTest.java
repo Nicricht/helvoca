@@ -35,7 +35,7 @@ import static org.mockito.Mockito.*;
 @SpringBootTest
 class TwilioExistingEnrollmentReconcilerPostgresIntegrationTest {
     @Container
-    static final PostgreSQLContainer<?> pg = new PostgreSQLContainer<>("postgres:16-alpine");
+    static final PostgreSQLContainer<?> pg = new PostgreSQLContainer<>("postgres:18-alpine");
 
     @DynamicPropertySource
     static void postgres(DynamicPropertyRegistry r) {
