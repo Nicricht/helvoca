@@ -22,7 +22,7 @@ import subprocess
 import sys
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from uuid import UUID
 
 PROJECT = "41988ee6-f9f6-48eb-b726-abb973bb5740"
@@ -101,9 +101,14 @@ def db_query(railway: str, phone: str) -> dict:
 
 def twilio_get(path: str, parent: str, token: str) -> dict:
     """Provider reads restricted to the account/phone resource namespace."""
-    expect(path.startswith("/2010-04-01/Accounts/")
-           and "://" not in path and "//" not in path and len(path) < 280,
-           "INVALID_PROVIDER_PATH")
+    allowed = re.fullmatch(
+        r"/2010-04-01/Accounts/AC[0-9a-fA-F]{32}(?:"
+        r"\\.json|"
+        r"/IncomingPhoneNumbers\\.json\\?PhoneNumber=%2B[1-9][0-9]{7,14}&PageSize=20|"
+        r"/IncomingPhoneNumbers/PN[0-9a-fA-F]{32}\\.json)",
+        path,
+    )
+    expect(allowed is not None, "INVALID_PROVIDER_PATH")
     expect(ACCOUNT.fullmatch(parent) is not None and bool(token),
            "TWILIO_CREDENTIALS_MISSING")
     raw = (parent + ":" + token).encode("ascii")
@@ -113,8 +118,12 @@ def twilio_get(path: str, parent: str, token: str) -> dict:
         "Authorization": "Basic " + basic,
         "Accept": "application/json",
     })
+    class DenyRedirect(HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            raise AuditError("TWILIO_REDIRECT_BLOCKED")
+    opener = build_opener(DenyRedirect())
     try:
-        with urlopen(request, timeout=12) as response:
+        with opener.open(request, timeout=12) as response:
             expect(response.geturl() == url, "TWILIO_REDIRECT_BLOCKED")
             data = response.read(131073)
     except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
