@@ -18,6 +18,7 @@ on:
       - 'test/voice-real-pilot-4of6-*'
       - 'chore/voice-real-pilot-5of6-*'
       - 'test/voice-real-pilot-6of6-*'
+      - 'test/voice-pilot-postgres18-compatibility-*'
 
 permissions:
   contents: read
@@ -85,7 +86,7 @@ jobs:
 
       - name: Run targeted Fast Gate
         env:
-          BASE_SHA: '738d0f9f6055b74db1894d7c323e1bc18de623ae'
+          BASE_SHA: '783bef015d3edc2030ab63f003c8806dd9959bd6'
         run: bash scripts/ci/fast-gate.sh "$BASE_SHA"
 
   test:
@@ -126,7 +127,7 @@ jobs:
 
       - name: Enforce differential Java coverage
         env:
-          BASE_SHA: '738d0f9f6055b74db1894d7c323e1bc18de623ae'
+          BASE_SHA: '783bef015d3edc2030ab63f003c8806dd9959bd6'
           DIFF_LINE_COVERAGE: "100"
           DIFF_BRANCH_COVERAGE: "100"
           DIFF_METHOD_COVERAGE: "100"
