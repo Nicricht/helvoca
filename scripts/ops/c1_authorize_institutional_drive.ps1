@@ -75,7 +75,21 @@ try {
         if (-not $rcloneExe) { throw 'C1_RCLONE_PORTABLE_NOT_FOUND' }
     }
 
+    $script:stage = 'CUSTOM_GOOGLE_CLIENT'
+    $oauthClientFile = Join-Path $private 'google-drive-desktop-oauth.json'
+    if (-not (Test-Path -LiteralPath $oauthClientFile)) { throw 'C1_OWN_GOOGLE_OAUTH_CLIENT_JSON_REQUIRED' }
+    Secure-File $oauthClientFile
+    try {
+        $oauthClient = [IO.File]::ReadAllText($oauthClientFile) | ConvertFrom-Json
+        $clientId = [string]$oauthClient.installed.client_id
+        $clientSecret = [string]$oauthClient.installed.client_secret
+    } catch { throw 'C1_GOOGLE_OAUTH_DESKTOP_JSON_INVALID' }
+    if ($clientId -notmatch '^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$' -or
+        [string]::IsNullOrWhiteSpace($clientSecret)) { throw 'C1_GOOGLE_OAUTH_DESKTOP_JSON_INVALID' }
+    # Own OAuth client credentials stay inside private rclone.conf and Railway,
+    # never in chat, git, terminal arguments, or process command lines.
     $script:stage = 'OAUTH_CONFIG'
+    if (-not $FreshAccount) { throw 'C1_FRESH_OAUTH_REQUIRED' }
     if ([string]::IsNullOrWhiteSpace($ExpectedEmail)) { throw 'C1_EXPECTED_INSTITUTIONAL_EMAIL_REQUIRED' }
     $ExpectedEmail = $ExpectedEmail.Trim().ToLowerInvariant()
     if ($ExpectedEmail -notmatch '^[^@\s]+@duocuc\.cl$') { throw 'C1_EXPECTED_EMAIL_NOT_INSTITUTIONAL' }
@@ -83,15 +97,20 @@ try {
     $remote = if ($FreshAccount) { 'institutional_c1_' + [guid]::NewGuid().ToString('N').Substring(0,12) } else { 'institutional' }
     $existing = & $rcloneExe --config $conf listremotes
     Assert-NativeSuccess 'C1_RCLONE_CONFIG_READ_FAILED'
-    if ($existing -notcontains "$($remote):") {
-        Write-Host 'C1: Autoriza con tu cuenta INSTITUCIONAL en el navegador.'
-        Write-Host 'C1: La app solo puede gestionar archivos creados por ella (drive.file).'
-        Write-Host 'C1: Si Google bloquea el OAuth compartido de rclone, deberas usar un cliente OAuth propio.'
-        # IMPORTANT: default rclone config create prints OAuth tokens; suppress it.
-        & $rcloneExe --config $conf config create $remote drive scope=drive.file config_is_local=true --no-output 1>$null 2>$null
-        Assert-NativeSuccess 'C1_GOOGLE_OAUTH_NOT_AUTHORIZED'
-        Secure-File $conf
-    }
+    if ($existing -contains "$($remote):") { throw 'C1_FRESH_OAUTH_REMOTE_COLLISION' }
+    # Initialize a new remote with the OWN desktop OAuth client, stored only
+    # in an ACL-restricted config. Reconnect forces interactive browser consent.
+    if ($clientId -match '[\r\n]' -or $clientSecret -match '[\r\n]') { throw 'C1_GOOGLE_OAUTH_DESKTOP_JSON_INVALID' }
+    $remoteBlock = "`n[$remote]`ntype = drive`nscope = drive.file`nclient_id = $clientId`nclient_secret = $clientSecret`n"
+    [IO.File]::AppendAllText($conf, $remoteBlock)
+    Secure-File $conf
+    Write-Host 'C1: Se abrira Google en el navegador para autorizar tu cuenta INSTITUCIONAL.'
+    Write-Host 'C1: Si seleccionas otra cuenta, el asistente bloqueara cualquier escritura.'
+    $script:stage = 'GOOGLE_CONSENT'
+    # OAuth CLI output is redirected because rclone can print secrets.
+    & $rcloneExe --config $conf config reconnect "$($remote):" 1>$null 2>$null
+    Assert-NativeSuccess 'C1_GOOGLE_OAUTH_NOT_AUTHORIZED'
+    Secure-File $conf
 
     # Check user identity with minimum-scope drive.file BEFORE ANY Drive write.
     $script:stage = 'GOOGLE_ACCOUNT_VERIFY'
@@ -156,6 +175,8 @@ try {
 
     # Set only the dedicated empty backup service; no deployment or cron.
     $script:stage = 'RAILWAY_VARIABLE_UPLOAD'
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_CLIENT_ID' $clientId
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_CLIENT_SECRET' $clientSecret
     Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' $oauthToken
     Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_ROOT_FOLDER_ID' $folder[0].ID
     Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_SCOPE' 'drive.file'
