@@ -85,6 +85,26 @@ Explicación corta:
 
 > Partimos desde $24.990 al mes. El plan define minutos y límites de voz; la configuración inicial está incluida durante esta etapa. WhatsApp e integraciones externas se cotizan o acuerdan por alcance cuando estén disponibles y certificadas para tu tenant.
 
+## 5 bis. Puerta C6-A: unit economics y coste operativo verificable
+
+**Objetivo:** impedir que un plan de precio fijo se venda con márgenes, cargos o límites inventados. Esta es una **plantilla de auditoría**, no un cálculo certificado de rentabilidad. No sustituye facturas ni tarifas reales. Los precios/minutos del cuadro anterior son valores documentados y deben contrastarse nuevamente con `/api/v1/public/pricing` al contratar; Enterprise requiere cotización individual.
+
+Para **cada plan y tenant**, preparar un registro privado sin credenciales ni datos personales con estas entradas:
+
+| Entrada necesaria | Fuente exigida antes de aprobar un piloto real |
+| --- | --- |
+| Precio mensual efectivamente cobrable en CLP e impuestos aplicables | Catálogo API vigente + condiciones de facturación aprobadas; distinguir precio publicado de ingreso neto |
+| Minutos incluidos, concurrencia máxima y excedente por minuto | Catálogo/entitlements del backend y contrato aceptado |
+| Consumo estimado y consumo medido de telefonía, por tipo de llamada | Tarifas oficiales vigentes de Twilio para número/ruta real + medición del piloto; separar número fijo, minutos y traspasos |
+| Consumo de Gemini Live, entrada/salida, modelo y cuotas de la cuenta | Tarifa oficial vigente del **modelo realmente configurado**, prueba de consumo/coste de cuenta, fecha y moneda; nunca asumir que el modelo puede usarse por aparecer en documentación |
+| Infraestructura por tenant, backups/observabilidad, soporte e incidentes | Coste facturado o asignación justificada de Railway/almacenamiento y horas de operación |
+| Comisiones de cobro, conversión USD/CLP, impuestos y reembolsos | Contrato y liquidaciones verificables de medios de pago, tipo de cambio con fecha y criterio tributario revisado |
+| Riesgo de excedentes, abuso, reintentos y fallos de proveedor | Escenarios de uso máximo, límites técnicos medidos, alertas y responsable de STOP |
+
+**Cálculo sin números ficticios:** `ingreso_neto_CLP = cobro_real_CLP - tributos_no_reconocidos_como_ingreso - descuentos/reembolsos aplicables`; `coste_total_CLP = telefonía + IA + infraestructura_asignada + comisiones + soporte + reserva_operativa`; `margen_estimado_CLP = ingreso_neto_CLP - coste_total_CLP`. Evaluar **uso promedio y peor caso permitido** por plan, incluidos excedentes y concurrencia. Guardar fecha, origen y criterio de cada tarifa; no mezclar USD y CLP sin tipo de cambio fechado.
+
+**Puerta NO-GO:** si faltan tarifas aplicables, límites verificables de consumo/coste, canal de soporte, mecanismo de suspensión o aceptación comercial/tributaria, no declarar margen positivo, SLA ni capacidad comercial lista. Con un piloto web aislado sin voz, marcar telefonía/IA real **fuera de alcance**, no cero coste supuesto de una prestación ofrecida. El titular valida costes/condiciones y un responsable operativo documenta alertas, presupuesto y acciones de PAUSE; ningún cálculo autoriza gastos, llamadas o cobros reales.
+
 ## 6. Oferta de piloto
 
 > Configuramos un piloto con tus servicios, horarios, preguntas frecuentes y reglas. Definimos por escrito qué canal y qué acción principal vamos a probar, qué queda fuera y cómo mediremos el resultado. Lo probamos contigo antes de activar. El piloto utiliza uno de los planes públicos vigentes o una condición especial documentada.
