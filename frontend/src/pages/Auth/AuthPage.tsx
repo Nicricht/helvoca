@@ -22,6 +22,24 @@ import styles from "./AuthPage.module.css";
 
 type AuthMode = "register" | "login";
 
+const PUBLIC_PLAN_NAMES: Record<string, string> = {
+  EMPRENDE: "Emprende",
+  NEGOCIO: "Negocio",
+  PRO: "Pro"
+};
+
+function requestedPublicPlan(): string | null {
+  const candidate = new URLSearchParams(window.location.search).get("plan");
+  return candidate && Object.prototype.hasOwnProperty.call(PUBLIC_PLAN_NAMES, candidate)
+    ? candidate
+    : null;
+}
+
+function selectedPlanDestination(roles: string[] | undefined, plan: string | null): string {
+  const destination = destinationForRoles(roles);
+  return destination === "/app" && plan ? `/app/plan?plan=${plan}` : destination;
+}
+
 type AuthResponse = {
   accessToken: string;
   user?: {
@@ -120,6 +138,7 @@ export function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [checkingSession, setCheckingSession] = useState(() => Boolean(getAccessToken()));
   const [message, setMessage] = useState("");
+  const selectedPlan = useMemo(requestedPublicPlan, []);
 
   const features = useMemo(() => [
     { feature: "calls", icon: PhoneCall, title: "Llamadas", detail: "Atención automática con contexto del negocio." },
@@ -160,7 +179,7 @@ export function AuthPage() {
       return response.json() as Promise<MeResponse>;
     }).then(me => {
       if (!me || cancelled) return;
-      window.location.replace(destinationForRoles(me.roles));
+      window.location.replace(selectedPlanDestination(me.roles, selectedPlan));
     }).catch(error => {
       if (cancelled) return;
       setMessage(errorMessage(error, "No pudimos verificar tu sesión."));
@@ -171,7 +190,7 @@ export function AuthPage() {
       cancelled = true;
       document.title = previousTitle;
     };
-  }, []);
+  }, [selectedPlan]);
 
   const switchMode = (next: AuthMode) => {
     if (busy) return;
@@ -200,7 +219,7 @@ export function AuthPage() {
         })
       }, false);
       setAccessToken(result.accessToken);
-      window.location.assign("/app");
+      window.location.assign(selectedPlan ? `/app/plan?plan=${selectedPlan}` : "/app");
     } catch (error) {
       setMessage(errorMessage(error, "No fue posible crear la empresa."));
       setBusy(false);
@@ -222,7 +241,7 @@ export function AuthPage() {
         })
       }, false);
       setAccessToken(result.accessToken);
-      window.location.assign(destinationForRoles(result.user?.roles));
+      window.location.assign(selectedPlanDestination(result.user?.roles, selectedPlan));
     } catch (error) {
       setMessage(errorMessage(error, "Credenciales inválidas."));
       setBusy(false);
@@ -291,6 +310,11 @@ export function AuthPage() {
                 <div><strong>{mode === "register" ? "Comienza con RecepVoz" : "Bienvenido de vuelta"}</strong><small>{mode === "register" ? "Crea tu cuenta en menos de un minuto." : "Ingresa a la operación de tu negocio."}</small></div>
               </div>
 
+              {selectedPlan && (
+                <p data-testid="selected-public-plan" role="status">
+                  Plan de interés: {PUBLIC_PLAN_NAMES[selectedPlan]}. Registrarte no inicia un cobro ni activa una suscripción.
+                </p>
+              )}
               <div className={styles.tabs} role="tablist" aria-label="Acceso a RecepVoz">
                 <button id="registerTab" role="tab" type="button" aria-selected={mode === "register"} onClick={() => switchMode("register")}>Crear cuenta</button>
                 <button id="loginTab" role="tab" type="button" aria-selected={mode === "login"} onClick={() => switchMode("login")}>Ingresar</button>
