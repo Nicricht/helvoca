@@ -7,7 +7,7 @@
 - Un respaldo nuevo de PostgreSQL 18 de producción fue exportado mediante acceso de solo lectura y cifrado con `age`. La consola del operador informó la restauración aislada inicial completada.
 - Google Drive institucional entregó un objeto remoto cifrado de **673001 bytes** con SHA-256 **`fdf281efa0ff75dac61e00353229d2e8f61f55c8c434a876c75d33d7449a7ce8`**. Se descargó independientemente vía conector y el operador confirmó que coincide con el cifrado local.
 - El operador ejecutó la restauración PostgreSQL 18 aislada desde descarga autenticada de Drive, con salida `C1_REMOTE_DOWNLOAD_DECRYPT_AND_OFFLINE_PG18_RESTORE_VERIFIED` y evidencia privada fechada 2026-10-14.
-- **Nuevo destino personal:** el operador comunicó que creó y cargó una carpeta personal restringida de Google Drive. En 2026-10-14 el conector de Drive disponible en esta conversación devolvió **HTTP 404/no acceso** a esa carpeta. **No hay lectura autenticada ni hash de su copia personal.** El enlace o ID personal no se guarda en este repositorio.
+- **Nueva carpeta `HelvocaBackups` accesible (2026-10-14):** el conector autenticado comprobó la carpeta y el archivo cifrado de **673001 bytes**, lo descargó de forma independiente y verificó SHA-256 **`fdf281efa0ff75dac61e00353229d2e8f61f55c8c434a876c75d33d7449a7ce8`**, idéntico al ciphertext que ya fue recuperado en PostgreSQL 18. **Advertencia bloqueante:** los metadatos de Google Drive identifican como propietario de la carpeta `nic.vegal@duocuc.cl` (institucional); no consta una cuenta personal independiente. La apariencia `drive/u/0` o el nombre de la carpeta no acreditan propiedad personal. **COPY_AND_READBACK=PASS; INDEPENDENT_PERSONAL_ACCOUNT=NOT_VERIFIED.** No registrar URL o ID de carpeta en repositorio.
 
 Los comandos de pruebas de recuperación de los scripts de `scripts/ops/c1_*` no programan tareas ni tienen autorización para transferir datos productivos a otros servicios.
 
@@ -39,7 +39,8 @@ Los valores son **objetivos provisionales**, no compromisos existentes ni métri
 ## Puertas de habilitación (todas obligatorias)
 
 - [x] Backup nuevo, cifrado, copia externa institucional y restauración independiente reportada por operador.
-- [ ] Copia del **destino personal** validada desde la cuenta titular con readback y hash remoto coincidente; la conexión disponible no tiene acceso.
+- [x] Copia adicional cifrada en `HelvocaBackups` descargada y comparada mediante SHA-256 independiente.
+- [ ] Comprobar que la copia esté en cuenta personal/empresarial **no institucional**: los metadatos actuales indican propietario institucional, por lo que esta puerta sigue bloqueada.
 - [ ] Guardar y recuperar la passphrase manual existente en bóveda separada; verificar el procedimiento sin revelar la clave.
 - [ ] Elegir destino de ejecución automática independiente del PC y comprobar autenticación PostgreSQL backup read-only, Drive y mecanismo de cifrado no interactivo.
 - [ ] Implementar cron, métricas, alertas, retención solo dry-run inicialmente; verificar tests y dos ejecuciones reales sin cambios productivos.
