@@ -139,7 +139,7 @@ class RenderStrictHttpContract(unittest.TestCase):
         from unittest.mock import patch
         out = StringIO()
         with patch("builtins.print", side_effect=lambda *v, **k: out.write(v[0]+"\\n")):
-            self.assertEqual(self.send(body,headers),204)
+            self.assertEqual(self.send(body,headers),200)
         self.assertIn("C5_AUTHENTICATED_TEST_RECEIPT_TOPIC=subscription_authorized_payment",out.getvalue())
         self.assertNotIn("981234",out.getvalue())
 
@@ -196,7 +196,7 @@ class LocalHttpContract(unittest.TestCase):
         body, headers = signed(event_id="998877")
         n = self.server.received
         code, data = self.send("/webhooks/v1/mercadopago", body, headers)
-        self.assertEqual(code, 204)
+        self.assertEqual(code, 200)
         self.assertEqual(data, b"")
         self.assertEqual(self.server.received, n+1)
         self.assertIn(("subscription_authorized_payment", "998877"), self.server.unique)
