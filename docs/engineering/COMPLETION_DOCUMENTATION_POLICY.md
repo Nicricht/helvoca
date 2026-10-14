@@ -17,6 +17,22 @@ La documentación es una **parte del entregable**, no una tarea opcional posteri
 
 En un cambio mínimo de riesgo LOW puede bastar la descripción/registro breve en el PR y un enlace al archivo modificado. No crear un Markdown nuevo para cada línea cambiada.
 
+## Regla operativa transversal: comprobar recursos existentes antes de pedir intervención
+
+**Primero comprobar, después pedir.** Esta sección aplica a **toda intervención futura de ChatGPT y otros agentes** en Helvoca, no solo al cierre de una tarea. La instrucción obligatoria está en [`AGENTS.md`](../../AGENTS.md) y este documento la desarrolla.
+
+- **Antes de pedir** al titular crear o editar una cuenta, secreto, servicio, variable, repositorio, backup, plan de pago, permiso o prueba, buscar primero evidencias en el repositorio, Issue #823, PRs, documentación, CI y conectores ya disponibles. Comprobar existencia/estado, no volver a preguntar por algo que ya se sabe. Un secreto existente **no prueba por sí mismo** que su valor actual sea correcto; el conector puede leer metadatos sin tener acceso a secretos. Distinguir `EXISTE`, `VALIDADO`, `NO VERIFICADO` y `AUSENTE`.
+- **Usar primero la vía segura propia**: inspección de solo lectura, herramientas autorizadas y pruebas aisladas sin credenciales visibles. No pedir al usuario ejecutar comandos, copiar claves o reenviar capturas que ya pueden comprobarse por herramientas. No exponer valores, respuestas confidenciales ni registrar datos personales.
+- **Responsabilidad técnica del agente**: implementar, corregir, testar, comprobar CI exacto y documentar sin convertir al usuario en operador de QA. No repetir tareas ya certificadas salvo cambio causal demostrado.
+- **Escalar una sola acción concreta** únicamente cuando una limitación de permisos, cuenta personal, autorización de coste o restricción real impida avanzar; explicar brevemente qué se comprobó, cuál es el bloqueo y por qué es indispensable. Si el usuario ya autorizó acciones ordinarias dentro de su alcance, no re-preguntar sin motivo.
+- **Errores de coordinación**: si antes se pidió crear algo existente, anular la indicación innecesaria, continuar con el recurso disponible y dejar un checkpoint que evite repetir el error.
+
+### Caso que motiva la regla: C5 Mercado Pago (2026-10-14)
+
+El repositorio ya contenía el secret de Actions `MERCADOPAGO_TEST_ACCESS_TOKEN`; se pidió al titular crearlo de nuevo sin revisar el estado. Luego se verificó con consulta GET de solo lectura y sin exponer secretos que la identidad autenticada tenía el **mismo User ID del vendedor TEST** previamente evidenciado; el nombre de acceso del panel y el nickname de API diferían. No se necesitó crear ni cambiar el secreto. Registro seguro y evidencia de regresión: [PR #834](https://github.com/Nicricht/helvoca/pull/834), [CI #38536658024](https://github.com/Nicricht/helvoca/actions/runs/38536658024) (GET autenticado y 16 tests) y [CI #38536658035](https://github.com/Nicricht/helvoca/actions/runs/38536658035) (23 tests Python, 15 Java PASS y test externo omitido). **No** indica checkout, webhook ni cobro realmente certificados; C5 sigue pendiente de la transacción TEST aislada.
+
+**Prohibición persistente:** no volver a solicitar la creación/reemplazo de ese secreto ni nuevas cuentas TEST salvo evidencia nueva de revocación, cambio o ausencia. No fusionar a `main` ni intervenir producción en nombre de esta regla. Toda nueva sesión debe continuar desde los checkpoints vigentes y realizar sus propias comprobaciones proporcionales.
+
 ## Registro de finalización obligatorio
 
 Antes de decir «terminado», incluir o actualizar un bloque equivalente al siguiente. No inventar valores desconocidos, ni escribir `PASS` para una prueba pendiente:
