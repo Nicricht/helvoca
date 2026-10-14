@@ -97,6 +97,14 @@ jobs:
           assert 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' in oauth
           assert "HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE" in oauth
           assert 'config create $remote drive' in oauth
+          assert '[switch]$FreshAccount' in oauth
+          assert '[string]$ExpectedEmail' in oauth
+          assert "C1_OAUTH_ACCOUNT_MISMATCH" in oauth
+          assert "C1_GOOGLE_ACCOUNT_INSTITUTIONAL_VERIFIED" in oauth
+          assert "https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)" in oauth
+          assert oauth.index("C1_OAUTH_ACCOUNT_MISMATCH") < oauth.index("mkdir")
+          assert "[regex]::Escape($remote)" in oauth
+          assert "institutional_c1_" in oauth
           assert 'config_is_local=true --no-output' in oauth
           assert "C1_OAUTH_UNEXPECTED_' + $script:stage" in oauth
           assert "C1_OAUTH_SETUP_PRIVATE_FAILURE" not in oauth
