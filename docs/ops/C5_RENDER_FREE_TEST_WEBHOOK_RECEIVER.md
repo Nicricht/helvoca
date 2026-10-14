@@ -173,3 +173,19 @@ El titular aportó una captura del formulario **Configurar notificaciones Webhoo
 **Nuevo deploy manual exclusivo de Render TEST:** `dep-db7mphuk1f9s738abs9g` **live**, SHA ejecutable `1231d72010b4dbdf430a3276d4c2098c70371b5b`; build y arranque correctos. Plan gratuito, AutoDeploy OFF; sin tocar Railway, main, configuraciones de MP, claves ni cuentas, sin transacciones ni dinero real.
 
 **Resultado aún no afirmable:** tras el cambio no se ha registrado **otro** evento oficial autenticado del simulador, por lo que no declarar su HTTP 200 remoto como certificado. C5-2 tampoco está cerrada sin una suscripción TEST real, notificación real validada, factura approved e idempotencia del backend. La última captura expuso una clave secreta TEST: nunca copiarla a GitHub/logs; rotar y sincronizar mediante canales privados antes de uso confiable de la integración.
+
+
+## C5-2 · autenticación REAL del simulador oficial comprobada (2026-10-14)
+
+**Resultado del titular / panel oficial TEST:** Mercado Pago Developers mostró `¡Excelente! Enviamos una notificación Webhook con éxito`, evento sintético `subscription_preapproval` y **HTTP 200 OK**. No almacenar la captura porque el formulario también muestra un secreto TEST sin enmascarar. **Este resultado reemplaza el anterior pendiente de confirmar el 200 remoto**, sin dar por aprobada la facturación.
+
+**Verificación independiente, Render:**
+- Servicio TEST existente `srv-db7ku5ivcj2c73e1cv40` (`helvoca-c5-test-webhook-ingress`), plan `free`, AutoDeploy `off`.
+- Deploy manual `dep-db7mphuk1f9s738abs9g`, estado `live`, binario/código exacto `1231d72010b4dbdf430a3276d4c2098c70371b5b`.
+- **2026-10-14T12:00:37.749712718Z**: `C5_TEST_WEBHOOK_HANDLER_ENTERED`; **2026-10-14T12:00:37.753116357Z**: `C5_AUTHENTICATED_SIMULATOR_RECEIPT_TOPIC=subscription_preapproval`.
+- La etiqueta `AUTHENTICATED_SIMULATOR_RECEIPT` solo se emite después de verificar HMAC, timestamp/ID y clasificar como `SIMULATOR_ONLY`. La respuesta del handler es 200. Evidencia de dos fuentes (panel del titular y logs del servidor) confirma **simulador TEST real autenticado y ACK correcto**.
+- Evidencia de regresión de código: [RED #38559402105](https://github.com/Nicricht/helvoca/actions/runs/38559402105), [GREEN #38559474707](https://github.com/Nicricht/helvoca/actions/runs/38559474707); CI de branch previa a este checkpoint: [regresión #38559734138](https://github.com/Nicricht/helvoca/actions/runs/38559734138) y [HTTPS #38559734050](https://github.com/Nicricht/helvoca/actions/runs/38559734050) success sobre `df918990ee66d88f6a73fe3c5ac95138317c27f1`. Esta actualización documental necesita comprobar su CI en su HEAD propio. No se cambió código del receptor ni se repitió una simulación.
+
+**Veredicto de alcance:** `DONE_VERIFIED` **únicamente para C5-2 recepción/validación de la notificación sintética oficial del simulador TEST**. `NO-GO` para facturación comercial integral y C5 final: todavía faltan suscripción TEST auténtica con cobro permitido, notificación de una transacción real de sandbox (no un fixture sintético), factura/estado final `approved` verificado de manera independiente en el backend/PostgreSQL, idempotencia/replay, tenant isolation y control operativo del receptor sin suspensión del plan gratuito. El ingreso de este simulador es intencionalmente efímero, **no persiste pagos ni activa planes**.
+
+**Seguridad:** no se copiaron valores del secret, app IDs, HMAC, request IDs ni bodies a GitHub. La clave TEST expuesta en capturas previas debe rotarse y sincronizarse de forma segura antes de confiar en la integración para usos posteriores; **no** rotar a ciegas ni tocar LIVE. Sin cambios a Railway, `main`, producción, cuentas ni pagos. Continuar según Issue #823, sin repetir la prueba ya certificada.
