@@ -22,6 +22,11 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -192,6 +197,87 @@ class BillingProviderPostgresBridgeIntegrationTest {
         assertNull(recovered.get("grace_until"));
         assertEquals("approved", recovered.get("last_billing_payment_status"));
         assertEquals("TRIALING", stored(tenantB).get("status"));
+    }
+
+    @Test
+    void parallelDuplicateApprovedInvoiceAppliesExactlyOneDurablePostgresUpdate() throws Exception {
+        String invoiceId = "test-invoice-concurrent";
+        // Instrument real DB writes in the temporary Testcontainers database only.
+        // The SECURITY DEFINER trigger can audit writes by the restricted SYSTEM
+        // role without granting audit-table writes to application connections.
+        owner.execute("""
+                CREATE TABLE public.c5_test_subscription_update_audit (
+                    business_id UUID NOT NULL
+                )
+                """);
+        owner.execute("""
+                CREATE FUNCTION public.c5_test_subscription_update_audit_fn()
+                RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+                SET search_path = pg_catalog, public
+                AS $fn$
+                BEGIN
+                    INSERT INTO public.c5_test_subscription_update_audit(business_id)
+                    VALUES (NEW.business_id);
+                    RETURN NEW;
+                END;
+                $fn$
+                """);
+        owner.execute("""
+                CREATE TRIGGER c5_test_subscription_update_audit
+                AFTER UPDATE ON public.business_subscription
+                FOR EACH ROW EXECUTE FUNCTION public.c5_test_subscription_update_audit_fn()
+                """);
+
+        ExecutorService workers = Executors.newFixedThreadPool(2);
+        try {
+            var invoice = new SubscriptionPaymentGateway.RemoteInvoice(
+                    invoiceId, subscriptionId(tenantA), "processed", "approved", "paid",
+                    OffsetDateTime.parse("2026-10-13T19:00:00Z"));
+            CountDownLatch enteredProvider = new CountDownLatch(2);
+            when(provider.getInvoice(invoiceId)).thenAnswer(invocation -> {
+                enteredProvider.countDown();
+                if (!enteredProvider.await(15, TimeUnit.SECONDS)) {
+                    throw new AssertionError("Both webhook deliveries must overlap");
+                }
+                return invoice;
+            });
+            CountDownLatch start = new CountDownLatch(1);
+            java.util.concurrent.Callable<Void> delivery = () -> {
+                assertTrue(start.await(15, TimeUnit.SECONDS));
+                scope.runAsSystem(() -> billing.reconcileAuthorizedPayment(invoiceId));
+                return null;
+            };
+            Future<Void> first = workers.submit(delivery);
+            Future<Void> second = workers.submit(delivery);
+            start.countDown();
+            first.get(30, TimeUnit.SECONDS);
+            second.get(30, TimeUnit.SECONDS);
+
+            assertEquals(0L, enteredProvider.getCount(), "Both provider deliveries were invoked");
+            assertEquals(1L, owner.queryForObject("""
+                    SELECT COUNT(*) FROM public.c5_test_subscription_update_audit
+                    WHERE business_id = ?
+                    """, Long.class, tenantA),
+                    "Only one committed database UPDATE is allowed for duplicate delivery");
+            assertEquals(0L, owner.queryForObject("""
+                    SELECT COUNT(*) FROM public.c5_test_subscription_update_audit
+                    WHERE business_id = ?
+                    """, Long.class, tenantB),
+                    "A duplicated payment must never change another tenant");
+            Map<String, Object> a = stored(tenantA);
+            assertEquals("PRO", a.get("plan_code"));
+            assertEquals("ACTIVE", a.get("status"));
+            assertEquals(invoiceId, a.get("last_billing_invoice_id"));
+            assertEquals("approved", a.get("last_billing_payment_status"));
+            assertEquals("TRIALING", stored(tenantB).get("status"));
+            verify(provider, times(2)).getInvoice(invoiceId);
+        } finally {
+            workers.shutdownNow();
+            assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+            owner.execute("DROP TRIGGER IF EXISTS c5_test_subscription_update_audit ON public.business_subscription");
+            owner.execute("DROP FUNCTION IF EXISTS public.c5_test_subscription_update_audit_fn()");
+            owner.execute("DROP TABLE IF EXISTS public.c5_test_subscription_update_audit");
+        }
     }
 
     @Test
