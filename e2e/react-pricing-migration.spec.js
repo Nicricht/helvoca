@@ -61,7 +61,7 @@ test.describe('React public pricing migration', () => {
     await expect(page.getByRole('link', { name: /^Cotizar/ })).toHaveAttribute('href', '/app/sales');
     expect(writes).toEqual([]);
     await start.nth(1).click();
-    await expect(page).toHaveURL(/\/app\/auth\?plan=NEGOCIO$/);
+    await expect(page).toHaveURL(/\/app\/auth\/?\?plan=NEGOCIO$/);
     expect(writes).toEqual([]);
   });
 

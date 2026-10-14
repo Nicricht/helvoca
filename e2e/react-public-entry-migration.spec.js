@@ -24,7 +24,7 @@ test.describe('React public entry and authentication migration', () => {
     await page.getByLabel('Correo').fill('owner@nuevo.cl');
     await page.getByLabel('Contraseña').fill('clave-segura-123');
     await page.getByRole('button', { name: 'Crear cuenta' }).click();
-    await expect(page).toHaveURL(/\/app\/plan\?plan=NEGOCIO$/);
+    await expect(page).toHaveURL(/\/app\/plan\/?\?plan=NEGOCIO$/);
     expect(checkoutCalls).toBe(0);
   });
 
@@ -38,7 +38,7 @@ test.describe('React public entry and authentication migration', () => {
     await page.getByLabel('Correo').fill('owner@negocio.cl');
     await page.getByLabel('Contraseña').fill('clave-segura-123');
     await page.getByRole('button', { name: 'Ingresar a RecepVoz' }).click();
-    await expect(page).toHaveURL(/\/app\/plan\?plan=PRO$/);
+    await expect(page).toHaveURL(/\/app\/plan\/?\?plan=PRO$/);
 
     // Unknown/enterprise values must not force an unauthorized checkout or plan.
     await page.route('**/api/v1/auth/me', route => route.fulfill(json({
