@@ -11,6 +11,12 @@ permissions:
   contents: read
   statuses: write
 
+# Do not let obsolete PR commits consume CI indefinitely.
+# Main and different pull requests remain independent.
+concurrency:
+  group: helvoca-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   production-gate:
     needs: golden-journey-release-contract
@@ -149,6 +155,7 @@ jobs:
     needs: [fast-gate, golden-journey-release-contract]
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 55
 
     steps:
       - name: Checkout
