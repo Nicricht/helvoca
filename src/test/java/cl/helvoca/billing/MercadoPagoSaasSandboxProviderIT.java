@@ -40,9 +40,39 @@ class MercadoPagoSaasSandboxProviderIT {
                 "{\"message\":\"invalid back_url\"}"));
     }
 
-    // RED placeholder: the regression tests above must fail before the fix.
+    // Never print the raw API response: it can contain email, IDs and other PII.
+    // These fixed labels are hints, not proof that a specific field caused HTTP 400.
     static String safeProviderErrorCategory(String response) {
-        return "UNCLASSIFIED";
+        if (response == null || response.isBlank() || response.length() > 16_384) {
+            return "UNCLASSIFIED";
+        }
+        try {
+            JsonNode payload = new ObjectMapper().readTree(response);
+            if (payload == null || !payload.isObject()) return "UNCLASSIFIED";
+            StringBuilder hints = new StringBuilder();
+            for (String key : new String[]{"message", "error"}) {
+                JsonNode field = payload.path(key);
+                if (field.isTextual()) hints.append(' ').append(field.asText());
+            }
+            JsonNode causes = payload.path("cause");
+            if (causes.isArray()) {
+                for (int i = 0; i < Math.min(8, causes.size()); i++) {
+                    JsonNode cause = causes.path(i);
+                    for (String key : new String[]{"code", "description"}) {
+                        JsonNode field = cause.path(key);
+                        if (field.isTextual()) hints.append(' ').append(field.asText());
+                    }
+                }
+            }
+            String details = hints.toString().toLowerCase(Locale.ROOT);
+            if (details.contains("payer_email") || details.contains("payer email")) return "PAYER_EMAIL_HINT";
+            if (details.contains("currency_id") || details.contains("currency id")) return "CURRENCY_HINT";
+            if (details.contains("auto_recurring") || details.contains("frequency_type")) return "RECURRENCE_HINT";
+            if (details.contains("back_url") || details.contains("back url")) return "BACK_URL_HINT";
+            return "UNCLASSIFIED";
+        } catch (Exception ignored) {
+            return "UNCLASSIFIED";
+        }
     }
 
     @Test
@@ -70,8 +100,24 @@ class MercadoPagoSaasSandboxProviderIT {
         properties.setBackUrl("https://recepvoz.cl/pricing.html");
 
         MercadoPagoSubscriptionGateway gateway = new MercadoPagoSubscriptionGateway(properties);
-        SubscriptionPaymentGateway.Checkout checkout =
-                gateway.createCheckout(businessId, payerEmail, plan);
+        SubscriptionPaymentGateway.Checkout checkout;
+        try {
+            checkout = gateway.createCheckout(businessId, payerEmail, plan);
+        } catch (IllegalStateException failedCheckout) {
+            if (failedCheckout.getCause() instanceof MPApiException apiError
+                    && apiError.getApiResponse() != null) {
+                // Public GitHub logs: status and fixed category ONLY, never raw
+                // provider content, IDs, buyer email, signature or access token.
+                if (apiError.getApiResponse().getStatusCode() == 400) {
+                    System.out.println("C5_SANDBOX_CREATE_REJECTED_HTTP_400");
+                    System.out.println("C5_SANDBOX_CREATE_REJECTION_HINT="
+                            + safeProviderErrorCategory(apiError.getApiResponse().getContent()));
+                } else {
+                    System.out.println("C5_SANDBOX_CREATE_REJECTED_OTHER_HTTP_STATUS");
+                }
+            }
+            throw failedCheckout;
+        }
 
         assertNotNull(checkout);
         assertNotNull(checkout.subscriptionId());
