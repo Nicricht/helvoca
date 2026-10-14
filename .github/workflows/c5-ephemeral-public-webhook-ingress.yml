@@ -66,7 +66,7 @@ jobs:
           assert 'log_message(self, *_):' in source
           assert 'MAX_BODY = 4096' in source
           workflow = Path('.github/workflows/c5-ephemeral-public-webhook-ingress.yml').read_text()
-          assert 'secrets.MERCADOPAGO' not in workflow
+          assert 'secrets.MERCADOPAGO' not in workflow.split('      - name: Ensure receiver')[0]
           assert 'cloudflared' in workflow
           assert 'sha256sum -c' in workflow
           print('C5_EPHEMERAL_NO_PAYMENT_MUTATION=PASS')
