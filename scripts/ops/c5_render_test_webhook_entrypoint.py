@@ -7,7 +7,10 @@ or charge subscriptions. Never use for production delivery or persist payloads.
 import os
 import re
 import sys
-from c5_ephemeral_webhook_ingress import Collector
+try:
+    from c5_ephemeral_webhook_ingress import Collector
+except ModuleNotFoundError:
+    from scripts.ops.c5_ephemeral_webhook_ingress import Collector
 
 
 def settings(env):
