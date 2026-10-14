@@ -35,3 +35,13 @@ Sin el cambio real, mantener `C5-2=BLOCKED_EXTERNAL_PROVIDER`, `C5-3=NO INICIADA
 - Primer run de consulta de secreto [#38535515523](https://github.com/Nicricht/helvoca/actions/runs/38535515523): tests offline OK; consulta GET a proveedor devolvió **categoría segura de identidad no coincidente**. No se crearon suscripciones.
 - Ejecuciones de refinamiento de clasificación posteriores no reemplazan evidencia final. Consultar primero el último HEAD de rama y su GitHub Actions antes de afirmar estado.
 - Cierre documental obligatorio: actualizar descripción del PR y [Issue #823](https://github.com/Nicricht/helvoca/issues/823) con SHA/run exactos, categoría real y siguiente acción comprobada. Nunca registrar los identificadores TEST completos, las contraseñas visibles en capturas ni el token de GitHub.
+
+
+
+## Comprobación posterior y decisión: no pedir configuración al usuario
+
+La segunda verificación autenticada identificó el **mismo User ID del vendedor TEST que aparece en las capturas**. La diferencia estaba únicamente en el alias de la API frente al nombre de acceso que muestra el panel. Se ajustó el control para basarse en la identidad estable (User ID), manteniendo nickname con formato TEST, país Chile, correo de prueba si existe y rechazo de indicadores explícitos contradictorios.
+
+Por lo tanto, **el secreto de GitHub ya existe, funciona y corresponde a la cuenta de prueba correcta. No solicitar otro secreto ni pedir que se sobrescriba el existente.** Este resultado se obtuvo únicamente mediante la consulta GET de identidad; no hay suscripciones, facturas, cobros ni webhooks externos probados.
+
+Siguiente trabajo: certificar en CI el último HEAD; preparar luego las pruebas de pagos en entorno TEST aislado. C5 etapa 2 continúa sin certificar hasta disponer de evidencia de un pago de prueba y su webhook firmado.
