@@ -15,7 +15,6 @@ jobs:
     timeout-minutes: 23
     env:
       HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST: "false"
-      MERCADOPAGO_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
