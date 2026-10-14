@@ -22,13 +22,14 @@ jobs:
         with:
           python-version: '3.11'
       - name: Confirm Python syntax
-        run: python3 -m py_compile scripts/ops/c1_replace_missing_offsite_archive.py scripts/ops/c1_railway_ascii_pg18_export.py scripts/ops/test_c1_replace_missing_offsite_archive.py scripts/ops/test_c1_railway_ascii_pg18_export.py scripts/ops/c1_independent_remote_restore.py scripts/ops/test_c1_independent_remote_restore.py scripts/ops/c1_unattended_institutional_backup.py scripts/ops/test_c1_unattended_institutional_backup.py
+        run: python3 -m py_compile scripts/ops/c1_replace_missing_offsite_archive.py scripts/ops/c1_railway_ascii_pg18_export.py scripts/ops/test_c1_replace_missing_offsite_archive.py scripts/ops/test_c1_railway_ascii_pg18_export.py scripts/ops/c1_independent_remote_restore.py scripts/ops/test_c1_independent_remote_restore.py scripts/ops/c1_unattended_institutional_backup.py scripts/ops/test_c1_unattended_institutional_backup.py scripts/ops/c1_railway_cron_backup.py scripts/ops/test_c1_railway_cron_backup.py
       - name: Synthetic offline security and failure regressions
         run: |
           python3 scripts/ops/test_c1_replace_missing_offsite_archive.py -v
           python3 scripts/ops/test_c1_railway_ascii_pg18_export.py -v
           python3 scripts/ops/test_c1_independent_remote_restore.py -v
           python3 scripts/ops/test_c1_unattended_institutional_backup.py -v
+          python3 scripts/ops/test_c1_railway_cron_backup.py -v
       - name: Check no production effects or plain remote dump commands
         run: |
           python3 - <<'PY'
@@ -64,6 +65,22 @@ jobs:
           assert 'rclone, "cat"' in unattended
           assert 'rclone, "delete"' not in unattended
           assert 'commercial_go": False' in unattended
+          native=Path('scripts/ops/c1_railway_cron_backup.py').read_text()
+          image=Path('infra/backup-cron/Dockerfile').read_text()
+          assert 'PGPASSWORD' in native
+          assert 'HELVOCA_C1_ALLOW_EXECUTION' not in native or 'require_approval' in native
+          assert 'require_approval(execute=args.execute' in native
+          assert 'institutional:' in native
+          assert '--no-password' in native
+          assert 'remote_cipher_digest' in native
+          assert 'private_pg_dump' in native
+          assert 'rclone, "copyto", "--immutable"' in native
+          assert 'rclone, "delete"' not in native
+          assert 'railway ssh' not in native.lower()
+          assert 'commercial_go": False' in native
+          assert 'CMD ["python3", "-c"' in image
+          assert 'postgres:18-' in image
+          assert 'age rclone' in image
           assert 'age-test' not in src
           assert 'merge_pull_request' not in src
           print('C1_MISSING_ARCHIVE_OFFLINE_SAFETY=PASS')
