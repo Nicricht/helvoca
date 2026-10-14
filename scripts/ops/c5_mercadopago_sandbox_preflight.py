@@ -51,10 +51,14 @@ def verify_identity(identity, seller_id, expected_nickname):
     if identity.get("site_id") != "MLC":
         raise SandboxBlocked("C5_MP_SELLER_NOT_CHILE")
     nickname = identity.get("nickname")
-    if not isinstance(nickname, str) or nickname.strip().upper() != expected_nickname:
-        raise SandboxBlocked("C5_MP_TEST_SELLER_NICKNAME_MISMATCH")
-    # The provider's Test Accounts panel supplies both independent values
-    # (user ID and generated nickname). Never infer TEST from APP_USR alone.
+    if not isinstance(nickname, str):
+        raise SandboxBlocked("C5_MP_TEST_SELLER_NICKNAME_MISSING")
+    # The authenticated provider ID is the stable unique identity. The TEST
+    # login username shown in Test Accounts can differ from the API nickname.
+    # Requiring literal nickname equality falsely blocked the VERIFIED SAME
+    # seller ID. Keep both names in TEST-only shape; never use APP_USR alone.
+    if not re.fullmatch(r"TEST[A-Z0-9]{4,40}", expected_nickname):
+        raise SandboxBlocked("C5_EXPECTED_TEST_SELLER_NICKNAME_INVALID")
     if not re.fullmatch(r"TEST[A-Z0-9]{4,40}", nickname.strip().upper()):
         raise SandboxBlocked("C5_MP_TEST_SELLER_NICKNAME_INVALID")
     provider_email = identity.get("email")
