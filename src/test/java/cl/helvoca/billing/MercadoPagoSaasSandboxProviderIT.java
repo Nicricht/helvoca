@@ -2,6 +2,10 @@ package cl.helvoca.billing;
 
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import com.mercadopago.exceptions.MPApiException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 
 import java.net.URI;
 import java.util.Locale;
@@ -10,6 +14,36 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MercadoPagoSaasSandboxProviderIT {
+
+    // Safe diagnostics contract: never publish provider response text, buyer,
+    // tokens, IDs, signatures or a checkout URL. All classifications are fixed labels.
+    @Test
+    void rejectsUnstructuredOrOversizedProviderError() {
+        assertEquals("UNCLASSIFIED", safeProviderErrorCategory(null));
+        assertEquals("UNCLASSIFIED", safeProviderErrorCategory("not a JSON object"));
+        assertEquals("UNCLASSIFIED", safeProviderErrorCategory("x".repeat(16_385)));
+        assertEquals("UNCLASSIFIED", safeProviderErrorCategory("{\\\"unexpected\\\":\\\"secret@example.com\\\"}"));
+    }
+
+    @Test
+    void classifiesOnlySupportedErrorHintFieldsWithoutLeakingProviderData() {
+        String privateValue = "sensitive-buyer@example.com";
+        String response = "{\\\"message\\\":\\\"Invalid payer_email for " + privateValue + "\\\"}";
+        String category = safeProviderErrorCategory(response);
+        assertEquals("PAYER_EMAIL_HINT", category);
+        assertFalse(category.contains(privateValue));
+        assertEquals("CURRENCY_HINT", safeProviderErrorCategory(
+                "{\\\"cause\\\":[{\\\"code\\\":\\\"invalid_currency_id\\\"}]}"));
+        assertEquals("RECURRENCE_HINT", safeProviderErrorCategory(
+                "{\\\"message\\\":\\\"auto_recurring is unsupported\\\"}"));
+        assertEquals("BACK_URL_HINT", safeProviderErrorCategory(
+                "{\\\"message\\\":\\\"invalid back_url\\\"}"));
+    }
+
+    // RED placeholder: the regression tests above must fail before the fix.
+    static String safeProviderErrorCategory(String response) {
+        return "UNCLASSIFIED";
+    }
 
     @Test
     void createsAndReadsRealSandboxSubscriptionWithTestCredentialsOnly() {
