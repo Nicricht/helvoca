@@ -41,10 +41,10 @@ test.describe('React public entry and authentication migration', () => {
     await expect(page).toHaveURL(/\/app\/plan\?plan=PRO$/);
 
     // Unknown/enterprise values must not force an unauthorized checkout or plan.
-    await page.goto('/app/auth?plan=ENTERPRISE');
     await page.route('**/api/v1/auth/me', route => route.fulfill(json({
       email: 'owner@negocio.cl', roles: ['BUSINESS_ADMIN']
     })));
+    await page.goto('/app/auth?plan=ENTERPRISE');
     await expect(page).toHaveURL(/\/app\/?$/);
   });
 
