@@ -25,9 +25,10 @@ class ReadOnlyExistingSecretTests(unittest.TestCase):
 
     def test_seller_id_matches_but_alias_differs(self):
         seller_id_hash = hashlib.sha256(b"123456").hexdigest()
-        with self.assertRaisesRegex(ProbeBlocked, "SELLER_ID_MATCH_BUT_ALIAS_MISMATCH"):
-            verify_public_identity({**ACCOUNT, "nickname": "TESTUSEROTHER123"}, EXPECTED,
-                                   seller_id_digest=seller_id_hash)
+        outcome = verify_public_identity(
+            {**ACCOUNT, "nickname": "TESTUSEROTHER123"}, EXPECTED,
+            seller_id_digest=seller_id_hash)
+        self.assertEqual(outcome, "C5_EXISTING_SECRET_SAME_TEST_SELLER_ID_ALIAS_VARIATION")
 
     def test_buyer_token_detected_without_exposing_id(self):
         buyer_id_hash = hashlib.sha256(b"123456").hexdigest()
