@@ -20,6 +20,7 @@ def good_env():
         "MERCADOPAGO_TEST_ACCESS_TOKEN": "APP_USR-" + ("x" * 20),
         "MERCADOPAGO_TEST_PAYER_EMAIL": "testuser123456789@testuser.com",
         "MERCADOPAGO_EXPECTED_TEST_SELLER_ID": "123456789",
+        "MERCADOPAGO_EXPECTED_TEST_SELLER_NICKNAME": "TEST45I5GYIH",
     }
 
 
@@ -55,49 +56,62 @@ class TestC5SandboxSafety(unittest.TestCase):
     def test_seller_id_required(self):
         self.expect_block("MERCADOPAGO_EXPECTED_TEST_SELLER_ID", "", "C5_EXPECTED_TEST_SELLER_ID_REQUIRED")
 
+    def test_nickname_required_from_official_panel(self):
+        self.expect_block("MERCADOPAGO_EXPECTED_TEST_SELLER_NICKNAME", "", "C5_EXPECTED_TEST_SELLER_NICKNAME_REQUIRED")
+
+    def test_live_like_nickname_cannot_be_attested_as_test(self):
+        self.expect_block("MERCADOPAGO_EXPECTED_TEST_SELLER_NICKNAME", "REALSELLER", "C5_EXPECTED_TEST_SELLER_NICKNAME_REQUIRED")
+
     def test_verified_identity(self):
-        self.assertTrue(verify_identity({"id": 123456789, "site_id": "MLC", "test_user": True}, "123456789"))
+        self.assertTrue(verify_identity({"id": 123456789, "site_id": "MLC", "nickname": "TEST45I5GYIH", "email": "test@testuser.com"}, "123456789", "TEST45I5GYIH"))
 
     def test_false_test_user_blocked(self):
-        with self.assertRaisesRegex(SandboxBlocked, "TEST_ACCOUNT_UNVERIFIED"):
-            verify_identity({"id": 123456789, "site_id": "MLC", "test_user": False}, "123456789")
+        with self.assertRaisesRegex(SandboxBlocked, "TEST_ACCOUNT_CONTRADICTED"):
+            verify_identity({"id": 123456789, "site_id": "MLC", "nickname": "TEST45I5GYIH", "test_user": False}, "123456789", "TEST45I5GYIH")
 
-    def test_missing_test_user_field_blocked(self):
-        with self.assertRaisesRegex(SandboxBlocked, "TEST_ACCOUNT_UNVERIFIED"):
-            verify_identity({"id": 123456789, "site_id": "MLC"}, "123456789")
+    def test_missing_test_user_field_uses_two_independent_panel_identifiers(self):
+        self.assertTrue(verify_identity({"id": 123456789, "site_id": "MLC", "nickname": "TEST45I5GYIH"}, "123456789", "TEST45I5GYIH"))
+
+    def test_mismatched_seller_alias_fails_closed(self):
+        with self.assertRaisesRegex(SandboxBlocked, "NICKNAME_MISMATCH"):
+            verify_identity({"id": 123456789, "site_id": "MLC", "nickname": "REALSELLER"}, "123456789", "TEST45I5GYIH")
+
+    def test_mismatched_seller_email_fails_closed(self):
+        with self.assertRaisesRegex(SandboxBlocked, "EMAIL_MISMATCH"):
+            verify_identity({"id": 123456789, "site_id": "MLC", "nickname": "TEST45I5GYIH", "email": "real@example.com"}, "123456789", "TEST45I5GYIH")
 
     def test_wrong_seller_blocked(self):
         with self.assertRaisesRegex(SandboxBlocked, "SELLER_ID_MISMATCH"):
-            verify_identity({"id": 123456789, "site_id": "MLC", "test_user": True}, "789789789")
+            verify_identity({"id": 123456789, "site_id": "MLC", "nickname": "TEST45I5GYIH"}, "789789789", "TEST45I5GYIH")
 
     def test_wrong_country_blocked(self):
         with self.assertRaisesRegex(SandboxBlocked, "SELLER_NOT_CHILE"):
-            verify_identity({"id": 123456789, "site_id": "MLA", "test_user": True}, "123456789")
+            verify_identity({"id": 123456789, "site_id": "MLA", "nickname": "TEST45I5GYIH"}, "123456789", "TEST45I5GYIH")
 
     def test_unstructured_identity_blocked(self):
         with self.assertRaisesRegex(SandboxBlocked, "IDENTITY_UNVERIFIED"):
-            verify_identity([], "123456789")
+            verify_identity([], "123456789", "TEST45I5GYIH")
 
     def test_authenticated_preflight_only_uses_read_only_get(self):
         calls = []
         def opener(req, timeout):
             calls.append((req.get_method(), req.full_url, timeout))
-            return io.BytesIO(b'{"id":123456789,"site_id":"MLC","test_user":true}')
-        self.assertTrue(check_provider_identity(good_env()["MERCADOPAGO_TEST_ACCESS_TOKEN"], "123456789", opener))
+            return io.BytesIO(b'{"id":123456789,"site_id":"MLC","nickname":"TEST45I5GYIH","email":"test@testuser.com"}')
+        self.assertTrue(check_provider_identity(good_env()["MERCADOPAGO_TEST_ACCESS_TOKEN"], "123456789", "TEST45I5GYIH", opener))
         self.assertEqual(calls, [("GET", IDENTITY_URL, 8)])
 
     def test_api_failure_does_not_expose_details(self):
         def opener(req, timeout):
             raise RuntimeError("provider-internal-detail")
         with self.assertRaises(SandboxBlocked) as error:
-            check_provider_identity(good_env()["MERCADOPAGO_TEST_ACCESS_TOKEN"], "123456789", opener)
+            check_provider_identity(good_env()["MERCADOPAGO_TEST_ACCESS_TOKEN"], "123456789", "TEST45I5GYIH", opener)
         self.assertEqual(str(error.exception), "C5_MP_IDENTITY_LOOKUP_FAILED")
 
     def test_overlarge_response_fails(self):
         def opener(req, timeout):
             return io.BytesIO(b"a" * 8193)
         with self.assertRaisesRegex(SandboxBlocked, "IDENTITY_UNVERIFIED"):
-            check_provider_identity(good_env()["MERCADOPAGO_TEST_ACCESS_TOKEN"], "123456789", opener)
+            check_provider_identity(good_env()["MERCADOPAGO_TEST_ACCESS_TOKEN"], "123456789", "TEST45I5GYIH", opener)
 
 
 if __name__ == "__main__":
