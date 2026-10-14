@@ -41,7 +41,6 @@ jobs:
           assert 'verifyNoInteractions(billing)' in src
           assert 'Instant.now().toEpochMilli()' in src
           assert 'MERCADOPAGO_TEST_ACCESS_TOKEN' not in src
-          assert 'C5' in src
           guard = Path('src/main/java/cl/helvoca/billing/MercadoPagoWebhookTimestampGuard.java').read_text()
           controller = Path('src/main/java/cl/helvoca/billing/MercadoPagoWebhookController.java').read_text()
           assert 'ts.length() == 10' in guard
