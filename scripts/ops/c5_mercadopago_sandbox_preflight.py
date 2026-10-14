@@ -60,7 +60,7 @@ def verify_identity(identity, seller_id, expected_nickname):
     provider_email = identity.get("email")
     if provider_email is not None and (
         not isinstance(provider_email, str)
-        or not re.fullmatch(r"[^@\\s]+@testuser\\.com", provider_email.strip().lower())
+        or not re.fullmatch(r"[^@\s]+@testuser\.com", provider_email.strip().lower())
     ):
         raise SandboxBlocked("C5_MP_TEST_SELLER_EMAIL_MISMATCH")
     # The /users/me documentation does not guarantee a test_user property.
