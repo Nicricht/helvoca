@@ -44,3 +44,39 @@ NO guardar o enviar por chat, GitHub, PR o logs: Access Token, claves, credencia
 ### Registro de finalización y reanudación
 
 La evidencia de **etapa 1** se registra en el PR de trabajo y se refleja en [Issue #823](https://github.com/Nicricht/helvoca/issues/823), incluyendo HEAD y CI **del commit final**. Aún sin esa evidencia, estado `IN_PROGRESS`. Prohibido repetir los tests CI ya válidos para el mismo SHA solo por cambio de chat.
+
+
+## Etapa 2/3 · Contrato HMAC preparado, prueba con proveedor todavía pendiente (2026-10-14)
+
+**Control del alcance:** esta entrega no es una nueva fase general. Continúa C5 del [Issue maestro #823](https://github.com/Nicricht/helvoca/issues/823). Implementación de las verificaciones offline en [PR #832](https://github.com/Nicricht/helvoca/pull/832), apilado sobre #831.
+
+### Contratos reusados y añadidos
+
+El backend ya tenía `MercadoPagoWebhookController` (`/webhooks/v1/mercadopago`), que usa la validación de firma oficial del SDK, consulta los estados del proveedor por ID mediante `BillingSubscriptionService` y no habilita el plan simplemente porque el JSON de la notificación diga `approved`.
+
+**Pruebas existentes reutilizadas, no reimplementadas:** `BillingSubscriptionServiceTest` valida que una suscripción `authorized` no active los entitlements sin factura efectivamente aprobada, que una misma factura aprobada no duplique la operación, que un rechazo no extienda el período de gracia por repetición y que los ID/referencias de otros tenants sean bloqueados. `BillingSubscriptionServiceEdgeCasesTest` cubre pagos `pending`, invoice sin ID de suscripción y respuestas inesperadas.
+
+**Brecha nueva abordada:** `MercadoPagoWebhookSignatureRoundTripTest.java` crea una firma HMAC-SHA256 **de verdad** con datos ficticios, conforme al manifiesto publicado por Mercado Pago `id:<data.id>;request-id:<x-request-id>;ts:<timestamp>;`, y llama al controlador real sin mockear el validador. Comprueba evento de suscripción, aviso de factura, firma alterada, `request-id` alterado, firma inválida, tópico ajeno y entrega duplicada. Que un evento firmado sea aceptado prueba **solo el contrato local**, no que el proveedor lo haya enviado ni que exista una factura pagada. <https://www.mercadopago.cl/developers/es/docs/links-and-debts/additional-content/your-integrations/notifications/webhooks?scope=prod>
+
+CI propuesto: `.github/workflows/c5-sandbox-webhook-contract-offline.yml` con Java 21 y pruebas de firma y facturación focalizadas. Evidencia final, HEAD y resultados se registran en el mismo PR #832 y el Issue #823 cuando terminen.
+
+### Bloqueos de la prueba sandbox auténtica
+
+**No hay certificación real de sandbox por disponer de un CI verde.** Se requiere, antes de una única creación TEST explícita:
+
+- Cuenta de desarrollador con aplicación Mercado Pago Chile y **credenciales de prueba** almacenadas de forma privada en GitHub Actions (jamás publicarlas); vendedor y comprador TEST distintos ya creados, bajo control del titular.
+- Confirmación verificable de procedencia TEST del token. **La documentación oficial describe credenciales TEST vinculadas a una aplicación y el endpoint GET `/users/me`, pero no garantiza que este endpoint devuelva el campo booleano `test_user`**. El chequeo estricto de la etapa 1 permanece `NO-GO`; no se debe sustituir el valor ausente por `true`, ni concluir que el prefijo `APP_USR` demuestra TEST. Investigar cómo atar de forma inequívoca token de prueba a la aplicación/entorno antes de cualquier POST, usando información oficial de credenciales y prueba de identidad de vendedor.
+- Endpoint de notificaciones en un **entorno de pruebas separado y no desplegado en producción**, con secret de firma propio de TEST. Asegurar TLS, validación real de firma, no compartición del tenant productivo, logs minimizados y recuperación ante duplicados.
+- Canal **privado** de recuperación de URL de checkout y evidencia de la factura. El test de la etapa 1 dejó de imprimir estos valores en logs CI, por lo que todavía no existe un método seguro certificado para completar el pago TEST desde la prueba automatizada.
+- Prueba de principio a fin: ID checkout remoto autenticado, comprador TEST completa autorización en web oficial, webhook `subscription_preapproval`, webhook `subscription_authorized_payment` de factura con estado aprobado leído en proveedor, status/plan local correcto, idempotencia ante doble notificación, ausencia de lecturas cruzadas, resultado NO-GO ante error o falta de prueba.
+
+**STOP:** No crear webhooks fingidos para aparentar entrega real del proveedor. No usar cuentas reales, `MERCADOPAGO_ENABLED` de Railway, LIVE ni pago de verdad; no modificar `main` sin C1 recuperable. Ante ausencia de secreto/entorno autónomo o identidad no concluyente, registrar `BLOCKED_EXTERNAL_PROVIDER` y dejar el software offline certificado sin afirmar cierre de la etapa 2.
+
+**Fuentes oficiales de límites:** [Credenciales TEST y producción](https://www.mercadopago.cl/developers/es/docs/mp-point/resources/credentials) y [topics de webhooks de suscripciones y facturas](https://www.mercadopago.cl/developers/es/docs/links-and-debts/additional-content/your-integrations/notifications/webhooks?scope=prod).
+
+### Checkpoint de continuidad de la etapa 2
+
+- **Rama:** `test/c5-webhook-signed-sandbox-contract-20261014`; PR #832; base PR #831.
+- **Estado del contrato offline:** `IN_PROGRESS` hasta CI del último commit, después registrar número de tests reales.
+- **Estado de sandbox proveedor:** `BLOCKED_EXTERNAL_PROVIDER` hasta obtener autorización, vendedor/comprador y secretos TEST verificados sin revelar datos. Este estado **no** se convierte en `DONE` por pasar las pruebas con mocks.
+- **Acción siguiente para quien retome:** leer PR #832 HEAD y CI exactos y registrar evidencia sin repetirla; averiguar primero **cómo demostrar TEST sin depender de un campo no documentado**, con credenciales en entorno aislado y sin hacer POST. No iniciar la etapa 3.
