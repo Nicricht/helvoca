@@ -86,6 +86,27 @@ class HmacContract(unittest.TestCase):
         with self.assertRaises(InvalidWebhook):
             verify(body, "type=subscription_authorized_payment&data.id=999999", headers, SECRET)
 
+    def test_bad_signature_has_priority_over_a_bad_topic(self):
+        body, headers = signed(event_id="123456", secret="wrong-test-secret")
+        with self.assertRaisesRegex(InvalidWebhook, "HMAC mismatch"):
+            verify(body, "type=orders", headers, SECRET)
+
+    def test_signed_conflicting_topic_is_classified(self):
+        body, headers = signed("subscription_preapproval", "123456")
+        with self.assertRaisesRegex(InvalidWebhook, "topic conflict"):
+            verify(body, "type=subscription_authorized_payment", headers, SECRET)
+
+    def test_signed_query_topic_not_allowed(self):
+        body, headers = signed("subscription_preapproval", "123456")
+        with self.assertRaisesRegex(InvalidWebhook, "query topic unsupported"):
+            verify(body, "type=orders", headers, SECRET)
+
+    def test_signed_body_topic_not_allowed(self):
+        body, headers = signed("subscription_preapproval", "123456")
+        modified = json.dumps({"type":"orders","data":{"id":"123456"}}).encode()
+        with self.assertRaisesRegex(InvalidWebhook, "body topic unsupported"):
+            verify(modified, "", headers, SECRET)
+
     def test_real_email_or_token_not_in_logs(self):
         from scripts.ops import c5_ephemeral_webhook_ingress as mod
         self.assertEqual(mod.Handler.log_message(None, "fake email %s", "hello@example.com"), None)
@@ -113,7 +134,10 @@ class DiagnosticNoSecretLeakContract(unittest.TestCase):
 
     def test_structural_rejections_have_distinct_safe_classes(self):
         cases = {
-            "unrecognized or conflicting topic": "TOPIC_SHAPE",
+            "topic missing": "TOPIC_MISSING",
+            "query topic unsupported": "TOPIC_QUERY_UNSUPPORTED",
+            "body topic unsupported": "TOPIC_BODY_UNSUPPORTED",
+            "topic conflict": "TOPIC_CONFLICT",
             "event id required": "EVENT_ID_MISSING",
             "conflicting event id": "EVENT_ID_CONFLICT",
             "event id invalid": "EVENT_ID_FORMAT",
