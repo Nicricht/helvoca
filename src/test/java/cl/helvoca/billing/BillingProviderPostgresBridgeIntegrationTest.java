@@ -291,7 +291,7 @@ class BillingProviderPostgresBridgeIntegrationTest {
                     + ";ts:" + timestamp + ";";
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            return "ts:" + timestamp + ",v1:" + HexFormat.of().formatHex(
+            return "ts=" + timestamp + ",v1=" + HexFormat.of().formatHex(
                     mac.doFinal(manifest.getBytes(StandardCharsets.UTF_8)));
         } catch (java.security.GeneralSecurityException error) {
             throw new AssertionError("Test JVM must support HmacSHA256", error);
@@ -313,13 +313,13 @@ class BillingProviderPostgresBridgeIntegrationTest {
         when(provider.getInvoice(invoiceId)).thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
                 invoiceId, subscriptionId(tenantA), "processed", "approved", "paid",
                 OffsetDateTime.parse("2026-10-13T19:00:00Z")));
-        String body = "{\\\"type\\\":\\\"subscription_authorized_payment\\\","
-                + "\\\"data\\\":{\\\"id\\\":\\\"" + invoiceId + "\\\"}}";
+        String body = "{\"type\":\"subscription_authorized_payment\","
+                + "\"data\":{\"id\":\"" + invoiceId + "\"}}";
         String good = signTestWebhook(invoiceId, requestId, timestamp, secret);
 
         // Invalid HMAC must not reconcile or change another business.
         assertEquals(401, scope.callAsSystem(() -> controller.webhook(
-                good.substring(0, good.length() - 1) + "0", requestId,
+                good.replace(",v1=", ",v1=00"), requestId,
                 "subscription_authorized_payment", null, invoiceId, body)).getStatusCode().value());
         assertEquals("TRIALING", stored(tenantA).get("status"));
         assertEquals("TRIALING", stored(tenantB).get("status"));
