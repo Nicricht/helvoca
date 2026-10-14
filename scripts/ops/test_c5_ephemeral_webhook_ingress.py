@@ -109,7 +109,7 @@ class DiagnosticNoSecretLeakContract(unittest.TestCase):
         self.assertEqual(safe_rejection_reason(InvalidWebhook("HMAC mismatch")), "HMAC_MISMATCH")
 
     def test_event_shape_is_not_called_credential_failure(self):
-        self.assertEqual(safe_rejection_reason(InvalidWebhook("event id required")), "EVENT_SHAPE")
+        self.assertEqual(safe_rejection_reason(InvalidWebhook("event id required")), "EVENT_ID_MISSING")
 
     def test_structural_rejections_have_distinct_safe_classes(self):
         cases = {
