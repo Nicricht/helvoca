@@ -36,9 +36,21 @@ def main():
     if url.scheme != "https" or not url.hostname.endswith(".trycloudflare.com"):
         fail("UNSAFE_PUBLIC_URL")
     try:
-        with request.urlopen(target + "/health", timeout=15) as response:
-            if response.status != 204:
-                fail("HEALTH_NOT_204")
+        # A Quick Tunnel URL may be published before the edge has finished
+        # routing. Never downgrade the TLS requirement or mask an HTTP failure:
+        # wait for a genuinely successful public health probe.
+        ready = False
+        for _ in range(25):
+            try:
+                with request.urlopen(target + "/health", timeout=8) as response:
+                    if response.status == 204:
+                        ready = True
+                        break
+            except (error.URLError, TimeoutError, OSError):
+                pass
+            time.sleep(2)
+        if not ready:
+            fail("HEALTH_NOT_READY")
         ident = "1234509876"
         ts = str(int(time.time() * 1000))
         reqid = "c5-fake-public-smoke"
