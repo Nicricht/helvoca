@@ -82,6 +82,12 @@ Fuentes: [Railway Cron Jobs](https://docs.railway.com/cron-jobs) y [Railway pric
 - El asistente es una ayuda para el operador; el proyecto no puede ejecutar un consentimiento OAuth en su nombre ni exportar credenciales desde el plugin de Google Drive. Usar solo desde una copia local de `Nicricht/helvoca` actualizada. Guardar el archivo `rclone.conf` con el mismo cuidado que cualquier contraseña y **nunca** compartirlo.
 - **Comando local (Windows, no requiere instalar rclone):** abrir PowerShell en la copia existente del repo, actualizar rama del PR #828 y ejecutar `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ops\c1_authorize_institutional_drive.ps1`. Solo compartir el código de éxito o bloqueo `C1_*`, sin capturas con OAuth.
 
+## Corrección del asistente OAuth tras fallo de ejecución local (2026-10-14)
+
+- El operador observó salida final `team_drive =` seguida de `C1_OAUTH_BLOCKED: C1_OAUTH_SETUP_PRIVATE_FAILURE`. Esta salida **no certifica OAuth** ni muestra por sí sola si el fallo fue Drive, archivo local o Railway. El script anterior ocultaba la etapa; no repetir autorización ni exportación manual sin inspeccionar estado local.
+- Corrección: `scripts/ops/c1_authorize_institutional_drive.ps1` ahora silencia la salida de configuración `rclone config create ... --no-output` para evitar revelar el OAuth token en consola; usa un modo compatible con los mensajes benignos de stderr de comandos nativos en Windows PowerShell 5.1 y devuelve un código de etapa `C1_OAUTH_UNEXPECTED_...` cuando aparece un error no clasificado.
+- Reejecución **idempotente por remoto ya existente**: si `rclone.conf` contiene `[institutional]`, no inicia automáticamente un nuevo consentimiento Google. Las pruebas solo suben un marcador sin datos de usuario. No borrar la configuración existente ni compartir `rclone.conf`, refresh/access tokens, logs extensos o pantallazos OAuth.
+- Regresión certificada en [GitHub CI #38519339157](https://github.com/Nicricht/helvoca/actions/runs/38519339157): parser PowerShell `PASS`, 56/56 tests offline y guardas sin efectos productivos; esto NO prueba un flujo OAuth real.
 ## Puertas de habilitación (todas obligatorias)
 
 - [x] Backup nuevo, cifrado, copia externa institucional y restauración independiente reportada por operador.
