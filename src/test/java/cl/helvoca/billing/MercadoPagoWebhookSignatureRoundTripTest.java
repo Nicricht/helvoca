@@ -17,7 +17,7 @@ import static org.mockito.Mockito.*;
  * contacting a provider. This does not certify provider webhook delivery.
  */
 class MercadoPagoWebhookSignatureRoundTripTest {
-    private static final String SECRET = "c5-only-local-fake-webhook-key";
+    static final String SECRET = "c5-only-local-fake-webhook-key";
 
     private MercadoPagoWebhookController controller(BillingSubscriptionService billing) {
         MercadoPagoProperties settings = new MercadoPagoProperties();
@@ -27,7 +27,7 @@ class MercadoPagoWebhookSignatureRoundTripTest {
         return new MercadoPagoWebhookController(settings, billing);
     }
 
-    private String sign(String dataId, String requestId) {
+    static String sign(String dataId, String requestId) {
         try {
             String timestamp = Long.toString(Instant.now().toEpochMilli());
             String manifest = "id:" + dataId.toLowerCase(java.util.Locale.ROOT)
