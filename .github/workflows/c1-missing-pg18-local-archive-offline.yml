@@ -90,13 +90,15 @@ jobs:
           assert 'postgres:18-' in image
           assert 'age rclone' in image
           oauth=Path('scripts/ops/c1_authorize_institutional_drive.ps1').read_text()
-          assert 'scope=drive.file' in oauth
+          assert 'type = drive`nscope = drive.file' in oauth
+          assert '[IO.File]::AppendAllText($conf, $remoteBlock)' in oauth
           assert 'Get-FileHash $zip -Algorithm SHA256' in oauth
           assert 'variable set $Name --stdin' in oauth
           assert '--skip-deploys' in oauth
           assert 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' in oauth
           assert "HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE" in oauth
-          assert 'config create $remote drive' in oauth
+          assert 'config reconnect "$($remote):"' in oauth
+          assert "Assert-NativeSuccess 'C1_GOOGLE_OAUTH_NOT_AUTHORIZED'" in oauth
           assert '[switch]$FreshAccount' in oauth
           assert '[string]$ExpectedEmail' in oauth
           assert "C1_OAUTH_ACCOUNT_MISMATCH" in oauth
@@ -105,7 +107,8 @@ jobs:
           assert oauth.index("C1_OAUTH_ACCOUNT_MISMATCH") < oauth.index("mkdir")
           assert "[regex]::Escape($remote)" in oauth
           assert "institutional_c1_" in oauth
-          assert 'config_is_local=true --no-output' in oauth
+          assert 'Secure-File $conf' in oauth
+          assert '1>$null 2>$null' in oauth
           assert "C1_OAUTH_UNEXPECTED_' + $script:stage" in oauth
           assert "C1_OAUTH_SETUP_PRIVATE_FAILURE" not in oauth
           assert "$script:stage = 'DRIVE_FOLDER'" in oauth
