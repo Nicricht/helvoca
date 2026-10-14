@@ -69,9 +69,15 @@ function projection(subscription: Subscription) {
   };
 }
 
-function openCheckout(url?: string | null) {
-  if (!url) return;
-  window.open(url, "_blank", "noopener,noreferrer");
+function safeCheckoutUrl(value?: string | null): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || !url.hostname || url.username || url.password) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
 }
 
 function Metric({
@@ -168,6 +174,7 @@ export function PlanConsumptionPage() {
   const planName = subscription.planName || subscription.publicPlanCode || subscription.plan || "Plan";
   const status = statusLabels[String(subscription.status ?? "").toUpperCase()] || "Sin estado";
   const billing = model.billingStatus.data;
+  const pendingCheckoutUrl = safeCheckoutUrl(billing?.checkoutUrl);
   const billingText = model.canManageBilling && model.billingStatus.isError
     ? "No pudimos cargar el estado de facturación."
     : billing?.awaitingProviderVerification && billing.pendingPlanName
@@ -184,9 +191,9 @@ export function PlanConsumptionPage() {
       `Vas a iniciar el checkout para ${plan.name}. El plan no se activará hasta verificar el pago. ¿Continuar?`
     );
     if (!confirmed) return;
-    model.checkout.mutate(plan.code, {
-      onSuccess: response => openCheckout(response.checkoutUrl)
-    });
+    // Async popup opening is commonly blocked by browsers. The verified
+    // HTTPS checkout is displayed as an explicit user-controlled link below.
+    model.checkout.mutate(plan.code);
   };
 
   return (
@@ -365,15 +372,20 @@ export function PlanConsumptionPage() {
                       <strong>Cambio pendiente: {billing.pendingPlanName}</strong>
                       <span>Tu plan actual sigue vigente hasta verificar un cobro aprobado.</span>
                     </div>
-                    {billing.checkoutUrl && (
-                      <button
-                        type="button"
+                    {pendingCheckoutUrl ? (
+                      <a
                         className="button primary"
-                        onClick={() => openCheckout(billing.checkoutUrl)}
+                        href={pendingCheckoutUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
                         Continuar checkout <ExternalLink size={14} aria-hidden="true" />
-                      </button>
-                    )}
+                      </a>
+                    ) : billing.checkoutUrl ? (
+                      <span role="alert">
+                        El enlace de checkout no es seguro. No se abrirá; solicita asistencia.
+                      </span>
+                    ) : null}
                   </div>
                 ) : !billing.billingEnabled || !billing.checkoutConfigured ? (
                   <div className={styles.manageStatus}>
