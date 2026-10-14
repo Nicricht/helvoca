@@ -1,0 +1,60 @@
+# C5 etapa 2 · receptor de webhooks TEST en Render Free (2026-10-14)
+
+**Fuente de verdad:** [plan maestro C0–C7, Issue #823](https://github.com/Nicricht/helvoca/issues/823). **Estado:** `TEST_INGRESS_DEPLOYED_AND_HTTPS_VERIFIED / REAL_MP_WEBHOOK_NOT_YET_CERTIFIED`.
+
+## Alcance autorizado y resultado
+
+El titular autorizó expresamente **crear un servicio exclusivo de RecepVoz en Render solo con plan gratuito**. Se comprobó primero el inventario de la cuenta Render: estaban servicios `tiempojusto` y `SIGAO`, no servicios Helvoca. No se tocaron ni reutilizaron; Railway continúa únicamente con environment `production`.
+
+Servicio nuevo exclusivo:
+
+- **Nombre:** `helvoca-c5-test-webhook-ingress`
+- **ID Render:** `srv-db7ku5ivcj2c73e1cv40`
+- **Plan:** `free` (no `starter`, ni suscripción paga para el servicio)
+- **Dashboard:** https://dashboard.render.com/web/srv-db7ku5ivcj2c73e1cv40
+- **Origen HTTPS:** https://helvoca-c5-test-webhook-ingress.onrender.com
+- **Salud:** `GET /health` → 204
+- **Receptor TEST:** `POST /webhooks/v1/mercadopago` → 401 sin firma HMAC válida
+- **Workspace y región:** workspace existente del titular, Virginia
+- **Repositorio:** `Nicricht/helvoca`, rama `feat/c5-render-free-test-ingress-20261014`
+- **AutoDeploy:** `no` intencional. Los commits en rama no despliegan código ni cambian producción sin revisión.
+- **Despliegue creado:** `dep-db7ku62vcj2c73e1d110`, `live`, SHA real **`2f04b0a0fd566c90f03559aa2bbb137db91c6792`**. Últimas adiciones posteriores a este SHA son workflows y documentación: **no se debe afirmar** que estén desplegadas.
+- **Comandos de build/start:** `python3 -m py_compile scripts/ops/c5_render_test_webhook_entrypoint.py scripts/ops/c5_ephemeral_webhook_ingress.py`, `python3 scripts/ops/c5_render_test_webhook_entrypoint.py`.
+
+## Barreras de seguridad
+
+- `C5_RENDER_TEST_ONLY=isolated-no-payment` y `C5_EPHEMERAL_MODE=test-only` son obligatorios. Sin ambos, la app **no escucha**.
+- `C5_EPHEMERAL_HMAC_SECRET` es una clave **aleatoria interna del receptor**, generada para esta prueba, almacenada solo en **Render Environment**; su valor **no está** en GitHub, registros, chat ni este documento. **NO es la firma real entregada por Mercado Pago**, no reutilizar el Access Token de prueba de la cuenta.
+- La app Python procesa firmas HMAC, tiempo de ±5 minutos, tópicos permitidos y tamaño del body. Solo mantiene contadores volátiles; no guarda facturas, identidades, credenciales ni datos personales. No llama a Mercado Pago, no modifica suscripciones, no tiene conexión a Railway ni PostgreSQL ni endpoint de pagos.
+- Permite `0.0.0.0:$PORT` **únicamente** a través de `c5_render_test_webhook_entrypoint.py` condicionado al modo TEST. Las pruebas locales previas siguen usando `127.0.0.1`.
+- Nadie debe registrar este receptor como webhook de pagos comerciales. No hay checkout autorizado ni mecanismo de persistencia/reconciliación conectado a la facturación de Helvoca.
+- Repositorio de otros proyectos y servicios externos permanecen intactos.
+
+## Verificación exacta
+
+1. [CI código y regresión #38544511970](https://github.com/Nicricht/helvoca/actions/runs/38544511970) **completed/success** en SHA `2f04b0a0fd566c90f03559aa2bbb137db91c6792`: **11/11 tests nuevo entrypoint Render y 17/17 tests receptor**, gate `C5_RENDER_FREE_NO_PROVIDER_NO_PAYMENT_CONTRACT=PASS`.
+2. [Deploy Render `dep-db7ku62vcj2c73e1d110`](https://dashboard.render.com/web/srv-db7ku5ivcj2c73e1cv40) **`live`**, confirmado mediante integración Render. Build y startup definidos explícitamente.
+3. [CI público #38544761946](https://github.com/Nicricht/helvoca/actions/runs/38544761946) **completed/success**, `C5_RENDER_STABLE_TLS_HEALTH=PASS`, `C5_RENDER_STABLE_HTTPS_UNSIGNED_REJECTED_401=PASS`, `C5_RENDER_NO_PROVIDER_OR_PAYMENT=PASS`. Probó HTTPS **en el dominio estable** ya servido por Render, desde el runner.
+4. [CI de código final antes de esta documentación #38544761855](https://github.com/Nicricht/helvoca/actions/runs/38544761855) **completed/success**, mismas 28 pruebas y contrato no-payment. Una adición exclusivamente documental obliga a comprobar estado de CI exacto posterior, sin presumir que el SHA de documentación corresponde al deploy.
+
+## Advertencias del plan gratuito
+
+Según [Render Free](https://render.com/docs/free), los servicios gratuitos se suspenden tras ~15 minutos sin tráfico y el siguiente request puede tardar aproximadamente un minuto en despertarlos. También consumen **horas gratuitas, minutos de build y ancho de banda compartidos con otros servicios del workspace**. El plan del servicio es `free`, pero el consumo que supere determinadas cuotas incluidas puede generar cargos adicionales si la cuenta tiene método de pago: **no autorizamos gastos ni cambio a plan pagado**. No mantener tráfico artificial para evitar el apagado y no usar este servicio gratuito para webhooks productivos o SLAs.
+
+El filesystem de Render Free es efímero y se pierde al reiniciar; por eso el receptor solo guarda contadores en RAM y **NO** certifica entrega durable ni reintentos a través de reinicios. En una prueba real el despertar de un servicio dormido puede interferir con los plazos de reintento del proveedor: debe ensayarse antes de afirmar recepción fiable.
+
+## Brecha que sigue pendiente en C5, etapa 2
+
+**No se ha realizado un checkout ni un pago auténtico TEST con Mercado Pago.** El receptor responde a HMAC sintético y rechaza eventos sin firma; la clave configurada actualmente no fue entregada/configurada en Mercado Pago.
+
+Para certificar un evento de Suscripciones, aún se necesita:
+
+1. Confirmar procedimiento **oficial** para inscribir el webhook `subscription_preapproval` y `subscription_authorized_payment` de la aplicación de pruebas. La documentación del proveedor señala que la configuración por panel tiene excepciones para Suscripciones, y el SDK Java 3.7.0 usado en Helvoca no expone `notificationUrl` en `PreapprovalCreateRequest`. No inventar integración basada en panel si no hay prueba de que se usará.
+2. Obtener o vincular **clave real de firma de notificaciones TEST** mediante el canal autorizado del proveedor. No se encontró disponible en los nombres consultados por GitHub Actions/Render producción, **no afirmar que no exista universalmente**.
+3. Completar un checkout TEST con la cuenta **comprador TEST ya existente** y verificar entrega remota auténtica y factura efectivamente aprobada mediante GET de Mercado Pago. Una creación de suscripción `pending` o HMAC sintético **NO** lo prueba.
+4. Recibir/gestionar con persistencia de pruebas e idempotencia conforme al backend Java, con evidencia privada sin guardar tokens ni checkout URLs en logs. El receptor Python aislado aquí no implementa esa persistencia.
+5. Mantener el merge/deploy production sujeto a C1 backup recuperable y C2 release. **C5 etapa 3 no iniciada.**
+
+**No pedir al titular** crear cuentas TEST, token de vendedor ni configurar otra app: ya existen, se comprobó el token mediante GET autenticado en [PR #834](https://github.com/Nicricht/helvoca/pull/834). Solo escalar una acción específica del panel de Mercado Pago si se comprueba que el agente no puede ejecutarla mediante conectores ya disponibles. No añadir costes sin autorización.
+
+**Reanudación:** primero PR de esta rama, Issue #823, CI exacto y deployment Render. Los siguientes cambios de aplicación deben certificarse y desplegarse **manualmente** en el servicio aislado; no activar AutoDeploy por comodidad.
