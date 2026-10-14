@@ -1,0 +1,47 @@
+name: C1 independent cloud-download PG18 restore contract (offline)
+on:
+  push:
+    branches:
+      - 'feat/c1-remote-downloaded-pg18-restore-*'
+  pull_request:
+    branches:
+      - 'main'
+    paths:
+      - 'scripts/ops/c1_verify_cloud_download_restore.py'
+      - 'scripts/ops/test_c1_verify_cloud_download_restore.py'
+      - 'docs/telephony/2026-10-13-c1-encrypted-independent-recovery.md'
+      - '.github/workflows/c1-cloud-download-pg18-restore-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  c1-cloud-restore-qa:
+    name: c1-cloud-restore-qa
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax and stdlib adversarial behavior tests
+        run: |
+          python3 -m py_compile scripts/ops/c1_verify_cloud_download_restore.py
+          python3 -m py_compile scripts/ops/test_c1_verify_cloud_download_restore.py
+          PYTHONPATH=scripts/ops python3 -m unittest discover -v -s scripts/ops -p 'test_c1_verify_cloud_download_restore.py'
+      - name: Require changed Python lines and branches 100 percent
+        run: |
+          python3 -m pip install --disable-pip-version-check 'coverage>=7,<8'
+          cd scripts/ops
+          python3 -m coverage run --branch --source=c1_verify_cloud_download_restore -m unittest discover -v -s . -p 'test_c1_verify_cloud_download_restore.py'
+          python3 -m coverage report -m --fail-under=100
+      - name: Static safe external-effect contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/ops/c1_verify_cloud_download_restore.py')
+          s=p.read_text()
+          for banned in ('dump_from_railway(', 'railway ssh', 'PGPASSWORD', 'DATABASE_URL', 'create_service', 'accept_deploy', 'set_variables', 'railway run', 'age --passphrase'):
+              assert banned not in s, 'unsafe production-effect contract'
+          for required in ('restore_to_disposable_docker', 'validate_dump(', 'CLOUD_SHA256', 'CLOUD_ENCRYPTED_BYTES', 'write_private_report', 'remote', 'commercial_go'):
+              assert required in s, 'missing fail-closed contract'
+          print('C1_CLOUD_RESTORE_NO_EXTERNAL_EFFECTS=PASS')
+          PY
