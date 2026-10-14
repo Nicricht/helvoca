@@ -97,6 +97,10 @@ jobs:
           assert 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' in oauth
           assert "HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE" in oauth
           assert 'config create $remote drive' in oauth
+          assert 'config_is_local=true --no-output' in oauth
+          assert "C1_OAUTH_UNEXPECTED_' + $script:stage" in oauth
+          assert "C1_OAUTH_SETUP_PRIVATE_FAILURE" not in oauth
+          assert "$script:stage = 'DRIVE_FOLDER'" in oauth
           assert 'HelvocaBackups-Automaticos' in oauth
           assert 'AGE-SECRET-KEY-' not in oauth
           assert 'docker' not in oauth.lower()
