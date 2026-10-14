@@ -76,6 +76,20 @@ class MercadoPagoSaasSandboxProviderIT {
     }
 
     @Test
+    void requiresVerifiedBuyerRatherThanExampleEmailBeforeProviderRequest() {
+        assertThrows(IllegalArgumentException.class, () -> validatedBuyerEmail(null));
+        assertThrows(IllegalArgumentException.class, () -> validatedBuyerEmail(""));
+        assertThrows(IllegalArgumentException.class, () -> validatedBuyerEmail("test@testuser.com"));
+        assertThrows(IllegalArgumentException.class, () -> validatedBuyerEmail("buyer@example.com"));
+        assertEquals("buyer_42@testuser.com", validatedBuyerEmail(" BUYER_42@TESTUSER.COM "));
+    }
+
+    // RED: legacy workflow allowed example email; never invoke provider here.
+    static String validatedBuyerEmail(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    @Test
     void createsAndReadsRealSandboxSubscriptionWithTestCredentialsOnly() {
         Assumptions.assumeTrue(
                 Boolean.parseBoolean(System.getenv("HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST")),
