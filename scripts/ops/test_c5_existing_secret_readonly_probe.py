@@ -22,6 +22,25 @@ class ReadOnlyExistingSecretTests(unittest.TestCase):
         with self.assertRaisesRegex(ProbeBlocked, "SELLER_IDENTITY_MISMATCH"):
             verify_public_identity({**ACCOUNT, "id": 654321}, EXPECTED)
 
+
+    def test_seller_id_matches_but_alias_differs(self):
+        seller_id_hash = hashlib.sha256(b"123456").hexdigest()
+        with self.assertRaisesRegex(ProbeBlocked, "SELLER_ID_MATCH_BUT_ALIAS_MISMATCH"):
+            verify_public_identity({**ACCOUNT, "nickname": "TESTUSEROTHER123"}, EXPECTED,
+                                   seller_id_digest=seller_id_hash)
+
+    def test_buyer_token_detected_without_exposing_id(self):
+        buyer_id_hash = hashlib.sha256(b"123456").hexdigest()
+        with self.assertRaisesRegex(ProbeBlocked, "IS_SCREENSHOT_BUYER_NOT_SELLER"):
+            verify_public_identity(ACCOUNT, hashlib.sha256(b"mismatching-seller").hexdigest(),
+                                   buyer_id_digest=buyer_id_hash)
+
+    def test_other_test_account_detected_without_exposing_id(self):
+        with self.assertRaisesRegex(ProbeBlocked, "IS_DIFFERENT_TEST_ACCOUNT"):
+            verify_public_identity(ACCOUNT, hashlib.sha256(b"other-test-account").hexdigest(),
+                                   seller_id_digest=hashlib.sha256(b"999").hexdigest(),
+                                   buyer_id_digest=hashlib.sha256(b"998").hexdigest())
+
     def test_live_username_is_blocked(self):
         with self.assertRaisesRegex(ProbeBlocked, "NOT_CONFIRMED_TEST_SELLER"):
             verify_public_identity({**ACCOUNT, "nickname": "LIVEUSER"}, EXPECTED)
