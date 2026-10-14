@@ -111,4 +111,25 @@ class VoiceCallRouterTest {
         assertFalse(router.readiness().ready());
         assertNull(router.readiness().selectedProvider());
     }
+
+
+    @Test
+    void unavailableProviderReadinessNeverEchoesExceptionMessages() {
+        VoiceProviderProperties settings = new VoiceProviderProperties();
+        settings.setProviderOrder(List.of("gemini"));
+        VoiceAiProviderRegistry providers = mock(VoiceAiProviderRegistry.class);
+        when(providers.require("gemini")).thenThrow(
+                new IllegalStateException("Bearer sk-super-secret; customer=+56987654321"));
+        VoiceCallRouter router = new VoiceCallRouter(settings, providers,
+                new VoiceProviderHealthRegistry(), mock(TwilioMediaStreamTwimlFactory.class),
+                mock(OpenAiLiveSipService.class));
+        var result = router.readiness();
+        assertFalse(result.ready());
+        assertNull(result.selectedProvider());
+        assertEquals("UNKNOWN_PROVIDER", result.providers().get(0).state());
+        assertEquals("Provider configuration is unavailable", result.providers().get(0).detail());
+        assertFalse(result.toString().contains("sk-super-secret"));
+        assertTrue(router.route("+14355652512", "+56911111111", CALL_SID).isEmpty());
+    }
+
 }

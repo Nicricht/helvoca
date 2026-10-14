@@ -152,10 +152,105 @@ class CallCertificationServiceTest {
         verifyNoInteractions(fixture.bookings, fixture.actions, fixture.transcripts, fixture.summaries);
     }
 
+    @Test
+    void persistedToolSuccessCannotOverrideCarrierFailureOrMissingTrustedBinding() {
+        Fixture fixture = new Fixture();
+        UUID id = UUID.randomUUID();
+        CallSession call = certifiedCall();
+        when(fixture.calls.findById(id)).thenReturn(Optional.of(call));
+
+        call.setStatus(CallStatus.FAILED);
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("carrier_call_not_completed"));
+        call.setStatus(CallStatus.COMPLETED);
+        call.setTelephonyProvider("simulator");
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("carrier_binding_incomplete"));
+        call.setTelephonyProvider("twilio");
+        call.setProviderCallId(null);
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("carrier_binding_incomplete"));
+        call.setProviderCallId("CA-invalid");
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("carrier_binding_incomplete"));
+        call.setProviderCallId("CA" + "a".repeat(32));
+        call.setPhoneNumberId(null);
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("carrier_binding_incomplete"));
+        call.setPhoneNumberId(UUID.randomUUID());
+        call.setAiProvider(null);
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("ai_provider_missing"));
+        call.setAiProvider(" ");
+        assertTrue(fixture.service.verifyAndCleanup(id).reason().contains("ai_provider_missing"));
+        call.setAiProvider("gemini");
+        assertFalse(fixture.service.verifyAndCleanup(id).success());
+        verifyNoInteractions(fixture.bookings);
+    }
+
+    @Test
+    void cancelledAnotherBookingCannotCertifyCompletedVoiceCall() {
+        Fixture fixture = new Fixture();
+        UUID callId = UUID.randomUUID();
+        UUID createdBooking = UUID.randomUUID();
+        UUID unrelatedBooking = UUID.randomUUID();
+        CallSession call = certifiedCall();
+
+        when(fixture.calls.findById(callId)).thenReturn(Optional.of(call));
+        when(fixture.transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId))
+                .thenReturn(List.of(mock(CallTranscript.class)));
+        when(fixture.summaries.findByCallId(callId))
+                .thenReturn(Optional.of(mock(CallSummary.class)));
+        when(fixture.actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(List.of(
+                action("SERVICES_LISTED", true, null),
+                action("AVAILABILITY_CHECKED", true, null),
+                action("BOOKING_CREATED", true, createdBooking),
+                action("BOOKING_CANCELLED", true, unrelatedBooking)));
+        when(fixture.bookings.findByIdAndBusinessId(createdBooking, call.getBusinessId()))
+                .thenReturn(Optional.of(booking(BookingStatus.CANCELLED)));
+
+        var result = fixture.service.verifyAndCleanup(callId);
+
+        assertFalse(result.success());
+        assertTrue(result.reason().contains("booking_cancelled_not_successful"));
+        assertEquals(0, result.cleanupCancelled());
+        verify(fixture.bookings, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void multipleCreatedBookingsRequireMatchingCancellationForEach() {
+        Fixture fixture = new Fixture();
+        UUID callId = UUID.randomUUID();
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        CallSession call = certifiedCall();
+
+        when(fixture.calls.findById(callId)).thenReturn(Optional.of(call));
+        when(fixture.transcripts.findAllByCallIdOrderBySequenceNumberAsc(callId))
+                .thenReturn(List.of(mock(CallTranscript.class)));
+        when(fixture.summaries.findByCallId(callId))
+                .thenReturn(Optional.of(mock(CallSummary.class)));
+        when(fixture.actions.findAllByCallIdOrderByCreatedAtAsc(callId)).thenReturn(List.of(
+                action("SERVICES_LISTED", true, null),
+                action("AVAILABILITY_CHECKED", true, null),
+                action("BOOKING_CREATED", true, first),
+                action("BOOKING_CREATED", true, second),
+                action("BOOKING_CANCELLED", true, first)));
+        when(fixture.bookings.findByIdAndBusinessId(first, call.getBusinessId()))
+                .thenReturn(Optional.of(booking(BookingStatus.CANCELLED)));
+        when(fixture.bookings.findByIdAndBusinessId(second, call.getBusinessId()))
+                .thenReturn(Optional.of(booking(BookingStatus.CANCELLED)));
+
+        var result = fixture.service.verifyAndCleanup(callId);
+
+        assertFalse(result.success());
+        assertTrue(result.reason().contains("booking_cancelled_not_successful"));
+        assertEquals(0, result.cleanupCancelled());
+    }
+
     private static CallSession certifiedCall() {
         CallSession call = new CallSession();
         call.setBusinessId(UUID.randomUUID());
         call.setCertification(true);
+        call.setStatus(CallStatus.COMPLETED);
+        call.setTelephonyProvider("twilio");
+        call.setProviderCallId("CA" + "a".repeat(32));
+        call.setPhoneNumberId(UUID.randomUUID());
+        call.setAiProvider("gemini");
         call.setStreamStartedAt(Instant.now().minusSeconds(10));
         call.setStreamEndedAt(Instant.now());
         call.setAiSetupCompletedAt(Instant.now().minusSeconds(9));

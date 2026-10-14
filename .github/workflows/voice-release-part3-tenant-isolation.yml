@@ -1,0 +1,64 @@
+name: Helvoca Part 3 Tenant Isolation and Twilio Approval Security (offline)
+
+on:
+  push:
+    branches:
+      - 'test/voice-release-part3-tenant-isolation-*'
+  pull_request:
+    paths:
+      - '.github/workflows/voice-release-part3-tenant-isolation.yml'
+      - 'src/test/java/cl/helvoca/security/TwilioPhoneTenantBoundaryPostgresIntegrationTest.java'
+      - 'docs/telephony/2026-10-13-voice-release-part3-security-no-go.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres18-phone-rls-and-platform-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HELVOCA_OUTBOUND_DELIVERY_ENABLED: 'false'
+      HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED: 'false'
+      HELVOCA_TWILIO_SUBACCOUNT_VOICE_CONFIGURE_ON_STARTUP: 'false'
+      HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+      TWILIO_CERTIFICATION_CALL_ON_STARTUP: 'false'
+      TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED: 'false'
+      TWILIO_PROVISIONING_ENABLED: 'false'
+      GEMINI_LIVE_ENABLED: 'false'
+      OPENAI_LIVE_ENABLED: 'false'
+      GEMINI_LIVE_PROBE_ON_STARTUP: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run real PostgreSQL 18 forced-RLS phone, platform approval and carrier-route gate regressions
+        run: |
+          mvn --batch-mode --no-transfer-progress \
+            -Dtest=TwilioPhoneTenantBoundaryPostgresIntegrationTest,PostgresRowLevelSecurityIntegrationTest,TwilioExistingEnrollmentAdminPostgresIntegrationTest,TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest,VoiceCarrierOwnershipPreflightServiceTest,VoiceCarrierOwnershipPreflightControllerTest \
+            test
+
+  migration-security-policy-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify V100-V103 frozen source, Git blob checksums and no implicit certification
+        run: |
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part2_migration_contract.py' -v
+          python3 scripts/ci/voice_part2_migration_contract.py
+      - name: Reject changes in existing V100-V103 migrations in this PR
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          tests=Path("src/test/java/cl/helvoca/security/TwilioPhoneTenantBoundaryPostgresIntegrationTest.java").read_text()
+          assert 'postgres:18-alpine' in tests
+          assert 'TWILIO' in tests
+          assert 'DataAccessException' in tests
+          assert 'twilio_existing_enrollment_audit' in tests
+          print("PART3_SECURITY_TEST_POLICY_OK; PROD_DEPLOY=NO-GO")
+          PY

@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class GptLiveEndToEndContractTest {
+    private static final String ACCOUNT_SID = "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private HttpServer server;
 
     @BeforeEach
@@ -86,6 +87,9 @@ class GptLiveEndToEndContractTest {
                 liveSip);
         TwilioVoiceController controller = new TwilioVoiceController(
                 mock(TwilioCallService.class), router, mock(CallSummaryService.class), new TwilioProperties());
+        cl.helvoca.telephony.twilio.TwilioCallBindingGuard guard = mock(cl.helvoca.telephony.twilio.TwilioCallBindingGuard.class);
+        when(guard.allowsIncoming(anyString(), anyString(), anyString(), anyString())).thenReturn(true);
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "bindingGuard", guard);
 
         String callSid = "CA0123456789abcdef0123456789abcdef";
         String businessPhone = "+14355652512";
@@ -101,7 +105,7 @@ class GptLiveEndToEndContractTest {
         when(tools.execute(context, "get_business_information", "{}"))
                 .thenReturn("{\"success\":true,\"data\":{\"name\":\"Restaurante Demo\"},\"error\":null}");
 
-        var twilioResponse = controller.outboundTest(callSid, businessPhone, callerPhone);
+        var twilioResponse = controller.outboundTest(callSid, businessPhone, callerPhone, ACCOUNT_SID);
         assertEquals(200, twilioResponse.getStatusCode().value());
         String xml = twilioResponse.getBody();
         assertNotNull(xml);

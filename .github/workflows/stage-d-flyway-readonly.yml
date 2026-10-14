@@ -1,0 +1,34 @@
+name: Stage D Production Flyway Read-Only Contract (offline CI)
+
+on:
+  push:
+    branches:
+      - 'chore/voice-pilot-stage-d-operational-preflight-*'
+  pull_request:
+    paths:
+      - 'scripts/ops/railway_pg18_flyway_readonly_preflight.py'
+      - 'scripts/ops/test_railway_pg18_flyway_readonly_preflight.py'
+      - 'docs/telephony/2026-10-13-stage-d-operational-readonly-preflight.md'
+      - '.github/workflows/stage-d-flyway-readonly.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safe-flyway-preflight-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact branch SHA
+        uses: actions/checkout@v7
+      - name: Run isolated safety tests with no credentials or network
+        run: python3 -m unittest discover -s scripts/ops -p 'test_railway_pg18_flyway_readonly_preflight.py' -v
+      - name: Compile Python and verify only the pre-authorized SQL template
+        run: |
+          python3 -m py_compile scripts/ops/railway_pg18_flyway_readonly_preflight.py
+          python3 -m py_compile scripts/ops/test_railway_pg18_flyway_readonly_preflight.py
+      - name: Confirm production evidence is not forged by CI
+        run: |
+          grep -q 'PRODUCTION_FLYWAY_READ_ONLY=PENDING' docs/telephony/2026-10-13-stage-d-operational-readonly-preflight.md
+          grep -q 'TWILIO_CARRIER_IDENTITY=PENDING' docs/telephony/2026-10-13-stage-d-operational-readonly-preflight.md
