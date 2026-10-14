@@ -7,6 +7,10 @@ const json = body => ({
 });
 
 async function bootAgenda(page, options = {}) {
+  // Freeze the browser wall clock to the same week as this suite's
+  // 2026-10-05/06 booking fixtures. This does not mock timers or production
+  // behavior; it prevents the calendar week from drifting with CI run dates.
+  await page.clock.setFixedTime(new Date('2026-10-07T12:00:00.000Z'));
   await page.addInitScript(
     token => sessionStorage.setItem('helvoca_access_token', token),
     options.token || 'agenda-react-e2e'
