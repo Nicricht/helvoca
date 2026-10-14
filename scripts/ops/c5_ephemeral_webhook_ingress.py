@@ -44,7 +44,10 @@ _SAFE_REJECT_CAUSES = {
     "invalid JSON": "ENVELOPE",
     "JSON object required": "ENVELOPE",
     "duplicate query": "ENVELOPE",
-    "unrecognized or conflicting topic": "TOPIC_SHAPE",
+    "topic missing": "TOPIC_MISSING",
+    "query topic unsupported": "TOPIC_QUERY_UNSUPPORTED",
+    "body topic unsupported": "TOPIC_BODY_UNSUPPORTED",
+    "topic conflict": "TOPIC_CONFLICT",
     "event id required": "EVENT_ID_MISSING",
     "conflicting event id": "EVENT_ID_CONFLICT",
     "event id invalid": "EVENT_ID_FORMAT",
@@ -107,9 +110,8 @@ def verify(body, query, headers, secret, now_ms=None):
     for key in ("type", "data.id"):
         if len(params.get(key, [])) > 1:
             raise InvalidWebhook("duplicate query")
-    topic = params.get("type", [data.get("type")])[0]
-    if topic not in ALLOWED_TOPICS or data.get("type") not in (None, topic):
-        raise InvalidWebhook("unrecognized or conflicting topic")
+    # Authenticate the request before diagnosing its notification topic.
+    # A syntactically valid request with a wrong HMAC must never look trusted.
     wrapped = data.get("data")
     body_id = wrapped.get("id") if isinstance(wrapped, dict) else None
     query_id = params.get("data.id", [None])[0]
@@ -122,13 +124,29 @@ def verify(body, query, headers, secret, now_ms=None):
     event_id = query_id if query_id is not None else body_id
     if not isinstance(event_id, str):
         raise InvalidWebhook("event id invalid")
-    allowed = NUMBER if topic == "subscription_authorized_payment" else PREAPPROVAL
-    if not allowed.fullmatch(event_id):
+    # Bound and normalize identifier before HMAC, without inferring topic.
+    if not PREAPPROVAL.fullmatch(event_id):
         raise InvalidWebhook("event id shape invalid")
     manifest = f"id:{event_id.lower()};request-id:{request_id};ts:{ts};".encode()
     expected = hmac.new(secret.encode(), manifest, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, supplied):
         raise InvalidWebhook("HMAC mismatch")
+
+    # Fixed labels distinguish a real provider format mismatch from a
+    # bad signature, without publishing raw query, body, topic or IDs.
+    query_topic = params.get("type", [None])[0]
+    body_topic = data.get("type")
+    if query_topic is None and body_topic is None:
+        raise InvalidWebhook("topic missing")
+    if query_topic is not None and query_topic not in ALLOWED_TOPICS:
+        raise InvalidWebhook("query topic unsupported")
+    if body_topic is not None and body_topic not in ALLOWED_TOPICS:
+        raise InvalidWebhook("body topic unsupported")
+    if query_topic is not None and body_topic is not None and query_topic != body_topic:
+        raise InvalidWebhook("topic conflict")
+    topic = query_topic if query_topic is not None else body_topic
+    if topic == "subscription_authorized_payment" and not NUMBER.fullmatch(event_id):
+        raise InvalidWebhook("event id shape invalid")
     return topic, event_id
 
 def require_sandbox_event(payload):
