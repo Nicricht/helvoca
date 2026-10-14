@@ -98,6 +98,11 @@ export function PlanConsumptionPage() {
   const reduceMotion = useReducedMotion();
   const model = usePlanConsumption();
   const subscription = model.subscription.data;
+  const intentCode = new URLSearchParams(window.location.search).get("plan");
+  const intentNames: Record<string, string> = { EMPRENDE: "Emprende", NEGOCIO: "Negocio", PRO: "Pro" };
+  const intentName = intentCode && Object.prototype.hasOwnProperty.call(intentNames, intentCode)
+    ? intentNames[intentCode]
+    : null;
 
   const loading = model.subscription.isPending || model.me.isPending;
   const failed = model.subscription.isError;
@@ -196,6 +201,13 @@ export function PlanConsumptionPage() {
             <p>Tu plan y consumo de este período.</p>
           </div>
         </header>
+
+        {intentName && (
+          <p className={styles.manageStatus} data-testid="plan-intent-unpaid" role="status">
+            Elegiste {intentName} al registrarte. Puedes revisar las opciones de abajo, pero
+            ningún cambio ni cobro se inicia automáticamente.
+          </p>
+        )}
 
         <motion.section
           className={styles.planCard}
