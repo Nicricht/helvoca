@@ -115,7 +115,9 @@ test.describe('React PLATFORM_ADMIN console migration', () => {
     const root = path.resolve(__dirname, '..');
     const authPage = fs.readFileSync(path.join(root, 'frontend/src/pages/Auth/AuthPage.tsx'), 'utf8');
 
-    expect(authPage).toContain('roles.includes("PLATFORM_ADMIN") ? "/app/platform" : "/app"');
+    expect(authPage).toContain('roles.includes("PLATFORM_ADMIN")) return "/app/platform"');
+    expect(authPage).toContain('window.location.replace(destinationForRoles(me.roles))');
+    expect(authPage).toContain('window.location.assign(destinationForRoles(result.user?.roles))');
     expect(authPage).not.toContain('/platform.html');
   });
 });

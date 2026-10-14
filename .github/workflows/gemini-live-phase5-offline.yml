@@ -1,0 +1,36 @@
+name: Gemini Live Phase 5 Offline Contracts
+
+# Dedicated isolated regression suite: no live Google/Twilio/Railway calls.
+# Never grants production credentials or executes the production HTTP smoke.
+on:
+  push:
+    branches:
+      - 'feat/gemini-live-offline-session-config-phase5-*'
+
+permissions:
+  contents: read
+
+jobs:
+  gemini-live-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GEMINI_LIVE_ENABLED: 'false'
+      GEMINI_LIVE_PROBE_ON_STARTUP: 'false'
+      TWILIO_PROVISIONING_ENABLED: 'false'
+      HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED: 'false'
+      HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v7
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Validate model, session snapshot, audio, VAD, barge-in and tool replay with mocks
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dtest=GeminiLiveVoiceProviderBakeOffTest,GeminiLiveVoiceSessionTest,GeminiLiveAudioInterruptionContractTest,GeminiLiveModelPolicyTest,GeminiLiveRuntimeReadinessTest,GeminiLiveModelBaselineTest,GeminiLivePropertiesLatencyTest,GeminiLiveLowLatencySetupTest,GeminiLiveToolReplayContractTest,GeminiTwilioAudioFramerTest,LocalBargeInDetectorTest,PcmuAudioCodecTest,GeminiToolCallLedgerTest,VoiceCommercialLifecycleCertificationTest
+          test

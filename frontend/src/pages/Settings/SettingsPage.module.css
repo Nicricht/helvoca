@@ -1834,3 +1834,34 @@
   .heroAction {min-height: 36px;}
   .advancedHeading {align-items: flex-start; flex-direction: column;}
 }
+
+/* Voice setup diagnostics: explain what is verified without suggesting live activation. */
+.voiceSetupGuide {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  margin: 16px 0;
+  border: 1px solid var(--border, #d5dce5);
+  border-radius: 16px;
+  background: var(--surface, #ffffff);
+}
+
+.voiceSetupHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.voiceSetupHeading strong { font-size: 1rem; }
+.voiceSetupHeading p, .voiceSetupGuide p { margin: 5px 0; line-height: 1.5; }
+.voiceSetupStatus { font-weight: 600; }
+.voiceSetupSteps { padding: 0; margin: 0; display: grid; gap: 10px; list-style: none; }
+.voiceSetupSteps li { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 10px; border: 1px solid var(--border, #e0e4eb); }
+.voiceSetupSteps li > div { flex: 1; min-width: 0; }
+.voiceSetupSteps a { display: inline-block; margin-top: 5px; text-decoration: underline; text-underline-offset: 3px; }
+.voiceSetupComplete, .voiceSetupPending { display: inline-flex; flex: none; border-radius: 6px; padding: 3px 7px; font-size: .72rem; font-weight: 700; }
+.voiceSetupComplete { color: #155c40; background: #e4f5e9; }
+.voiceSetupPending { color: #79511b; background: #fff1d6; }
+.voiceSetupNotice { font-size: .9rem; border-top: 1px solid var(--border, #e0e4eb); padding-top: 12px; }

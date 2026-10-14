@@ -1,0 +1,146 @@
+{
+  "schema": "helvoca.voice.release-handoff.offline.v1",
+  "captured_on": "2026-10-13",
+  "repository": "Nicricht/helvoca",
+  "classification": "OBSERVED_GITHUB_SNAPSHOT_NOT_LIVE_PROVIDER_ATTESTATION",
+  "scope": "PART10_OFFLINE_RELEASE_CANDIDATE",
+  "expected_main_sha_at_capture": "ca58693e167752bd6eab8ff4e9be770391fe4293",
+  "root_parent_pr": 810,
+  "root_parent_head_sha": "fa58a1852499ce728554d20f76c1f4b7bb033267",
+  "stack": [
+    {
+      "phase": 1,
+      "pr": 811,
+      "branch": "audit/voice-release-part1-lineage-20261013",
+      "sha": "38aad94e8b2e0abe51885eab71203010ffe4b9c3",
+      "base_branch": "test/voice-pilot-stage-d-carrier-db-readonly-20261013",
+      "observed_state": "open",
+      "observed_draft": true,
+      "observed_merged": false
+    },
+    {
+      "phase": 2,
+      "pr": 812,
+      "branch": "test/voice-release-part2-pg18-upgrade-20261013",
+      "sha": "6520ede7e072483f83cd0a70e2eb21cb186c87e6",
+      "base_branch": "audit/voice-release-part1-lineage-20261013",
+      "observed_state": "open",
+      "observed_draft": true,
+      "observed_merged": false
+    },
+    {
+      "phase": 3,
+      "pr": 813,
+      "branch": "test/voice-release-part3-tenant-isolation-20261013",
+      "sha": "25f45a898ec531d90d06a7e547e0a16f1f4fae3a",
+      "base_branch": "test/voice-release-part2-pg18-upgrade-20261013",
+      "observed_state": "open",
+      "observed_draft": true,
+      "observed_merged": false
+    },
+    {
+      "phase": 4,
+      "pr": 814,
+      "branch": "test/voice-release-part4-twilio-reconciliation-20261013",
+      "sha": "80094d6316ac92006c376cb7ab4514abe837bb6f",
+      "base_branch": "test/voice-release-part3-tenant-isolation-20261013",
+      "observed_state": "open",
+      "observed_draft": true,
+      "observed_merged": false
+    },
+    {
+      "phase": 5,
+      "pr": 815,
+      "branch": "test/voice-release-part5-integrated-offline-20261013",
+      "sha": "5a78ec252a6133574dedc4b1b55df2c5d650b219",
+      "base_branch": "test/voice-release-part4-twilio-reconciliation-20261013",
+      "observed_state": "open",
+      "observed_draft": true,
+      "observed_merged": false
+    },
+    {
+      "phase": 6,
+      "pr": 816,
+      "branch": "test/voice-release-part6-recovery-offline-20261013",
+      "sha": "8939fd4844eee83bcf74c71c7e0685de24f05f19",
+      "base_branch": "test/voice-release-part5-integrated-offline-20261013",
+      "observed_state": "open",
+      "observed_draft": true,
+      "observed_merged": false
+    },
+    {
+      "phase": 7,
+      "pr": 817,
+      "branch": "test/voice-release-part7-predeployment-no-go-20261013",
+      "sha": "0574feb80c8e4c20ab699f598f060fa57f5564af",
+      "base_branch": "test/voice-release-part6-recovery-offline-20261013",
+      "observed_state": "open",
+      "observed_draft": true,
+      "observed_merged": false
+    },
+    {
+      "phase": 8,
+      "pr": 818,
+      "branch": "test/voice-release-part8-gemini-cost-consent-offline-20261013",
+      "sha": "304aba39a7aed6932ce69af1a8a4c4a905e2ce44",
+      "base_branch": "test/voice-release-part7-predeployment-no-go-20261013",
+      "observed_state": "open",
+      "observed_draft": true,
+      "observed_merged": false
+    },
+    {
+      "phase": 9,
+      "pr": 819,
+      "branch": "test/voice-release-part9-full-regression-offline-20261013",
+      "sha": "663ef0c54e02e0e86b828cd913c2aab4bc5b42da",
+      "base_branch": "test/voice-release-part8-gemini-cost-consent-offline-20261013",
+      "observed_state": "open",
+      "observed_draft": true,
+      "observed_merged": false
+    }
+  ],
+  "last_integrated_offline_ci": {
+    "phase": 9,
+    "candidate_sha": "663ef0c54e02e0e86b828cd913c2aab4bc5b42da",
+    "push_run_id": 38378146552,
+    "pr_run_id": 38378187941,
+    "expected_jobs_each": 8,
+    "push_conclusion": "success",
+    "pr_conclusion": "success"
+  },
+  "observed_railway": {
+    "api": "online",
+    "postgres": "online",
+    "replicas_api": "1/1",
+    "replicas_postgres": "1/1",
+    "deployment_api_id": "4636d0d9-7be0-4a66-abce-58c68ccaede5",
+    "production_data_accessed": false
+  },
+  "release_blockers": {
+    "current_flyway_version_readonly_verified": false,
+    "production_backup_fresh_restored": false,
+    "encrypted_independent_offsite_copy_restored": false,
+    "representative_rpo_rto_measured": false,
+    "twilio_account_pn_sid_tenant_provenance_reconciled": false,
+    "twilio_current_webhook_verified": false,
+    "gemini_api_key_project_and_model_entitlement_verified": false,
+    "provider_pricing_and_enforceable_cost_limit_verified": false,
+    "recording_consent_and_participant_approval_verified": false,
+    "two_independent_operator_approvals_verified": false,
+    "maintenance_window_and_rollback_signoff_verified": false
+  },
+  "authorizations": {
+    "may_merge": false,
+    "may_deploy": false,
+    "may_migrate_production": false,
+    "may_write_twilio": false,
+    "may_update_webhooks": false,
+    "may_open_billable_model_session": false,
+    "may_make_real_calls": false,
+    "may_launch_commercially": false
+  },
+  "production_go": "NO-GO",
+  "live_call_certified": false,
+  "commercial_go": false,
+  "disclaimer": "All true/false fields are historical documentation and local release locks, not authenticated Twilio/Google/Railway/database claims. Passing CI never authorizes production work."
+}

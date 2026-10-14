@@ -1,0 +1,360 @@
+name: Helvoca Part 9 Eight Full Offline Cross-Tenant Release Gates
+
+# PART 9: full seven-gate suite repeated at the current exact candidate SHA.
+# Eighth job proves multi-tenant voice negatives on isolated PostgreSQL 18.
+# No production public HTTP smoke, carrier calls, model calls or deploy.
+on:
+  push:
+    branches:
+      - 'test/voice-release-part9-full-regression-offline-*'
+  pull_request:
+    branches:
+      - 'test/voice-release-part8-gemini-cost-consent-offline-*'
+
+env:
+  HELVOCA_OUTBOUND_DELIVERY_ENABLED: 'false'
+  HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED: 'false'
+  HELVOCA_TWILIO_SUBACCOUNT_VOICE_CONFIGURE_ON_STARTUP: 'false'
+  HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+  TWILIO_PROVISIONING_ENABLED: 'false'
+  TWILIO_CERTIFICATION_CALL_ON_STARTUP: 'false'
+  TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED: 'false'
+  GEMINI_LIVE_ENABLED: 'false'
+  GEMINI_LIVE_PROBE_ON_STARTUP: 'false'
+  OPENAI_LIVE_ENABLED: 'false'
+  HELVOCA_OUTBOUND_PROVIDER: NONE
+  APP_JOBS_ENABLED: 'false'
+
+permissions:
+  contents: read
+
+jobs:
+  meta-webhook-offline-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Deny production URLs, mutations and unsafe gate substitutions
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part9_integrated_gate_contract.py' -v
+          python3 scripts/ci/voice_part9_integrated_gate_contract.py
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part5_integrated_gate_contract.py' -v
+          python3 scripts/ci/voice_part5_integrated_gate_contract.py
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part8_model_cost_consent_gate.py' -v
+          python3 scripts/ci/voice_part8_model_cost_consent_gate.py --simulate-blocked
+          python3 scripts/ci/voice_part8_model_cost_consent_gate.py --simulate-review
+      - name: Validate signed webhook and read-only carrier contracts without HTTP to production
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dtest=TwilioSignatureValidationFilterTest,TwilioExistingNumberOwnershipVerifierTest,TwilioProductionAuditPreparationContractTest
+          test
+
+  golden-journey-release-contract:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run commercial Golden Journey release contract
+        run: bash scripts/ci/pilot-e2e-certification.sh
+
+  fast-gate:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Run targeted Fast Gate
+        env:
+          BASE_SHA: '25f45a898ec531d90d06a7e547e0a16f1f4fae3a'
+        run: bash scripts/ci/fast-gate.sh "$BASE_SHA"
+
+  test:
+    needs: [fast-gate, golden-journey-release-contract]
+
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Validate console JavaScript
+        run: |
+          node --check e2e/react-public-entry-migration.spec.js
+          node --check e2e/react-settings-core.spec.js
+          node --check e2e/commercial-status.spec.js
+          node --check e2e/react-settings-hardening.spec.js
+          node --check e2e/frontend-ux.spec.js
+
+      - name: Require React TypeScript typecheck before backend/browser integration
+        run: |
+          npm install --no-audit --no-fund
+          npm run frontend:typecheck
+      - name: Run backend tests with JaCoCo
+        run: |
+          set -o pipefail
+          mvn --batch-mode --no-transfer-progress -Pcoverage test 2>&1 | tee backend-test.log
+
+      - name: Enforce differential Java coverage
+        env:
+          BASE_SHA: '25f45a898ec531d90d06a7e547e0a16f1f4fae3a'
+          DIFF_LINE_COVERAGE: "100"
+          DIFF_BRANCH_COVERAGE: "100"
+          DIFF_METHOD_COVERAGE: "100"
+        run: python3 scripts/ci/check_diff_coverage.py "$BASE_SHA"
+
+      - name: Upload backend test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-diagnostics
+          path: |
+            backend-test.log
+            target/surefire-reports/**
+            target/site/jacoco/**
+          if-no-files-found: warn
+
+      - name: Install browser test dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Run browser E2E
+        env:
+          VISUAL_EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -o pipefail
+          npm run test:e2e 2>&1 | tee playwright-test.log
+
+      - name: Upload frontend visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-visual-evidence
+          path: test-results/visual-evidence/**
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload Playwright diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-diagnostics
+          path: |
+            playwright-test.log
+            test-results/**
+            playwright-report/**
+          if-no-files-found: warn
+
+
+  inventory-frontend-coverage:
+    needs: [fast-gate]
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install browser testing dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Build explicitly instrumented Inventory source
+        env:
+          VITE_COVERAGE: "true"
+        run: npm run frontend:build
+      - name: Inventory coverage test discovery manifest
+        run: npx playwright test e2e/react-inventory*.spec.js --list | tee .inventory-coverage-tests.txt
+      - name: Exercise Inventory behavior in Chromium
+        env:
+          VITE_COVERAGE: "true"
+        run: npx playwright test e2e/react-inventory*.spec.js
+      - name: Require affected Inventory original-source coverage (100% default; explicit PR 768 exception)
+        env:
+          INVENTORY_PR768_COVERAGE_EXCEPTION: "approved-95pct"
+        run: node scripts/ci/check-inventory-frontend-coverage.cjs
+      - name: Upload measured frontend coverage and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inventory-frontend-source-coverage
+          path: |
+            test-results/inventory-coverage/**
+            .inventory-coverage-raw/**
+            .inventory-coverage-tests.txt
+            test-results/**/error-context.md
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: true
+
+  home-frontend-coverage:
+    needs: [fast-gate]
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install Chromium browser dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Build instrumented original Home source
+        env:
+          VITE_HOME_COVERAGE: "true"
+        run: npm run frontend:build
+      - name: Discover all Home browser cases
+        run: npx playwright test e2e/react-home.spec.js --list | tee .home-coverage-tests.txt
+      - name: Capture Home source coverage in real Chromium
+        env:
+          VITE_HOME_COVERAGE: "true"
+        run: npx playwright test e2e/react-home.spec.js
+      - name: Require strict 100 percent remapped Home lines branches statements functions
+        run: node scripts/ci/check-home-frontend-coverage.cjs
+      - name: Archive Home coverage evidence even if gate fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: home-frontend-source-coverage
+          path: |
+            test-results/home-coverage/**
+            .home-coverage-raw/**
+            .home-coverage-tests.txt
+            test-results/**/error-context.md
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: true
+
+  system-integration-e2e:
+    needs: [fast-gate, golden-journey-release-contract]
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: helvoca
+          POSTGRES_USER: helvoca
+          POSTGRES_PASSWORD: helvoca
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U helvoca -d helvoca"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Run real stack system E2E
+        env:
+          DB_URL: jdbc:postgresql://127.0.0.1:5432/helvoca
+          DB_USERNAME: helvoca
+          DB_PASSWORD: helvoca
+          SYSTEM_E2E_BASE_URL: http://127.0.0.1:8080
+        run: bash scripts/ci/system-e2e.sh
+
+      - name: Upload system E2E diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-e2e-diagnostics
+          path: |
+            system-e2e-backend.log
+            test-results/system-e2e/**
+          if-no-files-found: warn
+
+
+  part9-cross-tenant-voice-adversarial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Check forced RLS tenant boundaries, Twilio verified ownership and safe voice routing on ephemeral PG18
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dhelvoca.test.postgres.image=postgres:18-alpine
+          -Dtest=TwilioPhoneTenantBoundaryPostgresIntegrationTest,PostgresRowLevelSecurityIntegrationTest,TwilioExistingEnrollmentAdminPostgresIntegrationTest,TwilioExistingEnrollmentReconcilerPostgresIntegrationTest,TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest,RealtimeToolTenantScopeIntegrationTest,TwilioMediaStreamStartupRecoveryPhase7Test,GeminiLiveRuntimeReadinessTest
+          test

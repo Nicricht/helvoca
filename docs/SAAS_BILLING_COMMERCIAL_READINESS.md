@@ -247,3 +247,9 @@ Run exactly one provider test before enabling a real customer:
 10. confirm a subsequent approved invoice returns the subscription to `ACTIVE`.
 
 Only after those ten checks should `MERCADOPAGO_ENABLED` be enabled with live credentials for real SaaS collection.
+
+## 2026-10-14 C5-A public-plan-intent repair (PR stacked on #842)
+
+Public Pricing fixed-price CTAs previously all linked to `/`, losing the chosen plan during registration. This is a **UI navigation defect**, not a provider failure. Now each fixed-price CTA passes the catalog public code as an encoded `plan` query to `/app/auth`. Auth redirects the authenticated BUSINESS_ADMIN to `/app/plan?plan=...` (valid only for EMPRENDE, NEGOCIO, PRO) and preserves the PLATFORM_ADMIN platform destination. `/app/plan` acknowledges/highlights the corresponding catalog plan; it **does not call** `/api/v1/billing/checkout` on navigation or authentication. A further explicit user confirmation is required before the billing mutation; provider-approved payment remains necessary for entitlement activation. Unknown values and ENTERPRISE are never treated as fixed-price intent; the Enterprise CTA goes to the existing Sales route, **not to self-service checkout**. A working individualized enterprise quote intake is not certified by this change and remains a C6/C7 business-process gap.
+
+Playwright regression cases cover three distinct public prices, registered and logged-in business admins, platform-admin isolation, no automatic checkout, unknown/enterprise inputs and in-app selected-plan feedback. The backend payment contract is unchanged, and the earlier authentic TEST invoice + real PostgreSQL-with-mocked-provider tests retain their original evidence boundaries. Exact new SHA, CI result, and any limitations must be recorded in this change's PR and Issue #823; never infer provider delivery or a production deploy from a browser E2E green result.

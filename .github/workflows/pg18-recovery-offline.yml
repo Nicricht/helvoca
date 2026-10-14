@@ -1,0 +1,33 @@
+name: Helvoca PostgreSQL 18 Recovery Offline Safety
+
+on:
+  push:
+    branches:
+      - 'chore/voice-pilot-post6-railway-recovery-audit-*'
+  pull_request:
+    paths:
+      - 'scripts/ops/railway_pg18_snapshot_drill.py'
+      - 'scripts/ops/test_railway_pg18_snapshot_drill.py'
+      - 'scripts/ops/test_railway_postgres_recovery_audit.py'
+      - 'scripts/ops/railway_postgres_recovery_audit.py'
+      - '.github/workflows/pg18-recovery-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-backup-and-isolated-restore-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v7
+      - name: Validate offline fail-closed backup contracts
+        run: python3 -m unittest discover -s scripts/ops -p 'test_railway_*.py' -v
+      - name: Reject accidental production restore commands
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -Eq '(createdb|dropdb|pg_restore).*(--project|--service)' scripts/ops/railway_pg18_snapshot_drill.py
+          python3 -m py_compile scripts/ops/railway_postgres_recovery_audit.py scripts/ops/railway_pg18_snapshot_drill.py

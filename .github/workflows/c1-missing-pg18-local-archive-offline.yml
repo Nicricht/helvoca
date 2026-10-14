@@ -1,0 +1,121 @@
+name: Helvoca C1 missing local PG18 archive recovery (offline)
+
+on:
+  push:
+    branches:
+      - 'feat/c1-missing-archive-*'
+  pull_request:
+    branches:
+      - 'feat/c4-voice-session-deadline-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  missing-archive-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Confirm Python syntax
+        run: python3 -m py_compile scripts/ops/c1_replace_missing_offsite_archive.py scripts/ops/c1_railway_ascii_pg18_export.py scripts/ops/test_c1_replace_missing_offsite_archive.py scripts/ops/test_c1_railway_ascii_pg18_export.py scripts/ops/c1_independent_remote_restore.py scripts/ops/test_c1_independent_remote_restore.py scripts/ops/c1_unattended_institutional_backup.py scripts/ops/test_c1_unattended_institutional_backup.py scripts/ops/c1_railway_cron_backup.py scripts/ops/test_c1_railway_cron_backup.py
+      - name: Parse one-time institutional OAuth PowerShell wizard, without executing it
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("scripts/ops/c1_authorize_institutional_drive.ps1", [ref]$tokens, [ref]$errors)
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Host ("C1_PARSE_LINE_{0}: {1}" -f $_.Extent.StartLineNumber, $_.Message) }; throw "C1_OAUTH_POWERSHELL_SYNTAX_INVALID" }
+          Write-Host "C1_OAUTH_POWERSHELL_SYNTAX_PASS"
+      - name: Synthetic offline security and failure regressions
+        run: |
+          python3 scripts/ops/test_c1_replace_missing_offsite_archive.py -v
+          python3 scripts/ops/test_c1_railway_ascii_pg18_export.py -v
+          python3 scripts/ops/test_c1_independent_remote_restore.py -v
+          python3 scripts/ops/test_c1_unattended_institutional_backup.py -v
+          python3 scripts/ops/test_c1_railway_cron_backup.py -v
+      - name: Check no production effects or plain remote dump commands
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('scripts/ops/c1_replace_missing_offsite_archive.py').read_text()
+          assert 'dump_from_railway' in src
+          assert 'restore_to_disposable_docker' in src
+          assert 'run_age' in src
+          assert '--passphrase' in src
+          assert 'remote_sync_or_offsite_durability_verified": False' in src
+          assert 'commercial_go": False' in src
+          transport=Path('scripts/ops/c1_railway_ascii_pg18_export.py').read_text()
+          assert 'set -o pipefail' in transport
+          assert 'base64.b64decode' in transport
+          assert 'path.open("xb")' in transport
+          assert 'archive_created' in transport
+          restored=Path('scripts/ops/c1_independent_remote_restore.py').read_text()
+          assert 'REMOTE_ENCRYPTED_SHA256' in restored
+          assert 'sha256_file(path)' in restored
+          assert 'restore_to_disposable_docker' in restored
+          assert 'dump_from_railway' not in restored
+          assert 'REMOTE_DOWNLOAD_SHA256_MISMATCH' in restored
+          assert 'complete_production_rto_verified": False' in restored
+          assert 'railway ssh' not in restored.lower()
+          assert 'production_modified": False' in restored
+          unattended=Path('scripts/ops/c1_unattended_institutional_backup.py').read_text()
+          assert 'HELVOCA_C1_ALLOW_EXECUTION' in unattended
+          assert 'read_only_encrypted_backup_approved' in unattended
+          assert 'remote_cipher_digest' in unattended
+          assert 'C1_REMOTE_CIPHER_SHA256_MISMATCH' in unattended
+          assert 'TemporaryDirectory' in unattended
+          assert 'rclone, "copyto", "--immutable"' in unattended
+          assert 'rclone, "cat"' in unattended
+          assert 'rclone, "delete"' not in unattended
+          assert 'commercial_go": False' in unattended
+          native=Path('scripts/ops/c1_railway_cron_backup.py').read_text()
+          image=Path('infra/backup-cron/Dockerfile').read_text()
+          assert 'PGPASSWORD' in native
+          assert 'HELVOCA_C1_ALLOW_EXECUTION' not in native or 'require_approval' in native
+          assert 'require_approval(execute=args.execute' in native
+          assert 'institutional:' in native
+          assert '--no-password' in native
+          assert 'remote_cipher_digest' in native
+          assert 'private_pg_dump' in native
+          assert 'rclone, "copyto", "--immutable"' in native
+          assert 'rclone, "delete"' not in native
+          assert 'railway ssh' not in native.lower()
+          assert 'commercial_go": False' in native
+          assert 'CMD ["python3", "-c"' in image
+          assert 'postgres:18-' in image
+          assert 'age rclone' in image
+          oauth=Path('scripts/ops/c1_authorize_institutional_drive.ps1').read_text()
+          assert 'type = drive`nscope = drive.file' in oauth
+          assert '[IO.File]::AppendAllText($conf, $remoteBlock)' in oauth
+          assert 'Get-FileHash $zip -Algorithm SHA256' in oauth
+          assert 'variable set $Name --stdin' in oauth
+          assert '--skip-deploys' in oauth
+          assert 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' in oauth
+          assert "HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE" in oauth
+          assert 'config reconnect "$($remote):"' in oauth
+          assert "Assert-NativeSuccess 'C1_GOOGLE_OAUTH_NOT_AUTHORIZED'" in oauth
+          assert '[switch]$FreshAccount' in oauth
+          assert '[string]$ExpectedEmail' in oauth
+          assert "C1_OAUTH_ACCOUNT_MISMATCH" in oauth
+          assert "C1_GOOGLE_ACCOUNT_INSTITUTIONAL_VERIFIED" in oauth
+          assert "https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)" in oauth
+          assert oauth.index("C1_OAUTH_ACCOUNT_MISMATCH") < oauth.index("mkdir")
+          assert "[regex]::Escape($remote)" in oauth
+          assert "institutional_c1_" in oauth
+          assert 'Secure-File $conf' in oauth
+          assert '1>$null 2>$null' in oauth
+          assert "C1_OAUTH_UNEXPECTED_' + $script:stage" in oauth
+          assert "C1_OAUTH_SETUP_PRIVATE_FAILURE" not in oauth
+          assert "$script:stage = 'DRIVE_FOLDER'" in oauth
+          assert 'HelvocaBackups-Automaticos' in oauth
+          assert 'AGE-SECRET-KEY-' not in oauth
+          assert 'docker' not in oauth.lower()
+          assert 'age-test' not in src
+          assert 'merge_pull_request' not in src
+          print('C1_MISSING_ARCHIVE_OFFLINE_SAFETY=PASS')
+          PY

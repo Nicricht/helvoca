@@ -1,0 +1,43 @@
+{
+  "note": "READ ONLY evidence template. Unknowns are deliberately null/false. Not a release approval.",
+  "baseline": {
+    "service_name": "helvoca-api",
+    "production_commit": "ca58693e167752bd6eab8ff4e9be770391fe4293",
+    "production_branch": "main",
+    "staged_changes": 0
+  },
+  "release": {
+    "candidate_commit": null,
+    "full_ci_sha": null,
+    "full_ci_conclusion": null,
+    "full_ci_job_count": null,
+    "full_ci_successful_jobs": null,
+    "approved_change_scope": "voice-pilot-one-tenant",
+    "maintenance_window_confirmed": false,
+    "rollback_baseline_commit": "ca58693e167752bd6eab8ff4e9be770391fe4293"
+  },
+  "postgres": {
+    "service_name": "Postgres",
+    "volume_id": "b28c1046-168e-4f2e-bf02-18a2a2f1e611",
+    "migrations_to_apply": [
+      "V100__twilio_managed_voice_binding_provenance.sql",
+      "V101__twilio_verified_existing_binding_provenance.sql",
+      "V102__twilio_existing_enrollment_claim.sql",
+      "V103__twilio_existing_enrollment_admin_approval.sql"
+    ],
+    "migration_compatibility_reviewed": false,
+    "flyway_history_read_only_confirmed": false,
+    "backup": {
+      "backup_id": null,
+      "snapshot_freshness_verified": false,
+      "restore_evidence_id": null,
+      "isolated_restore_completed": false,
+      "source_volume_untouched": false
+    }
+  },
+  "safeguards": {
+    "global_pilot_effects_disabled": false,
+    "other_tenants_unchanged": false,
+    "health_rollback_operator_assigned": false
+  }
+}

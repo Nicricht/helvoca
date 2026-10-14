@@ -46,6 +46,14 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  telephony:
+    twilio:
+      # Existing-number voice routing is deliberately OFF until a distinct
+      # authorized, tenant-and-phone-pinned controlled pilot.
+      existing-voice-route-enabled: ${HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED:false}
+      existing-voice-route-business-id: ${HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_BUSINESS_ID:}
+      existing-voice-route-phone-id: ${HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_PHONE_ID:}
+      existing-voice-route-account-sid: ${HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ACCOUNT_SID:}
   onboarding:
     import-ai:
       # The API key alone cannot enable paid imports.
@@ -180,7 +188,7 @@ app:
       certification-simulation: ${GEMINI_CERTIFICATION_SIMULATION:false}
       certification-caller: ${GEMINI_CERTIFICATION_CALLER:}
       api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_LIVE_MODEL:gemini-3.1-flash-live-preview}
+      model: ${GEMINI_LIVE_MODEL:gemini-3.8-live}
       voice: ${GEMINI_LIVE_VOICE:Sulafat}
       websocket-url: ${GEMINI_LIVE_WEBSOCKET_URL:wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent}
       start-of-speech-sensitivity: ${GEMINI_LIVE_START_SENSITIVITY:START_SENSITIVITY_HIGH}

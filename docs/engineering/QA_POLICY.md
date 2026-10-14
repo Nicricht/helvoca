@@ -72,6 +72,36 @@ Every reproducible bug that is fixed must gain a regression test at the lowest l
 
 A test that was weakened, skipped, broadened into irrelevance, or changed merely to hide a defect does not count as regression protection.
 
+## Evidence contract for every agent and every chat
+
+This document is a **mandatory release and completion contract**, not a suggestion or a report of already achieved coverage. An agent working on any branch must read the current `AGENTS.md` and this policy before implementation. Neither a new conversation nor the absence of an explicit QA request relaxes the requirements.
+
+**Every changed or affected functional scope needs a traceable QA evidence matrix** in its PR/checkpoint:
+
+| Evidence item | Required entry |
+| --- | --- |
+| Scope and risk | Changed paths, affected behaviors/invariants, risk LOW/MEDIUM/HIGH, expected and failure outcomes |
+| Test levels | Selected unit, integration, database, security, concurrency/idempotency, provider contract, UI/E2E, Golden Journey and production checks, with each relevant N/A explained |
+| RED -> GREEN | Regression that failed for the defect before the fix where feasible; exact failing and passing test run/commit evidence |
+| Coverage | Actual measured report and 100% numerator/denominator for applicable changed Java/frontend/Python/script counters; behavior/test inventory mapped to all applicable acceptance and invariants |
+| Final certification | Exact final HEAD SHA, CI run URLs with conclusions, Fast/Full Gate state, environment and exact deployed SHA where applicable |
+| Provider/business truth | Which boundary was actually exercised: mock/local fixture, public HTTPS, authenticated provider, real database, external checkout/terminal payment, or production |
+| Handoff | What is done, what is **not** done, current risks/hold, next exact safe action, and Issue #823 checkpoint for C0–C7 |
+
+An empty cell, assumed PASS, stale CI, skipped required suite, undocumented N/A, or an applicable coverage dimension below 100% means **NOT CERTIFIED**. The owner must not be asked to select test levels, rerun existing tests or compensate for missing agent QA access.
+
+### Python, operations scripts and other executable scopes
+
+For changed executable Python/operational scripts and any language not explicitly covered by the Java/React subsections below, maintain **100% of applicable changed behavior and material failure branches in meaningful tests**. Where reliable coverage instrumentation exists in the repository/job, record 100% changed executable statements/lines, branches (when measurable) and callable/function coverage (when measurable). When instrumentation is not available, do **not** invent a measurement or label a passed test suite "100% coverage"; document a technical N/A and provide a 100% acceptance/failure-path test matrix, including adversarial input and retry/timeout behavior when applicable. The missing metric remains a documented observability gap to address, not automatic certification of global numerical coverage.
+
+For provider handlers, webhooks and diagnostic receivers, require distinct evidence for: invalid/missing signature, valid HMAC, replay/stale timestamp, malformed/conflicting payload, unauthorized production mode, duplicate delivery and idempotency where business effects exist, provider-specific format compatibility, public network transport, and genuine provider delivery. A **signed local fixture cannot certify a real provider event**. Even a provider simulator HTTP 200 cannot certify an approved invoice or activation.
+
+### Enforcement and unverified status
+
+The repository's Fast Gate runs `scripts/ci/check-qa-governance.py` to protect policy invariants from silent removal. This is a **static policy integrity check**, not automatic proof of 100% runtime coverage or correct AI behavior. Exact-HEAD CI and any applicable runtime/provider/database evidence remain separately mandatory. Require code review/release gates before merging; do not merge directly to production-linked `main` to make a policy change appear universal.
+
+States must be accurate: `IN_PROGRESS`, `BLOCKED`, `NO-GO`, `DONE_OFFLINE_ONLY`, `DONE_VERIFIED`, with `DONE_VERIFIED` limited to the acceptance boundary actually proven. Full V1 commercial readiness remains governed by Issue #823 and C0–C7.
+
 ## Coverage policy
 
 Coverage is a structural signal, not proof that assertions are useful. Helvoca nevertheless uses a **100% quality contract**: no applicable coverage dimension for changed or affected production behavior may be certified below 100%.
