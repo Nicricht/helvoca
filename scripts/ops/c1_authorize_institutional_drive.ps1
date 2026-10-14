@@ -7,7 +7,10 @@ param(
     [string]$EnvironmentId = '8bbc755a-58b5-46e8-8227-eefa4adbbce4',
     [string]$ServiceId = '42bfe173-2f69-4605-ae63-a144a4a6e1dd'
 )
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
+# Native rclone and icacls may emit benign stderr on Windows PowerShell 5.1.
+# Each external command must be checked via LASTEXITCODE or safe failure code.
+$script:stage = 'START'
 Set-StrictMode -Version Latest
 
 function Assert-NativeSuccess([string]$Code) {
@@ -37,12 +40,14 @@ try {
         throw 'C1_RAILWAY_CLI_REQUIRED'
     }
     if ($env:OS -ne 'Windows_NT') { throw 'C1_WINDOWS_REQUIRED' }
+    $script:stage = 'LOCAL_PRIVATE_STORAGE'
     $private = Join-Path $env:USERPROFILE 'HelvocaPrivate\oauth'
     Secure-Directory $private
     $conf = Join-Path $private 'rclone.conf'
     if (-not (Test-Path -LiteralPath $conf)) { [IO.File]::WriteAllText($conf, '') }
     Secure-File $conf
 
+    $script:stage = 'PORTABLE_RCLONE'
     $found = Get-Command rclone -ErrorAction SilentlyContinue
     $rcloneExe = if ($found) { $found.Source } else { '' }
     if (-not $rcloneExe) {
@@ -68,6 +73,7 @@ try {
         if (-not $rcloneExe) { throw 'C1_RCLONE_PORTABLE_NOT_FOUND' }
     }
 
+    $script:stage = 'OAUTH_CONFIG'
     $remote = 'institutional'
     $existing = & $rcloneExe --config $conf listremotes
     Assert-NativeSuccess 'C1_RCLONE_CONFIG_READ_FAILED'
@@ -75,13 +81,15 @@ try {
         Write-Host 'C1: Autoriza con tu cuenta INSTITUCIONAL en el navegador.'
         Write-Host 'C1: La app solo puede gestionar archivos creados por ella (drive.file).'
         Write-Host 'C1: Si Google bloquea el OAuth compartido de rclone, deberas usar un cliente OAuth propio.'
-        & $rcloneExe --config $conf config create $remote drive scope=drive.file config_is_local=true
+        # IMPORTANT: default rclone config create prints OAuth tokens; suppress it.
+        & $rcloneExe --config $conf config create $remote drive scope=drive.file config_is_local=true --no-output 1>$null 2>$null
         Assert-NativeSuccess 'C1_GOOGLE_OAUTH_NOT_AUTHORIZED'
         Secure-File $conf
     }
 
     # drive.file needs an app-created folder. The browser-created manual
     # HelvocaBackups folder is neither renamed nor modified.
+    $script:stage = 'DRIVE_FOLDER'
     $folderName = 'HelvocaBackups-Automaticos'
     & $rcloneExe --config $conf mkdir "$($remote):$folderName" *> $null
     Assert-NativeSuccess 'C1_OAUTH_DRIVE_FOLDER_CREATE_BLOCKED'
@@ -94,6 +102,7 @@ try {
     }
 
     # One tiny nonsensitive probe; this is NOT customer data.
+    $script:stage = 'OAUTH_READBACK_TEST'
     $markerPath = Join-Path $private 'c1-check.tmp'
     [IO.File]::WriteAllText($markerPath, 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE')
     Secure-File $markerPath
@@ -109,6 +118,7 @@ try {
         }
     } finally { Remove-Item -LiteralPath $markerPath -ErrorAction SilentlyContinue }
 
+    $script:stage = 'LOCAL_OAUTH_TOKEN'
     $rawConf = [IO.File]::ReadAllText($conf)
     $tokenMatch = [regex]::Match($rawConf, '(?m)^[ \t]*token[ \t]*=[ \t]*(\{[^\r\n]+\})[ \t]*$')
     if (-not $tokenMatch.Success) { throw 'C1_OAUTH_TOKEN_NOT_FOUND_LOCALLY' }
@@ -119,6 +129,7 @@ try {
     }
 
     # Set only the dedicated empty backup service; no deployment or cron.
+    $script:stage = 'RAILWAY_VARIABLE_UPLOAD'
     Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' $oauthToken
     Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_ROOT_FOLDER_ID' $folder[0].ID
     Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_SCOPE' 'drive.file'
@@ -127,7 +138,12 @@ try {
     Write-Host 'Never share your local rclone.conf or any OAuth token.'
 } catch {
     $code = $_.Exception.Message
-    if ($code -notmatch '^C1_[A-Z0-9_]+$') { $code = 'C1_OAUTH_SETUP_PRIVATE_FAILURE' }
+    if ($code -notmatch '^C1_[A-Z0-9_]+
+    Write-Host "C1_OAUTH_BLOCKED: $code"
+    Write-Host 'No backup/production deployment requested. Do not paste OAuth details.'
+    exit 2
+}
+) { $code = 'C1_OAUTH_UNEXPECTED_' + $script:stage }
     Write-Host "C1_OAUTH_BLOCKED: $code"
     Write-Host 'No backup/production deployment requested. Do not paste OAuth details.'
     exit 2
