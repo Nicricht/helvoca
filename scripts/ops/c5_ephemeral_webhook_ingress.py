@@ -44,11 +44,11 @@ _SAFE_REJECT_CAUSES = {
     "invalid JSON": "ENVELOPE",
     "JSON object required": "ENVELOPE",
     "duplicate query": "ENVELOPE",
-    "unrecognized or conflicting topic": "EVENT_SHAPE",
-    "event id required": "EVENT_SHAPE",
-    "conflicting event id": "EVENT_SHAPE",
-    "event id invalid": "EVENT_SHAPE",
-    "event id shape invalid": "EVENT_SHAPE",
+    "unrecognized or conflicting topic": "TOPIC_SHAPE",
+    "event id required": "EVENT_ID_MISSING",
+    "conflicting event id": "EVENT_ID_CONFLICT",
+    "event id invalid": "EVENT_ID_FORMAT",
+    "event id shape invalid": "EVENT_ID_FORMAT",
 }
 def safe_rejection_reason(exception):
     return _SAFE_REJECT_CAUSES.get(str(exception), "UNKNOWN")
@@ -190,6 +190,9 @@ class Handler(BaseHTTPRequestHandler):
         parts = urlsplit(self.path)
         if parts.path != "/webhooks/v1/mercadopago":
             return self.respond(404)
+        # A constant, content-free marker distinguishes app ingress from
+        # upstream proxy/cold-start failures even for malformed requests.
+        print("C5_TEST_WEBHOOK_HANDLER_ENTERED", flush=True)
         raw_length = self.headers.get_all("Content-Length")
         if raw_length is None or len(raw_length) != 1:
             return self.respond(411)
