@@ -86,7 +86,7 @@ class TestC5SandboxSafety(unittest.TestCase):
                  "nickname": "TEST45I5GYIH"}, "123456789", "TEST45I5GYIH")
 
     def test_mismatched_seller_alias_fails_closed(self):
-        with self.assertRaisesRegex(SandboxBlocked, "NICKNAME_MISMATCH"):
+        with self.assertRaisesRegex(SandboxBlocked, "NICKNAME_INVALID"):
             verify_identity({"id": 123456789, "site_id": "MLC", "nickname": "REALSELLER"}, "123456789", "TEST45I5GYIH")
 
     def test_mismatched_seller_email_fails_closed(self):
