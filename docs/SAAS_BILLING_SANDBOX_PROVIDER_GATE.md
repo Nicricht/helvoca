@@ -115,3 +115,12 @@ Esta decisión se fundamenta en [Cuentas de prueba de Mercado Pago](https://www.
 **NO-GO externa:** Mercado Pago TEST real no se ha llamado con POST en esta entrega. Railway solo tiene production, por lo que no se montó receptor webhook allí. Una suscripción pending creada en /preapproval NO equivale a pago aprobado; para cerrar C5 etapa 2 faltan checkout con comprador TEST, webhook entregado por proveedor en receptor separado, factura aprobada consultada desde Mercado Pago y repetición real. No confundir tests con mocks o PostgreSQL temporal con certificación productiva.
 
 **Siguiente paso:** verificar CI en el SHA final del PR #835, registrar el resultado exacto, comprobar si ya existe un entorno receptor aislado reutilizable y solo solicitar acción externa al titular si se demuestra indispensable. La etapa 3 queda intacta.
+
+
+## C5 etapa 2 · Receptor HTTPS TEST dedicado en Render Free (2026-10-14)
+
+**Servicio real creado con autorización del titular:** `helvoca-c5-test-webhook-ingress`, Render **plan `free`**, service ID `srv-db7ku5ivcj2c73e1cv40`; dominio `https://helvoca-c5-test-webhook-ingress.onrender.com`, fuente rama `feat/c5-render-free-test-ingress-20261014`, **AutoDeploy desactivado**. Receptor independiente de Railway production, sin acceso a DB/credenciales MP, solo HMAC de pruebas con clave interna de Render.
+
+**Evidencia:** [CI de código #38544511970](https://github.com/Nicricht/helvoca/actions/runs/38544511970) 28/28 PASS; Render deployment `dep-db7ku62vcj2c73e1d110` estado `live` sobre SHA `2f04b0a0fd566c90f03559aa2bbb137db91c6792`; [CI externo HTTPS #38544761946](https://github.com/Nicricht/helvoca/actions/runs/38544761946) PASS: `GET /health` → 204 por HTTPS y POST sin firma → 401. Manual completo en [`docs/ops/C5_RENDER_FREE_TEST_WEBHOOK_RECEIVER.md`](ops/C5_RENDER_FREE_TEST_WEBHOOK_RECEIVER.md).
+
+**C5 todavía `NO-GO` real:** esta clave es interna y **no corresponde todavía a la firma emitida por Mercado Pago**. No hay checkout TEST, webhook MP auténtico, invoice aprobada ni persistencia durable del receptor. Render `free` duerme tras inactividad y consume cuotas gratuitas del workspace; no usar en producción ni prometer 24/7 o coste estrictamente nulo si existen excesos facturables. Se debe determinar método oficial de notificación de Suscripciones antes de crear un `preapproval` de prueba. No pedir crear nuevas cuentas/token, ya están comprobados; escalar únicamente la operación del panel de MP que no permita un conector. Ningún cambio en Railway production, sin fase 3.
