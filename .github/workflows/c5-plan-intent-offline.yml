@@ -28,7 +28,7 @@ jobs:
       - name: Install isolated Chromium
         run: npx playwright install --with-deps chromium
       - name: Real-browser plan interest without provider or production access
-        run: npx playwright test e2e/react-c5-plan-intent.spec.js e2e/react-pricing-migration.spec.js e2e/react-public-entry-migration.spec.js e2e/react-plan-consumption.spec.js --project=chromium
+        run: npx playwright test e2e/react-c5-plan-intent.spec.js e2e/react-pricing-migration.spec.js e2e/react-public-entry-migration.spec.js e2e/react-plan-consumption.spec.js
       - name: Check C5 scope and no live provider calls
         run: |
           python3 - <<'PY'
