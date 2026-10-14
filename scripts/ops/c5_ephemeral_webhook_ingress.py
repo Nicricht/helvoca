@@ -88,7 +88,7 @@ def parse_signature(header):
         raise InvalidWebhook("invalid timestamp")
     return ts, fields["v1"].lower()
 
-def verify(body, query, headers, secret, now_ms=None):
+def verify(body, query, headers, secret, now_ms=None, allow_simulator_topic_mismatch=False):
     if not secret or len(secret) < 24:
         raise InvalidWebhook("missing test-only secret")
     if not isinstance(body, (bytes, bytearray)) or len(body) > MAX_BODY:
@@ -143,8 +143,22 @@ def verify(body, query, headers, secret, now_ms=None):
     if body_topic is not None and body_topic not in ALLOWED_TOPICS:
         raise InvalidWebhook("body topic unsupported")
     if query_topic is not None and body_topic is not None and query_topic != body_topic:
-        raise InvalidWebhook("topic conflict")
-    topic = query_topic if query_topic is not None else body_topic
+        # The TEST-only Mercado Pago developer simulator has been observed
+        # sending two *recognized* but different subscription topics in URL
+        # and its fixed synthetic POST body. Never generalize this rule to
+        # real TEST events, production events, or unauthenticated requests.
+        if not (allow_simulator_topic_mismatch
+                and query_topic == "subscription_authorized_payment"
+                and body_topic == "subscription_preapproval"):
+            raise InvalidWebhook("topic conflict")
+        try:
+            if require_sandbox_event(body) != "SIMULATOR_ONLY":
+                raise InvalidWebhook("topic conflict")
+        except InvalidWebhook:
+            raise InvalidWebhook("topic conflict") from None
+        topic = body_topic
+    else:
+        topic = query_topic if query_topic is not None else body_topic
     if topic == "subscription_authorized_payment" and not NUMBER.fullmatch(event_id):
         raise InvalidWebhook("event id shape invalid")
     return topic, event_id
@@ -222,7 +236,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(413)
         try:
             content = self.rfile.read(size)
-            topic, event_id = verify(content, parts.query, self.headers, self.server.secret)
+            topic, event_id = verify(
+                content, parts.query, self.headers, self.server.secret,
+                allow_simulator_topic_mismatch=self.server.require_test_mode)
         except InvalidWebhook as exc:
             # Only a fixed enum is logged; client always receives the same
             # generic 401. Never log exception text, header, token or body.
